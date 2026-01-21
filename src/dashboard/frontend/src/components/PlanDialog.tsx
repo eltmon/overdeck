@@ -48,7 +48,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [minimized, setMinimized] = useState(false);
   const [position, setPosition] = useState({ x: -1, y: -1 }); // -1 means centered
   const [size, setSize] = useState({ width: 900, height: 600 });
-
+  
   // Track if we've actually connected to a planning session in THIS dialog instance
   // This prevents stale cache from incorrectly triggering 'complete' state
   const hasConnectedToSession = useRef(false);
@@ -133,6 +133,31 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     },
   });
 
+  // Start agent mutation - spawns work agent and updates status to "In Progress"
+  const startAgentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId: issue.identifier }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to start agent');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      onComplete();
+      onClose();
+    },
+    onError: (err: Error) => {
+      setError(`Failed to start agent: ${err.message}`);
+    },
+  });
+
   // Reset state when dialog closes/opens
   useEffect(() => {
     if (!isOpen) {
@@ -207,8 +232,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   };
 
   const handleComplete = () => {
-    onComplete();
-    onClose();
+    // Spawn the work agent - this also updates status to "In Progress"
+    startAgentMutation.mutate();
   };
 
   if (!isOpen) return null;
@@ -549,16 +574,22 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                   <div className="flex gap-3">
                     <button
                       onClick={onClose}
-                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                      disabled={startAgentMutation.isPending}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
                     >
                       Close
                     </button>
                     <button
                       onClick={handleComplete}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                      disabled={startAgentMutation.isPending}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50"
                     >
-                      <Play className="w-5 h-5" />
-                      Start Agent
+                      {startAgentMutation.isPending ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Play className="w-5 h-5" />
+                      )}
+                      {startAgentMutation.isPending ? 'Starting Agent...' : 'Start Agent'}
                     </button>
                   </div>
                 </div>

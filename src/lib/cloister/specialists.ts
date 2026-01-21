@@ -6,8 +6,10 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
+import { execSync } from 'child_process';
 import { PANOPTICON_HOME } from '../paths.js';
+import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
@@ -132,7 +134,10 @@ export function loadRegistry(): SpecialistRegistry {
  * @param registry - Registry to save
  */
 export function saveRegistry(registry: SpecialistRegistry): void {
-  initSpecialistsDirectory();
+  // Only ensure directory exists, don't call initSpecialistsDirectory to avoid recursion
+  if (!existsSync(SPECIALISTS_DIR)) {
+    mkdirSync(SPECIALISTS_DIR, { recursive: true });
+  }
 
   registry.lastUpdated = new Date().toISOString();
 
@@ -392,16 +397,17 @@ export function getEnabledSpecialists(): SpecialistMetadata[] {
  * @returns Path to JSONL file or null if not found
  */
 export function findSessionFile(sessionId: string): string | null {
-  const { getAllSessionFiles } = require('../cost-parsers/jsonl-parser.js');
-  const { basename } = require('path');
+  try {
+    const allFiles = getAllSessionFiles();
 
-  const allFiles = getAllSessionFiles();
-
-  for (const file of allFiles) {
-    const fileSessionId = basename(file, '.jsonl');
-    if (fileSessionId === sessionId) {
-      return file;
+    for (const file of allFiles) {
+      const fileSessionId = basename(file, '.jsonl');
+      if (fileSessionId === sessionId) {
+        return file;
+      }
     }
+  } catch {
+    // Session files not available
   }
 
   return null;
@@ -429,7 +435,6 @@ export function countContextTokens(name: SpecialistType): number | null {
     return null;
   }
 
-  const { parseClaudeSession } = require('../cost-parsers/jsonl-parser.js');
   const sessionUsage = parseClaudeSession(sessionFile);
 
   if (!sessionUsage) {
@@ -452,7 +457,6 @@ export function countContextTokens(name: SpecialistType): number | null {
  * @returns True if specialist has an active tmux session
  */
 export function isRunning(name: SpecialistType): boolean {
-  const { execSync } = require('child_process');
   const tmuxSession = getTmuxSessionName(name);
 
   try {
