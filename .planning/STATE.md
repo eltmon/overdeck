@@ -98,14 +98,15 @@ Contents:
 - [x] Specialist API endpoints (GET /api/specialists, POST /wake, POST /reset)
 - [x] Poke API endpoint (POST /api/agents/:id/poke)
 
-**Frontend:**
-- [ ] Two-section AgentList refactor
-- [ ] SpecialistAgentCard component
-- [ ] IssueAgentCard component (refactored from existing)
+**Frontend (Layer 3):**
+- [x] Two-section AgentList refactor (Specialists + Issue Agents)
+- [x] SpecialistAgentCard component (Wake/Reset/Kill buttons)
+- [x] IssueAgentCard component (Poke/Kill buttons)
 - [ ] AgentDetailView panel
+
+**Frontend (Layer 4 - Visualizations):**
 - [ ] HealthHistoryTimeline component
 - [ ] HealthHistoryChart component (Chart.js)
-- [ ] Poke, Wake, Reset button implementations
 
 ### Out of Scope (Future Phases)
 
