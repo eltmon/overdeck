@@ -1292,6 +1292,59 @@ app.delete('/api/agents/:id', (req, res) => {
   }
 });
 
+// Get health history for an agent (last 24h by default)
+app.get('/api/agents/:id/health-history', async (req, res) => {
+  const { id } = req.params;
+  const { hours = '24' } = req.query;
+
+  try {
+    const { getHealthHistory } = await import('../../lib/cloister/database.js');
+
+    // Calculate time range
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - parseInt(hours as string) * 60 * 60 * 1000);
+
+    const events = getHealthHistory(id, startTime.toISOString(), endTime.toISOString());
+
+    res.json({
+      agentId: id,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      events,
+    });
+  } catch (error) {
+    console.error('Error fetching health history:', error);
+    res.status(500).json({ error: 'Failed to fetch health history' });
+  }
+});
+
+// Poke an agent (send nudge message)
+app.post('/api/agents/:id/poke', (req, res) => {
+  const { id } = req.params;
+  const { message } = req.body;
+
+  const defaultPokeMessage =
+    'You seem to have been inactive for a while. If you\'re stuck:\n' +
+    '1. Check your current task in STATE.md\n' +
+    '2. Try an alternative approach if blocked\n' +
+    '3. Ask for help if needed\n\n' +
+    'What\'s your current status?';
+
+  const pokeMsg = message || defaultPokeMessage;
+
+  try {
+    // Send message via tmux (two separate commands: text then Enter)
+    const escapedMsg = pokeMsg.replace(/"/g, '\\"').replace(/'/g, "\\'");
+    execSync(`tmux send-keys -t "${id}" "${escapedMsg}"`, { encoding: 'utf-8' });
+    execSync(`tmux send-keys -t "${id}" Enter`, { encoding: 'utf-8' });
+
+    res.json({ success: true, message: 'Agent poked successfully' });
+  } catch (error) {
+    console.error('Error poking agent:', error);
+    res.status(500).json({ error: 'Failed to poke agent' });
+  }
+});
+
 // ============================================================================
 // AskUserQuestion Interception Endpoints (PAN-20)
 // ============================================================================
@@ -1543,6 +1596,112 @@ app.put('/api/cloister/config', (req, res) => {
   } catch (error: any) {
     console.error('Error updating Cloister config:', error);
     res.status(500).json({ error: 'Failed to update Cloister config: ' + error.message });
+  }
+});
+
+// ============================================================================
+// Specialist Agent Endpoints (PAN-27)
+// ============================================================================
+
+// Get all specialists with status
+app.get('/api/specialists', async (_req, res) => {
+  try {
+    const { getAllSpecialistStatus } = await import('../../lib/cloister/specialists.js');
+    const specialists = getAllSpecialistStatus();
+    res.json(specialists);
+  } catch (error: any) {
+    console.error('Error getting specialists:', error);
+    res.status(500).json({ error: 'Failed to get specialists: ' + error.message });
+  }
+});
+
+// Wake a specialist agent
+app.post('/api/specialists/:name/wake', async (req, res) => {
+  const { name } = req.params;
+  const { sessionId } = req.body;
+
+  try {
+    const {
+      getTmuxSessionName,
+      getSessionId,
+      recordWake,
+      isRunning
+    } = await import('../../lib/cloister/specialists.js');
+
+    // Check if already running
+    if (isRunning(name as any)) {
+      return res.status(400).json({ error: `Specialist ${name} is already running` });
+    }
+
+    const existingSessionId = getSessionId(name as any);
+    const tmuxSession = getTmuxSessionName(name as any);
+
+    if (!existingSessionId && !sessionId) {
+      return res.status(400).json({
+        error: 'No session ID found. Specialist must be initialized first or provide sessionId in request.'
+      });
+    }
+
+    const useSessionId = sessionId || existingSessionId;
+
+    // Spawn Claude Code with resume flag in tmux
+    const cwd = homedir();
+    execSync(
+      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude --resume ${useSessionId}"`,
+      { encoding: 'utf-8' }
+    );
+
+    // Record wake event
+    recordWake(name as any, useSessionId);
+
+    res.json({
+      success: true,
+      message: `Specialist ${name} woken up`,
+      tmuxSession,
+      sessionId: useSessionId,
+    });
+  } catch (error: any) {
+    console.error('Error waking specialist:', error);
+    res.status(500).json({ error: 'Failed to wake specialist: ' + error.message });
+  }
+});
+
+// Reset a specialist agent (clear session)
+app.post('/api/specialists/:name/reset', async (req, res) => {
+  const { name } = req.params;
+  const { reinitialize = false } = req.body;
+
+  try {
+    const {
+      clearSessionId,
+      isRunning,
+      getTmuxSessionName
+    } = await import('../../lib/cloister/specialists.js');
+
+    // Check if running - must be stopped first
+    if (isRunning(name as any)) {
+      const tmuxSession = getTmuxSessionName(name as any);
+      return res.status(400).json({
+        error: `Specialist ${name} is currently running. Stop it first (tmux kill-session -t ${tmuxSession})`
+      });
+    }
+
+    // Clear session file
+    const wasDeleted = clearSessionId(name as any);
+
+    if (reinitialize) {
+      // TODO: Add initialization logic if needed
+      // For now, just clearing is sufficient
+    }
+
+    res.json({
+      success: true,
+      message: `Specialist ${name} reset`,
+      sessionCleared: wasDeleted,
+    });
+  } catch (error: any) {
+    console.error('Error resetting specialist:', error);
+    res.status(500).json({ error: 'Failed to reset specialist: ' + error.message });
   }
 });
 

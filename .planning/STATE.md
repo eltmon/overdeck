@@ -93,10 +93,10 @@ Contents:
 - [x] SQLite health history storage
 - [x] Cloister service writes health events
 
-**Backend (Layer 2 - API):**
-- [ ] Specialist API endpoints (list, wake, reset)
-- [ ] Poke API endpoint
-- [ ] Health history API endpoint
+**Backend (Layer 2 - Complete):**
+- [x] Health history API endpoint (GET /api/agents/:id/health-history)
+- [x] Specialist API endpoints (GET /api/specialists, POST /wake, POST /reset)
+- [x] Poke API endpoint (POST /api/agents/:id/poke)
 
 **Frontend:**
 - [ ] Two-section AgentList refactor
