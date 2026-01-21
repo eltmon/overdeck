@@ -101,9 +101,6 @@ export function XTerminal({ sessionName, onDisconnect }: XTerminalProps) {
       term.open(terminalRef.current);
       fit.fit();
 
-      // Auto-focus the terminal to receive keyboard input
-      term.focus();
-
       terminalInstance.current = term;
       fitAddon.current = fit;
     }

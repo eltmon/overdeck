@@ -46,6 +46,7 @@ export interface Agent {
   killCount: number;
   workspace?: string;
   git?: GitStatus;
+  type?: 'agent' | 'planning';
 }
 
 export interface AgentHealth {

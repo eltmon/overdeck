@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from 'node-pty';
 import { execSync, exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { getCloisterService } from '../../lib/cloister/service.js';
@@ -236,21 +236,24 @@ interface SessionIndexEntry {
 
 /**
  * Get the active (most recently modified) session JSONL path for a Claude project
+ * Always uses actual file mtime since sessions-index.json can be stale
  */
 function getActiveSessionPath(projectDir: string): string | null {
-  const indexPath = join(projectDir, 'sessions-index.json');
-  if (!existsSync(indexPath)) return null;
+  if (!existsSync(projectDir)) return null;
 
   try {
-    const index = JSON.parse(readFileSync(indexPath, 'utf-8'));
-    const entries: SessionIndexEntry[] = index.entries || [];
-    if (entries.length === 0) return null;
+    // Find all .jsonl files and sort by actual file modification time
+    // This is more reliable than sessions-index.json which can be stale
+    const files = readdirSync(projectDir)
+      .filter(f => f.endsWith('.jsonl'))
+      .map(f => ({
+        name: f,
+        path: join(projectDir, f),
+        mtime: statSync(join(projectDir, f)).mtime.getTime()
+      }))
+      .sort((a, b) => b.mtime - a.mtime);
 
-    // Sort by modified time descending, get most recent
-    const sorted = entries.sort((a, b) =>
-      new Date(b.modified).getTime() - new Date(a.modified).getTime()
-    );
-    return sorted[0].fullPath;
+    return files.length > 0 ? files[0].path : null;
   } catch {
     return null;
   }
@@ -404,9 +407,10 @@ async function fetchGitHubIssues(): Promise<any[]> {
       let closedIssues: any[] = [];
 
       try {
-        const openJson = execSync(
+        // Use async execAsync to avoid blocking event loop
+        const { stdout: openJson } = await execAsync(
           `gh issue list --repo ${owner}/${repo} --state open --limit 100 --json number,title,body,state,labels,assignees,createdAt,updatedAt,url`,
-          { encoding: 'utf-8', timeout: 30000 }
+          { timeout: 30000 }
         );
         openIssues = JSON.parse(openJson);
       } catch (ghError: any) {
@@ -428,9 +432,10 @@ async function fetchGitHubIssues(): Promise<any[]> {
       }
 
       try {
-        const closedJson = execSync(
+        // Use async execAsync to avoid blocking event loop
+        const { stdout: closedJson } = await execAsync(
           `gh issue list --repo ${owner}/${repo} --state closed --limit 50 --json number,title,body,state,labels,assignees,createdAt,updatedAt,url`,
-          { encoding: 'utf-8', timeout: 30000 }
+          { timeout: 30000 }
         );
         closedIssues = JSON.parse(closedJson);
       } catch (ghError: any) {
@@ -1151,7 +1156,35 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return getDefaultProjectPath();
 }
 
-// Get git status for a workspace path
+// Get git status for a workspace path (ASYNC - non-blocking)
+async function getGitStatusAsync(workspacePath: string): Promise<{ branch: string; uncommittedFiles: number; latestCommit: string } | null> {
+  try {
+    if (!existsSync(workspacePath)) return null;
+
+    // Run all git commands in parallel for better performance
+    const [branchResult, uncommittedResult, commitResult] = await Promise.all([
+      execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""', { cwd: workspacePath }),
+      execAsync('git status --porcelain 2>/dev/null | wc -l', { cwd: workspacePath }),
+      execAsync('git log -1 --pretty=format:"%s" 2>/dev/null || echo ""', { cwd: workspacePath }),
+    ]);
+
+    const branch = branchResult.stdout.trim();
+    const uncommitted = uncommittedResult.stdout.trim();
+    const latestCommit = commitResult.stdout.trim();
+
+    if (!branch) return null;
+
+    return {
+      branch,
+      uncommittedFiles: parseInt(uncommitted) || 0,
+      latestCommit: latestCommit.slice(0, 60) + (latestCommit.length > 60 ? '...' : ''),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Synchronous version for backwards compatibility (use async where possible)
 function getGitStatus(workspacePath: string): { branch: string; uncommittedFiles: number; latestCommit: string } | null {
   try {
     if (!existsSync(workspacePath)) return null;
@@ -1186,18 +1219,22 @@ app.get('/api/agents', async (_req, res) => {
   try {
     const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}|#{session_created}" 2>/dev/null || true');
 
-    const agents = stdout
+    const agentLines = stdout
       .trim()
       .split('\n')
-      .filter((line) => line.startsWith('agent-'))
-      .map((line) => {
+      .filter((line) => line.startsWith('agent-') || line.startsWith('planning-'));
+
+    // Process agents in parallel to avoid blocking
+    const agents = await Promise.all(
+      agentLines.map(async (line) => {
         const [name, created] = line.split('|');
         const startedAt = new Date(parseInt(created) * 1000).toISOString();
+        const isPlanning = name.startsWith('planning-');
 
         // Check agent state from ~/.panopticon/agents/
         const stateFile = join(homedir(), '.panopticon', 'agents', name, 'state.json');
         const healthFile = join(homedir(), '.panopticon', 'agents', name, 'health.json');
-        let state: any = { runtime: 'claude', model: 'sonnet', workspace: process.cwd() };
+        let state: any = { runtime: 'claude', model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
         let health: any = { consecutiveFailures: 0, killCount: 0 };
 
         if (existsSync(stateFile)) {
@@ -1212,22 +1249,29 @@ app.get('/api/agents', async (_req, res) => {
           } catch {}
         }
 
-        // Get git status for workspace
-        const gitStatus = state.workspace ? getGitStatus(state.workspace) : null;
+        // Get git status for workspace (ASYNC - doesn't block event loop)
+        const gitStatus = state.workspace ? await getGitStatusAsync(state.workspace) : null;
+
+        // Extract issue ID from session name
+        const issueId = isPlanning
+          ? name.replace('planning-', '').toUpperCase()
+          : name.replace('agent-', '').toUpperCase();
 
         return {
           id: name,
-          issueId: name.replace('agent-', '').toUpperCase(),
+          issueId,
           runtime: state.runtime || 'claude',
-          model: state.model || 'sonnet',
+          model: state.model || (isPlanning ? 'opus' : 'sonnet'),
           status: 'healthy' as const,
           startedAt,
           consecutiveFailures: health.consecutiveFailures || 0,
           killCount: health.killCount || 0,
           workspace: state.workspace || null,
           git: gitStatus,
+          type: isPlanning ? 'planning' : 'agent',
         };
-      });
+      })
+    );
 
     res.json(agents);
   } catch (error) {
@@ -1267,8 +1311,8 @@ app.post('/api/agents/:id/message', (req, res) => {
     execSync(`tmux send-keys -t "${id}" "${message.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
     });
-    // Press Enter
-    execSync(`tmux send-keys -t "${id}" Enter`, { encoding: 'utf-8' });
+    // Press Enter (C-m is more reliable than literal 'Enter')
+    execSync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
 
     res.json({ success: true });
   } catch (error) {
@@ -1369,23 +1413,59 @@ app.get('/api/agents/:id/pending-questions', (req, res) => {
 // Submit answer to a pending question (sends keystrokes to tmux session)
 app.post('/api/agents/:id/answer-question', (req, res) => {
   const { id } = req.params;
-  const { answers } = req.body; // Array of selected option labels
+  const { answers } = req.body; // Array of selected option labels (one per question)
 
   if (!answers || !Array.isArray(answers) || answers.length === 0) {
     return res.status(400).json({ error: 'answers array required' });
   }
 
   try {
-    // Format answer text - join multiple selections with comma
-    const answerText = answers.join(', ');
+    // Get the pending questions to map labels to option indices
+    const pendingQuestions = getAgentPendingQuestions(id);
+    if (pendingQuestions.length === 0) {
+      return res.status(400).json({ error: 'No pending questions found' });
+    }
 
-    // Send to tmux session (escape quotes in the answer)
-    const escapedAnswer = answerText.replace(/"/g, '\\"');
-    execSync(`tmux send-keys -t "${id}" "${escapedAnswer}"`, {
-      encoding: 'utf-8',
-    });
-    // Press Enter to submit
-    execSync(`tmux send-keys -t "${id}" Enter`, { encoding: 'utf-8' });
+    const questionSet = pendingQuestions[0]; // Most recent question set
+    const questions = questionSet.questions;
+
+    // Claude's AskUserQuestion UI:
+    // - Number key (1-4) selects an option for current question
+    // - Tab moves to next question
+    // - When on Submit, Enter submits all answers
+
+    for (let i = 0; i < answers.length && i < questions.length; i++) {
+      const answer = answers[i];
+      const question = questions[i];
+
+      // Find the 1-based index of the selected option
+      const optionIndex = question.options.findIndex(
+        (opt: { label: string }) => opt.label === answer
+      );
+
+      if (optionIndex === -1) {
+        // Answer not found in options - might be custom text (option 4)
+        // Send "4" to select "Type something" then type the answer
+        execSync(`tmux send-keys -t "${id}" "4"`, { encoding: 'utf-8' });
+        // Small delay then type the custom answer
+        const escapedAnswer = answer.replace(/'/g, "'\\''");
+        execSync(`tmux send-keys -t "${id}" '${escapedAnswer}'`, { encoding: 'utf-8' });
+        execSync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
+      } else {
+        // Send the number key (1-based index)
+        const keyNumber = optionIndex + 1;
+        execSync(`tmux send-keys -t "${id}" "${keyNumber}"`, { encoding: 'utf-8' });
+      }
+
+      // Tab to next question (or to Submit if last)
+      execSync(`tmux send-keys -t "${id}" Tab`, { encoding: 'utf-8' });
+
+      // Small delay between keystrokes for reliability
+      execSync('sleep 0.1');
+    }
+
+    // Press Enter to submit (should be on Submit button now)
+    execSync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
 
     res.json({ success: true });
   } catch (error) {
@@ -1394,34 +1474,34 @@ app.post('/api/agents/:id/answer-question', (req, res) => {
   }
 });
 
-// Check if a tmux session is alive and active
-function checkAgentHealth(agentId: string): {
+// Check if a tmux session is alive and active (ASYNC - doesn't block event loop)
+async function checkAgentHealthAsync(agentId: string): Promise<{
   alive: boolean;
   lastOutput?: string;
   outputAge?: number;
-} {
+}> {
   try {
     // Check if session exists
-    execSync(`tmux has-session -t "${agentId}" 2>/dev/null`);
+    await execAsync(`tmux has-session -t "${agentId}" 2>/dev/null`);
 
     // Get recent output to check if active
-    const output = execSync(
+    const { stdout } = await execAsync(
       `tmux capture-pane -t "${agentId}" -p -S -5 2>/dev/null`,
-      { encoding: 'utf-8', maxBuffer: 1024 * 1024 }
-    ).trim();
+      { maxBuffer: 1024 * 1024 }
+    );
 
-    return { alive: true, lastOutput: output };
+    return { alive: true, lastOutput: stdout.trim() };
   } catch {
     return { alive: false };
   }
 }
 
-// Determine health status based on activity
-function determineHealthStatus(
+// Determine health status based on activity (ASYNC)
+async function determineHealthStatusAsync(
   agentId: string,
   stateFile: string
-): { status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string } {
-  const health = checkAgentHealth(agentId);
+): Promise<{ status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string }> {
+  const health = await checkAgentHealthAsync(agentId);
 
   if (!health.alive) {
     return { status: 'dead', reason: 'Session not found' };
@@ -1449,17 +1529,19 @@ function determineHealthStatus(
   return { status: 'healthy' };
 }
 
-// Get agent health status
-app.get('/api/health/agents', (_req, res) => {
+// Get agent health status (ASYNC - doesn't block event loop)
+app.get('/api/health/agents', async (_req, res) => {
   try {
     const agentsDir = join(homedir(), '.panopticon', 'agents');
     if (!existsSync(agentsDir)) {
       return res.json([]);
     }
 
-    const agents = readdirSync(agentsDir)
-      .filter((name) => name.startsWith('agent-'))
-      .map((name) => {
+    const agentNames = readdirSync(agentsDir).filter((name) => name.startsWith('agent-'));
+
+    // Process agents in parallel to avoid blocking
+    const agents = await Promise.all(
+      agentNames.map(async (name) => {
         const stateFile = join(agentsDir, name, 'state.json');
         const healthFile = join(agentsDir, name, 'health.json');
 
@@ -1474,8 +1556,8 @@ app.get('/api/health/agents', (_req, res) => {
           } catch {}
         }
 
-        // Check live status
-        const { status, reason } = determineHealthStatus(name, stateFile);
+        // Check live status (ASYNC)
+        const { status, reason } = await determineHealthStatusAsync(name, stateFile);
 
         return {
           agentId: name,
@@ -1485,7 +1567,8 @@ app.get('/api/health/agents', (_req, res) => {
           consecutiveFailures: storedHealth.consecutiveFailures,
           killCount: storedHealth.killCount,
         };
-      });
+      })
+    );
 
     res.json(agents);
   } catch (error) {
@@ -1494,10 +1577,10 @@ app.get('/api/health/agents', (_req, res) => {
   }
 });
 
-// Ping an agent to check if it's responsive
-app.post('/api/health/agents/:id/ping', (req, res) => {
+// Ping an agent to check if it's responsive (ASYNC)
+app.post('/api/health/agents/:id/ping', async (req, res) => {
   const { id } = req.params;
-  const health = checkAgentHealth(id);
+  const health = await checkAgentHealthAsync(id);
 
   if (!health.alive) {
     return res.json({ success: false, status: 'dead' });
@@ -1751,6 +1834,59 @@ app.get('/api/activity/:id', (req, res) => {
 });
 
 // Get container status for workspace
+// Get container status (ASYNC - non-blocking)
+async function getContainerStatusAsync(issueId: string): Promise<Record<string, { running: boolean; uptime: string | null }>> {
+  const issueLower = issueId.toLowerCase();
+  const containerMap: Record<string, string[]> = {
+    'frontend': ['frontend', 'fe'],
+    'api': ['api'],
+    'postgres': ['postgres'],
+    'redis': ['redis'],
+  };
+
+  // Build all possible container patterns
+  const checks: Array<{ displayName: string; containerName: string }> = [];
+  for (const [displayName, suffixes] of Object.entries(containerMap)) {
+    for (const suffix of suffixes) {
+      checks.push(
+        { displayName, containerName: `myn-feature-${issueLower}-${suffix}-1` },
+        { displayName, containerName: `feature-${issueLower}-${suffix}-1` },
+        { displayName, containerName: `${issueLower}-${suffix}-1` },
+      );
+    }
+  }
+
+  // Run all docker checks in parallel
+  const results = await Promise.all(
+    checks.map(async ({ displayName, containerName }) => {
+      try {
+        const { stdout } = await execAsync(
+          `docker ps -a --filter "name=${containerName}" --format "{{.Status}}" 2>/dev/null || echo ""`
+        );
+        return { displayName, containerName, output: stdout.trim() };
+      } catch {
+        return { displayName, containerName, output: '' };
+      }
+    })
+  );
+
+  // Process results - first match wins for each display name
+  const status: Record<string, { running: boolean; uptime: string | null }> = {};
+  for (const displayName of Object.keys(containerMap)) {
+    const match = results.find(r => r.displayName === displayName && r.output);
+    if (match) {
+      const isRunning = match.output.startsWith('Up');
+      const uptime = isRunning ? match.output.replace(/^Up\s+/, '').split(/\s+/)[0] : null;
+      status[displayName] = { running: isRunning, uptime };
+    } else {
+      status[displayName] = { running: false, uptime: null };
+    }
+  }
+
+  return status;
+}
+
+// Synchronous version for backwards compatibility
 function getContainerStatus(issueId: string): Record<string, { running: boolean; uptime: string | null }> {
   const issueLower = issueId.toLowerCase();
   // Map display names to possible container suffixes
@@ -1801,7 +1937,27 @@ function getContainerStatus(issueId: string): Record<string, { running: boolean;
   return status;
 }
 
-// Get MR URL for an issue from GitLab
+// Get MR URL for an issue from GitLab (ASYNC - non-blocking)
+async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<string | null> {
+  try {
+    const { stdout } = await execAsync(`glab mr list -A -F json 2>/dev/null || echo "[]"`, {
+      cwd: workspacePath,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const mrs = JSON.parse(stdout);
+    for (const mr of mrs) {
+      const branchMatch = mr.source_branch?.match(/feature\/(\w+-\d+)/i);
+      if (branchMatch && branchMatch[1].toUpperCase() === issueId.toUpperCase()) {
+        return mr.web_url;
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+// Synchronous version for backwards compatibility
 function getMrUrl(issueId: string, workspacePath: string): string | null {
   try {
     // Try to get MR from glab
@@ -1824,7 +1980,68 @@ function getMrUrl(issueId: string, workspacePath: string): string | null {
   return null;
 }
 
-// Get git status for sub-repos (frontend/api)
+// Get git status for sub-repos (ASYNC - non-blocking)
+async function getRepoGitStatusAsync(workspacePath: string): Promise<{
+  frontend: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
+  api: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
+}> {
+  const result: {
+    frontend: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
+    api: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
+  } = { frontend: null, api: null };
+
+  const repoPaths = [
+    { key: 'frontend', paths: ['fe', 'frontend'] },
+    { key: 'api', paths: ['api', 'backend'] },
+  ];
+
+  // Find which paths exist first (sync but fast)
+  const existingRepos: Array<{ key: string; repoDir: string }> = [];
+  for (const { key, paths } of repoPaths) {
+    for (const subdir of paths) {
+      const repoDir = join(workspacePath, subdir);
+      if (existsSync(repoDir)) {
+        existingRepos.push({ key, repoDir });
+        break; // First match wins
+      }
+    }
+  }
+
+  // Run all git commands in parallel for all repos
+  const gitResults = await Promise.all(
+    existingRepos.map(async ({ key, repoDir }) => {
+      try {
+        const [branchResult, uncommittedResult, commitResult] = await Promise.all([
+          execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""', { cwd: repoDir }),
+          execAsync('git status --porcelain 2>/dev/null | wc -l', { cwd: repoDir }),
+          execAsync('git log -1 --pretty=format:"%s" 2>/dev/null || echo ""', { cwd: repoDir }),
+        ]);
+        return {
+          key,
+          branch: branchResult.stdout.trim(),
+          uncommitted: uncommittedResult.stdout.trim(),
+          latestCommit: commitResult.stdout.trim(),
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  for (const gitResult of gitResults) {
+    if (gitResult && gitResult.branch) {
+      result[gitResult.key as 'frontend' | 'api'] = {
+        branch: gitResult.branch,
+        uncommittedFiles: parseInt(gitResult.uncommitted, 10) || 0,
+        latestCommit: gitResult.latestCommit.slice(0, 60) + (gitResult.latestCommit.length > 60 ? '...' : ''),
+      };
+    }
+  }
+
+  return result;
+}
+
+// Synchronous version for backwards compatibility
 function getRepoGitStatus(workspacePath: string): {
   frontend: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
   api: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
@@ -1874,8 +2091,8 @@ function getRepoGitStatus(workspacePath: string): {
   return result;
 }
 
-// Get workspace info for an issue
-app.get('/api/workspaces/:issueId', (req, res) => {
+// Get workspace info for an issue (ASYNC - non-blocking for terminal performance)
+app.get('/api/workspaces/:issueId', async (req, res) => {
   const { issueId } = req.params;
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
@@ -1900,10 +2117,6 @@ app.get('/api/workspaces/:issueId', (req, res) => {
       message: 'Workspace exists but is not a valid git worktree',
     });
   }
-
-  // Get git status for main workspace and sub-repos
-  const git = getGitStatus(workspacePath);
-  const repoGit = getRepoGitStatus(workspacePath);
 
   // Construct service URLs based on workspace naming convention
   const frontendUrl = `https://feature-${issueLower}.myn.test`;
@@ -1946,38 +2159,34 @@ app.get('/api/workspaces/:issueId', (req, res) => {
                     existsSync(join(devcontainerPath, 'compose.infra.yml')) ||
                     existsSync(devcontainerPath); // .devcontainer dir exists = containerized
 
-  // Get container status
-  const containers = hasDocker ? getContainerStatus(issueId) : null;
-
   // Check if project supports containerization (has new-feature script)
   const canContainerize = !hasDocker && existsSync(join(projectPath, 'infra', 'new-feature'));
 
-  // Get MR URL
-  const mrUrl = getMrUrl(issueId, workspacePath);
+  // Run all async operations in parallel to minimize blocking
+  const agentSession = `agent-${issueLower}`;
+  const [git, repoGit, containers, mrUrl, sessionsResult, paneResult] = await Promise.all([
+    getGitStatusAsync(workspacePath),
+    getRepoGitStatusAsync(workspacePath),
+    hasDocker ? getContainerStatusAsync(issueId) : Promise.resolve(null),
+    getMrUrlAsync(issueId, workspacePath),
+    execAsync('tmux list-sessions 2>/dev/null || echo ""').catch(() => ({ stdout: '' })),
+    execAsync(`tmux capture-pane -t "${agentSession}" -p 2>/dev/null | tail -50`).catch(() => ({ stdout: '' })),
+  ]);
 
-  // Check for running agent
+  // Check for running agent from async results
   let hasAgent = false;
   let agentSessionId: string | null = null;
   let agentModel: string | undefined;
 
-  try {
-    const sessions = execSync('tmux list-sessions 2>/dev/null || echo ""', { encoding: 'utf-8' });
-    const agentSession = `agent-${issueLower}`;
-    if (sessions.includes(agentSession)) {
-      hasAgent = true;
-      agentSessionId = agentSession;
+  const sessions = sessionsResult.stdout;
+  if (sessions.includes(agentSession)) {
+    hasAgent = true;
+    agentSessionId = agentSession;
 
-      // Try to detect model from tmux output
-      try {
-        const paneOutput = execSync(
-          `tmux capture-pane -t "${agentSession}" -p 2>/dev/null | tail -50`,
-          { encoding: 'utf-8' }
-        );
-        const modelMatch = paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
-        agentModel = modelMatch ? modelMatch[1] : undefined;
-      } catch {}
-    }
-  } catch {}
+    const paneOutput = paneResult.stdout;
+    const modelMatch = paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
+    agentModel = modelMatch ? modelMatch[1] : undefined;
+  }
 
   res.json({
     exists: true,
@@ -3597,6 +3806,20 @@ Start by exploring the codebase to understand the context, then begin the discov
       ensureTmuxRunning();
       execSync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
 
+      // Create agent state file so QuestionDialog can find the JSONL path
+      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+      execSync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
+      writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+        id: sessionName,
+        issueId: issue.identifier,
+        workspace: agentCwd,
+        runtime: 'claude',
+        model: 'opus', // Planning uses Opus
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        type: 'planning'
+      }, null, 2));
+
       // Resize the tmux window to be wide enough for Claude's TUI
       try {
         execSync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
@@ -3611,8 +3834,8 @@ Start by exploring the codebase to understand the context, then begin the discov
           const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
           // Escape special characters for tmux send-keys
           const escapedMessage = initMessage.replace(/'/g, "'\\''");
-          // Send text followed by Enter in single atomic command
-          execSync(`tmux send-keys -t ${sessionName} '${escapedMessage}' Enter`, { encoding: 'utf-8' });
+          // Send text followed by C-m (Ctrl+M = Enter) - more reliable than literal 'Enter'
+          execSync(`tmux send-keys -t ${sessionName} '${escapedMessage}' C-m`, { encoding: 'utf-8' });
           console.log(`Sent planning prompt to ${sessionName}`);
         } catch (err) {
           console.error('Failed to send planning prompt:', err);

@@ -19,10 +19,8 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
-  MessageCircle,
 } from 'lucide-react';
 import { Agent } from '../types';
-import { QuestionDialog, PendingQuestion } from './QuestionDialog';
 
 interface ContainerStatus {
   running: boolean;
@@ -110,54 +108,6 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
     refetchInterval: 5000, // Check for container changes
   });
 
-  // Poll for pending questions (AskUserQuestion interception - PAN-20)
-  // DISABLED: Path mapping issues cause late/incorrect detection. Re-enable when fixed.
-  const { data: pendingQuestionsData } = useQuery<{ pending: boolean; questions: PendingQuestion[] }>({
-    queryKey: ['pending-questions', agent.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/agents/${agent.id}/pending-questions`);
-      if (!res.ok) throw new Error('Failed to fetch pending questions');
-      return res.json();
-    },
-    refetchInterval: 3000,
-    enabled: false, // DISABLED for now
-  });
-
-  const pendingQuestions = pendingQuestionsData?.questions || [];
-  const [showQuestionDialog, setShowQuestionDialog] = useState(false);
-
-  // Auto-show dialog when new questions arrive
-  useEffect(() => {
-    if (pendingQuestions.length > 0) {
-      setShowQuestionDialog(true);
-    }
-  }, [pendingQuestions.length]);
-
-  const answerMutation = useMutation({
-    mutationFn: async (answers: string[]) => {
-      const res = await fetch(`/api/agents/${agent.id}/answer-question`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to send answer');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      setShowQuestionDialog(false);
-      // Invalidate to refresh questions state
-      queryClient.invalidateQueries({ queryKey: ['pending-questions', agent.id] });
-      // Refresh output to show response
-      setTimeout(() => refetch(), 500);
-    },
-  });
-
-  const handleAnswerQuestion = (answers: string[]) => {
-    answerMutation.mutate(answers);
-  };
 
   const startContainersMutation = useMutation({
     mutationFn: async () => {
@@ -354,39 +304,18 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
   return (
     <>
-      {/* Question Dialog for AskUserQuestion interception (PAN-20) */}
-      {showQuestionDialog && pendingQuestions.length > 0 && (
-        <QuestionDialog
-          questions={pendingQuestions}
-          agentId={agent.id}
-          onSubmit={handleAnswerQuestion}
-          onDismiss={() => setShowQuestionDialog(false)}
-          isSubmitting={answerMutation.isPending}
-          error={answerMutation.error instanceof Error ? answerMutation.error.message : undefined}
-        />
-      )}
-
       <div className="flex h-full bg-gray-800 border-l border-gray-700">
         {/* Left sidebar - Workspace info */}
         <div className="w-64 border-r border-gray-700 flex flex-col overflow-y-auto">
           {/* Header */}
           <div className="px-3 py-2 border-b border-gray-700">
             <div className="flex items-center gap-2">
-              {pendingQuestions.length > 0 ? (
-                <>
-                  <MessageCircle className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
-                  <span className="text-xs text-yellow-400">Needs Input</span>
-                </>
-              ) : (
-                <>
-                  <div className="flex gap-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '300ms' }} />
-                  </div>
-                  <span className="text-xs text-gray-400">Agent Running</span>
-                </>
-              )}
+              <div className="flex gap-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span className="text-xs text-gray-400">Agent Running</span>
             </div>
             <h2 className="font-mono text-sm text-white font-medium mt-1">
               {agent.issueId}
@@ -784,24 +713,6 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               {output || 'Connecting to agent...'}
               <div ref={bottomRef} />
             </pre>
-
-            {/* Pending question banner */}
-            {pendingQuestions.length > 0 && !showQuestionDialog && (
-              <div className="p-2 border-t border-yellow-600 bg-yellow-900/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-yellow-400 text-sm">
-                    <MessageCircle className="w-4 h-4" />
-                    <span>Agent is waiting for your input</span>
-                  </div>
-                  <button
-                    onClick={() => setShowQuestionDialog(true)}
-                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white text-sm rounded transition-colors"
-                  >
-                    Answer
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Input */}
             <div className="p-2 border-t border-gray-700 bg-gray-800">

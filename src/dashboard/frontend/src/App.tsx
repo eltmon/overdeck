@@ -166,12 +166,18 @@ export default function App() {
                   >
                     {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </button>
-                  <WorkspacePanel
-                    agent={selectedIssueAgent}
-                    issueId={selectedIssue}
-                    issueUrl={selectedIssueData?.url}
-                    onClose={() => setSelectedIssue(null)}
-                  />
+                  {selectedIssueAgent.type === 'planning' ? (
+                    <div className="h-full p-4">
+                      <TerminalView agentId={selectedIssueAgent.id} />
+                    </div>
+                  ) : (
+                    <WorkspacePanel
+                      agent={selectedIssueAgent}
+                      issueId={selectedIssue}
+                      issueUrl={selectedIssueData?.url}
+                      onClose={() => setSelectedIssue(null)}
+                    />
+                  )}
                 </div>
               </>
             )}

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 
 // Cost data for an issue
@@ -706,15 +706,17 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
 
       {/* Action buttons for running agents */}
       {isRunning && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-600">
+        <div className={`flex items-center gap-3 mt-3 pt-3 border-t ${agent?.type === 'planning' ? 'border-purple-600/50' : 'border-gray-600'}`}>
           <button
-            onClick={handleWatch}
+            onClick={agent?.type === 'planning' ? handlePlan : handleWatch}
             className={`flex items-center gap-1 text-xs transition-colors ${
-              isSelected ? 'text-blue-400' : 'text-gray-400 hover:text-white'
+              agent?.type === 'planning'
+                ? 'text-purple-400 hover:text-purple-300'
+                : isSelected ? 'text-blue-400' : 'text-gray-400 hover:text-white'
             }`}
           >
-            <Eye className="w-3.5 h-3.5" />
-            Watch
+            {agent?.type === 'planning' ? <Sparkles className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            {agent?.type === 'planning' ? 'Continue Planning' : 'Watch'}
           </button>
           <button
             onClick={handleTell}
