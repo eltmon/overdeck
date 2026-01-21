@@ -1,4 +1,4 @@
-# Planning Session: PAN-27
+# Planning Session: PAN-29
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,78 +22,120 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-27
-- **Title:** Cloister Phase 2: Agent Management UI
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/27
+- **ID:** PAN-29
+- **Title:** Implement merge-agent: Automatic merge conflict resolution
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/29
 
 ## Description
-## Overview
+## Problem
 
-Implement Cloister Phase 2: Enhanced Agent Management UI per PRD.
-
-**PRD:** docs/PRD-CLOISTER.md
-
-## Phase 2 Scope
-
-### 1. Two-Section Agents Page
-
-Split agents into:
-- **Specialist Agents (Permanent)** - merge-agent, review-agent, test-agent
-- **Issue Agents (Ephemeral)** - from /work-issue
-
-Specialist agent display:
+When clicking "Approve & Merge" on an issue with merge conflicts, Panopticon currently shows:
 ```
-┌─────────────────────────────────────────────────────┐
-│ 😴 merge-agent     Sleeping    Last: 2 hrs ago      │
-│    Session: 286e638d...  Context: 45K tokens        │
-│                                      [Wake] [Reset] │
-└─────────────────────────────────────────────────────┘
+Merge conflict! Please resolve manually:
+cd /path/to/project
+git merge feature-branch
 ```
 
-### 2. Agent Detail View
+Per the Cloister PRD, the `merge-agent` specialist should automatically wake up and resolve conflicts.
 
-When clicking an agent, show:
-- Terminal output stream (existing)
-- Health history timeline (new)
-- Git status (existing)
-- Session ID and context size (for specialists)
+## Current State
 
-### 3. Action Buttons
+- **Cloister Phase 1 (PAN-21)** ✅ - Watchdog framework for monitoring agents
+- **Cloister Phase 2 (PAN-27)** ✅ - UI for displaying specialist agents
+- **Specialist agents themselves** ❌ - Not implemented
 
-- **Poke** - Send nudge message to stuck agent
-- **Kill** - Terminate agent (existing)
-- **Send Message** - Custom message to agent
-- **Wake** - Resume sleeping specialist (--resume)
-- **Reset** - Clear specialist session and start fresh
+The UI scaffolding exists (`SpecialistAgentCard.tsx`, `/api/specialists` endpoints), but no actual specialist agents are running.
 
-### 4. Health History Graph
+## Proposed Solution: merge-agent
 
-Show agent health over last 24 hours:
-- Timeline of state changes (🟢→🟡→🟠→🔴)
-- Activity events
-- Interventions (pokes, kills)
+### Behavior
 
-## Backend Requirements
+When approve workflow encounters a merge conflict:
+1. Abort the merge attempt
+2. Wake the `merge-agent` (or spawn if not running)
+3. Pass context: branch names, conflict files, issue ID
+4. merge-agent resolves conflicts using Claude Code
+5. On success: continue with merge and push
+6. On failure: notify user with details
 
-- [ ] API: List specialist agents from `~/.panopticon/specialists/`
-- [ ] API: GET /api/specialists - list all specialists with status
-- [ ] API: POST /api/specialists/:name/wake - wake with --resume
-- [ ] API: POST /api/specialists/:name/reset - clear session
-- [ ] API: POST /api/agents/:id/poke - send nudge message
-- [ ] API: POST /api/agents/:id/message - send custom message
-- [ ] API: GET /api/agents/:id/health-history - last 24h of health
+### Specialist Agent Lifecycle
 
-## Frontend Requirements
+```
+~/.panopticon/specialists/
+├── merge-agent/
+│   ├── config.json      # Agent configuration
+│   ├── session.json     # Claude --resume session ID
+│   └── history.jsonl    # Past merge resolutions (for context)
+├── review-agent/
+│   └── ...
+└── test-agent/
+    └── ...
+```
 
-- [ ] Split AgentList into SpecialistAgents + IssueAgents sections
-- [ ] Add Wake/Reset buttons for specialists
-- [ ] Add Poke/Message buttons for all agents
-- [ ] Add health history timeline component
-- [ ] Show session ID and context size for specialists
+### Configuration (config.json)
 
-## Depends On
+```json
+{
+  "name": "merge-agent",
+  "model": "sonnet",
+  "triggerOn": ["merge-conflict", "ci-failure"],
+  "autoWake": true,
+  "maxContextTokens": 100000,
+  "sessionRotation": "weekly"
+}
+```
 
-- Phase 1 complete (#21) ✅
+### merge-agent Prompt
+
+```markdown
+You are a merge specialist. Your job is to resolve git merge conflicts.
+
+Context:
+- Target branch: main
+- Source branch: feature/pan-27
+- Conflict files: [list]
+- Issue: PAN-27 (Cloister Phase 2)
+
+Instructions:
+1. Analyze each conflict file
+2. Understand the intent of both changes
+3. Resolve conflicts preserving both intents where possible
+4. Run tests to verify resolution
+5. Stage and complete the merge
+6. Report results
+```
+
+### Integration Points
+
+1. **Approve workflow** (`/api/approve`) - Detect conflict, wake merge-agent
+2. **Dashboard** - Show merge-agent status, allow manual wake
+3. **CLI** - `pan specialist wake merge-agent`
+4. **Hooks** - `on-merge-conflict` hook to trigger agent
+
+## Implementation Tasks
+
+- [ ] Create `~/.panopticon/specialists/` directory structure
+- [ ] Implement specialist agent spawning with `--resume` support
+- [ ] Add merge-agent configuration and prompt template
+- [ ] Modify approve workflow to delegate conflicts to merge-agent
+- [ ] Add `pan specialist` CLI commands (list, wake, reset, status)
+- [ ] Integrate with existing Cloister health monitoring
+- [ ] Add merge-agent activity to dashboard Agents tab
+
+## Future Specialists (separate issues)
+
+- **review-agent** - Triggered on PR open, performs code review
+- **test-agent** - Triggered on push, runs and reports test results
+
+## References
+
+- Cloister PRD: `docs/PRD-CLOISTER.md`
+- Phase 2 UI: PAN-27 (now merged)
+- Specialist config: `src/lib/cloister/specialists.ts`
+
+## Priority
+
+P1 - Key workflow improvement, directly requested
 
 ---
 

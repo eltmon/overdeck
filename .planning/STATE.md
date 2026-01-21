@@ -1,290 +1,302 @@
-# PAN-27: Cloister Phase 2 - Agent Management UI - STATE
+# PAN-29: Implement merge-agent - Automatic Merge Conflict Resolution
 
 ## Issue Summary
 
-Implement Cloister Phase 2: Enhanced Agent Management UI per PRD-CLOISTER.md. This includes a two-section agents page (Specialist vs Issue agents), health history visualization, and full action button support.
+When clicking "Approve & Merge" on an issue with merge conflicts, Panopticon currently shows a manual resolution message. This issue implements the `merge-agent` specialist to automatically resolve conflicts using Claude Code.
 
 ## Key Decisions
 
-### 1. Specialist Agents Scope
-**Decision:** Full implementation (backend + UI)
+### 1. Working Directory
+**Decision:** Main project directory
 
-The PRD indicates specialist agents backend is part of Phase 2. Implementation includes:
-- Specialist registry module (`src/lib/cloister/specialists.ts`)
-- Session management (read/write session IDs, context token counting)
-- API endpoints: GET /api/specialists, POST /wake, POST /reset
-- UI components: SpecialistAgentCard with Wake/Reset buttons
+merge-agent works directly in the project root, not in the workspace. This matches the manual workflow and is simpler to implement.
 
-Specialist types:
-- `merge-agent` - PR merging and conflict resolution
-- `review-agent` - Code review
-- `test-agent` - Test running
+### 2. Failure Handling
+**Decision:** Notify user only
 
-### 2. Health History Storage
-**Decision:** SQLite for persistence
+If merge-agent fails to resolve conflicts:
+1. Abort the merge attempt
+2. Report which files/conflicts failed
+3. User resolves manually
 
-Create `~/.panopticon/cloister.db` with `health_events` table:
-```sql
-CREATE TABLE health_events (
-  id INTEGER PRIMARY KEY,
-  agent_id TEXT NOT NULL,
-  timestamp TEXT NOT NULL,
-  state TEXT NOT NULL,  -- active, stale, warning, stuck
-  previous_state TEXT,
-  source TEXT,          -- jsonl_mtime, tmux_activity, etc.
-  metadata TEXT         -- JSON for additional context
-);
-CREATE INDEX idx_agent_timestamp ON health_events(agent_id, timestamp);
-```
+No automatic escalation to Opus or alternative approaches.
 
-Retention: 7 days (cleanup on service start)
+### 3. Session Mode
+**Decision:** Persistent session with `--resume`
 
-### 3. Health History Visualization
-**Decision:** Chart.js + react-chartjs-2
+merge-agent maintains a single persistent Claude session ID stored in `~/.panopticon/specialists/merge-agent.session`. This allows:
+- Context accumulation across merges (learns project patterns)
+- More efficient token usage via context caching
+- Session rotation when context gets too large (manual for MVP)
 
-Timeline visualization with:
-- 24-hour area chart showing state durations
-- Color coding: 🟢 green (active), 🟡 yellow (stale), 🟠 orange (warning), 🔴 red (stuck)
-- Expandable from compact timeline to full chart
-- Click-through to see individual events
+### 4. Scope
+**Decision:** MVP - merge-agent only
 
-### 4. Action Buttons
-**Decision:** All actions implemented
+Focus solely on merge conflict resolution. Other specialists (review-agent, test-agent) remain as UI-only scaffolding for future issues.
 
-| Action | Target | Behavior |
-|--------|--------|----------|
-| **Poke** | Issue agents (warning/stuck) | Send standard nudge message |
-| **Kill** | All agents | Terminate via tmux kill-session |
-| **Send Message** | All agents | Custom message via tmux send-keys |
-| **Wake** | Specialists (sleeping) | Resume with --resume flag |
-| **Reset** | Specialists (any) | Clear session file, reinitialize |
+### 5. Progress Reporting
+**Decision:** Both dashboard activity log + API result
 
-### 5. Agent List Sections
-**Decision:** Two distinct sections
+- Real-time progress streams to dashboard activity log
+- Final result returned via API response (success/failure + details)
 
-**Specialist Agents Section (top):**
-- Shows all 3 specialists (merge-agent, review-agent, test-agent)
-- States: Sleeping (😴), Active (🟢), Not initialized (⚪)
-- Displays session ID (truncated), context token count
-- Actions: Wake, Reset
+### 6. Test Running
+**Decision:** Yes - run tests after resolution
 
-**Issue Agents Section (bottom):**
-- Shows ephemeral agents from /work-issue
-- Displays issue ID, branch name, Cloister health state
-- Actions: View, Poke (if warning/stuck), Kill, Send Message
+After resolving conflicts, merge-agent runs the project's test suite to verify the merge didn't break anything. If tests fail, the merge is aborted.
 
-### 6. Agent Detail View
-**Decision:** Slide-out panel on click
+### 7. Timeout
+**Decision:** 15 minutes
 
-Contents:
-- Header: Agent ID, status badge, issue link
-- Terminal output stream (existing TerminalView)
-- Health history timeline (new)
-- Git status (existing - branch, uncommitted files)
-- For specialists: Session ID, context size, last wake time
+merge-agent has 15 minutes to complete conflict resolution + tests before being considered stuck.
 
 ## Scope
 
-### In Scope (PAN-27)
+### In Scope (PAN-29)
 
-**Backend (Layer 1 - Complete):**
-- [x] Specialist registry module (`src/lib/cloister/specialists.ts`)
-- [x] Specialist session management (context token counting from JSONL)
-- [x] SQLite health history storage
-- [x] Cloister service writes health events
+**Integration Layer:**
+- [ ] Modify approve API to detect conflicts and delegate to merge-agent
+- [ ] Add `MergeConflictContext` type with branch info, conflict files
+- [ ] Implement `spawnMergeAgent()` function
 
-**Backend (Layer 2 - Complete):**
-- [x] Health history API endpoint (GET /api/agents/:id/health-history)
-- [x] Specialist API endpoints (GET /api/specialists, POST /wake, POST /reset)
-- [x] Poke API endpoint (POST /api/agents/:id/poke)
+**Agent Layer:**
+- [ ] Create merge-agent prompt template
+- [ ] Implement agent spawning with `--resume` support
+- [ ] Implement result polling/streaming
+- [ ] Handle success flow (complete merge, push, continue)
+- [ ] Handle failure flow (abort, report, cleanup)
 
-**Frontend (Layer 3 - Complete):**
-- [x] Two-section AgentList refactor (Specialists + Issue Agents)
-- [x] SpecialistAgentCard component (Wake/Reset/Kill buttons)
-- [x] IssueAgentCard component (Poke/Kill buttons)
-- [x] AgentDetailView panel (slide-out with specialist info, health, terminal)
+**Persistence:**
+- [ ] Session ID storage in `~/.panopticon/specialists/merge-agent.session`
+- [ ] Merge history in `~/.panopticon/specialists/merge-agent/history.jsonl`
 
-**Frontend (Layer 4 - Complete):**
-- [x] HealthHistoryTimeline component (visual timeline with duration bars)
-- [x] HealthHistoryChart component (Chart.js line/area chart)
-- [x] Toggle between timeline and chart views
-- [x] Configurable time ranges (1h, 6h, 24h, 3d, 7d)
+**Dashboard:**
+- [ ] Modify approve flow to show "Resolving conflicts..." status
+- [ ] Stream merge-agent progress to activity log
+- [ ] Update agent list to show merge-agent as active during resolution
 
-### Out of Scope (Future Phases)
+### Out of Scope
 
-- Active heartbeats via hooks (Phase 3)
-- Model routing and handoffs (Phase 4)
-- Auto-wake on GitHub/Linear webhooks (Phase 5)
-- Cost tracking per agent (separate PRD)
-- Multi-runtime support (OpenCode, Codex)
+- CLI commands (`pan specialist wake/list/reset`) - future issue
+- review-agent implementation - future issue
+- test-agent implementation - future issue
+- Automatic escalation to Opus on failure - future enhancement
+- Session rotation based on context size - future enhancement
+- Multi-project specialist sharing - future enhancement
 
 ## Architecture
 
-### New Files
+### Files to Create/Modify
 
 ```
 src/lib/cloister/
-├── specialists.ts       # Specialist registry and session management
-├── database.ts          # SQLite health history storage
-└── config.ts            # (existing)
+├── specialists.ts          # (existing) - minor updates
+├── merge-agent.ts          # NEW - merge-agent logic
+└── prompts/
+    └── merge-agent.md      # NEW - prompt template
 
 src/dashboard/server/
-├── index.ts             # (add specialist + history endpoints)
-└── routes/
-    └── specialists.ts   # (optional - if splitting routes)
-
-src/dashboard/frontend/src/components/
-├── AgentList.tsx        # (refactor into sections)
-├── SpecialistAgentCard.tsx
-├── IssueAgentCard.tsx
-├── AgentDetailView.tsx
-├── HealthHistoryTimeline.tsx
-└── HealthHistoryChart.tsx
+└── index.ts                # MODIFY - integrate merge-agent in approve flow
 ```
 
 ### Data Flow
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Health Event Flow                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  CloisterService.performHealthCheck()                       │
-│         │                                                   │
-│         ▼                                                   │
-│  evaluateAgentHealth() ──► health state determined          │
-│         │                                                   │
-│         ▼                                                   │
-│  writeHealthEvent(db, event) ──► SQLite cloister.db        │
-│         │                                                   │
-│         ▼                                                   │
-│  GET /api/agents/:id/health-history                         │
-│         │                                                   │
-│         ▼                                                   │
-│  HealthHistoryTimeline / HealthHistoryChart                 │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│                   Specialist Flow                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ~/.panopticon/specialists/                                 │
-│  ├── registry.json        # List of configured specialists  │
-│  ├── merge-agent.session  # Session ID (if initialized)    │
-│  ├── review-agent.session                                   │
-│  └── test-agent.session                                     │
-│                                                             │
-│  GET /api/specialists                                       │
-│    └─► List all with status (sleeping/active/uninitialized) │
-│                                                             │
-│  POST /api/specialists/:name/wake                           │
-│    └─► tmux new-session + claude --resume <session-id>      │
-│                                                             │
-│  POST /api/specialists/:name/reset                          │
-│    └─► Delete .session file, optionally reinitialize        │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    Approve Flow with merge-agent                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  POST /api/approve                                               │
+│         │                                                        │
+│         ▼                                                        │
+│  git merge feature-branch                                        │
+│         │                                                        │
+│         ├── Success ──► Push to main ──► Update Linear ──► Done │
+│         │                                                        │
+│         └── Conflict detected                                    │
+│                  │                                               │
+│                  ▼                                               │
+│         git merge --abort                                        │
+│                  │                                               │
+│                  ▼                                               │
+│         spawnMergeAgent({                                        │
+│           projectPath,                                           │
+│           sourceBranch,                                          │
+│           targetBranch,                                          │
+│           conflictFiles                                          │
+│         })                                                       │
+│                  │                                               │
+│                  ▼                                               │
+│         ┌────────────────────────────────────┐                   │
+│         │        merge-agent (Claude)         │                  │
+│         │  1. Analyze conflict files          │                  │
+│         │  2. Understand both change intents  │                  │
+│         │  3. Resolve conflicts               │                  │
+│         │  4. Run tests                       │                  │
+│         │  5. Stage and commit merge          │                  │
+│         └────────────────────────────────────┘                   │
+│                  │                                               │
+│                  ├── Success                                     │
+│                  │      │                                        │
+│                  │      ▼                                        │
+│                  │   Push to main ──► Update Linear ──► Done     │
+│                  │                                               │
+│                  └── Failure                                     │
+│                         │                                        │
+│                         ▼                                        │
+│                  Return error with details                       │
+│                  (files that failed, reason)                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+### merge-agent Prompt Structure
+
+```markdown
+You are a merge conflict resolution specialist.
+
+## Context
+- Project: {projectPath}
+- Target branch: main
+- Source branch: {sourceBranch}
+- Conflict files: {conflictFiles}
+- Issue: {issueId}
+
+## Your Task
+Resolve the merge conflicts and verify the result.
+
+## Instructions
+1. Analyze each conflict file to understand both versions
+2. Resolve conflicts by:
+   - Preserving the intent of both changes when possible
+   - If incompatible, prefer the feature branch changes (they're newer)
+   - Keep code style consistent with the project
+3. Run the test suite: {testCommand}
+4. If tests pass, stage all resolved files
+5. Complete the merge commit
+
+## Constraints
+- Do NOT create new commits beyond the merge commit
+- Do NOT modify files that don't have conflicts
+- Do NOT push to remote (the caller handles that)
+
+## When Done
+Report your results in this format:
+MERGE_RESULT: SUCCESS|FAILURE
+RESOLVED_FILES: file1.ts, file2.ts
+FAILED_FILES: (if any)
+TESTS: PASS|FAIL|SKIP
+NOTES: (any important observations)
+```
+
+### Success/Failure Detection
+
+Parse agent output for structured result markers:
+- `MERGE_RESULT: SUCCESS` + `TESTS: PASS` → Continue with push
+- `MERGE_RESULT: FAILURE` → Abort, report failure
+- Timeout (15 min) → Kill agent, abort, report timeout
 
 ## Implementation Order
 
-### Layer 1: Backend Foundation
-1. `panopticon-agl` - SQLite database module
-2. `panopticon-vw4` - Specialist registry module
-3. `panopticon-x55` - Specialist session management
-4. `panopticon-rpk` - Cloister writes health events
+### Layer 1: Agent Infrastructure
+1. Create merge-agent prompt template
+2. Implement `spawnMergeAgent()` with --resume support
+3. Implement result parsing from agent output
 
-### Layer 2: API Endpoints
-5. `panopticon-xud` - Health history API
-6. `panopticon-fyv` - Specialist API endpoints
-7. `panopticon-9yw` - Poke API endpoint
+### Layer 2: Integration
+4. Modify approve API to detect conflicts
+5. Integrate merge-agent spawning on conflict
+6. Handle success/failure flows
+7. Stream progress to activity log
 
-### Layer 3: Frontend Components
-8. `panopticon-9lh` - AgentList two sections
-9. `panopticon-5f4` - SpecialistAgentCard
-10. `panopticon-cbw` - IssueAgentCard
-11. `panopticon-2cw` - AgentDetailView
+### Layer 3: Polish
+8. Add merge history logging
+9. Update dashboard to show merge-agent status
+10. Error handling and edge cases
 
-### Layer 4: Visualizations
-12. `panopticon-isv` - HealthHistoryTimeline
-13. `panopticon-7um` - HealthHistoryChart (Chart.js)
+## Beads Tasks
 
-## Dependencies Diagram
-
-```
-Layer 1 (Backend Foundation)
-panopticon-agl ────────────────────────────┐
-panopticon-vw4 ──► panopticon-x55 ─────────┤
-                                           │
-Layer 2 (API Endpoints)                    │
-panopticon-rpk ◄───────────────────────────┤
-panopticon-xud ◄───────────────────────────┘
-panopticon-fyv ◄── panopticon-x55
-panopticon-9yw (no deps)
-
-Layer 3 (Frontend Components)
-panopticon-9lh (no deps - can start early)
-panopticon-5f4 ◄── panopticon-fyv
-panopticon-cbw ◄── panopticon-9yw
-panopticon-2cw (no deps)
-
-Layer 4 (Visualizations)
-panopticon-isv ◄── panopticon-xud
-panopticon-7um ◄── panopticon-xud
-```
-
-## Beads Tasks Summary
-
-| ID | Title | Layer | Status |
-|----|-------|-------|--------|
-| panopticon-agl | Create SQLite database module | 1 | open |
-| panopticon-vw4 | Create specialist registry module | 1 | open |
-| panopticon-x55 | Implement specialist session management | 1 | open |
-| panopticon-rpk | Modify Cloister to write health events | 1 | open |
-| panopticon-xud | Implement health history API endpoint | 2 | open |
-| panopticon-fyv | Add specialist API endpoints | 2 | open |
-| panopticon-9yw | Add poke API endpoint | 2 | open |
-| panopticon-9lh | Update AgentList to show two sections | 3 | open |
-| panopticon-5f4 | Create SpecialistAgentCard component | 3 | open |
-| panopticon-cbw | Create IssueAgentCard component | 3 | open |
-| panopticon-2cw | Create AgentDetailView component | 3 | open |
-| panopticon-isv | Create HealthHistoryTimeline component | 4 | open |
-| panopticon-7um | Create HealthHistoryChart component | 4 | open |
+| ID | Title | Layer | Blocked By |
+|----|-------|-------|------------|
+| panopticon-m01 | Create merge-agent prompt template | 1 | - |
+| panopticon-m02 | Implement spawnMergeAgent with --resume | 1 | - |
+| panopticon-m03 | Implement result parsing | 1 | m02 |
+| panopticon-m04 | Modify approve API to detect conflicts | 2 | - |
+| panopticon-m05 | Integrate merge-agent in approve flow | 2 | m02, m03, m04 |
+| panopticon-m06 | Handle success flow (push, continue) | 2 | m05 |
+| panopticon-m07 | Handle failure flow (abort, report) | 2 | m05 |
+| panopticon-m08 | Add merge history logging | 3 | m06, m07 |
+| panopticon-m09 | Update dashboard for merge-agent status | 3 | m05 |
+| panopticon-m10 | Edge cases and error handling | 3 | m06, m07 |
 
 ## Technical Notes
 
-### SQLite Package
-Use `better-sqlite3` for synchronous SQLite operations in Node.js. Already commonly used in CLI tools.
+### Claude Code Spawning
 
-### Chart.js Setup
-```bash
-npm install chart.js react-chartjs-2
+```typescript
+import { execSync, spawn } from 'child_process';
+
+interface MergeAgentConfig {
+  projectPath: string;
+  sourceBranch: string;
+  targetBranch: string;
+  conflictFiles: string[];
+  issueId: string;
+  testCommand: string;
+}
+
+async function spawnMergeAgent(config: MergeAgentConfig): Promise<MergeResult> {
+  const sessionFile = `${SPECIALISTS_DIR}/merge-agent.session`;
+  const sessionId = existsSync(sessionFile)
+    ? readFileSync(sessionFile, 'utf-8').trim()
+    : null;
+
+  const prompt = buildMergePrompt(config);
+
+  // Build command
+  const args = ['--model', 'sonnet', '--print', '-p', prompt];
+  if (sessionId) {
+    args.push('--resume', sessionId);
+  }
+
+  // Spawn in project directory
+  const proc = spawn('claude', args, {
+    cwd: config.projectPath,
+    env: { ...process.env, PANOPTICON_AGENT_ID: 'merge-agent' }
+  });
+
+  // Capture output, look for MERGE_RESULT markers
+  // ...
+}
 ```
 
-Chart configuration:
-- Type: Area/line chart
-- X-axis: Time (24h)
-- Y-axis: State (categorical - map to numbers for visualization)
-- Colors: Match health state colors (green/yellow/orange/red)
+### Session ID Capture
 
-### Specialist Session Discovery
-To count context tokens for a sleeping specialist:
-1. Read session ID from `~/.panopticon/specialists/<name>.session`
-2. Find JSONL file via Claude Code's session index or direct path search
-3. Parse JSONL and sum `usage.input_tokens + usage.output_tokens`
+After first run (no --resume), capture session ID from Claude's output or from the JSONL session file created.
 
-Note: This is approximate - actual context window includes system prompt and any images.
+### Test Command Detection
 
-### Poke Message Format
-Standard nudge message for stuck agents:
-```
-You seem to have been inactive for a while. If you're stuck:
-1. Check your current task in STATE.md
-2. Try an alternative approach if blocked
-3. Ask for help if needed
+Detect test command from package.json, pom.xml, Cargo.toml, etc.:
+- `npm test` / `yarn test` for Node.js
+- `mvn test` for Java
+- `cargo test` for Rust
+- `pytest` for Python
 
-What's your current status?
+Fallback: skip tests if unknown.
+
+### Timeout Implementation
+
+```typescript
+const MERGE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+const timeoutPromise = new Promise((_, reject) =>
+  setTimeout(() => reject(new Error('merge-agent timeout')), MERGE_TIMEOUT_MS)
+);
+
+const result = await Promise.race([
+  runMergeAgent(config),
+  timeoutPromise
+]);
 ```
 
 ## Open Questions
@@ -293,7 +305,7 @@ None - all decisions captured above.
 
 ## References
 
-- PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md`
-- Phase 1 Implementation: Commit `a1a9753`
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/27
-- Existing components: `src/dashboard/frontend/src/components/`
+- PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md` (Phase 5: Specialist Agents)
+- Specialist infrastructure: `/home/eltmon/projects/panopticon/src/lib/cloister/specialists.ts`
+- Approve API: `/home/eltmon/projects/panopticon/src/dashboard/server/index.ts` (line ~2765)
+- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/29
