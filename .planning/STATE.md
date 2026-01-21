@@ -1,362 +1,293 @@
-# PAN-3: Comprehensive Agent Skills Suite - STATE
+# PAN-27: Cloister Phase 2 - Agent Management UI - STATE
 
 ## Issue Summary
-Create a full suite of `pan-*` skills that guide AI assistants through Panopticon operations. Skills should enable conversational guidance so users never need to learn CLI commands directly.
+
+Implement Cloister Phase 2: Enhanced Agent Management UI per PRD-CLOISTER.md. This includes a two-section agents page (Specialist vs Issue agents), health history visualization, and full action button support.
 
 ## Key Decisions
 
-### 1. Skill Purpose
-**Decision:** Skills are guidance wrappers + documentation.
+### 1. Specialist Agents Scope
+**Decision:** Full implementation (backend + UI)
 
-Skills help AI assistants:
-- Understand when to invoke which `pan` CLI commands
-- Guide users through configuration decisions
-- Provide context about how Panopticon components work together
-- Offer troubleshooting guidance
+The PRD indicates specialist agents backend is part of Phase 2. Implementation includes:
+- Specialist registry module (`src/lib/cloister/specialists.ts`)
+- Session management (read/write session IDs, context token counting)
+- API endpoints: GET /api/specialists, POST /wake, POST /reset
+- UI components: SpecialistAgentCard with Wake/Reset buttons
 
-### 2. Naming Convention
-**Decision:** Use `pan-*` (dashes) for directory names.
+Specialist types:
+- `merge-agent` - PR merging and conflict resolution
+- `review-agent` - Code review
+- `test-agent` - Test running
 
-- Directory: `~/.panopticon/skills/pan-help/`
-- Skill name in SKILL.md: Can use `pan:help` or `pan-help` (both work for invocation)
-- Matches existing skills: `bug-fix`, `feature-work`, `code-review-*`
+### 2. Health History Storage
+**Decision:** SQLite for persistence
 
-### 3. Skill Location & Distribution
-**Decision:** Repo is source of truth, runtime is a copy.
-
-**Distribution flow:**
+Create `~/.panopticon/cloister.db` with `health_events` table:
+```sql
+CREATE TABLE health_events (
+  id INTEGER PRIMARY KEY,
+  agent_id TEXT NOT NULL,
+  timestamp TEXT NOT NULL,
+  state TEXT NOT NULL,  -- active, stale, warning, stuck
+  previous_state TEXT,
+  source TEXT,          -- jsonl_mtime, tmux_activity, etc.
+  metadata TEXT         -- JSON for additional context
+);
+CREATE INDEX idx_agent_timestamp ON health_events(agent_id, timestamp);
 ```
-repo/skills/pan-*/           ← SOURCE OF TRUTH (version controlled)
-       ↓ pan init / npm postinstall
-~/.panopticon/skills/pan-*/  ← Runtime copy (user's machine)
-       ↓ pan sync
-~/.claude/skills/pan-*/      ← Symlinked for AI tools
-```
 
-**Workflow for creating/updating skills (for agents working on PAN-3):**
-1. Create/edit skill in feature branch: `skills/{name}/SKILL.md`
-2. Commit to feature branch (`feature/pan-3`)
-3. Test locally by copying to `~/.panopticon/skills/` and running `pan sync`
-4. When done with phase, PR/review
-5. Merge to main
-6. On release: `npm publish` includes skills in package
-7. Users run `pan init` or update → skills copied to `~/.panopticon/skills/`
+Retention: 7 days (cleanup on service start)
 
-**Current workspace path:** `/home/eltmon/projects/panopticon/workspaces/feature-pan-3/`
-**Skills directory:** `./skills/` (relative to workspace root)
+### 3. Health History Visualization
+**Decision:** Chart.js + react-chartjs-2
 
-**Note:** Phase 1 skills already exist in both:
-- `~/.panopticon/skills/pan-*/` (working now via `pan sync`)
-- `./skills/pan-*/` (committed to repo)
+Timeline visualization with:
+- 24-hour area chart showing state durations
+- Color coding: 🟢 green (active), 🟡 yellow (stale), 🟠 orange (warning), 🔴 red (stuck)
+- Expandable from compact timeline to full chart
+- Click-through to see individual events
 
-**Project-specific skills** (not Panopticon generic):
-- Live in `{project}/.claude/skills/` (git-tracked in the project)
-- These are NOT managed by Panopticon
-- `pan sync` adds Panopticon skills alongside, never replaces project skills
-- "Git-tracked always wins" - project skills take precedence
+### 4. Action Buttons
+**Decision:** All actions implemented
 
-### 4. Docker Templates
-**Decision:** Create app-type templates in `templates/docker/`
+| Action | Target | Behavior |
+|--------|--------|----------|
+| **Poke** | Issue agents (warning/stuck) | Send standard nudge message |
+| **Kill** | All agents | Terminate via tmux kill-session |
+| **Send Message** | All agents | Custom message via tmux send-keys |
+| **Wake** | Specialists (sleeping) | Resume with --resume flag |
+| **Reset** | Specialists (any) | Clear session file, reinitialize |
 
-Templates needed:
-- `spring-boot/` - Java/Spring with Maven, Postgres, Redis
-- `react-vite/` - React with Vite hot-reload
-- `nextjs/` - Next.js with app router
-- `dotnet/` - .NET Core with SQL Server
-- `python-fastapi/` - FastAPI with uvicorn
-- `monorepo/` - Frontend + backend combo
+### 5. Agent List Sections
+**Decision:** Two distinct sections
 
-Each template includes:
-- `Dockerfile.dev` - Development Dockerfile
-- `docker-compose.yml` - Service orchestration
-- `README.md` - Usage instructions
+**Specialist Agents Section (top):**
+- Shows all 3 specialists (merge-agent, review-agent, test-agent)
+- States: Sleeping (😴), Active (🟢), Not initialized (⚪)
+- Displays session ID (truncated), context token count
+- Actions: Wake, Reset
 
-### 5. Traefik/Networking
-**Decision:** Traefik infrastructure already exists (PAN-4).
+**Issue Agents Section (bottom):**
+- Shows ephemeral agents from /work-issue
+- Displays issue ID, branch name, Cloister health state
+- Actions: View, Poke (if warning/stuck), Kill, Send Message
 
-Skills (`pan-network`, `pan-docker`) will guide users through:
-- Using existing Traefik setup
-- Configuring workspace routing
-- Platform-specific DNS setup (Linux, macOS, WSL2)
+### 6. Agent Detail View
+**Decision:** Slide-out panel on click
 
-No new infrastructure needed - just guidance skills.
+Contents:
+- Header: Agent ID, status badge, issue link
+- Terminal output stream (existing TerminalView)
+- Health history timeline (new)
+- Git status (existing - branch, uncommitted files)
+- For specialists: Session ID, context size, last wake time
 
 ## Scope
 
-### In Scope
+### In Scope (PAN-27)
 
-**Skills to create (organized by priority):**
+**Backend:**
+- [ ] Specialist registry module (`src/lib/cloister/specialists.ts`)
+- [ ] Specialist session management (context token counting from JSONL)
+- [ ] Specialist API endpoints (list, wake, reset)
+- [ ] Poke API endpoint
+- [ ] SQLite health history storage
+- [ ] Health history API endpoint
 
-| Priority | Skill | Purpose |
-|----------|-------|---------|
-| P0 | `pan-help` | Entry point - overview of all commands and skills |
-| P0 | `pan-install` | Guide through npm install, dependencies, env setup |
-| P0 | `pan-setup` | First-time configuration wizard |
-| P0 | `pan-quickstart` | Combined: install → setup → first workspace |
-| P0 | `pan-up` | Start dashboard, API, Traefik |
-| P0 | `pan-down` | Graceful shutdown of all services |
-| P0 | `pan-status` | Check running agents, workspaces, health |
-| P0 | `pan-plan` | Planning workflow with AI discovery |
-| P0 | `pan-issue` | Create workspace + spawn agent |
-| P1 | `pan-config` | View/edit Panopticon configuration |
-| P1 | `pan-tracker` | Configure issue tracker (Linear/GitHub/GitLab) |
-| P1 | `pan-projects` | Add/remove managed projects |
-| P1 | `pan-docker` | Docker template selection and configuration |
-| P1 | `pan-network` | Traefik, local domains, platform-specific setup |
-| P1 | `pan-sync` | Sync skills to Claude Code |
-| P1 | `pan-approve` | Review + approve agent work, merge MR |
-| P1 | `pan-tell` | Send message to running agent |
-| P1 | `pan-kill` | Stop a running agent |
-| P1 | `pan-health` | System health check |
-| P1 | `pan-diagnose` | Interactive troubleshooting |
-| P2 | `pan-logs` | View logs from agents, dashboard, API |
-| P2 | `pan-rescue` | Recover stuck agents, clean orphaned workspaces |
+**Frontend:**
+- [ ] Two-section AgentList refactor
+- [ ] SpecialistAgentCard component
+- [ ] IssueAgentCard component (refactored from existing)
+- [ ] AgentDetailView panel
+- [ ] HealthHistoryTimeline component
+- [ ] HealthHistoryChart component (Chart.js)
+- [ ] Poke, Wake, Reset button implementations
 
-**Docker templates to create:**
-- `templates/docker/spring-boot/`
-- `templates/docker/react-vite/`
-- `templates/docker/nextjs/`
-- `templates/docker/dotnet/`
-- `templates/docker/python-fastapi/`
-- `templates/docker/monorepo/`
+### Out of Scope (Future Phases)
 
-### Out of Scope
-
-- New CLI commands (existing commands are sufficient)
-- New infrastructure (Traefik already set up)
-- State mapping configuration (`pan-states` deferred - complex topic)
-- Skill creation guidance (`skill-creator` already exists)
+- Active heartbeats via hooks (Phase 3)
+- Model routing and handoffs (Phase 4)
+- Auto-wake on GitHub/Linear webhooks (Phase 5)
+- Cost tracking per agent (separate PRD)
+- Multi-runtime support (OpenCode, Codex)
 
 ## Architecture
 
-### Skill Structure
+### New Files
 
-Each skill follows this structure:
 ```
-pan-{name}/
-├── SKILL.md          # Main guidance content with YAML frontmatter
-├── templates/        # (optional) Config templates, checklists
-└── resources/        # (optional) Reference docs, examples
-```
+src/lib/cloister/
+├── specialists.ts       # Specialist registry and session management
+├── database.ts          # SQLite health history storage
+└── config.ts            # (existing)
 
-### Skill YAML Frontmatter
-```yaml
----
-name: pan-help
-description: Overview of all Panopticon commands and capabilities
-triggers:
-  - pan help
-  - panopticon help
-  - what can panopticon do
-allowed-tools:
-  - Bash
-  - Read
----
+src/dashboard/server/
+├── index.ts             # (add specialist + history endpoints)
+└── routes/
+    └── specialists.ts   # (optional - if splitting routes)
+
+src/dashboard/frontend/src/components/
+├── AgentList.tsx        # (refactor into sections)
+├── SpecialistAgentCard.tsx
+├── IssueAgentCard.tsx
+├── AgentDetailView.tsx
+├── HealthHistoryTimeline.tsx
+└── HealthHistoryChart.tsx
 ```
 
-### Skill Content Pattern
+### Data Flow
 
-Skills should include:
-1. **Overview** - What this skill helps with
-2. **When to use** - Trigger conditions
-3. **Workflow** - Step-by-step guidance
-4. **CLI commands** - Which `pan` commands to run
-5. **Troubleshooting** - Common issues and fixes
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Health Event Flow                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  CloisterService.performHealthCheck()                       │
+│         │                                                   │
+│         ▼                                                   │
+│  evaluateAgentHealth() ──► health state determined          │
+│         │                                                   │
+│         ▼                                                   │
+│  writeHealthEvent(db, event) ──► SQLite cloister.db        │
+│         │                                                   │
+│         ▼                                                   │
+│  GET /api/agents/:id/health-history                         │
+│         │                                                   │
+│         ▼                                                   │
+│  HealthHistoryTimeline / HealthHistoryChart                 │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                   Specialist Flow                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ~/.panopticon/specialists/                                 │
+│  ├── registry.json        # List of configured specialists  │
+│  ├── merge-agent.session  # Session ID (if initialized)    │
+│  ├── review-agent.session                                   │
+│  └── test-agent.session                                     │
+│                                                             │
+│  GET /api/specialists                                       │
+│    └─► List all with status (sleeping/active/uninitialized) │
+│                                                             │
+│  POST /api/specialists/:name/wake                           │
+│    └─► tmux new-session + claude --resume <session-id>      │
+│                                                             │
+│  POST /api/specialists/:name/reset                          │
+│    └─► Delete .session file, optionally reinitialize        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ## Implementation Order
 
-### Phase 1: Core Onboarding (P0)
-1. `pan-help` - Entry point, no dependencies
-2. `pan-install` - Installation guidance
-3. `pan-setup` - Configuration wizard
-4. `pan-quickstart` - Combines install + setup
-5. `pan-up` / `pan-down` - Service lifecycle
-6. `pan-status` - Health overview
-7. `pan-plan` - Planning workflow
-8. `pan-issue` - Workspace + agent creation
+### Layer 1: Backend Foundation
+1. `panopticon-agl` - SQLite database module
+2. `panopticon-vw4` - Specialist registry module
+3. `panopticon-x55` - Specialist session management
+4. `panopticon-rpk` - Cloister writes health events
 
-### Phase 2: Configuration (P1)
-9. `pan-config` - Config management
-10. `pan-tracker` - Tracker setup
-11. `pan-projects` - Project management
-12. `pan-sync` - Skills sync
+### Layer 2: API Endpoints
+5. `panopticon-xud` - Health history API
+6. `panopticon-fyv` - Specialist API endpoints
+7. `panopticon-9yw` - Poke API endpoint
 
-### Phase 3: Docker & Networking (P1)
-13. Docker templates (all 6)
-14. `pan-docker` - Template selection
-15. `pan-network` - Networking guidance
+### Layer 3: Frontend Components
+8. `panopticon-9lh` - AgentList two sections
+9. `panopticon-5f4` - SpecialistAgentCard
+10. `panopticon-cbw` - IssueAgentCard
+11. `panopticon-2cw` - AgentDetailView
 
-### Phase 4: Operations (P1)
-16. `pan-approve` - Work approval
-17. `pan-tell` / `pan-kill` - Agent management
-18. `pan-health` / `pan-diagnose` - Health & troubleshooting
+### Layer 4: Visualizations
+12. `panopticon-isv` - HealthHistoryTimeline
+13. `panopticon-7um` - HealthHistoryChart (Chart.js)
 
-### Phase 5: Advanced (P2)
-19. `pan-logs` - Log viewing
-20. `pan-rescue` - Recovery operations
-
-## Critical Dependencies
+## Dependencies Diagram
 
 ```
-pan-help (no deps - start here)
-    │
-    ├──► pan-install ──► pan-setup ──► pan-quickstart
-    │
-    ├──► pan-up/pan-down ──► pan-status
-    │
-    └──► pan-plan ──► pan-issue
-                         │
-                         ├──► pan-approve
-                         ├──► pan-tell
-                         └──► pan-kill
+Layer 1 (Backend Foundation)
+panopticon-agl ────────────────────────────┐
+panopticon-vw4 ──► panopticon-x55 ─────────┤
+                                           │
+Layer 2 (API Endpoints)                    │
+panopticon-rpk ◄───────────────────────────┤
+panopticon-xud ◄───────────────────────────┘
+panopticon-fyv ◄── panopticon-x55
+panopticon-9yw (no deps)
 
-Docker templates (can be parallel)
-    │
-    └──► pan-docker ──► pan-network
+Layer 3 (Frontend Components)
+panopticon-9lh (no deps - can start early)
+panopticon-5f4 ◄── panopticon-fyv
+panopticon-cbw ◄── panopticon-9yw
+panopticon-2cw (no deps)
 
-pan-config (no deps)
-    │
-    ├──► pan-tracker
-    ├──► pan-projects
-    └──► pan-sync
-
-pan-health (no deps)
-    │
-    └──► pan-diagnose ──► pan-rescue
-```
-
-## Current Status
-
-### ✅ ALL SKILLS COMPLETED AND VERIFIED (2026-01-20)
-
-**Status:** All Phase 1-5 skills have been created, synced, and verified.
-
-### Skills Audit
-
-| Phase | Skills | Repo | Synced | Verified |
-|-------|--------|------|--------|----------|
-| 1 (P0) | pan-help, install, setup, quickstart, up, down, status, plan, issue | ✅ | ✅ | ✅ |
-| 2 (P1) | pan-config, tracker, projects, sync | ✅ | ✅ | ✅ |
-| 3 (P1) | Docker templates (6) + pan-docker, pan-network | ✅ | ✅ | ✅ |
-| 4 (P1) | pan-approve, tell, kill, health, diagnose | ✅ | ✅ | ✅ |
-| 5 (P2) | pan-logs, pan-rescue | ✅ | ✅ | ✅ |
-| Bonus | pan-code-review, pan-convoy-synthesis | ✅ | ✅ | ✅ |
-
-### Completion Summary (2026-01-20)
-
-**All tasks completed:**
-1. ✅ Copied Phase 2-5 skills from repo to `~/.panopticon/skills/`
-2. ✅ Synced all skills to `~/.claude/skills/` via `pan sync` (45 items)
-3. ✅ Verified Phase 1 skills: All 9 skills have proper YAML frontmatter and content
-4. ✅ Verified Phase 2 skills: pan-config, tracker, projects, sync
-5. ✅ Verified Phase 3 skills: All 6 Docker templates + pan-docker, pan-network
-6. ✅ Verified Phase 4 skills: pan-approve, tell, kill, health, diagnose
-7. ✅ Verified Phase 5 skills: pan-logs, pan-rescue
-8. ✅ Verified bonus skills: pan-code-review, pan-convoy-synthesis
-
-### Verification Details
-
-**Skills structure verified:**
-- ✅ All skills have proper YAML frontmatter (name, description, triggers, allowed-tools)
-- ✅ All skills have comprehensive content with proper sections
-- ✅ All Docker templates include Dockerfile.dev, docker-compose.yml, README.md
-- ✅ All skills synced to both `~/.panopticon/skills/` and `~/.claude/skills/`
-
-**Total skills available:**
-- 25 pan-* skills (Phase 1-5 + bonus)
-- 6 Docker templates (spring-boot, react-vite, nextjs, dotnet, python-fastapi, monorepo)
-- Plus existing skills (beads, bug-fix, code-review-*, feature-work, etc.)
-
-### Remaining Work
-
-**All core work complete.** Ready for:
-1. Testing skills in real usage scenarios
-2. Gathering user feedback
-3. Documentation updates (if needed)
-4. PR creation and merge to main
-
-## Completed During Planning
-
-| Task | Status | Reference |
-|------|--------|-----------|
-| Fix planning prompt template to include PRD instruction | ✅ Done | [GitHub #7](https://github.com/eltmon/panopticon-cli/issues/7) |
-| Create Phase 1 skills (9 skills) | ✅ Done | Commit `073b520` |
-
-**Fix details:** Updated `src/dashboard/server/index.ts` to include PRD creation instruction in both the main planning prompt and continuation prompt templates.
-
-## Open Questions
-
-None - scope is clear enough to proceed.
-
-## Sample Skill Template
-
-Reference implementation for new skills:
-
-```markdown
----
-name: pan-help
-description: Overview of all Panopticon commands and capabilities
----
-
-# Panopticon Help
-
-## Overview
-[What this skill helps with]
-
-## When to Use
-- User asks about Panopticon capabilities
-- User is confused about which command to use
-- First-time users exploring the system
-
-## Available Commands
-
-### Getting Started
-| Command | Description |
-|---------|-------------|
-| `pan install` | Install dependencies and set up environment |
-| `pan up` | Start dashboard and services |
-| `pan status` | Check system health |
-
-### Work Management
-| Command | Description |
-|---------|-------------|
-| `pan work issue <id>` | Spawn agent for an issue |
-| `pan work status` | Show running agents |
-
-## Workflow
-1. Step one
-2. Step two
-3. Step three
-
-## Troubleshooting
-**Problem:** X doesn't work
-**Solution:** Do Y
+Layer 4 (Visualizations)
+panopticon-isv ◄── panopticon-xud
+panopticon-7um ◄── panopticon-xud
 ```
 
 ## Beads Tasks Summary
 
-### Verification Tasks (Created 2025-01-20)
+| ID | Title | Layer | Status |
+|----|-------|-------|--------|
+| panopticon-agl | Create SQLite database module | 1 | open |
+| panopticon-vw4 | Create specialist registry module | 1 | open |
+| panopticon-x55 | Implement specialist session management | 1 | open |
+| panopticon-rpk | Modify Cloister to write health events | 1 | open |
+| panopticon-xud | Implement health history API endpoint | 2 | open |
+| panopticon-fyv | Add specialist API endpoints | 2 | open |
+| panopticon-9yw | Add poke API endpoint | 2 | open |
+| panopticon-9lh | Update AgentList to show two sections | 3 | open |
+| panopticon-5f4 | Create SpecialistAgentCard component | 3 | open |
+| panopticon-cbw | Create IssueAgentCard component | 3 | open |
+| panopticon-2cw | Create AgentDetailView component | 3 | open |
+| panopticon-isv | Create HealthHistoryTimeline component | 4 | open |
+| panopticon-7um | Create HealthHistoryChart component | 4 | open |
 
-| Priority | Task ID | Description |
-|----------|---------|-------------|
-| P0 | panopticon-qe0 | Sync skills to ~/.panopticon/skills/ |
-| P0 | panopticon-19b | Sync skills to ~/.claude/skills/ |
-| P1 | panopticon-uow | Verify Phase 1 skills (P0): pan-help, install, setup, quickstart, up, down, status, plan, issue |
-| P1 | panopticon-e5w | Verify Phase 2 skills (P1): pan-config, tracker, projects, sync |
-| P1 | panopticon-cjm | Verify Phase 3: Docker templates + pan-docker, pan-network |
-| P1 | panopticon-6kf | Verify Phase 4 skills (P1): pan-approve, tell, kill, health, diagnose |
-| P2 | panopticon-v60 | Verify Phase 5 skills (P2): pan-logs, pan-rescue |
-| P2 | panopticon-fof | Verify bonus skills: pan-code-review, pan-convoy-synthesis |
+## Technical Notes
 
-### Execution Order
+### SQLite Package
+Use `better-sqlite3` for synchronous SQLite operations in Node.js. Already commonly used in CLI tools.
 
-1. **P0 (blocking):** panopticon-qe0 → panopticon-19b (sync must happen first)
-2. **P1 (can parallelize):** panopticon-uow, panopticon-e5w, panopticon-cjm, panopticon-6kf
-3. **P2 (after P1):** panopticon-v60, panopticon-fof
+### Chart.js Setup
+```bash
+npm install chart.js react-chartjs-2
+```
+
+Chart configuration:
+- Type: Area/line chart
+- X-axis: Time (24h)
+- Y-axis: State (categorical - map to numbers for visualization)
+- Colors: Match health state colors (green/yellow/orange/red)
+
+### Specialist Session Discovery
+To count context tokens for a sleeping specialist:
+1. Read session ID from `~/.panopticon/specialists/<name>.session`
+2. Find JSONL file via Claude Code's session index or direct path search
+3. Parse JSONL and sum `usage.input_tokens + usage.output_tokens`
+
+Note: This is approximate - actual context window includes system prompt and any images.
+
+### Poke Message Format
+Standard nudge message for stuck agents:
+```
+You seem to have been inactive for a while. If you're stuck:
+1. Check your current task in STATE.md
+2. Try an alternative approach if blocked
+3. Ask for help if needed
+
+What's your current status?
+```
+
+## Open Questions
+
+None - all decisions captured above.
 
 ## References
 
-- Existing skills structure: `~/.panopticon/skills/bug-fix/SKILL.md`
-- CLI commands: `pan --help`, `pan work --help`
-- Traefik setup: `templates/traefik/`
-- PRD: `/home/eltmon/projects/panopticon/docs/PRD.md`
+- PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md`
+- Phase 1 Implementation: Commit `a1a9753`
+- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/27
+- Existing components: `src/dashboard/frontend/src/components/`
