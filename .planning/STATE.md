@@ -98,15 +98,17 @@ Contents:
 - [x] Specialist API endpoints (GET /api/specialists, POST /wake, POST /reset)
 - [x] Poke API endpoint (POST /api/agents/:id/poke)
 
-**Frontend (Layer 3):**
+**Frontend (Layer 3 - Complete):**
 - [x] Two-section AgentList refactor (Specialists + Issue Agents)
 - [x] SpecialistAgentCard component (Wake/Reset/Kill buttons)
 - [x] IssueAgentCard component (Poke/Kill buttons)
-- [ ] AgentDetailView panel
+- [x] AgentDetailView panel (slide-out with specialist info, health, terminal)
 
-**Frontend (Layer 4 - Visualizations):**
-- [ ] HealthHistoryTimeline component
-- [ ] HealthHistoryChart component (Chart.js)
+**Frontend (Layer 4 - Complete):**
+- [x] HealthHistoryTimeline component (visual timeline with duration bars)
+- [x] HealthHistoryChart component (Chart.js line/area chart)
+- [x] Toggle between timeline and chart views
+- [x] Configurable time ranges (1h, 6h, 24h, 3d, 7d)
 
 ### Out of Scope (Future Phases)
 
