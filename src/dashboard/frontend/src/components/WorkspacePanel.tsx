@@ -111,6 +111,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
   });
 
   // Poll for pending questions (AskUserQuestion interception - PAN-20)
+  // DISABLED: Path mapping issues cause late/incorrect detection. Re-enable when fixed.
   const { data: pendingQuestionsData } = useQuery<{ pending: boolean; questions: PendingQuestion[] }>({
     queryKey: ['pending-questions', agent.id],
     queryFn: async () => {
@@ -118,7 +119,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
       if (!res.ok) throw new Error('Failed to fetch pending questions');
       return res.json();
     },
-    refetchInterval: 3000, // Poll every 3 seconds for questions
+    refetchInterval: 3000,
+    enabled: false, // DISABLED for now
   });
 
   const pendingQuestions = pendingQuestionsData?.questions || [];

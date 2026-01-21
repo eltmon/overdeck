@@ -8,6 +8,8 @@ import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { getCloisterService } from '../../lib/cloister/service.js';
+import { loadCloisterConfig, saveCloisterConfig } from '../../lib/cloister/config.js';
 
 // Promisified exec for non-blocking operations
 const execAsync = promisify(exec);
@@ -1458,6 +1460,120 @@ app.post('/api/health/agents/:id/ping', (req, res) => {
   }
 
   res.json({ success: true, status: 'healthy', hasOutput: !!health.lastOutput });
+});
+
+// ============== Cloister API ==============
+
+// Get Cloister status
+app.get('/api/cloister/status', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const status = service.getStatus();
+    res.json(status);
+  } catch (error: any) {
+    console.error('Error getting Cloister status:', error);
+    res.status(500).json({ error: 'Failed to get Cloister status: ' + error.message });
+  }
+});
+
+// Start Cloister
+app.post('/api/cloister/start', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    service.start();
+    res.json({ success: true, message: 'Cloister started' });
+  } catch (error: any) {
+    console.error('Error starting Cloister:', error);
+    res.status(500).json({ error: 'Failed to start Cloister: ' + error.message });
+  }
+});
+
+// Stop Cloister (monitoring only, does NOT kill agents)
+app.post('/api/cloister/stop', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    service.stop();
+    res.json({ success: true, message: 'Cloister stopped (agents still running)' });
+  } catch (error: any) {
+    console.error('Error stopping Cloister:', error);
+    res.status(500).json({ error: 'Failed to stop Cloister: ' + error.message });
+  }
+});
+
+// Emergency stop - kill ALL agents
+app.post('/api/cloister/emergency-stop', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const killedAgents = service.emergencyStop();
+    res.json({
+      success: true,
+      message: 'Emergency stop executed',
+      killedAgents,
+    });
+  } catch (error: any) {
+    console.error('Error executing emergency stop:', error);
+    res.status(500).json({ error: 'Failed to execute emergency stop: ' + error.message });
+  }
+});
+
+// Get Cloister configuration
+app.get('/api/cloister/config', (_req, res) => {
+  try {
+    const config = loadCloisterConfig();
+    res.json(config);
+  } catch (error: any) {
+    console.error('Error loading Cloister config:', error);
+    res.status(500).json({ error: 'Failed to load Cloister config: ' + error.message });
+  }
+});
+
+// Update Cloister configuration
+app.put('/api/cloister/config', (req, res) => {
+  try {
+    const updates = req.body;
+    const service = getCloisterService();
+
+    // Save configuration
+    saveCloisterConfig(updates);
+
+    // Reload service configuration
+    service.reloadConfig();
+
+    res.json({ success: true, config: updates });
+  } catch (error: any) {
+    console.error('Error updating Cloister config:', error);
+    res.status(500).json({ error: 'Failed to update Cloister config: ' + error.message });
+  }
+});
+
+// Get agent health (Cloister-based)
+app.get('/api/agents/:id/cloister-health', (req, res) => {
+  try {
+    const { id } = req.params;
+    const service = getCloisterService();
+    const health = service.getAgentHealth(id);
+
+    if (!health) {
+      return res.status(404).json({ error: 'Agent not found or runtime not available' });
+    }
+
+    res.json(health);
+  } catch (error: any) {
+    console.error('Error getting agent health:', error);
+    res.status(500).json({ error: 'Failed to get agent health: ' + error.message });
+  }
+});
+
+// Get all agents health
+app.get('/api/cloister/agents/health', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const agentHealths = service.getAllAgentHealth();
+    res.json({ agents: agentHealths });
+  } catch (error: any) {
+    console.error('Error getting agents health:', error);
+    res.status(500).json({ error: 'Failed to get agents health: ' + error.message });
+  }
 });
 
 // Get activity log

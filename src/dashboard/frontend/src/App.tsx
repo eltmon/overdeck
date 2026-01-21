@@ -9,6 +9,7 @@ import { WorkspacePanel } from './components/WorkspacePanel';
 import { IssueDetailPanel } from './components/IssueDetailPanel';
 import { ActivityPanel } from './components/ActivityPanel';
 import { RuntimeComparison } from './components/RuntimeComparison';
+import { CloisterStatusBar } from './components/CloisterStatusBar';
 import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3 } from 'lucide-react';
 import { Agent, Issue } from './types';
 
@@ -105,9 +106,12 @@ export default function App() {
     <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Eye className="w-6 h-6 text-blue-400" />
-            <h1 className="text-xl font-bold text-white">Panopticon</h1>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <Eye className="w-6 h-6 text-blue-400" />
+              <h1 className="text-xl font-bold text-white">Panopticon</h1>
+            </div>
+            <CloisterStatusBar />
           </div>
           <nav className="flex gap-2">
             {([

@@ -9,6 +9,7 @@ import { skillsCommand } from './commands/skills.js';
 import { registerWorkCommands, statusCommand } from './commands/work/index.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerInstallCommand } from './commands/install.js';
+import { registerCloisterCommands } from './commands/cloister/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
@@ -64,6 +65,9 @@ registerWorkCommands(program);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);
+
+// Register cloister commands (pan cloister status, pan cloister start, etc.)
+registerCloisterCommands(program);
 
 // Register install command
 registerInstallCommand(program);

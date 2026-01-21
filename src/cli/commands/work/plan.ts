@@ -442,6 +442,16 @@ function generateWorkspaceFile(issue: LinearIssue, prdFiles: string[]): string {
   lines.push('4. Update STATE.md with progress');
   lines.push('5. Repeat until all tasks complete');
   lines.push('');
+  lines.push('## CRITICAL: Work Completion Requirements');
+  lines.push('');
+  lines.push('**You are NOT done until ALL of these are true:**');
+  lines.push('');
+  lines.push('1. **Tests pass** - Run the full test suite');
+  lines.push('2. **All changes committed** - `git status` shows "nothing to commit"');
+  lines.push('3. **Pushed to remote** - `git push`');
+  lines.push('');
+  lines.push('**Uncommitted changes = NOT COMPLETE.**');
+  lines.push('');
 
   return lines.join('\n');
 }

@@ -218,6 +218,26 @@ function buildAgentPrompt(issueId: string, workspacePath: string, projectRoot: s
   lines.push('but STATE.md provides the narrative context and current state that beads alone cannot capture.');
   lines.push('');
 
+  // CRITICAL: Work completion requirements
+  lines.push('## CRITICAL: Work Completion Requirements');
+  lines.push('');
+  lines.push('**You are NOT done until ALL of these are true:**');
+  lines.push('');
+  lines.push('1. **Tests pass** - Run the full test suite (`npm test` or equivalent)');
+  lines.push('2. **All changes committed** - `git status` shows "nothing to commit, working tree clean"');
+  lines.push('3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`');
+  lines.push('');
+  lines.push('**Before declaring work complete, run:**');
+  lines.push('```');
+  lines.push('npm test                                         # Run tests');
+  lines.push('git add -A && git commit -m "feat: description"  # Commit ALL changes');
+  lines.push('git push -u origin $(git branch --show-current)  # Push');
+  lines.push('git status                                       # Must show "nothing to commit"');
+  lines.push('```');
+  lines.push('');
+  lines.push('**Uncommitted changes = NOT COMPLETE. Do not say you are done if `git status` shows changes.**');
+  lines.push('');
+
   return lines.join('\n');
 }
 
