@@ -5,5 +5,7 @@
  */
 
 export * from './config.js';
+export * from './database.js';
 export * from './health.js';
 export * from './service.js';
+export * from './specialists.js';

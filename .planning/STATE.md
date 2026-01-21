@@ -87,12 +87,15 @@ Contents:
 
 ### In Scope (PAN-27)
 
-**Backend:**
-- [ ] Specialist registry module (`src/lib/cloister/specialists.ts`)
-- [ ] Specialist session management (context token counting from JSONL)
+**Backend (Layer 1 - Complete):**
+- [x] Specialist registry module (`src/lib/cloister/specialists.ts`)
+- [x] Specialist session management (context token counting from JSONL)
+- [x] SQLite health history storage
+- [x] Cloister service writes health events
+
+**Backend (Layer 2 - API):**
 - [ ] Specialist API endpoints (list, wake, reset)
 - [ ] Poke API endpoint
-- [ ] SQLite health history storage
 - [ ] Health history API endpoint
 
 **Frontend:**

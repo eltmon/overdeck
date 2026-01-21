@@ -5,7 +5,7 @@
  * Named after the TARDIS's Cloister Bell - an alarm for catastrophic events.
  */
 
-import type { AgentRuntime } from '../runtimes/types.js';
+import type { AgentRuntime, HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth, HealthSummary } from './health.js';
 import { loadCloisterConfig } from './config.js';
@@ -17,6 +17,12 @@ import {
   getAgentsToKill,
   getAgentsNeedingAttention,
 } from './health.js';
+import {
+  initHealthDatabase,
+  writeHealthEvent,
+  getLatestHealthEvent,
+  closeHealthDatabase,
+} from './database.js';
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgents } from '../agents.js';
 
@@ -61,6 +67,7 @@ export class CloisterService {
   private lastCheck: Date | null = null;
   private config: CloisterConfig;
   private listeners: CloisterEventListener[] = [];
+  private previousStates: Map<string, HealthState> = new Map();
 
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfig();
@@ -76,6 +83,15 @@ export class CloisterService {
     }
 
     console.log('🔔 Starting Cloister agent watchdog...');
+
+    // Initialize health history database
+    try {
+      initHealthDatabase();
+      console.log('  ✓ Health history database initialized');
+    } catch (error) {
+      console.error('  ✗ Failed to initialize health database:', error);
+    }
+
     this.running = true;
     this.emit({ type: 'started' });
 
@@ -101,6 +117,13 @@ export class CloisterService {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
+    }
+
+    // Close database connection
+    try {
+      closeHealthDatabase();
+    } catch (error) {
+      console.error('Failed to close health database:', error);
     }
 
     this.emit({ type: 'stopped' });
@@ -175,6 +198,9 @@ export class CloisterService {
         if (runtime) {
           const health = getAgentHealth(agentId, runtime);
           agentHealths.push(health);
+
+          // Write health event to database
+          this.recordHealthEvent(health);
         }
       }
 
@@ -246,6 +272,65 @@ export class CloisterService {
       console.log(`🔔 Killed ${agentId}`);
     } catch (error) {
       console.error(`Failed to kill ${agentId}:`, error);
+    }
+  }
+
+  /**
+   * Record health event to database
+   *
+   * Only writes events when state changes or on first check.
+   */
+  private recordHealthEvent(health: AgentHealth): void {
+    try {
+      const currentState = health.state;
+      const previousState = this.previousStates.get(health.agentId);
+
+      // Only write event if state changed or this is first check
+      if (previousState === undefined || previousState !== currentState) {
+        // Determine source from heartbeat
+        const source = health.heartbeat?.source
+          ? this.mapActivitySource(health.heartbeat.source)
+          : 'unknown';
+
+        writeHealthEvent({
+          agentId: health.agentId,
+          timestamp: new Date().toISOString(),
+          state: currentState,
+          previousState: previousState,
+          source,
+          metadata: health.heartbeat
+            ? JSON.stringify({
+                confidence: health.heartbeat.confidence,
+                lastAction: health.heartbeat.lastAction,
+                toolName: health.heartbeat.toolName,
+                timeSinceActivity: health.timeSinceActivity,
+              })
+            : undefined,
+        });
+
+        // Update tracked state
+        this.previousStates.set(health.agentId, currentState);
+      }
+    } catch (error) {
+      console.error(`Failed to record health event for ${health.agentId}:`, error);
+    }
+  }
+
+  /**
+   * Map ActivitySource to database source string
+   */
+  private mapActivitySource(source: string): string {
+    switch (source) {
+      case 'jsonl':
+        return 'jsonl_mtime';
+      case 'tmux':
+        return 'tmux_activity';
+      case 'git':
+        return 'git_activity';
+      case 'active-heartbeat':
+        return 'active_heartbeat';
+      default:
+        return source;
     }
   }
 

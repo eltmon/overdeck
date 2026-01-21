@@ -57,6 +57,7 @@
     "@iarna/toml": "^2.2.5",
     "@linear/sdk": "^70.0.0",
     "@octokit/rest": "^22.0.1",
+    "better-sqlite3": "^12.6.2",
     "chalk": "^5.6.2",
     "commander": "^12.1.0",
     "conf": "^12.0.0",
@@ -65,6 +66,7 @@
     "ora": "^8.2.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/inquirer": "^9.0.9",
     "@types/node": "^20.10.0",
     "@vitest/coverage-v8": "^1.0.4",
