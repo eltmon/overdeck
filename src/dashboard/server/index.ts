@@ -3410,14 +3410,13 @@ Start by exploring the codebase to understand the context, then begin the discov
           const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
           // Escape special characters for tmux send-keys
           const escapedMessage = initMessage.replace(/'/g, "'\\''");
-          // CRITICAL: Send text and Enter as SEPARATE commands!
-          execSync(`tmux send-keys -t ${sessionName} '${escapedMessage}'`, { encoding: 'utf-8' });
-          execSync(`tmux send-keys -t ${sessionName} Enter`, { encoding: 'utf-8' });
+          // Send text followed by Enter in single atomic command
+          execSync(`tmux send-keys -t ${sessionName} '${escapedMessage}' Enter`, { encoding: 'utf-8' });
           console.log(`Sent planning prompt to ${sessionName}`);
         } catch (err) {
           console.error('Failed to send planning prompt:', err);
         }
-      }, 3000); // Wait 3 seconds for Claude to fully initialize
+      }, 6000); // Wait 6 seconds for Claude to fully initialize (TUI takes time)
 
       planningAgentStarted = true;
     } catch (err: any) {
