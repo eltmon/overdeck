@@ -310,6 +310,21 @@ async function installCommand(options: InstallOptions): Promise<void> {
       } else {
         spinner.info('Traefik configuration already exists (skipping)');
       }
+
+      // Check if existing docker-compose.yml needs migration (for upgrades)
+      const existingCompose = join(TRAEFIK_DIR, 'docker-compose.yml');
+      if (existsSync(existingCompose)) {
+        const content = readFileSync(existingCompose, 'utf-8');
+        if (content.includes('panopticon:') && !content.includes('external: true')) {
+          // Patch the file to add external: true
+          const patched = content.replace(
+            /networks:\s*\n\s*panopticon:\s*\n\s*name: panopticon\s*\n\s*driver: bridge/,
+            'networks:\n  panopticon:\n    name: panopticon\n    external: true  # Network created by \'pan install\''
+          );
+          writeFileSync(existingCompose, patched);
+          spinner.info('Migrated Traefik config (added external: true to network)');
+        }
+      }
     } catch (error) {
       spinner.fail(`Failed to set up Traefik configuration: ${error}`);
       console.log(chalk.yellow('You can set up Traefik manually later'));

@@ -128,6 +128,21 @@ program
       const traefikDir = join(process.env.HOME || '', '.panopticon', 'traefik');
       if (existsSync(traefikDir)) {
         try {
+          // Ensure network is marked as external (migration for older installs)
+          const composeFile = join(traefikDir, 'docker-compose.yml');
+          if (existsSync(composeFile)) {
+            const content = readFileSync(composeFile, 'utf-8');
+            if (!content.includes('external: true') && content.includes('panopticon:')) {
+              const patched = content.replace(
+                /networks:\s*\n\s*panopticon:\s*\n\s*name: panopticon\s*\n\s*driver: bridge/,
+                'networks:\n  panopticon:\n    name: panopticon\n    external: true  # Network created by \'pan install\''
+              );
+              const { writeFileSync } = await import('fs');
+              writeFileSync(composeFile, patched);
+              console.log(chalk.dim('  (migrated network config)'));
+            }
+          }
+
           console.log(chalk.dim('Starting Traefik...'));
           execSync('docker-compose up -d', {
             cwd: traefikDir,
