@@ -5,7 +5,7 @@ export interface LinearProject {
   icon?: string;
 }
 
-export type IssueSource = 'linear' | 'github' | 'gitlab' | 'jira';
+export type IssueSource = 'linear' | 'github' | 'gitlab' | 'jira' | 'rally';
 
 export interface Issue {
   id: string;

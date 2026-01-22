@@ -6,7 +6,7 @@
  */
 
 // Supported tracker types
-export type TrackerType = 'linear' | 'github' | 'gitlab';
+export type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
 
 // Normalized issue state (lowest common denominator)
 export type IssueState = 'open' | 'in_progress' | 'closed';

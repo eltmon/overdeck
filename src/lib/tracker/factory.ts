@@ -9,6 +9,7 @@ import { TrackerAuthError } from './interface.js';
 import { LinearTracker } from './linear.js';
 import { GitHubTracker } from './github.js';
 import { GitLabTracker } from './gitlab.js';
+import { RallyTracker } from './rally.js';
 import type { TrackersConfig } from '../config.js';
 
 // Configuration for a single tracker
@@ -26,6 +27,11 @@ export interface TrackerConfig {
 
   // GitLab-specific
   projectId?: string;
+
+  // Rally-specific
+  server?: string;
+  workspace?: string;
+  project?: string;
 }
 
 // Multi-tracker configuration (re-exported from config.ts)
@@ -89,6 +95,26 @@ export function createTracker(config: TrackerConfig): IssueTracker {
       }
 
       return new GitLabTracker(token, config.projectId);
+    }
+
+    case 'rally': {
+      const apiKey = config.apiKeyEnv
+        ? process.env[config.apiKeyEnv]
+        : process.env.RALLY_API_KEY;
+
+      if (!apiKey) {
+        throw new TrackerAuthError(
+          'rally',
+          `API key not found. Set ${config.apiKeyEnv ?? 'RALLY_API_KEY'} environment variable.`
+        );
+      }
+
+      return new RallyTracker({
+        apiKey,
+        server: config.server,
+        workspace: config.workspace,
+        project: config.project,
+      });
     }
 
     default:

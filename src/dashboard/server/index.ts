@@ -145,6 +145,41 @@ function getLinearApiKey(): string | null {
   return process.env.LINEAR_API_KEY || null;
 }
 
+// Rally configuration
+interface RallyConfig {
+  apiKey: string;
+  server?: string;
+  workspace?: string;
+  project?: string;
+}
+
+function getRallyConfig(): RallyConfig | null {
+  const envFile = join(homedir(), '.panopticon.env');
+  if (!existsSync(envFile)) return null;
+
+  const content = readFileSync(envFile, 'utf-8');
+
+  // Look for RALLY_API_KEY
+  const apiKeyMatch = content.match(/RALLY_API_KEY=(.+)/);
+  if (!apiKeyMatch) return null;
+
+  const apiKey = apiKeyMatch[1].trim();
+
+  // Optional: RALLY_SERVER
+  const serverMatch = content.match(/RALLY_SERVER=(.+)/);
+  const server = serverMatch?.[1].trim();
+
+  // Optional: RALLY_WORKSPACE
+  const workspaceMatch = content.match(/RALLY_WORKSPACE=(.+)/);
+  const workspace = workspaceMatch?.[1].trim();
+
+  // Optional: RALLY_PROJECT
+  const projectMatch = content.match(/RALLY_PROJECT=(.+)/);
+  const project = projectMatch?.[1].trim();
+
+  return { apiKey, server, workspace, project };
+}
+
 // GitHub configuration
 interface GitHubConfig {
   token: string;
@@ -522,6 +557,78 @@ async function fetchGitHubIssues(): Promise<any[]> {
   return allIssues;
 }
 
+// Map Rally ScheduleState to canonical dashboard state
+function mapRallyStateToCanonical(scheduleState: string): string {
+  const stateLower = scheduleState.toLowerCase();
+
+  if (stateLower === 'defined') return 'todo';
+  if (stateLower === 'in-progress') return 'in_progress';
+  if (stateLower === 'completed' || stateLower === 'accepted') return 'done';
+
+  return 'todo';
+}
+
+// Fetch Rally issues using the Rally adapter
+async function fetchRallyIssues(): Promise<any[]> {
+  const config = getRallyConfig();
+  if (!config) return [];
+
+  try {
+    // Dynamically import the Rally tracker
+    const { RallyTracker } = await import('../../lib/tracker/rally.js');
+
+    const tracker = new RallyTracker({
+      apiKey: config.apiKey,
+      server: config.server,
+      workspace: config.workspace,
+      project: config.project,
+    });
+
+    // Fetch all open issues
+    const issues = await tracker.listIssues({
+      includeClosed: false,
+      limit: 100,
+    });
+
+    // Format issues to match dashboard schema
+    const formattedIssues = issues.map((issue: any) => {
+      const canonicalStatus = mapRallyStateToCanonical(issue.state);
+
+      return {
+        id: `rally-${issue.id}`,
+        identifier: issue.ref,
+        title: issue.title,
+        description: issue.description || '',
+        status: canonicalStatus === 'todo' ? 'Todo' :
+                canonicalStatus === 'in_progress' ? 'In Progress' :
+                canonicalStatus === 'done' ? 'Done' : 'Todo',
+        priority: issue.priority ?? 3,
+        assignee: issue.assignee ? {
+          name: issue.assignee,
+          email: `${issue.assignee.replace(/\s+/g, '.').toLowerCase()}@rally`,
+        } : undefined,
+        labels: issue.labels || [],
+        url: issue.url,
+        createdAt: issue.createdAt,
+        updatedAt: issue.updatedAt,
+        project: {
+          id: 'rally-project',
+          name: 'Rally',
+          color: '#00C7B1',
+          icon: 'rally',
+        },
+        source: 'rally',
+      };
+    });
+
+    console.log(`Fetched ${formattedIssues.length} Rally issues`);
+    return formattedIssues;
+  } catch (error: any) {
+    console.error('Error fetching Rally issues:', error.message);
+    return [];
+  }
+}
+
 // Get Linear issues using raw GraphQL for efficiency (single query with all data)
 // Query params:
 //   - cycle: 'current' (default) | 'all' | 'backlog' - filter by cycle
@@ -683,11 +790,14 @@ app.get('/api/issues', async (req, res) => {
       source: 'linear',
     }));
 
-    // Fetch GitHub issues in parallel
-    const githubIssues = await fetchGitHubIssues();
+    // Fetch GitHub and Rally issues in parallel
+    const [githubIssues, rallyIssues] = await Promise.all([
+      fetchGitHubIssues(),
+      fetchRallyIssues(),
+    ]);
 
     // Merge and sort by updatedAt
-    const allFormatted = [...linearFormatted, ...githubIssues].sort((a, b) =>
+    const allFormatted = [...linearFormatted, ...githubIssues, ...rallyIssues].sort((a, b) =>
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
 

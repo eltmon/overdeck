@@ -51,6 +51,9 @@ function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
     owner: (trackerConfig as any).owner,
     repo: (trackerConfig as any).repo,
     projectId: (trackerConfig as any).project_id,
+    server: (trackerConfig as any).server,
+    workspace: (trackerConfig as any).workspace,
+    project: (trackerConfig as any).project,
   };
 }
 
@@ -64,6 +67,7 @@ function getConfiguredTrackers(): TrackerType[] {
   if (config.trackers.linear) trackers.push('linear');
   if (config.trackers.github) trackers.push('github');
   if (config.trackers.gitlab) trackers.push('gitlab');
+  if (config.trackers.rally) trackers.push('rally');
 
   return trackers;
 }
@@ -117,9 +121,9 @@ export async function listCommand(options: ListOptions): Promise<void> {
     if (options.tracker) {
       // Specific tracker requested
       const trackerType = options.tracker as TrackerType;
-      if (!['linear', 'github', 'gitlab'].includes(trackerType)) {
+      if (!['linear', 'github', 'gitlab', 'rally'].includes(trackerType)) {
         spinner.fail(`Unknown tracker: ${options.tracker}`);
-        console.log(chalk.dim('Valid trackers: linear, github, gitlab'));
+        console.log(chalk.dim('Valid trackers: linear, github, gitlab, rally'));
         process.exit(1);
       }
       trackersToQuery.push(trackerType);

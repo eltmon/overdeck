@@ -1,11 +1,12 @@
 ---
 name: pan-tracker
-description: Configure issue tracker integration (Linear, GitHub, GitLab)
+description: Configure issue tracker integration (Linear, GitHub, GitLab, Rally)
 triggers:
   - pan tracker
   - configure tracker
   - setup linear
   - setup github issues
+  - setup rally
   - connect issue tracker
   - tracker integration
 allowed-tools:
@@ -18,7 +19,7 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through configuring issue tracker integration with Panopticon. Supported trackers include Linear, GitHub Issues, and GitLab Issues.
+This skill guides you through configuring issue tracker integration with Panopticon. Supported trackers include Linear, GitHub Issues, GitLab Issues, and Rally (Broadcom Agile Central).
 
 ## When to Use
 
@@ -34,6 +35,7 @@ This skill guides you through configuring issue tracker integration with Panopti
 | **Linear** | Full support | API key in `~/.panopticon.env` |
 | **GitHub Issues** | Full support | Token + repo config in `~/.panopticon.env` |
 | **GitLab Issues** | Partial | Token + URL in `~/.panopticon.env` |
+| **Rally** | Full support | API key + workspace/project in `~/.panopticon/config.toml` |
 
 ## Linear Setup
 
@@ -149,6 +151,81 @@ EOF
 
 For self-hosted GitLab, change `GITLAB_URL` to your instance URL.
 
+## Rally Setup
+
+### 1. Get Your API Key
+
+1. Log into Rally at https://rally1.rallydev.com (or your organization's Rally server)
+2. Click your profile icon → API Keys
+3. Click "Generate New API Key"
+4. Copy the API key
+
+### 2. Find Your Workspace and Project OIDs
+
+```bash
+# Workspace OID is in the URL when viewing your workspace
+# Example: https://rally1.rallydev.com/#/12345d/dashboard
+# Workspace OID: /workspace/12345
+
+# Project OID is in the URL when viewing a project
+# Example: https://rally1.rallydev.com/#/12345d/portfolioitemstreegrid?workspace=/workspace/12345&project=/project/67890
+# Project OID: /project/67890
+```
+
+**Note:** The workspace and project parameters are optional. If not specified, Rally will query all accessible workspaces/projects.
+
+### 3. Configure Panopticon
+
+Add Rally configuration to `~/.panopticon/config.toml`:
+
+```toml
+[trackers.rally]
+type = "rally"
+api_key_env = "RALLY_API_KEY"
+server = "https://rally1.rallydev.com"  # Optional, defaults to rally1.rallydev.com
+workspace = "/workspace/12345"           # Optional, your workspace OID
+project = "/project/67890"               # Optional, your project OID
+```
+
+Add your API key to `~/.panopticon.env`:
+
+```bash
+echo "RALLY_API_KEY=_abc123your_key_here" >> ~/.panopticon.env
+```
+
+### 4. Set Rally as Primary or Secondary Tracker
+
+In `~/.panopticon/config.toml`, specify Rally as your primary or secondary tracker:
+
+```toml
+[trackers]
+primary = "linear"     # Your main tracker
+secondary = "rally"    # Rally as secondary tracker
+
+# Or use Rally as primary:
+# primary = "rally"
+```
+
+### 5. Verify Setup
+
+```bash
+pan work list --tracker rally
+# Should show issues from your Rally workspace
+
+# Or list all trackers:
+pan work list --all-trackers
+```
+
+### Rally-Specific Notes
+
+- **Work Item Types**: Rally supports User Stories, Defects, Tasks, and Features. All are treated as issues in Panopticon.
+- **State Mapping**:
+  - `Defined` → Open
+  - `In-Progress` → In Progress
+  - `Completed`, `Accepted` → Closed
+- **Identifiers**: Rally uses FormattedID (e.g., `US123`, `DE456`, `TA789`, `F012`)
+- **Priority**: Rally's priority strings (High, Normal, Low) are automatically mapped to numeric priorities
+
 ## Multiple Trackers
 
 You can configure multiple trackers simultaneously. Panopticon will aggregate issues from all configured trackers.
@@ -159,16 +236,36 @@ LINEAR_API_KEY=lin_api_xxxxx
 GITHUB_TOKEN=ghp_xxxxx
 GITHUB_REPOS=myorg/repo:GH
 GITHUB_LOCAL_PATHS=myorg/repo=/home/user/repo
+RALLY_API_KEY=_abc123xxxxx
+```
+
+**Example config.toml with multiple trackers:**
+
+```toml
+[trackers]
+primary = "linear"
+secondary = "rally"
+
+[trackers.linear]
+type = "linear"
+api_key_env = "LINEAR_API_KEY"
+
+[trackers.rally]
+type = "rally"
+api_key_env = "RALLY_API_KEY"
+workspace = "/workspace/12345"
+project = "/project/67890"
 ```
 
 ## Workflow
 
-1. **Choose your tracker(s)**: Linear, GitHub, or GitLab
+1. **Choose your tracker(s)**: Linear, GitHub, GitLab, or Rally
 2. **Get API credentials**: Follow the steps above for your tracker
-3. **Add to ~/.panopticon.env**: Configure tokens and repos
-4. **Set up mappings**: Map tracker projects to local paths
-5. **Verify**: Run `pan work list` to confirm connectivity
-6. **Restart dashboard**: `pan down && pan up`
+3. **Add to ~/.panopticon.env**: Configure API keys/tokens
+4. **Configure ~/.panopticon/config.toml**: Add tracker configuration
+5. **Set up mappings**: Map tracker projects to local paths (if needed)
+6. **Verify**: Run `pan work list` to confirm connectivity
+7. **Restart dashboard**: `pan down && pan up`
 
 ## Troubleshooting
 

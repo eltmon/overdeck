@@ -23,7 +23,15 @@ export interface GitLabConfig {
   project_id: string;    // GitLab project ID
 }
 
-export type TrackerConfigItem = LinearConfig | GitHubConfig | GitLabConfig;
+export interface RallyConfig {
+  type: 'rally';
+  api_key_env?: string;  // Env var name for API key (default: RALLY_API_KEY)
+  server?: string;       // Rally server URL (default: rally1.rallydev.com)
+  workspace?: string;    // Rally workspace OID (e.g., "/workspace/12345")
+  project?: string;      // Rally project OID (e.g., "/project/67890")
+}
+
+export type TrackerConfigItem = LinearConfig | GitHubConfig | GitLabConfig | RallyConfig;
 
 export interface TrackersConfig {
   primary: TrackerType;
@@ -31,6 +39,7 @@ export interface TrackersConfig {
   linear?: LinearConfig;
   github?: GitHubConfig;
   gitlab?: GitLabConfig;
+  rally?: RallyConfig;
 }
 
 export interface PanopticonConfig {
