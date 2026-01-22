@@ -201,7 +201,7 @@ export class CloisterService {
   /**
    * Perform a health check on all running agents
    */
-  private async performHealthCheck(): Promise<void> {
+  private performHealthCheck(): void {
     try {
       const runningAgents = listRunningAgents().filter((a) => a.tmuxActive);
       const agentIds = runningAgents.map((a) => a.id);
@@ -250,7 +250,8 @@ export class CloisterService {
       }
 
       // Check for handoff triggers (Phase 4)
-      await this.checkHandoffTriggers(agentHealths);
+      // Note: Intentionally not awaiting - runs in background
+      void this.checkHandoffTriggers(agentHealths);
     } catch (error) {
       console.error('Cloister health check failed:', error);
       this.emit({ type: 'error', error: error as Error });

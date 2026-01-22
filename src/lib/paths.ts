@@ -1,8 +1,8 @@
 import { homedir } from 'os';
 import { join } from 'path';
 
-// Panopticon home directory
-export const PANOPTICON_HOME = join(homedir(), '.panopticon');
+// Panopticon home directory (can be overridden for testing)
+export const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
 
 // Subdirectories
 export const CONFIG_DIR = PANOPTICON_HOME;
