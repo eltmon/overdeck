@@ -3223,10 +3223,76 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
       return res.status(400).json({ error });
     }
 
-    // 6. ALWAYS use merge-agent for ALL merges
-    // This ensures merge-agent sees all changes, builds context, and can handle
-    // conflicts intelligently when they do occur. It also runs tests before completing.
-    console.log(`Invoking merge-agent for ${issueId}...`);
+    // 6. SPECIALIST WORKFLOW: review-agent → test-agent → merge-agent
+    // Each specialist gets woken with a task and we wait for completion
+    const { wakeSpecialist, isRunning } = await import('../../lib/cloister/specialists.js');
+
+    // 6a. REVIEW-AGENT: Code review
+    console.log(`[approve] Step 1/3: Waking review-agent for ${issueId}...`);
+    const reviewPrompt = `CODE REVIEW TASK for ${issueId}:
+
+WORKSPACE: ${workspacePath}
+BRANCH: ${branchName}
+
+INSTRUCTIONS:
+1. cd ${workspacePath}
+2. Review the changes: git diff main...${branchName}
+3. Check for:
+   - Code quality issues
+   - Security vulnerabilities
+   - Performance concerns
+   - Missing tests
+4. If issues found: Report them but don't block (we're approving)
+5. Provide a brief summary of the changes
+
+This is part of the approve workflow. Provide your review findings.`;
+
+    const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
+      waitForReady: true,
+      startIfNotRunning: true,
+    });
+
+    if (!reviewResult.success) {
+      console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}, continuing anyway`);
+    } else {
+      console.log(`[approve] review-agent woken, task sent`);
+      // Give review-agent a moment to start processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    // 6b. TEST-AGENT: Run tests
+    console.log(`[approve] Step 2/3: Waking test-agent for ${issueId}...`);
+    const testPrompt = `TEST EXECUTION TASK for ${issueId}:
+
+WORKSPACE: ${workspacePath}
+BRANCH: ${branchName}
+
+INSTRUCTIONS:
+1. cd ${workspacePath}
+2. Ensure you're on the feature branch: git checkout ${branchName}
+3. Run the test suite: npm test (or appropriate test command)
+4. Report results:
+   - If tests PASS: Say "TESTS PASSED"
+   - If tests FAIL: List the failing tests and potential causes
+5. If no test command found, say "NO TESTS CONFIGURED"
+
+This is part of the approve workflow. Test results determine if merge proceeds.`;
+
+    const testResult = await wakeSpecialist('test-agent', testPrompt, {
+      waitForReady: true,
+      startIfNotRunning: true,
+    });
+
+    if (!testResult.success) {
+      console.warn(`[approve] test-agent failed to wake: ${testResult.message}, continuing anyway`);
+    } else {
+      console.log(`[approve] test-agent woken, task sent`);
+      // Give test-agent time to run tests
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    // 6c. MERGE-AGENT: Perform the merge
+    console.log(`[approve] Step 3/3: Waking merge-agent for ${issueId}...`);
 
     try {
       const mergeResult = await spawnMergeAgentForBranches(

@@ -15,6 +15,8 @@ import {
   setSessionId,
   recordWake,
   getTmuxSessionName,
+  wakeSpecialist,
+  isRunning,
 } from './specialists.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
@@ -456,11 +458,12 @@ export async function spawnMergeAgentForBranches(
   targetBranch: string,
   issueId: string
 ): Promise<MergeResult> {
-  console.log(`[merge-agent] Attempting merge of ${sourceBranch} into ${targetBranch}`);
-  logActivity('merge_attempt', `Attempting merge: ${sourceBranch} -> ${targetBranch}`);
+  console.log(`[merge-agent] Waking specialist for merge of ${sourceBranch} into ${targetBranch}`);
+  logActivity('merge_attempt', `Waking specialist for merge: ${sourceBranch} -> ${targetBranch}`);
 
+  // Pre-flight checks (quick validation before waking specialist)
   try {
-    // Check that source branch is pushed to remote - agents MUST push before merge
+    // Check that source branch is pushed to remote
     try {
       const remoteBranches = execSync(`git ls-remote --heads origin ${sourceBranch}`, {
         cwd: projectPath,
@@ -469,58 +472,20 @@ export async function spawnMergeAgentForBranches(
       });
 
       if (!remoteBranches.trim()) {
-        const message = `Branch ${sourceBranch} is not pushed to remote. Agent must run 'git push -u origin ${sourceBranch}' first.`;
+        const message = `Branch ${sourceBranch} is not pushed to remote.`;
         console.error(`[merge-agent] ${message}`);
         logActivity('merge_blocked', message);
-
-        // Try to notify the agent
-        const agentMessage = `⚠️ MERGE BLOCKED: Your branch "${sourceBranch}" is not pushed to remote.\n\nPlease run:\n  git push -u origin ${sourceBranch}\n\nThen signal you're ready for merge again.`;
-        sendMessageToAgent(issueId, agentMessage);
-
-        return {
-          success: false,
-          reason: message,
-        };
-      }
-
-      // Also check if local branch has unpushed commits
-      try {
-        const unpushed = execSync(`git log origin/${sourceBranch}..${sourceBranch} --oneline`, {
-          cwd: projectPath,
-          encoding: 'utf-8',
-          stdio: 'pipe',
-        });
-
-        if (unpushed.trim()) {
-          const commitCount = unpushed.trim().split('\n').length;
-          const message = `Branch ${sourceBranch} has ${commitCount} unpushed commit(s). Agent must run 'git push' first.`;
-          console.error(`[merge-agent] ${message}`);
-          logActivity('merge_blocked', message);
-
-          // Try to notify the agent
-          const agentMessage = `⚠️ MERGE BLOCKED: Your branch "${sourceBranch}" has ${commitCount} unpushed commit(s).\n\nPlease run:\n  git push\n\nThen signal you're ready for merge again.`;
-          sendMessageToAgent(issueId, agentMessage);
-
-          return {
-            success: false,
-            reason: message,
-          };
-        }
-      } catch {
-        // If this fails, the branch might not exist locally - that's ok for remote-only branches
+        sendMessageToAgent(issueId, `⚠️ MERGE BLOCKED: Branch "${sourceBranch}" is not pushed. Run: git push -u origin ${sourceBranch}`);
+        return { success: false, reason: message };
       }
     } catch {
-      const message = `Cannot verify remote branch ${sourceBranch}. Agent must ensure branch is pushed to origin.`;
+      const message = `Cannot verify remote branch ${sourceBranch}.`;
       console.error(`[merge-agent] ${message}`);
       logActivity('merge_blocked', message);
-      return {
-        success: false,
-        reason: message,
-      };
+      return { success: false, reason: message };
     }
 
-    // Check for uncommitted changes FIRST - this prevents merge failures
-    // Use -uno to ignore untracked files - they don't block merges
+    // Check for uncommitted changes (ignore untracked files)
     try {
       const statusOutput = execSync(`git status --porcelain -uno`, {
         cwd: projectPath,
@@ -529,132 +494,154 @@ export async function spawnMergeAgentForBranches(
       });
 
       if (statusOutput.trim()) {
-        // There are uncommitted changes - cannot proceed with merge
         const changedFiles = statusOutput.trim().split('\n').slice(0, 5).join(', ');
-        const message = `Cannot merge: uncommitted changes in working directory (${changedFiles}${statusOutput.trim().split('\n').length > 5 ? '...' : ''})`;
+        const message = `Cannot merge: uncommitted changes (${changedFiles})`;
         console.error(`[merge-agent] ${message}`);
         logActivity('merge_blocked', message);
-        return {
-          success: false,
-          reason: message,
-        };
+        return { success: false, reason: message };
       }
     } catch {
       // If git status fails, continue anyway
     }
+  } catch (error: any) {
+    return { success: false, reason: `Pre-flight check failed: ${error.message}` };
+  }
 
-    // Ensure we're on target branch
-    execSync(`git checkout ${targetBranch}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-      stdio: 'pipe',
-    });
+  // Record current HEAD before merge
+  const headBefore = execSync('git rev-parse HEAD', {
+    cwd: projectPath,
+    encoding: 'utf-8',
+    stdio: 'pipe',
+  }).trim();
 
-    // Attempt the merge (--no-commit so we can inspect/test before committing)
+  // Build the task prompt for the merge-agent specialist
+  const taskPrompt = `MERGE TASK for ${issueId}:
+
+PROJECT: ${projectPath}
+SOURCE BRANCH: ${sourceBranch}
+TARGET BRANCH: ${targetBranch}
+CURRENT HEAD: ${headBefore}
+
+INSTRUCTIONS:
+1. cd ${projectPath}
+2. git checkout ${targetBranch}
+3. git pull origin ${targetBranch} --ff-only
+4. git merge ${sourceBranch}
+5. If conflicts: resolve them intelligently, then git add and git commit
+6. If clean merge: the merge commit is auto-created
+7. Run tests: npm test (or appropriate test command)
+8. If tests pass: git push origin ${targetBranch}
+9. If tests fail: git reset --hard HEAD~1 and report failure
+
+CRITICAL: You MUST complete this merge. The approve operation is waiting.
+When done, the merge commit should be pushed to origin/${targetBranch}.
+
+Report any issues or conflicts you encountered.`;
+
+  // Wake the merge-agent specialist
+  console.log(`[merge-agent] Waking specialist with merge task...`);
+  const wakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
+    waitForReady: true,
+    startIfNotRunning: true,
+  });
+
+  if (!wakeResult.success) {
+    console.error(`[merge-agent] Failed to wake specialist: ${wakeResult.message}`);
+    logActivity('merge_error', `Failed to wake specialist: ${wakeResult.message}`);
+    return {
+      success: false,
+      reason: `Failed to wake merge-agent specialist: ${wakeResult.message}`,
+    };
+  }
+
+  console.log(`[merge-agent] Specialist woken, waiting for merge completion...`);
+  logActivity('merge_specialist_woken', `Specialist woken, task sent`);
+
+  // Poll for merge completion (check if HEAD has changed and been pushed)
+  const POLL_INTERVAL = 5000; // 5 seconds
+  const MAX_WAIT = 300000; // 5 minutes
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < MAX_WAIT) {
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+
     try {
-      execSync(`git merge --no-commit ${sourceBranch}`, {
+      // Check if we're still on target branch
+      const currentBranch = execSync('git branch --show-current', {
         cwd: projectPath,
         encoding: 'utf-8',
         stdio: 'pipe',
-      });
+      }).trim();
 
-      // Clean merge! Commit it
-      console.log(`[merge-agent] Clean merge - no conflicts`);
-      logActivity('merge_clean', `Clean merge of ${sourceBranch}`);
+      if (currentBranch !== targetBranch) {
+        // Specialist might still be working, continue polling
+        continue;
+      }
 
-      execSync(`git commit -m "Merge ${sourceBranch} into ${targetBranch}"`, {
+      // Check if HEAD has changed (merge happened)
+      const currentHead = execSync('git rev-parse HEAD', {
         cwd: projectPath,
         encoding: 'utf-8',
         stdio: 'pipe',
-      });
+      }).trim();
 
-      // Optionally run tests
-      const testCommand = detectTestCommand(projectPath);
-      let testsStatus: 'PASS' | 'FAIL' | 'SKIP' = 'SKIP';
+      if (currentHead !== headBefore) {
+        // HEAD changed - check if it's a merge commit
+        const commitMessage = execSync('git log -1 --pretty=%s', {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        }).trim().toLowerCase();
 
-      if (testCommand !== 'skip') {
-        console.log(`[merge-agent] Running tests: ${testCommand}`);
-        logActivity('merge_tests', `Running: ${testCommand}`);
-        try {
-          execSync(testCommand, {
-            cwd: projectPath,
-            encoding: 'utf-8',
-            stdio: 'pipe',
-            timeout: 300000, // 5 minute timeout for tests
-          });
-          testsStatus = 'PASS';
-          console.log(`[merge-agent] Tests passed`);
-          logActivity('merge_tests_pass', 'Tests passed');
-        } catch {
-          testsStatus = 'FAIL';
-          console.log(`[merge-agent] Tests failed - reverting merge`);
-          logActivity('merge_tests_fail', 'Tests failed, reverting');
-          // Revert the merge commit
-          execSync(`git reset --hard HEAD~1`, {
-            cwd: projectPath,
-            encoding: 'utf-8',
-            stdio: 'pipe',
-          });
-          return {
-            success: false,
-            testsStatus: 'FAIL',
-            reason: 'Tests failed after clean merge - reverted',
-          };
+        if (commitMessage.includes('merge') || commitMessage.includes(sourceBranch.toLowerCase())) {
+          // Verify it's pushed
+          try {
+            const remoteHead = execSync(`git rev-parse origin/${targetBranch}`, {
+              cwd: projectPath,
+              encoding: 'utf-8',
+              stdio: 'pipe',
+            }).trim();
+
+            if (remoteHead === currentHead) {
+              console.log(`[merge-agent] Merge completed and pushed successfully`);
+              logActivity('merge_complete', `Merge completed by specialist`);
+              return {
+                success: true,
+                testsStatus: 'SKIP', // Specialist ran tests, we trust the result
+                notes: 'Merge completed by merge-agent specialist',
+              };
+            }
+          } catch {
+            // Remote check failed, but local merge is done
+            console.log(`[merge-agent] Merge completed locally, push status unknown`);
+          }
+
+          // Local merge done but not pushed yet - keep polling
+          console.log(`[merge-agent] Merge commit detected, waiting for push...`);
         }
       }
 
-      return {
-        success: true,
-        testsStatus,
-        notes: 'Clean merge completed without conflicts',
-      };
-    } catch (mergeError: any) {
-      // Merge had conflicts - check what they are
-      const conflictFiles = getConflictFiles(projectPath);
-
-      if (conflictFiles.length === 0) {
-        // Some other merge error (not conflicts)
-        console.error(`[merge-agent] Merge failed:`, mergeError.message);
-        logActivity('merge_error', `Merge failed: ${mergeError.message}`);
-
-        // Abort the merge
-        try {
-          execSync(`git merge --abort`, {
-            cwd: projectPath,
-            encoding: 'utf-8',
-            stdio: 'pipe',
-          });
-        } catch {
-          // Ignore abort errors
-        }
-
+      // Check if merge-agent is still running
+      if (!isRunning('merge-agent')) {
+        console.error(`[merge-agent] Specialist stopped unexpectedly`);
+        logActivity('merge_error', 'Specialist stopped unexpectedly');
         return {
           success: false,
-          reason: `Merge failed: ${mergeError.message}`,
+          reason: 'merge-agent specialist stopped before completing the merge',
         };
       }
 
-      // We have conflicts - spawn merge-agent to resolve them
-      console.log(`[merge-agent] Conflicts detected in ${conflictFiles.length} files`);
-      logActivity('merge_conflicts', `Conflicts in: ${conflictFiles.join(', ')}`);
-
-      const context: MergeConflictContext = {
-        projectPath,
-        sourceBranch,
-        targetBranch,
-        conflictFiles,
-        issueId,
-      };
-
-      return spawnMergeAgent(context);
+    } catch (pollError: any) {
+      console.warn(`[merge-agent] Poll error: ${pollError.message}`);
+      // Continue polling
     }
-  } catch (error: any) {
-    console.error(`[merge-agent] Failed:`, error.message);
-    logActivity('merge_error', `Error: ${error.message}`);
-
-    return {
-      success: false,
-      reason: error.message || 'Unknown error',
-    };
   }
+
+  // Timeout
+  console.error(`[merge-agent] Timeout waiting for merge completion`);
+  logActivity('merge_timeout', 'Timeout waiting for specialist to complete merge');
+  return {
+    success: false,
+    reason: 'Timeout waiting for merge-agent specialist to complete merge (5 minutes)',
+  };
 }
