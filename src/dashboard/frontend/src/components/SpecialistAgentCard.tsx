@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Brain, RotateCcw, Power, Square } from 'lucide-react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { Brain, RotateCcw, Power, Square, Loader2 } from 'lucide-react';
 
 export interface SpecialistAgent {
   name: 'merge-agent' | 'review-agent' | 'test-agent';
@@ -67,6 +67,27 @@ async function killSpecialist(tmuxSession: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to kill specialist');
 }
 
+interface SpecialistCost {
+  cost: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+async function fetchSpecialistCost(name: string): Promise<SpecialistCost> {
+  const res = await fetch(`/api/specialists/${name}/cost`);
+  if (!res.ok) return { cost: 0, inputTokens: 0, outputTokens: 0 };
+  return res.json();
+}
+
+function useSpecialistCost(name: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['specialist-cost', name],
+    queryFn: () => fetchSpecialistCost(name),
+    enabled,
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+}
+
 function formatTokens(tokens: number): string {
   if (tokens >= 1000000) {
     return `${(tokens / 1000000).toFixed(1)}M`;
@@ -103,6 +124,7 @@ export function SpecialistAgentCard({
   isSelected,
 }: SpecialistAgentCardProps) {
   const queryClient = useQueryClient();
+  const { data: costData } = useSpecialistCost(specialist.name, specialist.state !== 'uninitialized');
 
   const wakeMutation = useMutation({
     mutationFn: () => wakeSpecialist(specialist.name),
@@ -169,9 +191,13 @@ export function SpecialistAgentCard({
           <div>
             <div className="font-medium text-white flex items-center gap-2">
               {specialist.displayName}
-              <span className={`text-xs ${STATE_COLOR[specialist.state]}`}>
-                {STATE_EMOJI[specialist.state]}
-              </span>
+              {specialist.state === 'active' ? (
+                <Loader2 className="w-4 h-4 text-green-400 animate-spin" />
+              ) : (
+                <span className={`text-xs ${STATE_COLOR[specialist.state]}`}>
+                  {STATE_EMOJI[specialist.state]}
+                </span>
+              )}
             </div>
             <div className="text-sm text-gray-400">{specialist.description}</div>
             {specialist.sessionId && (
@@ -187,6 +213,11 @@ export function SpecialistAgentCard({
             <div className="text-sm text-gray-400">
               {STATE_LABEL[specialist.state]}
             </div>
+            {costData && costData.cost > 0 && (
+              <div className="text-xs text-green-400 font-medium" title="Total cost">
+                ${costData.cost.toFixed(4)}
+              </div>
+            )}
             {specialist.contextTokens && (
               <div className="text-xs text-gray-500">
                 {formatTokens(specialist.contextTokens)} tokens

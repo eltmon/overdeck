@@ -2038,6 +2038,63 @@ app.post('/api/specialists/:name/init', async (req, res) => {
   }
 });
 
+// Get specialist cost
+app.get('/api/specialists/:name/cost', async (req, res) => {
+  const { name } = req.params;
+
+  try {
+    const { getSessionId } = await import('../../lib/cloister/specialists.js');
+    const sessionId = getSessionId(name as any);
+
+    if (!sessionId) {
+      return res.json({ cost: 0, inputTokens: 0, outputTokens: 0 });
+    }
+
+    // Find the JSONL session file
+    const homeDir = process.env.HOME || '/home/eltmon';
+    const claudeProjectsDir = join(homeDir, '.claude', 'projects');
+
+    // Specialists run from home directory, so the project dir is just the home dir
+    const projectDirName = `-${homeDir.replace(/^\//, '').replace(/\//g, '-')}`;
+    const projectDir = join(claudeProjectsDir, projectDirName);
+    const sessionsIndexPath = join(projectDir, 'sessions-index.json');
+
+    let cost = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    if (existsSync(sessionsIndexPath)) {
+      const indexContent = JSON.parse(readFileSync(sessionsIndexPath, 'utf-8'));
+      const sessionEntry = indexContent.entries?.find((e: any) => e.sessionId === sessionId);
+
+      if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
+        const jsonlContent = readFileSync(sessionEntry.fullPath, 'utf-8');
+        const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
+
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry.usage) {
+              inputTokens += entry.usage.input_tokens || 0;
+              outputTokens += entry.usage.output_tokens || 0;
+            }
+            if (entry.costUSD !== undefined) {
+              cost += entry.costUSD;
+            }
+          } catch {
+            // Skip malformed lines
+          }
+        }
+      }
+    }
+
+    res.json({ cost, inputTokens, outputTokens });
+  } catch (error: any) {
+    console.error('Error getting specialist cost:', error);
+    res.json({ cost: 0, inputTokens: 0, outputTokens: 0 });
+  }
+});
+
 // Get agent health (Cloister-based)
 app.get('/api/agents/:id/cloister-health', (req, res) => {
   try {
@@ -3256,8 +3313,44 @@ This is part of the approve workflow. Provide your review findings.`;
       console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}, continuing anyway`);
     } else {
       console.log(`[approve] review-agent woken, task sent`);
-      // Give review-agent a moment to start processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for review-agent to complete (poll tmux output for idle prompt)
+      const reviewStartTime = Date.now();
+      const REVIEW_TIMEOUT = 120000; // 2 minutes
+      let lastOutput = '';
+      let stableCount = 0;
+
+      while (Date.now() - reviewStartTime < REVIEW_TIMEOUT) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        try {
+          // Capture tmux output to check if specialist is idle
+          const output = execSync(`tmux capture-pane -t specialist-review-agent -p | tail -5`, {
+            encoding: 'utf-8',
+            stdio: 'pipe',
+          });
+
+          // Check if output contains idle prompt (❯ at end with no pending input)
+          const isIdle = output.includes('❯') && !output.includes('Thinking') && !output.includes('●');
+
+          if (isIdle && output === lastOutput) {
+            stableCount++;
+            if (stableCount >= 2) {
+              console.log(`[approve] review-agent completed (idle detected)`);
+              break;
+            }
+          } else {
+            stableCount = 0;
+          }
+          lastOutput = output;
+        } catch {
+          // tmux capture failed, continue waiting
+        }
+
+        const elapsed = Math.round((Date.now() - reviewStartTime) / 1000);
+        if (elapsed % 15 === 0) {
+          console.log(`[approve] Waiting for review-agent... (${elapsed}s)`);
+        }
+      }
     }
 
     // 6b. TEST-AGENT: Run tests
@@ -3287,8 +3380,42 @@ This is part of the approve workflow. Test results determine if merge proceeds.`
       console.warn(`[approve] test-agent failed to wake: ${testResult.message}, continuing anyway`);
     } else {
       console.log(`[approve] test-agent woken, task sent`);
-      // Give test-agent time to run tests
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Wait for test-agent to complete (poll tmux output for idle prompt)
+      const testStartTime = Date.now();
+      const TEST_TIMEOUT = 180000; // 3 minutes (tests can take a while)
+      let lastTestOutput = '';
+      let testStableCount = 0;
+
+      while (Date.now() - testStartTime < TEST_TIMEOUT) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        try {
+          const output = execSync(`tmux capture-pane -t specialist-test-agent -p | tail -5`, {
+            encoding: 'utf-8',
+            stdio: 'pipe',
+          });
+
+          const isIdle = output.includes('❯') && !output.includes('Thinking') && !output.includes('●');
+
+          if (isIdle && output === lastTestOutput) {
+            testStableCount++;
+            if (testStableCount >= 2) {
+              console.log(`[approve] test-agent completed (idle detected)`);
+              break;
+            }
+          } else {
+            testStableCount = 0;
+          }
+          lastTestOutput = output;
+        } catch {
+          // tmux capture failed, continue waiting
+        }
+
+        const elapsed = Math.round((Date.now() - testStartTime) / 1000);
+        if (elapsed % 15 === 0) {
+          console.log(`[approve] Waiting for test-agent... (${elapsed}s)`);
+        }
+      }
     }
 
     // 6c. MERGE-AGENT: Perform the merge
