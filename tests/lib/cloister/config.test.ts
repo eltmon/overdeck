@@ -63,9 +63,10 @@ describe('Cloister Configuration', () => {
 
     it('should enable merge and review agents by default', () => {
       expect(DEFAULT_CLOISTER_CONFIG.specialists?.merge_agent?.enabled).toBe(true);
-      expect(DEFAULT_CLOISTER_CONFIG.specialists?.merge_agent?.auto_wake).toBe(true);
+      // auto_wake is false - specialists only wake on explicit user action
+      expect(DEFAULT_CLOISTER_CONFIG.specialists?.merge_agent?.auto_wake).toBe(false);
       expect(DEFAULT_CLOISTER_CONFIG.specialists?.review_agent?.enabled).toBe(true);
-      expect(DEFAULT_CLOISTER_CONFIG.specialists?.review_agent?.auto_wake).toBe(true);
+      expect(DEFAULT_CLOISTER_CONFIG.specialists?.review_agent?.auto_wake).toBe(false);
     });
 
     it('should disable test agent by default', () => {

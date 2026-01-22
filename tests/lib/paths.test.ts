@@ -106,7 +106,7 @@ describe('paths', () => {
     });
 
     it('should have correct number of directories', () => {
-      expect(INIT_DIRS.length).toBe(12);
+      expect(INIT_DIRS.length).toBe(14);
     });
   });
 });
