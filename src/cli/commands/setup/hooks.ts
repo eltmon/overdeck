@@ -7,7 +7,7 @@ import { homedir } from 'os';
 interface ClaudeSettings {
   hooks?: {
     PostToolUse?: Array<{
-      matcher: Record<string, any>;
+      matcher: string;  // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
       hooks: Array<{
         type: string;
         command: string;
@@ -193,9 +193,9 @@ export async function setupHooksCommand(): Promise<void> {
     settings.hooks.PostToolUse = [];
   }
 
-  // Append Panopticon hook
+  // Append Panopticon hook (matcher: ".*" matches all tools)
   settings.hooks.PostToolUse.push({
-    matcher: {},
+    matcher: '.*',
     hooks: [
       {
         type: 'command',
