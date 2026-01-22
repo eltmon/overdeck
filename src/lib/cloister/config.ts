@@ -61,12 +61,19 @@ export interface SpecialistConfig {
 }
 
 /**
+ * Test agent specific configuration
+ */
+export interface TestAgentConfig extends SpecialistConfig {
+  test_command?: string; // Optional test command override (e.g., "npm test", "pytest", etc.)
+}
+
+/**
  * All specialist agents configuration
  */
 export interface SpecialistsConfig {
   merge_agent?: SpecialistConfig;
   review_agent?: SpecialistConfig;
-  test_agent?: SpecialistConfig;
+  test_agent?: TestAgentConfig;
 }
 
 /**

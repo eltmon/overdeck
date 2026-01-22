@@ -1,0 +1,45 @@
+/**
+ * Specialists CLI Commands
+ *
+ * pan specialists <command>
+ */
+
+import { Command } from 'commander';
+import { listCommand } from './list.js';
+import { wakeCommand } from './wake.js';
+import { queueCommand } from './queue.js';
+import { resetCommand } from './reset.js';
+
+export function registerSpecialistsCommands(program: Command): void {
+  const specialists = program
+    .command('specialists')
+    .description('Manage specialist agents (review-agent, test-agent, merge-agent)');
+
+  // pan specialists list
+  specialists
+    .command('list')
+    .description('Show all specialists with their status')
+    .option('--json', 'Output in JSON format')
+    .action(listCommand);
+
+  // pan specialists wake <name>
+  specialists
+    .command('wake <name>')
+    .description('Wake up a specialist agent (for testing/debugging)')
+    .option('--task <description>', 'Optional task description to wake with')
+    .action(wakeCommand);
+
+  // pan specialists queue <name>
+  specialists
+    .command('queue <name>')
+    .description('Show pending work in a specialist\'s queue')
+    .option('--json', 'Output in JSON format')
+    .action(queueCommand);
+
+  // pan specialists reset <name>
+  specialists
+    .command('reset <name>')
+    .description('Reset a specialist (clear session, start fresh)')
+    .option('--force', 'Skip confirmation prompt')
+    .action(resetCommand);
+}

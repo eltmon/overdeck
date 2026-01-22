@@ -201,7 +201,7 @@ export class CloisterService {
   /**
    * Perform a health check on all running agents
    */
-  private performHealthCheck(): void {
+  private async performHealthCheck(): Promise<void> {
     try {
       const runningAgents = listRunningAgents().filter((a) => a.tmuxActive);
       const agentIds = runningAgents.map((a) => a.id);
