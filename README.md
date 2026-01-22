@@ -19,8 +19,10 @@ Panopticon is a unified orchestration layer for AI coding assistants. It works w
 ### Features
 
 - **Multi-agent orchestration** - Spawn and manage multiple AI agents in tmux sessions
+- **Cloister AI Lifecycle Manager** - Automatic model routing, stuck detection, and specialist handoffs
 - **Universal skills** - One SKILL.md format works across all supported tools
-- **GUPP Hooks** - Self-propelling agents that auto-resume work
+- **Heartbeat Hooks** - Real-time agent activity monitoring via Claude Code hooks
+- **Multi-project support** - YAML-based project registry with label-based issue routing
 - **Health Monitoring** - Deacon-style stuck detection with auto-recovery
 - **Context Engineering** - Structured state management (STATE.md, WORKSPACE.md)
 - **Agent CVs** - Work history tracking for capability-based routing
@@ -235,7 +237,21 @@ Create `~/.panopticon.env`:
 ```bash
 LINEAR_API_KEY=lin_api_xxxxx
 GITHUB_TOKEN=ghp_xxxxx  # Optional: for GitHub-tracked projects
+RALLY_API_KEY=_xxxxx    # Optional: for Rally as secondary tracker
 ```
+
+### Issue Trackers
+
+Panopticon supports multiple issue trackers:
+
+| Tracker | Role | Configuration |
+|---------|------|---------------|
+| **Linear** | Primary tracker | `LINEAR_API_KEY` in `.panopticon.env` |
+| **GitHub Issues** | Secondary tracker | `GITHUB_TOKEN` or `gh auth login` |
+| **GitLab Issues** | Secondary tracker | `glab auth login` |
+| **Rally** | Secondary tracker | `RALLY_API_KEY` in `.panopticon.env` |
+
+Secondary trackers sync issues to the dashboard alongside Linear issues, allowing unified project management.
 
 ### Register Projects
 
@@ -272,17 +288,183 @@ If you have multiple Linear projects, configure which local directory each maps 
 
 The dashboard uses this mapping to determine where to create workspaces when you click "Create Workspace" or "Start Agent" for an issue.
 
+## Cloister: AI Lifecycle Manager
+
+Cloister is Panopticon's intelligent agent lifecycle manager. It monitors all running agents and automatically handles:
+
+- **Model Routing** - Routes tasks to appropriate models based on complexity
+- **Stuck Detection** - Identifies agents that have stopped making progress
+- **Automatic Handoffs** - Escalates to specialists when needed
+- **Specialist Coordination** - Manages test-agent, review-agent, and merge-agent
+
+### How Cloister Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     CLOISTER SERVICE                         │
+│                                                              │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │  Heartbeat  │───▶│   Trigger   │───▶│   Handoff   │     │
+│  │   Monitor   │    │   Detector  │    │   Manager   │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+│         │                  │                  │             │
+│         ▼                  ▼                  ▼             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │   Agent     │    │  Complexity │    │ Specialists │     │
+│  │   Health    │    │   Analysis  │    │             │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Starting Cloister
+
+```bash
+# Via dashboard - click "Start" in the Cloister status bar
+# Or via CLI:
+pan cloister start
+
+# Check status
+pan cloister status
+
+# Stop monitoring
+pan cloister stop
+```
+
+### Specialists
+
+Cloister manages specialized agents that handle specific phases of the development lifecycle:
+
+| Specialist | Purpose | Trigger |
+|------------|---------|---------|
+| **test-agent** | Runs test suite after implementation | `implementation_complete` signal |
+| **review-agent** | Code review before merge | After tests pass (manual trigger) |
+| **merge-agent** | Handles git merge and conflict resolution | "Approve & Merge" button |
+
+### Automatic Handoffs
+
+Cloister detects situations that require intervention:
+
+| Trigger | Condition | Action |
+|---------|-----------|--------|
+| **stuck_escalation** | No activity for 30+ minutes | Escalate to more capable model |
+| **complexity_upgrade** | Task complexity exceeds model capability | Route to Opus |
+| **implementation_complete** | Agent signals work is done | Wake test-agent |
+| **merge_requested** | User clicks "Approve & Merge" | Wake merge-agent |
+
+### Heartbeat Monitoring
+
+Agents send heartbeats via Claude Code hooks. Cloister tracks:
+
+- Last tool use and timestamp
+- Current task being worked on
+- Git branch and workspace
+- Process health
+
+Heartbeat files are stored in `~/.panopticon/heartbeats/`:
+
+```json
+{
+  "timestamp": "2024-01-22T10:30:00-08:00",
+  "agent_id": "agent-min-123",
+  "tool_name": "Edit",
+  "last_action": "{\"file_path\":\"/path/to/file.ts\"...}",
+  "git_branch": "feature/min-123",
+  "workspace": "/home/user/projects/myapp/workspaces/feature-min-123"
+}
+```
+
+### Configuration
+
+Cloister configuration lives in `~/.panopticon/cloister/config.json`:
+
+```json
+{
+  "monitoring": {
+    "heartbeat_interval_ms": 5000,
+    "stuck_threshold_minutes": 30,
+    "health_check_interval_ms": 30000
+  },
+  "specialists": {
+    "test_agent": { "enabled": true, "auto_wake": true },
+    "review_agent": { "enabled": true, "auto_wake": false },
+    "merge_agent": { "enabled": true, "auto_wake": false }
+  },
+  "triggers": {
+    "stuck_escalation": { "enabled": true },
+    "complexity_upgrade": { "enabled": true }
+  }
+}
+```
+
+---
+
+## Multi-Project Support
+
+Panopticon supports managing multiple projects with intelligent issue routing.
+
+### Project Registry
+
+Projects are registered in `~/.panopticon/projects.yaml`:
+
+```yaml
+projects:
+  myn:
+    name: "Mind Your Now"
+    path: /home/user/projects/myn
+    linear_team: MIN
+    issue_routing:
+      - labels: [splash, landing-pages, seo]
+        path: /home/user/projects/myn/splash
+      - labels: [docs, marketing]
+        path: /home/user/projects/myn/docs
+      - default: true
+        path: /home/user/projects/myn
+
+  panopticon:
+    name: "Panopticon"
+    path: /home/user/projects/panopticon
+    linear_team: PAN
+```
+
+### Label-Based Routing
+
+Issues are routed to different subdirectories based on their labels:
+
+1. **Labeled issues** - Matched against `issue_routing` rules in order
+2. **Default route** - Issues without matching labels use the `default: true` path
+3. **Fallback** - If no default, uses the project root path
+
+Example: An issue with label "splash" in the MIN team would create its workspace at `/home/user/projects/myn/splash/workspaces/feature-min-xxx/`.
+
+### Managing Projects
+
+```bash
+# List registered projects
+pan project list
+
+# Add a project
+pan project add /path/to/project --name myproject --linear-team PRJ
+
+# Remove a project
+pan project remove myproject
+```
+
+---
+
 ## Commands
 
 ### Core Commands
 
 ```bash
 pan init              # Initialize ~/.panopticon/
-pan sync              # Sync skills to all AI tools
+pan sync              # Sync skills, commands, agents, AND hooks to all AI tools
+pan sync --dry-run    # Preview what will be synced
 pan doctor            # Check system health
 pan skills            # List available skills
 pan status            # Show running agents
 ```
+
+> **Note:** `pan sync` now automatically syncs heartbeat hooks to `~/.panopticon/bin/`. This happens automatically on `npm install/upgrade` as well.
 
 ### Agent Management
 
@@ -459,6 +641,31 @@ pan work recover min-123
 pan work recover --all
 ```
 
+### Cloister Commands
+
+```bash
+# Start Cloister monitoring service
+pan cloister start
+
+# Stop Cloister
+pan cloister stop
+
+# Check Cloister status
+pan cloister status
+
+# List all specialists
+pan specialists list
+
+# Wake a specific specialist
+pan specialists wake merge-agent --issue MIN-123
+
+# View specialist queue
+pan specialists queue
+
+# Reset specialist state
+pan specialists reset merge-agent
+```
+
 ## Dashboard
 
 ![Panopticon Dashboard](docs/dashboard-overview.png)
@@ -493,6 +700,37 @@ Stop with `pan down`.
 | **Metrics** | Runtime comparison and cost tracking |
 | **Skills** | Available skills and their descriptions |
 | **Health** | System health checks and diagnostics |
+
+### Issue Cards
+
+Issue cards on the Kanban board display:
+
+- **Cost badges** - Color-coded by amount ($0-5 green, $5-20 yellow, $20+ red)
+- **Container status** - Shows if workspace has Docker containers (running/stopped)
+- **Agent status** - Indicates if an agent is currently working on the issue
+- **Workspace status** - Shows if workspace exists, is corrupted, or needs creation
+
+### Workspace Actions
+
+Click an issue card to open the workspace detail panel:
+
+| Button | Action |
+|--------|--------|
+| **Create Workspace** | Creates git worktree for the issue |
+| **Containerize** | Adds Docker containers to an existing workspace |
+| **Start Containers** | Starts stopped Docker containers |
+| **Start Planning** | Opens interactive planning session with AI |
+| **Start Agent** | Spawns autonomous agent in tmux |
+| **Approve & Merge** | Triggers merge-agent to handle PR merge |
+
+### Interactive Planning
+
+The planning dialog provides a real-time terminal for collaborative planning:
+
+- **Discovery questions** - AI asks clarifying questions before implementation
+- **Codebase exploration** - AI reads files and understands patterns
+- **Pull/Push buttons** - Git operations to share planning context with teammates
+- **AskUserQuestion rendering** - Questions from the AI appear as interactive prompts
 
 ### Metrics & Cost Tracking
 
@@ -572,6 +810,7 @@ Panopticon ships with 25+ skills organized into categories:
 | `pan-docker` | Docker operations |
 | `pan-network` | Network diagnostics |
 | `pan-config` | Configuration management |
+| `pan-restart` | Safely restart Panopticon dashboard and services |
 | `pan-code-review` | Orchestrate parallel code review (3 reviewers + synthesis) |
 | `pan-convoy-synthesis` | Synthesize convoy coordination |
 | `pan-subagent-creator` | Create specialized subagents |
@@ -771,21 +1010,39 @@ This ensures every Panopticon-managed project has a well-defined canonical PRD t
 
 ```
 ~/.panopticon/
+  config.toml           # Main configuration
+  projects.yaml         # Multi-project registry with issue routing
+  project-mappings.json # Linear project → local path mappings (legacy)
+  session-map.json      # Claude sessions → issue linking
+  runtime-metrics.json  # Runtime performance metrics
+
   skills/               # Shared skills (SKILL.md format)
   commands/             # Slash commands
-  agents/               # Per-agent state
+  agents/               # Subagent templates (.md files)
+  bin/                  # Hook scripts (synced via pan sync)
+    heartbeat-hook      # Real-time activity monitoring hook
+
+  agents/               # Per-agent runtime state
     agent-min-123/
-      state.json        # Agent state
+      state.json        # Agent state (model, phase, complexity)
       health.json       # Health status
       hook.json         # GUPP work queue
       cv.json           # Work history
       mail/             # Incoming messages
-  projects.json         # Managed projects
-  project-mappings.json # Linear project → local path mappings
-  session-map.json      # Claude sessions → issue linking
-  runtime-metrics.json  # Runtime performance metrics
+
+  cloister/             # Cloister AI lifecycle manager
+    config.json         # Cloister settings
+    state.json          # Running state
+    events.jsonl        # Handoff event log
+
+  heartbeats/           # Real-time agent activity
+    agent-min-123.json  # Last heartbeat from agent
+
   costs/                # Raw cost logs (JSONL)
   backups/              # Sync backups
+  traefik/              # Traefik reverse proxy config
+    dynamic/            # Dynamic route configs
+    certs/              # TLS certificates
 ```
 
 ## Health Monitoring (Deacon Pattern)
