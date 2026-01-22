@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, TrendingUp, AlertCircle } from 'lucide-react';
+import { ArrowRight, AlertCircle } from 'lucide-react';
 import { useHandoffSuggestion } from '../hooks/useHandoffData';
 
 interface HandoffPanelProps {

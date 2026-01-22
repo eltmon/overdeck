@@ -223,6 +223,21 @@ See [docs/DNS_SETUP.md](docs/DNS_SETUP.md) for detailed DNS configuration (espec
 - **Linear API key** - For issue tracking integration
 - **Beads CLI (bd)** - For persistent task tracking across sessions
 
+### Platform Support
+
+The Panopticon dashboard includes terminal streaming, which requires a native binary (`node-pty`). Prebuilt binaries are available for:
+
+| Platform | Architecture | Support |
+|----------|-------------|---------|
+| macOS | Intel (x64) | ✅ Prebuilt |
+| macOS | Apple Silicon (arm64) | ✅ Prebuilt |
+| Linux | x64 (glibc) | ✅ Prebuilt |
+| Linux | arm64 (glibc) | ✅ Prebuilt |
+| Linux | musl (Alpine) | ✅ Prebuilt |
+| Windows | x64 | ✅ Prebuilt |
+
+If a prebuilt binary is not available for your platform, node-gyp will automatically compile from source during installation (requires Python and build tools).
+
 ### Why CLI tools instead of API tokens?
 
 Panopticon uses `gh` and `glab` CLIs instead of raw API tokens because:

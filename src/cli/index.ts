@@ -96,9 +96,10 @@ program
     const { readFileSync, existsSync } = await import('fs');
     const { parse } = await import('@iarna/toml');
 
-    // Find dashboard directory relative to CLI
+    // Find dashboard - check bundled first, then source
     const __dirname = dirname(fileURLToPath(import.meta.url));
-    const dashboardDir = join(__dirname, '..', 'dashboard');
+    const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
+    const srcDashboard = join(__dirname, '..', '..', 'src', 'dashboard');
 
     // Check if Traefik is enabled
     const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
@@ -137,26 +138,47 @@ program
       }
     }
 
-    // Check npm is available
-    try {
-      execSync('npm --version', { stdio: 'pipe' });
-    } catch {
-      console.error(chalk.red('Error: npm not found in PATH'));
-      console.error(chalk.dim('Make sure Node.js and npm are installed and in your PATH'));
+    // Determine which mode to use
+    const isProduction = existsSync(bundledServer);
+    const isDevelopment = existsSync(srcDashboard);
+
+    if (!isProduction && !isDevelopment) {
+      console.error(chalk.red('Error: Dashboard not found'));
+      console.error(chalk.dim('This may be a corrupted installation. Try reinstalling panopticon-cli.'));
       process.exit(1);
     }
 
+    // Check npm is available (only needed for development mode)
+    if (isDevelopment && !isProduction) {
+      try {
+        execSync('npm --version', { stdio: 'pipe' });
+      } catch {
+        console.error(chalk.red('Error: npm not found in PATH'));
+        console.error(chalk.dim('Make sure Node.js and npm are installed and in your PATH'));
+        process.exit(1);
+      }
+    }
+
     // Start dashboard
-    console.log(chalk.dim('Starting dashboard...'));
+    if (isProduction) {
+      console.log(chalk.dim('Starting dashboard (bundled mode)...'));
+    } else {
+      console.log(chalk.dim('Starting dashboard (development mode)...'));
+    }
 
     if (options.detach) {
       // Run in background
-      const child = spawn('npm', ['run', 'dev'], {
-        cwd: dashboardDir,
-        detached: true,
-        stdio: 'ignore',
-        shell: true,
-      });
+      const child = isProduction
+        ? spawn('node', [bundledServer], {
+            detached: true,
+            stdio: 'ignore',
+          })
+        : spawn('npm', ['run', 'dev'], {
+            cwd: srcDashboard,
+            detached: true,
+            stdio: 'ignore',
+            shell: true,
+          });
 
       // Handle spawn errors before unref
       let hasError = false;
@@ -191,11 +213,15 @@ program
       }
       console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
 
-      const child = spawn('npm', ['run', 'dev'], {
-        cwd: dashboardDir,
-        stdio: 'inherit',
-        shell: true,
-      });
+      const child = isProduction
+        ? spawn('node', [bundledServer], {
+            stdio: 'inherit',
+          })
+        : spawn('npm', ['run', 'dev'], {
+            cwd: srcDashboard,
+            stdio: 'inherit',
+            shell: true,
+          });
 
       child.on('error', (err) => {
         console.error(chalk.red('Failed to start dashboard:'), err.message);

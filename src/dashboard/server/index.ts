@@ -2,11 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import * as pty from 'node-pty';
+import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { execSync, exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync } from 'fs';
 import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { loadCloisterConfig, saveCloisterConfig } from '../../lib/cloister/config.js';
@@ -5615,6 +5616,20 @@ wss.on('connection', (ws: WebSocket, req) => {
     });
   })();
 });
+
+// Serve static files in production mode
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const publicDir = join(__dirname, 'public');
+
+if (existsSync(publicDir)) {
+  console.log(`Serving static files from ${publicDir}`);
+  app.use(express.static(publicDir));
+
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    res.sendFile(join(publicDir, 'index.html'));
+  });
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Panopticon API server running on http://0.0.0.0:${PORT}`);
