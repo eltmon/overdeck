@@ -36,13 +36,26 @@ export function sessionExists(name: string): boolean {
   }
 }
 
-export function createSession(name: string, cwd: string, initialCommand?: string): void {
+export function createSession(
+  name: string,
+  cwd: string,
+  initialCommand?: string,
+  options?: { env?: Record<string, string> }
+): void {
   const escapedCwd = cwd.replace(/"/g, '\\"');
+
+  // Build environment variable flags for tmux
+  let envFlags = '';
+  if (options?.env) {
+    for (const [key, value] of Object.entries(options.env)) {
+      envFlags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
+    }
+  }
 
   // For complex commands (with special chars), start session first then send command
   if (initialCommand && (initialCommand.includes('`') || initialCommand.includes('\n') || initialCommand.length > 500)) {
     // Create session without command
-    execSync(`tmux new-session -d -s ${name} -c "${escapedCwd}"`);
+    execSync(`tmux new-session -d -s ${name} -c "${escapedCwd}"${envFlags}`);
 
     // Small delay to let session initialize
     execSync('sleep 0.5');
@@ -58,10 +71,10 @@ export function createSession(name: string, cwd: string, initialCommand?: string
     execSync(`tmux send-keys -t ${name} "bash ${tmpFile}" Enter`);
   } else if (initialCommand) {
     // Simple command - use inline
-    const cmd = `tmux new-session -d -s ${name} -c "${escapedCwd}" "${initialCommand.replace(/"/g, '\\"')}"`;
+    const cmd = `tmux new-session -d -s ${name} -c "${escapedCwd}"${envFlags} "${initialCommand.replace(/"/g, '\\"')}"`;
     execSync(cmd);
   } else {
-    execSync(`tmux new-session -d -s ${name} -c "${escapedCwd}"`);
+    execSync(`tmux new-session -d -s ${name} -c "${escapedCwd}"${envFlags}`);
   }
 }
 

@@ -1,0 +1,59 @@
+#!/bin/bash
+# ~/.panopticon/bin/heartbeat-hook
+# Called by Claude Code after every tool use with JSON on stdin
+#
+# This hook receives PostToolUse event data from Claude Code and writes
+# rich heartbeat information to enable real-time agent monitoring.
+
+set -e
+
+# Parse tool info from stdin
+TOOL_INFO=$(cat)
+
+# Check if jq is available
+if ! command -v jq &> /dev/null; then
+  echo "Warning: jq not found. Heartbeat hook requires jq to parse tool data." >&2
+  exit 0  # Silent failure - don't break Claude Code execution
+fi
+
+# Extract tool name and input (truncate input to 100 chars to avoid huge files)
+TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"')
+TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""')
+
+# Get agent ID from env (set by pan work issue) or tmux session name
+AGENT_ID="${PANOPTICON_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
+
+# Get current beads task from cache (if exists)
+TASK_CACHE="$HOME/.panopticon/agents/$AGENT_ID/current-task.json"
+CURRENT_TASK=""
+if [ -f "$TASK_CACHE" ]; then
+  CURRENT_TASK=$(jq -r '.title // ""' "$TASK_CACHE" 2>/dev/null || echo "")
+fi
+
+# Get git branch (fast, single command)
+GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+
+# Get workspace from pwd
+WORKSPACE=$(pwd)
+
+# Ensure heartbeat directory exists
+HEARTBEAT_DIR="$HOME/.panopticon/heartbeats"
+mkdir -p "$HEARTBEAT_DIR"
+
+# Write heartbeat atomically (write to temp file, then move)
+TEMP_FILE="$HEARTBEAT_DIR/$AGENT_ID.json.tmp"
+cat > "$TEMP_FILE" << EOF
+{
+  "timestamp": "$(date -Iseconds)",
+  "agent_id": "$AGENT_ID",
+  "tool_name": "$TOOL_NAME",
+  "last_action": "$TOOL_INPUT",
+  "current_task": "$CURRENT_TASK",
+  "git_branch": "$GIT_BRANCH",
+  "workspace": "$WORKSPACE",
+  "pid": $$
+}
+EOF
+
+# Atomic move to avoid race conditions
+mv "$TEMP_FILE" "$HEARTBEAT_DIR/$AGENT_ID.json"

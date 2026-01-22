@@ -89,9 +89,19 @@ export function spawnAgent(options: SpawnOptions): AgentState {
     writeFileSync(promptFile, prompt);
   }
 
+  // Auto-setup hooks if not configured
+  checkAndSetupHooks();
+
+  // Write initial task cache for heartbeat hook
+  writeTaskCache(agentId, options.issueId);
+
   // Create tmux session and start claude
   const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`;
-  createSession(agentId, options.workspace, claudeCmd);
+  createSession(agentId, options.workspace, claudeCmd, {
+    env: {
+      PANOPTICON_AGENT_ID: agentId
+    }
+  });
 
   // If there's a prompt, load it via tmux buffer after claude starts
   if (prompt) {
@@ -306,4 +316,61 @@ export function autoRecoverAgents(): { recovered: string[]; failed: string[] } {
   }
 
   return { recovered, failed };
+}
+
+/**
+ * Check if Panopticon hooks are configured, and auto-setup if not
+ */
+function checkAndSetupHooks(): void {
+  const { homedir } = require('os');
+  const settingsPath = join(homedir(), '.claude', 'settings.json');
+  const hookPath = join(homedir(), '.panopticon', 'bin', 'heartbeat-hook');
+
+  // Check if settings.json exists and has heartbeat hook configured
+  if (existsSync(settingsPath)) {
+    try {
+      const settingsContent = readFileSync(settingsPath, 'utf-8');
+      const settings = JSON.parse(settingsContent);
+      const postToolUse = settings?.hooks?.PostToolUse || [];
+
+      const hookConfigured = postToolUse.some((hook: any) =>
+        hook.command === hookPath ||
+        hook.command?.includes('panopticon') ||
+        hook.command?.includes('heartbeat-hook')
+      );
+
+      if (hookConfigured) {
+        return; // Already configured
+      }
+    } catch {
+      // Ignore errors, will attempt setup
+    }
+  }
+
+  // Hooks not configured - run setup silently
+  try {
+    console.log('Configuring Panopticon heartbeat hooks...');
+    execSync('pan setup hooks', { stdio: 'pipe' });
+    console.log('✓ Heartbeat hooks configured');
+  } catch (error) {
+    console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
+  }
+}
+
+/**
+ * Write task cache for heartbeat hook to use
+ */
+function writeTaskCache(agentId: string, issueId: string): void {
+  const cacheDir = join(getAgentDir(agentId));
+  mkdirSync(cacheDir, { recursive: true });
+
+  const cacheFile = join(cacheDir, 'current-task.json');
+  writeFileSync(
+    cacheFile,
+    JSON.stringify({
+      id: issueId,
+      title: `Working on ${issueId}`,
+      updated_at: new Date().toISOString()
+    }, null, 2)
+  );
 }
