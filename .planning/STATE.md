@@ -1,161 +1,127 @@
-# PAN-50: Replace rally npm package with direct WSAPI calls
+# PAN-53: E2E Integration Test - Full Specialist Workflow
 
-## Status: IMPLEMENTATION COMPLETE ✅
+## Summary
 
-## Problem Statement
-
-The `rally` npm package (v2.1.3) depends on deprecated `core-js@2.x`:
-- `rally@2.1.3` → `babel-runtime@6.11.6` → `core-js@2.6.12`
-- core-js@<3.23.3 is unmaintained and causes V8 performance issues (up to 100x slowdown)
+This issue serves as a **live integration test** of the specialist workflow. The work itself is trivial (add a timestamp to a fixture file), but the real purpose is verifying that the `review-agent → test-agent → merge-agent` pipeline executes correctly when work is approved via the dashboard.
 
 ## Decisions Made
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Rally usage | Actively used | Not just dependency hygiene - needs to work correctly |
-| Testing approach | Mock-only | Keep current approach, no real Rally instance needed |
-| Artifact types | All (US, DE, TA, F) | Maintain existing functionality |
-| Scope | Pure 1:1 replacement | No feature creep, match existing behavior exactly |
+### 1. Test Strategy: Real Workflow ✓
+- PAN-53 itself is the test subject
+- Agent makes the simple fixture change
+- Approve triggers the real specialist pipeline
+- Playwright E2E tests verify dashboard shows specialists activating
 
-## Rally WSAPI Reference
+### 2. Trigger Mechanism: Dashboard API ✓
+- Approval via `POST /api/agents/:id/approve` endpoint (dashboard)
+- This endpoint orchestrates: review-agent → test-agent → merge-agent
+- NOT the CLI command (`pan work approve`) which does simpler merge
 
-- **Base URL**: `https://rally1.rallydev.com/slm/webservice/v2.0/`
-- **Auth**: `ZSESSIONID` header with API key
-- **Content-Type**: `application/json`
-
-### Endpoints Used
-
-| Operation | Method | Endpoint |
-|-----------|--------|----------|
-| Query artifacts | GET | `/artifact?query=...&fetch=...` |
-| Get by ref | GET | `/{type}/{objectId}` |
-| Create | POST | `/{type}/create` |
-| Update | POST | `/{type}/{objectId}` |
+### 3. Verification: Automated E2E Tests ✓
+- Playwright tests check dashboard during approve workflow
+- Verify each specialist card transitions to "Active" state
+- Check for green status indicators (🟢) on specialist cards
 
 ## Architecture
 
-### New File: `src/lib/tracker/rally-api.ts`
+### Existing Components (Already Built)
+1. **Specialist System** (`src/lib/cloister/specialists.ts`)
+   - `wakeSpecialist()` - wakes a specialist with a task prompt
+   - `isRunning()` - checks if specialist tmux session exists
+   - `getSpecialistStatus()` - returns state (sleeping/active/uninitialized)
 
-Thin REST client (~100 lines) that:
-- Wraps native `fetch` with Rally-specific headers
-- Handles JSON serialization/deserialization
-- Provides typed methods: `query()`, `get()`, `create()`, `update()`
-- Does NOT handle business logic (normalization, state mapping)
+2. **Dashboard Approve Endpoint** (`src/dashboard/server/index.ts:3100+`)
+   - Orchestrates review-agent → test-agent → merge-agent
+   - Each specialist gets woken with task-specific prompts
+   - merge-agent via `spawnMergeAgentForBranches()`
 
-```typescript
-export interface RallyQueryResult {
-  QueryResult: {
-    Results: any[];
-    TotalResultCount: number;
-    Errors: string[];
-    Warnings: string[];
-  };
-}
+3. **Dashboard UI** (`SpecialistAgentCard.tsx`)
+   - Shows specialist state with emoji (🟢 active, 😴 sleeping, ⚪ uninitialized)
+   - Real-time updates via React Query
 
-export class RallyRestApi {
-  constructor(config: { apiKey: string; server?: string });
-  async query(config: RallyQueryConfig): Promise<RallyQueryResult>;
-  async create(type: string, data: any): Promise<RallyCreateResult>;
-  async update(ref: string, data: any): Promise<RallyUpdateResult>;
-}
+### New Components Needed
+1. **Playwright E2E Test** (`src/dashboard/frontend/tests/specialist-workflow.spec.ts`)
+   - Navigate to dashboard
+   - Trigger approve workflow (via API or UI click)
+   - Assert specialists transition to active state
+   - Assert merge completes (check main branch)
+
+2. **Fixture Update** (`tests/fixtures/e2e-test.txt`)
+   - Add: `E2E test completed at: [timestamp]`
+
+## Implementation Steps
+
+### Phase 1: Prepare Test Infrastructure
+1. Ensure fixture file exists and is tracked
+2. Create the Playwright test file skeleton
+3. Verify dashboard server is accessible for tests
+
+### Phase 2: Implement the Simple Change
+1. Add timestamp line to `tests/fixtures/e2e-test.txt`
+2. Commit with message referencing PAN-53
+3. Push to feature branch
+
+### Phase 3: Create E2E Test
+1. Write Playwright test that:
+   - Waits for agent to push changes
+   - Triggers approve via dashboard API
+   - Polls `/api/specialists` for state changes
+   - Asserts all three specialists become active
+   - Verifies merge completion
+
+### Phase 4: Verify Success Criteria
+- [ ] All three specialists visibly working in dashboard
+- [ ] Merge completes successfully
+- [ ] Change appears in main branch
+- [ ] E2E test passes
+
+## Test Considerations
+
+### Timing
+- Specialists may not become active immediately
+- Need polling/waiting for state transitions
+- review-agent: ~2s delay before test-agent
+- test-agent: ~3s delay before merge-agent
+
+### Dashboard URLs
+```
+Frontend: http://localhost:3010 (or 3001 in some configs)
+API: http://localhost:3011 (or 3002 in some configs)
 ```
 
-### Modified File: `src/lib/tracker/rally.ts`
+### Specialist States to Check
+```typescript
+// Expected transitions during approve:
+review-agent: sleeping → active → sleeping
+test-agent: sleeping → active → sleeping
+merge-agent: uninitialized → active → sleeping (or terminated)
+```
 
-- Replace `import rally from 'rally'` with `import { RallyRestApi } from './rally-api.js'`
-- Replace callback-based SDK calls with Promise-based REST calls
-- Keep all existing normalization and business logic unchanged
-- Remove Promise wrappers (no longer needed)
+## Out of Scope
+- Workspace cleanup (mentioned in issue but separate concern)
+- Deleting the issue after test (manual step)
+- Linear integration testing
+- PR creation (direct branch merge)
 
-### Modified File: `tests/lib/tracker/rally.test.ts`
+## Risks
+1. **Specialists not initialized**: May fail if no session files exist
+2. **Timing races**: E2E test may miss transient "active" states
+3. **Dashboard not running**: Tests need dashboard server up
 
-- Replace `vi.mock('rally')` with `vi.mock('../../../src/lib/tracker/rally-api.js')`
-- Mock the new `RallyRestApi` class methods instead of SDK callbacks
-- Keep same test cases and expected outcomes
+## Beads (Implementation Tasks)
 
-## Implementation Tasks (Beads)
+Execute in order (each depends on previous):
 
 | Bead ID | Task | Description |
 |---------|------|-------------|
-| panopticon-kqx0.1 | Create rally-api.ts | REST client with fetch, typed responses |
-| panopticon-kqx0.2 | Update rally.ts | Replace SDK with new client, simplify Promise handling |
-| panopticon-kqx0.3 | Update rally.test.ts | Mock new client class |
-| panopticon-kqx0.4 | Remove rally dependency | Update package.json, run npm install |
-| panopticon-kqx0.5 | Verify clean | Run `npm ls core-js`, confirm empty |
-| panopticon-kqx0.6 | Run tests | Ensure all tests pass |
+| `panopticon-am4j` | Add timestamp to fixture | Add `E2E test completed at: [timestamp]` to e2e-test.txt |
+| `panopticon-j4z1` | Commit and push | Git commit/push to feature branch |
+| `panopticon-owuo` | Create Playwright test | Write specialist-workflow.spec.ts |
+| `panopticon-40zw` | Run and verify | Execute test, verify all success criteria |
 
-**Dependency chain:** `.1` → `.2` → `.3` → `.4` → `.5` → `.6` (sequential)
-
-## Test Strategy
-
-- Existing test cases cover all functionality
-- Tests will mock `RallyRestApi` class methods
-- Mock responses match Rally WSAPI format (slightly different from SDK)
-- No integration tests against real Rally
-
-## Response Format Mapping
-
-The rally SDK normalized responses; we need to handle raw WSAPI format:
-
-**SDK Response** (current):
-```javascript
-{ Results: [...artifacts] }
-```
-
-**WSAPI Response** (new):
-```javascript
-{
-  QueryResult: {
-    Results: [...artifacts],
-    TotalResultCount: 42,
-    Errors: [],
-    Warnings: []
-  }
-}
-```
-
-The `rally-api.ts` client will extract `QueryResult.Results` to maintain compatibility.
-
-## Acceptance Criteria
-
-- [x] All Rally tracker tests pass (`npm test -- tests/lib/tracker/rally.test.ts`) - **22/22 passing**
-- [x] `npm ls core-js` returns empty (no core-js in dependency tree) - **Verified**
-- [x] No changes to public API (`RallyTracker` class interface unchanged) - **Confirmed**
-- [x] Full test suite passes (`npm test`) - **221/221 passing**
-
-## Implementation Summary
-
-### Files Created
-- `src/lib/tracker/rally-api.ts` - New REST client using native fetch (~200 lines)
-
-### Files Modified
-- `src/lib/tracker/rally.ts` - Updated to use RallyRestApi instead of rally SDK
-- `tests/lib/tracker/rally.test.ts` - Updated mocks to use Promise-based API
-- `package.json` - Removed rally dependency
-
-### Results
-- **core-js removed**: Dependency tree now clean of deprecated core-js@2.x
-- **All tests passing**: 22 Rally tests + 199 other tests = 221 total
-- **API unchanged**: Drop-in replacement, no breaking changes
-- **Implementation**: Pure 1:1 replacement as planned
-
-## Risk Assessment
-
-| Risk | Likelihood | Mitigation |
-|------|------------|------------|
-| API differences | Low | Rally WSAPI is well-documented; SDK was just a wrapper |
-| Auth changes | Low | Use same `ZSESSIONID` header pattern |
-| Response format changes | Medium | Handle in rally-api.ts, test coverage |
-
-## Out of Scope
-
-- Adding retry logic
-- Adding rate limiting
-- Supporting new Rally features
-- Changing the IssueTracker interface
-- Adding integration tests
-
-## References
-
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/50
-- Rally WSAPI Docs: https://rally1.rallydev.com/slm/doc/webservice/
+## Related Files
+- `src/lib/cloister/specialists.ts` - Specialist infrastructure
+- `src/dashboard/server/index.ts` - Approve endpoint (~line 3100)
+- `src/dashboard/frontend/src/components/SpecialistAgentCard.tsx` - UI component
+- `tests/fixtures/e2e-test.txt` - Test fixture
+- `src/dashboard/frontend/tests/` - Playwright tests location
