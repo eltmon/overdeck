@@ -17,6 +17,7 @@ import { checkAllTriggers } from '../../lib/cloister/triggers.js';
 import { getAgentState } from '../../lib/agents.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
+import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } from '../../lib/projects.js';
 
 // Promisified exec for non-blocking operations
 const execAsync = promisify(exec);
@@ -1228,7 +1229,19 @@ app.post('/api/project-mappings', (req, res) => {
 });
 
 // Get local path for a Linear project (used when creating workspaces)
-function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
+// Now integrates with YAML-based project registry (projects.yaml) as primary source
+function getProjectPath(linearProjectId?: string, issuePrefix?: string, issueLabels?: string[]): string {
+  // First, try the new YAML-based project registry (preferred)
+  // This supports label-based routing for multi-repo projects like MYN
+  if (issuePrefix) {
+    const issueId = `${issuePrefix}-1`; // Construct a dummy issue ID for resolution
+    const resolved = resolveProjectFromIssue(issueId, issueLabels || []);
+    if (resolved) {
+      return resolved.projectPath;
+    }
+  }
+
+  // Fall back to legacy JSON mappings
   const mappings = getProjectMappings();
 
   // Try to find by project ID first

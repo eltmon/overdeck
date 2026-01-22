@@ -11,7 +11,7 @@ import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerCloisterCommands } from './commands/cloister/index.js';
 import { registerSetupCommands } from './commands/setup/index.js';
-import { projectAddCommand, projectListCommand, projectRemoveCommand } from './commands/project.js';
+import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
 
@@ -237,26 +237,36 @@ program
   });
 
 // Project management commands
-const project = program.command('project').description('Project management');
+const project = program.command('project').description('Project registry for multi-project workspace support');
 
 project
   .command('add <path>')
   .description('Register a project with Panopticon')
   .option('--name <name>', 'Project name')
   .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
-  .option('--linear-team <team>', 'Linear team prefix')
+  .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
   .action(projectAddCommand);
 
 project
   .command('list')
-  .description('List all managed projects')
+  .description('List all registered projects')
   .option('--json', 'Output as JSON')
   .action(projectListCommand);
 
 project
+  .command('show <key>')
+  .description('Show details for a specific project')
+  .action(projectShowCommand);
+
+project
   .command('remove <nameOrPath>')
-  .description('Remove a project from Panopticon')
+  .description('Remove a project from the registry')
   .action(projectRemoveCommand);
+
+project
+  .command('init')
+  .description('Initialize projects.yaml with example configuration')
+  .action(projectInitCommand);
 
 // Doctor command
 program

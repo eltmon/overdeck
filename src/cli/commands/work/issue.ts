@@ -3,6 +3,7 @@ import ora from 'ora';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { spawnAgent } from '../../../lib/agents.js';
+import { resolveProjectFromIssue, hasProjects, listProjects } from '../../../lib/projects.js';
 
 interface IssueOptions {
   model: string;
@@ -12,12 +13,28 @@ interface IssueOptions {
 
 /**
  * Find the workspace directory for an issue.
- * Looks for workspaces/feature-{issue-id}/ in the project root.
+ * First checks project registry for the correct project path,
+ * then looks for workspaces/feature-{issue-id}/ in the project root.
  */
-function findWorkspace(issueId: string): string | null {
+function findWorkspace(issueId: string, labels: string[] = []): string | null {
   const normalizedId = issueId.toLowerCase();
 
-  // Search upward for a project root (has .git or workspaces/)
+  // First, try to resolve from project registry
+  const resolved = resolveProjectFromIssue(issueId, labels);
+  if (resolved) {
+    const workspaceName = `feature-${normalizedId}`;
+    const workspacePath = join(resolved.projectPath, 'workspaces', workspaceName);
+    if (existsSync(workspacePath)) {
+      return workspacePath;
+    }
+    // Also try without "feature-" prefix
+    const altPath = join(resolved.projectPath, 'workspaces', normalizedId);
+    if (existsSync(altPath)) {
+      return altPath;
+    }
+  }
+
+  // Fall back to searching upward from cwd (backward compatible)
   let dir = process.cwd();
   for (let i = 0; i < 10; i++) {
     const workspacesDir = join(dir, 'workspaces');
@@ -46,8 +63,18 @@ function findWorkspace(issueId: string): string | null {
 
 /**
  * Find the project root (contains workspaces/, .git, or CLAUDE.md)
+ * First checks project registry, then falls back to searching upward.
  */
-function findProjectRoot(): string {
+function findProjectRoot(issueId?: string, labels: string[] = []): string {
+  // If we have an issue ID, try to resolve from registry first
+  if (issueId) {
+    const resolved = resolveProjectFromIssue(issueId, labels);
+    if (resolved) {
+      return resolved.projectPath;
+    }
+  }
+
+  // Fall back to searching upward from cwd
   let dir = process.cwd();
   for (let i = 0; i < 10; i++) {
     if (existsSync(join(dir, 'workspaces')) ||
@@ -248,9 +275,15 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
     const normalizedId = id.toLowerCase();
 
-    // Find workspace for this issue
-    const projectRoot = findProjectRoot();
+    // Find workspace for this issue (using project registry first, then cwd fallback)
+    const projectRoot = findProjectRoot(id);
     let workspace = findWorkspace(id);
+
+    // Log project resolution info
+    const resolved = resolveProjectFromIssue(id);
+    if (resolved) {
+      spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
+    }
 
     if (!workspace) {
       spinner.warn(`No workspace found for ${id}, using project root`);

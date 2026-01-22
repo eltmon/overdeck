@@ -6,6 +6,11 @@ import { join, basename } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
 import { mergeSkillsIntoWorkspace } from '../../lib/skills-merge.js';
+import {
+  resolveProjectFromIssue,
+  hasProjects,
+  PROJECTS_CONFIG_FILE,
+} from '../../lib/projects.js';
 
 export function registerWorkspaceCommands(program: Command): void {
   const workspace = program.command('workspace').description('Workspace management');
@@ -15,24 +20,30 @@ export function registerWorkspaceCommands(program: Command): void {
     .description('Create workspace for issue')
     .option('--dry-run', 'Show what would be created')
     .option('--no-skills', 'Skip skills symlink setup')
+    .option('--labels <labels>', 'Comma-separated labels for routing (e.g., docs,marketing)')
+    .option('--project <path>', 'Explicit project path (overrides registry)')
     .action(createCommand);
 
   workspace
     .command('list')
     .description('List all workspaces')
     .option('--json', 'Output as JSON')
+    .option('--all', 'List workspaces across all registered projects')
     .action(listCommand);
 
   workspace
     .command('destroy <issueId>')
     .description('Destroy workspace')
     .option('--force', 'Force removal even with uncommitted changes')
+    .option('--project <path>', 'Explicit project path (overrides registry)')
     .action(destroyCommand);
 }
 
 interface CreateOptions {
   dryRun?: boolean;
   skills?: boolean;
+  labels?: string;
+  project?: string;
 }
 
 async function createCommand(issueId: string, options: CreateOptions): Promise<void> {
@@ -44,8 +55,36 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     const branchName = `feature/${normalizedId}`;
     const folderName = `feature-${normalizedId}`;
 
-    // Determine paths
-    const projectRoot = process.cwd();
+    // Parse labels if provided
+    const labels = options.labels
+      ? options.labels.split(',').map((l) => l.trim())
+      : [];
+
+    // Resolve project root - try registry first, fall back to cwd
+    let projectRoot: string;
+    let projectName: string | undefined;
+
+    if (options.project) {
+      // Explicit project path provided
+      projectRoot = options.project;
+    } else {
+      // Try to resolve from project registry
+      const resolved = resolveProjectFromIssue(issueId, labels);
+      if (resolved) {
+        projectRoot = resolved.projectPath;
+        projectName = resolved.projectName;
+        spinner.text = `Resolved project: ${projectName} (${projectRoot})`;
+      } else if (hasProjects()) {
+        // Registry exists but no match found - warn user
+        spinner.warn(`No project found for ${issueId} in registry. Using current directory.`);
+        spinner.start('Creating workspace...');
+        projectRoot = process.cwd();
+      } else {
+        // No registry - use cwd (backward compatible)
+        projectRoot = process.cwd();
+      }
+    }
+
     const workspacesDir = join(projectRoot, 'workspaces');
     const workspacePath = join(workspacesDir, folderName);
 
@@ -53,6 +92,10 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       spinner.info('Dry run mode');
       console.log('');
       console.log(chalk.bold('Would create:'));
+      if (projectName) {
+        console.log(`  Project:   ${chalk.green(projectName)}`);
+      }
+      console.log(`  Root:      ${chalk.dim(projectRoot)}`);
       console.log(`  Workspace: ${chalk.cyan(workspacePath)}`);
       console.log(`  Branch:    ${chalk.cyan(branchName)}`);
       console.log(`  CLAUDE.md: ${chalk.dim(join(workspacePath, 'CLAUDE.md'))}`);
@@ -87,6 +130,7 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       WORKSPACE_PATH: workspacePath,
       FRONTEND_URL: `https://${folderName}.localhost:3000`,
       API_URL: `https://api-${folderName}.localhost:8080`,
+      PROJECT_NAME: projectName,
     };
 
     const claudeMd = generateClaudeMd(projectRoot, variables);
@@ -104,6 +148,9 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
 
     console.log('');
     console.log(chalk.bold('Workspace Details:'));
+    if (projectName) {
+      console.log(`  Project: ${chalk.green(projectName)}`);
+    }
     console.log(`  Path:   ${chalk.cyan(workspacePath)}`);
     console.log(`  Branch: ${chalk.dim(branchName)}`);
     console.log('');
@@ -125,12 +172,75 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
   }
 }
 
-async function listCommand(options: { json?: boolean }): Promise<void> {
+interface ListOptions {
+  json?: boolean;
+  all?: boolean;
+}
+
+async function listCommand(options: ListOptions): Promise<void> {
+  const { listProjects } = await import('../../lib/projects.js');
+  const projects = listProjects();
+
+  // If we have registered projects and --all is specified, list across all projects
+  if (projects.length > 0 && options.all) {
+    const allWorkspaces: Array<{
+      projectName: string;
+      projectPath: string;
+      workspaces: ReturnType<typeof listWorktrees>;
+    }> = [];
+
+    for (const { key, config } of projects) {
+      if (!existsSync(join(config.path, '.git'))) {
+        continue;
+      }
+
+      const worktrees = listWorktrees(config.path);
+      const workspaces = worktrees.filter(
+        (w) => w.path.includes('/workspaces/') || w.path.includes('\\workspaces\\')
+      );
+
+      if (workspaces.length > 0) {
+        allWorkspaces.push({
+          projectName: config.name,
+          projectPath: config.path,
+          workspaces,
+        });
+      }
+    }
+
+    if (options.json) {
+      console.log(JSON.stringify(allWorkspaces, null, 2));
+      return;
+    }
+
+    if (allWorkspaces.length === 0) {
+      console.log(chalk.dim('No workspaces found in any registered project.'));
+      console.log(chalk.dim('Create one with: pan workspace create <issue-id>'));
+      return;
+    }
+
+    for (const proj of allWorkspaces) {
+      console.log(chalk.bold(`\n${proj.projectName}\n`));
+      for (const ws of proj.workspaces) {
+        const name = basename(ws.path);
+        const status = ws.prunable ? chalk.yellow(' (prunable)') : '';
+        console.log(`  ${chalk.cyan(name)}${status}`);
+        console.log(`    Branch: ${ws.branch || chalk.dim('(detached)')}`);
+        console.log(`    Path:   ${chalk.dim(ws.path)}`);
+      }
+    }
+    return;
+  }
+
+  // Default behavior: list from current directory
   const projectRoot = process.cwd();
 
   // Check if we're in a git repo
   if (!existsSync(join(projectRoot, '.git'))) {
     console.error(chalk.red('Not a git repository.'));
+    if (projects.length > 0) {
+      console.log(chalk.dim('Tip: Use --all to list workspaces across all registered projects.'));
+    }
     process.exit(1);
   }
 
@@ -149,6 +259,9 @@ async function listCommand(options: { json?: boolean }): Promise<void> {
   if (workspaces.length === 0) {
     console.log(chalk.dim('No workspaces found.'));
     console.log(chalk.dim('Create one with: pan workspace create <issue-id>'));
+    if (projects.length > 0) {
+      console.log(chalk.dim('Tip: Use --all to list workspaces across all registered projects.'));
+    }
     return;
   }
 
@@ -164,28 +277,52 @@ async function listCommand(options: { json?: boolean }): Promise<void> {
   }
 }
 
-async function destroyCommand(
-  issueId: string,
-  options: { force?: boolean }
-): Promise<void> {
+interface DestroyOptions {
+  force?: boolean;
+  project?: string;
+}
+
+async function destroyCommand(issueId: string, options: DestroyOptions): Promise<void> {
   const spinner = ora('Destroying workspace...').start();
 
   try {
     const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const folderName = `feature-${normalizedId}`;
-    const projectRoot = process.cwd();
+
+    // Resolve project root - try registry first, then explicit option, then cwd
+    let projectRoot: string;
+
+    if (options.project) {
+      projectRoot = options.project;
+    } else {
+      // Try to resolve from project registry
+      const resolved = resolveProjectFromIssue(issueId);
+      if (resolved) {
+        projectRoot = resolved.projectPath;
+      } else {
+        projectRoot = process.cwd();
+      }
+    }
+
     const workspacePath = join(projectRoot, 'workspaces', folderName);
 
     if (!existsSync(workspacePath)) {
-      spinner.fail(`Workspace not found: ${workspacePath}`);
-      process.exit(1);
+      // If not found and we resolved from registry, also check cwd
+      const cwdPath = join(process.cwd(), 'workspaces', folderName);
+      if (projectRoot !== process.cwd() && existsSync(cwdPath)) {
+        projectRoot = process.cwd();
+      } else {
+        spinner.fail(`Workspace not found: ${workspacePath}`);
+        process.exit(1);
+      }
     }
 
+    const finalWorkspacePath = join(projectRoot, 'workspaces', folderName);
+
     spinner.text = 'Removing git worktree...';
-    removeWorktree(projectRoot, workspacePath);
+    removeWorktree(projectRoot, finalWorkspacePath);
 
     spinner.succeed(`Workspace destroyed: ${folderName}`);
-
   } catch (error: any) {
     spinner.fail(error.message);
     if (!options.force) {
