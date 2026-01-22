@@ -4185,8 +4185,12 @@ Start by exploring the codebase to understand the context, then begin the discov
           const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
           // Escape special characters for tmux send-keys
           const escapedMessage = initMessage.replace(/'/g, "'\\''");
-          // Send text followed by C-m (Ctrl+M = Enter) - more reliable than literal 'Enter'
-          await execAsync(`tmux send-keys -t ${sessionName} '${escapedMessage}' C-m`, { encoding: 'utf-8' });
+          // Send text first, then Enter SEPARATELY with a delay
+          // This prevents Enter being interpreted as a newline in the text
+          await execAsync(`tmux send-keys -t ${sessionName} '${escapedMessage}'`, { encoding: 'utf-8' });
+          // Wait 500ms for text to be fully received before sending Enter
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await execAsync(`tmux send-keys -t ${sessionName} C-m`, { encoding: 'utf-8' });
           console.log(`Sent planning prompt to ${sessionName}`);
         } catch (err) {
           console.error('Failed to send planning prompt:', err);

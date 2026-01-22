@@ -573,7 +573,10 @@ Say: "I am the ${name} specialist, ready and waiting for tasks."`;
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     const escapedPrompt = identityPrompt.replace(/'/g, "'\\''");
-    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}' C-m`, { encoding: 'utf-8' });
+    // Send text and Enter SEPARATELY to avoid Enter being interpreted as newline
+    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    execSync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
 
     // Record wake event
     recordWake(name);
