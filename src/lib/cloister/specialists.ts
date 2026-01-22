@@ -78,8 +78,8 @@ const DEFAULT_SPECIALISTS: SpecialistMetadata[] = [
     name: 'test-agent',
     displayName: 'Test Agent',
     description: 'Test execution and analysis',
-    enabled: false,
-    autoWake: false,
+    enabled: true,
+    autoWake: true,
   },
 ];
 
