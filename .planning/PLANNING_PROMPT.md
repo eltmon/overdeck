@@ -1,4 +1,4 @@
-# Planning Session: PAN-31
+# Planning Session: PAN-32
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,96 +22,140 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-31
-- **Title:** Cloister Phase 4: Model Routing & Handoffs
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/31
+- **ID:** PAN-32
+- **Title:** Cloister Phase 5: Remaining Specialist Agents (review, test, planning)
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/32
 
 ## Description
 ## Overview
 
-Intelligently route tasks to the most cost-effective model based on task complexity. Enable automatic handoffs between models as work progresses.
+Implement the remaining specialist agents beyond merge-agent. Specialists are long-lived agents that sleep until triggered and maintain context via `--resume`.
 
-## Goals
+## Completed
 
-1. Route tasks to appropriate models based on complexity (Opus/Sonnet/Haiku)
-2. Auto-escalate when agents get stuck
-3. Downgrade to cheaper models for simpler tasks
-4. Preserve context during handoffs via STATE.md
+- [x] merge-agent (PAN-29) ✅
 
-## Model Tiers
+## Remaining Specialists
 
-| Tier | Model | Cost | Best For |
-|------|-------|------|----------|
-| 💎 Opus | claude-opus-4 | $$$$$ | Architecture, complex debugging, planning |
-| 🔷 Sonnet | claude-sonnet-4 | $$$ | Feature implementation, bug fixes, most work |
-| 💠 Haiku | claude-haiku-3.5 | $ | Tests, simple fixes, formatting, docs |
+### review-agent (Sonnet)
+**Trigger:** PR opened
+**Responsibility:** Code review, security checks, suggest changes
+
+```typescript
+// Wake prompt example
+`# Code Review Request
+
+PR: ${task.prUrl}
+Branch: ${task.sourceBranch}
+Files changed: ${task.filesChanged.length}
+
+## Instructions
+1. Review code for correctness, security, performance
+2. Check for OWASP top 10 vulnerabilities
+3. Suggest improvements
+4. Approve or request changes
+`
+```
+
+### test-agent (Haiku)
+**Trigger:** Push to branch
+**Responsibility:** Run test suites, report failures, simple fixes
+
+```typescript
+// Wake prompt example
+`# Test Request
+
+Workspace: ${task.workspace}
+Branch: ${task.branch}
+
+## Instructions
+1. cd to workspace
+2. Run full test suite
+3. If failures:
+   - Analyze root cause
+   - Fix if simple (< 5 min)
+   - Otherwise report back
+4. Report results
+`
+```
+
+### planning-agent (Opus)
+**Trigger:** New complex issue
+**Responsibility:** Architecture, breaking down work, creating beads tasks
+
+```typescript
+// Wake prompt example
+`# Planning Request
+
+Issue: ${task.issueId}
+Title: ${task.title}
+
+## Instructions
+1. Understand the requirements
+2. Research existing codebase patterns
+3. Design implementation approach
+4. Break down into beads tasks
+5. Estimate complexity for each task
+6. Write to .planning/STATE.md
+`
+```
 
 ## Tasks
 
-From PRD-CLOISTER.md Phase 4:
+- [ ] review-agent implementation
+  - [ ] PR webhook trigger (GitHub/GitLab)
+  - [ ] Code review prompt template
+  - [ ] Integration with existing review workflow
+- [ ] test-agent implementation
+  - [ ] Push webhook trigger
+  - [ ] Test runner detection (jest/vitest/pytest/etc)
+  - [ ] Simple fix capability
+- [ ] planning-agent implementation
+  - [ ] Complex issue detection
+  - [ ] Beads task generation
+  - [ ] STATE.md template
+- [ ] Auto-wake on triggers (webhook from GitHub/Linear)
+- [ ] Session rotation when context gets too large
 
-- [ ] Beads complexity field support (`trivial`, `simple`, `medium`, `complex`, `expert`)
-- [ ] Automatic complexity detection (tags, keywords, file count)
-- [ ] Model router component in Cloister
-- [ ] Complexity → Model mapping configuration
-- [ ] Handoff triggers:
-  - [ ] Task completion → check next task complexity
-  - [ ] Stuck detection → escalate to higher model
-  - [ ] Test failures → escalate
-- [ ] Context preservation during handoff:
-  - [ ] STATE.md summary
-  - [ ] Active beads tasks
-  - [ ] Git state
-- [ ] Cost tracking per agent/model
-- [ ] Dashboard cost display
+## Specialist Registry
 
-## Handoff Triggers
-
-| Trigger | Condition | From | To |
-|---------|-----------|------|-----|
-| Planning complete | Beads "plan" task closed | Opus | Sonnet |
-| Implementation complete | Beads "implement" closed | Sonnet | test-agent |
-| Stuck (Haiku) | No activity > 10 min | Haiku | Sonnet |
-| Stuck (Sonnet) | No activity > 20 min | Sonnet | Opus |
-| Test failures x2 | Repeated failures | Haiku | Sonnet |
-
-## Kill & Spawn Handoff Flow
-
-```
-1. Signal current agent to save state (update STATE.md)
-2. Wait for agent to become idle
-3. Capture context (workspace, git, beads tasks)
-4. Kill current agent
-5. Build handoff prompt with context
-6. Spawn new agent with appropriate model
-```
+All specialists share:
+- Session persistence in `~/.panopticon/specialists/<name>.session`
+- Wake with `claude --resume $SESSION_ID -p "task prompt"`
+- Context accumulation over time
 
 ## Configuration
 
 ```yaml
-# ~/.panopticon/cloister.yaml
-handoffs:
-  auto_triggers:
-    planning_complete:
-      enabled: true
-      from_model: opus
-      to_model: sonnet
-    stuck_escalation:
-      enabled: true
-      thresholds:
-        haiku_to_sonnet_minutes: 10
-        sonnet_to_opus_minutes: 20
+specialists:
+  merge-agent:
+    enabled: true
+    model: sonnet
+    auto_wake: true
+  review-agent:
+    enabled: true
+    model: sonnet
+    auto_wake: true
+  test-agent:
+    enabled: true
+    model: haiku
+    auto_wake: true
+  planning-agent:
+    enabled: true
+    model: opus
+    auto_wake: false  # Manual trigger only
 ```
 
 ## Dependencies
 
 - Phase 1 (Watchdog Framework) ✅
 - Phase 2 (Agent Management UI) ✅
-- Phase 3 (Heartbeats & Hooks) - for stuck detection
+- merge-agent (PAN-29) ✅
 
 ## References
 
-- PRD-CLOISTER.md lines 48-680 (Model Selection & Handoffs)
+- PRD-CLOISTER.md lines 16-47 (Agent Taxonomy)
+- PRD-CLOISTER.md lines 1411-1421 (Phase 5 tasks)
 
 ---
 
