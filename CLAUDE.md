@@ -69,6 +69,29 @@ To use a skill, invoke it with `/skill-name` or reference it in your prompt.
 
 ---
 
+## Publishing to npm
+
+**IMPORTANT:** Panopticon publishes to npm via GitHub Actions, NOT manually.
+
+To release a new version:
+```bash
+# 1. Update version in package.json
+npm version patch  # or: minor, major
+
+# 2. Push the commit and tag
+git push && git push --tags
+```
+
+GitHub Actions will automatically:
+- Run tests
+- Build the package
+- Publish to npm with provenance
+- Create a GitHub Release
+
+**DO NOT** run `npm publish` manually - it will fail without the NPM_TOKEN secret.
+
+---
+
 ## Warnings
 
 - **DO NOT** modify files outside this workspace without explicit permission
