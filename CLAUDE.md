@@ -38,7 +38,12 @@ bd create --title "Implement feature X" --parent <parent-id>
 ### Blocking Issues
 
 ```bash
-bd update <id> --blocked-by <blocker-id>
+# Make issue-A blocked by issue-B (A cannot start until B is done)
+bd dep add <blocked-issue> <blocker-issue> --type blocks
+
+# Example: PAN-5 is blocked by PAN-1
+bd dep add pan-5 pan-1 --type blocks
+
 bd ready  # Will exclude blocked issues
 ```
 
