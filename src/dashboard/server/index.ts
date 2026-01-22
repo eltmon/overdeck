@@ -1297,8 +1297,8 @@ app.get('/api/agents/:id/output', async (req, res) => {
   }
 });
 
-// Send message to agent
-app.post('/api/agents/:id/message', (req, res) => {
+// Send message to agent (async to avoid blocking event loop)
+app.post('/api/agents/:id/message', async (req, res) => {
   const { id } = req.params;
   const { message } = req.body;
 
@@ -1307,12 +1307,10 @@ app.post('/api/agents/:id/message', (req, res) => {
   }
 
   try {
-    // Send message to tmux session
-    execSync(`tmux send-keys -t "${id}" "${message.replace(/"/g, '\\"')}"`, {
-      encoding: 'utf-8',
-    });
+    // Send message to tmux session (async)
+    await execAsync(`tmux send-keys -t "${id}" "${message.replace(/"/g, '\\"')}"`);
     // Press Enter (C-m is more reliable than literal 'Enter')
-    execSync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${id}" C-m`);
 
     res.json({ success: true });
   } catch (error) {
@@ -1321,14 +1319,12 @@ app.post('/api/agents/:id/message', (req, res) => {
   }
 });
 
-// Kill agent
-app.delete('/api/agents/:id', (req, res) => {
+// Kill agent (async to avoid blocking event loop)
+app.delete('/api/agents/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    execSync(`tmux kill-session -t "${id}" 2>/dev/null || true`, {
-      encoding: 'utf-8',
-    });
+    await execAsync(`tmux kill-session -t "${id}" 2>/dev/null || true`);
 
     res.json({ success: true });
   } catch (error) {
@@ -1363,8 +1359,8 @@ app.get('/api/agents/:id/health-history', async (req, res) => {
   }
 });
 
-// Poke an agent (send nudge message)
-app.post('/api/agents/:id/poke', (req, res) => {
+// Poke an agent (send nudge message) - ASYNC to avoid blocking event loop
+app.post('/api/agents/:id/poke', async (req, res) => {
   const { id } = req.params;
   const { message } = req.body;
 
@@ -1380,8 +1376,8 @@ app.post('/api/agents/:id/poke', (req, res) => {
   try {
     // Send message via tmux (two separate commands: text then Enter)
     const escapedMsg = pokeMsg.replace(/"/g, '\\"').replace(/'/g, "\\'");
-    execSync(`tmux send-keys -t "${id}" "${escapedMsg}"`, { encoding: 'utf-8' });
-    execSync(`tmux send-keys -t "${id}" Enter`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${id}" "${escapedMsg}"`);
+    await execAsync(`tmux send-keys -t "${id}" Enter`);
 
     res.json({ success: true, message: 'Agent poked successfully' });
   } catch (error) {
@@ -1411,7 +1407,8 @@ app.get('/api/agents/:id/pending-questions', (req, res) => {
 });
 
 // Submit answer to a pending question (sends keystrokes to tmux session)
-app.post('/api/agents/:id/answer-question', (req, res) => {
+// ASYNC to avoid blocking event loop
+app.post('/api/agents/:id/answer-question', async (req, res) => {
   const { id } = req.params;
   const { answers } = req.body; // Array of selected option labels (one per question)
 
@@ -1434,6 +1431,9 @@ app.post('/api/agents/:id/answer-question', (req, res) => {
     // - Tab moves to next question
     // - When on Submit, Enter submits all answers
 
+    // Helper for small delay (non-blocking)
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     for (let i = 0; i < answers.length && i < questions.length; i++) {
       const answer = answers[i];
       const question = questions[i];
@@ -1446,26 +1446,26 @@ app.post('/api/agents/:id/answer-question', (req, res) => {
       if (optionIndex === -1) {
         // Answer not found in options - might be custom text (option 4)
         // Send "4" to select "Type something" then type the answer
-        execSync(`tmux send-keys -t "${id}" "4"`, { encoding: 'utf-8' });
+        await execAsync(`tmux send-keys -t "${id}" "4"`);
         // Small delay then type the custom answer
         const escapedAnswer = answer.replace(/'/g, "'\\''");
-        execSync(`tmux send-keys -t "${id}" '${escapedAnswer}'`, { encoding: 'utf-8' });
-        execSync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
+        await execAsync(`tmux send-keys -t "${id}" '${escapedAnswer}'`);
+        await execAsync(`tmux send-keys -t "${id}" C-m`);
       } else {
         // Send the number key (1-based index)
         const keyNumber = optionIndex + 1;
-        execSync(`tmux send-keys -t "${id}" "${keyNumber}"`, { encoding: 'utf-8' });
+        await execAsync(`tmux send-keys -t "${id}" "${keyNumber}"`);
       }
 
       // Tab to next question (or to Submit if last)
-      execSync(`tmux send-keys -t "${id}" Tab`, { encoding: 'utf-8' });
+      await execAsync(`tmux send-keys -t "${id}" Tab`);
 
-      // Small delay between keystrokes for reliability
-      execSync('sleep 0.1');
+      // Small delay between keystrokes for reliability (non-blocking)
+      await delay(100);
     }
 
     // Press Enter to submit (should be on Submit button now)
-    execSync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${id}" C-m`);
 
     res.json({ success: true });
   } catch (error) {
@@ -5148,6 +5148,25 @@ wss.on('connection', (ws: WebSocket, req) => {
       .catch(() => { /* ignore initial resize errors */ });
 
     activePtys.set(sessionName, ptyProcess);
+
+    // Capture and send the current visible screen state with ANSI escape codes
+    // This ensures the client sees the actual current terminal state immediately
+    // The PTY will then handle live updates going forward
+    setTimeout(async () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          // Capture with -e to include escape sequences (colors, formatting)
+          // -p prints to stdout, -S - -E - captures only the visible viewport (not scrollback)
+          const { stdout } = await execAsync(`tmux capture-pane -t "${sessionName}" -e -p -S - -E - 2>/dev/null || echo ""`);
+          if (stdout.trim()) {
+            // Send a clear screen sequence first, then the captured content
+            ws.send('\x1b[2J\x1b[H' + stdout);
+          }
+        } catch {
+          // Ignore capture errors
+        }
+      }
+    }, 200);
 
     // Forward PTY output to WebSocket
     ptyProcess.onData((data) => {

@@ -118,10 +118,9 @@ export function XTerminal({ sessionName, onDisconnect }: XTerminalProps) {
       // Reset reconnect attempts on successful connection
       reconnectAttempts.current = 0;
 
-      // Clear any "reconnecting" or "connection lost" messages
-      if (reconnectAttempts.current > 0) {
-        term.writeln('\r\n\x1b[32m● Connected\x1b[0m');
-      }
+      // Clear terminal buffer on connect to ensure fresh content from server
+      // The server sends the current pane content immediately on connect
+      term.clear();
 
       // Small delay to ensure container is fully laid out, then fit once
       setTimeout(() => {
