@@ -167,7 +167,8 @@ export class ClaudeCodeRuntime implements AgentRuntime {
    * Read active heartbeat file if it exists
    */
   private getActiveHeartbeat(agentId: string): Heartbeat | null {
-    const heartbeatPath = join(getAgentDir(agentId), 'heartbeat.json');
+    // Heartbeats are now in shared directory: ~/.panopticon/heartbeats/
+    const heartbeatPath = join(homedir(), '.panopticon', 'heartbeats', `${agentId}.json`);
     if (!existsSync(heartbeatPath)) {
       return null;
     }
@@ -192,6 +193,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
         confidence: 'high',
         toolName: data.tool_name,
         lastAction: data.last_action,
+        currentTask: data.current_task,
+        gitBranch: data.git_branch,
+        workspace: data.workspace,
         pid: data.pid,
         sessionId: data.session_id,
       };

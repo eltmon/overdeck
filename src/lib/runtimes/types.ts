@@ -37,6 +37,9 @@ export interface Heartbeat {
   confidence: 'high' | 'medium' | 'low';
   toolName?: string;
   lastAction?: string;
+  currentTask?: string;
+  gitBranch?: string;
+  workspace?: string;
   pid?: number;
   sessionId?: string;
 }
