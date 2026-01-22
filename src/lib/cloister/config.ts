@@ -70,6 +70,67 @@ export interface SpecialistsConfig {
 }
 
 /**
+ * Model selection configuration
+ */
+export interface ModelSelectionConfig {
+  default_model: 'opus' | 'sonnet' | 'haiku';
+  complexity_routing: {
+    trivial: 'opus' | 'sonnet' | 'haiku';
+    simple: 'opus' | 'sonnet' | 'haiku';
+    medium: 'opus' | 'sonnet' | 'haiku';
+    complex: 'opus' | 'sonnet' | 'haiku';
+    expert: 'opus' | 'sonnet' | 'haiku';
+  };
+  specialist_models: {
+    merge_agent: 'opus' | 'sonnet' | 'haiku';
+    review_agent: 'opus' | 'sonnet' | 'haiku';
+    test_agent: 'opus' | 'sonnet' | 'haiku';
+    planning_agent: 'opus' | 'sonnet' | 'haiku';
+  };
+}
+
+/**
+ * Handoff trigger configuration
+ */
+export interface HandoffTriggersConfig {
+  planning_complete?: {
+    enabled: boolean;
+    from_model: 'opus' | 'sonnet' | 'haiku';
+    to_model: 'opus' | 'sonnet' | 'haiku';
+  };
+  stuck_escalation?: {
+    enabled: boolean;
+    haiku_to_sonnet_minutes: number;
+    sonnet_to_opus_minutes: number;
+  };
+  test_failure?: {
+    enabled: boolean;
+    from_model: 'opus' | 'sonnet' | 'haiku';
+    to_model: 'opus' | 'sonnet' | 'haiku';
+    trigger_on: 'any_failure' | '2_consecutive';
+  };
+  implementation_complete?: {
+    enabled: boolean;
+    to_specialist: string; // e.g., 'test-agent'
+  };
+}
+
+/**
+ * Handoff configuration
+ */
+export interface HandoffConfig {
+  auto_triggers: HandoffTriggersConfig;
+}
+
+/**
+ * Cost tracking configuration
+ */
+export interface CostTrackingConfig {
+  display_enabled: boolean;
+  log_to_jsonl: boolean;
+}
+
+/**
  * Complete Cloister configuration
  */
 export interface CloisterConfig {
@@ -79,6 +140,9 @@ export interface CloisterConfig {
   monitoring: MonitoringConfig;
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
+  model_selection?: ModelSelectionConfig;
+  handoffs?: HandoffConfig;
+  cost_tracking?: CostTrackingConfig;
 }
 
 /**
@@ -119,6 +183,50 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       enabled: false, // Not yet implemented
       auto_wake: false,
     },
+  },
+  model_selection: {
+    default_model: 'sonnet',
+    complexity_routing: {
+      trivial: 'haiku',
+      simple: 'haiku',
+      medium: 'sonnet',
+      complex: 'sonnet',
+      expert: 'opus',
+    },
+    specialist_models: {
+      merge_agent: 'sonnet',
+      review_agent: 'sonnet',
+      test_agent: 'haiku',
+      planning_agent: 'opus',
+    },
+  },
+  handoffs: {
+    auto_triggers: {
+      planning_complete: {
+        enabled: true,
+        from_model: 'opus',
+        to_model: 'sonnet',
+      },
+      stuck_escalation: {
+        enabled: true,
+        haiku_to_sonnet_minutes: 10,
+        sonnet_to_opus_minutes: 20,
+      },
+      test_failure: {
+        enabled: true,
+        from_model: 'haiku',
+        to_model: 'sonnet',
+        trigger_on: 'any_failure',
+      },
+      implementation_complete: {
+        enabled: true,
+        to_specialist: 'test-agent',
+      },
+    },
+  },
+  cost_tracking: {
+    display_enabled: true,
+    log_to_jsonl: true,
   },
 };
 
