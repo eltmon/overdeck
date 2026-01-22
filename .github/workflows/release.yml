@@ -26,6 +26,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install dashboard frontend dependencies
+        run: cd src/dashboard/frontend && npm ci
+
+      - name: Install dashboard server dependencies
+        run: cd src/dashboard/server && npm ci
+
       - name: Build
         run: npm run build
 
