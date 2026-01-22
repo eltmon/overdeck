@@ -2530,7 +2530,7 @@ app.get('/api/workspaces/:issueId/clean/preview', (req, res) => {
 });
 
 // Clean and recreate a corrupted workspace
-app.post('/api/workspaces/:issueId/clean', (req, res) => {
+app.post('/api/workspaces/:issueId/clean', async (req, res) => {
   const { issueId } = req.params;
   const { createBackup } = req.body || {};
   const issuePrefix = issueId.split('-')[0];
@@ -2553,7 +2553,7 @@ app.post('/api/workspaces/:issueId/clean', (req, res) => {
       console.log(`Creating backup: ${workspacePath} -> ${backupPath}`);
 
       // Copy workspace to backup (excluding node_modules, target, etc. to save space)
-      execSync(
+      await execAsync(
         `rsync -a --quiet --exclude=node_modules --exclude=target --exclude=dist --exclude=.git --exclude=__pycache__ --exclude=.cache --exclude=.next --exclude=coverage "${workspacePath}/" "${backupPath}/"`,
         { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
       );
@@ -2563,17 +2563,17 @@ app.post('/api/workspaces/:issueId/clean', (req, res) => {
     // If regular rm fails (files owned by root from Docker), use Docker to clean up
     console.log(`Removing corrupted workspace: ${workspacePath}`);
     try {
-      execSync(`rm -rf "${workspacePath}"`, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024, stdio: 'pipe' });
+      await execAsync(`rm -rf "${workspacePath}"`, { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 });
     } catch (rmError: any) {
       console.log('Regular rm failed, using Docker to clean up root-owned files...');
       // Use Alpine container to remove contents as root inside Docker (no sudo needed on host)
       // Note: Can't remove /cleanup itself (mount point), so remove contents then rmdir from host
-      execSync(
+      await execAsync(
         `docker run --rm -v "${workspacePath}:/cleanup" alpine sh -c "rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?* 2>/dev/null || true"`,
-        { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024, stdio: 'pipe' }
+        { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
       );
       // Now remove the empty directory from host
-      execSync(`rmdir "${workspacePath}"`, { encoding: 'utf-8', stdio: 'pipe' });
+      await execAsync(`rmdir "${workspacePath}"`, { encoding: 'utf-8' });
     }
 
     // Create fresh workspace using pan command
@@ -3819,7 +3819,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
           });
 
           // Run pan workspace create
-          execSync(`pan workspace create ${issue.identifier}`, {
+          await execAsync(`pan workspace create ${issue.identifier}`, {
             cwd: projectPath,
             encoding: 'utf-8',
             timeout: 60000,
@@ -3842,14 +3842,14 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
 
     try {
       // Kill existing planning session if any
-      execSync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
 
       // Create planning prompt file - store IN workspace if exists (for git-backed planning)
       const planningDir = workspaceCreated
         ? join(workspacePath, '.planning')
         : join(projectPath, '.planning', issueLower);
       if (!existsSync(planningDir)) {
-        execSync(`mkdir -p "${planningDir}"`, { encoding: 'utf-8' });
+        await execAsync(`mkdir -p "${planningDir}"`, { encoding: 'utf-8' });
       }
 
       const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
@@ -3924,11 +3924,11 @@ Start by exploring the codebase to understand the context, then begin the discov
 
       // Ensure tmux is running before starting session
       ensureTmuxRunning();
-      execSync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
+      await execAsync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
 
       // Create agent state file so QuestionDialog can find the JSONL path
       const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-      execSync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
+      await execAsync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
       writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
         id: sessionName,
         issueId: issue.identifier,
@@ -3942,20 +3942,20 @@ Start by exploring the codebase to understand the context, then begin the discov
 
       // Resize the tmux window to be wide enough for Claude's TUI
       try {
-        execSync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
+        await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
       } catch {
         // Ignore resize errors
       }
 
       // Wait for Claude to initialize, then send the planning prompt
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
           // Send a short message that tells Claude to read the prompt file
           const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
           // Escape special characters for tmux send-keys
           const escapedMessage = initMessage.replace(/'/g, "'\\''");
           // Send text followed by C-m (Ctrl+M = Enter) - more reliable than literal 'Enter'
-          execSync(`tmux send-keys -t ${sessionName} '${escapedMessage}' C-m`, { encoding: 'utf-8' });
+          await execAsync(`tmux send-keys -t ${sessionName} '${escapedMessage}' C-m`, { encoding: 'utf-8' });
           console.log(`Sent planning prompt to ${sessionName}`);
         } catch (err) {
           console.error('Failed to send planning prompt:', err);

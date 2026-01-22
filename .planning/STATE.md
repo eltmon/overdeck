@@ -1,343 +1,366 @@
-# PAN-30: Cloister Phase 3 - Active Heartbeats & Hooks
+# PAN-35: Terminal Latency Phase 2 - Remaining Blocking Operations
 
 ## Issue Summary
 
-Enable rich heartbeat data from agents via Claude Code hooks, providing detailed activity information beyond passive file monitoring. This allows the dashboard to show what tool an agent is using and what action it's taking in real-time.
+Convert remaining `execSync` calls to `execAsync` to eliminate occasional lag spikes in the dashboard. While PAN-17 fixed the main terminal latency issues (WebSocket now ~2ms, keystroke latency ~1ms), there are still 73 `execSync` calls throughout the server that could cause lag during workspace/agent management operations.
+
+## Current Status (2026-01-21)
+
+**Terminal Performance: ✅ EXCELLENT**
+- WebSocket connect: 1.80ms (was 2354ms before PAN-17)
+- First keystroke: ~1ms (was 2066ms before PAN-17)
+- P95 latency: 1.20ms (was 2066ms before PAN-17)
+- Throughput: 7,362 keys/sec
+
+**Phase 1 Complete: ✅**
+- Workspace creation endpoint converted to execAsync (panopticon-hk2)
+  - `/api/issues/:id/start-planning` - pan workspace create and tmux operations
+- Workspace deletion endpoint converted to execAsync (panopticon-3uu)
+  - `/api/workspaces/:issueId/clean` - rsync backup and cleanup operations
+
+**Remaining Work:**
+- Approval flow git operations (Medium Priority): ~20 calls
+- Beads integration: ~5 calls
+- Other planning session operations: ~10 calls
+- Git status helpers: 3 calls
+- Docker checks: ~3 calls
 
 ## Key Decisions
 
-### 1. Heartbeat Scope
-**Decision:** Rich Context
+### 1. Scope - Focus on User-Facing Operations
+**Decision:** Convert only operations that users actively trigger
 
-Include comprehensive data in each heartbeat:
-- Tool name
-- Current beads task (via cache)
-- Git branch
-- Workspace path
-- Timestamp
-- Agent ID
+**Rationale:**
+- Terminal latency (high-frequency) is already fixed in PAN-17
+- Focus on operations users click/interact with directly
+- Skip one-time startup operations like `ensureTmuxRunning()`
 
-This provides maximum value for the dashboard at minimal overhead cost.
+**Priority order:**
+1. **High**: Agent management (message, kill, poke) - Already async in PAN-17 ✅
+2. **High**: Workspace operations (create, delete) - Still sync
+3. **Medium**: Approval flow (merge, push) - Still sync
+4. **Medium**: Beads operations - Still sync
+5. **Low**: Git status helpers - Async version exists, but sync version still called in places
+6. **Low**: Docker checks - Infrequent, acceptable to block briefly
 
-### 2. Existing Hooks Handling
-**Decision:** Merge (append to array)
+### 2. Conversion Strategy
+**Decision:** Incremental conversion with parallel execution where possible
 
-When running `pan setup hooks`:
-- Read existing `~/.claude/settings.json`
-- Preserve any existing PostToolUse hooks
-- Append Panopticon heartbeat hook to the array
-- Never clobber user's custom hooks
+**Pattern:**
+```typescript
+// BEFORE (blocking)
+const result = execSync('command', { encoding: 'utf-8' });
 
-### 3. Heartbeat Mode
-**Decision:** Required for new agents
+// AFTER (non-blocking)
+const { stdout: result } = await execAsync('command', { encoding: 'utf-8' });
+```
 
-When spawning agents via `pan work issue`:
-- Automatically run hook setup if not already configured
-- Set `PANOPTICON_AGENT_ID` environment variable
-- Silent auto-setup (one-line confirmation message)
+**For multiple sequential operations:**
+```typescript
+// BEFORE (3x blocking)
+execSync('git add .');
+execSync('git commit -m "msg"');
+execSync('git push');
 
-### 4. Task Lookup Method
-**Decision:** Cache-based
+// AFTER (parallel where possible, or Promise.all)
+await Promise.all([
+  execAsync('git add .'),
+  execAsync('git commit -m "msg"').then(() => execAsync('git push'))
+]);
+```
 
-Performance optimization for beads task lookup:
-- When agent starts or switches tasks, write current task to a state file
-- Heartbeat hook reads from cache file (0ms overhead)
-- Avoids 50-200ms penalty of running `bd show` per tool call
+### 3. Testing Strategy
+**Decision:** Use existing Playwright latency tests + manual verification
 
-Task cache location: `~/.panopticon/agents/{agentId}/current-task.json`
+**Tests:**
+- Run `npm run test:latency` before/after each conversion
+- Verify no regression in terminal performance
+- Manual testing of converted endpoints in dashboard UI
+- Check error handling (timeout, failures)
 
-### 5. Heartbeat Path
-**Decision:** Shared directory
+### 4. Error Handling
+**Decision:** Preserve existing error handling behavior
 
-Heartbeats written to: `~/.panopticon/heartbeats/{agentId}.json`
+**Pattern:**
+```typescript
+// BEFORE
+try {
+  const result = execSync('cmd', { encoding: 'utf-8' });
+  // ...
+} catch (err) {
+  return res.status(400).json({ error: err.message });
+}
 
-Benefits:
-- Easier for dashboard to watch all heartbeats in one directory
-- Can use `inotify` or `fs.watch` efficiently
-- Clear separation from agent state files
+// AFTER (same behavior)
+try {
+  const { stdout: result } = await execAsync('cmd', { encoding: 'utf-8' });
+  // ...
+} catch (err: any) {
+  return res.status(400).json({ error: err.message });
+}
+```
 
-**Note:** Need to update `claude-code.ts` to read from new location.
+### 5. Backwards Compatibility
+**Decision:** No API changes, only internal implementation changes
 
-### 6. Idempotent Setup
-**Decision:** Yes
-
-`pan setup hooks` will:
-- Check if Panopticon heartbeat hook already exists in settings.json
-- Skip if already present (print "Already configured")
-- Update if version/path has changed
-
-### 7. Auto Setup Mode
-**Decision:** Silent auto-setup
-
-On first `pan work issue`:
-- Detect hooks not configured
-- Automatically run setup
-- Print single line: "Configured Panopticon heartbeat hooks"
-- Continue with agent spawn
-
-### 8. Dependency Handling
-**Decision:** Install if missing
-
-The heartbeat hook script will:
-- Check for `jq` dependency at install time
-- Attempt to install via package manager if missing (apt, brew, etc.)
-- Fail with clear instructions if auto-install fails
-
-## Current Status
-
-**✅ COMPLETE - All Changes Committed and Pushed**
-
-All core features have been implemented and tested:
-- ✅ Layer 1: Hook Infrastructure (heartbeat-hook script, pan setup hooks command, jq dependency installation)
-- ✅ Layer 2: Integration (spawnAgent PANOPTICON_AGENT_ID, auto-setup hooks, task cache writing, claude-code.ts updates)
-- ✅ All tests passing (208/208)
-- ✅ Changes committed to feature/pan-30 branch
-- ✅ Changes pushed to remote repository
-
-**Commit:** bba6bf6
-**Branch:** feature/pan-30
-**Remote:** https://github.com/eltmon/panopticon-cli/pull/new/feature/pan-30
-
-**Recent Fixes:**
-- Fixed Claude Code hooks format (bba6bf6) - Updated to new format: `{ matcher: {}, hooks: [{ type: "command", command: "..." }] }`
-
-**Ready for:**
-- Manual testing with live agent spawn
-- Code review
-- Pull request creation
-
-## Scope
-
-### In Scope (PAN-30)
-
-**Heartbeat Hook Infrastructure:**
-- Create `~/.panopticon/bin/heartbeat-hook` bash script
-- Parse Claude Code's PostToolUse JSON input
-- Write rich heartbeat to `~/.panopticon/heartbeats/{agentId}.json`
-- Include tool name, timestamp, beads task (from cache), git branch, workspace
-
-**Setup Command:**
-- Implement `pan setup hooks` CLI command
-- Read/modify `~/.claude/settings.json`
-- Merge Panopticon hook with existing hooks
-- Idempotent (safe to run multiple times)
-- Install `jq` dependency if missing
-
-**Agent Spawning Integration:**
-- Modify `spawnAgent()` to set `PANOPTICON_AGENT_ID` env var
-- Auto-run hook setup on first spawn if not configured
-- Write task cache file when agent starts
-
-**Runtime Updates:**
-- Update `claude-code.ts` to read heartbeats from new shared directory
-- Ensure hybrid detection (active first, passive fallback) still works
-
-### Out of Scope
-
-- Dashboard UI changes (already supports heartbeat display)
-- Webhook notifications (future phase)
-- Multi-runtime heartbeat hooks (OpenCode, Codex - future)
-- Cost tracking in heartbeats (separate feature)
+**Why:**
+- All endpoints keep same request/response format
+- Same error codes and messages
+- Same side effects (files created, git commits, etc.)
+- Only difference: non-blocking execution
 
 ## Architecture
 
-### Files to Create/Modify
+### Remaining execSync Calls by Category
+
+#### 1. Workspace Management (High Priority)
+**Location:** `/api/workspaces/create`, `/api/workspaces/:id/delete`
+**Impact:** User clicks "Create Workspace" or "Delete Workspace" button, UI freezes during operation
+**Count:** ~25 calls
+
+Operations:
+- `pan workspace create` (spawns Docker containers)
+- `git worktree` operations
+- `rsync` for backups
+- `docker run` for cleanup
+
+**Conversion impact:** Eliminates 2-5 second freezes when creating/deleting workspaces
+
+#### 2. Approval Flow (Medium Priority)
+**Location:** `/api/workspaces/:id/approve`
+**Impact:** User clicks "Approve & Merge" button, UI freezes during git operations
+**Count:** ~20 calls
+
+Operations:
+- `git status`, `git push`, `git checkout`, `git merge`
+- `git worktree remove`
+- `gh issue close`
+
+**Conversion impact:** Eliminates 3-10 second freeze during approval
+
+#### 3. Beads Integration (Medium Priority)
+**Location:** `/api/plans/:id/beads`
+**Impact:** Planning session creates beads tasks
+**Count:** ~5 calls
+
+Operations:
+- `which bd`
+- `bd create` (multiple)
+- `bd flush`
+
+**Conversion impact:** Eliminates 1-3 second lag when creating beads tasks
+
+#### 4. Git Status Helper (Low Priority)
+**Location:** `getGitStatus()` helper function
+**Impact:** Called occasionally, but async version `getGitStatusAsync()` already exists and is used in most places
+**Count:** 3 calls in sync version
+
+**Note:** The sync version (`getGitStatus()`) appears to be unused or only used in non-critical paths. Verify and remove if unused.
+
+#### 5. Planning Sessions (Low Priority)
+**Location:** `/api/planning/:id/start`, `/api/planning/:id/continue`
+**Impact:** Starting planning sessions
+**Count:** ~10 calls
+
+Operations:
+- `mkdir`, `git add`, `git commit`, `git push`
+- `tmux new-session`, `tmux send-keys`
+
+**Conversion impact:** Minor, infrequent operation
+
+#### 6. Docker Checks (Very Low Priority)
+**Location:** Various endpoints
+**Impact:** Checking if Docker is running
+**Count:** ~3 calls
+
+Operation: `docker info`
+
+**Note:** This is fast (10-50ms) and only called when creating containerized workspaces. Low priority.
+
+### Files to Modify
 
 ```
-~/.panopticon/
-├── bin/
-│   └── heartbeat-hook         # NEW - bash script called by Claude Code
-├── heartbeats/
-│   └── {agentId}.json         # NEW - heartbeat files (one per agent)
-└── agents/{agentId}/
-    └── current-task.json      # NEW - beads task cache
-
-src/cli/commands/
-├── setup.ts                   # MODIFY - add 'hooks' subcommand
-└── setup/
-    └── hooks.ts               # NEW - `pan setup hooks` implementation
-
-src/lib/
-├── agents.ts                  # MODIFY - set PANOPTICON_AGENT_ID, auto-setup hooks
-└── runtimes/
-    └── claude-code.ts         # MODIFY - read from new heartbeat directory
-```
-
-### Heartbeat Hook Script
-
-```bash
-#!/bin/bash
-# ~/.panopticon/bin/heartbeat-hook
-# Called by Claude Code after every tool use with JSON on stdin
-
-set -e
-
-# Parse tool info from stdin
-TOOL_INFO=$(cat)
-
-# Extract tool name (jq required)
-TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"')
-TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""')
-
-# Get agent ID from env (set by pan work issue) or tmux session name
-AGENT_ID="${PANOPTICON_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
-
-# Get current beads task from cache (if exists)
-TASK_CACHE="$HOME/.panopticon/agents/$AGENT_ID/current-task.json"
-CURRENT_TASK=""
-if [ -f "$TASK_CACHE" ]; then
-  CURRENT_TASK=$(jq -r '.title // ""' "$TASK_CACHE" 2>/dev/null || true)
-fi
-
-# Get git branch (fast, single command)
-GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
-
-# Get workspace from pwd
-WORKSPACE=$(pwd)
-
-# Ensure heartbeat directory exists
-HEARTBEAT_DIR="$HOME/.panopticon/heartbeats"
-mkdir -p "$HEARTBEAT_DIR"
-
-# Write heartbeat
-cat > "$HEARTBEAT_DIR/$AGENT_ID.json" << EOF
-{
-  "timestamp": "$(date -Iseconds)",
-  "agent_id": "$AGENT_ID",
-  "tool_name": "$TOOL_NAME",
-  "last_action": "$TOOL_INPUT",
-  "current_task": "$CURRENT_TASK",
-  "git_branch": "$GIT_BRANCH",
-  "workspace": "$WORKSPACE",
-  "pid": $$
-}
-EOF
-```
-
-### Settings.json Modification
-
-Before:
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      { "matcher": ".*", "command": "my-custom-hook" }
-    ]
-  }
-}
-```
-
-After:
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      { "matcher": ".*", "command": "my-custom-hook" },
-      { "matcher": ".*", "command": "~/.panopticon/bin/heartbeat-hook" }
-    ]
-  }
-}
-```
-
-### Heartbeat File Format
-
-```json
-{
-  "timestamp": "2026-01-21T10:30:45-08:00",
-  "agent_id": "agent-pan-30",
-  "tool_name": "Edit",
-  "last_action": "file_path: src/lib/agents.ts, old_string: ...",
-  "current_task": "Implement heartbeat hook script",
-  "git_branch": "feature/pan-30",
-  "workspace": "/home/user/projects/panopticon/workspaces/feature-pan-30",
-  "pid": 12345
-}
+src/dashboard/server/index.ts
+├── getGitStatus()              # REMOVE if unused, or convert to async
+├── /api/workspaces/create      # Convert git/docker operations
+├── /api/workspaces/:id/delete  # Convert cleanup operations
+├── /api/workspaces/:id/approve # Convert git operations
+├── /api/plans/:id/beads        # Convert bd commands
+└── /api/planning/*             # Convert git/tmux operations
 ```
 
 ## Implementation Order
 
-### Layer 1: Hook Infrastructure
-1. Create heartbeat-hook bash script
-2. Make it executable and test manually
-3. Create `pan setup hooks` command
+### Phase 1: High Priority (User-Blocking Operations)
+1. **Convert workspace creation** (`/api/workspaces/create`)
+   - `pan workspace create` execution
+   - Git worktree operations
+   - Docker container startup checks
+2. **Convert workspace deletion** (`/api/workspaces/:id/delete`)
+   - `git worktree remove`
+   - Backup operations (rsync)
+   - Docker cleanup
 
-### Layer 2: Integration
-4. Modify `spawnAgent()` to set env var and auto-setup
-5. Add task cache writing when agent starts
-6. Update `claude-code.ts` to read from new heartbeat directory
+### Phase 2: Medium Priority (Frequent Operations)
+3. **Convert approval flow** (`/api/workspaces/:id/approve`)
+   - Git status, checkout, merge, push
+   - Branch cleanup
+   - Issue closing (gh CLI)
+4. **Convert beads operations** (`/api/plans/:id/beads`)
+   - `bd create` commands
+   - `bd flush`
 
-### Layer 3: Polish
-7. Add dependency installation (jq)
-8. Handle edge cases (permissions, missing directories)
-9. Add tests for setup command
+### Phase 3: Low Priority (Polish)
+5. **Audit getGitStatus() usage** - Remove if unused, or ensure all callers use async version
+6. **Convert planning session operations** (optional)
+7. **Add timeout handling** for long-running async operations
+
+## Testing Plan
+
+### Before Each Conversion
+```bash
+cd src/dashboard/frontend
+npx playwright test tests/terminal-latency.spec.ts --reporter=list
+```
+
+**Baseline:**
+- WebSocket connect: < 5ms
+- First keystroke: < 5ms
+- P95: < 10ms
+- No dropped keystrokes
+
+### After Each Conversion
+1. Run latency tests again - verify no regression
+2. Manual test in dashboard UI:
+   - Create workspace for test issue
+   - Delete workspace
+   - Approve & merge (with test branch)
+3. Check server logs for errors
+4. Verify async operations complete successfully
+
+### Integration Test Scenarios
+1. Create multiple workspaces rapidly (test concurrent operations)
+2. Approve while creating workspace (test no event loop blocking)
+3. Terminal typing during workspace creation (should remain responsive)
 
 ## Beads Tasks
 
-| ID | Title | Layer | Blocked By |
+| ID | Title | Phase | Blocked By |
 |----|-------|-------|------------|
-| pan30-01 | Create heartbeat-hook bash script | 1 | - |
-| pan30-02 | Implement `pan setup hooks` command | 1 | pan30-01 |
-| pan30-03 | Add jq dependency installation | 1 | pan30-02 |
-| pan30-04 | Modify spawnAgent to set PANOPTICON_AGENT_ID | 2 | - |
-| pan30-05 | Add auto-setup hooks on first spawn | 2 | pan30-02, pan30-04 |
-| pan30-06 | Write task cache file on agent start | 2 | pan30-04 |
-| pan30-07 | Update claude-code.ts heartbeat reading | 2 | pan30-01 |
-| pan30-08 | Handle edge cases and permissions | 3 | pan30-05, pan30-07 |
-| pan30-09 | Add tests for pan setup hooks | 3 | pan30-02 |
+| pan35-01 | Audit getGitStatus() usage and remove/convert | 3 | - |
+| pan35-02 | Convert workspace creation to execAsync | 1 | - |
+| pan35-03 | Convert workspace deletion to execAsync | 1 | - |
+| pan35-04 | Convert approval flow git operations to execAsync | 2 | - |
+| pan35-05 | Convert beads integration to execAsync | 2 | - |
+| pan35-06 | Add timeout handling for long async operations | 3 | pan35-02, pan35-03, pan35-04 |
+| pan35-07 | Run comprehensive latency tests and verify metrics | 3 | pan35-02, pan35-03, pan35-04, pan35-05 |
 
-## Technical Notes
+## Success Metrics
 
-### Claude Code Hook JSON Format
+### Performance Targets (Already Met for Terminal!)
+- WebSocket connect: < 5ms ✅ (currently 1.8ms)
+- First keystroke: < 5ms ✅ (currently ~1ms)
+- P95 latency: < 10ms ✅ (currently 1.2ms)
 
-Claude Code sends PostToolUse hooks JSON like:
-```json
-{
-  "tool_name": "Edit",
-  "tool_input": { "file_path": "...", "old_string": "...", "new_string": "..." },
-  "tool_result": { "success": true, ... }
-}
-```
+### New Targets for User Operations
+- Workspace create: < 100ms time-to-first-response (spinner shows immediately)
+- Workspace delete: < 100ms time-to-first-response
+- Approval flow: < 100ms time-to-first-response
+- Terminal remains responsive during all operations
 
-### Environment Variable Injection
-
-```typescript
-// In spawnAgent()
-const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`;
-createSession(agentId, options.workspace, claudeCmd, {
-  env: {
-    ...process.env,
-    PANOPTICON_AGENT_ID: agentId
-  }
-});
-```
-
-### Idempotent Hook Setup
-
-```typescript
-function hookAlreadyConfigured(settings: any): boolean {
-  const postToolUse = settings?.hooks?.PostToolUse || [];
-  return postToolUse.some((h: any) =>
-    h.command?.includes('panopticon') ||
-    h.command?.includes('heartbeat-hook')
-  );
-}
-```
-
-### Task Cache Update
-
-Write task cache when:
-1. Agent starts (from initial prompt context)
-2. Agent updates beads task status (`bd update --status in_progress`)
-
-For MVP: Only write on agent start. Task switching detection is future work.
+**Note:** The operations themselves may take seconds (Docker, git), but the HTTP endpoint should return immediately with a "in progress" response, allowing the UI to show loading states without freezing.
 
 ## Open Questions
 
-None - all decisions captured above.
+### 1. Should workspace operations be truly async?
+**Current:** Synchronous - endpoint blocks until operation completes
+**Alternative:** Return immediately, poll for completion status
+
+**Recommendation:** Keep synchronous for MVP (Phase 2), but ensure they're non-blocking. Consider background jobs for Phase 3.
+
+### 2. What about very long operations (git clone, docker build)?
+**Current:** Can take 30+ seconds
+**Concern:** Even with execAsync, the HTTP request hangs
+
+**Recommendation:**
+- Short timeout on HTTP response (5-10s)
+- Return "in progress" if operation not complete
+- Client polls for status
+- (Future work, out of scope for PAN-35)
+
+## Technical Notes
+
+### execAsync is Already Available
+```typescript
+import { promisify } from 'util';
+import { exec } from 'child_process';
+
+const execAsync = promisify(exec);
+
+// Usage
+const { stdout, stderr } = await execAsync('command', {
+  encoding: 'utf-8',
+  maxBuffer: 10 * 1024 * 1024,
+  timeout: 30000
+});
+```
+
+### Common Patterns
+
+**Pattern 1: Simple replacement**
+```typescript
+// BEFORE
+const branch = execSync('git branch --show-current', { cwd, encoding: 'utf-8' }).trim();
+
+// AFTER
+const { stdout: branch } = await execAsync('git branch --show-current', { cwd, encoding: 'utf-8' });
+const branchTrimmed = branch.trim();
+```
+
+**Pattern 2: Multiple sequential commands**
+```typescript
+// BEFORE
+execSync('git add .', { cwd });
+execSync('git commit -m "msg"', { cwd });
+execSync('git push', { cwd });
+
+// AFTER (sequential - commit depends on add, push depends on commit)
+await execAsync('git add .', { cwd });
+await execAsync('git commit -m "msg"', { cwd });
+await execAsync('git push', { cwd });
+
+// OR (if bash chaining is acceptable)
+await execAsync('git add . && git commit -m "msg" && git push', { cwd, shell: '/bin/bash' });
+```
+
+**Pattern 3: Parallel operations**
+```typescript
+// BEFORE (sequential, wastes time)
+const branch = execSync('git branch', { cwd, encoding: 'utf-8' });
+const status = execSync('git status', { cwd, encoding: 'utf-8' });
+
+// AFTER (parallel, faster)
+const [{ stdout: branch }, { stdout: status }] = await Promise.all([
+  execAsync('git branch', { cwd, encoding: 'utf-8' }),
+  execAsync('git status', { cwd, encoding: 'utf-8' })
+]);
+```
+
+### Error Handling
+
+**execAsync rejects on non-zero exit code**, just like execSync throws:
+```typescript
+try {
+  await execAsync('command-that-fails');
+} catch (err: any) {
+  console.error('Command failed:', err.message);
+  // err.stdout and err.stderr available
+}
+```
 
 ## References
 
-- PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md` (Phase 3: Active Heartbeats & Hooks)
-- Claude Code Runtime: `/home/eltmon/projects/panopticon/src/lib/runtimes/claude-code.ts`
-- Agent spawning: `/home/eltmon/projects/panopticon/src/lib/agents.ts`
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/30
+- PAN-17: Original async conversion (terminal endpoints)
+- Playwright tests: `src/dashboard/frontend/tests/terminal-latency.spec.ts`
+- Server code: `src/dashboard/server/index.ts`
+- Issue: https://github.com/eltmon/panopticon-cli/issues/35
