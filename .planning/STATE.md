@@ -12,14 +12,18 @@ Convert remaining `execSync` calls to `execAsync` to eliminate occasional lag sp
 - P95 latency: 1.20ms (was 2066ms before PAN-17)
 - Throughput: 7,362 keys/sec
 
+**Phase 1 Complete: ✅**
+- Workspace creation endpoint converted to execAsync (panopticon-hk2)
+  - `/api/issues/:id/start-planning` - pan workspace create and tmux operations
+- Workspace deletion endpoint converted to execAsync (panopticon-3uu)
+  - `/api/workspaces/:issueId/clean` - rsync backup and cleanup operations
+
 **Remaining Work:**
-73 `execSync` calls in non-critical paths that could cause occasional lag spikes:
-- Workspace management (create, delete, approve): ~25 calls
-- Git operations (status, commit, push): ~20 calls
+- Approval flow git operations (Medium Priority): ~20 calls
 - Beads integration: ~5 calls
-- Docker operations: ~8 calls
-- Planning session management: ~10 calls
-- Misc (ensureTmuxRunning, file operations): ~5 calls
+- Other planning session operations: ~10 calls
+- Git status helpers: 3 calls
+- Docker checks: ~3 calls
 
 ## Key Decisions
 
