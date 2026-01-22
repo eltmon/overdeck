@@ -51,7 +51,8 @@
     "test:coverage": "vitest run --coverage",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "postinstall": "node scripts/postinstall.mjs || true"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",

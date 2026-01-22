@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
-import { planSync, executeSync } from '../../lib/sync.js';
+import { planSync, executeSync, planHooksSync, syncHooks } from '../../lib/sync.js';
 import { SYNC_TARGETS, Runtime } from '../../lib/paths.js';
 
 interface SyncOptions {
@@ -29,6 +29,18 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // Dry run mode
   if (options.dryRun) {
     console.log(chalk.bold('Sync Plan (dry run):\n'));
+
+    // Show hooks plan
+    const hooksPlan = planHooksSync();
+    if (hooksPlan.length > 0) {
+      console.log(chalk.cyan('hooks (bin scripts):'));
+      for (const hook of hooksPlan) {
+        const icon = hook.status === 'new' ? chalk.green('+') : chalk.blue('↻');
+        const status = hook.status === 'new' ? '' : chalk.dim('[update]');
+        console.log(`  ${icon} ${hook.name} ${status}`);
+      }
+      console.log('');
+    }
 
     for (const runtime of validTargets) {
       const plan = planSync(runtime);
@@ -117,5 +129,20 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log(chalk.dim('Use --force to overwrite conflicting items.'));
   } else {
     spinner.succeed(`Synced ${totalCreated} items to ${validTargets.join(', ')}`);
+  }
+
+  // Sync hooks (bin scripts)
+  const hooksSpinner = ora('Syncing hooks...').start();
+  const hooksResult = syncHooks();
+
+  if (hooksResult.errors.length > 0) {
+    hooksSpinner.warn(`Synced ${hooksResult.synced.length} hooks, ${hooksResult.errors.length} errors`);
+    for (const error of hooksResult.errors) {
+      console.log(chalk.red(`  ✗ ${error}`));
+    }
+  } else if (hooksResult.synced.length > 0) {
+    hooksSpinner.succeed(`Synced ${hooksResult.synced.length} hooks to ~/.panopticon/bin/`);
+  } else {
+    hooksSpinner.info('No hooks to sync');
   }
 }

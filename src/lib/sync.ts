@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync } from 'fs';
 import { join, basename } from 'path';
-import { SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, SYNC_TARGETS, type Runtime } from './paths.js';
+import { SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, SOURCE_SCRIPTS_DIR, SYNC_TARGETS, type Runtime } from './paths.js';
 
 export interface SyncItem {
   name: string;
@@ -233,6 +233,72 @@ export function executeSync(runtime: Runtime, options: SyncOptions = {}): SyncRe
 
     symlinkSync(item.sourcePath, item.targetPath);
     result.created.push(item.name);
+  }
+
+  return result;
+}
+
+/**
+ * Hook item for sync planning
+ */
+export interface HookItem {
+  name: string;
+  sourcePath: string;
+  targetPath: string;
+  status: 'new' | 'updated' | 'current';
+}
+
+/**
+ * Plan hooks sync (checks what would be updated)
+ */
+export function planHooksSync(): HookItem[] {
+  const hooks: HookItem[] = [];
+
+  if (!existsSync(SOURCE_SCRIPTS_DIR)) {
+    return hooks;
+  }
+
+  // Only sync hook scripts (no extension) - skip helper scripts like .mjs, .sh
+  const scripts = readdirSync(SOURCE_SCRIPTS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && !entry.name.startsWith('.') && !entry.name.includes('.'));
+
+  for (const script of scripts) {
+    const sourcePath = join(SOURCE_SCRIPTS_DIR, script.name);
+    const targetPath = join(BIN_DIR, script.name);
+
+    let status: HookItem['status'] = 'new';
+
+    if (existsSync(targetPath)) {
+      // Could compare file contents/timestamps here for 'current' vs 'updated'
+      // For now, always update to ensure latest version
+      status = 'updated';
+    }
+
+    hooks.push({ name: script.name, sourcePath, targetPath, status });
+  }
+
+  return hooks;
+}
+
+/**
+ * Sync hooks (copy scripts to ~/.panopticon/bin/)
+ */
+export function syncHooks(): { synced: string[]; errors: string[] } {
+  const result = { synced: [] as string[], errors: [] as string[] };
+
+  // Ensure bin directory exists
+  mkdirSync(BIN_DIR, { recursive: true });
+
+  const hooks = planHooksSync();
+
+  for (const hook of hooks) {
+    try {
+      copyFileSync(hook.sourcePath, hook.targetPath);
+      chmodSync(hook.targetPath, 0o755); // Make executable
+      result.synced.push(hook.name);
+    } catch (error) {
+      result.errors.push(`${hook.name}: ${error}`);
+    }
   }
 
   return result;

@@ -9,8 +9,10 @@ export const CONFIG_DIR = PANOPTICON_HOME;
 export const SKILLS_DIR = join(PANOPTICON_HOME, 'skills');
 export const COMMANDS_DIR = join(PANOPTICON_HOME, 'commands');
 export const AGENTS_DIR = join(PANOPTICON_HOME, 'agents');
+export const BIN_DIR = join(PANOPTICON_HOME, 'bin');
 export const BACKUPS_DIR = join(PANOPTICON_HOME, 'backups');
 export const COSTS_DIR = join(PANOPTICON_HOME, 'costs');
+export const HEARTBEATS_DIR = join(PANOPTICON_HOME, 'heartbeats');
 
 // Traefik directories
 export const TRAEFIK_DIR = join(PANOPTICON_HOME, 'traefik');
@@ -65,11 +67,25 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const currentFile = fileURLToPath(import.meta.url);
-const distDir = dirname(currentFile); // dist/ or dist/lib/ depending on bundler
-const packageRoot = dirname(distDir);  // package root
+const currentDir = dirname(currentFile);
+
+// Handle both development (src/lib/) and production (dist/) modes
+// In dev: /path/to/panopticon/src/lib/paths.ts -> /path/to/panopticon
+// In prod: /path/to/panopticon/dist/lib/paths.js -> /path/to/panopticon
+let packageRoot: string;
+if (currentDir.includes('/src/')) {
+  // Development mode - go up from src/lib to package root
+  packageRoot = dirname(dirname(currentDir));
+} else {
+  // Production mode - go up from dist (or dist/lib) to package root
+  packageRoot = currentDir.endsWith('/lib')
+    ? dirname(dirname(currentDir))
+    : dirname(currentDir);
+}
 
 export const SOURCE_TEMPLATES_DIR = join(packageRoot, 'templates');
 export const SOURCE_TRAEFIK_TEMPLATES = join(SOURCE_TEMPLATES_DIR, 'traefik');
+export const SOURCE_SCRIPTS_DIR = join(packageRoot, 'scripts');
 
 // All directories to create on init
 export const INIT_DIRS = [
@@ -77,8 +93,10 @@ export const INIT_DIRS = [
   SKILLS_DIR,
   COMMANDS_DIR,
   AGENTS_DIR,
+  BIN_DIR,
   BACKUPS_DIR,
   COSTS_DIR,
+  HEARTBEATS_DIR,
   TEMPLATES_DIR,
   CLAUDE_MD_TEMPLATES,
   CERTS_DIR,
