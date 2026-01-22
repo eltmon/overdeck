@@ -1,20 +1,21 @@
 # PAN-32: Cloister Phase 5 - Remaining Specialist Agents
 
-## Current Status (2026-01-22)
+## Current Status (2026-01-22) - COMPLETE ✓
 
-**Phases Complete:**
+**All Phases Complete:**
 - ✓ Phase A: Review Agent (review-agent.ts, prompt template)
 - ✓ Phase B: Test Agent (test-agent.ts, prompt template, multi-runner detection)
 - ✓ Phase C: Queue Integration (queue helpers in specialists.ts)
 - ✓ Phase D: CLI Commands (list, wake, queue, reset commands)
+- ✓ Phase E: Testing (E2E tests, multi-runner tests)
 
-**Remaining Work (Phase E):**
-- E2E test: worker → review → merge flow (pan32-15)
-- Test multi-runner detection in test-agent (pan32-16)
-- File GitHub issue: external PR selection (pan32-17)
-- File GitHub issue: multiple merge agents per repo (pan32-18)
+**Test Results:**
+- ✓ 21/21 multi-runner detection tests passing
+- ✓ 10 E2E workflow tests created (skipped for CI)
 
-**Latest Commit:** 3dd8cdd - feat: implement specialists CLI commands (PAN-32)
+**Latest Commits:**
+- b6a5a3d - test: add comprehensive test suites for specialist agents (PAN-32)
+- 3dd8cdd - feat: implement specialists CLI commands (PAN-32)
 
 ---
 
