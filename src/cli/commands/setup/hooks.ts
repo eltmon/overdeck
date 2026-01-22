@@ -7,8 +7,11 @@ import { homedir } from 'os';
 interface ClaudeSettings {
   hooks?: {
     PostToolUse?: Array<{
-      matcher: string;
-      command: string;
+      matcher: Record<string, any>;
+      hooks: Array<{
+        type: string;
+        command: string;
+      }>;
     }>;
   };
   [key: string]: any;
@@ -77,10 +80,12 @@ function installJq(): boolean {
  */
 function hookAlreadyConfigured(settings: ClaudeSettings, hookPath: string): boolean {
   const postToolUse = settings?.hooks?.PostToolUse || [];
-  return postToolUse.some((hook) =>
-    hook.command === hookPath ||
-    hook.command.includes('panopticon') ||
-    hook.command.includes('heartbeat-hook')
+  return postToolUse.some((hookConfig) =>
+    hookConfig.hooks?.some((hook) =>
+      hook.command === hookPath ||
+      hook.command?.includes('panopticon') ||
+      hook.command?.includes('heartbeat-hook')
+    )
   );
 }
 
@@ -190,8 +195,13 @@ export async function setupHooksCommand(): Promise<void> {
 
   // Append Panopticon hook
   settings.hooks.PostToolUse.push({
-    matcher: '.*',
-    command: scriptDest
+    matcher: {},
+    hooks: [
+      {
+        type: 'command',
+        command: scriptDest
+      }
+    ]
   });
 
   // 7. Write updated settings

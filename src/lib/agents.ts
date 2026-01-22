@@ -333,10 +333,12 @@ function checkAndSetupHooks(): void {
       const settings = JSON.parse(settingsContent);
       const postToolUse = settings?.hooks?.PostToolUse || [];
 
-      const hookConfigured = postToolUse.some((hook: any) =>
-        hook.command === hookPath ||
-        hook.command?.includes('panopticon') ||
-        hook.command?.includes('heartbeat-hook')
+      const hookConfigured = postToolUse.some((hookConfig: any) =>
+        hookConfig.hooks?.some((hook: any) =>
+          hook.command === hookPath ||
+          hook.command?.includes('panopticon') ||
+          hook.command?.includes('heartbeat-hook')
+        )
       );
 
       if (hookConfigured) {
