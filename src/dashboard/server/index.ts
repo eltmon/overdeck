@@ -3281,17 +3281,25 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
     }
 
     // 6. SPECIALIST WORKFLOW: review-agent → test-agent → merge-agent
-    // Each specialist gets woken with a task and we wait for completion
-    const { wakeSpecialist, isRunning } = await import('../../lib/cloister/specialists.js');
+    // Kick off review-agent with handoff instructions - it will wake the next specialists
+    const { wakeSpecialist } = await import('../../lib/cloister/specialists.js');
 
-    // 6a. REVIEW-AGENT: Code review
-    console.log(`[approve] Step 1/3: Waking review-agent for ${issueId}...`);
-    const reviewPrompt = `CODE REVIEW TASK for ${issueId}:
+    // Build the full pipeline prompt for review-agent
+    // It will hand off to test-agent, which hands off to merge-agent
+    console.log(`[approve] Starting specialist pipeline for ${issueId}...`);
 
+    const pipelinePrompt = `APPROVE WORKFLOW for ${issueId}
+
+You are the FIRST specialist in a 3-step pipeline: review → test → merge.
+Your job is to review the code and then HAND OFF to test-agent.
+
+=== CONTEXT ===
+ISSUE: ${issueId}
 WORKSPACE: ${workspacePath}
 BRANCH: ${branchName}
+PROJECT: ${projectPath}
 
-INSTRUCTIONS:
+=== YOUR TASK (REVIEW) ===
 1. cd ${workspacePath}
 2. Review the changes: git diff main...${branchName}
 3. Check for:
@@ -3299,126 +3307,52 @@ INSTRUCTIONS:
    - Security vulnerabilities
    - Performance concerns
    - Missing tests
-4. If issues found: Report them but don't block (we're approving)
-5. Provide a brief summary of the changes
+4. Provide a brief summary of findings
 
-This is part of the approve workflow. Provide your review findings.`;
+=== CRITICAL: HANDOFF TO TEST-AGENT ===
+After your review, you MUST hand off to test-agent using this Bash command:
 
-    const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
+pan specialists wake test-agent --task "TEST TASK for ${issueId}:
+WORKSPACE: ${workspacePath}
+BRANCH: ${branchName}
+PROJECT: ${projectPath}
+
+1. cd ${workspacePath}
+2. Run tests: npm test
+3. If PASS: Hand off to merge-agent with:
+   pan specialists wake merge-agent --task \\"MERGE TASK for ${issueId}: PROJECT=${projectPath} BRANCH=${branchName} - merge to main, run tests, push\\"
+4. If FAIL: Report failures and DO NOT hand off to merge-agent"
+
+=== REVIEW GUIDELINES ===
+- This is an APPROVED workflow - don't block unless critical security issue
+- Be concise - full review not needed, just key observations
+- ALWAYS hand off to test-agent when done, even if you found minor issues`;
+
+    const reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
       waitForReady: true,
       startIfNotRunning: true,
     });
 
     if (!reviewResult.success) {
-      console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}, continuing anyway`);
+      console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}`);
+      // Fall back to direct merge if specialists aren't available
+      console.log(`[approve] Falling back to direct merge...`);
     } else {
-      console.log(`[approve] review-agent woken, task sent`);
-      // Wait for review-agent to complete (poll tmux output for idle prompt)
-      const reviewStartTime = Date.now();
-      const REVIEW_TIMEOUT = 120000; // 2 minutes
-      let lastOutput = '';
-      let stableCount = 0;
+      console.log(`[approve] Pipeline started - review-agent will hand off to test-agent → merge-agent`);
+      // Don't wait - the specialists will handle the rest
+      // The merge-agent will complete the merge when it runs
 
-      while (Date.now() - reviewStartTime < REVIEW_TIMEOUT) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        try {
-          // Capture tmux output to check if specialist is idle
-          const output = execSync(`tmux capture-pane -t specialist-review-agent -p | tail -5`, {
-            encoding: 'utf-8',
-            stdio: 'pipe',
-          });
-
-          // Check if output contains idle prompt (❯ at end with no pending input)
-          const isIdle = output.includes('❯') && !output.includes('Thinking') && !output.includes('●');
-
-          if (isIdle && output === lastOutput) {
-            stableCount++;
-            if (stableCount >= 2) {
-              console.log(`[approve] review-agent completed (idle detected)`);
-              break;
-            }
-          } else {
-            stableCount = 0;
-          }
-          lastOutput = output;
-        } catch {
-          // tmux capture failed, continue waiting
-        }
-
-        const elapsed = Math.round((Date.now() - reviewStartTime) / 1000);
-        if (elapsed % 15 === 0) {
-          console.log(`[approve] Waiting for review-agent... (${elapsed}s)`);
-        }
-      }
+      // Return early with pipeline status
+      completePendingOperation(issueId, null);
+      return res.json({
+        success: true,
+        message: `Approval pipeline started for ${issueId}. Specialists: review → test → merge`,
+        pipeline: 'running',
+        note: 'Watch the specialists panel for progress. Merge will complete automatically.',
+      });
     }
 
-    // 6b. TEST-AGENT: Run tests
-    console.log(`[approve] Step 2/3: Waking test-agent for ${issueId}...`);
-    const testPrompt = `TEST EXECUTION TASK for ${issueId}:
-
-WORKSPACE: ${workspacePath}
-BRANCH: ${branchName}
-
-INSTRUCTIONS:
-1. cd ${workspacePath}
-2. Ensure you're on the feature branch: git checkout ${branchName}
-3. Run the test suite: npm test (or appropriate test command)
-4. Report results:
-   - If tests PASS: Say "TESTS PASSED"
-   - If tests FAIL: List the failing tests and potential causes
-5. If no test command found, say "NO TESTS CONFIGURED"
-
-This is part of the approve workflow. Test results determine if merge proceeds.`;
-
-    const testResult = await wakeSpecialist('test-agent', testPrompt, {
-      waitForReady: true,
-      startIfNotRunning: true,
-    });
-
-    if (!testResult.success) {
-      console.warn(`[approve] test-agent failed to wake: ${testResult.message}, continuing anyway`);
-    } else {
-      console.log(`[approve] test-agent woken, task sent`);
-      // Wait for test-agent to complete (poll tmux output for idle prompt)
-      const testStartTime = Date.now();
-      const TEST_TIMEOUT = 180000; // 3 minutes (tests can take a while)
-      let lastTestOutput = '';
-      let testStableCount = 0;
-
-      while (Date.now() - testStartTime < TEST_TIMEOUT) {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        try {
-          const output = execSync(`tmux capture-pane -t specialist-test-agent -p | tail -5`, {
-            encoding: 'utf-8',
-            stdio: 'pipe',
-          });
-
-          const isIdle = output.includes('❯') && !output.includes('Thinking') && !output.includes('●');
-
-          if (isIdle && output === lastTestOutput) {
-            testStableCount++;
-            if (testStableCount >= 2) {
-              console.log(`[approve] test-agent completed (idle detected)`);
-              break;
-            }
-          } else {
-            testStableCount = 0;
-          }
-          lastTestOutput = output;
-        } catch {
-          // tmux capture failed, continue waiting
-        }
-
-        const elapsed = Math.round((Date.now() - testStartTime) / 1000);
-        if (elapsed % 15 === 0) {
-          console.log(`[approve] Waiting for test-agent... (${elapsed}s)`);
-        }
-      }
-    }
-
-    // 6c. MERGE-AGENT: Perform the merge
+    // 6c. MERGE-AGENT: Direct merge (fallback if review-agent failed)
     console.log(`[approve] Step 3/3: Waking merge-agent for ${issueId}...`);
 
     try {
