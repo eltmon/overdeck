@@ -78,6 +78,14 @@ export function checkStuckEscalation(
   }
 
   // Get minutes since last activity
+  if (!health.lastActivity) {
+    return {
+      triggered: false,
+      type: 'stuck_escalation',
+      reason: 'No last activity timestamp available',
+      confidence: 'low',
+    };
+  }
   const minutesSinceActivity = (Date.now() - health.lastActivity.getTime()) / (1000 * 60);
 
   // Check model-specific thresholds

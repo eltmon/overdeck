@@ -5,6 +5,7 @@
  * Supports all Rally work item types: User Stories, Defects, Tasks, and Features.
  */
 
+// @ts-expect-error No type declarations available for 'rally' package
 import rally from 'rally';
 import type {
   Issue,

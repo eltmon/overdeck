@@ -258,7 +258,7 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
       result[key] = deepMerge(defaultVal as any, overrideVal as any);
     } else {
       // Direct override for primitives and arrays
-      result[key] = overrideVal;
+      result[key] = overrideVal as T[keyof T];
     }
   }
 
