@@ -3498,14 +3498,8 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
       }
     }
 
-    // 4. Delete feature branch if it exists
-    try {
-      execSync(`git branch -d ${branchName} 2>/dev/null || git branch -D ${branchName} 2>/dev/null || true`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        shell: '/bin/bash'
-      });
-    } catch {}
+    // 4. Feature branches are preserved for history - do NOT delete them
+    // Users can manually delete branches if needed via: git branch -d <branch>
 
     // 5. Run pan sync for Panopticon issues
     if (isGitHubIssue) {

@@ -59,7 +59,8 @@ function findPRForBranch(workspace: string): { number: number; url: string } | n
 
 function mergePR(workspace: string, prNumber: number): { success: boolean; error?: string } {
   try {
-    execSync(`gh pr merge ${prNumber} --squash --delete-branch`, {
+    // NOTE: Do NOT use --delete-branch - feature branches should be preserved for history
+    execSync(`gh pr merge ${prNumber} --squash`, {
       cwd: workspace,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],

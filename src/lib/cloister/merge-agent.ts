@@ -261,126 +261,188 @@ function logMergeHistory(context: MergeConflictContext, result: MergeResult, ses
 }
 
 /**
- * Spawn merge-agent to resolve conflicts
+ * Log activity to the dashboard activity log
+ */
+function logActivity(action: string, details: string): void {
+  const ACTIVITY_LOG = '/tmp/panopticon-activity.log';
+  try {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      source: 'merge-agent',
+      action,
+      details,
+    };
+    appendFileSync(ACTIVITY_LOG, JSON.stringify(entry) + '\n');
+  } catch {
+    // Non-fatal
+  }
+}
+
+/**
+ * Capture tmux output and look for result markers
+ */
+function captureTmuxOutput(sessionName: string): string {
+  try {
+    return execSync(`tmux capture-pane -t "${sessionName}" -p`, { encoding: 'utf-8' });
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Check if specialist-merge-agent tmux session is running
+ */
+function isMergeAgentRunning(): boolean {
+  try {
+    execSync(`tmux has-session -t specialist-merge-agent 2>/dev/null`, { encoding: 'utf-8' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Send a message to an agent's tmux session
+ */
+function sendMessageToAgent(issueId: string, message: string): boolean {
+  // Agent sessions are typically named agent-{issueId} (lowercase)
+  const sessionName = `agent-${issueId.toLowerCase()}`;
+
+  try {
+    // Check if session exists
+    execSync(`tmux has-session -t "${sessionName}" 2>/dev/null`, { encoding: 'utf-8' });
+
+    // Send the message
+    const escapedMessage = message.replace(/'/g, "'\\''");
+    execSync(`tmux send-keys -t "${sessionName}" '${escapedMessage}'`, { encoding: 'utf-8' });
+    execSync(`tmux send-keys -t "${sessionName}" C-m`, { encoding: 'utf-8' });
+
+    console.log(`[merge-agent] Sent message to ${sessionName}`);
+    logActivity('agent_message', `Sent to ${sessionName}: ${message.slice(0, 100)}...`);
+    return true;
+  } catch {
+    console.log(`[merge-agent] Could not send message to ${sessionName} (session may not exist)`);
+    return false;
+  }
+}
+
+/**
+ * Spawn merge-agent to resolve conflicts using the tmux session
  *
  * @param context - Merge conflict context
  * @returns Promise that resolves with merge result
  */
 export async function spawnMergeAgent(context: MergeConflictContext): Promise<MergeResult> {
   console.log(`[merge-agent] Starting conflict resolution for ${context.issueId}`);
+  logActivity('merge_start', `Starting merge for ${context.issueId}: ${context.conflictFiles.join(', ')}`);
 
   // Detect test command if not provided
   if (!context.testCommand) {
     context.testCommand = detectTestCommand(context.projectPath);
   }
 
-  // Get existing session ID
-  const sessionId = getSessionId('merge-agent');
+  const tmuxSession = getTmuxSessionName('merge-agent');
+  console.log(`[merge-agent] Using tmux session: ${tmuxSession}`);
+  console.log(`[merge-agent] Test command: ${context.testCommand}`);
+
+  // Check if merge-agent session is running
+  if (!isMergeAgentRunning()) {
+    console.log(`[merge-agent] Session not running, cannot proceed`);
+    logActivity('merge_error', `Session ${tmuxSession} not running`);
+    return {
+      success: false,
+      reason: `Specialist ${tmuxSession} is not running. Start Cloister first.`,
+    };
+  }
 
   // Build prompt
   const prompt = buildMergePrompt(context);
 
-  // Build Claude command args
-  const args = ['--model', 'sonnet', '--print', '-p', prompt];
+  // Escape prompt for tmux send-keys
+  const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
-  if (sessionId) {
-    args.push('--resume', sessionId);
-  }
+  try {
+    // Send prompt to tmux session
+    console.log(`[merge-agent] Sending task to ${tmuxSession}...`);
+    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    execSync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
 
-  console.log(`[merge-agent] Session: ${sessionId || 'new session'}`);
-  console.log(`[merge-agent] Test command: ${context.testCommand}`);
+    // Record wake event
+    recordWake('merge-agent');
+    logActivity('merge_task_sent', `Task sent to ${tmuxSession}`);
 
-  // Spawn Claude process
-  const proc = spawn('claude', args, {
-    cwd: context.projectPath,
-    env: {
-      ...process.env,
-      PANOPTICON_AGENT_ID: 'merge-agent',
-    },
-  });
+    console.log(`[merge-agent] Task sent, waiting for completion...`);
 
-  // Capture output
-  let output = '';
-  let errorOutput = '';
+    // Poll for result with timeout
+    const startTime = Date.now();
+    const POLL_INTERVAL = 5000; // 5 seconds
+    let lastOutput = '';
 
-  proc.stdout?.on('data', (data) => {
-    const chunk = data.toString();
-    output += chunk;
-    // Also stream to console for visibility
-    process.stdout.write(chunk);
-  });
+    while (Date.now() - startTime < MERGE_TIMEOUT_MS) {
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
 
-  proc.stderr?.on('data', (data) => {
-    const chunk = data.toString();
-    errorOutput += chunk;
-    process.stderr.write(chunk);
-  });
+      const output = captureTmuxOutput(tmuxSession);
 
-  // Create timeout promise
-  const timeoutPromise = new Promise<MergeResult>((_, reject) => {
-    setTimeout(() => {
-      proc.kill('SIGTERM');
-      reject(new Error('merge-agent timeout after 15 minutes'));
-    }, MERGE_TIMEOUT_MS);
-  });
+      // Check if we have new output with result markers
+      if (output !== lastOutput) {
+        lastOutput = output;
 
-  // Create completion promise
-  const completionPromise = new Promise<MergeResult>((resolve, reject) => {
-    proc.on('close', (code) => {
-      console.log(`[merge-agent] Process exited with code ${code}`);
+        // Look for result markers in the output
+        if (output.includes('MERGE_RESULT:')) {
+          console.log(`[merge-agent] Found result markers in output`);
 
-      // Try to extract session ID from output if this was a new session
-      if (!sessionId && output) {
-        // Look for session ID in output (Claude Code prints it)
-        const sessionMatch = output.match(/Session ID: ([a-f0-9-]+)/i);
-        if (sessionMatch) {
-          const newSessionId = sessionMatch[1];
-          setSessionId('merge-agent', newSessionId);
-          recordWake('merge-agent', newSessionId);
-          console.log(`[merge-agent] Captured session ID: ${newSessionId}`);
+          const result = parseAgentOutput(output);
+          logMergeHistory(context, result);
+
+          if (result.success) {
+            logActivity('merge_success', `Merge completed for ${context.issueId}`);
+          } else {
+            logActivity('merge_failure', `Merge failed for ${context.issueId}: ${result.reason}`);
+          }
+
+          return result;
         }
-      } else if (sessionId) {
-        recordWake('merge-agent');
       }
 
-      // Parse output for results
-      const result = parseAgentOutput(output);
+      // Log progress periodically
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      if (elapsed % 30 === 0) {
+        console.log(`[merge-agent] Still working... (${elapsed}s elapsed)`);
+      }
+    }
 
-      // Log to history
-      logMergeHistory(context, result, sessionId || undefined);
+    // Timeout
+    console.log(`[merge-agent] Timeout after ${MERGE_TIMEOUT_MS / 1000} seconds`);
+    logActivity('merge_timeout', `Merge timed out for ${context.issueId}`);
 
-      resolve(result);
-    });
-
-    proc.on('error', (error) => {
-      console.error(`[merge-agent] Process error:`, error);
-      reject(error);
-    });
-  });
-
-  // Race between timeout and completion
-  try {
-    const result = await Promise.race([completionPromise, timeoutPromise]);
-    return result;
+    return {
+      success: false,
+      reason: `Timeout after ${MERGE_TIMEOUT_MS / 60000} minutes`,
+      output: lastOutput,
+    };
   } catch (error: any) {
     console.error(`[merge-agent] Failed:`, error);
+    logActivity('merge_error', `Error: ${error.message}`);
 
     const result: MergeResult = {
       success: false,
       reason: error.message || 'Unknown error',
-      output: output || errorOutput,
     };
 
-    logMergeHistory(context, result, sessionId || undefined);
-
+    logMergeHistory(context, result);
     return result;
   }
 }
 
 /**
- * Spawn merge-agent with conflict detection
+ * Attempt merge and handle result (clean merge, conflicts, or failure)
  *
- * Convenience function that detects conflicts and spawns the agent.
+ * This function:
+ * 1. Attempts to merge sourceBranch into current branch
+ * 2. If clean merge: commits and optionally runs tests
+ * 3. If conflicts: spawns merge-agent to resolve them
+ * 4. If failure: returns error
  *
  * @param projectPath - Project root path
  * @param sourceBranch - Feature branch to merge
@@ -394,23 +456,204 @@ export async function spawnMergeAgentForBranches(
   targetBranch: string,
   issueId: string
 ): Promise<MergeResult> {
-  // Get conflict files
-  const conflictFiles = getConflictFiles(projectPath);
+  console.log(`[merge-agent] Attempting merge of ${sourceBranch} into ${targetBranch}`);
+  logActivity('merge_attempt', `Attempting merge: ${sourceBranch} -> ${targetBranch}`);
 
-  if (conflictFiles.length === 0) {
+  try {
+    // Check that source branch is pushed to remote - agents MUST push before merge
+    try {
+      const remoteBranches = execSync(`git ls-remote --heads origin ${sourceBranch}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      });
+
+      if (!remoteBranches.trim()) {
+        const message = `Branch ${sourceBranch} is not pushed to remote. Agent must run 'git push -u origin ${sourceBranch}' first.`;
+        console.error(`[merge-agent] ${message}`);
+        logActivity('merge_blocked', message);
+
+        // Try to notify the agent
+        const agentMessage = `⚠️ MERGE BLOCKED: Your branch "${sourceBranch}" is not pushed to remote.\n\nPlease run:\n  git push -u origin ${sourceBranch}\n\nThen signal you're ready for merge again.`;
+        sendMessageToAgent(issueId, agentMessage);
+
+        return {
+          success: false,
+          reason: message,
+        };
+      }
+
+      // Also check if local branch has unpushed commits
+      try {
+        const unpushed = execSync(`git log origin/${sourceBranch}..${sourceBranch} --oneline`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+          stdio: 'pipe',
+        });
+
+        if (unpushed.trim()) {
+          const commitCount = unpushed.trim().split('\n').length;
+          const message = `Branch ${sourceBranch} has ${commitCount} unpushed commit(s). Agent must run 'git push' first.`;
+          console.error(`[merge-agent] ${message}`);
+          logActivity('merge_blocked', message);
+
+          // Try to notify the agent
+          const agentMessage = `⚠️ MERGE BLOCKED: Your branch "${sourceBranch}" has ${commitCount} unpushed commit(s).\n\nPlease run:\n  git push\n\nThen signal you're ready for merge again.`;
+          sendMessageToAgent(issueId, agentMessage);
+
+          return {
+            success: false,
+            reason: message,
+          };
+        }
+      } catch {
+        // If this fails, the branch might not exist locally - that's ok for remote-only branches
+      }
+    } catch {
+      const message = `Cannot verify remote branch ${sourceBranch}. Agent must ensure branch is pushed to origin.`;
+      console.error(`[merge-agent] ${message}`);
+      logActivity('merge_blocked', message);
+      return {
+        success: false,
+        reason: message,
+      };
+    }
+
+    // Check for uncommitted changes FIRST - this prevents merge failures
+    try {
+      const statusOutput = execSync(`git status --porcelain`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      });
+
+      if (statusOutput.trim()) {
+        // There are uncommitted changes - cannot proceed with merge
+        const changedFiles = statusOutput.trim().split('\n').slice(0, 5).join(', ');
+        const message = `Cannot merge: uncommitted changes in working directory (${changedFiles}${statusOutput.trim().split('\n').length > 5 ? '...' : ''})`;
+        console.error(`[merge-agent] ${message}`);
+        logActivity('merge_blocked', message);
+        return {
+          success: false,
+          reason: message,
+        };
+      }
+    } catch {
+      // If git status fails, continue anyway
+    }
+
+    // Ensure we're on target branch
+    execSync(`git checkout ${targetBranch}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    });
+
+    // Attempt the merge (--no-commit so we can inspect/test before committing)
+    try {
+      execSync(`git merge --no-commit ${sourceBranch}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      });
+
+      // Clean merge! Commit it
+      console.log(`[merge-agent] Clean merge - no conflicts`);
+      logActivity('merge_clean', `Clean merge of ${sourceBranch}`);
+
+      execSync(`git commit -m "Merge ${sourceBranch} into ${targetBranch}"`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      });
+
+      // Optionally run tests
+      const testCommand = detectTestCommand(projectPath);
+      let testsStatus: 'PASS' | 'FAIL' | 'SKIP' = 'SKIP';
+
+      if (testCommand !== 'skip') {
+        console.log(`[merge-agent] Running tests: ${testCommand}`);
+        logActivity('merge_tests', `Running: ${testCommand}`);
+        try {
+          execSync(testCommand, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            stdio: 'pipe',
+            timeout: 300000, // 5 minute timeout for tests
+          });
+          testsStatus = 'PASS';
+          console.log(`[merge-agent] Tests passed`);
+          logActivity('merge_tests_pass', 'Tests passed');
+        } catch {
+          testsStatus = 'FAIL';
+          console.log(`[merge-agent] Tests failed - reverting merge`);
+          logActivity('merge_tests_fail', 'Tests failed, reverting');
+          // Revert the merge commit
+          execSync(`git reset --hard HEAD~1`, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            stdio: 'pipe',
+          });
+          return {
+            success: false,
+            testsStatus: 'FAIL',
+            reason: 'Tests failed after clean merge - reverted',
+          };
+        }
+      }
+
+      return {
+        success: true,
+        testsStatus,
+        notes: 'Clean merge completed without conflicts',
+      };
+    } catch (mergeError: any) {
+      // Merge had conflicts - check what they are
+      const conflictFiles = getConflictFiles(projectPath);
+
+      if (conflictFiles.length === 0) {
+        // Some other merge error (not conflicts)
+        console.error(`[merge-agent] Merge failed:`, mergeError.message);
+        logActivity('merge_error', `Merge failed: ${mergeError.message}`);
+
+        // Abort the merge
+        try {
+          execSync(`git merge --abort`, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            stdio: 'pipe',
+          });
+        } catch {
+          // Ignore abort errors
+        }
+
+        return {
+          success: false,
+          reason: `Merge failed: ${mergeError.message}`,
+        };
+      }
+
+      // We have conflicts - spawn merge-agent to resolve them
+      console.log(`[merge-agent] Conflicts detected in ${conflictFiles.length} files`);
+      logActivity('merge_conflicts', `Conflicts in: ${conflictFiles.join(', ')}`);
+
+      const context: MergeConflictContext = {
+        projectPath,
+        sourceBranch,
+        targetBranch,
+        conflictFiles,
+        issueId,
+      };
+
+      return spawnMergeAgent(context);
+    }
+  } catch (error: any) {
+    console.error(`[merge-agent] Failed:`, error.message);
+    logActivity('merge_error', `Error: ${error.message}`);
+
     return {
       success: false,
-      reason: 'No conflict files detected',
+      reason: error.message || 'Unknown error',
     };
   }
-
-  const context: MergeConflictContext = {
-    projectPath,
-    sourceBranch,
-    targetBranch,
-    conflictFiles,
-    issueId,
-  };
-
-  return spawnMergeAgent(context);
 }
