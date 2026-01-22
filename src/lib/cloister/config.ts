@@ -173,11 +173,11 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   specialists: {
     merge_agent: {
       enabled: true,
-      auto_wake: true,
+      auto_wake: false, // Only wake on explicit "Approve & Merge" click
     },
     review_agent: {
       enabled: true,
-      auto_wake: true,
+      auto_wake: false, // Only wake on explicit request
     },
     test_agent: {
       enabled: false, // Not yet implemented
@@ -219,7 +219,7 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
         trigger_on: 'any_failure',
       },
       implementation_complete: {
-        enabled: true,
+        enabled: true, // Auto-handoff to test-agent when implementation done
         to_specialist: 'test-agent',
       },
     },
