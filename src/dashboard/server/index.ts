@@ -3189,8 +3189,10 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
     }
 
     // 3. Check for uncommitted changes in workspace before proceeding
+    // Use -uno to ignore untracked files - they don't block merges and are often
+    // Panopticon-managed symlinks that haven't been added to .gitignore yet
     try {
-      const status = execSync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' });
+      const status = execSync('git status --porcelain -uno', { cwd: workspacePath, encoding: 'utf-8' });
       if (status.trim()) {
         const error = `Workspace has uncommitted changes. Please commit or stash them first:\ncd ${workspacePath}\ngit status`;
         completePendingOperation(issueId, error);
