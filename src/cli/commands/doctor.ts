@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -136,7 +136,7 @@ export async function doctorCommand(): Promise<void> {
   if (process.env.LINEAR_API_KEY) {
     checks.push({ name: 'LINEAR_API_KEY', status: 'ok', message: 'Set in environment' });
   } else if (existsSync(envFile)) {
-    const content = require('fs').readFileSync(envFile, 'utf-8');
+    const content = readFileSync(envFile, 'utf-8');
     if (content.includes('LINEAR_API_KEY')) {
       checks.push({ name: 'LINEAR_API_KEY', status: 'ok', message: 'Set in config file' });
     } else {

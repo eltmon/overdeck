@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { homedir } from 'os';
 import { AGENTS_DIR } from './paths.js';
 import { createSession, killSession, sendKeys, sessionExists, getAgentSessions } from './tmux.js';
 import { initHook, checkHook, generateGUPPPrompt } from './hooks.js';
@@ -332,7 +333,6 @@ export function autoRecoverAgents(): { recovered: string[]; failed: string[] } {
  * Check if Panopticon hooks are configured, and auto-setup if not
  */
 function checkAndSetupHooks(): void {
-  const { homedir } = require('os');
   const settingsPath = join(homedir(), '.claude', 'settings.json');
   const hookPath = join(homedir(), '.panopticon', 'bin', 'heartbeat-hook');
 

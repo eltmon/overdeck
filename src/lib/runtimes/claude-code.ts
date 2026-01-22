@@ -7,7 +7,7 @@
  * Session index: ~/.claude/projects/<workspace-hash>/sessions-index.json
  */
 
-import { existsSync, readFileSync, readdirSync, statSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import type {
@@ -20,7 +20,7 @@ import type {
   Agent,
   ActivitySource,
 } from './types.js';
-import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl } from '../agents.js';
+import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentState } from '../agents.js';
 import { sessionExists, killSession, sendKeys, getAgentSessions } from '../tmux.js';
 import { parseClaudeSession, getSessionFiles, getProjectDirs } from '../cost-parsers/jsonl-parser.js';
 
@@ -307,8 +307,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     mkdirSync(mailDir, { recursive: true });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fs = require('fs');
-    fs.writeFileSync(
+    writeFileSync(
       join(mailDir, `${timestamp}.md`),
       `# Message\n\n${message}\n`
     );
@@ -328,7 +327,6 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     const state = getAgentState(agentId);
     if (state) {
       state.status = 'stopped';
-      const { saveAgentState } = require('../agents.js');
       saveAgentState(state);
     }
   }

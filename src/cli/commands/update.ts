@@ -4,13 +4,20 @@
 
 import { execSync } from 'child_process';
 import chalk from 'chalk';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { loadConfig } from '../../lib/config.js';
 import { syncCommand } from './sync.js';
 
 // Get current installed version
 function getCurrentVersion(): string {
   try {
-    const pkg = require('../../../package.json');
+    // Navigate from this file to package.json
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pkgPath = join(__dirname, '..', '..', '..', 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
     return pkg.version;
   } catch {
     return 'unknown';
