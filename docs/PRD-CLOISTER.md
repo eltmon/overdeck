@@ -1432,10 +1432,49 @@ CLOISTER_AUTO_KILL=false
 - [ ] Notifications (Slack webhook, email)
 - [ ] Auto-restart on crash (with backoff)
 - [ ] Mass death detection (3+ deaths in 30 sec)
-- [ ] FPP violation detection (work sitting idle) - *Fixed Point Principle: "Any runnable action is a fixed point and must resolve before the system can rest"*
+- [ ] FPP violation detection (work sitting idle)
 - [ ] Cost limits and alerts
 - [ ] Session rotation for long-running specialists
 - [ ] Metrics and analytics dashboard
+
+### FPP (Fixed Point Principle) Violation Detection
+
+> "Any runnable action is a fixed point and must resolve before the system can rest."
+>
+> *Inspired by Doctor Who: a fixed point in time must occur — it cannot be avoided.*
+
+The Fixed Point Principle ensures agents are self-propelling. A "violation" occurs when work exists but isn't being executed.
+
+**Detect violations when:**
+- Agent has work on its hook but isn't executing
+- PR is approved but not merged
+- Review requested but agent is idle
+- Work completed but Linear status not updated
+- Agent finished but didn't pop work from hook
+
+**Detection thresholds:**
+```yaml
+fpp_violation:
+  hook_idle_minutes: 5      # Work on hook, no activity
+  pr_approved_minutes: 10   # PR approved, not merged
+  review_pending_minutes: 15 # Review requested, no response
+```
+
+**Actions on violation:**
+1. **Nudge** - Send message to agent via tmux: "You have pending work on your hook. Execute it now."
+2. **Escalate** - After 2 failed nudges, alert user via dashboard/notification
+3. **Auto-recover** - If agent crashed, restart with hook context injected
+
+**Implementation:**
+```typescript
+interface FPPViolation {
+  agentId: string;
+  type: 'hook_idle' | 'pr_stale' | 'review_pending' | 'status_mismatch';
+  detectedAt: string;
+  nudgeCount: number;
+  resolved: boolean;
+}
+```
 
 ## Open Questions
 
