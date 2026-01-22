@@ -1,4 +1,4 @@
-# Planning Session: PAN-29
+# Planning Session: PAN-30
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,120 +22,79 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-29
-- **Title:** Implement merge-agent: Automatic merge conflict resolution
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/29
+- **ID:** PAN-30
+- **Title:** Cloister Phase 3: Active Heartbeats & Hooks
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/30
 
 ## Description
-## Problem
+## Overview
 
-When clicking "Approve & Merge" on an issue with merge conflicts, Panopticon currently shows:
+Enable rich heartbeat data from agents via Claude Code hooks, providing detailed activity information beyond passive file monitoring.
+
+## Goals
+
+1. Agents report what tool they are using and what action they are taking
+2. Enable agent ID injection for proper session tracking
+3. Provide hybrid detection (active heartbeats with passive fallback)
+
+## Tasks
+
+From PRD-CLOISTER.md Phase 3:
+
+- [ ] Heartbeat hook script (`~/.panopticon/bin/heartbeat-hook`)
+- [ ] `pan setup hooks` command to configure Claude Code
+- [ ] Agent ID environment variable injection (`PANOPTICON_AGENT_ID`)
+- [ ] Rich heartbeat data (tool name, last action)
+- [ ] Hybrid detection (active + passive fallback)
+
+## Heartbeat Hook Script
+
+```bash
+#!/bin/bash
+# ~/.panopticon/bin/heartbeat-hook
+# Called after every tool use with JSON on stdin
+
+TOOL_INFO=$(cat)
+TOOL_NAME=$(echo "$TOOL_INFO" | jq -r ".tool_name // \"unknown\"")
+AGENT_ID="${PANOPTICON_AGENT_ID:-$(tmux display-message -p "#S" 2>/dev/null || echo "unknown")}"
+
+HEARTBEAT_DIR="$HOME/.panopticon/agents/$AGENT_ID"
+mkdir -p "$HEARTBEAT_DIR"
+
+cat > "$HEARTBEAT_DIR/heartbeat.json" << HEARTBEAT
+{
+  "timestamp": "$(date -Iseconds)",
+  "agent_id": "$AGENT_ID",
+  "tool_name": "$TOOL_NAME",
+  "pid": $$
+}
+HEARTBEAT
 ```
-Merge conflict! Please resolve manually:
-cd /path/to/project
-git merge feature-branch
-```
 
-Per the Cloister PRD, the `merge-agent` specialist should automatically wake up and resolve conflicts.
+## Claude Code Hook Configuration
 
-## Current State
-
-- **Cloister Phase 1 (PAN-21)** ✅ - Watchdog framework for monitoring agents
-- **Cloister Phase 2 (PAN-27)** ✅ - UI for displaying specialist agents
-- **Specialist agents themselves** ❌ - Not implemented
-
-The UI scaffolding exists (`SpecialistAgentCard.tsx`, `/api/specialists` endpoints), but no actual specialist agents are running.
-
-## Proposed Solution: merge-agent
-
-### Behavior
-
-When approve workflow encounters a merge conflict:
-1. Abort the merge attempt
-2. Wake the `merge-agent` (or spawn if not running)
-3. Pass context: branch names, conflict files, issue ID
-4. merge-agent resolves conflicts using Claude Code
-5. On success: continue with merge and push
-6. On failure: notify user with details
-
-### Specialist Agent Lifecycle
-
-```
-~/.panopticon/specialists/
-├── merge-agent/
-│   ├── config.json      # Agent configuration
-│   ├── session.json     # Claude --resume session ID
-│   └── history.jsonl    # Past merge resolutions (for context)
-├── review-agent/
-│   └── ...
-└── test-agent/
-    └── ...
-```
-
-### Configuration (config.json)
-
+Add to `~/.claude/settings.json`:
 ```json
 {
-  "name": "merge-agent",
-  "model": "sonnet",
-  "triggerOn": ["merge-conflict", "ci-failure"],
-  "autoWake": true,
-  "maxContextTokens": 100000,
-  "sessionRotation": "weekly"
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "command": "~/.panopticon/bin/heartbeat-hook"
+      }
+    ]
+  }
 }
 ```
 
-### merge-agent Prompt
+## Dependencies
 
-```markdown
-You are a merge specialist. Your job is to resolve git merge conflicts.
-
-Context:
-- Target branch: main
-- Source branch: feature/pan-27
-- Conflict files: [list]
-- Issue: PAN-27 (Cloister Phase 2)
-
-Instructions:
-1. Analyze each conflict file
-2. Understand the intent of both changes
-3. Resolve conflicts preserving both intents where possible
-4. Run tests to verify resolution
-5. Stage and complete the merge
-6. Report results
-```
-
-### Integration Points
-
-1. **Approve workflow** (`/api/approve`) - Detect conflict, wake merge-agent
-2. **Dashboard** - Show merge-agent status, allow manual wake
-3. **CLI** - `pan specialist wake merge-agent`
-4. **Hooks** - `on-merge-conflict` hook to trigger agent
-
-## Implementation Tasks
-
-- [ ] Create `~/.panopticon/specialists/` directory structure
-- [ ] Implement specialist agent spawning with `--resume` support
-- [ ] Add merge-agent configuration and prompt template
-- [ ] Modify approve workflow to delegate conflicts to merge-agent
-- [ ] Add `pan specialist` CLI commands (list, wake, reset, status)
-- [ ] Integrate with existing Cloister health monitoring
-- [ ] Add merge-agent activity to dashboard Agents tab
-
-## Future Specialists (separate issues)
-
-- **review-agent** - Triggered on PR open, performs code review
-- **test-agent** - Triggered on push, runs and reports test results
+- Phase 1 (Watchdog Framework) ✅
+- Phase 2 (Agent Management UI) ✅
 
 ## References
 
-- Cloister PRD: `docs/PRD-CLOISTER.md`
-- Phase 2 UI: PAN-27 (now merged)
-- Specialist config: `src/lib/cloister/specialists.ts`
-
-## Priority
-
-P1 - Key workflow improvement, directly requested
+- PRD-CLOISTER.md lines 916-1070
 
 ---
 

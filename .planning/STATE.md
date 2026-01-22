@@ -1,351 +1,316 @@
-# PAN-29: Implement merge-agent - Automatic Merge Conflict Resolution
+# PAN-30: Cloister Phase 3 - Active Heartbeats & Hooks
 
 ## Issue Summary
 
-When clicking "Approve & Merge" on an issue with merge conflicts, Panopticon currently shows a manual resolution message. This issue implements the `merge-agent` specialist to automatically resolve conflicts using Claude Code.
+Enable rich heartbeat data from agents via Claude Code hooks, providing detailed activity information beyond passive file monitoring. This allows the dashboard to show what tool an agent is using and what action it's taking in real-time.
 
 ## Key Decisions
 
-### 1. Working Directory
-**Decision:** Main project directory
+### 1. Heartbeat Scope
+**Decision:** Rich Context
 
-merge-agent works directly in the project root, not in the workspace. This matches the manual workflow and is simpler to implement.
+Include comprehensive data in each heartbeat:
+- Tool name
+- Current beads task (via cache)
+- Git branch
+- Workspace path
+- Timestamp
+- Agent ID
 
-### 2. Failure Handling
-**Decision:** Notify user only
+This provides maximum value for the dashboard at minimal overhead cost.
 
-If merge-agent fails to resolve conflicts:
-1. Abort the merge attempt
-2. Report which files/conflicts failed
-3. User resolves manually
+### 2. Existing Hooks Handling
+**Decision:** Merge (append to array)
 
-No automatic escalation to Opus or alternative approaches.
+When running `pan setup hooks`:
+- Read existing `~/.claude/settings.json`
+- Preserve any existing PostToolUse hooks
+- Append Panopticon heartbeat hook to the array
+- Never clobber user's custom hooks
 
-### 3. Session Mode
-**Decision:** Persistent session with `--resume`
+### 3. Heartbeat Mode
+**Decision:** Required for new agents
 
-merge-agent maintains a single persistent Claude session ID stored in `~/.panopticon/specialists/merge-agent.session`. This allows:
-- Context accumulation across merges (learns project patterns)
-- More efficient token usage via context caching
-- Session rotation when context gets too large (manual for MVP)
+When spawning agents via `pan work issue`:
+- Automatically run hook setup if not already configured
+- Set `PANOPTICON_AGENT_ID` environment variable
+- Silent auto-setup (one-line confirmation message)
 
-### 4. Scope
-**Decision:** MVP - merge-agent only
+### 4. Task Lookup Method
+**Decision:** Cache-based
 
-Focus solely on merge conflict resolution. Other specialists (review-agent, test-agent) remain as UI-only scaffolding for future issues.
+Performance optimization for beads task lookup:
+- When agent starts or switches tasks, write current task to a state file
+- Heartbeat hook reads from cache file (0ms overhead)
+- Avoids 50-200ms penalty of running `bd show` per tool call
 
-### 5. Progress Reporting
-**Decision:** Both dashboard activity log + API result
+Task cache location: `~/.panopticon/agents/{agentId}/current-task.json`
 
-- Real-time progress streams to dashboard activity log
-- Final result returned via API response (success/failure + details)
+### 5. Heartbeat Path
+**Decision:** Shared directory
 
-### 6. Test Running
-**Decision:** Yes - run tests after resolution
+Heartbeats written to: `~/.panopticon/heartbeats/{agentId}.json`
 
-After resolving conflicts, merge-agent runs the project's test suite to verify the merge didn't break anything. If tests fail, the merge is aborted.
+Benefits:
+- Easier for dashboard to watch all heartbeats in one directory
+- Can use `inotify` or `fs.watch` efficiently
+- Clear separation from agent state files
 
-### 7. Timeout
-**Decision:** 15 minutes
+**Note:** Need to update `claude-code.ts` to read from new location.
 
-merge-agent has 15 minutes to complete conflict resolution + tests before being considered stuck.
+### 6. Idempotent Setup
+**Decision:** Yes
+
+`pan setup hooks` will:
+- Check if Panopticon heartbeat hook already exists in settings.json
+- Skip if already present (print "Already configured")
+- Update if version/path has changed
+
+### 7. Auto Setup Mode
+**Decision:** Silent auto-setup
+
+On first `pan work issue`:
+- Detect hooks not configured
+- Automatically run setup
+- Print single line: "Configured Panopticon heartbeat hooks"
+- Continue with agent spawn
+
+### 8. Dependency Handling
+**Decision:** Install if missing
+
+The heartbeat hook script will:
+- Check for `jq` dependency at install time
+- Attempt to install via package manager if missing (apt, brew, etc.)
+- Fail with clear instructions if auto-install fails
 
 ## Current Status
 
-**Implementation Complete - Ready for Testing**
-
-All core functionality has been implemented:
-
-### Completed Work
-
-**Integration Layer:**
-- ✅ Modified approve API to detect conflicts and delegate to merge-agent
-- ✅ Added `MergeConflictContext` type with branch info, conflict files
-- ✅ Implemented `spawnMergeAgent()` and `spawnMergeAgentForBranches()` functions
-
-**Agent Layer:**
-- ✅ Created merge-agent prompt template at `src/lib/cloister/prompts/merge-agent.md`
-- ✅ Implemented agent spawning with `--resume` support
-- ✅ Implemented result parsing from structured output markers
-- ✅ Handle success flow (complete merge, push, continue)
-- ✅ Handle failure flow (abort, report, cleanup)
-- ✅ Test command detection (npm, maven, cargo, pytest)
-
-**Persistence:**
-- ✅ Session ID storage in `~/.panopticon/specialists/merge-agent.session`
-- ✅ Merge history in `~/.panopticon/specialists/merge-agent/history.jsonl`
-- ✅ Session ID capture and management
-
-**Dashboard:**
-- ✅ Specialist infrastructure already in place (displays all specialists)
-- ✅ merge-agent will appear in "Specialist Agents" section when configured
-- ✅ Activity logging through console output
-
-### Files Created/Modified
-
-**New Files:**
-- `src/lib/cloister/merge-agent.ts` - Core merge-agent implementation
-- `src/lib/cloister/prompts/merge-agent.md` - Prompt template with placeholders
-
-**Modified Files:**
-- `src/dashboard/server/index.ts` - Integrated merge-agent in approve endpoint
-
-### Testing Requirements
-
-Before marking complete, need to test:
-1. **Happy path:** Create a merge conflict and verify merge-agent resolves it
-2. **Test failure:** Verify merge-agent aborts when tests fail
-3. **Agent failure:** Verify graceful handling when merge-agent can't resolve
-4. **Session persistence:** Verify session ID is captured and reused
+**Planning Complete - Ready for Implementation**
 
 ## Scope
 
-### In Scope (PAN-29)
+### In Scope (PAN-30)
 
-**Integration Layer:**
-- ✅ Modify approve API to detect conflicts and delegate to merge-agent
-- ✅ Add `MergeConflictContext` type with branch info, conflict files
-- ✅ Implement `spawnMergeAgent()` function
+**Heartbeat Hook Infrastructure:**
+- Create `~/.panopticon/bin/heartbeat-hook` bash script
+- Parse Claude Code's PostToolUse JSON input
+- Write rich heartbeat to `~/.panopticon/heartbeats/{agentId}.json`
+- Include tool name, timestamp, beads task (from cache), git branch, workspace
 
-**Agent Layer:**
-- ✅ Create merge-agent prompt template
-- ✅ Implement agent spawning with `--resume` support
-- ✅ Implement result polling/streaming
-- ✅ Handle success flow (complete merge, push, continue)
-- ✅ Handle failure flow (abort, report, cleanup)
+**Setup Command:**
+- Implement `pan setup hooks` CLI command
+- Read/modify `~/.claude/settings.json`
+- Merge Panopticon hook with existing hooks
+- Idempotent (safe to run multiple times)
+- Install `jq` dependency if missing
 
-**Persistence:**
-- ✅ Session ID storage in `~/.panopticon/specialists/merge-agent.session`
-- ✅ Merge history in `~/.panopticon/specialists/merge-agent/history.jsonl`
+**Agent Spawning Integration:**
+- Modify `spawnAgent()` to set `PANOPTICON_AGENT_ID` env var
+- Auto-run hook setup on first spawn if not configured
+- Write task cache file when agent starts
 
-**Dashboard:**
-- ✅ Modify approve flow to show "Resolving conflicts..." status
-- ✅ Stream merge-agent progress to activity log
-- ✅ Update agent list to show merge-agent as active during resolution
+**Runtime Updates:**
+- Update `claude-code.ts` to read heartbeats from new shared directory
+- Ensure hybrid detection (active first, passive fallback) still works
 
 ### Out of Scope
 
-- CLI commands (`pan specialist wake/list/reset`) - future issue
-- review-agent implementation - future issue
-- test-agent implementation - future issue
-- Automatic escalation to Opus on failure - future enhancement
-- Session rotation based on context size - future enhancement
-- Multi-project specialist sharing - future enhancement
+- Dashboard UI changes (already supports heartbeat display)
+- Webhook notifications (future phase)
+- Multi-runtime heartbeat hooks (OpenCode, Codex - future)
+- Cost tracking in heartbeats (separate feature)
 
 ## Architecture
 
 ### Files to Create/Modify
 
 ```
-src/lib/cloister/
-├── specialists.ts          # (existing) - minor updates
-├── merge-agent.ts          # NEW - merge-agent logic
-└── prompts/
-    └── merge-agent.md      # NEW - prompt template
+~/.panopticon/
+├── bin/
+│   └── heartbeat-hook         # NEW - bash script called by Claude Code
+├── heartbeats/
+│   └── {agentId}.json         # NEW - heartbeat files (one per agent)
+└── agents/{agentId}/
+    └── current-task.json      # NEW - beads task cache
 
-src/dashboard/server/
-└── index.ts                # MODIFY - integrate merge-agent in approve flow
+src/cli/commands/
+├── setup.ts                   # MODIFY - add 'hooks' subcommand
+└── setup/
+    └── hooks.ts               # NEW - `pan setup hooks` implementation
+
+src/lib/
+├── agents.ts                  # MODIFY - set PANOPTICON_AGENT_ID, auto-setup hooks
+└── runtimes/
+    └── claude-code.ts         # MODIFY - read from new heartbeat directory
 ```
 
-### Data Flow
+### Heartbeat Hook Script
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Approve Flow with merge-agent                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  POST /api/approve                                               │
-│         │                                                        │
-│         ▼                                                        │
-│  git merge feature-branch                                        │
-│         │                                                        │
-│         ├── Success ──► Push to main ──► Update Linear ──► Done │
-│         │                                                        │
-│         └── Conflict detected                                    │
-│                  │                                               │
-│                  ▼                                               │
-│         git merge --abort                                        │
-│                  │                                               │
-│                  ▼                                               │
-│         spawnMergeAgent({                                        │
-│           projectPath,                                           │
-│           sourceBranch,                                          │
-│           targetBranch,                                          │
-│           conflictFiles                                          │
-│         })                                                       │
-│                  │                                               │
-│                  ▼                                               │
-│         ┌────────────────────────────────────┐                   │
-│         │        merge-agent (Claude)         │                  │
-│         │  1. Analyze conflict files          │                  │
-│         │  2. Understand both change intents  │                  │
-│         │  3. Resolve conflicts               │                  │
-│         │  4. Run tests                       │                  │
-│         │  5. Stage and commit merge          │                  │
-│         └────────────────────────────────────┘                   │
-│                  │                                               │
-│                  ├── Success                                     │
-│                  │      │                                        │
-│                  │      ▼                                        │
-│                  │   Push to main ──► Update Linear ──► Done     │
-│                  │                                               │
-│                  └── Failure                                     │
-│                         │                                        │
-│                         ▼                                        │
-│                  Return error with details                       │
-│                  (files that failed, reason)                     │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+```bash
+#!/bin/bash
+# ~/.panopticon/bin/heartbeat-hook
+# Called by Claude Code after every tool use with JSON on stdin
 
-### merge-agent Prompt Structure
+set -e
 
-```markdown
-You are a merge conflict resolution specialist.
+# Parse tool info from stdin
+TOOL_INFO=$(cat)
 
-## Context
-- Project: {projectPath}
-- Target branch: main
-- Source branch: {sourceBranch}
-- Conflict files: {conflictFiles}
-- Issue: {issueId}
+# Extract tool name (jq required)
+TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"')
+TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""')
 
-## Your Task
-Resolve the merge conflicts and verify the result.
+# Get agent ID from env (set by pan work issue) or tmux session name
+AGENT_ID="${PANOPTICON_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
 
-## Instructions
-1. Analyze each conflict file to understand both versions
-2. Resolve conflicts by:
-   - Preserving the intent of both changes when possible
-   - If incompatible, prefer the feature branch changes (they're newer)
-   - Keep code style consistent with the project
-3. Run the test suite: {testCommand}
-4. If tests pass, stage all resolved files
-5. Complete the merge commit
+# Get current beads task from cache (if exists)
+TASK_CACHE="$HOME/.panopticon/agents/$AGENT_ID/current-task.json"
+CURRENT_TASK=""
+if [ -f "$TASK_CACHE" ]; then
+  CURRENT_TASK=$(jq -r '.title // ""' "$TASK_CACHE" 2>/dev/null || true)
+fi
 
-## Constraints
-- Do NOT create new commits beyond the merge commit
-- Do NOT modify files that don't have conflicts
-- Do NOT push to remote (the caller handles that)
+# Get git branch (fast, single command)
+GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 
-## When Done
-Report your results in this format:
-MERGE_RESULT: SUCCESS|FAILURE
-RESOLVED_FILES: file1.ts, file2.ts
-FAILED_FILES: (if any)
-TESTS: PASS|FAIL|SKIP
-NOTES: (any important observations)
+# Get workspace from pwd
+WORKSPACE=$(pwd)
+
+# Ensure heartbeat directory exists
+HEARTBEAT_DIR="$HOME/.panopticon/heartbeats"
+mkdir -p "$HEARTBEAT_DIR"
+
+# Write heartbeat
+cat > "$HEARTBEAT_DIR/$AGENT_ID.json" << EOF
+{
+  "timestamp": "$(date -Iseconds)",
+  "agent_id": "$AGENT_ID",
+  "tool_name": "$TOOL_NAME",
+  "last_action": "$TOOL_INPUT",
+  "current_task": "$CURRENT_TASK",
+  "git_branch": "$GIT_BRANCH",
+  "workspace": "$WORKSPACE",
+  "pid": $$
+}
+EOF
 ```
 
-### Success/Failure Detection
+### Settings.json Modification
 
-Parse agent output for structured result markers:
-- `MERGE_RESULT: SUCCESS` + `TESTS: PASS` → Continue with push
-- `MERGE_RESULT: FAILURE` → Abort, report failure
-- Timeout (15 min) → Kill agent, abort, report timeout
+Before:
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      { "matcher": ".*", "command": "my-custom-hook" }
+    ]
+  }
+}
+```
+
+After:
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      { "matcher": ".*", "command": "my-custom-hook" },
+      { "matcher": ".*", "command": "~/.panopticon/bin/heartbeat-hook" }
+    ]
+  }
+}
+```
+
+### Heartbeat File Format
+
+```json
+{
+  "timestamp": "2026-01-21T10:30:45-08:00",
+  "agent_id": "agent-pan-30",
+  "tool_name": "Edit",
+  "last_action": "file_path: src/lib/agents.ts, old_string: ...",
+  "current_task": "Implement heartbeat hook script",
+  "git_branch": "feature/pan-30",
+  "workspace": "/home/user/projects/panopticon/workspaces/feature-pan-30",
+  "pid": 12345
+}
+```
 
 ## Implementation Order
 
-### Layer 1: Agent Infrastructure
-1. Create merge-agent prompt template
-2. Implement `spawnMergeAgent()` with --resume support
-3. Implement result parsing from agent output
+### Layer 1: Hook Infrastructure
+1. Create heartbeat-hook bash script
+2. Make it executable and test manually
+3. Create `pan setup hooks` command
 
 ### Layer 2: Integration
-4. Modify approve API to detect conflicts
-5. Integrate merge-agent spawning on conflict
-6. Handle success/failure flows
-7. Stream progress to activity log
+4. Modify `spawnAgent()` to set env var and auto-setup
+5. Add task cache writing when agent starts
+6. Update `claude-code.ts` to read from new heartbeat directory
 
 ### Layer 3: Polish
-8. Add merge history logging
-9. Update dashboard to show merge-agent status
-10. Error handling and edge cases
+7. Add dependency installation (jq)
+8. Handle edge cases (permissions, missing directories)
+9. Add tests for setup command
 
 ## Beads Tasks
 
 | ID | Title | Layer | Blocked By |
 |----|-------|-------|------------|
-| panopticon-m01 | Create merge-agent prompt template | 1 | - |
-| panopticon-m02 | Implement spawnMergeAgent with --resume | 1 | - |
-| panopticon-m03 | Implement result parsing | 1 | m02 |
-| panopticon-m04 | Modify approve API to detect conflicts | 2 | - |
-| panopticon-m05 | Integrate merge-agent in approve flow | 2 | m02, m03, m04 |
-| panopticon-m06 | Handle success flow (push, continue) | 2 | m05 |
-| panopticon-m07 | Handle failure flow (abort, report) | 2 | m05 |
-| panopticon-m08 | Add merge history logging | 3 | m06, m07 |
-| panopticon-m09 | Update dashboard for merge-agent status | 3 | m05 |
-| panopticon-m10 | Edge cases and error handling | 3 | m06, m07 |
+| pan30-01 | Create heartbeat-hook bash script | 1 | - |
+| pan30-02 | Implement `pan setup hooks` command | 1 | pan30-01 |
+| pan30-03 | Add jq dependency installation | 1 | pan30-02 |
+| pan30-04 | Modify spawnAgent to set PANOPTICON_AGENT_ID | 2 | - |
+| pan30-05 | Add auto-setup hooks on first spawn | 2 | pan30-02, pan30-04 |
+| pan30-06 | Write task cache file on agent start | 2 | pan30-04 |
+| pan30-07 | Update claude-code.ts heartbeat reading | 2 | pan30-01 |
+| pan30-08 | Handle edge cases and permissions | 3 | pan30-05, pan30-07 |
+| pan30-09 | Add tests for pan setup hooks | 3 | pan30-02 |
 
 ## Technical Notes
 
-### Claude Code Spawning
+### Claude Code Hook JSON Format
+
+Claude Code sends PostToolUse hooks JSON like:
+```json
+{
+  "tool_name": "Edit",
+  "tool_input": { "file_path": "...", "old_string": "...", "new_string": "..." },
+  "tool_result": { "success": true, ... }
+}
+```
+
+### Environment Variable Injection
 
 ```typescript
-import { execSync, spawn } from 'child_process';
-
-interface MergeAgentConfig {
-  projectPath: string;
-  sourceBranch: string;
-  targetBranch: string;
-  conflictFiles: string[];
-  issueId: string;
-  testCommand: string;
-}
-
-async function spawnMergeAgent(config: MergeAgentConfig): Promise<MergeResult> {
-  const sessionFile = `${SPECIALISTS_DIR}/merge-agent.session`;
-  const sessionId = existsSync(sessionFile)
-    ? readFileSync(sessionFile, 'utf-8').trim()
-    : null;
-
-  const prompt = buildMergePrompt(config);
-
-  // Build command
-  const args = ['--model', 'sonnet', '--print', '-p', prompt];
-  if (sessionId) {
-    args.push('--resume', sessionId);
+// In spawnAgent()
+const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`;
+createSession(agentId, options.workspace, claudeCmd, {
+  env: {
+    ...process.env,
+    PANOPTICON_AGENT_ID: agentId
   }
+});
+```
 
-  // Spawn in project directory
-  const proc = spawn('claude', args, {
-    cwd: config.projectPath,
-    env: { ...process.env, PANOPTICON_AGENT_ID: 'merge-agent' }
-  });
+### Idempotent Hook Setup
 
-  // Capture output, look for MERGE_RESULT markers
-  // ...
+```typescript
+function hookAlreadyConfigured(settings: any): boolean {
+  const postToolUse = settings?.hooks?.PostToolUse || [];
+  return postToolUse.some((h: any) =>
+    h.command?.includes('panopticon') ||
+    h.command?.includes('heartbeat-hook')
+  );
 }
 ```
 
-### Session ID Capture
+### Task Cache Update
 
-After first run (no --resume), capture session ID from Claude's output or from the JSONL session file created.
+Write task cache when:
+1. Agent starts (from initial prompt context)
+2. Agent updates beads task status (`bd update --status in_progress`)
 
-### Test Command Detection
-
-Detect test command from package.json, pom.xml, Cargo.toml, etc.:
-- `npm test` / `yarn test` for Node.js
-- `mvn test` for Java
-- `cargo test` for Rust
-- `pytest` for Python
-
-Fallback: skip tests if unknown.
-
-### Timeout Implementation
-
-```typescript
-const MERGE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
-
-const timeoutPromise = new Promise((_, reject) =>
-  setTimeout(() => reject(new Error('merge-agent timeout')), MERGE_TIMEOUT_MS)
-);
-
-const result = await Promise.race([
-  runMergeAgent(config),
-  timeoutPromise
-]);
-```
+For MVP: Only write on agent start. Task switching detection is future work.
 
 ## Open Questions
 
@@ -353,7 +318,7 @@ None - all decisions captured above.
 
 ## References
 
-- PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md` (Phase 5: Specialist Agents)
-- Specialist infrastructure: `/home/eltmon/projects/panopticon/src/lib/cloister/specialists.ts`
-- Approve API: `/home/eltmon/projects/panopticon/src/dashboard/server/index.ts` (line ~2765)
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/29
+- PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md` (Phase 3: Active Heartbeats & Hooks)
+- Claude Code Runtime: `/home/eltmon/projects/panopticon/src/lib/runtimes/claude-code.ts`
+- Agent spawning: `/home/eltmon/projects/panopticon/src/lib/agents.ts`
+- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/30
