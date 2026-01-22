@@ -3127,60 +3127,64 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
       });
     }
 
-    // 6. Try to merge the feature branch
+    // 6. ALWAYS use merge-agent for ALL merges
+    // This ensures merge-agent sees all changes, builds context, and can handle
+    // conflicts intelligently when they do occur. It also runs tests before completing.
+    console.log(`Invoking merge-agent for ${issueId}...`);
+
     try {
-      execSync(`git merge ${branchName} --no-edit`, { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
-      mergeCompleted = true;
-      console.log(`Merged ${branchName} to main`);
-    } catch (mergeError: any) {
-      // Merge conflict detected - try to resolve with merge-agent
-      console.log(`Merge conflict detected for ${issueId}, invoking merge-agent...`);
+      const mergeResult = await spawnMergeAgentForBranches(
+        projectPath,
+        branchName,
+        'main',
+        issueId
+      );
 
-      try {
-        // Attempt automatic resolution with merge-agent
-        const mergeResult = await spawnMergeAgentForBranches(
-          projectPath,
-          branchName,
-          'main',
-          issueId
-        );
-
-        if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
-          // merge-agent successfully resolved conflicts and tests passed
-          mergeCompleted = true;
-          console.log(`merge-agent successfully resolved conflicts for ${issueId}`);
-          console.log(`Resolved files: ${mergeResult.resolvedFiles?.join(', ')}`);
-        } else if (mergeResult.success && mergeResult.testsStatus === 'SKIP') {
-          // merge-agent resolved conflicts but tests were skipped
-          mergeCompleted = true;
-          console.log(`merge-agent resolved conflicts for ${issueId} (tests skipped)`);
-          console.log(`Resolved files: ${mergeResult.resolvedFiles?.join(', ')}`);
-        } else if (mergeResult.success && mergeResult.testsStatus === 'FAIL') {
-          // merge-agent resolved conflicts but tests failed
-          try {
-            execSync('git merge --abort', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
-          } catch {}
-          return res.status(400).json({
-            error: `merge-agent resolved conflicts but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`
-          });
-        } else {
-          // merge-agent failed to resolve conflicts
-          try {
-            execSync('git merge --abort', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
-          } catch {}
-          return res.status(400).json({
-            error: `merge-agent could not resolve conflicts automatically.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`
-          });
+      if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
+        // merge-agent successfully completed merge and tests passed
+        mergeCompleted = true;
+        console.log(`merge-agent successfully merged ${issueId}`);
+        if (mergeResult.resolvedFiles?.length) {
+          console.log(`Resolved conflicts in: ${mergeResult.resolvedFiles.join(', ')}`);
         }
-      } catch (agentError: any) {
-        // merge-agent itself failed (timeout, crash, etc.)
+      } else if (mergeResult.success && mergeResult.testsStatus === 'SKIP') {
+        // merge-agent completed merge but tests were skipped
+        mergeCompleted = true;
+        console.log(`merge-agent merged ${issueId} (tests skipped)`);
+        if (mergeResult.resolvedFiles?.length) {
+          console.log(`Resolved conflicts in: ${mergeResult.resolvedFiles.join(', ')}`);
+        }
+      } else if (mergeResult.success && mergeResult.testsStatus === 'FAIL') {
+        // merge-agent completed merge but tests failed
+        try {
+          execSync('git reset --hard HEAD~1', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+        } catch {}
+        return res.status(400).json({
+          error: `merge-agent completed merge but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`
+        });
+      } else {
+        // merge-agent failed (conflicts it couldn't resolve, or other issue)
         try {
           execSync('git merge --abort', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
         } catch {}
+        try {
+          execSync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+        } catch {}
         return res.status(400).json({
-          error: `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`
+          error: `merge-agent could not complete merge.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`
         });
       }
+    } catch (agentError: any) {
+      // merge-agent itself failed (timeout, crash, etc.)
+      try {
+        execSync('git merge --abort', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+      } catch {}
+      try {
+        execSync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+      } catch {}
+      return res.status(400).json({
+        error: `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`
+      });
     }
 
     // 7. CRITICAL: Push merged main to remote BEFORE any cleanup

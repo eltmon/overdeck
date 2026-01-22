@@ -21,9 +21,16 @@ Long-lived agents with persistent session IDs. Sleep until triggered, wake with 
 
 | Agent | Trigger | Responsibility |
 |-------|---------|----------------|
-| `merge-agent` | PR approved | Resolve conflicts, merge PRs, handle CI failures |
+| `merge-agent` | ALL approve requests | Handle ALL merges (not just conflicts), run tests, complete merge |
 | `review-agent` | PR opened | Code review, security checks, suggest changes |
 | `test-agent` | Push to branch | Run test suites, report failures |
+
+**Why merge-agent handles ALL merges (not just conflicts):**
+- Sees all code changes coming through the pipeline
+- Builds context about the codebase over time
+- When conflicts DO occur, has better understanding for intelligent resolution
+- Ensures tests are always run before completing any merge
+- Provides consistent merge workflow regardless of conflict presence
 
 **Characteristics:**
 - Persistent session ID stored in `~/.panopticon/specialists/<name>.session`

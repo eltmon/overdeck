@@ -342,20 +342,27 @@ Cloister manages specialized agents that handle specific phases of the developme
 
 #### Merge Agent Workflow
 
-The merge-agent is a specialist that handles the entire PR merge process:
+The merge-agent is a specialist that handles **ALL** merges, not just conflicts. This ensures:
+- It sees all code changes coming through the pipeline
+- It builds context about the codebase over time
+- When conflicts DO occur, it has better understanding for intelligent resolution
+- Tests are always run before completing the merge
+
+**Workflow:**
 
 1. **Pull latest main** - Ensures local main is up-to-date
-2. **Merge main into feature branch** - Brings in any changes from main
-3. **Resolve conflicts** - Uses AI to resolve merge conflicts intelligently
-4. **Run tests** - Verifies the merge didn't break anything
-5. **Push changes** - Pushes the resolved merge
-6. **Create/Update PR** - Creates a PR if one doesn't exist
-7. **Merge PR** - Merges the PR using `gh pr merge`
+2. **Analyze incoming changes** - Reviews what the feature branch contains
+3. **Perform merge** - Merges feature branch into main
+4. **Resolve conflicts** - If conflicts exist, uses AI to resolve them intelligently
+5. **Run tests** - Verifies the merge didn't break anything
+6. **Commit merge** - Commits the merge with descriptive message
+7. **Report results** - Returns success/failure with details
 
 **Triggering merge-agent:**
 
 ```bash
 # Via dashboard - click "Approve & Merge" on an issue card
+# merge-agent is ALWAYS invoked, regardless of whether conflicts exist
 
 # Via CLI
 pan specialists wake merge-agent --issue MIN-123
@@ -363,9 +370,9 @@ pan specialists wake merge-agent --issue MIN-123
 
 The merge-agent uses a specialized prompt template that instructs it to:
 - Never force-push
-- Always run tests before merging
+- Always run tests before completing
 - Document conflict resolution decisions
-- Update the issue status on success
+- Provide detailed feedback on what was merged
 
 #### Specialist Auto-Initialization
 
