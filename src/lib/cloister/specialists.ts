@@ -5,7 +5,7 @@
  * Specialists maintain context across invocations via session files.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, appendFileSync } from 'fs';
 import { join, basename } from 'path';
 import { execSync } from 'child_process';
 import { PANOPTICON_HOME } from '../paths.js';
@@ -640,6 +640,198 @@ export async function initializeEnabledSpecialists(): Promise<Array<{
 }
 
 /**
+ * Wake a specialist to process a task
+ *
+ * Sends a task prompt to a running specialist. If the specialist isn't running,
+ * starts it first (with --resume if it has a session).
+ *
+ * @param name - Specialist name
+ * @param taskPrompt - The task prompt to send to the specialist
+ * @param options - Additional options
+ * @returns Promise with wake result
+ */
+export async function wakeSpecialist(
+  name: SpecialistType,
+  taskPrompt: string,
+  options: {
+    waitForReady?: boolean; // Wait for agent to be ready before sending prompt (default: true)
+    startIfNotRunning?: boolean; // Start the agent if not running (default: true)
+  } = {}
+): Promise<{
+  success: boolean;
+  message: string;
+  tmuxSession?: string;
+  wasAlreadyRunning: boolean;
+  error?: string;
+}> {
+  const { waitForReady = true, startIfNotRunning = true } = options;
+  const tmuxSession = getTmuxSessionName(name);
+  const sessionId = getSessionId(name);
+  const wasAlreadyRunning = isRunning(name);
+
+  // If not running, start it first
+  if (!wasAlreadyRunning) {
+    if (!startIfNotRunning) {
+      return {
+        success: false,
+        message: `Specialist ${name} is not running`,
+        wasAlreadyRunning: false,
+        error: 'not_running',
+      };
+    }
+
+    const cwd = process.env.HOME || '/home/eltmon';
+
+    try {
+      // Start with --resume if we have a session, otherwise fresh
+      const claudeCmd = sessionId
+        ? `claude --resume "${sessionId}" --dangerously-skip-permissions`
+        : `claude --dangerously-skip-permissions`;
+
+      execSync(
+        `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${claudeCmd}"`,
+        { encoding: 'utf-8' }
+      );
+
+      if (waitForReady) {
+        // Wait for Claude to be ready
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Failed to start specialist ${name}: ${error.message}`,
+        wasAlreadyRunning: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // Send the task prompt
+  try {
+    const escapedPrompt = taskPrompt.replace(/'/g, "'\\''");
+    // Send text and Enter SEPARATELY (critical for tmux)
+    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 200));
+    execSync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+
+    // Record wake event
+    recordWake(name, sessionId || undefined);
+
+    return {
+      success: true,
+      message: wasAlreadyRunning
+        ? `Sent task to running specialist ${name}`
+        : `Started specialist ${name} and sent task`,
+      tmuxSession,
+      wasAlreadyRunning,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: `Failed to send task to specialist ${name}: ${error.message}`,
+      tmuxSession,
+      wasAlreadyRunning,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Wake specialist with a task from the queue
+ *
+ * Convenience wrapper that formats task details into a prompt.
+ *
+ * @param name - Specialist name
+ * @param task - Task from the queue
+ * @returns Promise with wake result
+ */
+export async function wakeSpecialistWithTask(
+  name: SpecialistType,
+  task: {
+    issueId: string;
+    branch?: string;
+    workspace?: string;
+    prUrl?: string;
+    context?: Record<string, any>;
+  }
+): Promise<ReturnType<typeof wakeSpecialist>> {
+  // Build context-aware prompt based on specialist type and task
+  let prompt: string;
+
+  switch (name) {
+    case 'merge-agent':
+      prompt = `New merge task for ${task.issueId}:
+
+Branch: ${task.branch || 'unknown'}
+Workspace: ${task.workspace || 'unknown'}
+${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
+
+Your task:
+1. Fetch the latest main branch
+2. Attempt to merge ${task.branch} into main
+3. If conflicts arise, resolve them intelligently based on context
+4. Run the test suite to verify the merge is clean
+5. If tests pass, complete the merge and push
+6. If tests fail, analyze the failures and either fix them or report back
+
+When done, provide feedback on:
+- Any conflicts encountered and how you resolved them
+- Test results
+- Any patterns you notice that future agents should be aware of
+
+Use the send-feedback-to-agent skill to report findings back to the issue agent.`;
+      break;
+
+    case 'review-agent':
+      prompt = `New review task for ${task.issueId}:
+
+Branch: ${task.branch || 'unknown'}
+Workspace: ${task.workspace || 'unknown'}
+${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
+
+Your task:
+1. Review all changes in the branch
+2. Check for code quality issues, security concerns, and best practices
+3. Verify test coverage is adequate
+4. Provide specific, actionable feedback
+
+When done, provide feedback on:
+- Critical issues that must be fixed
+- Suggestions for improvement
+- Patterns that should be documented
+
+Use the send-feedback-to-agent skill to report findings back to the issue agent.`;
+      break;
+
+    case 'test-agent':
+      prompt = `New test task for ${task.issueId}:
+
+Branch: ${task.branch || 'unknown'}
+Workspace: ${task.workspace || 'unknown'}
+
+Your task:
+1. Run the full test suite
+2. Analyze any failures in detail
+3. Identify root causes (code bug vs test bug vs environment issue)
+4. Suggest fixes
+
+When done, provide feedback on:
+- Test results summary
+- Root cause analysis for any failures
+- Recommended fixes
+
+Use the send-feedback-to-agent skill to report findings back to the issue agent.`;
+      break;
+
+    default:
+      prompt = `Task for ${task.issueId}: Please process this task and report findings.`;
+  }
+
+  return wakeSpecialist(name, prompt);
+}
+
+/**
  * ===========================================================================
  * Specialist Queue Helpers
  * ===========================================================================
@@ -682,17 +874,20 @@ export function submitToSpecialistQueue(
     context?: Record<string, any>;
   }
 ): HookItem {
+  // Put specialist-specific fields into context to match HookItem type
   const item: Omit<HookItem, 'id' | 'createdAt'> = {
     type: 'task',
     priority: task.priority,
     source: task.source,
     payload: {
-      prUrl: task.prUrl,
       issueId: task.issueId,
-      workspace: task.workspace,
-      branch: task.branch,
-      filesChanged: task.filesChanged,
-      context: task.context,
+      context: {
+        ...task.context,
+        prUrl: task.prUrl,
+        workspace: task.workspace,
+        branch: task.branch,
+        filesChanged: task.filesChanged,
+      },
     },
   };
 
@@ -735,4 +930,198 @@ export function completeSpecialistTask(specialistName: SpecialistType, itemId: s
 export function getNextSpecialistTask(specialistName: SpecialistType): HookItem | null {
   const { items } = checkSpecialistQueue(specialistName);
   return items.length > 0 ? items[0] : null;
+}
+
+/**
+ * ===========================================================================
+ * Specialist Feedback System
+ * ===========================================================================
+ *
+ * Specialists accumulate context and expertise. This system allows them to
+ * share learnings back to issue agents, creating a feedback loop that
+ * improves the overall system over time.
+ */
+
+/**
+ * Feedback from a specialist to an issue agent
+ */
+export interface SpecialistFeedback {
+  id: string;
+  timestamp: string;
+  fromSpecialist: SpecialistType;
+  toIssueId: string;
+  feedbackType: 'success' | 'failure' | 'warning' | 'insight';
+  category: 'merge' | 'test' | 'review' | 'general';
+  summary: string;
+  details: string;
+  actionItems?: string[];
+  patterns?: string[];  // Patterns the specialist noticed
+  suggestions?: string[];  // Suggestions for the issue agent
+}
+
+const FEEDBACK_DIR = join(PANOPTICON_HOME, 'specialists', 'feedback');
+const FEEDBACK_LOG = join(FEEDBACK_DIR, 'feedback.jsonl');
+
+/**
+ * Send feedback from a specialist to an issue agent
+ *
+ * This is the key mechanism for specialists to share their accumulated
+ * expertise back to the issue agents that spawned the work.
+ *
+ * @param feedback - The feedback to send
+ * @returns True if feedback was sent successfully
+ */
+export function sendFeedbackToAgent(
+  feedback: Omit<SpecialistFeedback, 'id' | 'timestamp'>
+): boolean {
+  const { fromSpecialist, toIssueId, summary, details } = feedback;
+
+  // Ensure feedback directory exists
+  if (!existsSync(FEEDBACK_DIR)) {
+    mkdirSync(FEEDBACK_DIR, { recursive: true });
+  }
+
+  // Create full feedback record
+  const fullFeedback: SpecialistFeedback = {
+    ...feedback,
+    id: `feedback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date().toISOString(),
+  };
+
+  // Log feedback to JSONL
+  try {
+    const line = JSON.stringify(fullFeedback) + '\n';
+    appendFileSync(FEEDBACK_LOG, line, 'utf-8');
+  } catch (error) {
+    console.error(`[specialist] Failed to log feedback:`, error);
+  }
+
+  // Try to send feedback to the issue agent's tmux session
+  const agentSession = `agent-${toIssueId.toLowerCase()}`;
+
+  try {
+    execSync(`tmux has-session -t "${agentSession}" 2>/dev/null`, { encoding: 'utf-8' });
+
+    // Format feedback message for the agent
+    const feedbackMessage = formatFeedbackForAgent(fullFeedback);
+    const escapedMessage = feedbackMessage.replace(/'/g, "'\\''");
+
+    // Send to agent
+    execSync(`tmux send-keys -t "${agentSession}" '${escapedMessage}'`, { encoding: 'utf-8' });
+    execSync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
+
+    console.log(`[specialist] Sent feedback from ${fromSpecialist} to ${agentSession}`);
+    return true;
+  } catch {
+    // Agent session doesn't exist or send failed
+    console.log(`[specialist] Could not send feedback to ${agentSession} (session may not exist)`);
+    // Feedback is still logged, can be retrieved later
+    return false;
+  }
+}
+
+/**
+ * Format feedback for display to an agent
+ */
+function formatFeedbackForAgent(feedback: SpecialistFeedback): string {
+  const { fromSpecialist, feedbackType, category, summary, details, actionItems, patterns, suggestions } = feedback;
+
+  const typeEmoji = {
+    success: '✅',
+    failure: '❌',
+    warning: '⚠️',
+    insight: '💡',
+  }[feedbackType];
+
+  let message = `\n${typeEmoji} **Feedback from ${fromSpecialist}** (${category})\n\n`;
+  message += `**Summary:** ${summary}\n\n`;
+  message += `**Details:**\n${details}\n`;
+
+  if (actionItems?.length) {
+    message += `\n**Action Items:**\n`;
+    actionItems.forEach((item, i) => {
+      message += `${i + 1}. ${item}\n`;
+    });
+  }
+
+  if (patterns?.length) {
+    message += `\n**Patterns Noticed:**\n`;
+    patterns.forEach(pattern => {
+      message += `- ${pattern}\n`;
+    });
+  }
+
+  if (suggestions?.length) {
+    message += `\n**Suggestions:**\n`;
+    suggestions.forEach(suggestion => {
+      message += `- ${suggestion}\n`;
+    });
+  }
+
+  return message;
+}
+
+/**
+ * Get pending feedback for an issue that hasn't been delivered yet
+ *
+ * @param issueId - Issue ID to get feedback for
+ * @returns Array of feedback records
+ */
+export function getPendingFeedback(issueId: string): SpecialistFeedback[] {
+  if (!existsSync(FEEDBACK_LOG)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(FEEDBACK_LOG, 'utf-8');
+    const lines = content.trim().split('\n').filter(l => l.length > 0);
+    const allFeedback = lines.map(line => JSON.parse(line) as SpecialistFeedback);
+
+    // Filter to this issue
+    return allFeedback.filter(f => f.toIssueId.toLowerCase() === issueId.toLowerCase());
+  } catch (error) {
+    console.error(`[specialist] Failed to read feedback log:`, error);
+    return [];
+  }
+}
+
+/**
+ * Get feedback statistics for all specialists
+ *
+ * @returns Feedback stats by specialist and type
+ */
+export function getFeedbackStats(): {
+  bySpecialist: Record<SpecialistType, number>;
+  byType: Record<string, number>;
+  total: number;
+} {
+  const stats = {
+    bySpecialist: {
+      'merge-agent': 0,
+      'review-agent': 0,
+      'test-agent': 0,
+    } as Record<SpecialistType, number>,
+    byType: {} as Record<string, number>,
+    total: 0,
+  };
+
+  if (!existsSync(FEEDBACK_LOG)) {
+    return stats;
+  }
+
+  try {
+    const content = readFileSync(FEEDBACK_LOG, 'utf-8');
+    const lines = content.trim().split('\n').filter(l => l.length > 0);
+
+    for (const line of lines) {
+      const feedback = JSON.parse(line) as SpecialistFeedback;
+      stats.bySpecialist[feedback.fromSpecialist] = (stats.bySpecialist[feedback.fromSpecialist] || 0) + 1;
+      stats.byType[feedback.feedbackType] = (stats.byType[feedback.feedbackType] || 0) + 1;
+      stats.total++;
+    }
+  } catch (error) {
+    console.error(`[specialist] Failed to read feedback stats:`, error);
+  }
+
+  return stats;
 }

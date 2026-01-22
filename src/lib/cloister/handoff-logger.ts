@@ -4,7 +4,7 @@
  * Logs handoff events to JSONL file for tracking and analysis.
  */
 
-import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { PANOPTICON_HOME } from '../paths.js';
 import type { HandoffContext } from './handoff-context.js';
@@ -42,9 +42,19 @@ export interface HandoffEvent {
     handoffCount?: number;
   };
 
-  // Result
+  // Result - handoff OPERATION success (did we spawn new agent?)
   success: boolean;
   errorMessage?: string;
+
+  // Recovery outcome - did the agent ACTUALLY recover?
+  // This is verified after the handoff, not at handoff time
+  outcome?: {
+    verified: boolean;          // Has recovery been checked?
+    agentRecovered: boolean;    // Did the agent start making progress?
+    verifiedAt?: string;        // When was this verified?
+    verificationMethod?: 'heartbeat' | 'manual' | 'task_complete';
+    notes?: string;
+  };
 }
 
 /**
@@ -179,6 +189,12 @@ export function readAgentHandoffEvents(agentId: string): HandoffEvent[] {
 /**
  * Get handoff statistics
  *
+ * Returns both operation success rate (handoff executed) and recovery success rate
+ * (agent actually recovered). These are DIFFERENT metrics:
+ *
+ * - operationSuccessRate: Did the handoff operation complete successfully?
+ * - recoverySuccessRate: Did the agent actually start making progress after handoff?
+ *
  * @returns Handoff statistics
  */
 export function getHandoffStats(): {
@@ -188,7 +204,13 @@ export function getHandoffStats(): {
     from: Record<string, number>;
     to: Record<string, number>;
   };
+  // Legacy field for backwards compatibility
   successRate: number;
+  // More detailed metrics
+  operationSuccessRate: number;  // Handoff operation succeeded
+  recoverySuccessRate: number;   // Agent actually recovered (verified only)
+  pendingVerification: number;   // Handoffs that haven't been verified yet
+  verifiedCount: number;         // Total handoffs that have been verified
 } {
   const events = readHandoffEvents();
 
@@ -200,9 +222,14 @@ export function getHandoffStats(): {
       to: {} as Record<string, number>,
     },
     successRate: 0,
+    operationSuccessRate: 0,
+    recoverySuccessRate: 0,
+    pendingVerification: 0,
+    verifiedCount: 0,
   };
 
-  let successCount = 0;
+  let operationSuccessCount = 0;
+  let recoverySuccessCount = 0;
 
   for (const event of events) {
     // Count by trigger
@@ -212,13 +239,84 @@ export function getHandoffStats(): {
     stats.byModel.from[event.from.model] = (stats.byModel.from[event.from.model] || 0) + 1;
     stats.byModel.to[event.to.model] = (stats.byModel.to[event.to.model] || 0) + 1;
 
-    // Count successes
+    // Count operation successes (handoff executed)
     if (event.success) {
-      successCount++;
+      operationSuccessCount++;
+    }
+
+    // Count recovery outcomes (agent actually recovered)
+    if (event.outcome?.verified) {
+      stats.verifiedCount++;
+      if (event.outcome.agentRecovered) {
+        recoverySuccessCount++;
+      }
+    } else {
+      stats.pendingVerification++;
     }
   }
 
-  stats.successRate = events.length > 0 ? successCount / events.length : 0;
+  // Calculate rates
+  stats.operationSuccessRate = events.length > 0 ? operationSuccessCount / events.length : 0;
+  stats.recoverySuccessRate = stats.verifiedCount > 0 ? recoverySuccessCount / stats.verifiedCount : 0;
+
+  // Legacy successRate - use operation success for backwards compatibility
+  // but NOTE: This is misleading for "did the agent recover?"
+  stats.successRate = stats.operationSuccessRate;
 
   return stats;
+}
+
+/**
+ * Update the outcome of a handoff event (verify if agent recovered)
+ *
+ * @param agentId - Agent ID
+ * @param timestamp - Original handoff timestamp
+ * @param outcome - Recovery outcome
+ */
+export function updateHandoffOutcome(
+  agentId: string,
+  timestamp: string,
+  outcome: {
+    agentRecovered: boolean;
+    verificationMethod: 'heartbeat' | 'manual' | 'task_complete';
+    notes?: string;
+  }
+): void {
+  ensureLogDir();
+
+  if (!existsSync(HANDOFF_LOG_FILE)) {
+    return;
+  }
+
+  const content = readFileSync(HANDOFF_LOG_FILE, 'utf-8');
+  const lines = content.trim().split('\n').filter(line => line.trim());
+
+  // Find and update the matching event
+  const updatedLines = lines.map(line => {
+    const event = JSON.parse(line) as HandoffEvent;
+    if (event.agentId === agentId && event.timestamp === timestamp) {
+      event.outcome = {
+        verified: true,
+        agentRecovered: outcome.agentRecovered,
+        verifiedAt: new Date().toISOString(),
+        verificationMethod: outcome.verificationMethod,
+        notes: outcome.notes,
+      };
+      return JSON.stringify(event);
+    }
+    return line;
+  });
+
+  // Rewrite the file
+  writeFileSync(HANDOFF_LOG_FILE, updatedLines.join('\n') + '\n', 'utf-8');
+}
+
+/**
+ * Get handoffs pending verification
+ *
+ * @returns Array of handoff events that need outcome verification
+ */
+export function getPendingVerificationHandoffs(): HandoffEvent[] {
+  const events = readHandoffEvents();
+  return events.filter(e => e.success && !e.outcome?.verified);
 }

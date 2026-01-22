@@ -26,6 +26,47 @@ Enable intelligent task routing to cost-effective models based on complexity, wi
 
 **Why both:** Kill & Spawn provides clean handoffs for general work; Specialist Wake leverages context preservation for recurring specialist tasks.
 
+### 1b. Specialist Feedback Loop (NEW)
+
+**Decision:** Specialists send feedback back to issue agents after completing tasks
+
+**The Genius:** Specialists accumulate context and expertise over time. A merge-agent that has resolved 50 merges learns patterns about common conflicts, test failures, and code structure. This knowledge should flow BACK to issue agents.
+
+**Feedback Flow:**
+```
+Issue Agent → Specialist (task) → Specialist processes → Feedback → Issue Agent
+     ↑                                                              │
+     └──────────────────────────────────────────────────────────────┘
+```
+
+**SpecialistFeedback Interface:**
+```typescript
+interface SpecialistFeedback {
+  id: string;
+  timestamp: string;
+  fromSpecialist: 'merge-agent' | 'test-agent' | 'review-agent';
+  toIssueId: string;
+  feedbackType: 'success' | 'failure' | 'warning' | 'insight';
+  category: 'merge' | 'test' | 'review' | 'general';
+  summary: string;
+  details: string;
+  actionItems?: string[];    // Specific actions for the agent
+  patterns?: string[];       // Patterns the specialist noticed
+  suggestions?: string[];    // Improvement suggestions
+}
+```
+
+**Delivery Mechanism:**
+1. Log to `~/.panopticon/specialists/feedback/feedback.jsonl` (persistent)
+2. Send to issue agent's tmux session via `tmux send-keys`
+3. If agent not running, feedback is queued for retrieval
+
+**Why This Matters:**
+- Merge-agent learns: "Config files always conflict on version bumps"
+- Test-agent learns: "Auth tests fail when TEST_API_KEY not set"
+- Review-agent learns: "This codebase uses snake_case, not camelCase"
+- This knowledge accumulates and improves all future work
+
 ### 2. Handoff Triggers
 
 **Decision:** Implement all triggers with specific detection mechanisms
@@ -80,6 +121,15 @@ expert: opus
 - Stuck (🔴): > 30 min
 
 Map model-specific thresholds onto these states.
+
+**Future Enhancement: Context-Aware Specialist Routing**
+
+Instead of just upgrading the model when stuck, route to the appropriate specialist:
+- Stuck on merge conflicts → route to merge-agent
+- Stuck on test failures → route to test-agent
+- Stuck on code review feedback → route to review-agent
+
+This leverages specialist expertise rather than just throwing more compute at the problem.
 
 ### 5. Context Preservation
 
@@ -174,10 +224,32 @@ interface HandoffEvent {
     costAtHandoff?: number;
   };
 
+  // Operation success - did the handoff execute?
   success: boolean;
   errorMessage?: string;
+
+  // Recovery outcome - did the agent ACTUALLY recover? (NEW)
+  outcome?: {
+    verified: boolean;          // Has recovery been checked?
+    agentRecovered: boolean;    // Did agent start making progress?
+    verifiedAt?: string;
+    verificationMethod?: 'heartbeat' | 'manual' | 'task_complete';
+    notes?: string;
+  };
 }
 ```
+
+**CRITICAL: Two Different Success Metrics**
+
+1. **Operation Success Rate**: Did the handoff operation complete?
+   - "We spawned a new agent" = success
+   - This is what `success: boolean` tracks
+
+2. **Recovery Success Rate**: Did the agent actually recover?
+   - "The agent is no longer stuck and making progress" = success
+   - This requires follow-up verification via `outcome`
+
+**Why This Matters:** A 100% operation success rate with 0% recovery success means handoffs are executing but not helping. The dashboard must show BOTH metrics to be useful.
 
 ### 9. Scope Boundaries
 

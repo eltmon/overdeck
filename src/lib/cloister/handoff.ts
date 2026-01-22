@@ -14,6 +14,14 @@ import { getAgentState, saveAgentState, stopAgent, spawnAgent, getAgentDir } fro
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
 import { sessionExists } from '../tmux.js';
+import {
+  wakeSpecialist,
+  getSessionId,
+  getTmuxSessionName,
+  isRunning,
+  recordWake,
+  type SpecialistType,
+} from './specialists.js';
 
 /**
  * Handoff method type
@@ -204,8 +212,8 @@ async function performSpecialistWake(
     const prompt = buildHandoffPrompt(context, options.additionalInstructions);
 
     // Step 3: Wake specialist using --resume
-    // Determine specialist session ID from agent ID
-    const specialistName = extractSpecialistName(state.id);
+    // Determine specialist type from agent ID or options
+    const specialistName = extractSpecialistName(state.id) as SpecialistType | null;
     if (!specialistName) {
       return {
         success: false,
@@ -215,31 +223,32 @@ async function performSpecialistWake(
     }
 
     // Check if specialist session exists
-    // TODO: Implement specialist session tracking
-    // For now, fall back to kill-spawn
-    console.warn(`Specialist wake not yet fully implemented, falling back to kill-spawn`);
-    return await performKillAndSpawn(state, options);
+    const sessionId = getSessionId(specialistName);
+    const tmuxSession = getTmuxSessionName(specialistName);
 
-    // Future implementation:
-    // const specialistSessionId = await getSpecialistSessionId(specialistName);
-    // if (!specialistSessionId) {
-    //   return { success: false, method: 'specialist-wake', error: 'Specialist session not found' };
-    // }
-    //
-    // // Resume specialist with new task
-    // execSync(`claude --resume ${specialistSessionId} --model ${options.targetModel}`, {
-    //   cwd: state.workspace,
-    // });
-    //
-    // // Send prompt
-    // messageAgent(state.id, prompt);
-    //
-    // return {
-    //   success: true,
-    //   method: 'specialist-wake',
-    //   newSessionId: specialistSessionId,
-    //   context,
-    // };
+    console.log(`[handoff] Waking specialist ${specialistName} (session: ${sessionId || 'none'})`);
+
+    // Wake the specialist with the task prompt
+    const wakeResult = await wakeSpecialist(specialistName, prompt, {
+      waitForReady: true,
+      startIfNotRunning: true,
+    });
+
+    if (!wakeResult.success) {
+      console.error(`[handoff] Failed to wake specialist: ${wakeResult.error}`);
+      // Fall back to kill-spawn if specialist wake fails
+      console.warn(`[handoff] Falling back to kill-spawn`);
+      return await performKillAndSpawn(state, options);
+    }
+
+    console.log(`[handoff] Successfully woke specialist ${specialistName}`);
+
+    return {
+      success: true,
+      method: 'specialist-wake',
+      newSessionId: sessionId || undefined,
+      context,
+    };
   } catch (error) {
     return {
       success: false,
