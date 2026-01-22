@@ -1734,10 +1734,10 @@ app.get('/api/cloister/status', (_req, res) => {
 });
 
 // Start Cloister
-app.post('/api/cloister/start', (_req, res) => {
+app.post('/api/cloister/start', async (_req, res) => {
   try {
     const service = getCloisterService();
-    service.start();
+    await service.start();
     res.json({ success: true, message: 'Cloister started' });
   } catch (error: any) {
     console.error('Error starting Cloister:', error);
@@ -1914,67 +1914,18 @@ app.post('/api/specialists/:name/init', async (req, res) => {
   const { name } = req.params;
 
   try {
-    const {
-      getTmuxSessionName,
-      isRunning,
-      recordWake,
-      getSessionId
-    } = await import('../../lib/cloister/specialists.js');
+    const { initializeSpecialist } = await import('../../lib/cloister/specialists.js');
 
-    // Check if already running
-    if (isRunning(name as any)) {
-      return res.status(400).json({ error: `Specialist ${name} is already running` });
+    const result = await initializeSpecialist(name as any);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
     }
-
-    // Check if already initialized
-    if (getSessionId(name as any)) {
-      return res.status(400).json({
-        error: `Specialist ${name} is already initialized. Use /wake to start it, or /reset to clear session.`
-      });
-    }
-
-    const tmuxSession = getTmuxSessionName(name as any);
-    const cwd = homedir();
-
-    // Get specialist prompt if available
-    const promptPath = join(homedir(), 'projects', 'panopticon', 'src', 'lib', 'cloister', 'prompts', `${name}.md`);
-    let initPrompt = '';
-
-    if (existsSync(promptPath)) {
-      // Read the prompt template (without variable substitution for init)
-      initPrompt = readFileSync(promptPath, 'utf-8')
-        .replace(/\{\{[^}]+\}\}/g, '[TO BE PROVIDED]'); // Replace template vars
-    }
-
-    // Create a basic identity prompt for the specialist
-    const identityPrompt = `You are the ${name} specialist agent for Panopticon.
-Your role: ${name === 'merge-agent' ? 'Resolve merge conflicts and ensure clean integrations' :
-             name === 'review-agent' ? 'Review code changes and provide quality feedback' :
-             name === 'test-agent' ? 'Execute and analyze test results' : 'Assist with development tasks'}
-
-You will be woken up when your services are needed. For now, acknowledge your initialization and wait.
-Say: "I am the ${name} specialist, ready and waiting for tasks."`;
-
-    // Spawn Claude Code fresh in tmux (no --resume since this is first init)
-    execSync(
-      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude --dangerously-skip-permissions"`,
-      { encoding: 'utf-8' }
-    );
-
-    // Wait for Claude to start, then send identity prompt
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    const escapedPrompt = identityPrompt.replace(/'/g, "'\\''");
-    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}' C-m`, { encoding: 'utf-8' });
-
-    // We need to capture the session ID after Claude creates it
-    // For now, record wake without session ID (user will need to run /compact or check session)
-    recordWake(name as any);
 
     res.json({
       success: true,
-      message: `Specialist ${name} initialized and started`,
-      tmuxSession,
+      message: result.message,
+      tmuxSession: result.tmuxSession,
       note: 'Session ID will be available after Claude responds. Use "claude config get sessionId" in the tmux session to get it, then update via /reset with reinitialize.'
     });
   } catch (error: any) {

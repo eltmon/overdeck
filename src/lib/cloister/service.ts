@@ -23,6 +23,7 @@ import {
   getLatestHealthEvent,
   closeHealthDatabase,
 } from './database.js';
+import { initializeEnabledSpecialists } from './specialists.js';
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgents } from '../agents.js';
 
@@ -76,7 +77,7 @@ export class CloisterService {
   /**
    * Start the Cloister service
    */
-  start(): void {
+  async start(): Promise<void> {
     if (this.running) {
       console.warn('Cloister is already running');
       return;
@@ -90,6 +91,21 @@ export class CloisterService {
       console.log('  ✓ Health history database initialized');
     } catch (error) {
       console.error('  ✗ Failed to initialize health database:', error);
+    }
+
+    // Auto-initialize enabled specialists
+    try {
+      console.log('  → Checking specialists...');
+      const results = await initializeEnabledSpecialists();
+      for (const result of results) {
+        if (result.success) {
+          console.log(`    ✓ ${result.name}: ${result.message}`);
+        } else {
+          console.log(`    ✗ ${result.name}: ${result.message}`);
+        }
+      }
+    } catch (error) {
+      console.error('  ✗ Failed to initialize specialists:', error);
     }
 
     this.running = true;

@@ -516,3 +516,122 @@ export function getSpecialistStatus(name: SpecialistType): SpecialistStatus {
 export function getAllSpecialistStatus(): SpecialistStatus[] {
   return getAllSpecialists().map((metadata) => getSpecialistStatus(metadata.name));
 }
+
+/**
+ * Initialize a specialist agent
+ *
+ * Creates a tmux session and starts Claude Code with an identity prompt.
+ * This is for first-time initialization of specialists that don't have session files.
+ *
+ * @param name - Specialist name
+ * @returns Promise with initialization result
+ */
+export async function initializeSpecialist(name: SpecialistType): Promise<{
+  success: boolean;
+  message: string;
+  tmuxSession?: string;
+  error?: string;
+}> {
+  // Check if already running
+  if (isRunning(name)) {
+    return {
+      success: false,
+      message: `Specialist ${name} is already running`,
+      error: 'already_running',
+    };
+  }
+
+  // Check if already initialized
+  if (getSessionId(name)) {
+    return {
+      success: false,
+      message: `Specialist ${name} is already initialized. Use wake to start it.`,
+      error: 'already_initialized',
+    };
+  }
+
+  const tmuxSession = getTmuxSessionName(name);
+  const cwd = process.env.HOME || '/home/eltmon';
+
+  // Create identity prompt for the specialist
+  const identityPrompt = `You are the ${name} specialist agent for Panopticon.
+Your role: ${name === 'merge-agent' ? 'Resolve merge conflicts and ensure clean integrations' :
+             name === 'review-agent' ? 'Review code changes and provide quality feedback' :
+             name === 'test-agent' ? 'Execute and analyze test results' : 'Assist with development tasks'}
+
+You will be woken up when your services are needed. For now, acknowledge your initialization and wait.
+Say: "I am the ${name} specialist, ready and waiting for tasks."`;
+
+  try {
+    // Spawn Claude Code fresh in tmux
+    execSync(
+      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude --dangerously-skip-permissions"`,
+      { encoding: 'utf-8' }
+    );
+
+    // Wait for Claude to start, then send identity prompt
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const escapedPrompt = identityPrompt.replace(/'/g, "'\\''");
+    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}' C-m`, { encoding: 'utf-8' });
+
+    // Record wake event
+    recordWake(name);
+
+    return {
+      success: true,
+      message: `Specialist ${name} initialized and started`,
+      tmuxSession,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: `Failed to initialize specialist ${name}: ${error.message}`,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Initialize all enabled but uninitialized specialists
+ *
+ * Called during Cloister startup to ensure specialists are ready.
+ *
+ * @returns Promise with array of initialization results
+ */
+export async function initializeEnabledSpecialists(): Promise<Array<{
+  name: SpecialistType;
+  success: boolean;
+  message: string;
+}>> {
+  const enabled = getEnabledSpecialists();
+  const results: Array<{ name: SpecialistType; success: boolean; message: string }> = [];
+
+  for (const specialist of enabled) {
+    const sessionId = getSessionId(specialist.name);
+
+    if (!sessionId) {
+      // Specialist is enabled but not initialized
+      console.log(`  → Auto-initializing specialist: ${specialist.name}`);
+      const result = await initializeSpecialist(specialist.name);
+      results.push({
+        name: specialist.name,
+        success: result.success,
+        message: result.message,
+      });
+
+      // Small delay between initializations to avoid overwhelming the system
+      if (results.length < enabled.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } else {
+      results.push({
+        name: specialist.name,
+        success: true,
+        message: `Already initialized with session ${sessionId.substring(0, 8)}...`,
+      });
+    }
+  }
+
+  return results;
+}

@@ -15,7 +15,7 @@ export async function startCommand(): Promise<void> {
     return;
   }
 
-  service.start();
+  await service.start();
   console.log(chalk.green('✓ Cloister started'));
   console.log(chalk.dim('  Monitoring all running agents...'));
 }
