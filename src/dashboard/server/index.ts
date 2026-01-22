@@ -11,6 +11,12 @@ import { homedir } from 'os';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { loadCloisterConfig, saveCloisterConfig } from '../../lib/cloister/config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
+import { performHandoff } from '../../lib/cloister/handoff.js';
+import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
+import { checkAllTriggers } from '../../lib/cloister/triggers.js';
+import { getAgentState } from '../../lib/agents.js';
+import { getAgentHealth } from '../../lib/cloister/health.js';
+import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 
 // Promisified exec for non-blocking operations
 const execAsync = promisify(exec);
@@ -1976,6 +1982,193 @@ app.get('/api/activity/:id', (req, res) => {
     return res.status(404).json({ error: 'Activity not found' });
   }
   res.json(activity);
+});
+
+// ============================================================================
+// Handoff API Endpoints (Phase 4)
+// ============================================================================
+
+// Get handoff suggestion for an agent
+app.get('/api/agents/:id/handoff/suggestion', async (req, res) => {
+  try {
+    const agentId = req.params.id;
+    const agentState = getAgentState(agentId);
+
+    if (!agentState) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    // Get agent health
+    const runtime = getRuntimeForAgent(agentId);
+    if (!runtime) {
+      return res.status(404).json({ error: 'Runtime not found for agent' });
+    }
+
+    const health = getAgentHealth(agentId, runtime);
+
+    // Check all triggers
+    const triggers = checkAllTriggers(
+      agentId,
+      agentState.workspace,
+      agentState.issueId,
+      agentState.model,
+      health,
+      loadCloisterConfig()
+    );
+
+    if (triggers.length > 0) {
+      const trigger = triggers[0];
+      return res.json({
+        suggested: true,
+        trigger: trigger.type,
+        currentModel: agentState.model,
+        suggestedModel: trigger.suggestedModel,
+        reason: trigger.reason,
+      });
+    }
+
+    res.json({
+      suggested: false,
+      trigger: null,
+      currentModel: agentState.model,
+      suggestedModel: null,
+      reason: 'No handoff triggers detected',
+    });
+  } catch (error: any) {
+    console.error('Error getting handoff suggestion:', error);
+    res.status(500).json({ error: 'Failed to get handoff suggestion: ' + error.message });
+  }
+});
+
+// Execute handoff for an agent
+app.post('/api/agents/:id/handoff', async (req, res) => {
+  try {
+    const agentId = req.params.id;
+    const { toModel, reason } = req.body;
+
+    if (!toModel) {
+      return res.status(400).json({ error: 'toModel is required' });
+    }
+
+    const result = await performHandoff(agentId, {
+      targetModel: toModel,
+      reason: reason || 'Manual handoff from dashboard',
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        newAgentId: result.newAgentId,
+        newSessionId: result.newSessionId,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error,
+      });
+    }
+  } catch (error: any) {
+    console.error('Error executing handoff:', error);
+    res.status(500).json({ error: 'Failed to execute handoff: ' + error.message });
+  }
+});
+
+// Get handoff history for an issue
+app.get('/api/issues/:id/handoffs', (req, res) => {
+  try {
+    const issueId = req.params.id;
+    const handoffs = readIssueHandoffEvents(issueId);
+    res.json({ handoffs });
+  } catch (error: any) {
+    console.error('Error getting issue handoffs:', error);
+    res.status(500).json({ error: 'Failed to get issue handoffs: ' + error.message });
+  }
+});
+
+// Get handoff history for an agent
+app.get('/api/agents/:id/handoffs', (req, res) => {
+  try {
+    const agentId = req.params.id;
+    const handoffs = readAgentHandoffEvents(agentId);
+    res.json({ handoffs });
+  } catch (error: any) {
+    console.error('Error getting agent handoffs:', error);
+    res.status(500).json({ error: 'Failed to get agent handoffs: ' + error.message });
+  }
+});
+
+// Get all handoff events
+app.get('/api/handoffs', (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+    const handoffs = readHandoffEvents(limit);
+    res.json({
+      handoffs,
+      total: handoffs.length,
+    });
+  } catch (error: any) {
+    console.error('Error getting handoffs:', error);
+    res.status(500).json({ error: 'Failed to get handoffs: ' + error.message });
+  }
+});
+
+// Get handoff statistics
+app.get('/api/handoffs/stats', (req, res) => {
+  try {
+    const stats = getHandoffStats();
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Error getting handoff stats:', error);
+    res.status(500).json({ error: 'Failed to get handoff stats: ' + error.message });
+  }
+});
+
+// Get agent cost (placeholder - to be implemented with actual cost tracking)
+app.get('/api/agents/:id/cost', (req, res) => {
+  try {
+    const agentId = req.params.id;
+    const agentState = getAgentState(agentId);
+
+    if (!agentState) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    // Return cost from agent state
+    res.json({
+      agentId,
+      model: agentState.model,
+      tokens: {
+        input: 0,  // TODO: Parse from session JSONL
+        output: 0,
+        cacheRead: 0,
+      },
+      cost: agentState.costSoFar || 0,
+    });
+  } catch (error: any) {
+    console.error('Error getting agent cost:', error);
+    res.status(500).json({ error: 'Failed to get agent cost: ' + error.message });
+  }
+});
+
+// Get cost summary
+app.get('/api/costs/summary', (req, res) => {
+  try {
+    // TODO: Aggregate costs from all agents
+    res.json({
+      totalCost: 0,
+      byModel: {
+        opus: 0,
+        sonnet: 0,
+        haiku: 0,
+      },
+      byAgent: {},
+      today: 0,
+      thisWeek: 0,
+    });
+  } catch (error: any) {
+    console.error('Error getting cost summary:', error);
+    res.status(500).json({ error: 'Failed to get cost summary: ' + error.message });
+  }
 });
 
 // Get container status for workspace
