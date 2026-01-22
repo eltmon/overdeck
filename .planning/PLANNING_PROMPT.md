@@ -1,4 +1,4 @@
-# Planning Session: PAN-30
+# Planning Session: PAN-35
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,79 +22,83 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-30
-- **Title:** Cloister Phase 3: Active Heartbeats & Hooks
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/30
+- **ID:** PAN-35
+- **Title:** Terminal latency: Phase 2 - remaining blocking operations
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/35
 
 ## Description
-## Overview
+## Problem
 
-Enable rich heartbeat data from agents via Claude Code hooks, providing detailed activity information beyond passive file monitoring.
+Terminal view still has occasional lag spikes (~2 second latency on first keystroke, occasional freezes).
 
-## Goals
+## Investigation Method
 
-1. Agents report what tool they are using and what action they are taking
-2. Enable agent ID injection for proper session tracking
-3. Provide hybrid detection (active heartbeats with passive fallback)
-
-## Tasks
-
-From PRD-CLOISTER.md Phase 3:
-
-- [ ] Heartbeat hook script (`~/.panopticon/bin/heartbeat-hook`)
-- [ ] `pan setup hooks` command to configure Claude Code
-- [ ] Agent ID environment variable injection (`PANOPTICON_AGENT_ID`)
-- [ ] Rich heartbeat data (tool name, last action)
-- [ ] Hybrid detection (active + passive fallback)
-
-## Heartbeat Hook Script
-
+Run Playwright latency tests:
 ```bash
-#!/bin/bash
-# ~/.panopticon/bin/heartbeat-hook
-# Called after every tool use with JSON on stdin
-
-TOOL_INFO=$(cat)
-TOOL_NAME=$(echo "$TOOL_INFO" | jq -r ".tool_name // \"unknown\"")
-AGENT_ID="${PANOPTICON_AGENT_ID:-$(tmux display-message -p "#S" 2>/dev/null || echo "unknown")}"
-
-HEARTBEAT_DIR="$HOME/.panopticon/agents/$AGENT_ID"
-mkdir -p "$HEARTBEAT_DIR"
-
-cat > "$HEARTBEAT_DIR/heartbeat.json" << HEARTBEAT
-{
-  "timestamp": "$(date -Iseconds)",
-  "agent_id": "$AGENT_ID",
-  "tool_name": "$TOOL_NAME",
-  "pid": $$
-}
-HEARTBEAT
+cd src/dashboard/frontend
+npx playwright test tests/terminal-latency.spec.ts --reporter=list
 ```
 
-## Claude Code Hook Configuration
+## Current Results (2026-01-21)
 
-Add to `~/.claude/settings.json`:
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": ".*",
-        "command": "~/.panopticon/bin/heartbeat-hook"
-      }
-    ]
-  }
-}
+```
+WebSocket connect time: 2354ms  # TOO SLOW
+First keystroke: 2066ms        # MAJOR LAG
+P50: 0.90ms                    # OK
+P95: 2066ms                    # SPIKES
 ```
 
-## Dependencies
+## Root Cause Analysis
 
-- Phase 1 (Watchdog Framework) ✅
-- Phase 2 (Agent Management UI) ✅
+### Fixed in PAN-17 (commit b2874bb)
+- Converted main endpoints to async (`execAsync`)
+- Added reconnection with backoff
+- Debounced resize events
+
+### Remaining Sync Operations Found
+
+1. **`/api/agents/:id/message`** (line 1311-1315) - Uses `execSync` for tmux send-keys
+2. **`/api/agents/:id`** DELETE (line 1329) - Uses `execSync` for tmux kill-session  
+3. **`/api/agents/:id/answer-question`** (line 1449-1468) - Multiple `execSync` for tmux interaction
+4. **`/api/agents/:id/pending-questions`** - May have sync file reads in `getAgentPendingQuestions()`
+5. **Beads endpoints** (line ~984-1018) - Uses `execSync` for `bd` commands
+
+### Polling Pressure
+
+Multiple components poll aggressively:
+- WorkspacePanel output: **1 second**
+- ActivityPanel: **1 second**  
+- TerminalView: **2 seconds**
+- PlanDialog: **2 seconds** during planning
+- AgentList: **3 seconds**
+- Many others: **5 seconds**
+
+Combined polling could cause event loop pressure even with async calls.
+
+## Proposed Fixes
+
+1. **Convert remaining execSync to execAsync** - Low risk, high impact
+2. **Batch/throttle polling** - Reduce concurrent requests
+3. **Move tmux operations to worker thread** - Isolate blocking ops
+4. **WebSocket for real-time data** - Replace polling with push
+
+## Testing
+
+After each fix, re-run Playwright tests:
+```bash
+npx playwright test tests/terminal-latency.spec.ts
+```
+
+Target metrics:
+- WebSocket connect: < 500ms
+- First keystroke: < 100ms
+- P95 latency: < 50ms
 
 ## References
 
-- PRD-CLOISTER.md lines 916-1070
+- PAN-17: Original async fix
+- Playwright tests: `src/dashboard/frontend/tests/terminal-latency.spec.ts`
+- Server code: `src/dashboard/server/index.ts`
 
 ---
 
