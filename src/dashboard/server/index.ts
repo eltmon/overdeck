@@ -3207,6 +3207,40 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
       // Agent not running, that's fine
     }
 
+    // 8.5. Move PRD from active to completed (preserve documentation)
+    try {
+      const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
+      const completedDir = join(projectPath, 'docs', 'prds', 'completed');
+      const completedPrdPath = join(completedDir, `${issueLower}-plan.md`);
+
+      if (existsSync(activePrdPath)) {
+        // Ensure completed directory exists
+        if (!existsSync(completedDir)) {
+          mkdirSync(completedDir, { recursive: true });
+        }
+        // Move the PRD
+        renameSync(activePrdPath, completedPrdPath);
+        console.log(`Moved PRD from active to completed: ${issueLower}-plan.md`);
+
+        // Commit the PRD move
+        try {
+          execSync(`git add docs/prds && git commit -m "docs: move ${issueId} PRD to completed"`, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            stdio: 'pipe'
+          });
+          execSync('git push origin main', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+          console.log('Committed and pushed PRD move');
+        } catch (commitErr: any) {
+          // Non-fatal - PRD move is nice to have
+          console.log('Could not commit PRD move (non-fatal):', commitErr.message);
+        }
+      }
+    } catch (prdErr: any) {
+      // Non-fatal - PRD handling shouldn't block approval
+      console.log('PRD move failed (non-fatal):', prdErr.message);
+    }
+
     // 9. Remove the workspace (git worktree) - ONLY after successful push
     try {
       execSync(`git worktree remove workspaces/feature-${issueLower} --force`, {
