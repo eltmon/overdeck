@@ -129,7 +129,22 @@ else
     exit 1
 fi
 
-# Test 4: Traefik starts successfully
+# Test 4: docker-compose.yml uses external network (regression test for PAN-45)
+test_start "docker-compose.yml correctly references external network"
+if grep -q "external: true" "$PANOPTICON_HOME/traefik/docker-compose.yml"; then
+    # Verify docker-compose config is valid (no label mismatch)
+    if cd "$PANOPTICON_HOME/traefik" && docker-compose config > /dev/null 2>&1; then
+        test_pass
+    else
+        test_fail "docker-compose config validation failed - network label mismatch?"
+        exit 1
+    fi
+else
+    test_fail "docker-compose.yml missing 'external: true' for panopticon network"
+    exit 1
+fi
+
+# Test 5: Traefik starts successfully
 test_start "pan up starts Traefik container"
 pan up --detach > /dev/null 2>&1
 sleep 3  # Wait for services to start
@@ -142,7 +157,7 @@ else
     exit 1
 fi
 
-# Test 5: Traefik dashboard accessible
+# Test 6: Traefik dashboard accessible
 test_start "Traefik dashboard accessible on :8080"
 if curl -sf http://localhost:8080 > /dev/null; then
     test_pass
@@ -150,7 +165,7 @@ else
     test_fail "Traefik dashboard not accessible"
 fi
 
-# Test 6: Dashboard ports are in use
+# Test 7: Dashboard ports are in use
 test_start "Dashboard running on ports 3001 and 3002"
 FRONTEND_RUNNING=false
 API_RUNNING=false
@@ -178,7 +193,7 @@ else
     test_fail "Dashboard not running on expected ports"
 fi
 
-# Test 7: HTTPS endpoint responds (if DNS configured)
+# Test 8: HTTPS endpoint responds (if DNS configured)
 test_start "HTTPS endpoint https://pan.localhost responds"
 if curl -k -sf https://pan.localhost > /dev/null 2>&1; then
     test_pass
@@ -187,7 +202,7 @@ else
     log_warn "Add to /etc/hosts: 127.0.0.1 pan.localhost"
 fi
 
-# Test 8: Port-based access still works
+# Test 9: Port-based access still works
 test_start "Port-based access works (http://localhost:3001)"
 if curl -sf http://localhost:3001 > /dev/null 2>&1; then
     test_pass
@@ -195,7 +210,7 @@ else
     test_fail "Port-based frontend not accessible"
 fi
 
-# Test 9: pan down stops everything
+# Test 10: pan down stops everything
 test_start "pan down stops Traefik and dashboard"
 pan down > /dev/null 2>&1
 sleep 2
@@ -224,7 +239,7 @@ else
     test_fail "Not all services stopped cleanly"
 fi
 
-# Test 10: Minimal mode skips Traefik
+# Test 11: Minimal mode skips Traefik
 test_start "pan install --minimal disables Traefik"
 rm -rf $PANOPTICON_HOME
 pan install --minimal --skip-mkcert > /dev/null 2>&1

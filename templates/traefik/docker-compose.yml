@@ -37,4 +37,4 @@ services:
 networks:
   panopticon:
     name: panopticon
-    driver: bridge
+    external: true  # Network created by 'pan install'

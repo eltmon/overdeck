@@ -1,326 +1,173 @@
-# PAN-19: pan up: Dashboard fails to start - spawn npm ENOENT
+# PAN-45: Traefik fails to start due to Docker network label mismatch
 
-## Issue Summary
+## Status: IMPLEMENTATION COMPLETE
 
-Running `pan up` fails on macOS with `spawn npm ENOENT` error (v0.3.2) or `spawn /bin/sh ENOENT` error (v0.3.4).
+## Problem
 
-**GitHub Issue:** https://github.com/eltmon/panopticon-cli/issues/19
-
-## Root Cause Analysis
-
-### Initial Diagnosis (Wrong)
-The v0.3.4 fix added `shell: true` to spawn calls, thinking the issue was PATH resolution for nvm-managed npm.
-
-### Actual Root Cause (Correct)
-The **real problem** is that the dashboard source code is **not included in the npm package**.
-
-**Path calculation in `src/cli/index.ts` line 105:**
-```typescript
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const dashboardDir = join(__dirname, '..', 'dashboard');
+`pan up` fails to start Traefik with error:
+```
+network panopticon was found but has incorrect label com.docker.compose.network set to "" (expected: "panopticon")
 ```
 
-| Scenario | `__dirname` | `dashboardDir` | Exists? |
-|----------|-------------|----------------|---------|
-| Dev (from repo) | `src/cli/` | `src/dashboard/` | ✅ Yes |
-| Global npm install | `.../dist/cli/` | `.../dist/dashboard/` | ❌ **No** |
+**Root Cause:** `pan install` creates the Docker network directly via `docker network create`, but Traefik's `docker-compose.yml` expects to manage the network itself. Since the network wasn't created by docker-compose, it lacks the required labels.
 
-**Why ENOENT occurs:**
-- `spawn()` throws `ENOENT` when `cwd` doesn't exist
-- The error `spawn /bin/sh ENOENT` is misleading - `/bin/sh` exists, but the working directory doesn't
-- Node.js conflates "command not found" and "cwd not found" into the same error
+## Decision Log
 
-**Current npm package contents (from `tsup.config.ts`):**
-- `dist/cli/index.js` - CLI entry point ✅
-- `dist/index.js` - SDK entry point ✅
-- `dist/dashboard/` - **Missing** ❌
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Fix approach | Add `external: true` to network definition | Standard docker-compose pattern for pre-existing networks |
+| Testing | Add regression test to e2e-traefik.sh | Prevent future regression |
+| Upgrade path | Migration in `pan install` + auto-fix in `pan up` | Belt and suspenders - catch it in both places |
 
-## Key Decisions
+## Solution
 
-### 1. Fix Approach: Bundle Pre-built Dashboard
+### 1. Fix the Template (Primary Fix)
 
-**Decision:** Include a pre-built dashboard in the npm package.
-
-**Rationale:**
-- Makes the package fully self-contained
-- No runtime dependency on source code
-- Better UX - `pan up` just works after `npm install -g`
-
-### 2. Use Prebuilt node-pty Package
-
-**Decision:** Replace `node-pty` with `@homebridge/node-pty-prebuilt-multiarch`
-
-**Platform support:**
-| Platform | Prebuilt? |
-|----------|-----------|
-| macOS x64 (Intel) | ✅ Yes |
-| macOS arm64 (Apple Silicon) | ✅ Yes |
-| Linux x64 (glibc) | ✅ Yes |
-| Linux arm64 (glibc) | ✅ Yes |
-| Linux musl (Alpine) | ✅ Yes |
-| Windows x64 | ✅ Yes |
-
-**Fallback:** If prebuild unavailable, node-gyp compiles from source.
-
-### 3. Bundled Dashboard Architecture
-
-**Decision:** Build frontend to static files, bundle server with esbuild.
-
-```
-dist/
-├── cli/
-│   └── index.js          # CLI entry (existing)
-├── dashboard/
-│   ├── server.js         # Bundled Express server
-│   └── public/           # Built Vite static files
-│       ├── index.html
-│       └── assets/
-└── index.js              # SDK entry (existing)
+Update `templates/traefik/docker-compose.yml`:
+```yaml
+networks:
+  panopticon:
+    name: panopticon
+    external: true  # Network created by 'pan install'
 ```
 
-### 4. Runtime Mode Detection
+### 2. Migration in `pan install`
 
-**Decision:** `pan up` auto-detects production vs development mode.
+In `src/cli/commands/install.ts`, after the Traefik setup section, check if existing `~/.panopticon/traefik/docker-compose.yml` needs patching:
 
 ```typescript
-// Check for bundled dashboard (production)
-const bundledDashboard = join(__dirname, '..', 'dashboard', 'server.js');
-if (existsSync(bundledDashboard)) {
-  // Production: run pre-built server
-  spawn('node', [bundledDashboard], { ... });
-} else {
-  // Development: run npm dev
-  spawn('npm', ['run', 'dev'], { cwd: srcDashboard, ... });
-}
-```
-
-## Scope
-
-### In Scope
-- Build frontend to static files (`vite build`)
-- Bundle server with esbuild (node-pty external)
-- Switch to `@homebridge/node-pty-prebuilt-multiarch`
-- Update `pan up` to run bundled dashboard
-- Server serves static files in production mode
-- Update build scripts and package.json
-
-### Out of Scope
-- Docker-based dashboard deployment
-- Dashboard auto-update mechanism
-- Separate `@panopticon/dashboard` npm package
-
-### Documentation Updates
-- Update README.md with platform support table
-- Document that terminal streaming requires native binary
-
-## Implementation Plan
-
-### Phase 1: Server Modifications
-
-**File:** `src/dashboard/server/index.ts`
-
-1. Add static file serving for production mode:
-```typescript
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
-import express from 'express';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const publicDir = join(__dirname, 'public');
-
-// Serve static files in production
-if (existsSync(publicDir)) {
-  app.use(express.static(publicDir));
-  // SPA fallback
-  app.get('*', (req, res) => {
-    res.sendFile(join(publicDir, 'index.html'));
-  });
-}
-```
-
-2. Replace `node-pty` import:
-```typescript
-// Before
-import * as pty from 'node-pty';
-
-// After
-import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
-```
-
-### Phase 2: Build Configuration
-
-**New file:** `src/dashboard/server/esbuild.config.mjs`
-```javascript
-import { build } from 'esbuild';
-
-await build({
-  entryPoints: ['index.ts'],
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  outfile: '../../dist/dashboard/server.js',
-  external: ['@homebridge/node-pty-prebuilt-multiarch'],
-  banner: {
-    js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);"
-  }
-});
-```
-
-**Update:** `src/dashboard/frontend/vite.config.ts`
-```typescript
-export default defineConfig({
-  build: {
-    outDir: '../../dist/dashboard/public',
-  }
-});
-```
-
-### Phase 3: Package.json Updates
-
-**Root `package.json`:**
-```json
-{
-  "scripts": {
-    "build": "npm run build:cli && npm run build:dashboard",
-    "build:cli": "tsup",
-    "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
-    "build:dashboard:frontend": "cd src/dashboard/frontend && npm run build",
-    "build:dashboard:server": "cd src/dashboard/server && node esbuild.config.mjs"
-  },
-  "files": [
-    "dist",
-    "templates",
-    "README.md",
-    "LICENSE"
-  ]
-}
-```
-
-**`src/dashboard/server/package.json`:**
-```json
-{
-  "dependencies": {
-    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1"
+// Check if existing docker-compose.yml needs migration (for upgrades)
+const existingCompose = join(TRAEFIK_DIR, 'docker-compose.yml');
+if (existsSync(existingCompose)) {
+  const content = readFileSync(existingCompose, 'utf-8');
+  if (content.includes('panopticon:') && !content.includes('external: true')) {
+    // Patch the file to add external: true
+    const patched = content.replace(
+      /networks:\s*\n\s*panopticon:\s*\n\s*name: panopticon\s*\n\s*driver: bridge/,
+      'networks:\n  panopticon:\n    name: panopticon\n    external: true'
+    );
+    writeFileSync(existingCompose, patched);
+    spinner.info('Migrated Traefik config (added external: true to network)');
   }
 }
 ```
 
-### Phase 4: CLI Updates
+### 3. Auto-fix in `pan up`
 
-**File:** `src/cli/index.ts`
+In `src/cli/index.ts`, before running `docker-compose up -d` in the Traefik section:
 
 ```typescript
-// Find dashboard - check bundled first, then source
-const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
-const srcDashboard = join(__dirname, '..', '..', 'src', 'dashboard');
-
-if (existsSync(bundledServer)) {
-  // Production mode - run bundled server
-  console.log(chalk.dim('Running bundled dashboard...'));
-  const child = spawn('node', [bundledServer], {
-    stdio: options.detach ? 'ignore' : 'inherit',
-    detached: options.detach,
-  });
-  // ... rest of handling
-} else if (existsSync(srcDashboard)) {
-  // Development mode - run npm dev
-  console.log(chalk.dim('Running dashboard in dev mode...'));
-  const child = spawn('npm', ['run', 'dev'], {
-    cwd: srcDashboard,
-    stdio: options.detach ? 'ignore' : 'inherit',
-    shell: true,
-    detached: options.detach,
-  });
-  // ... rest of handling
-} else {
-  console.error(chalk.red('Error: Dashboard not found'));
-  console.error(chalk.dim('This may be a corrupted installation. Try reinstalling panopticon-cli.'));
-  process.exit(1);
+// Ensure network is marked as external (migration for older installs)
+const composeFile = join(traefikDir, 'docker-compose.yml');
+if (existsSync(composeFile)) {
+  const content = readFileSync(composeFile, 'utf-8');
+  if (!content.includes('external: true') && content.includes('panopticon:')) {
+    const patched = content.replace(
+      /networks:\s*\n\s*panopticon:\s*\n\s*name: panopticon\s*\n(\s*driver: bridge)?/,
+      'networks:\n  panopticon:\n    name: panopticon\n    external: true'
+    );
+    writeFileSync(composeFile, patched);
+    console.log(chalk.dim('  (migrated network config)'));
+  }
 }
 ```
 
-## Testing Plan
+### 4. Regression Test
 
-1. **Build verification:**
-   - `npm run build` completes without errors
-   - `dist/dashboard/server.js` exists
-   - `dist/dashboard/public/index.html` exists
+Add to `tests/e2e-traefik.sh`:
 
-2. **Local production test:**
-   - `node dist/dashboard/server.js` starts server
-   - Frontend loads at http://localhost:3001
-   - WebSocket connections work
-   - Terminal streaming works
+```bash
+test_install_then_up() {
+  echo "=== Test: pan install then pan up (network label mismatch regression) ==="
 
-3. **npm pack test:**
-   - `npm pack` creates tarball
-   - Extract and verify `dist/dashboard/` contents
-   - Install from tarball: `npm install -g ./panopticon-cli-*.tgz`
-   - `pan up` works
+  # Clean state
+  docker network rm panopticon 2>/dev/null || true
+  rm -rf ~/.panopticon/traefik
 
-**Note:** Cross-platform support is handled by `@homebridge/node-pty-prebuilt-multiarch` prebuilt binaries. Manual testing on each platform is not required.
+  # Run install (creates network)
+  pan install --skip-mkcert
 
-## Success Criteria
+  # Verify network exists
+  if ! docker network ls | grep -q panopticon; then
+    echo "FAIL: Network not created by pan install"
+    return 1
+  fi
 
-1. `npm install -g panopticon-cli` works without additional setup
-2. `pan up` starts dashboard on first run
-3. Dashboard fully functional (terminal streaming, Linear integration)
-4. No source code or npm dependencies required at runtime
-5. Package size reasonable (<50MB)
+  # Verify docker-compose can use the network (the actual bug)
+  cd ~/.panopticon/traefik
+  if ! docker-compose config > /dev/null 2>&1; then
+    echo "FAIL: docker-compose config failed - network label mismatch?"
+    return 1
+  fi
 
-## Current Status
+  echo "PASS: install then up works correctly"
+}
+```
 
-**Phase: IMPLEMENTATION COMPLETE**
+## Files to Modify
 
-All tasks completed successfully. The dashboard is now bundled with the npm package and `pan up` works in both production and development modes.
+| File | Change |
+|------|--------|
+| `templates/traefik/docker-compose.yml` | Add `external: true` to network |
+| `src/cli/commands/install.ts` | Add migration for existing installs |
+| `src/cli/index.ts` | Add auto-fix before `docker-compose up` |
+| `tests/e2e-traefik.sh` | Add regression test |
 
-### Implementation Summary
+## Out of Scope
 
-1. ✅ Switched to @homebridge/node-pty-prebuilt-multiarch (prebuilt binaries for all platforms)
-2. ✅ Added static file serving to Express server (production mode)
-3. ✅ Created esbuild config to bundle server code
-4. ✅ Updated Vite config to output to dist/dashboard/public
-5. ✅ Added build scripts to root package.json
-6. ✅ Updated pan up command to auto-detect bundled vs development mode
-7. ✅ Updated README with platform support table
-8. ✅ Tested build and npm pack - verified dashboard files included (1.2MB compressed)
+- Changing how `pan install` creates the network (keep using `docker network create`)
+- Modifying other docker-compose templates (they already use `external: true`)
+- Dashboard docker-compose.yml (already correct)
 
-### Build Verification
+## Acceptance Criteria
 
-- `npm run build` completes successfully
-- `dist/dashboard/server.js` exists (3.6MB bundled server)
-- `dist/dashboard/public/index.html` exists with assets
-- `npm pack` includes all dashboard files
-- Bundled server starts correctly with dependencies installed
-- Package size: 1.2MB compressed, 5.6MB unpacked (well under 50MB target)
+1. Fresh install: `pan install && pan up` starts Traefik without errors
+2. Existing install: `pan up` auto-fixes and starts Traefik
+3. Test: e2e-traefik.sh passes with new test case
+4. Consistency: Traefik docker-compose.yml matches dashboard pattern
 
 ## Beads Tasks
 
 | ID | Title | Status | Blocked By |
 |----|-------|--------|------------|
-| panopticon-5pc5 | Switch server to @homebridge/node-pty-prebuilt-multiarch | closed | - |
-| panopticon-y33i | Add static file serving to server | closed | - |
-| panopticon-2fco | Create esbuild config for server bundle | closed | - |
-| panopticon-dy5b | Update Vite config for production output path | closed | - |
-| panopticon-nr36 | Add dashboard build scripts to root package.json | closed | - |
-| panopticon-z63a | Update pan up command for bundled mode | closed | - |
-| panopticon-1vmk | Update README with platform support | closed | - |
-| panopticon-55ct | Test build and pack locally | closed | - |
-
-### Superseded Tasks (from previous plan)
-
-| ID | Title | Status | Notes |
-|----|-------|--------|-------|
-| panopticon-324n | Add shell: true to foreground spawn | closed | Previous fix, didn't solve root cause |
-| panopticon-rsb1 | Add shell: true to background spawn | closed | Previous fix |
-| panopticon-qdu3 | Add npm pre-flight check | closed | Previous fix |
-| panopticon-pxqm | Add error handling for background spawn | closed | Previous fix |
-| panopticon-zppl | Test on macOS with nvm | superseded | Replaced by panopticon-8mvd |
-| panopticon-nnic | Test on Linux (verify no regression) | closed | Previous fix verified |
+| panopticon-6a6o | Fix templates/traefik/docker-compose.yml | open | - |
+| panopticon-z5oc | Add migration to pan install | open | - |
+| panopticon-hm01 | Add auto-fix to pan up | open | - |
+| panopticon-mlc0 | Add regression test to e2e-traefik.sh | open | - |
 
 ## References
 
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/19
-- [@homebridge/node-pty-prebuilt-multiarch](https://github.com/homebridge/node-pty-prebuilt-multiarch)
-- Vite build docs: https://vitejs.dev/guide/build.html
-- esbuild node bundling: https://esbuild.github.io/getting-started/#bundling-for-node
+- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/45
+- Docker Compose external networks: https://docs.docker.com/compose/networking/#use-a-pre-existing-network
+
+## Implementation Summary
+
+All tasks have been completed:
+
+1. ✅ **Template Fixed**: Updated `templates/traefik/docker-compose.yml` to use `external: true`
+2. ✅ **Migration Added**: Added auto-migration code to `pan install` that patches existing docker-compose.yml files
+3. ✅ **Auto-fix Added**: Added auto-fix code to `pan up` that ensures network config is correct before starting Traefik
+4. ✅ **Regression Test Added**: Added Test 4 to `tests/e2e-traefik.sh` that validates the docker-compose config
+
+### Changes Made
+
+- `templates/traefik/docker-compose.yml`: Changed `driver: bridge` to `external: true`
+- `src/cli/commands/install.ts`: Added migration logic after Traefik setup (lines 314-327)
+- `src/cli/index.ts`: Added auto-fix logic before starting Traefik (lines 131-144)
+- `tests/e2e-traefik.sh`: Added Test 4 for regression testing (lines 132-145), renumbered subsequent tests
+
+### Beads Tasks Completed
+
+All beads tasks have been closed:
+- panopticon-6a6o: Fix template ✅
+- panopticon-z5oc: Add migration to install ✅
+- panopticon-hm01: Add auto-fix to up ✅
+- panopticon-mlc0: Add regression test ✅
+
+### Build Status
+
+✅ Project built successfully (CLI + Dashboard)
+
+### Next Steps
+
+Ready for commit and push to remote.
