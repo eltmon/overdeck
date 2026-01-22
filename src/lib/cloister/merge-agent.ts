@@ -520,8 +520,9 @@ export async function spawnMergeAgentForBranches(
     }
 
     // Check for uncommitted changes FIRST - this prevents merge failures
+    // Use -uno to ignore untracked files - they don't block merges
     try {
-      const statusOutput = execSync(`git status --porcelain`, {
+      const statusOutput = execSync(`git status --porcelain -uno`, {
         cwd: projectPath,
         encoding: 'utf-8',
         stdio: 'pipe',
