@@ -1,5 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell } from 'lucide-react';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft } from 'lucide-react';
+import { useState } from 'react';
+import { useAgentCost } from '../hooks/useHandoffData';
+import { HandoffPanel } from './HandoffPanel';
 
 export interface IssueAgent {
   id: string;
@@ -105,6 +108,8 @@ export function IssueAgentCard({
   isSelected,
 }: IssueAgentCardProps) {
   const queryClient = useQueryClient();
+  const [showHandoffPanel, setShowHandoffPanel] = useState(false);
+  const { data: costData } = useAgentCost(agent.id);
 
   const killMutation = useMutation({
     mutationFn: () => killAgent(agent.id),
@@ -138,6 +143,11 @@ export function IssueAgentCard({
 
   const needsPoke = health?.state === 'warning' || health?.state === 'stuck';
 
+  const toggleHandoffPanel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowHandoffPanel(!showHandoffPanel);
+  };
+
   return (
     <div
       onClick={onSelect}
@@ -160,8 +170,17 @@ export function IssueAgentCard({
                 </span>
               )}
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400 flex items-center gap-2">
               {agent.runtime} / {agent.model}
+              {costData && costData.cost > 0 && (
+                <span
+                  className="flex items-center gap-1 text-xs text-emerald-400"
+                  title="Agent cost so far"
+                >
+                  <DollarSign className="w-3 h-3" />
+                  ${costData.cost.toFixed(4)}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -187,6 +206,17 @@ export function IssueAgentCard({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Handoff button */}
+            <button
+              onClick={toggleHandoffPanel}
+              className={`p-2 hover:bg-gray-600 rounded ${
+                showHandoffPanel ? 'text-blue-400' : 'text-gray-400 hover:text-blue-400'
+              }`}
+              title="Model handoff controls"
+            >
+              <ArrowRightLeft className="w-4 h-4" />
+            </button>
+
             {/* Poke button - only for warning/stuck */}
             {needsPoke && (
               <button
@@ -211,6 +241,13 @@ export function IssueAgentCard({
           </div>
         </div>
       </div>
+
+      {/* Handoff Panel */}
+      {showHandoffPanel && (
+        <div className="mt-3 pt-3 border-t border-gray-700">
+          <HandoffPanel agentId={agent.id} />
+        </div>
+      )}
     </div>
   );
 }
