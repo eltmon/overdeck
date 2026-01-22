@@ -12,15 +12,18 @@ export const TEMP_DIR = join(__dirname, '.temp');
 
 // Clean up temp directory before each test
 beforeEach(() => {
-  if (existsSync(TEMP_DIR)) {
-    try {
+  try {
+    if (existsSync(TEMP_DIR)) {
       rmSync(TEMP_DIR, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-    } catch (error) {
-      // Ignore cleanup errors
-      console.warn('Failed to clean up TEMP_DIR in beforeEach:', error);
     }
+  } catch (error) {
+    // Ignore cleanup errors
   }
-  mkdirSync(TEMP_DIR, { recursive: true });
+  try {
+    mkdirSync(TEMP_DIR, { recursive: true });
+  } catch (error) {
+    // Directory might already exist from another test running in parallel
+  }
 });
 
 // Clean up temp directory after each test suite
