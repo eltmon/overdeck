@@ -1,4 +1,4 @@
-# Planning Session: PAN-31
+# Planning Session: PAN-19
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,96 +22,55 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-31
-- **Title:** Cloister Phase 4: Model Routing & Handoffs
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/31
+- **ID:** PAN-19
+- **Title:** pan up: Dashboard fails to start - spawn npm ENOENT
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/19
 
 ## Description
-## Overview
+## Bug Description
 
-Intelligently route tasks to the most cost-effective model based on task complexity. Enable automatic handoffs between models as work progresses.
+Running `pan up` fails to start the dashboard with a `spawn npm ENOENT` error.
 
-## Goals
+## Steps to Reproduce
 
-1. Route tasks to appropriate models based on complexity (Opus/Sonnet/Haiku)
-2. Auto-escalate when agents get stuck
-3. Downgrade to cheaper models for simpler tasks
-4. Preserve context during handoffs via STATE.md
+1. Run `pan install` (completes successfully)
+2. Run `pan up`
 
-## Model Tiers
-
-| Tier | Model | Cost | Best For |
-|------|-------|------|----------|
-| 💎 Opus | claude-opus-4 | $$$$$ | Architecture, complex debugging, planning |
-| 🔷 Sonnet | claude-sonnet-4 | $$$ | Feature implementation, bug fixes, most work |
-| 💠 Haiku | claude-haiku-3.5 | $ | Tests, simple fixes, formatting, docs |
-
-## Tasks
-
-From PRD-CLOISTER.md Phase 4:
-
-- [ ] Beads complexity field support (`trivial`, `simple`, `medium`, `complex`, `expert`)
-- [ ] Automatic complexity detection (tags, keywords, file count)
-- [ ] Model router component in Cloister
-- [ ] Complexity → Model mapping configuration
-- [ ] Handoff triggers:
-  - [ ] Task completion → check next task complexity
-  - [ ] Stuck detection → escalate to higher model
-  - [ ] Test failures → escalate
-- [ ] Context preservation during handoff:
-  - [ ] STATE.md summary
-  - [ ] Active beads tasks
-  - [ ] Git state
-- [ ] Cost tracking per agent/model
-- [ ] Dashboard cost display
-
-## Handoff Triggers
-
-| Trigger | Condition | From | To |
-|---------|-----------|------|-----|
-| Planning complete | Beads "plan" task closed | Opus | Sonnet |
-| Implementation complete | Beads "implement" closed | Sonnet | test-agent |
-| Stuck (Haiku) | No activity > 10 min | Haiku | Sonnet |
-| Stuck (Sonnet) | No activity > 20 min | Sonnet | Opus |
-| Test failures x2 | Repeated failures | Haiku | Sonnet |
-
-## Kill & Spawn Handoff Flow
+## Error Output
 
 ```
-1. Signal current agent to save state (update STATE.md)
-2. Wait for agent to become idle
-3. Capture context (workspace, git, beads tasks)
-4. Kill current agent
-5. Build handoff prompt with context
-6. Spawn new agent with appropriate model
+Failed to start dashboard: spawn npm ENOENT
+
+Starting Panopticon...
+
+Starting Traefik...
+⚠ Failed to start Traefik (continuing anyway)
+  Run with --skip-traefik to suppress this message
+
+Starting dashboard...
+  Frontend: https://pan.localhost
+  API:      https://pan.localhost/api
+
+Press Ctrl+C to stop
 ```
 
-## Configuration
+The process exits with code 1.
 
-```yaml
-# ~/.panopticon/cloister.yaml
-handoffs:
-  auto_triggers:
-    planning_complete:
-      enabled: true
-      from_model: opus
-      to_model: sonnet
-    stuck_escalation:
-      enabled: true
-      thresholds:
-        haiku_to_sonnet_minutes: 10
-        sonnet_to_opus_minutes: 20
-```
+## Environment
 
-## Dependencies
+- Platform: macOS (darwin)
+- Node.js: v20.19.5
+- npm: available in PATH
+- panopticon-cli installed globally via npm
+- Docker: running
 
-- Phase 1 (Watchdog Framework) ✅
-- Phase 2 (Agent Management UI) ✅
-- Phase 3 (Heartbeats & Hooks) - for stuck detection
+## Analysis
 
-## References
+The error `spawn npm ENOENT` suggests that npm cannot be found when spawning a child process. This may be a PATH issue when the CLI spawns subprocesses, or npm may need to be resolved differently.
 
-- PRD-CLOISTER.md lines 48-680 (Model Selection & Handoffs)
+## Workaround Attempted
+
+None found yet.
 
 ---
 

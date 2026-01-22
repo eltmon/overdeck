@@ -1,461 +1,191 @@
-# PAN-31: Cloister Phase 4 - Model Routing & Handoffs
+# PAN-19: pan up: Dashboard fails to start - spawn npm ENOENT
 
 ## Issue Summary
 
-Enable intelligent task routing to cost-effective models based on complexity, with automatic handoffs between models as work progresses. This builds on Phase 3's heartbeat/health infrastructure to create a complete agent orchestration system.
+Running `pan up` fails on macOS with `spawn npm ENOENT` error. This affects users with nvm-managed Node.js installations where the npm binary path isn't resolved correctly when spawning child processes.
+
+**GitHub Issue:** https://github.com/eltmon/panopticon-cli/issues/19
+
+## Root Cause Analysis
+
+**Problem Location:** `src/cli/index.ts` lines 145 and 170
+
+```typescript
+const child = spawn('npm', ['run', 'dev'], {
+  cwd: dashboardDir,
+  stdio: 'inherit',  // or 'ignore' for detached mode
+});
+```
+
+**Why it fails:**
+1. `spawn()` without `shell: true` uses `execvp()` to resolve the command
+2. On macOS with nvm, npm lives in `~/.nvm/versions/node/v20.x.x/bin/npm`
+3. The nvm PATH is set up by shell initialization scripts (`.bashrc`/`.zshrc`)
+4. When Node.js spawns a process without a shell, it may not have the nvm PATH
+5. Result: `ENOENT` - npm not found
+
+**Evidence from GitHub issue comment:**
+```
+$ which npm
+/Users/edward.becker/.nvm/versions/node/v20.19.5/bin/npm
+
+$ npm list -g panopticon-cli
+└── panopticon-cli@0.3.2
+```
+npm IS in the shell PATH, but `spawn('npm', ...)` fails.
 
 ## Key Decisions
 
-### 1. Handoff Methods
+### 1. Fix Approach: Use `shell: true`
 
-**Decision:** Implement both Kill & Spawn AND Specialist Wake
+**Decision:** Add `shell: true` to both spawn calls (foreground and background modes)
 
-**Kill & Spawn (General Agents):**
-- Signal agent to save state (update STATE.md)
-- Wait for idle (30s timeout)
-- Capture handoff context (beads, git, STATE.md)
-- Kill current agent
-- Build handoff prompt with context
-- Spawn new agent with appropriate model
+**Rationale:**
+- Simplest fix with minimal code change
+- Makes spawn use the shell to resolve npm, which will have the full PATH including nvm
+- Cross-platform compatible (works on Windows, macOS, Linux)
+- Pattern already used elsewhere in the codebase (e.g., `execSync` calls)
 
-**Specialist Wake (Permanent Specialists):**
-- For test-agent, merge-agent, review-agent
-- Use `--resume {sessionId}` to preserve context
-- Pass task-specific prompt
-- Faster context loading, specialist expertise
+**Alternative considered:** Resolve npm path explicitly via `process.execPath`. More robust but adds complexity and edge cases.
 
-**Why both:** Kill & Spawn provides clean handoffs for general work; Specialist Wake leverages context preservation for recurring specialist tasks.
+### 2. Add Pre-flight Check for npm
 
-### 2. Handoff Triggers
+**Decision:** Verify npm is accessible before attempting to spawn
 
-**Decision:** Implement all triggers with specific detection mechanisms
+**Implementation:**
+- Use existing `checkCommand()` pattern from `install.ts` and `doctor.ts`
+- Run `which npm` (or equivalent) before spawn
+- Provide clear error message if npm is not found
 
-| Trigger | Detection | From | To |
-|---------|-----------|------|-----|
-| Planning complete | Beads "plan" task closed + PRD file created | Opus | Sonnet |
-| Stuck (Haiku) | Heartbeat > 10 min stale | Haiku | Sonnet |
-| Stuck (Sonnet) | Heartbeat > 20 min stale | Sonnet | Opus |
-| Test failures | Any test failure detected | Haiku | Sonnet |
-| Implementation complete | Beads "implement" task closed | Sonnet | test-agent |
+### 3. Add Error Handling for Background Mode
 
-**Planning Complete Detection (Multi-Signal):**
-1. Primary: Beads task with "plan" in title is closed via `bd close`
-2. Secondary: PRD file created at `docs/prds/active/{issue}-plan.md`
-3. Tertiary: Agent uses ExitPlanMode tool (if detectable via hooks)
+**Decision:** Add error handler for detached spawn before calling `unref()`
 
-**Why aggressive test escalation:** Haiku is for simple tasks - if tests fail, the task isn't simple.
-
-### 3. Complexity Detection
-
-**Decision:** Automatic complexity detection from multiple signals
-
-**Signals:**
-- Beads task complexity field (explicit, highest priority)
-- Task tags: `trivial`, `docs`, `tests` → Haiku; `architecture`, `security` → Opus
-- File count: >10 files → medium+; >20 files → complex+
-- Keyword patterns: "refactor", "architecture" → complex; "typo", "rename" → simple
-
-**Complexity → Model Mapping:**
-```yaml
-trivial: haiku
-simple: haiku
-medium: sonnet
-complex: sonnet
-expert: opus
-```
-
-### 4. Stuck Detection
-
-**Decision:** Heartbeat-based detection using existing Phase 3 infrastructure
-
-**Thresholds:**
-- Haiku: Stuck after 10 minutes of no activity → escalate to Sonnet
-- Sonnet: Stuck after 20 minutes of no activity → escalate to Opus
-- Opus: Stuck after 30 minutes → alert user (no auto-escalation)
-
-**Detection Source:** Use existing health state from `cloister/health.ts`
-- Active (🟢): < 5 min
-- Stale (🟡): 5-15 min
-- Warning (🟠): 15-30 min
-- Stuck (🔴): > 30 min
-
-Map model-specific thresholds onto these states.
-
-### 5. Context Preservation
-
-**Decision:** STATE.md as primary context carrier
-
-**HandoffContext Interface:**
+**Current problem:** Lines 145-150 spawn in background with no error handling:
 ```typescript
-interface HandoffContext {
-  issueId: string;
-  agentId: string;
-  workspace: string;
-
-  // Source info
-  previousModel: string;
-  previousRuntime: 'claude-code';
-  previousSessionId?: string;
-
-  // Files
-  stateFile: string;           // .planning/STATE.md content
-  claudeMd: string;            // CLAUDE.md content
-
-  // Git state
-  gitBranch: string;
-  uncommittedFiles: string[];
-  lastCommit: string;
-
-  // Beads state
-  activeBeadsTasks: BeadsTask[];
-  remainingTasks: BeadsTask[];
-  completedTasks: BeadsTask[];
-
-  // AI summaries
-  whatWasDone: string;
-  whatRemains: string;
-  blockers: string[];
-  decisions: string[];
-
-  // Metrics
-  tokenUsage: TokenUsage;
-  costSoFar: number;
-  handoffCount: number;
-}
+const child = spawn('npm', ['run', 'dev'], {
+  cwd: dashboardDir,
+  detached: true,
+  stdio: 'ignore',
+});
+child.unref();  // Errors are lost!
 ```
 
-### 6. Cost Tracking & Display
+**Fix:** Add error listener that fires before unref or use a small delay to catch immediate spawn errors.
 
-**Decision:** Display costs per agent and cumulative totals in dashboard
+## Scope
 
-**Dashboard Display:**
-- Per-agent cost in agent card
-- Total cost in header/status bar
-- Cost breakdown by model tier (pie chart or table)
+### In Scope
+- Fix the `spawn npm ENOENT` error by adding `shell: true`
+- Add npm existence check before spawning
+- Add error handling for background spawn mode
+- Test on macOS and Linux
 
-**Follow-up Issue:** Create GitHub issue for specialist cost breakdown (specialist vs general work split)
+### Out of Scope
+- Windows-specific fixes (though `shell: true` should help there too)
+- Changes to other spawn calls in the codebase
+- Refactoring the dashboard startup logic
 
-**Out of Scope:** Cost limits enforcement (display only, no auto-kill on limits)
-
-### 7. Dashboard UI
-
-**Decision:** Both inline controls + dedicated page
-
-**Inline (Agent Card):**
-- Current model badge
-- "Handoff Suggestion" indicator when triggered
-- Quick "Handoff" button with model selector
-
-**Dedicated Page (/handoffs):**
-- Handoff history table with filters
-- Cost analysis charts
-- Model usage breakdown
-
-### 8. Event Logging
-
-**Decision:** JSONL file at `~/.panopticon/logs/handoffs.jsonl`
-
-**HandoffEvent Structure:**
-```typescript
-interface HandoffEvent {
-  timestamp: string;
-  agentId: string;
-  issueId: string;
-
-  from: { model: string; runtime: string; sessionId?: string };
-  to: { model: string; runtime: string; sessionId?: string };
-
-  trigger: 'planning_complete' | 'stuck_escalation' | 'test_failure' | 'manual' | 'task_complete';
-  reason: string;
-
-  context: {
-    beadsTaskCompleted?: string;
-    stuckMinutes?: number;
-    costAtHandoff?: number;
-  };
-
-  success: boolean;
-  errorMessage?: string;
-}
-```
-
-### 9. Scope Boundaries
-
-**In Scope:**
-- ✅ Beads complexity field support
-- ✅ Automatic complexity detection
-- ✅ Model router component
-- ✅ All handoff triggers (planning complete, stuck, test failures)
-- ✅ Both handoff methods (Kill & Spawn, Specialist Wake)
-- ✅ Context preservation via STATE.md
-- ✅ Cost tracking & dashboard display
-- ✅ Handoff UI (inline + page)
-- ✅ Handoff event logging (JSONL)
-
-**Out of Scope:**
-- ❌ Cross-runtime handoffs (only Claude Code → Claude Code)
-- ❌ Cost limits enforcement (display only)
-- ❌ Model selection for new agents (future: pick model based on task)
-
-## Architecture
-
-### Component Overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Cloister Service                        │
-├──────────────┬──────────────┬──────────────┬────────────────┤
-│   Health     │  Heartbeats  │   Model      │   Handoff      │
-│   Monitor    │   (Phase 3)  │   Router     │   Manager      │
-│              │              │   [NEW]      │   [NEW]        │
-└──────┬───────┴──────┬───────┴──────┬───────┴───────┬────────┘
-       │              │              │               │
-       ▼              ▼              ▼               ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    Agent State Store                          │
-│  ~/.panopticon/agents/{id}/state.json                        │
-│  + model, complexity, handoffCount, costSoFar                │
-└──────────────────────────────────────────────────────────────┘
-       │
-       ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    Handoff Event Log                          │
-│  ~/.panopticon/logs/handoffs.jsonl                           │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### New Files to Create
-
-```
-src/lib/cloister/
-├── router.ts           # Model router: complexity→model mapping
-├── handoff.ts          # Handoff manager: orchestrates handoffs
-├── handoff-context.ts  # Context capture and serialization
-└── complexity.ts       # Complexity detection logic
-
-src/dashboard/server/
-├── routes/handoffs.ts  # /api/agents/:id/handoff endpoints
-└── routes/costs.ts     # /api/costs endpoints (if not existing)
-
-src/dashboard/frontend/
-├── components/HandoffPanel.tsx    # Inline agent card panel
-├── pages/Handoffs.tsx             # Dedicated handoffs page
-└── components/CostDisplay.tsx     # Cost visualization
-```
+## Implementation Plan
 
 ### Files to Modify
 
-```
-src/lib/cloister/service.ts        # Add router integration, handoff triggers
-src/lib/cloister/config.ts         # Add handoff configuration
-src/lib/agents.ts                  # Add model parameter, handoff support
-src/dashboard/server/index.ts      # Add handoff endpoints
-src/dashboard/frontend/AgentCard   # Add handoff UI
-```
+**Primary:** `src/cli/index.ts`
+- Lines 145-150: Background spawn (--detach mode)
+- Lines 170-178: Foreground spawn
 
-### Configuration Schema
+### Code Changes
 
-```yaml
-# ~/.panopticon/cloister.yaml additions
-
-model_selection:
-  default_model: sonnet
-
-  complexity_routing:
-    trivial: haiku
-    simple: haiku
-    medium: sonnet
-    complex: sonnet
-    expert: opus
-
-  specialists:
-    merge-agent: sonnet
-    review-agent: sonnet
-    test-agent: haiku
-    planning-agent: opus
-
-handoffs:
-  auto_triggers:
-    planning_complete:
-      enabled: true
-      detection:
-        - beads_task_closed: "plan"
-        - prd_file_created: true
-      from_model: opus
-      to_model: sonnet
-
-    stuck_escalation:
-      enabled: true
-      thresholds:
-        haiku_to_sonnet_minutes: 10
-        sonnet_to_opus_minutes: 20
-
-    test_failure:
-      enabled: true
-      from_model: haiku
-      to_model: sonnet
-      trigger_on: any_failure  # vs "2_consecutive"
-
-    implementation_complete:
-      enabled: true
-      to_specialist: test-agent
-
-cost_tracking:
-  display_enabled: true
-  log_to_jsonl: true
-```
-
-## API Endpoints
-
-### Handoff Suggestion
-```
-GET /api/agents/:id/handoff/suggestion
-Response: {
-  suggested: boolean,
-  trigger: 'stuck_escalation' | 'planning_complete' | 'test_failure' | null,
-  currentModel: string,
-  suggestedModel: string,
-  reason: string,
-  estimatedSavings?: number
+**1. Add npm check helper (before line 140):**
+```typescript
+async function checkNpmExists(): Promise<boolean> {
+  try {
+    execSync('npm --version', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 ```
 
-### Execute Handoff
-```
-POST /api/agents/:id/handoff
-Body: {
-  toModel: 'opus' | 'sonnet' | 'haiku',
-  reason?: string
-}
-Response: {
-  success: boolean,
-  newAgentId: string,
-  newSessionId?: string,
-  handoffEvent: HandoffEvent
+**2. Pre-flight check (before line 141):**
+```typescript
+// Check npm is available
+if (!await checkNpmExists()) {
+  console.error(chalk.red('Error: npm not found in PATH'));
+  console.error(chalk.dim('Make sure Node.js and npm are installed and in your PATH'));
+  process.exit(1);
 }
 ```
 
-### Handoff History
-```
-GET /api/issues/:id/handoffs
-Response: {
-  handoffs: HandoffEvent[]
-}
+**3. Fix background spawn (lines 145-150):**
+```typescript
+const child = spawn('npm', ['run', 'dev'], {
+  cwd: dashboardDir,
+  detached: true,
+  stdio: 'ignore',
+  shell: true,  // ADD THIS
+});
 
-GET /api/handoffs
-Query: ?limit=50&since=2024-01-01
-Response: {
-  handoffs: HandoffEvent[],
-  total: number
-}
-```
+// Handle spawn errors before unref
+child.on('error', (err) => {
+  console.error(chalk.red('Failed to start dashboard in background:'), err.message);
+  process.exit(1);
+});
 
-### Cost Endpoints
-```
-GET /api/agents/:id/cost
-Response: {
-  agentId: string,
-  model: string,
-  tokens: { input: number, output: number, cacheRead: number },
-  cost: number
-}
-
-GET /api/costs/summary
-Response: {
-  totalCost: number,
-  byModel: { opus: number, sonnet: number, haiku: number },
-  byAgent: { [agentId]: number },
-  today: number,
-  thisWeek: number
-}
+// Small delay to catch immediate spawn errors
+setTimeout(() => {
+  child.unref();
+  console.log(chalk.green('✓ Dashboard started in background'));
+  // ... rest of output
+}, 100);
 ```
 
-## Implementation Order
+**4. Fix foreground spawn (lines 170-173):**
+```typescript
+const child = spawn('npm', ['run', 'dev'], {
+  cwd: dashboardDir,
+  stdio: 'inherit',
+  shell: true,  // ADD THIS
+});
+```
 
-### Phase A: Foundation (Model Router + Complexity)
-1. Create `complexity.ts` - complexity detection logic
-2. Create `router.ts` - complexity→model mapping
-3. Extend agent state with complexity, model tracking
-4. Add configuration schema for model routing
+## Testing Plan
 
-### Phase B: Handoff Infrastructure
-5. Create `handoff-context.ts` - context capture
-6. Create `handoff.ts` - handoff orchestration
-7. Implement Kill & Spawn handoff method
-8. Implement Specialist Wake handoff method
+1. **Manual test on macOS with nvm:**
+   - Install panopticon-cli globally
+   - Run `pan up` - should start dashboard
+   - Run `pan up --detach` - should start in background
 
-### Phase C: Triggers
-9. Implement stuck escalation trigger (heartbeat-based)
-10. Implement planning complete detection
-11. Implement test failure detection
-12. Implement task completion detection
+2. **Manual test on Linux (WSL2):**
+   - Same tests as above
+   - Verify no regressions
 
-### Phase D: Dashboard & Logging
-13. Add handoff JSONL logging
-14. Add cost display to agent cards
-15. Create HandoffPanel component
-16. Create /handoffs page
-17. Add handoff API endpoints
-
-### Phase E: Integration & Testing
-18. Wire triggers to handoff manager in Cloister service
-19. E2E test: stuck escalation scenario
-20. E2E test: planning→implementation handoff
-21. Manual testing of dashboard UI
-
-## Beads Tasks
-
-| ID | Title | Phase | Blocked By | Complexity |
-|----|-------|-------|------------|------------|
-| pan31-01 | Create complexity detection module | A | - | simple |
-| pan31-02 | Create model router with config | A | pan31-01 | simple |
-| pan31-03 | Extend agent state for model/complexity tracking | A | - | simple |
-| pan31-04 | Add handoff config schema to cloister.yaml | A | pan31-02 | trivial |
-| pan31-05 | Create handoff context capture module | B | pan31-03 | medium |
-| pan31-06 | Implement Kill & Spawn handoff method | B | pan31-05 | medium |
-| pan31-07 | Implement Specialist Wake handoff method | B | pan31-05 | medium |
-| pan31-08 | Create handoff manager orchestration | B | pan31-06, pan31-07 | medium |
-| pan31-09 | Implement stuck escalation trigger | C | pan31-08 | simple |
-| pan31-10 | Implement planning complete detection | C | pan31-08 | medium |
-| pan31-11 | Implement test failure escalation | C | pan31-08 | simple |
-| pan31-12 | Implement task completion detection | C | pan31-08 | simple |
-| pan31-13 | Add handoff JSONL logging | D | pan31-08 | trivial |
-| pan31-14 | Add cost display to dashboard agent cards | D | - | simple |
-| pan31-15 | Create HandoffPanel component | D | pan31-13 | medium |
-| pan31-16 | Create /handoffs page with history | D | pan31-13, pan31-15 | medium |
-| pan31-17 | Add handoff API endpoints | D | pan31-08 | simple |
-| pan31-18 | Wire triggers into Cloister service | E | pan31-09, pan31-10, pan31-11, pan31-12 | medium |
-| pan31-19 | E2E test: stuck escalation | E | pan31-18 | simple |
-| pan31-20 | E2E test: planning handoff | E | pan31-18 | simple |
-| pan31-21 | Create follow-up issue for specialist cost breakdown | D | - | trivial |
+3. **Test npm not found scenario:**
+   - Temporarily modify PATH to exclude npm
+   - Verify clear error message is shown
 
 ## Success Criteria
 
-1. ✅ Beads complexity field influences model selection
-2. ✅ Automatic complexity detection works for unlabeled tasks
-3. ✅ Model router correctly maps complexity→model
-4. ✅ Stuck agents automatically escalate to higher model
-5. ✅ Planning completion triggers Opus→Sonnet handoff
-6. ✅ Test failures escalate Haiku→Sonnet
-7. ✅ Context (STATE.md, beads, git) preserved during handoff
-8. ✅ Specialists can be woken with --resume
-9. ✅ Cost displayed per agent in dashboard
-10. ✅ Handoff events logged to JSONL
-11. ✅ Dashboard shows handoff controls and history
-12. ✅ No regressions in Phase 1-3 functionality
+1. `pan up` works on macOS with nvm-managed Node.js
+2. `pan up --detach` works and shows proper error if spawn fails
+3. Clear error message when npm is not found
+4. No regressions on Linux
 
-## Open Questions (Resolved)
+## Beads Tasks
 
-1. **How detect planning complete?** → Multi-signal: beads task + PRD file + ExitPlanMode
-2. **Stuck detection source?** → Heartbeat-based, using existing health states
-3. **Test failure threshold?** → Any failure escalates (aggressive)
-4. **Cross-runtime handoffs?** → Out of scope (Claude Code only)
-5. **Cost limits?** → Display only, no enforcement
+| ID | Title | Status | Blocked By |
+|----|-------|--------|------------|
+| panopticon-324n | Add shell: true to foreground spawn | open | - |
+| panopticon-rsb1 | Add shell: true to background spawn | open | - |
+| panopticon-qdu3 | Add npm pre-flight check | open | - |
+| panopticon-pxqm | Add error handling for background spawn | open | panopticon-rsb1 |
+| panopticon-zppl | Test on macOS with nvm | open | 324n, rsb1, qdu3, pxqm |
+| panopticon-nnic | Test on Linux (verify no regression) | open | 324n, rsb1 |
 
 ## References
 
-- PRD-CLOISTER.md lines 48-680 (Model Selection & Handoffs)
-- Phase 3 (Heartbeats & Hooks) - Complete ✅
-- src/lib/cloister/service.ts - Main service
-- src/lib/cloister/specialists.ts - Specialist management
-- src/lib/cost.ts - Cost tracking infrastructure
+- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/19
+- Source file: `src/cli/index.ts` lines 87-180
+- Similar pattern: `src/cli/commands/install.ts` `checkCommand()` function
+- Similar pattern: `src/cli/commands/doctor.ts` `checkCommand()` function
