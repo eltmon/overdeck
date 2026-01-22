@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { execSync, exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
@@ -76,6 +76,90 @@ function appendActivityOutput(id: string, line: string) {
       activity.output.shift();
     }
   }
+}
+
+// ============================================================================
+// Pending Operations State - Persists across refreshes and server restarts
+// ============================================================================
+
+interface PendingOperation {
+  type: 'approve' | 'close' | 'containerize' | 'start';
+  issueId: string;
+  startedAt: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
+const PENDING_OPS_FILE = join(homedir(), '.panopticon', 'pending-operations.json');
+
+function loadPendingOperations(): Record<string, PendingOperation> {
+  try {
+    if (existsSync(PENDING_OPS_FILE)) {
+      const data = JSON.parse(readFileSync(PENDING_OPS_FILE, 'utf-8'));
+      // Clean up stale operations (older than 10 minutes with running status)
+      const now = Date.now();
+      const tenMinutes = 10 * 60 * 1000;
+      for (const key of Object.keys(data)) {
+        const op = data[key];
+        if (op.status === 'running' && now - new Date(op.startedAt).getTime() > tenMinutes) {
+          op.status = 'failed';
+          op.error = 'Operation timed out';
+        }
+      }
+      return data;
+    }
+  } catch (err) {
+    console.error('Failed to load pending operations:', err);
+  }
+  return {};
+}
+
+function savePendingOperations(ops: Record<string, PendingOperation>): void {
+  try {
+    const dir = dirname(PENDING_OPS_FILE);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(PENDING_OPS_FILE, JSON.stringify(ops, null, 2));
+  } catch (err) {
+    console.error('Failed to save pending operations:', err);
+  }
+}
+
+function setPendingOperation(issueId: string, type: PendingOperation['type']): void {
+  const ops = loadPendingOperations();
+  ops[issueId] = {
+    type,
+    issueId,
+    startedAt: new Date().toISOString(),
+    status: 'running',
+  };
+  savePendingOperations(ops);
+}
+
+function completePendingOperation(issueId: string, error?: string): void {
+  const ops = loadPendingOperations();
+  if (ops[issueId]) {
+    if (error) {
+      ops[issueId].status = 'failed';
+      ops[issueId].error = error;
+    } else {
+      // Remove successful operations after a short delay
+      delete ops[issueId];
+    }
+    savePendingOperations(ops);
+  }
+}
+
+function getPendingOperation(issueId: string): PendingOperation | null {
+  const ops = loadPendingOperations();
+  return ops[issueId] || null;
+}
+
+function clearPendingOperation(issueId: string): void {
+  const ops = loadPendingOperations();
+  delete ops[issueId];
+  savePendingOperations(ops);
 }
 
 // Get the first registered project path from pan
@@ -2554,6 +2638,9 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     agentModel = modelMatch ? modelMatch[1] : undefined;
   }
 
+  // Get any pending operation for this issue
+  const pendingOperation = getPendingOperation(issueId);
+
   res.json({
     exists: true,
     issueId,
@@ -2570,6 +2657,7 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     containers,
     hasDocker,
     canContainerize,
+    pendingOperation,
   });
 });
 
@@ -3082,9 +3170,13 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
   let mergeCompleted = false;
   let pushCompleted = false;
 
+  // Mark operation as pending (persists across refreshes)
+  setPendingOperation(issueId, 'approve');
+
   try {
     // 1. Check workspace exists
     if (!existsSync(workspacePath)) {
+      completePendingOperation(issueId, 'Workspace does not exist');
       return res.status(400).json({ error: 'Workspace does not exist' });
     }
 
@@ -3092,6 +3184,7 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
     try {
       execSync(`git rev-parse --verify ${branchName}`, { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
     } catch {
+      completePendingOperation(issueId, `Branch ${branchName} does not exist`);
       return res.status(400).json({ error: `Branch ${branchName} does not exist` });
     }
 
@@ -3099,9 +3192,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
     try {
       const status = execSync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' });
       if (status.trim()) {
-        return res.status(400).json({
-          error: `Workspace has uncommitted changes. Please commit or stash them first:\ncd ${workspacePath}\ngit status`
-        });
+        const error = `Workspace has uncommitted changes. Please commit or stash them first:\ncd ${workspacePath}\ngit status`;
+        completePendingOperation(issueId, error);
+        return res.status(400).json({ error });
       }
     } catch (statusErr) {
       // If we can't check status, continue but log it
@@ -3123,9 +3216,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
       // Use explicit origin main to avoid tracking branch issues in worktrees
       execSync('git pull origin main --ff-only', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
     } catch (checkoutErr: any) {
-      return res.status(400).json({
-        error: `Failed to checkout/update main branch: ${checkoutErr.message}`
-      });
+      const error = `Failed to checkout/update main branch: ${checkoutErr.message}`;
+      completePendingOperation(issueId, error);
+      return res.status(400).json({ error });
     }
 
     // 6. ALWAYS use merge-agent for ALL merges
@@ -3160,9 +3253,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
         try {
           execSync('git reset --hard HEAD~1', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
         } catch {}
-        return res.status(400).json({
-          error: `merge-agent completed merge but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`
-        });
+        const error = `merge-agent completed merge but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`;
+        completePendingOperation(issueId, error);
+        return res.status(400).json({ error });
       } else {
         // merge-agent failed (conflicts it couldn't resolve, or other issue)
         try {
@@ -3171,9 +3264,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
         try {
           execSync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
         } catch {}
-        return res.status(400).json({
-          error: `merge-agent could not complete merge.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`
-        });
+        const error = `merge-agent could not complete merge.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
+        completePendingOperation(issueId, error);
+        return res.status(400).json({ error });
       }
     } catch (agentError: any) {
       // merge-agent itself failed (timeout, crash, etc.)
@@ -3183,9 +3276,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
       try {
         execSync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
       } catch {}
-      return res.status(400).json({
-        error: `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`
-      });
+      const error = `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
+      completePendingOperation(issueId, error);
+      return res.status(400).json({ error });
     }
 
     // 7. CRITICAL: Push merged main to remote BEFORE any cleanup
@@ -3195,9 +3288,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
       console.log('Pushed merged main to remote');
     } catch (pushErr: any) {
       // CRITICAL: If push fails, DO NOT proceed with cleanup
-      return res.status(400).json({
-        error: `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`
-      });
+      const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
+      completePendingOperation(issueId, error);
+      return res.status(400).json({ error });
     }
 
     // 8. Stop any running agent
@@ -3389,14 +3482,25 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
     // Record task metrics for the completed work
     recordApprovedTask(issueId, workspacePath, 'success');
 
+    // Clear pending operation on success
+    completePendingOperation(issueId);
+
     res.json({
       success: true,
       message: `Approved ${issueId}: merged, workspace removed, issue closed${isGitHubIssue || issueId.toUpperCase().startsWith('PAN-') ? ', skills synced' : ''}, metrics recorded`,
     });
   } catch (error: any) {
     console.error('Error approving workspace:', error);
+    completePendingOperation(issueId, error.message);
     res.status(500).json({ error: 'Failed to approve: ' + error.message });
   }
+});
+
+// Clear pending operation (dismiss error state)
+app.delete('/api/workspaces/:issueId/pending', (req, res) => {
+  const { issueId } = req.params;
+  clearPendingOperation(issueId);
+  res.json({ success: true });
 });
 
 // Close/resolve an issue manually (without merge)

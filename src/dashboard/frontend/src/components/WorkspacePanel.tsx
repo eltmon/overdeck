@@ -27,6 +27,14 @@ interface ContainerStatus {
   uptime: string | null;
 }
 
+interface PendingOperation {
+  type: 'approve' | 'close' | 'containerize' | 'start';
+  issueId: string;
+  startedAt: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
 interface WorkspaceInfo {
   exists: boolean;
   corrupted?: boolean;
@@ -38,6 +46,7 @@ interface WorkspaceInfo {
   containers?: Record<string, ContainerStatus> | null;
   hasDocker?: boolean;
   canContainerize?: boolean;
+  pendingOperation?: PendingOperation | null;
 }
 
 // Clipboard helper that works without HTTPS
@@ -185,6 +194,22 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['issues'] });
       onClose();
+    },
+  });
+
+  // Dismiss pending operation error state
+  const dismissPendingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/pending`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error('Failed to dismiss');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
     },
   });
 
@@ -608,13 +633,37 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
         {/* Actions */}
         <div className="px-3 py-2 border-b border-gray-700">
           <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Actions</div>
+          {/* Server-side pending operation status */}
+          {workspace?.pendingOperation?.type === 'approve' && workspace.pendingOperation.status === 'running' && (
+            <div className="flex items-center gap-2 text-xs text-blue-400 bg-blue-900/20 px-2 py-1.5 rounded mb-2">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>Merging in progress... (survives tab switches)</span>
+            </div>
+          )}
+          {workspace?.pendingOperation?.status === 'failed' && (
+            <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1.5 rounded mb-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">Operation failed</span>
+                <button
+                  onClick={() => dismissPendingMutation.mutate()}
+                  className="text-gray-400 hover:text-white"
+                  title="Dismiss"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="mt-1 text-gray-400 whitespace-pre-wrap">
+                {workspace.pendingOperation.error}
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={handleApprove}
-              disabled={approveMutation.isPending}
+              disabled={approveMutation.isPending || (workspace?.pendingOperation?.type === 'approve' && workspace.pendingOperation.status === 'running')}
               className="flex items-center gap-1 px-2 py-1 text-xs bg-green-900/30 text-green-400 rounded hover:bg-green-900/50 disabled:opacity-50"
             >
-              {approveMutation.isPending ? (
+              {(approveMutation.isPending || (workspace?.pendingOperation?.type === 'approve' && workspace.pendingOperation.status === 'running')) ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
                 <CheckCircle className="w-3 h-3" />
@@ -642,7 +691,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               Close (No Merge)
             </button>
           </div>
-          {approveMutation.isError && (
+          {approveMutation.isError && !workspace?.pendingOperation?.error && (
             <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded mt-2">
               {approveMutation.error instanceof Error
                 ? approveMutation.error.message
