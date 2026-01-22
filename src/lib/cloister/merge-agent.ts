@@ -3,8 +3,12 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { spawn, execSync } from 'child_process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import { PANOPTICON_HOME } from '../paths.js';
 import {
   getSessionId,
@@ -64,7 +68,7 @@ const MERGE_TIMEOUT_MS = 15 * 60 * 1000;
  * Build the prompt for merge-agent
  */
 function buildMergePrompt(context: MergeConflictContext): string {
-  const templatePath = join(process.cwd(), 'src/lib/cloister/prompts/merge-agent.md');
+  const templatePath = join(__dirname, 'prompts', 'merge-agent.md');
 
   if (!existsSync(templatePath)) {
     throw new Error(`Merge agent prompt template not found at ${templatePath}`);
