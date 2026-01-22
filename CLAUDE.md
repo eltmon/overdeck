@@ -1,15 +1,15 @@
-# Workspace: feature-pan-35
+# Workspace: feature-pan-31
 
-**Issue:** PAN-35
-**Branch:** feature/pan-35
-**Path:** /home/eltmon/projects/panopticon/workspaces/feature-pan-35
+**Issue:** PAN-31
+**Branch:** feature/pan-31
+**Path:** /home/eltmon/projects/panopticon/workspaces/feature-pan-31
 
 ## URLs (if workspace has Docker)
 
 | Service | URL |
 |---------|-----|
-| Frontend | https://feature-pan-35.localhost:3000 |
-| API | https://api-feature-pan-35.localhost:8080 |
+| Frontend | https://feature-pan-31.localhost:3000 |
+| API | https://api-feature-pan-31.localhost:8080 |
 
 
 ---

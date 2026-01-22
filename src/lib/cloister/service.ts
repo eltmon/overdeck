@@ -25,7 +25,10 @@ import {
 } from './database.js';
 import { initializeEnabledSpecialists } from './specialists.js';
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgents } from '../agents.js';
+import { listRunningAgents, getAgentState } from '../agents.js';
+import { checkAllTriggers, type TriggerDetection } from './triggers.js';
+import { performHandoff, type HandoffResult } from './handoff.js';
+import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
 
 /**
  * Cloister service status
@@ -49,6 +52,8 @@ export type CloisterEvent =
   | { type: 'agent_stuck'; agentId: string; health: AgentHealth }
   | { type: 'poked_agent'; agentId: string }
   | { type: 'killed_agent'; agentId: string }
+  | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
+  | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
   | { type: 'emergency_stop'; killedAgents: string[] }
   | { type: 'error'; error: Error };
 
@@ -243,6 +248,9 @@ export class CloisterService {
           }
         }
       }
+
+      // Check for handoff triggers (Phase 4)
+      await this.checkHandoffTriggers(agentHealths);
     } catch (error) {
       console.error('Cloister health check failed:', error);
       this.emit({ type: 'error', error: error as Error });
@@ -329,6 +337,72 @@ export class CloisterService {
       }
     } catch (error) {
       console.error(`Failed to record health event for ${health.agentId}:`, error);
+    }
+  }
+
+  /**
+   * Check for handoff triggers and execute handoffs (Phase 4)
+   *
+   * Checks all triggers for each agent and performs handoffs when triggered.
+   */
+  private async checkHandoffTriggers(agentHealths: AgentHealth[]): Promise<void> {
+    for (const health of agentHealths) {
+      try {
+        // Get agent state
+        const agentState = getAgentState(health.agentId);
+        if (!agentState) continue;
+
+        // Skip if no workspace (can't determine context)
+        if (!agentState.workspace) continue;
+
+        // Check all triggers
+        const triggers = checkAllTriggers(
+          health.agentId,
+          agentState.workspace,
+          agentState.issueId,
+          agentState.model,
+          health,
+          this.config
+        );
+
+        // Execute handoff for first triggered condition
+        // (Priority: stuck > planning > test > completion)
+        if (triggers.length > 0) {
+          const trigger = triggers[0];
+          this.emit({ type: 'handoff_triggered', agentId: health.agentId, trigger });
+
+          console.log(`🔔 Handoff triggered for ${health.agentId}: ${trigger.reason}`);
+
+          // Perform handoff
+          const result = await performHandoff(health.agentId, {
+            targetModel: trigger.suggestedModel || 'sonnet',
+            reason: trigger.reason,
+          });
+
+          this.emit({ type: 'handoff_completed', agentId: health.agentId, result });
+
+          // Log handoff event
+          if (result.context) {
+            const event = createHandoffEvent(
+              health.agentId,
+              agentState.issueId,
+              result.context,
+              trigger.type,
+              result.success,
+              result.error
+            );
+            logHandoffEvent(event);
+          }
+
+          if (result.success) {
+            console.log(`✓ Handoff completed: ${health.agentId} → ${result.newAgentId} (${trigger.suggestedModel})`);
+          } else {
+            console.error(`✗ Handoff failed: ${result.error}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to check handoff triggers for ${health.agentId}:`, error);
+      }
     }
   }
 

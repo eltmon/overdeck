@@ -5,6 +5,7 @@ import { AGENTS_DIR } from './paths.js';
 import { createSession, killSession, sendKeys, sessionExists, getAgentSessions } from './tmux.js';
 import { initHook, checkHook, generateGUPPPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
+import type { ComplexityLevel } from './cloister/complexity.js';
 
 export interface AgentState {
   id: string;
@@ -15,6 +16,12 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+
+  // Model routing & handoffs (Phase 4)
+  complexity?: ComplexityLevel;
+  handoffCount?: number;
+  costSoFar?: number;
+  sessionId?: string; // For resuming sessions after handoff
 }
 
 export function getAgentDir(agentId: string): string {
@@ -67,6 +74,9 @@ export function spawnAgent(options: SpawnOptions): AgentState {
     model: options.model || 'sonnet',
     status: 'starting',
     startedAt: new Date().toISOString(),
+    // Initialize Phase 4 fields
+    handoffCount: 0,
+    costSoFar: 0,
   };
 
   saveAgentState(state);
