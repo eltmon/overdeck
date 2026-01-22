@@ -174,7 +174,7 @@ const child = spawn('npm', ['run', 'dev'], {
 
 ## Current Status
 
-**Implementation Phase: COMPLETE**
+**Implementation Phase: COMPLETE ✅**
 
 All code changes have been implemented:
 - ✅ Added npm pre-flight check (lines 140-147)
@@ -182,9 +182,14 @@ All code changes have been implemented:
 - ✅ Added error handling for background spawn (lines 162-174)
 - ✅ Added `shell: true` to foreground spawn (line 197)
 
-**Next Phase: Testing**
+**Testing Phase: PARTIAL**
 
-Ready to test on macOS with nvm and Linux to verify the fixes work as expected.
+- ✅ Linux testing complete - No regressions on WSL2 with nvm-managed Node v20.19.2
+- ⏳ macOS testing pending - Requires testing on macOS with nvm to verify the fix works
+
+**Changes Committed:**
+- Commit: d4bd2ad - "fix: resolve spawn npm ENOENT on macOS with nvm (PAN-19)"
+- Pushed to branch: feature/pan-19
 
 ## Beads Tasks
 
@@ -195,7 +200,7 @@ Ready to test on macOS with nvm and Linux to verify the fixes work as expected.
 | panopticon-qdu3 | Add npm pre-flight check | closed | - |
 | panopticon-pxqm | Add error handling for background spawn | closed | - |
 | panopticon-zppl | Test on macOS with nvm | open | - |
-| panopticon-nnic | Test on Linux (verify no regression) | open | - |
+| panopticon-nnic | Test on Linux (verify no regression) | closed | - |
 
 ## References
 
