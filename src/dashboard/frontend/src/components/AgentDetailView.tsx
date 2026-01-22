@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X, ExternalLink, GitBranch, Activity, Clock, Brain, Wrench, BarChart3 } from 'lucide-react';
+import { X, Activity, Brain, BarChart3 } from 'lucide-react';
 import { TerminalView } from './TerminalView';
 import { HealthHistoryTimeline } from './HealthHistoryTimeline';
 import { HealthHistoryChart } from './HealthHistoryChart';
@@ -55,12 +55,6 @@ const HEALTH_STATE_EMOJI = {
   stuck: '🔴',
 };
 
-const HEALTH_STATE_LABEL = {
-  active: 'Active',
-  stale: 'Stale',
-  warning: 'Warning',
-  stuck: 'Stuck',
-};
 
 function formatDuration(timestamp: string): string {
   const date = new Date(timestamp);

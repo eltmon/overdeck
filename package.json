@@ -41,7 +41,11 @@
   },
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
-    "build": "tsup",
+    "build": "npm run build:cli && npm run build:dashboard",
+    "build:cli": "tsup",
+    "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
+    "build:dashboard:frontend": "cd src/dashboard/frontend && npm run build",
+    "build:dashboard:server": "cd src/dashboard/server && npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "test": "vitest --no-file-parallelism",
@@ -55,6 +59,7 @@
     "postinstall": "node scripts/postinstall.mjs || true"
   },
   "dependencies": {
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "@iarna/toml": "^2.2.5",
     "@linear/sdk": "^70.0.0",
     "@octokit/rest": "^22.0.1",

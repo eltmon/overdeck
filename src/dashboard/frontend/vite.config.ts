@@ -17,4 +17,8 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    outDir: '../../../dist/dashboard/public',
+    emptyOutDir: true,
+  },
 });

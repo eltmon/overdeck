@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, TrendingUp, AlertCircle, Clock } from 'lucide-react';
+import { ArrowRight, Clock } from 'lucide-react';
 
 function formatTimestamp(timestamp: string): string {
   const date = new Date(timestamp);
