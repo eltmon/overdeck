@@ -638,3 +638,101 @@ export async function initializeEnabledSpecialists(): Promise<Array<{
 
   return results;
 }
+
+/**
+ * ===========================================================================
+ * Specialist Queue Helpers
+ * ===========================================================================
+ */
+
+import { HookItem, pushToHook, checkHook, popFromHook } from '../hooks.js';
+
+/**
+ * Specialist queue item - extends HookItem with specialist-specific payload
+ */
+export interface SpecialistQueueItem extends HookItem {
+  type: 'task';
+  payload: {
+    prUrl?: string;
+    issueId: string;
+    workspace?: string;
+    branch?: string;
+    filesChanged?: string[];
+    context?: Record<string, any>;
+  };
+}
+
+/**
+ * Submit a task to a specialist's queue
+ *
+ * @param specialistName - Name of the specialist (e.g., 'review-agent', 'merge-agent')
+ * @param task - Task details
+ * @returns The created queue item
+ */
+export function submitToSpecialistQueue(
+  specialistName: SpecialistType,
+  task: {
+    priority: 'urgent' | 'high' | 'normal' | 'low';
+    source: string;
+    prUrl?: string;
+    issueId: string;
+    workspace?: string;
+    branch?: string;
+    filesChanged?: string[];
+    context?: Record<string, any>;
+  }
+): HookItem {
+  const item: Omit<HookItem, 'id' | 'createdAt'> = {
+    type: 'task',
+    priority: task.priority,
+    source: task.source,
+    payload: {
+      prUrl: task.prUrl,
+      issueId: task.issueId,
+      workspace: task.workspace,
+      branch: task.branch,
+      filesChanged: task.filesChanged,
+      context: task.context,
+    },
+  };
+
+  return pushToHook(specialistName, item);
+}
+
+/**
+ * Check if a specialist has pending work in their queue
+ *
+ * @param specialistName - Name of the specialist
+ * @returns Queue status
+ */
+export function checkSpecialistQueue(specialistName: SpecialistType): {
+  hasWork: boolean;
+  urgentCount: number;
+  items: HookItem[];
+} {
+  return checkHook(specialistName);
+}
+
+/**
+ * Remove a completed task from a specialist's queue
+ *
+ * @param specialistName - Name of the specialist
+ * @param itemId - ID of the completed task
+ * @returns True if item was removed
+ */
+export function completeSpecialistTask(specialistName: SpecialistType, itemId: string): boolean {
+  return popFromHook(specialistName, itemId);
+}
+
+/**
+ * Get the next task from a specialist's queue (highest priority)
+ *
+ * Does NOT remove the task - use completeSpecialistTask() after execution.
+ *
+ * @param specialistName - Name of the specialist
+ * @returns The next task or null if queue is empty
+ */
+export function getNextSpecialistTask(specialistName: SpecialistType): HookItem | null {
+  const { items } = checkSpecialistQueue(specialistName);
+  return items.length > 0 ? items[0] : null;
+}

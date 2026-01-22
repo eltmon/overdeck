@@ -250,7 +250,8 @@ export class CloisterService {
       }
 
       // Check for handoff triggers (Phase 4)
-      await this.checkHandoffTriggers(agentHealths);
+      // Note: Intentionally not awaiting - runs in background
+      void this.checkHandoffTriggers(agentHealths);
     } catch (error) {
       console.error('Cloister health check failed:', error);
       this.emit({ type: 'error', error: error as Error });

@@ -1,15 +1,15 @@
-# Workspace: feature-pan-31
+# Workspace: feature-pan-32
 
-**Issue:** PAN-31
-**Branch:** feature/pan-31
-**Path:** /home/eltmon/projects/panopticon/workspaces/feature-pan-31
+**Issue:** PAN-32
+**Branch:** feature/pan-32
+**Path:** /home/eltmon/projects/panopticon/workspaces/feature-pan-32
 
 ## URLs (if workspace has Docker)
 
 | Service | URL |
 |---------|-----|
-| Frontend | https://feature-pan-31.localhost:3000 |
-| API | https://api-feature-pan-31.localhost:8080 |
+| Frontend | https://feature-pan-32.localhost:3000 |
+| API | https://api-feature-pan-32.localhost:8080 |
 
 
 ---
@@ -38,12 +38,7 @@ bd create --title "Implement feature X" --parent <parent-id>
 ### Blocking Issues
 
 ```bash
-# Make issue-A blocked by issue-B (A cannot start until B is done)
-bd dep add <blocked-issue> <blocker-issue> --type blocks
-
-# Example: PAN-5 is blocked by PAN-1
-bd dep add pan-5 pan-1 --type blocks
-
+bd update <id> --blocked-by <blocker-id>
 bd ready  # Will exclude blocked issues
 ```
 
