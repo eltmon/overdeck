@@ -17,7 +17,7 @@ Panopticon is an **opinionated multi-agent orchestration system** for Claude Cod
 This document synthesizes insights from:
 
 1. **Cursor's Dynamic Context Discovery** - Pull context on demand, reduce token usage by 46.9%
-2. **Gastown's Agent Orchestration** - Beads, GUPP, hooks, multi-runtime support, health monitoring
+2. **Gastown's Agent Orchestration** - Beads, FPP, hooks, multi-runtime support, health monitoring
 3. **GSD-Plus Context Engineering** - Structured state management (STATE.md, WORKSPACE.md, SUMMARY.md)
 4. **Current Panopticon Implementation** - What we've already built in MYN infra
 5. **Claude Code Skills** - Progressive disclosure, cross-platform compatibility
@@ -121,7 +121,7 @@ Panopticon sits **above** individual projects and manages them:
 ├─────────────────────────────────────────────────────────────────┤
 │   Hooks   │   Skills Index │   Agent CVs   │   Activity Feed    │
 │  ─────────────────────────────────────────────────────────────  │
-│  - GUPP: "Work on hook = MUST run"                              │
+│  - FPP: "Work on hook = MUST run"                               │
 │  - Skills loaded on-demand (progressive disclosure)             │
 │  - Agent performance history                                    │
 │  - Real-time work tracking                                      │
@@ -483,22 +483,24 @@ function loadContext(agent: Agent, budget: ContextBudget): Context {
 
 Gastown shows that Beads isn't just an issue tracker - it's the **persistent memory layer** for multi-agent systems.
 
-### The GUPP Principle
+### The FPP Principle (Fixed Point Principle)
 
-> "If there is work on your Hook, YOU MUST RUN IT."
+> "Any runnable action is a fixed point and must resolve before the system can rest."
+>
+> *Inspired by Doctor Who: a fixed point in time must occur — it cannot be avoided.*
 
 This transforms agents from passive responders to **self-propelling workers**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     GUPP FLOW                                    │
+│                     FPP FLOW                                     │
 └─────────────────────────────────────────────────────────────────┘
 
 1. Agent starts → Checks hook (bd hook check)
 2. Work found  → Execute immediately (no confirmation)
 3. Work done   → Close bead, check for more work
 4. No work     → Enter idle/patrol mode
-5. New work arrives → Hook notified → GUPP triggers
+5. New work arrives → Hook notified → FPP triggers
 ```
 
 ### Hooks as Primary Interface
@@ -1368,7 +1370,7 @@ Each completed piece of work produces a summary:
 
 1. Context discovery > context loading
 2. Beads is more than issue tracking - it's persistent memory
-3. GUPP principle enables self-propelling agents
+3. FPP principle enables self-propelling agents
 4. Skills with progressive disclosure reduce context usage vs. heavy molecule templates
 
 ## Files Created/Modified
@@ -2782,7 +2784,7 @@ Changes are immediately available in Claude Code (if using symlinks).
 ### Phase 3: Beads Deep Integration (Saturday Evening)
 
 - [ ] Implement hooks for all agents
-- [ ] Add GUPP enforcement
+- [ ] Add FPP enforcement
 - [ ] Add crash recovery via Beads state
 - [ ] Add agent CV tracking
 
@@ -4023,7 +4025,7 @@ bd show MIN-123
 | Concept | Source | Description |
 |---------|--------|-------------|
 | Dynamic Context Discovery | Cursor | Pull context on demand vs. load upfront |
-| GUPP | Gastown | "If work on hook, MUST run" |
+| FPP | Gastown | Fixed Point Principle - "If work on hook, MUST run" |
 | NDI | Gastown | Nondeterministic Idempotence |
 | Hooks | Gastown | Agent work queues |
 | Skills | Claude Code | Markdown workflow guidance (progressive disclosure) |
@@ -4055,7 +4057,7 @@ bd show MIN-123
 
 **Key Gastown concepts we're adopting:**
 - **Beads** - Git-backed work tracking (ESSENTIAL)
-- **GUPP** - "If there is work on your Hook, YOU MUST RUN IT" - self-propelling agents
+- **FPP** - Fixed Point Principle - "Any runnable action is a fixed point and must resolve" - self-propelling agents
 - **Hooks** - Persistent work state via git worktrees
 - **Deacon** - Watchdog agent for stuck detection
 

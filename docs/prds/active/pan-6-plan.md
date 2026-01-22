@@ -306,7 +306,7 @@ Phase 1: Core Subagents (no deps)
 ## Out of Scope
 
 - MCP server functionality
-- Auto-triggering reviews on git push (future: GUPP hooks)
+- Auto-triggering reviews on git push (future: FPP hooks)
 - Multiple convoy templates beyond code-review (can add later)
 - Custom user templates (can add later)
 

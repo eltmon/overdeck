@@ -42,7 +42,7 @@ panopticon/
 │   ├── lib/              # Shared libraries
 │   │   ├── agents.ts     # Agent management
 │   │   ├── health.ts     # Health monitoring
-│   │   ├── hooks.ts      # GUPP hooks
+│   │   ├── hooks.ts      # FPP hooks
 │   │   └── paths.ts      # Path constants
 │   ├── dashboard/        # Web dashboard
 │   │   ├── frontend/     # React frontend

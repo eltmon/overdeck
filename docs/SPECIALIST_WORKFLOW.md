@@ -108,7 +108,7 @@ Worker agent can:
 
 ### Review Agent Workflow
 
-1. **Wakes up** when work is detected in queue (GUPP principle)
+1. **Wakes up** when work is detected in queue (FPP principle)
 2. **Reads PR** using GitHub CLI (`gh pr view`, `gh pr diff`)
 3. **Reviews code** for:
    - Correctness and logic errors
@@ -359,6 +359,6 @@ Review agent logs for specific errors.
 
 ## Related Documentation
 
-- [GUPP Hooks System](../src/lib/hooks.ts) - Queue implementation
+- [FPP Hooks System](../src/lib/hooks.ts) - Queue implementation
 - [Cloister Configuration](../src/lib/cloister/config.ts) - Config schema
 - [Specialist Registry](../src/lib/cloister/specialists.ts) - Registry management

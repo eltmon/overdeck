@@ -1432,7 +1432,7 @@ CLOISTER_AUTO_KILL=false
 - [ ] Notifications (Slack webhook, email)
 - [ ] Auto-restart on crash (with backoff)
 - [ ] Mass death detection (3+ deaths in 30 sec)
-- [ ] GUPP violation detection (work sitting idle)
+- [ ] FPP violation detection (work sitting idle)
 - [ ] Cost limits and alerts
 - [ ] Session rotation for long-running specialists
 - [ ] Metrics and analytics dashboard

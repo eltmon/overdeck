@@ -1,7 +1,9 @@
 /**
- * GUPP Hooks System
+ * FPP Hooks System - Fixed Point Principle
  *
- * "If there is work on your Hook, YOU MUST RUN IT."
+ * "Any runnable action is a fixed point and must resolve before the system can rest."
+ *
+ * Inspired by Doctor Who: a fixed point in time must occur — it cannot be avoided.
  *
  * Hooks are persistent work queues for agents. When an agent starts,
  * it checks its hook for pending work and executes immediately.
@@ -82,7 +84,7 @@ export function getHook(agentId: string): Hook | null {
 }
 
 /**
- * Add work to an agent's hook (GUPP trigger)
+ * Add work to an agent's hook (FPP trigger)
  */
 export function pushToHook(agentId: string, item: Omit<HookItem, 'id' | 'createdAt'>): HookItem {
   initHook(agentId);
@@ -102,7 +104,7 @@ export function pushToHook(agentId: string, item: Omit<HookItem, 'id' | 'created
 }
 
 /**
- * Check if agent has pending work (GUPP check)
+ * Check if agent has pending work (FPP check)
  */
 export function checkHook(agentId: string): { hasWork: boolean; urgentCount: number; items: HookItem[] } {
   const hook = getHook(agentId);
@@ -235,17 +237,17 @@ export function collectMail(agentId: string): HookItem[] {
 }
 
 /**
- * Generate GUPP prompt for agent startup
+ * Generate Fixed Point prompt for agent startup
  */
-export function generateGUPPPrompt(agentId: string): string | null {
+export function generateFixedPointPrompt(agentId: string): string | null {
   const { hasWork, urgentCount, items } = checkHook(agentId);
 
   if (!hasWork) return null;
 
   const lines: string[] = [
-    '# GUPP: Work Found on Your Hook',
+    '# FPP: Work Found on Your Hook',
     '',
-    '> "If there is work on your Hook, YOU MUST RUN IT."',
+    '> "Any runnable action is a fixed point and must resolve before the system can rest."',
     '',
   ];
 

@@ -32,4 +32,4 @@ This document identifies gaps between the requirements defined in `docs/PRD.md` 
 - Dashboard only shows basic agent list and basic health status.
 
 ## Summary
-The core "Panopticon" orchestration (Agents, Workspaces, GUPP Hooks, Basic Multi-Runtime) is implemented. The primary remaining gaps are related to **Smart Context Budgeting** and **Comparative Runtime Metrics**.
+The core "Panopticon" orchestration (Agents, Workspaces, FPP Hooks, Basic Multi-Runtime) is implemented. The primary remaining gaps are related to **Smart Context Budgeting** and **Comparative Runtime Metrics**.

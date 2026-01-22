@@ -714,7 +714,7 @@ pan work health status
 pan work health daemon --interval 30
 ```
 
-### GUPP Hooks
+### FPP Hooks (Fixed Point Principle)
 
 ```bash
 # Check for pending work on hook
@@ -1245,7 +1245,7 @@ This ensures every Panopticon-managed project has a well-defined canonical PRD t
     agent-min-123/
       state.json        # Agent state (model, phase, complexity)
       health.json       # Health status
-      hook.json         # GUPP work queue
+      hook.json         # FPP work queue
       cv.json           # Work history
       mail/             # Incoming messages
       handoffs/         # Handoff prompts (for debugging)
@@ -1311,11 +1311,15 @@ When an agent is stuck (no activity for 30+ minutes), Panopticon will:
 2. Record the kill in health.json
 3. Respawn with crash recovery context
 
-## GUPP (Give Up Push Pop)
+## FPP (Fixed Point Principle)
 
-> "If there is work on your Hook, YOU MUST RUN IT."
+> "Any runnable action is a fixed point and must resolve before the system can rest."
 
-GUPP ensures agents are self-propelling:
+*Inspired by Doctor Who: a fixed point in time must occur — it cannot be avoided.*
+
+**Fixed Point Principle (FPP):** Any runnable bead, hook, or agent action represents a fixed point in execution and must be resolved immediately. Panopticon continues executing until no fixed points remain.
+
+FPP ensures agents are self-propelling:
 1. Work items are pushed to the agent's hook
 2. On spawn/recovery, the hook is checked
 3. Pending work is injected into the agent's prompt

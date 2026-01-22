@@ -85,7 +85,7 @@ export function registerWorkCommands(program: Command): void {
 
   work
     .command('hook [action] [idOrMessage...]')
-    .description('GUPP hooks: check, push, pop, clear, mail, gupp')
+    .description('FPP hooks: check, push, pop, clear, mail, fpp')
     .option('--json', 'Output as JSON')
     .action((action, idOrMessage, options) => {
       hookCommand(action || 'help', idOrMessage?.join(' '), options);

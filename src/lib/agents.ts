@@ -4,7 +4,7 @@ import { execSync } from 'child_process';
 import { homedir } from 'os';
 import { AGENTS_DIR } from './paths.js';
 import { createSession, killSession, sendKeys, sessionExists, getAgentSessions } from './tmux.js';
-import { initHook, checkHook, generateGUPPPrompt } from './hooks.js';
+import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
 
@@ -63,7 +63,7 @@ export function spawnAgent(options: SpawnOptions): AgentState {
     throw new Error(`Agent ${agentId} already running. Use 'pan work tell' to message it.`);
   }
 
-  // Initialize hook for this agent (GUPP support)
+  // Initialize hook for this agent (FPP support)
   initHook(agentId);
 
   // Create state
@@ -82,15 +82,15 @@ export function spawnAgent(options: SpawnOptions): AgentState {
 
   saveAgentState(state);
 
-  // Build prompt with GUPP work if available
+  // Build prompt with FPP work if available
   let prompt = options.prompt || '';
 
-  // GUPP: Check for pending work on hook
+  // FPP: Check for pending work on hook
   const { hasWork, items } = checkHook(agentId);
   if (hasWork) {
-    const guppPrompt = generateGUPPPrompt(agentId);
-    if (guppPrompt) {
-      prompt = guppPrompt + '\n\n---\n\n' + prompt;
+    const fixedPointPrompt = generateFixedPointPrompt(agentId);
+    if (fixedPointPrompt) {
+      prompt = fixedPointPrompt + '\n\n---\n\n' + prompt;
     }
   }
 
@@ -286,19 +286,19 @@ function generateRecoveryPrompt(state: AgentState): string {
     '3. Check hook for pending work: `pan work hook check`',
     '4. Resume from last known state',
     '',
-    '## GUPP Reminder',
-    '> "If there is work on your Hook, YOU MUST RUN IT."',
+    '## FPP Reminder',
+    '> "Any runnable action is a fixed point and must resolve before the system can rest."',
     '',
   ];
 
-  // Add GUPP work if available
+  // Add FPP work if available
   const { hasWork } = checkHook(state.id);
   if (hasWork) {
-    const guppPrompt = generateGUPPPrompt(state.id);
-    if (guppPrompt) {
+    const fixedPointPrompt = generateFixedPointPrompt(state.id);
+    if (fixedPointPrompt) {
       lines.push('---');
       lines.push('');
-      lines.push(guppPrompt);
+      lines.push(fixedPointPrompt);
     }
   }
 

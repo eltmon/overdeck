@@ -5,7 +5,7 @@ import {
   popFromHook,
   clearHook,
   sendMail,
-  generateGUPPPrompt,
+  generateFixedPointPrompt,
   HookItem,
 } from '../../../lib/hooks.js';
 
@@ -130,11 +130,11 @@ export async function hookCommand(
       break;
     }
 
-    case 'gupp': {
-      const prompt = generateGUPPPrompt(idOrMessage || agentId);
+    case 'fpp': {
+      const prompt = generateFixedPointPrompt(idOrMessage || agentId);
 
       if (!prompt) {
-        console.log(chalk.green('No GUPP work found'));
+        console.log(chalk.green('No fixed point work found'));
         return;
       }
 
@@ -150,6 +150,6 @@ export async function hookCommand(
       console.log(`  ${chalk.cyan('pan work hook pop <item-id>')}  - Remove completed item`);
       console.log(`  ${chalk.cyan('pan work hook clear [agent-id]')}  - Clear all hook items`);
       console.log(`  ${chalk.cyan('pan work hook mail <agent-id> <msg>')}  - Send mail to agent`);
-      console.log(`  ${chalk.cyan('pan work hook gupp [agent-id]')}  - Generate GUPP prompt`);
+      console.log(`  ${chalk.cyan('pan work hook fpp [agent-id]')}  - Generate FPP prompt`);
   }
 }
