@@ -137,6 +137,15 @@ program
       }
     }
 
+    // Check npm is available
+    try {
+      execSync('npm --version', { stdio: 'pipe' });
+    } catch {
+      console.error(chalk.red('Error: npm not found in PATH'));
+      console.error(chalk.dim('Make sure Node.js and npm are installed and in your PATH'));
+      process.exit(1);
+    }
+
     // Start dashboard
     console.log(chalk.dim('Starting dashboard...'));
 
@@ -146,8 +155,23 @@ program
         cwd: dashboardDir,
         detached: true,
         stdio: 'ignore',
+        shell: true,
       });
-      child.unref();
+
+      // Handle spawn errors before unref
+      let hasError = false;
+      child.on('error', (err) => {
+        hasError = true;
+        console.error(chalk.red('Failed to start dashboard in background:'), err.message);
+        process.exit(1);
+      });
+
+      // Small delay to catch immediate spawn errors
+      setTimeout(() => {
+        if (!hasError) {
+          child.unref();
+        }
+      }, 100);
       console.log(chalk.green('✓ Dashboard started in background'));
       if (traefikEnabled) {
         console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
@@ -170,6 +194,7 @@ program
       const child = spawn('npm', ['run', 'dev'], {
         cwd: dashboardDir,
         stdio: 'inherit',
+        shell: true,
       });
 
       child.on('error', (err) => {

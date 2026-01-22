@@ -172,30 +172,16 @@ const child = spawn('npm', ['run', 'dev'], {
 3. Clear error message when npm is not found
 4. No regressions on Linux
 
-## Current Status
-
-**Implementation Phase: COMPLETE**
-
-All code changes have been implemented:
-- ✅ Added npm pre-flight check (lines 140-147)
-- ✅ Added `shell: true` to background spawn (line 158)
-- ✅ Added error handling for background spawn (lines 162-174)
-- ✅ Added `shell: true` to foreground spawn (line 197)
-
-**Next Phase: Testing**
-
-Ready to test on macOS with nvm and Linux to verify the fixes work as expected.
-
 ## Beads Tasks
 
 | ID | Title | Status | Blocked By |
 |----|-------|--------|------------|
-| panopticon-324n | Add shell: true to foreground spawn | closed | - |
-| panopticon-rsb1 | Add shell: true to background spawn | closed | - |
-| panopticon-qdu3 | Add npm pre-flight check | closed | - |
-| panopticon-pxqm | Add error handling for background spawn | closed | - |
-| panopticon-zppl | Test on macOS with nvm | open | - |
-| panopticon-nnic | Test on Linux (verify no regression) | open | - |
+| panopticon-324n | Add shell: true to foreground spawn | open | - |
+| panopticon-rsb1 | Add shell: true to background spawn | open | - |
+| panopticon-qdu3 | Add npm pre-flight check | open | - |
+| panopticon-pxqm | Add error handling for background spawn | open | panopticon-rsb1 |
+| panopticon-zppl | Test on macOS with nvm | open | 324n, rsb1, qdu3, pxqm |
+| panopticon-nnic | Test on Linux (verify no regression) | open | 324n, rsb1 |
 
 ## References
 
