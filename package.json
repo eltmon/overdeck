@@ -1,6 +1,6 @@
 {
   "name": "panopticon-cli",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "keywords": [
     "ai-agents",
