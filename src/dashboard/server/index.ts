@@ -2457,15 +2457,29 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     return res.json({ exists: false, issueId });
   }
 
-  // Check if workspace is corrupted (exists but not a valid git worktree)
+  // Check if workspace is valid (has git, devcontainer, or CLAUDE.md)
+  // MYN monorepo style has .git in subdirs (api/.git, fe/.git), not at root
   const gitFile = join(workspacePath, '.git');
-  if (!existsSync(gitFile)) {
+  const apiGit = join(workspacePath, 'api', '.git');
+  const feGit = join(workspacePath, 'fe', '.git');
+  const srcGit = join(workspacePath, 'src', '.git');
+  const devcontainer = join(workspacePath, '.devcontainer');
+  const claudeMd = join(workspacePath, 'CLAUDE.md');
+
+  const hasValidStructure = existsSync(gitFile) ||       // Standard git worktree
+                            existsSync(apiGit) ||         // MYN monorepo (api subdir)
+                            existsSync(feGit) ||          // MYN monorepo (fe subdir)
+                            existsSync(srcGit) ||         // Other monorepo patterns
+                            existsSync(devcontainer) ||   // Containerized workspace
+                            existsSync(claudeMd);         // Panopticon workspace
+
+  if (!hasValidStructure) {
     return res.json({
       exists: true,
       corrupted: true,
       issueId,
       path: workspacePath,
-      message: 'Workspace exists but is not a valid git worktree',
+      message: 'Workspace exists but is not a valid git worktree or containerized workspace',
     });
   }
 
