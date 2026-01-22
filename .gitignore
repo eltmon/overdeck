@@ -37,3 +37,7 @@ workspaces/
 src/lib/**/*.js
 src/dashboard/frontend/test-results/
 src/dashboard/restart.sh
+
+# Workspace-specific generated files
+CLAUDE.md
+.planning/PLANNING_PROMPT.md
