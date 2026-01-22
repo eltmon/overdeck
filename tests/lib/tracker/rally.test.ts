@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RallyTracker } from '../../../src/lib/tracker/rally.js';
 import { TrackerAuthError, IssueNotFoundError } from '../../../src/lib/tracker/interface.js';
 
-// Mock rally SDK
+// Mock RallyRestApi
 const mockQuery = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 
-vi.mock('rally', () => ({
-  default: vi.fn(() => ({
+vi.mock('../../../src/lib/tracker/rally-api.js', () => ({
+  RallyRestApi: vi.fn().mockImplementation(() => ({
     query: mockQuery,
     create: mockCreate,
     update: mockUpdate,
@@ -80,8 +80,13 @@ describe('RallyTracker', () => {
         },
       ];
 
-      mockQuery.mockImplementation((config, callback) => {
-        callback(null, { Results: mockResults });
+      mockQuery.mockResolvedValue({
+        QueryResult: {
+          Results: mockResults,
+          TotalResultCount: 2,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -110,23 +115,41 @@ describe('RallyTracker', () => {
     });
 
     it('should apply limit filter', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        callback(null, { Results: [] });
+      mockQuery.mockResolvedValue({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test Issue',
+            Description: 'Test description',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ limit: 25 });
 
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: 25 }),
-        expect.any(Function)
+        expect.objectContaining({ limit: 25 })
       );
     });
 
     it('should throw TrackerAuthError on 401 error', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        callback({ message: 'Unauthorized' }, null);
-      });
+      mockQuery.mockRejectedValue(new Error('Unauthorized'));
 
       const tracker = new RallyTracker({ apiKey: 'bad_key' });
 
@@ -155,8 +178,13 @@ describe('RallyTracker', () => {
         },
       ];
 
-      mockQuery.mockImplementation((config, callback) => {
-        callback(null, { Results: mockResults });
+      mockQuery.mockResolvedValue({
+        QueryResult: {
+          Results: mockResults,
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -165,15 +193,19 @@ describe('RallyTracker', () => {
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           query: '(FormattedID = "US999")',
-        }),
-        expect.any(Function)
+        })
       );
       expect(issue.ref).toBe('US999');
     });
 
     it('should throw IssueNotFoundError when issue not found', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        callback(null, { Results: [] });
+      mockQuery.mockResolvedValue({
+        QueryResult: {
+          Results: [],
+          TotalResultCount: 0,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -184,41 +216,78 @@ describe('RallyTracker', () => {
 
   describe('updateIssue', () => {
     it('should update issue title and description', async () => {
-      // Mock getIssue call
-      mockQuery.mockImplementation((config, callback) => {
-        if (config.query?.includes('FormattedID')) {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              FormattedID: 'US123',
-              Name: 'Original Title',
-              Description: 'Original description',
-              ScheduleState: 'Defined',
-              State: null,
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: 'Normal',
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'HierarchicalRequirement',
-              _ref: '/hierarchicalrequirement/12345',
-            }],
-          });
-        } else {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              _ref: '/hierarchicalrequirement/12345',
-              _type: 'HierarchicalRequirement',
-            }],
-          });
-        }
+      // Mock getIssue call (first query)
+      mockQuery.mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Original Title',
+            Description: 'Original description',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockUpdate.mockImplementation((config, callback) => {
-        callback(null, { Object: {} });
+      // Mock query for ref (second query)
+      mockQuery.mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            _ref: '/hierarchicalrequirement/12345',
+            _type: 'HierarchicalRequirement',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      });
+
+      // Mock final getIssue call
+      mockQuery.mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Updated Title',
+            Description: 'Updated description',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      });
+
+      mockUpdate.mockResolvedValue({
+        OperationResult: {
+          Object: {},
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -233,46 +302,76 @@ describe('RallyTracker', () => {
             Name: 'Updated Title',
             Description: 'Updated description',
           }),
-        }),
-        expect.any(Function)
+        })
       );
     });
 
     it('should update state for User Story', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        if (config.query?.includes('FormattedID')) {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              FormattedID: 'US123',
-              Name: 'Test Story',
-              Description: '',
-              ScheduleState: 'Defined',
-              State: null,
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: 'Normal',
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'HierarchicalRequirement',
-              _ref: '/hierarchicalrequirement/12345',
-            }],
-          });
-        } else {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              _ref: '/hierarchicalrequirement/12345',
-              _type: 'HierarchicalRequirement',
-            }],
-          });
-        }
+      mockQuery.mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test Story',
+            Description: '',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      }).mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            _ref: '/hierarchicalrequirement/12345',
+            _type: 'HierarchicalRequirement',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      }).mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test Story',
+            Description: '',
+            ScheduleState: 'In-Progress',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockUpdate.mockImplementation((config, callback) => {
-        callback(null, { Object: {} });
+      mockUpdate.mockResolvedValue({
+        OperationResult: {
+          Object: {},
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -283,46 +382,76 @@ describe('RallyTracker', () => {
           data: expect.objectContaining({
             ScheduleState: 'In-Progress',
           }),
-        }),
-        expect.any(Function)
+        })
       );
     });
 
     it('should update state for Defect using State field', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        if (config.query?.includes('FormattedID')) {
-          callback(null, {
-            Results: [{
-              ObjectID: '67890',
-              FormattedID: 'DE456',
-              Name: 'Test Defect',
-              Description: '',
-              ScheduleState: null,
-              State: 'Defined',
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: 'High',
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'Defect',
-              _ref: '/defect/67890',
-            }],
-          });
-        } else {
-          callback(null, {
-            Results: [{
-              ObjectID: '67890',
-              _ref: '/defect/67890',
-              _type: 'Defect',
-            }],
-          });
-        }
+      mockQuery.mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '67890',
+            FormattedID: 'DE456',
+            Name: 'Test Defect',
+            Description: '',
+            ScheduleState: null,
+            State: 'Defined',
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'High',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'Defect',
+            _ref: '/defect/67890',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      }).mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '67890',
+            _ref: '/defect/67890',
+            _type: 'Defect',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      }).mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '67890',
+            FormattedID: 'DE456',
+            Name: 'Test Defect',
+            Description: '',
+            ScheduleState: null,
+            State: 'Completed',
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'High',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'Defect',
+            _ref: '/defect/67890',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockUpdate.mockImplementation((config, callback) => {
-        callback(null, { Object: {} });
+      mockUpdate.mockResolvedValue({
+        OperationResult: {
+          Object: {},
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -333,46 +462,42 @@ describe('RallyTracker', () => {
           data: expect.objectContaining({
             State: 'Completed',
           }),
-        }),
-        expect.any(Function)
+        })
       );
     });
 
     it('should update priority', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        if (config.query?.includes('FormattedID')) {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              FormattedID: 'US123',
-              Name: 'Test',
-              Description: '',
-              ScheduleState: 'Defined',
-              State: null,
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: 'Normal',
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'HierarchicalRequirement',
-              _ref: '/hierarchicalrequirement/12345',
-            }],
-          });
-        } else {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              _ref: '/hierarchicalrequirement/12345',
-              _type: 'HierarchicalRequirement',
-            }],
-          });
-        }
+      mockQuery.mockResolvedValue({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test Issue',
+            Description: 'Test description',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockUpdate.mockImplementation((config, callback) => {
-        callback(null, { Object: {} });
+      mockUpdate.mockResolvedValue({
+        OperationResult: {
+          Object: {},
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -383,26 +508,27 @@ describe('RallyTracker', () => {
           data: expect.objectContaining({
             Priority: 'High',
           }),
-        }),
-        expect.any(Function)
+        })
       );
     });
   });
 
   describe('createIssue', () => {
     it('should create issue with all fields', async () => {
-      mockCreate.mockImplementation((config, callback) => {
-        callback(null, {
+      mockCreate.mockResolvedValue({
+        CreateResult: {
           Object: {
             FormattedID: 'US200',
             ObjectID: '200',
             _ref: '/hierarchicalrequirement/200',
           },
-        });
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockQuery.mockImplementation((config, callback) => {
-        callback(null, {
+      mockQuery.mockResolvedValue({
+        QueryResult: {
           Results: [{
             ObjectID: '200',
             FormattedID: 'US200',
@@ -418,8 +544,12 @@ describe('RallyTracker', () => {
             LastUpdateDate: '2024-01-15T00:00:00Z',
             Parent: null,
             _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/200',
           }],
-        });
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({
@@ -443,8 +573,7 @@ describe('RallyTracker', () => {
             Priority: 'High',
             DueDate: '2024-12-31',
           }),
-        }),
-        expect.any(Function)
+        })
       );
 
       expect(issue.ref).toBe('US200');
@@ -461,61 +590,67 @@ describe('RallyTracker', () => {
 
   describe('getComments', () => {
     it('should return comments for issue', async () => {
-      let callCount = 0;
-      mockQuery.mockImplementation((config, callback) => {
-        callCount++;
-        // First call is getIssue
-        if (callCount === 1) {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              FormattedID: 'US123',
-              Name: 'Test',
-              Description: '',
-              ScheduleState: 'Defined',
-              State: null,
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: 'Normal',
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'HierarchicalRequirement',
-            }],
-          });
-        }
-        // Second call is for getting the artifact with Discussion
-        else if (config.type === 'artifact') {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              _ref: '/hierarchicalrequirement/12345',
-              Discussion: { _ref: '/discussion/111' },
-            }],
-          });
-        }
-        // Third call is for getting conversation posts
-        else if (config.type === 'conversationpost') {
-          callback(null, {
-            Results: [
-              {
-                ObjectID: '1001',
-                Text: 'First comment',
-                User: { _refObjectName: 'John Doe' },
-                CreationDate: '2024-01-10T00:00:00Z',
-                PostNumber: 1,
-              },
-              {
-                ObjectID: '1002',
-                Text: 'Second comment',
-                User: { _refObjectName: 'Jane Smith' },
-                CreationDate: '2024-01-11T00:00:00Z',
-                PostNumber: 2,
-              },
-            ],
-          });
-        }
+      // First query: getIssue
+      mockQuery.mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test',
+            Description: '',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      })
+      // Second query: get artifact with Discussion
+      .mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            _ref: '/hierarchicalrequirement/12345',
+            Discussion: { _ref: '/discussion/111' },
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      })
+      // Third query: get conversation posts
+      .mockResolvedValueOnce({
+        QueryResult: {
+          Results: [
+            {
+              ObjectID: '1001',
+              Text: 'First comment',
+              User: { _refObjectName: 'John Doe' },
+              CreationDate: '2024-01-10T00:00:00Z',
+              PostNumber: 1,
+            },
+            {
+              ObjectID: '1002',
+              Text: 'Second comment',
+              User: { _refObjectName: 'Jane Smith' },
+              CreationDate: '2024-01-11T00:00:00Z',
+              PostNumber: 2,
+            },
+          ],
+          TotalResultCount: 2,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -532,40 +667,43 @@ describe('RallyTracker', () => {
     });
 
     it('should return empty array if no discussion', async () => {
-      let callCount = 0;
-      mockQuery.mockImplementation((config, callback) => {
-        callCount++;
-        // First call is getIssue
-        if (callCount === 1) {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              FormattedID: 'US123',
-              Name: 'Test',
-              Description: '',
-              ScheduleState: 'Defined',
-              State: null,
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: 'Normal',
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'HierarchicalRequirement',
-            }],
-          });
-        }
-        // Second call is for getting the artifact with Discussion
-        else {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              _ref: '/hierarchicalrequirement/12345',
-              Discussion: null,
-            }],
-          });
-        }
+      // First query: getIssue
+      mockQuery.mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test',
+            Description: '',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
+      })
+      // Second query: get artifact with no Discussion
+      .mockResolvedValueOnce({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            _ref: '/hierarchicalrequirement/12345',
+            Discussion: null,
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -577,22 +715,39 @@ describe('RallyTracker', () => {
 
   describe('addComment', () => {
     it('should add comment to issue with existing discussion', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        callback(null, {
+      mockQuery.mockResolvedValue({
+        QueryResult: {
           Results: [{
             ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test Issue',
+            Description: 'Test description',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
             _ref: '/hierarchicalrequirement/12345',
-            Discussion: { _ref: '/discussion/111' },
           }],
-        });
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockCreate.mockImplementation((config, callback) => {
-        callback(null, {
+      mockCreate.mockResolvedValue({
+        CreateResult: {
           Object: {
             ObjectID: '2001',
           },
-        });
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -604,30 +759,46 @@ describe('RallyTracker', () => {
           data: expect.objectContaining({
             Text: 'New comment',
           }),
-        }),
-        expect.any(Function)
+        })
       );
 
       expect(comment.body).toBe('New comment');
     });
 
     it('should create discussion if none exists', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        callback(null, {
+      mockQuery.mockResolvedValue({
+        QueryResult: {
           Results: [{
             ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test Issue',
+            Description: 'Test description',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
             _ref: '/hierarchicalrequirement/12345',
-            Discussion: null,
           }],
-        });
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockCreate.mockImplementation((config, callback) => {
-        callback(null, {
+      mockCreate.mockResolvedValue({
+        CreateResult: {
           Object: {
             ObjectID: '2001',
           },
-        });
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -640,40 +811,37 @@ describe('RallyTracker', () => {
 
   describe('transitionIssue', () => {
     it('should transition issue state', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        if (config.query?.includes('FormattedID')) {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              FormattedID: 'US123',
-              Name: 'Test',
-              Description: '',
-              ScheduleState: 'Defined',
-              State: null,
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: 'Normal',
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'HierarchicalRequirement',
-              _ref: '/hierarchicalrequirement/12345',
-            }],
-          });
-        } else {
-          callback(null, {
-            Results: [{
-              ObjectID: '12345',
-              _ref: '/hierarchicalrequirement/12345',
-              _type: 'HierarchicalRequirement',
-            }],
-          });
-        }
+      mockQuery.mockResolvedValue({
+        QueryResult: {
+          Results: [{
+            ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test Issue',
+            Description: 'Test description',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
+            _ref: '/hierarchicalrequirement/12345',
+          }],
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockUpdate.mockImplementation((config, callback) => {
-        callback(null, { Object: {} });
+      mockUpdate.mockResolvedValue({
+        OperationResult: {
+          Object: {},
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -684,30 +852,46 @@ describe('RallyTracker', () => {
           data: expect.objectContaining({
             ScheduleState: 'Completed',
           }),
-        }),
-        expect.any(Function)
+        })
       );
     });
   });
 
   describe('linkPR', () => {
     it('should add comment with PR link', async () => {
-      mockQuery.mockImplementation((config, callback) => {
-        callback(null, {
+      mockQuery.mockResolvedValue({
+        QueryResult: {
           Results: [{
             ObjectID: '12345',
+            FormattedID: 'US123',
+            Name: 'Test Issue',
+            Description: 'Test description',
+            ScheduleState: 'Defined',
+            State: null,
+            Tags: { _tagsNameArray: [] },
+            Owner: null,
+            Priority: 'Normal',
+            DueDate: null,
+            CreationDate: '2024-01-01T00:00:00Z',
+            LastUpdateDate: '2024-01-01T00:00:00Z',
+            Parent: null,
+            _type: 'HierarchicalRequirement',
             _ref: '/hierarchicalrequirement/12345',
-            Discussion: { _ref: '/discussion/111' },
           }],
-        });
+          TotalResultCount: 1,
+          Errors: [],
+          Warnings: [],
+        },
       });
 
-      mockCreate.mockImplementation((config, callback) => {
-        callback(null, {
+      mockCreate.mockResolvedValue({
+        CreateResult: {
           Object: {
             ObjectID: '3001',
           },
-        });
+          Errors: [],
+          Warnings: [],
+        },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -718,8 +902,7 @@ describe('RallyTracker', () => {
           data: expect.objectContaining({
             Text: 'Linked Pull Request: https://github.com/owner/repo/pull/50',
           }),
-        }),
-        expect.any(Function)
+        })
       );
     });
   });
@@ -733,9 +916,11 @@ describe('RallyTracker', () => {
         { rallyState: 'Accepted', expected: 'closed' },
       ];
 
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+
       for (const test of stateTests) {
-        mockQuery.mockImplementation((config, callback) => {
-          callback(null, {
+        mockQuery.mockResolvedValueOnce({
+          QueryResult: {
             Results: [{
               ObjectID: '1',
               FormattedID: 'US1',
@@ -751,11 +936,14 @@ describe('RallyTracker', () => {
               LastUpdateDate: '2024-01-01T00:00:00Z',
               Parent: null,
               _type: 'HierarchicalRequirement',
+              _ref: '/hierarchicalrequirement/1',
             }],
-          });
+            TotalResultCount: 1,
+            Errors: [],
+            Warnings: [],
+          },
         });
 
-        const tracker = new RallyTracker({ apiKey: 'test_key' });
         const issue = await tracker.getIssue('US1');
         expect(issue.state).toBe(test.expected);
       }
@@ -771,9 +959,11 @@ describe('RallyTracker', () => {
         { rallyPriority: 'Low', expected: 3 },
       ];
 
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+
       for (const test of priorityTests) {
-        mockQuery.mockImplementation((config, callback) => {
-          callback(null, {
+        mockQuery.mockResolvedValueOnce({
+          QueryResult: {
             Results: [{
               ObjectID: '1',
               FormattedID: 'US1',
@@ -789,11 +979,14 @@ describe('RallyTracker', () => {
               LastUpdateDate: '2024-01-01T00:00:00Z',
               Parent: null,
               _type: 'HierarchicalRequirement',
+              _ref: '/hierarchicalrequirement/1',
             }],
-          });
+            TotalResultCount: 1,
+            Errors: [],
+            Warnings: [],
+          },
         });
 
-        const tracker = new RallyTracker({ apiKey: 'test_key' });
         const issue = await tracker.getIssue('US1');
         expect(issue.priority).toBe(test.expected);
       }

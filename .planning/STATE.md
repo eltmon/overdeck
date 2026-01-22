@@ -1,173 +1,161 @@
-# PAN-45: Traefik fails to start due to Docker network label mismatch
+# PAN-50: Replace rally npm package with direct WSAPI calls
 
-## Status: IMPLEMENTATION COMPLETE
+## Status: IMPLEMENTATION COMPLETE ✅
 
-## Problem
+## Problem Statement
 
-`pan up` fails to start Traefik with error:
-```
-network panopticon was found but has incorrect label com.docker.compose.network set to "" (expected: "panopticon")
-```
+The `rally` npm package (v2.1.3) depends on deprecated `core-js@2.x`:
+- `rally@2.1.3` → `babel-runtime@6.11.6` → `core-js@2.6.12`
+- core-js@<3.23.3 is unmaintained and causes V8 performance issues (up to 100x slowdown)
 
-**Root Cause:** `pan install` creates the Docker network directly via `docker network create`, but Traefik's `docker-compose.yml` expects to manage the network itself. Since the network wasn't created by docker-compose, it lacks the required labels.
-
-## Decision Log
+## Decisions Made
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Fix approach | Add `external: true` to network definition | Standard docker-compose pattern for pre-existing networks |
-| Testing | Add regression test to e2e-traefik.sh | Prevent future regression |
-| Upgrade path | Migration in `pan install` + auto-fix in `pan up` | Belt and suspenders - catch it in both places |
+| Rally usage | Actively used | Not just dependency hygiene - needs to work correctly |
+| Testing approach | Mock-only | Keep current approach, no real Rally instance needed |
+| Artifact types | All (US, DE, TA, F) | Maintain existing functionality |
+| Scope | Pure 1:1 replacement | No feature creep, match existing behavior exactly |
 
-## Solution
+## Rally WSAPI Reference
 
-### 1. Fix the Template (Primary Fix)
+- **Base URL**: `https://rally1.rallydev.com/slm/webservice/v2.0/`
+- **Auth**: `ZSESSIONID` header with API key
+- **Content-Type**: `application/json`
 
-Update `templates/traefik/docker-compose.yml`:
-```yaml
-networks:
-  panopticon:
-    name: panopticon
-    external: true  # Network created by 'pan install'
-```
+### Endpoints Used
 
-### 2. Migration in `pan install`
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Query artifacts | GET | `/artifact?query=...&fetch=...` |
+| Get by ref | GET | `/{type}/{objectId}` |
+| Create | POST | `/{type}/create` |
+| Update | POST | `/{type}/{objectId}` |
 
-In `src/cli/commands/install.ts`, after the Traefik setup section, check if existing `~/.panopticon/traefik/docker-compose.yml` needs patching:
+## Architecture
+
+### New File: `src/lib/tracker/rally-api.ts`
+
+Thin REST client (~100 lines) that:
+- Wraps native `fetch` with Rally-specific headers
+- Handles JSON serialization/deserialization
+- Provides typed methods: `query()`, `get()`, `create()`, `update()`
+- Does NOT handle business logic (normalization, state mapping)
 
 ```typescript
-// Check if existing docker-compose.yml needs migration (for upgrades)
-const existingCompose = join(TRAEFIK_DIR, 'docker-compose.yml');
-if (existsSync(existingCompose)) {
-  const content = readFileSync(existingCompose, 'utf-8');
-  if (content.includes('panopticon:') && !content.includes('external: true')) {
-    // Patch the file to add external: true
-    const patched = content.replace(
-      /networks:\s*\n\s*panopticon:\s*\n\s*name: panopticon\s*\n\s*driver: bridge/,
-      'networks:\n  panopticon:\n    name: panopticon\n    external: true'
-    );
-    writeFileSync(existingCompose, patched);
-    spinner.info('Migrated Traefik config (added external: true to network)');
+export interface RallyQueryResult {
+  QueryResult: {
+    Results: any[];
+    TotalResultCount: number;
+    Errors: string[];
+    Warnings: string[];
+  };
+}
+
+export class RallyRestApi {
+  constructor(config: { apiKey: string; server?: string });
+  async query(config: RallyQueryConfig): Promise<RallyQueryResult>;
+  async create(type: string, data: any): Promise<RallyCreateResult>;
+  async update(ref: string, data: any): Promise<RallyUpdateResult>;
+}
+```
+
+### Modified File: `src/lib/tracker/rally.ts`
+
+- Replace `import rally from 'rally'` with `import { RallyRestApi } from './rally-api.js'`
+- Replace callback-based SDK calls with Promise-based REST calls
+- Keep all existing normalization and business logic unchanged
+- Remove Promise wrappers (no longer needed)
+
+### Modified File: `tests/lib/tracker/rally.test.ts`
+
+- Replace `vi.mock('rally')` with `vi.mock('../../../src/lib/tracker/rally-api.js')`
+- Mock the new `RallyRestApi` class methods instead of SDK callbacks
+- Keep same test cases and expected outcomes
+
+## Implementation Tasks (Beads)
+
+| Bead ID | Task | Description |
+|---------|------|-------------|
+| panopticon-kqx0.1 | Create rally-api.ts | REST client with fetch, typed responses |
+| panopticon-kqx0.2 | Update rally.ts | Replace SDK with new client, simplify Promise handling |
+| panopticon-kqx0.3 | Update rally.test.ts | Mock new client class |
+| panopticon-kqx0.4 | Remove rally dependency | Update package.json, run npm install |
+| panopticon-kqx0.5 | Verify clean | Run `npm ls core-js`, confirm empty |
+| panopticon-kqx0.6 | Run tests | Ensure all tests pass |
+
+**Dependency chain:** `.1` → `.2` → `.3` → `.4` → `.5` → `.6` (sequential)
+
+## Test Strategy
+
+- Existing test cases cover all functionality
+- Tests will mock `RallyRestApi` class methods
+- Mock responses match Rally WSAPI format (slightly different from SDK)
+- No integration tests against real Rally
+
+## Response Format Mapping
+
+The rally SDK normalized responses; we need to handle raw WSAPI format:
+
+**SDK Response** (current):
+```javascript
+{ Results: [...artifacts] }
+```
+
+**WSAPI Response** (new):
+```javascript
+{
+  QueryResult: {
+    Results: [...artifacts],
+    TotalResultCount: 42,
+    Errors: [],
+    Warnings: []
   }
 }
 ```
 
-### 3. Auto-fix in `pan up`
-
-In `src/cli/index.ts`, before running `docker-compose up -d` in the Traefik section:
-
-```typescript
-// Ensure network is marked as external (migration for older installs)
-const composeFile = join(traefikDir, 'docker-compose.yml');
-if (existsSync(composeFile)) {
-  const content = readFileSync(composeFile, 'utf-8');
-  if (!content.includes('external: true') && content.includes('panopticon:')) {
-    const patched = content.replace(
-      /networks:\s*\n\s*panopticon:\s*\n\s*name: panopticon\s*\n(\s*driver: bridge)?/,
-      'networks:\n  panopticon:\n    name: panopticon\n    external: true'
-    );
-    writeFileSync(composeFile, patched);
-    console.log(chalk.dim('  (migrated network config)'));
-  }
-}
-```
-
-### 4. Regression Test
-
-Add to `tests/e2e-traefik.sh`:
-
-```bash
-test_install_then_up() {
-  echo "=== Test: pan install then pan up (network label mismatch regression) ==="
-
-  # Clean state
-  docker network rm panopticon 2>/dev/null || true
-  rm -rf ~/.panopticon/traefik
-
-  # Run install (creates network)
-  pan install --skip-mkcert
-
-  # Verify network exists
-  if ! docker network ls | grep -q panopticon; then
-    echo "FAIL: Network not created by pan install"
-    return 1
-  fi
-
-  # Verify docker-compose can use the network (the actual bug)
-  cd ~/.panopticon/traefik
-  if ! docker-compose config > /dev/null 2>&1; then
-    echo "FAIL: docker-compose config failed - network label mismatch?"
-    return 1
-  fi
-
-  echo "PASS: install then up works correctly"
-}
-```
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `templates/traefik/docker-compose.yml` | Add `external: true` to network |
-| `src/cli/commands/install.ts` | Add migration for existing installs |
-| `src/cli/index.ts` | Add auto-fix before `docker-compose up` |
-| `tests/e2e-traefik.sh` | Add regression test |
-
-## Out of Scope
-
-- Changing how `pan install` creates the network (keep using `docker network create`)
-- Modifying other docker-compose templates (they already use `external: true`)
-- Dashboard docker-compose.yml (already correct)
+The `rally-api.ts` client will extract `QueryResult.Results` to maintain compatibility.
 
 ## Acceptance Criteria
 
-1. Fresh install: `pan install && pan up` starts Traefik without errors
-2. Existing install: `pan up` auto-fixes and starts Traefik
-3. Test: e2e-traefik.sh passes with new test case
-4. Consistency: Traefik docker-compose.yml matches dashboard pattern
-
-## Beads Tasks
-
-| ID | Title | Status | Blocked By |
-|----|-------|--------|------------|
-| panopticon-6a6o | Fix templates/traefik/docker-compose.yml | open | - |
-| panopticon-z5oc | Add migration to pan install | open | - |
-| panopticon-hm01 | Add auto-fix to pan up | open | - |
-| panopticon-mlc0 | Add regression test to e2e-traefik.sh | open | - |
-
-## References
-
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/45
-- Docker Compose external networks: https://docs.docker.com/compose/networking/#use-a-pre-existing-network
+- [x] All Rally tracker tests pass (`npm test -- tests/lib/tracker/rally.test.ts`) - **22/22 passing**
+- [x] `npm ls core-js` returns empty (no core-js in dependency tree) - **Verified**
+- [x] No changes to public API (`RallyTracker` class interface unchanged) - **Confirmed**
+- [x] Full test suite passes (`npm test`) - **221/221 passing**
 
 ## Implementation Summary
 
-All tasks have been completed:
+### Files Created
+- `src/lib/tracker/rally-api.ts` - New REST client using native fetch (~200 lines)
 
-1. ✅ **Template Fixed**: Updated `templates/traefik/docker-compose.yml` to use `external: true`
-2. ✅ **Migration Added**: Added auto-migration code to `pan install` that patches existing docker-compose.yml files
-3. ✅ **Auto-fix Added**: Added auto-fix code to `pan up` that ensures network config is correct before starting Traefik
-4. ✅ **Regression Test Added**: Added Test 4 to `tests/e2e-traefik.sh` that validates the docker-compose config
+### Files Modified
+- `src/lib/tracker/rally.ts` - Updated to use RallyRestApi instead of rally SDK
+- `tests/lib/tracker/rally.test.ts` - Updated mocks to use Promise-based API
+- `package.json` - Removed rally dependency
 
-### Changes Made
+### Results
+- **core-js removed**: Dependency tree now clean of deprecated core-js@2.x
+- **All tests passing**: 22 Rally tests + 199 other tests = 221 total
+- **API unchanged**: Drop-in replacement, no breaking changes
+- **Implementation**: Pure 1:1 replacement as planned
 
-- `templates/traefik/docker-compose.yml`: Changed `driver: bridge` to `external: true`
-- `src/cli/commands/install.ts`: Added migration logic after Traefik setup (lines 314-327)
-- `src/cli/index.ts`: Added auto-fix logic before starting Traefik (lines 131-144)
-- `tests/e2e-traefik.sh`: Added Test 4 for regression testing (lines 132-145), renumbered subsequent tests
+## Risk Assessment
 
-### Beads Tasks Completed
+| Risk | Likelihood | Mitigation |
+|------|------------|------------|
+| API differences | Low | Rally WSAPI is well-documented; SDK was just a wrapper |
+| Auth changes | Low | Use same `ZSESSIONID` header pattern |
+| Response format changes | Medium | Handle in rally-api.ts, test coverage |
 
-All beads tasks have been closed:
-- panopticon-6a6o: Fix template ✅
-- panopticon-z5oc: Add migration to install ✅
-- panopticon-hm01: Add auto-fix to up ✅
-- panopticon-mlc0: Add regression test ✅
+## Out of Scope
 
-### Build Status
+- Adding retry logic
+- Adding rate limiting
+- Supporting new Rally features
+- Changing the IssueTracker interface
+- Adding integration tests
 
-✅ Project built successfully (CLI + Dashboard)
+## References
 
-### Next Steps
-
-Ready for commit and push to remote.
+- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/50
+- Rally WSAPI Docs: https://rally1.rallydev.com/slm/doc/webservice/

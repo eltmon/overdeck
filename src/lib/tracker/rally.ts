@@ -5,8 +5,7 @@
  * Supports all Rally work item types: User Stories, Defects, Tasks, and Features.
  */
 
-// @ts-expect-error No type declarations available for 'rally' package
-import rally from 'rally';
+import { RallyRestApi } from './rally-api.js';
 import type {
   Issue,
   IssueFilters,
@@ -56,7 +55,7 @@ export interface RallyConfig {
 
 export class RallyTracker implements IssueTracker {
   readonly name: TrackerType = 'rally' as TrackerType;
-  private restApi: any;
+  private restApi: RallyRestApi;
   private workspace?: string;
   private project?: string;
 
@@ -65,7 +64,7 @@ export class RallyTracker implements IssueTracker {
       throw new TrackerAuthError('rally' as TrackerType, 'API key is required');
     }
 
-    this.restApi = rally({
+    this.restApi = new RallyRestApi({
       apiKey: config.apiKey,
       server: config.server || 'https://rally1.rallydev.com',
       requestOptions: {
@@ -438,48 +437,37 @@ export class RallyTracker implements IssueTracker {
   }
 
   // Rally API wrapper methods
-  private queryRally(queryConfig: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.restApi.query(queryConfig, (error: any, result: any) => {
-        if (error) {
-          reject(new Error(error.message || 'Rally API query failed'));
-        } else {
-          resolve(result);
-        }
-      });
-    });
+  private async queryRally(queryConfig: any): Promise<any> {
+    const result = await this.restApi.query(queryConfig);
+    // Extract Results from WSAPI response format
+    return {
+      Results: result.QueryResult.Results,
+      TotalResultCount: result.QueryResult.TotalResultCount,
+    };
   }
 
-  private createRally(type: string, data: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.restApi.create({
-        type,
-        data,
-        fetch: ['FormattedID', 'ObjectID', '_ref'],
-      }, (error: any, result: any) => {
-        if (error) {
-          reject(new Error(error.message || 'Rally API create failed'));
-        } else {
-          resolve(result);
-        }
-      });
+  private async createRally(type: string, data: any): Promise<any> {
+    const result = await this.restApi.create({
+      type,
+      data,
+      fetch: ['FormattedID', 'ObjectID', '_ref'],
     });
+    // Extract Object from WSAPI response format
+    return {
+      Object: result.CreateResult.Object,
+    };
   }
 
-  private updateRally(type: string, ref: string, data: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.restApi.update({
-        type,
-        ref,
-        data,
-        fetch: ['FormattedID', 'ObjectID'],
-      }, (error: any, result: any) => {
-        if (error) {
-          reject(new Error(error.message || 'Rally API update failed'));
-        } else {
-          resolve(result);
-        }
-      });
+  private async updateRally(type: string, ref: string, data: any): Promise<any> {
+    const result = await this.restApi.update({
+      type,
+      ref,
+      data,
+      fetch: ['FormattedID', 'ObjectID'],
     });
+    // Extract Object from WSAPI response format
+    return {
+      Object: result.OperationResult.Object,
+    };
   }
 }
