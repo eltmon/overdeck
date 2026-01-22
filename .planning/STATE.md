@@ -94,9 +94,12 @@ All core features have been implemented and tested:
 - ✅ Changes committed to feature/pan-30 branch
 - ✅ Changes pushed to remote repository
 
-**Commit:** 2f9c4a2
+**Commit:** bba6bf6
 **Branch:** feature/pan-30
 **Remote:** https://github.com/eltmon/panopticon-cli/pull/new/feature/pan-30
+
+**Recent Fixes:**
+- Fixed Claude Code hooks format (bba6bf6) - Updated to new format: `{ matcher: {}, hooks: [{ type: "command", command: "..." }] }`
 
 **Ready for:**
 - Manual testing with live agent spawn
