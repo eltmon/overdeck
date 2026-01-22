@@ -45,6 +45,7 @@ async function emergencyStop(): Promise<{ killedAgents: string[] }> {
 
 export function CloisterStatusBar() {
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   const { data: status, refetch } = useQuery({
     queryKey: ['cloister-status'],
@@ -53,12 +54,17 @@ export function CloisterStatusBar() {
   });
 
   const handleToggle = async () => {
-    if (status?.running) {
-      await stopCloister();
-    } else {
-      await startCloister();
+    setIsToggling(true);
+    try {
+      if (status?.running) {
+        await stopCloister();
+      } else {
+        await startCloister();
+      }
+      await refetch();
+    } finally {
+      setIsToggling(false);
     }
-    refetch();
   };
 
   const handleEmergencyStop = async () => {
@@ -129,13 +135,18 @@ export function CloisterStatusBar() {
         {/* Toggle Monitoring */}
         <button
           onClick={handleToggle}
+          disabled={isToggling}
           className={`px-3 py-1 rounded text-xs transition-colors ${
-            status.running
+            isToggling
+              ? 'bg-gray-600 text-gray-400 cursor-wait'
+              : status.running
               ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {status.running ? 'Pause' : 'Start'}
+          {isToggling
+            ? (status.running ? 'Stopping...' : 'Starting...')
+            : (status.running ? 'Pause' : 'Start')}
         </button>
 
         {/* Emergency Stop */}
