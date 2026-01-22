@@ -340,6 +340,37 @@ Cloister manages specialized agents that handle specific phases of the developme
 | **review-agent** | Code review before merge | After tests pass (manual trigger) |
 | **merge-agent** | Handles git merge and conflict resolution | "Approve & Merge" button |
 
+#### Merge Agent Workflow
+
+The merge-agent is a specialist that handles the entire PR merge process:
+
+1. **Pull latest main** - Ensures local main is up-to-date
+2. **Merge main into feature branch** - Brings in any changes from main
+3. **Resolve conflicts** - Uses AI to resolve merge conflicts intelligently
+4. **Run tests** - Verifies the merge didn't break anything
+5. **Push changes** - Pushes the resolved merge
+6. **Create/Update PR** - Creates a PR if one doesn't exist
+7. **Merge PR** - Merges the PR using `gh pr merge`
+
+**Triggering merge-agent:**
+
+```bash
+# Via dashboard - click "Approve & Merge" on an issue card
+
+# Via CLI
+pan specialists wake merge-agent --issue MIN-123
+```
+
+The merge-agent uses a specialized prompt template that instructs it to:
+- Never force-push
+- Always run tests before merging
+- Document conflict resolution decisions
+- Update the issue status on success
+
+#### Specialist Auto-Initialization
+
+When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures the test-agent, review-agent, and merge-agent are ready to receive wake signals without manual setup.
+
 ### Automatic Handoffs
 
 Cloister detects situations that require intervention:
@@ -349,7 +380,54 @@ Cloister detects situations that require intervention:
 | **stuck_escalation** | No activity for 30+ minutes | Escalate to more capable model |
 | **complexity_upgrade** | Task complexity exceeds model capability | Route to Opus |
 | **implementation_complete** | Agent signals work is done | Wake test-agent |
+| **test_failure** | Tests fail repeatedly | Escalate model or request help |
+| **planning_complete** | Planning session finishes | Transition to implementation |
 | **merge_requested** | User clicks "Approve & Merge" | Wake merge-agent |
+
+### Handoff Methods
+
+Cloister supports two handoff methods, automatically selected based on agent type:
+
+| Method | When Used | How It Works |
+|--------|-----------|--------------|
+| **Kill & Spawn** | General agents (agent-min-123, etc.) | 1. Captures full context (STATE.md, beads, git state)<br>2. Kills tmux session<br>3. Spawns new agent with handoff prompt<br>4. New agent continues work with preserved context |
+| **Specialist Wake** | Permanent specialists (merge-agent, test-agent) | 1. Captures handoff context<br>2. Sends wake message to existing session<br>3. Specialist resumes with context injection |
+
+**Kill & Spawn** is used for temporary agents that work on specific issues. It creates a clean handoff by:
+- Capturing the agent's current understanding (from STATE.md)
+- Preserving beads task progress and open items
+- Including relevant git diff and file context
+- Building a comprehensive handoff prompt for the new model
+
+**Specialist Wake** is used for permanent specialists that persist across multiple issues. It avoids the overhead of killing/respawning by injecting context into the existing session.
+
+### Handoff Context Capture
+
+When a handoff occurs, Cloister captures:
+
+```json
+{
+  "agentId": "agent-min-123",
+  "issueId": "MIN-123",
+  "currentModel": "sonnet",
+  "targetModel": "opus",
+  "reason": "stuck_escalation",
+  "handoffCount": 1,
+  "state": {
+    "phase": "implementation",
+    "complexity": "complex",
+    "lastActivity": "2024-01-22T10:30:00-08:00"
+  },
+  "beadsTasks": [...],
+  "gitContext": {
+    "branch": "feature/min-123",
+    "uncommittedChanges": ["src/auth.ts", "src/tests/auth.test.ts"],
+    "recentCommits": [...]
+  }
+}
+```
+
+Handoff prompts are saved to `~/.panopticon/agents/{agent-id}/handoffs/` for debugging.
 
 ### Heartbeat Monitoring
 
@@ -373,6 +451,41 @@ Heartbeat files are stored in `~/.panopticon/heartbeats/`:
 }
 ```
 
+### Heartbeat Hook Installation
+
+The heartbeat hook is automatically synced to `~/.panopticon/bin/heartbeat-hook` via `pan sync`. It's also installed automatically when you install or upgrade Panopticon via npm.
+
+**Manual installation:**
+```bash
+pan sync  # Syncs all skills, agents, AND hooks
+```
+
+**Hook configuration in `~/.claude/settings.json`:**
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.panopticon/bin/heartbeat-hook"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Hook resilience:** The heartbeat hook is designed to fail silently if:
+- The heartbeats directory doesn't exist
+- Write permissions are missing
+- The hook script has errors
+
+This prevents hook failures from interrupting agent work.
+
 ### Configuration
 
 Cloister configuration lives in `~/.panopticon/cloister/config.json`:
@@ -395,6 +508,77 @@ Cloister configuration lives in `~/.panopticon/cloister/config.json`:
   }
 }
 ```
+
+---
+
+## Model Routing & Complexity Detection
+
+Cloister automatically routes tasks to the appropriate model based on detected complexity, optimizing for cost while ensuring quality.
+
+### Complexity Levels
+
+| Level | Model | Use Case |
+|-------|-------|----------|
+| **trivial** | Haiku | Typos, comments, documentation updates |
+| **simple** | Haiku | Small fixes, test additions, minor changes |
+| **medium** | Sonnet | Features, components, integrations |
+| **complex** | Sonnet/Opus | Refactors, migrations, redesigns |
+| **expert** | Opus | Architecture, security, performance optimization |
+
+### Complexity Detection Signals
+
+Complexity is detected from multiple signals (in priority order):
+
+1. **Explicit field** - Task has a `complexity` field set (e.g., in beads)
+2. **Labels/tags** - Issue labels like `architecture`, `security`, `refactor`
+3. **Keywords** - Title/description contains keywords like "migration", "overhaul"
+4. **File count** - Number of files changed (>20 files = complex)
+5. **Time estimate** - If estimate exceeds thresholds
+
+**Keyword patterns:**
+```javascript
+{
+  trivial: ['typo', 'rename', 'comment', 'documentation', 'readme'],
+  simple: ['add comment', 'update docs', 'fix typo', 'small fix'],
+  medium: ['feature', 'endpoint', 'component', 'service'],
+  complex: ['refactor', 'migration', 'redesign', 'overhaul'],
+  expert: ['architecture', 'security', 'performance optimization']
+}
+```
+
+### Configuring Model Routing
+
+Edit `~/.panopticon/cloister/config.json`:
+
+```json
+{
+  "model_selection": {
+    "default_model": "sonnet",
+    "complexity_routing": {
+      "trivial": "haiku",
+      "simple": "haiku",
+      "medium": "sonnet",
+      "complex": "sonnet",
+      "expert": "opus"
+    }
+  }
+}
+```
+
+### Cost Optimization
+
+Model routing helps optimize costs:
+
+| Model | Relative Cost | Best For |
+|-------|---------------|----------|
+| Haiku | 1x (cheapest) | Simple tasks, bulk operations |
+| Sonnet | 3x | Most development work |
+| Opus | 15x | Complex architecture, critical fixes |
+
+A typical agent run might:
+1. Start on Haiku for initial exploration
+2. Escalate to Sonnet for implementation
+3. Escalate to Opus only if stuck or complexity detected
 
 ---
 
@@ -462,9 +646,22 @@ pan sync --dry-run    # Preview what will be synced
 pan doctor            # Check system health
 pan skills            # List available skills
 pan status            # Show running agents
+pan up                # Start dashboard (Docker or minimal)
+pan down              # Stop dashboard and services
 ```
 
-> **Note:** `pan sync` now automatically syncs heartbeat hooks to `~/.panopticon/bin/`. This happens automatically on `npm install/upgrade` as well.
+#### What `pan sync` Does
+
+`pan sync` synchronizes Panopticon assets to all supported AI tools:
+
+| Asset Type | Source | Destinations |
+|------------|--------|--------------|
+| **Skills** | `~/.panopticon/skills/` | `~/.claude/skills/`, `~/.codex/skills/`, `~/.gemini/skills/` |
+| **Agents** | `~/.panopticon/agents/*.md` | `~/.claude/agents/` |
+| **Commands** | `~/.panopticon/commands/` | `~/.claude/commands/` |
+| **Hooks** | `src/hooks/` (in package) | `~/.panopticon/bin/` |
+
+**Automatic sync:** Hooks are also synced automatically when you install or upgrade Panopticon via npm (`postinstall` hook).
 
 ### Agent Management
 
@@ -1029,6 +1226,7 @@ This ensures every Panopticon-managed project has a well-defined canonical PRD t
       hook.json         # GUPP work queue
       cv.json           # Work history
       mail/             # Incoming messages
+      handoffs/         # Handoff prompts (for debugging)
 
   cloister/             # Cloister AI lifecycle manager
     config.json         # Cloister settings
@@ -1038,12 +1236,45 @@ This ensures every Panopticon-managed project has a well-defined canonical PRD t
   heartbeats/           # Real-time agent activity
     agent-min-123.json  # Last heartbeat from agent
 
+  logs/                 # Log files
+    handoffs.jsonl      # All handoff events (for analytics)
+
   costs/                # Raw cost logs (JSONL)
   backups/              # Sync backups
   traefik/              # Traefik reverse proxy config
     dynamic/            # Dynamic route configs
     certs/              # TLS certificates
 ```
+
+### Agent State Management
+
+Each agent's state is tracked in `~/.panopticon/agents/{agent-id}/state.json`:
+
+```json
+{
+  "id": "agent-min-123",
+  "issueId": "MIN-123",
+  "workspace": "/home/user/projects/myapp/workspaces/feature-min-123",
+  "branch": "feature/min-123",
+  "phase": "implementation",
+  "model": "sonnet",
+  "complexity": "medium",
+  "handoffCount": 0,
+  "sessionId": "abc123",
+  "createdAt": "2024-01-22T10:00:00-08:00",
+  "updatedAt": "2024-01-22T10:30:00-08:00"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `phase` | Current work phase: `planning`, `implementation`, `testing`, `review`, `merging` |
+| `model` | Current model: `haiku`, `sonnet`, `opus` |
+| `complexity` | Detected complexity: `trivial`, `simple`, `medium`, `complex`, `expert` |
+| `handoffCount` | Number of times the agent has been handed off to a different model |
+| `sessionId` | Claude Code session ID (for resuming after handoff) |
+
+**State Cleanup:** When an agent is killed or aborted (`pan work kill`), Panopticon automatically cleans up its state files to prevent stale data from affecting future runs.
 
 ## Health Monitoring (Deacon Pattern)
 
