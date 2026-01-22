@@ -41,3 +41,6 @@ src/dashboard/restart.sh
 # Workspace-specific generated files
 CLAUDE.md
 .planning/PLANNING_PROMPT.md
+
+# Beads daemon files
+.beads/
