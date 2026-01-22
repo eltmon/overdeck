@@ -485,7 +485,7 @@ export async function spawnMergeAgentForBranches(
       return { success: false, reason: message };
     }
 
-    // Check for uncommitted changes (ignore untracked files)
+    // Check for uncommitted changes (ignore untracked files and .beads/ metadata)
     try {
       const statusOutput = execSync(`git status --porcelain -uno`, {
         cwd: projectPath,
@@ -494,11 +494,21 @@ export async function spawnMergeAgentForBranches(
       });
 
       if (statusOutput.trim()) {
-        const changedFiles = statusOutput.trim().split('\n').slice(0, 5).join(', ');
-        const message = `Cannot merge: uncommitted changes (${changedFiles})`;
-        console.error(`[merge-agent] ${message}`);
-        logActivity('merge_blocked', message);
-        return { success: false, reason: message };
+        // Filter out .beads/ files - they're task tracking metadata, not code
+        const significantChanges = statusOutput
+          .trim()
+          .split('\n')
+          .filter(line => !line.includes('.beads/'));
+
+        if (significantChanges.length > 0) {
+          const changedFiles = significantChanges.slice(0, 5).join(', ');
+          const message = `Cannot merge: uncommitted changes (${changedFiles})`;
+          console.error(`[merge-agent] ${message}`);
+          logActivity('merge_blocked', message);
+          return { success: false, reason: message };
+        }
+        // Only .beads/ changes - that's fine, continue with merge
+        console.log(`[merge-agent] Ignoring uncommitted .beads/ metadata files`);
       }
     } catch {
       // If git status fails, continue anyway
