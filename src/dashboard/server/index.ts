@@ -1436,6 +1436,16 @@ app.delete('/api/agents/:id', async (req, res) => {
   try {
     await execAsync(`tmux kill-session -t "${id}" 2>/dev/null || true`);
 
+    // Clean up agent state files to prevent stale "running" status
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+    try {
+      if (existsSync(agentStateDir)) {
+        rmSync(agentStateDir, { recursive: true, force: true });
+      }
+    } catch (cleanupErr) {
+      console.log('Warning: Could not clean up agent state:', cleanupErr);
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error killing agent:', error);
@@ -4342,6 +4352,20 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
 
     // Kill the tmux session
     execSync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+    // Clean up agent state files to prevent stale "running" status
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    const workAgentStateDir = join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
+    try {
+      if (existsSync(agentStateDir)) {
+        rmSync(agentStateDir, { recursive: true, force: true });
+      }
+      if (existsSync(workAgentStateDir)) {
+        rmSync(workAgentStateDir, { recursive: true, force: true });
+      }
+    } catch (cleanupErr) {
+      console.log('Warning: Could not clean up agent state:', cleanupErr);
+    }
 
     // Optionally delete the workspace
     let workspaceDeleted = false;
