@@ -13,6 +13,7 @@ import { recoverCommand } from './recover.js';
 import { cvCommand } from './cv.js';
 import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
+import { reopenCommand } from './reopen.js';
 
 export function registerWorkCommands(program: Command): void {
   const work = program
@@ -123,6 +124,14 @@ export function registerWorkCommands(program: Command): void {
         interval: parseInt(options.interval, 10),
       });
     });
+
+  work
+    .command('reopen <id>')
+    .description('Reopen a closed/done issue and re-run planning')
+    .option('--skip-plan', 'Skip automatic planning after reopen')
+    .option('--json', 'Output as JSON')
+    .option('--force', 'Skip confirmation')
+    .action(reopenCommand);
 }
 
 // Re-export individual commands for direct use

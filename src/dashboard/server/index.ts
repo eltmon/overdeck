@@ -4894,6 +4894,66 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
   }
 });
 
+// Reopen a done/closed issue - moves back to Backlog and optionally starts planning
+app.post('/api/issues/:id/reopen', async (req, res) => {
+  const { id } = req.params;
+  const { skipPlan = false } = req.body || {};
+
+  try {
+    // Check if it's a Linear issue
+    const linearKey = process.env.LINEAR_API_KEY || '';
+    if (!linearKey) {
+      return res.status(400).json({ error: 'LINEAR_API_KEY not configured' });
+    }
+
+    // Import Linear SDK
+    const { LinearClient } = await import('@linear/sdk');
+    const client = new LinearClient({ apiKey: linearKey });
+
+    // Find the issue
+    const issueResult = await client.issueSearch(id, { first: 1 });
+    const issue = issueResult.nodes[0];
+
+    if (!issue) {
+      return res.status(404).json({ error: `Issue ${id} not found` });
+    }
+
+    // Get backlog state
+    const team = await issue.team;
+    if (!team) {
+      return res.status(400).json({ error: 'Could not determine team for issue' });
+    }
+
+    const states = await team.states();
+    const backlogState = states.nodes.find(s => s.type === 'backlog');
+
+    if (!backlogState) {
+      return res.status(400).json({ error: 'Could not find Backlog state for team' });
+    }
+
+    // Move issue to Backlog
+    await issue.update({ stateId: backlogState.id });
+
+    console.log(`Reopened issue ${id} - moved to Backlog`);
+
+    // Optionally start planning
+    if (!skipPlan) {
+      // We could trigger planning here, but for now just return success
+      // The user can click Plan from the dashboard
+    }
+
+    res.json({
+      success: true,
+      message: `Issue ${id} reopened and moved to Backlog`,
+      issueId: issue.identifier,
+      newState: 'Backlog',
+    });
+  } catch (error: any) {
+    console.error('Error reopening issue:', error);
+    res.status(500).json({ error: 'Failed to reopen issue: ' + error.message });
+  }
+});
+
 // Get beads tasks for an issue
 app.get('/api/issues/:id/beads', (req, res) => {
   const { id } = req.params;

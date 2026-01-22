@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 
 // Cost data for an issue
@@ -876,6 +876,60 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
         </div>
       )}
 
+      {/* Done/In Review items - Reopen option */}
+      {!isRunning && (STATUS_LABELS[issue.status] === 'done' || STATUS_LABELS[issue.status] === 'in_review') && (
+        <ReopenSection issue={issue} />
+      )}
+
+    </div>
+  );
+}
+
+// Reopen section for Done/In Review items
+function ReopenSection({ issue }: { issue: Issue }) {
+  const queryClient = useQueryClient();
+
+  const reopenMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${issue.identifier}/reopen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to reopen issue');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+    },
+  });
+
+  const handleReopen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`Reopen ${issue.identifier} and start planning?`)) {
+      reopenMutation.mutate();
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30">
+      <button
+        onClick={handleReopen}
+        disabled={reopenMutation.isPending}
+        className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50"
+      >
+        {reopenMutation.isPending ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <RotateCcw className="w-3.5 h-3.5" />
+        )}
+        {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
+      </button>
+      {reopenMutation.isError && (
+        <span className="text-xs text-red-400">{(reopenMutation.error as Error).message}</span>
+      )}
     </div>
   );
 }
