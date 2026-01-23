@@ -1,6 +1,6 @@
 # PAN-70: Convert remaining execSync calls to async
 
-## Status: COMPLETE
+## Status: IN_PROGRESS
 
 ## Problem Statement
 
@@ -169,48 +169,14 @@ Called by multiple API endpoints. After `isRunning()` and `isIdleAtPrompt()` bec
   - `src/cli/commands/specialists/reset.ts`: `resetCommand()` and `resetAllSpecialists()`
   - `src/cli/commands/specialists/wake.ts`: `wakeCommand()`
 
-✅ **health.ts** (beads: panopticon-dy2a)
-- Added `execAsync = promisify(exec)` import
-- Converted all functions to async:
-  - `isAgentAlive()` → returns `Promise<boolean>`
-  - `getAgentOutput()` → returns `Promise<string | null>`
-  - `sendHealthNudge()` → returns `Promise<boolean>`
-  - `pingAgent()` → returns `Promise<AgentHealth>`
-  - `runHealthCheck()` - converted internal execSync call
-- Updated all callers:
-  - `src/cli/commands/work/health.ts`: `healthCommand()` ping action
+### Next Steps
 
-✅ **server/index.ts** (beads: panopticon-0cyo) - COMPLETE
-- Added `execAsync = promisify(exec)` import
-- Removed `execSync` from import (no longer used)
-- Converted ALL execSync calls to async:
-  - **High priority**: `detectSpecialistCompletion()`, `pollReviewStatus()` (called every 5s)
-  - **Medium priority**: All tmux, git, and Docker operations
-  - **Low priority**: Workspace management, beads commands, utilities
-- Converted helper functions:
-  - `getGitStatus()` → async (3 git commands)
-  - `ensureTmuxRunning()` → async
-  - `getMrUrl()` → async
-- **Impact**: ALL 69 blocking execSync calls in server/index.ts are now non-blocking
-- **Total converted**: ~87 execSync calls across all three target files
-
-✅ **CLI command callers** (bonus)
-- `src/cli/commands/specialists/wake.ts` → async (replaced sleep with Promise-based delay)
-- `src/cli/commands/specialists/reset.ts` → async
-
-### Summary
-
-✅ All execSync calls converted in the three target files:
-- specialists.ts: 15 calls → async
-- health.ts: 3 calls → async
-- server/index.ts: 69 calls → async
-- CLI callers: 12 calls → async (bonus)
+1. **health.ts** (beads: panopticon-dy2a) - Convert health check functions
+2. **server/index.ts** (beads: panopticon-0cyo) - Convert remaining execSync calls in API endpoints and polling logic
 
 ### Remaining Work
 
-- [x] Convert specialists.ts to async ✅
-- [x] Convert health.ts functions to async ✅
-- [x] Convert high-priority polling in server/index.ts ✅
-- [x] Convert ALL remaining server/index.ts execSync calls ✅
+- [ ] Convert health.ts functions to async
+- [ ] Convert server/index.ts remaining execSync calls
 - [ ] Run tests to verify no regressions
 - [ ] Measure terminal latency (P95 < 50ms target)
