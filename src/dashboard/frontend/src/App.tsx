@@ -12,6 +12,7 @@ import { RuntimeComparison } from './components/RuntimeComparison';
 import { CloisterStatusBar } from './components/CloisterStatusBar';
 import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
+import { MetricsSummary } from './components/MetricsSummary';
 import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft } from 'lucide-react';
 import { Agent, Issue } from './types';
 
@@ -200,6 +201,7 @@ export default function App() {
         {activeTab === 'kanban' && (
           <>
             <div className={`flex-1 overflow-auto p-6 ${selectedIssue ? '' : 'w-full'}`}>
+              <MetricsSummary />
               <KanbanBoard
                 selectedIssue={selectedIssue}
                 onSelectIssue={setSelectedIssue}
