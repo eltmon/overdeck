@@ -481,69 +481,84 @@ export function isIdleAtPrompt(name: SpecialistType): boolean {
   const tmuxSession = getTmuxSessionName(name);
 
   try {
-    // Capture more lines for better context
+    // Capture the last few lines of the tmux pane
     const output = execSync(
-      `tmux capture-pane -t "${tmuxSession}" -p | tail -15`,
+      `tmux capture-pane -t "${tmuxSession}" -p | tail -8`,
       { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
     ).trim();
 
     const lines = output.split('\n').filter(line => line.trim());
     if (lines.length === 0) return false;
 
-    // First check for ACTIVE indicators in recent output
-    // These indicate the agent is actively working
-    const activeIndicators = [
-      // Spinner characters (Claude Code uses these during processing)
-      '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏',
-      // Tool execution indicators
-      'Read(', 'Edit(', 'Write(', 'Bash(', 'Glob(', 'Grep(',
-      'Task(', 'WebFetch(', 'WebSearch(',
-      // Active state text
-      'Reading', 'Writing', 'Editing', 'Searching', 'Running',
-      'Executing', 'Analyzing', 'Processing', 'Thinking',
-      // Git operations
-      'Committing', 'Pushing', 'Pulling', 'Merging',
-      // Test indicators
-      'test', 'PASS', 'FAIL', 'npm run', 'npm test',
-      // Claude-specific active states
-      'Nebulizing', 'Generating', 'Completing',
+    const lastLine = lines[lines.length - 1].trim();
+    const lastFewLines = lines.slice(-4).join('\n');
+
+    // PRIMARY CHECK: Is the prompt visible?
+    // When Claude Code is idle, the last line shows the prompt (❯)
+    // or the statusline with bypass permissions hint
+    const hasPrompt = lastLine === '❯' ||
+                      lastLine.endsWith('❯') ||
+                      lastLine.includes('bypass permissions') ||
+                      lastLine.includes('shift+tab to cycle');
+
+    if (hasPrompt) {
+      // Prompt is showing - likely idle, but verify no spinner
+      // Spinners appear on the LAST line when actively processing
+      const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+      const hasSpinner = spinnerChars.some(char => lastLine.includes(char));
+
+      if (hasSpinner) {
+        return false; // Spinner on last line = actively working
+      }
+
+      return true; // Prompt visible, no spinner = idle
+    }
+
+    // SECONDARY CHECK: Look for active work indicators on the last line
+    // These indicate the agent is mid-task
+    const activePatterns = [
+      /Writing.*\.\.\./i,      // "Writing tests..."
+      /Reading.*\.\.\./i,      // "Reading file..."
+      /Editing.*\.\.\./i,      // "Editing..."
+      /Running.*\.\.\./i,      // "Running tests..."
+      /Searching.*\.\.\./i,    // "Searching..."
+      /Analyzing.*\.\.\./i,    // "Analyzing..."
+      /Processing.*\.\.\./i,   // "Processing..."
+      /Nebulizing/i,           // Claude-specific
+      /Generating/i,           // Claude-specific
+      /esc to interrupt/i,     // Active task indicator
     ];
 
-    // Check recent lines for active indicators
-    const recentOutput = lines.slice(-10).join(' ').toLowerCase();
-    for (const indicator of activeIndicators) {
-      if (recentOutput.includes(indicator.toLowerCase())) {
-        // Found active indicator - but verify we're not at the prompt AFTER completing
-        const lastLine = lines[lines.length - 1].trim();
-        // If the very last line is the prompt, we're actually idle now
-        if (lastLine === '❯' || lastLine.endsWith('❯ ') || lastLine.endsWith('❯')) {
-          // Double check by looking at more context - if we see the prompt
-          // character at the end of the last non-empty line, we're likely idle
-          const lastFewLines = lines.slice(-3).join('\n');
-          if (lastFewLines.includes('bypass permissions') ||
-              lastFewLines.includes('shift+tab to cycle')) {
-            return true; // Actually idle, prompt is showing
-          }
-        }
-        return false; // Active indicator found and not at prompt
+    for (const pattern of activePatterns) {
+      if (pattern.test(lastLine) || pattern.test(lastFewLines)) {
+        return false; // Active work indicator found
       }
     }
 
-    // No active indicators found - check for idle indicators
-    const lastLine = lines[lines.length - 1].trim();
+    // TERTIARY CHECK: Other idle indicators in recent output
+    const idleIndicators = [
+      'How can I help',
+      'Waiting for',
+      'Ready for',
+    ];
 
-    // Idle indicators: the prompt character, or permission/input prompts
-    // When Claude Code is waiting for input, the last line typically shows:
-    // - "❯" (the input prompt)
-    // - "⏵⏵ bypass permissions" (the permissions reminder)
-    // - Percentage indicators like "37% |" (the status line when idle)
-    return lastLine.endsWith('❯') ||
-           lastLine === '❯' ||
-           lastLine.includes('bypass permissions') ||
-           lastLine.includes('shift+tab to cycle') ||
-           lastLine.includes('Waiting for') ||
-           lastLine.includes('Ready for') ||
-           lastLine.includes('How can I help');
+    for (const indicator of idleIndicators) {
+      if (lastFewLines.includes(indicator)) {
+        return true;
+      }
+    }
+
+    // If we can't determine state, check if output looks like completion
+    // (task done messages, checkmarks, etc. followed by prompt area)
+    if (lastFewLines.includes('✔') || lastFewLines.includes('✓') || lastFewLines.includes('Complete')) {
+      // Recent completion - check if prompt is somewhere in last lines
+      if (lastFewLines.includes('❯')) {
+        return true;
+      }
+    }
+
+    // Default: if we can't tell, assume not idle (safer for showing "active")
+    return false;
   } catch {
     // If we can't capture the pane, assume not idle (safer)
     return false;
