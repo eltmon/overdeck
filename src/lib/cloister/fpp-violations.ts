@@ -5,9 +5,12 @@
  * escalating nudges to get them back on track.
  */
 
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 import { checkHook } from '../hooks.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentHealth } from './health.js';
+import { PANOPTICON_HOME } from '../paths.js';
 
 /**
  * FPP violation types
@@ -47,9 +50,69 @@ export const DEFAULT_FPP_CONFIG: FPPViolationConfig = {
 };
 
 /**
- * In-memory store of active violations
+ * Path to violations data file
  */
-const activeViolations = new Map<string, FPPViolation>();
+const VIOLATIONS_DATA_FILE = join(PANOPTICON_HOME, 'fpp-violations.json');
+
+/**
+ * Persisted violations data format
+ */
+interface ViolationsDataPersisted {
+  violations: Array<[string, FPPViolation]>;
+}
+
+/**
+ * Load violations from file
+ */
+function loadViolations(): Map<string, FPPViolation> {
+  if (!existsSync(VIOLATIONS_DATA_FILE)) {
+    return new Map();
+  }
+
+  try {
+    const fileContent = readFileSync(VIOLATIONS_DATA_FILE, 'utf-8');
+    const persisted: ViolationsDataPersisted = JSON.parse(fileContent);
+
+    return new Map(persisted.violations || []);
+  } catch (error) {
+    console.error('Failed to load violations data, starting fresh:', error);
+    return new Map();
+  }
+}
+
+/**
+ * Save violations to file (atomic write)
+ */
+function saveViolations(violations: Map<string, FPPViolation>): void {
+  try {
+    // Ensure directory exists
+    const dir = dirname(VIOLATIONS_DATA_FILE);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const persisted: ViolationsDataPersisted = {
+      violations: Array.from(violations.entries()),
+    };
+
+    // Atomic write: write to temp file, then rename
+    const tempFile = `${VIOLATIONS_DATA_FILE}.tmp`;
+    writeFileSync(tempFile, JSON.stringify(persisted, null, 2));
+    writeFileSync(VIOLATIONS_DATA_FILE, readFileSync(tempFile));
+
+    // Clean up temp file
+    try {
+      require('fs').unlinkSync(tempFile);
+    } catch {}
+  } catch (error) {
+    console.error('Failed to save violations data:', error);
+  }
+}
+
+/**
+ * Store of active violations (persisted to disk)
+ */
+const activeViolations = loadViolations();
 
 /**
  * Get escalating nudge message based on nudge count
@@ -123,7 +186,14 @@ export function checkAgentForViolations(
     : 0;
 
   // Check for work on hook
-  const hookStatus = checkHook(agentId);
+  let hookStatus: ReturnType<typeof checkHook>;
+  try {
+    hookStatus = checkHook(agentId);
+  } catch (error) {
+    console.error(`Failed to check hook for ${agentId}:`, error);
+    return null;
+  }
+
   if (hookStatus.hasWork && idleMinutes >= config.hook_idle_minutes) {
     // Check if we already have an active violation
     const existingKey = `${agentId}-hook_idle`;
@@ -143,6 +213,7 @@ export function checkAgentForViolations(
     };
 
     activeViolations.set(existingKey, violation);
+    saveViolations(activeViolations);
     return violation;
   }
 
@@ -169,6 +240,7 @@ export function sendNudge(violation: FPPViolation): boolean {
   try {
     runtime.sendMessage(violation.agentId, message);
     console.log(`🔔 Sent FPP nudge #${violation.nudgeCount} to ${violation.agentId}`);
+    saveViolations(activeViolations);
     return true;
   } catch (error) {
     console.error(`Failed to send nudge to ${violation.agentId}:`, error);
@@ -189,6 +261,7 @@ export function resolveViolation(agentId: string, type: FPPViolationType): void 
   if (violation) {
     violation.resolved = true;
     console.log(`🔔 FPP violation resolved for ${agentId}: ${type}`);
+    saveViolations(activeViolations);
   }
 }
 
@@ -232,10 +305,16 @@ export function hasExceededMaxNudges(
  */
 export function clearOldViolations(hoursOld: number = 24): void {
   const cutoff = Date.now() - hoursOld * 60 * 60 * 1000;
+  let changed = false;
 
   for (const [key, violation] of activeViolations.entries()) {
     if (violation.resolved && new Date(violation.detectedAt).getTime() < cutoff) {
       activeViolations.delete(key);
+      changed = true;
     }
+  }
+
+  if (changed) {
+    saveViolations(activeViolations);
   }
 }
