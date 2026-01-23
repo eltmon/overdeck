@@ -368,10 +368,11 @@ export function forceKillSpecialist(name: SpecialistType): {
       success: true,
       message: `Specialist ${name} force-killed after ${healthState.forceKillCount} total kills`,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      message: `Failed to kill specialist ${name}: ${error.message}`,
+      message: `Failed to kill specialist ${name}: ${msg}`,
     };
   }
 }
@@ -509,8 +510,9 @@ export async function runPatrol(): Promise<PatrolResult> {
             } else {
               console.error(`[deacon] Failed to wake ${specialist.name} for queued task: ${wakeResult.error}`);
             }
-          } catch (error: any) {
-            console.error(`[deacon] Error processing queue for ${specialist.name}:`, error);
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            console.error(`[deacon] Error processing queue for ${specialist.name}:`, msg);
           }
         }
       }

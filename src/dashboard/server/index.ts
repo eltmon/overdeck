@@ -2678,9 +2678,10 @@ app.get('/api/specialists/queues', async (_req, res) => {
     );
 
     res.json({ queues });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error('Error getting specialist queues:', error);
-    res.status(500).json({ error: 'Failed to get specialist queues: ' + error.message });
+    res.status(500).json({ error: 'Failed to get specialist queues: ' + msg });
   }
 });
 
@@ -2689,8 +2690,15 @@ app.get('/api/specialists/:name/queue', async (req, res) => {
   const { name } = req.params;
 
   try {
-    const { checkSpecialistQueue } = await import('../../lib/cloister/specialists.js');
-    const queue = checkSpecialistQueue(name as any);
+    const { checkSpecialistQueue, type SpecialistType } = await import('../../lib/cloister/specialists.js');
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
+    const queue = checkSpecialistQueue(name as SpecialistType);
 
     res.json({
       specialistName: name,
@@ -2699,9 +2707,10 @@ app.get('/api/specialists/:name/queue', async (req, res) => {
       totalCount: queue.items.length,
       items: queue.items,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error(`Error getting queue for ${name}:`, error);
-    res.status(500).json({ error: `Failed to get queue for ${name}: ${error.message}` });
+    res.status(500).json({ error: `Failed to get queue for ${name}: ${msg}` });
   }
 });
 
@@ -2710,8 +2719,15 @@ app.delete('/api/specialists/:name/queue/:itemId', async (req, res) => {
   const { name, itemId } = req.params;
 
   try {
-    const { completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
-    const success = completeSpecialistTask(name as any, itemId);
+    const { completeSpecialistTask, type SpecialistType } = await import('../../lib/cloister/specialists.js');
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
+    const success = completeSpecialistTask(name as SpecialistType, itemId);
 
     if (!success) {
       return res.status(404).json({ error: `Item ${itemId} not found in queue for ${name}` });
@@ -2721,9 +2737,10 @@ app.delete('/api/specialists/:name/queue/:itemId', async (req, res) => {
       success: true,
       message: `Removed item ${itemId} from ${name}'s queue`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error(`Error removing item from ${name}'s queue:`, error);
-    res.status(500).json({ error: `Failed to remove item: ${error.message}` });
+    res.status(500).json({ error: `Failed to remove item: ${msg}` });
   }
 });
 
@@ -2738,6 +2755,13 @@ app.put('/api/specialists/:name/queue/reorder', async (req, res) => {
 
   try {
     const { reorderHookItems } = await import('../../lib/hooks.js');
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
     const success = reorderHookItems(name, itemIds);
 
     if (!success) {
@@ -2748,9 +2772,10 @@ app.put('/api/specialists/:name/queue/reorder', async (req, res) => {
       success: true,
       message: `Reordered queue for ${name}`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error(`Error reordering queue for ${name}:`, error);
-    res.status(500).json({ error: `Failed to reorder queue: ${error.message}` });
+    res.status(500).json({ error: `Failed to reorder queue: ${msg}` });
   }
 });
 

@@ -90,6 +90,17 @@ function useSpecialistCost(name: string, enabled: boolean) {
 }
 
 // Queue types and functions (PAN-74)
+interface TaskContext {
+  prUrl?: string;
+  workspace?: string;
+  branch?: string;
+  filesChanged?: string[];
+  reason?: string;
+  targetModel?: string;
+  additionalInstructions?: string;
+  [key: string]: string | string[] | undefined;
+}
+
 interface QueueItem {
   id: string;
   type: 'task' | 'message' | 'notification';
@@ -99,7 +110,7 @@ interface QueueItem {
     issueId?: string;
     message?: string;
     action?: string;
-    context?: Record<string, any>;
+    context?: TaskContext;
   };
   createdAt: string;
   expiresAt?: string;
