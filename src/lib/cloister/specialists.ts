@@ -468,30 +468,46 @@ export function isRunning(name: SpecialistType): boolean {
 }
 
 /**
- * Check if a specialist has recent heartbeat activity
+ * Check if a specialist is idle (waiting at the prompt)
  *
- * Used to determine if a specialist is actively working vs idle.
- * A specialist is considered "active" if it has a heartbeat within the last 60 seconds.
+ * Checks the tmux pane output to see if the last line is the idle prompt (❯).
+ * This is more reliable than heartbeat timing since it directly detects
+ * when Claude Code is waiting for input.
  *
  * @param name - Specialist name
- * @param thresholdSeconds - Seconds threshold for "recent" activity (default 60)
- * @returns true if specialist has recent activity
+ * @returns true if specialist appears to be at the idle prompt
  */
-export function hasRecentActivity(name: SpecialistType, thresholdSeconds = 60): boolean {
-  const heartbeatFile = join(PANOPTICON_HOME, 'heartbeats', `${getTmuxSessionName(name)}.json`);
+export function isIdleAtPrompt(name: SpecialistType): boolean {
+  const tmuxSession = getTmuxSessionName(name);
 
   try {
-    if (!existsSync(heartbeatFile)) {
-      return false;
-    }
+    // Capture the last few lines of the tmux pane
+    const output = execSync(
+      `tmux capture-pane -t "${tmuxSession}" -p | tail -5`,
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
 
-    const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf-8'));
-    const timestamp = new Date(heartbeat.timestamp).getTime();
-    const now = Date.now();
-    const ageSeconds = (now - timestamp) / 1000;
+    // Check if any of the last lines contains the idle prompt
+    // The prompt is typically "❯" or ends with "❯"
+    const lines = output.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return false;
 
-    return ageSeconds < thresholdSeconds;
+    // Check the last non-empty line for the prompt
+    const lastLine = lines[lines.length - 1].trim();
+
+    // Idle indicators: the prompt character, or permission/input prompts
+    // When Claude Code is waiting for input, the last line typically shows:
+    // - "❯" (the input prompt)
+    // - "⏵⏵ bypass permissions" (the permissions reminder)
+    // - Percentage indicators like "37% |" (the status line when idle)
+    return lastLine.endsWith('❯') ||
+           lastLine === '❯' ||
+           lastLine.includes('bypass permissions') ||
+           lastLine.includes('shift+tab to cycle') ||
+           lastLine.includes('Waiting for') ||
+           lastLine.includes('Ready for');
   } catch {
+    // If we can't capture the pane, assume not idle (safer)
     return false;
   }
 }
@@ -516,17 +532,16 @@ export function getSpecialistStatus(name: SpecialistType): SpecialistStatus {
   const sessionId = getSessionId(name);
   const running = isRunning(name);
   const contextTokens = countContextTokens(name);
-  const recentActivity = hasRecentActivity(name);
 
-  // Determine state based on tmux session AND recent heartbeat activity
-  // A specialist is only "active" if it has recent tool use (heartbeat within 60s)
-  // This prevents the spinner from showing when a specialist is idle at the prompt
+  // Determine state by checking if the specialist is at the idle prompt
+  // If running but idle at prompt (❯), they're sleeping
+  // If running and NOT at prompt, they're active (working on something)
   let state: SpecialistState;
-  if (running && recentActivity) {
-    // Tmux session exists AND recent heartbeat = actively working
-    state = 'active';
+  if (running) {
+    const idle = isIdleAtPrompt(name);
+    state = idle ? 'sleeping' : 'active';
   } else if (sessionId) {
-    // Has session ID = sleeping (either tmux not running, or running but idle)
+    // Has session ID but not running = sleeping
     state = 'sleeping';
   } else {
     state = 'uninitialized';
