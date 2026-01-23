@@ -468,6 +468,35 @@ export function isRunning(name: SpecialistType): boolean {
 }
 
 /**
+ * Check if a specialist has recent heartbeat activity
+ *
+ * Used to determine if a specialist is actively working vs idle.
+ * A specialist is considered "active" if it has a heartbeat within the last 60 seconds.
+ *
+ * @param name - Specialist name
+ * @param thresholdSeconds - Seconds threshold for "recent" activity (default 60)
+ * @returns true if specialist has recent activity
+ */
+export function hasRecentActivity(name: SpecialistType, thresholdSeconds = 60): boolean {
+  const heartbeatFile = join(PANOPTICON_HOME, 'heartbeats', `${getTmuxSessionName(name)}.json`);
+
+  try {
+    if (!existsSync(heartbeatFile)) {
+      return false;
+    }
+
+    const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf-8'));
+    const timestamp = new Date(heartbeat.timestamp).getTime();
+    const now = Date.now();
+    const ageSeconds = (now - timestamp) / 1000;
+
+    return ageSeconds < thresholdSeconds;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Get complete status for a specialist
  *
  * Combines metadata, session info, and runtime state.
@@ -487,12 +516,17 @@ export function getSpecialistStatus(name: SpecialistType): SpecialistStatus {
   const sessionId = getSessionId(name);
   const running = isRunning(name);
   const contextTokens = countContextTokens(name);
+  const recentActivity = hasRecentActivity(name);
 
-  // Determine state
+  // Determine state based on tmux session AND recent heartbeat activity
+  // A specialist is only "active" if it has recent tool use (heartbeat within 60s)
+  // This prevents the spinner from showing when a specialist is idle at the prompt
   let state: SpecialistState;
-  if (running) {
+  if (running && recentActivity) {
+    // Tmux session exists AND recent heartbeat = actively working
     state = 'active';
   } else if (sessionId) {
+    // Has session ID = sleeping (either tmux not running, or running but idle)
     state = 'sleeping';
   } else {
     state = 'uninitialized';
