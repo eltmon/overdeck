@@ -1908,6 +1908,58 @@ app.put('/api/cloister/config', (req, res) => {
 });
 
 // ============================================================================
+// Confirmation Dialog System (PAN-33)
+// ============================================================================
+
+/**
+ * In-memory store for pending confirmation requests.
+ * In the future, this could be enhanced with tmux output polling to automatically
+ * detect confirmation prompts from agents.
+ */
+interface ConfirmationRequest {
+  id: string;
+  agentId: string;
+  sessionName: string;
+  action: string;
+  details?: string;
+  timestamp: string;
+}
+
+const pendingConfirmations = new Map<string, ConfirmationRequest>();
+
+// Get pending confirmation requests
+app.get('/api/confirmations', (_req, res) => {
+  res.json(Array.from(pendingConfirmations.values()));
+});
+
+// Respond to a confirmation request
+app.post('/api/confirmations/:id/respond', async (req, res) => {
+  const { id } = req.params;
+  const { confirmed } = req.body;
+
+  const request = pendingConfirmations.get(id);
+  if (!request) {
+    return res.status(404).json({ error: 'Confirmation request not found' });
+  }
+
+  try {
+    // Send response to the agent's tmux session
+    const response = confirmed ? 'y' : 'n';
+    execSync(`tmux send-keys -t "${request.sessionName}" '${response}'`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    execSync(`tmux send-keys -t "${request.sessionName}" C-m`, { encoding: 'utf-8' });
+
+    // Remove from pending
+    pendingConfirmations.delete(id);
+
+    res.json({ success: true, confirmed });
+  } catch (error: any) {
+    console.error('Error sending confirmation response:', error);
+    res.status(500).json({ error: 'Failed to send response: ' + error.message });
+  }
+});
+
+// ============================================================================
 // Specialist Agent Endpoints (PAN-27)
 // ============================================================================
 

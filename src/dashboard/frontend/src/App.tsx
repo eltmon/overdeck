@@ -11,6 +11,7 @@ import { ActivityPanel } from './components/ActivityPanel';
 import { RuntimeComparison } from './components/RuntimeComparison';
 import { CloisterStatusBar } from './components/CloisterStatusBar';
 import { HandoffsPage } from './components/HandoffsPage';
+import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft } from 'lucide-react';
 import { Agent, Issue } from './types';
 
@@ -32,6 +33,21 @@ async function fetchIssues(): Promise<Issue[]> {
   return res.json();
 }
 
+async function fetchConfirmations(): Promise<ConfirmationRequest[]> {
+  const res = await fetch('/api/confirmations');
+  if (!res.ok) throw new Error('Failed to fetch confirmations');
+  return res.json();
+}
+
+async function respondToConfirmation(id: string, confirmed: boolean): Promise<void> {
+  const res = await fetch(`/api/confirmations/${id}/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmed }),
+  });
+  if (!res.ok) throw new Error('Failed to respond to confirmation');
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('kanban');
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
@@ -39,6 +55,7 @@ export default function App() {
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch agents to find if selected issue has an agent
@@ -53,6 +70,20 @@ export default function App() {
     queryKey: ['issues'],
     queryFn: fetchIssues,
   });
+
+  // Poll for pending confirmations
+  const { data: confirmations = [] } = useQuery({
+    queryKey: ['confirmations'],
+    queryFn: fetchConfirmations,
+    refetchInterval: 2000, // Poll every 2 seconds
+  });
+
+  // Show the most recent confirmation request
+  useEffect(() => {
+    if (confirmations.length > 0 && !currentConfirmation) {
+      setCurrentConfirmation(confirmations[0]);
+    }
+  }, [confirmations, currentConfirmation]);
 
   // Find agent for selected issue
   const selectedIssueAgent = selectedIssue
@@ -98,6 +129,30 @@ export default function App() {
 
   const toggleExpand = useCallback(() => {
     setIsExpanded((prev) => !prev);
+  }, []);
+
+  const handleConfirm = useCallback(async () => {
+    if (!currentConfirmation) return;
+    try {
+      await respondToConfirmation(currentConfirmation.id, true);
+      setCurrentConfirmation(null);
+    } catch (error) {
+      console.error('Failed to confirm:', error);
+    }
+  }, [currentConfirmation]);
+
+  const handleDeny = useCallback(async () => {
+    if (!currentConfirmation) return;
+    try {
+      await respondToConfirmation(currentConfirmation.id, false);
+      setCurrentConfirmation(null);
+    } catch (error) {
+      console.error('Failed to deny:', error);
+    }
+  }, [currentConfirmation]);
+
+  const handleCloseConfirmation = useCallback(() => {
+    setCurrentConfirmation(null);
   }, []);
 
   // Calculate actual panel width (expanded = full width minus a small margin for kanban)
@@ -230,6 +285,15 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        request={currentConfirmation}
+        isOpen={!!currentConfirmation}
+        onConfirm={handleConfirm}
+        onDeny={handleDeny}
+        onClose={handleCloseConfirmation}
+      />
     </div>
   );
 }
