@@ -18,6 +18,13 @@ describe('submitToSpecialistQueue', () => {
     clearHook('merge-agent');
   });
 
+  afterEach(() => {
+    // Clean up to prevent pollution of real queue
+    clearHook('test-agent');
+    clearHook('review-agent');
+    clearHook('merge-agent');
+  });
+
   it('should submit task with all fields in context', () => {
     const item = submitToSpecialistQueue('test-agent', {
       priority: 'urgent',
@@ -77,6 +84,10 @@ describe('submitToSpecialistQueue', () => {
 
 describe('checkSpecialistQueue', () => {
   beforeEach(() => {
+    clearHook('test-agent');
+  });
+
+  afterEach(() => {
     clearHook('test-agent');
   });
 
@@ -149,6 +160,10 @@ describe('getNextSpecialistTask', () => {
     clearHook('test-agent');
   });
 
+  afterEach(() => {
+    clearHook('test-agent');
+  });
+
   it('should return null for empty queue', () => {
     const task = getNextSpecialistTask('test-agent');
     expect(task).toBeNull();
@@ -191,6 +206,10 @@ describe('getNextSpecialistTask', () => {
 
 describe('completeSpecialistTask', () => {
   beforeEach(() => {
+    clearHook('test-agent');
+  });
+
+  afterEach(() => {
     clearHook('test-agent');
   });
 

@@ -496,6 +496,7 @@ export async function runPatrol(): Promise<PatrolResult> {
           console.log(`[deacon] ${specialist.name} idle with queued work, waking for ${nextTask.payload.issueId}`);
           try {
             // Extract task details from payload
+            // Note: branch, workspace, prUrl are stored in context by submitToSpecialistQueue
             const taskDetails = {
               issueId: nextTask.payload.issueId || '',
               branch: nextTask.payload.context?.branch,
