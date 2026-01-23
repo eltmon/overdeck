@@ -1,3 +1,18 @@
+---
+name: test-specialist-workflow
+description: Test the full specialist handoff pipeline (review → test → merge)
+triggers:
+  - test specialist workflow
+  - test specialists
+  - specialist e2e test
+  - test approve pipeline
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
+---
+
 # Test Specialist Workflow
 
 Test the full specialist handoff pipeline: review-agent -> test-agent -> merge-agent
