@@ -875,14 +875,20 @@ pan cloister status
 # List all specialists
 pan specialists list
 
-# Wake a specific specialist
-pan specialists wake merge-agent --issue MIN-123
+# Wake a specialist (resumes previous session if exists)
+pan specialists wake merge-agent
+
+# Wake and send a task
+pan specialists wake merge-agent --task "Review PR #123 for security issues"
 
 # View specialist queue
-pan specialists queue
+pan specialists queue merge-agent
 
-# Reset specialist state
+# Reset a single specialist (wipes context)
 pan specialists reset merge-agent
+
+# Reset ALL specialists (fresh start)
+pan specialists reset --all
 ```
 
 ## Dashboard
