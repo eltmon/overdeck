@@ -1932,6 +1932,84 @@ app.put('/api/cloister/config', (req, res) => {
 });
 
 // ============================================================================
+// Metrics API Endpoints (PAN-33 Phase 6)
+// ============================================================================
+
+// Get metrics summary
+app.get('/api/metrics/summary', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const costSummary = service.getCostSummary();
+    const status = service.getStatus();
+
+    res.json({
+      today: {
+        totalCost: costSummary.dailyTotal,
+        agentCount: status.summary.total,
+        activeCount: status.summary.active,
+        stuckCount: status.summary.stuck,
+        warningCount: status.summary.warning,
+      },
+      topSpenders: {
+        agents: costSummary.topAgents.slice(0, 5),
+        issues: costSummary.topIssues.slice(0, 5),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error getting metrics summary:', error);
+    res.status(500).json({ error: 'Failed to get metrics summary: ' + error.message });
+  }
+});
+
+// Get cost metrics (date range)
+app.get('/api/metrics/costs', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const costSummary = service.getCostSummary();
+
+    res.json({
+      dailyTotal: costSummary.dailyTotal,
+      topAgents: costSummary.topAgents,
+      topIssues: costSummary.topIssues,
+    });
+  } catch (error: any) {
+    console.error('Error getting cost metrics:', error);
+    res.status(500).json({ error: 'Failed to get cost metrics: ' + error.message });
+  }
+});
+
+// Get handoff metrics
+app.get('/api/metrics/handoffs', (_req, res) => {
+  try {
+    // Placeholder - would need handoff stats from handoff-logger
+    res.json({
+      totalHandoffs: 0,
+      successRate: 0,
+      byType: {},
+    });
+  } catch (error: any) {
+    console.error('Error getting handoff metrics:', error);
+    res.status(500).json({ error: 'Failed to get handoff metrics: ' + error.message });
+  }
+});
+
+// Get stuck agent incidents
+app.get('/api/metrics/stuck', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const status = service.getStatus();
+
+    res.json({
+      current: status.summary.stuck,
+      incidents: [], // Placeholder - would need historical tracking
+    });
+  } catch (error: any) {
+    console.error('Error getting stuck agent metrics:', error);
+    res.status(500).json({ error: 'Failed to get stuck agent metrics: ' + error.message });
+  }
+});
+
+// ============================================================================
 // Confirmation Dialog System (PAN-33)
 // ============================================================================
 
