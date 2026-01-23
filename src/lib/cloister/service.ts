@@ -29,6 +29,60 @@ import { listRunningAgents, getAgentState } from '../agents.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
+import { PANOPTICON_HOME } from '../paths.js';
+import { existsSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
+import { join } from 'path';
+
+// State file for cross-process communication
+const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
+
+/**
+ * Write Cloister running state to file for cross-process visibility
+ */
+function writeStateFile(running: boolean, pid?: number): void {
+  try {
+    if (running) {
+      writeFileSync(CLOISTER_STATE_FILE, JSON.stringify({
+        running: true,
+        pid: pid || process.pid,
+        startedAt: new Date().toISOString(),
+      }));
+    } else {
+      if (existsSync(CLOISTER_STATE_FILE)) {
+        unlinkSync(CLOISTER_STATE_FILE);
+      }
+    }
+  } catch (error) {
+    // Non-fatal - state file is for convenience
+    console.warn('Failed to write Cloister state file:', error);
+  }
+}
+
+/**
+ * Read Cloister running state from file
+ */
+function readStateFile(): { running: boolean; pid?: number; startedAt?: string } {
+  try {
+    if (existsSync(CLOISTER_STATE_FILE)) {
+      const data = JSON.parse(readFileSync(CLOISTER_STATE_FILE, 'utf-8'));
+      // Verify the process is still running
+      if (data.pid) {
+        try {
+          process.kill(data.pid, 0); // Signal 0 checks if process exists
+          return data;
+        } catch {
+          // Process doesn't exist - clean up stale state file
+          unlinkSync(CLOISTER_STATE_FILE);
+          return { running: false };
+        }
+      }
+      return data;
+    }
+  } catch {
+    // State file doesn't exist or is corrupted
+  }
+  return { running: false };
+}
 
 /**
  * Cloister service status
@@ -114,6 +168,7 @@ export class CloisterService {
     }
 
     this.running = true;
+    writeStateFile(true);
     this.emit({ type: 'started' });
 
     // Start monitoring loop
@@ -134,6 +189,7 @@ export class CloisterService {
 
     console.log('🔔 Stopping Cloister agent watchdog...');
     this.running = false;
+    writeStateFile(false);
 
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
@@ -446,7 +502,7 @@ export class CloisterService {
     const needsAttention = getAgentsNeedingAttention(agentHealths).map((h) => h.agentId);
 
     return {
-      running: this.running,
+      running: this.isRunning(),
       lastCheck: this.lastCheck,
       config: this.config,
       summary,
@@ -539,9 +595,18 @@ export class CloisterService {
 
   /**
    * Check if service is running
+   *
+   * Checks both local instance state and cross-process state file.
+   * This allows the CLI to detect if Cloister is running in the dashboard process.
    */
   isRunning(): boolean {
-    return this.running;
+    // First check our own instance
+    if (this.running) {
+      return true;
+    }
+    // Check if another process has Cloister running
+    const stateFile = readStateFile();
+    return stateFile.running;
   }
 }
 

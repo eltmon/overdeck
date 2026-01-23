@@ -5956,7 +5956,20 @@ if (existsSync(publicDir)) {
   });
 }
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Panopticon API server running on http://0.0.0.0:${PORT}`);
   console.log(`WebSocket terminal available at ws://0.0.0.0:${PORT}/ws/terminal`);
+
+  // Auto-start Cloister if configured
+  try {
+    const config = loadCloisterConfig();
+    if (config.startup?.auto_start) {
+      console.log('Cloister auto-start enabled, starting...');
+      const service = getCloisterService();
+      await service.start();
+      console.log('Cloister auto-started successfully');
+    }
+  } catch (error: any) {
+    console.error('Failed to auto-start Cloister:', error.message);
+  }
 });
