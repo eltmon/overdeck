@@ -1,5 +1,6 @@
 /**
  * pan specialists reset <name>
+ * pan specialists reset --all
  *
  * Reset a specialist (clear session, start fresh)
  */
@@ -16,14 +17,29 @@ import {
 
 interface ResetOptions {
   force?: boolean;
+  all?: boolean;
 }
 
-export async function resetCommand(name: string, options: ResetOptions): Promise<void> {
+const ALL_SPECIALISTS: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent'];
+
+export async function resetCommand(name: string | undefined, options: ResetOptions): Promise<void> {
+  // Handle --all flag
+  if (options.all) {
+    await resetAllSpecialists(options);
+    return;
+  }
+
   // Validate specialist name
-  const validNames: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent'];
-  if (!validNames.includes(name as SpecialistType)) {
+  if (!name) {
+    console.log(chalk.red('\nError: Specialist name required'));
+    console.log(`Usage: pan specialists reset <name> or pan specialists reset --all`);
+    console.log(`Valid specialists: ${ALL_SPECIALISTS.join(', ')}\n`);
+    process.exit(1);
+  }
+
+  if (!ALL_SPECIALISTS.includes(name as SpecialistType)) {
     console.log(chalk.red(`\nError: Unknown specialist '${name}'`));
-    console.log(`Valid specialists: ${validNames.join(', ')}\n`);
+    console.log(`Valid specialists: ${ALL_SPECIALISTS.join(', ')}\n`);
     process.exit(1);
   }
 
@@ -98,4 +114,62 @@ function confirm(question: string): Promise<boolean> {
       resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
     });
   });
+}
+
+/**
+ * Reset all specialists (wipe all context)
+ */
+async function resetAllSpecialists(options: ResetOptions): Promise<void> {
+  console.log(chalk.bold('\nResetting ALL specialists...\n'));
+
+  // Show current state for all specialists
+  console.log(chalk.dim('Current state:'));
+  for (const specialistName of ALL_SPECIALISTS) {
+    const status = getSpecialistStatus(specialistName);
+    const stateIcon = status.isRunning ? chalk.yellow('●') : status.sessionId ? chalk.blue('●') : chalk.dim('○');
+    const sessionInfo = status.sessionId ? ` (${status.sessionId.substring(0, 8)}...)` : '';
+    console.log(`  ${stateIcon} ${specialistName}: ${status.state}${sessionInfo}`);
+  }
+  console.log('');
+
+  // Confirm if not forced
+  if (!options.force) {
+    const confirmed = await confirm(
+      'This will wipe ALL specialist sessions and context. Continue?'
+    );
+
+    if (!confirmed) {
+      console.log(chalk.dim('Reset cancelled\n'));
+      return;
+    }
+  }
+
+  // Reset each specialist
+  let resetCount = 0;
+  for (const specialistName of ALL_SPECIALISTS) {
+    const status = getSpecialistStatus(specialistName);
+    const tmuxSession = getTmuxSessionName(specialistName);
+
+    // Kill tmux session if running
+    if (status.isRunning) {
+      try {
+        execSync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8', stdio: 'ignore' });
+        console.log(chalk.dim(`  Stopped ${specialistName} tmux session`));
+      } catch {
+        // Session may not exist
+      }
+    }
+
+    // Clear session file
+    const cleared = clearSessionId(specialistName);
+    if (cleared || status.sessionId) {
+      console.log(chalk.green(`  ✓ ${specialistName} reset`));
+      resetCount++;
+    } else {
+      console.log(chalk.dim(`  ○ ${specialistName} (no session to clear)`));
+    }
+  }
+
+  console.log(chalk.green(`\n✓ Reset ${resetCount} specialist(s)`));
+  console.log(chalk.dim('Next wake will start fresh sessions\n'));
 }

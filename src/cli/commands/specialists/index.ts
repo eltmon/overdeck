@@ -36,10 +36,11 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--json', 'Output in JSON format')
     .action(queueCommand);
 
-  // pan specialists reset <name>
+  // pan specialists reset <name> or pan specialists reset --all
   specialists
-    .command('reset <name>')
+    .command('reset [name]')
     .description('Reset a specialist (clear session, start fresh)')
     .option('--force', 'Skip confirmation prompt')
+    .option('--all', 'Reset ALL specialists (wipe all context)')
     .action(resetCommand);
 }
