@@ -169,14 +169,25 @@ Called by multiple API endpoints. After `isRunning()` and `isIdleAtPrompt()` bec
   - `src/cli/commands/specialists/reset.ts`: `resetCommand()` and `resetAllSpecialists()`
   - `src/cli/commands/specialists/wake.ts`: `wakeCommand()`
 
+✅ **health.ts** (beads: panopticon-dy2a)
+- Added `execAsync = promisify(exec)` import
+- Converted all functions to async:
+  - `isAgentAlive()` → returns `Promise<boolean>`
+  - `getAgentOutput()` → returns `Promise<string | null>`
+  - `sendHealthNudge()` → returns `Promise<boolean>`
+  - `pingAgent()` → returns `Promise<AgentHealth>`
+  - `runHealthCheck()` - converted internal execSync call
+- Updated all callers:
+  - `src/cli/commands/work/health.ts`: `healthCommand()` ping action
+
 ### Next Steps
 
-1. **health.ts** (beads: panopticon-dy2a) - Convert health check functions
-2. **server/index.ts** (beads: panopticon-0cyo) - Convert remaining execSync calls in API endpoints and polling logic
+1. **server/index.ts** (beads: panopticon-0cyo) - Convert remaining execSync calls in API endpoints and polling logic
 
 ### Remaining Work
 
-- [ ] Convert health.ts functions to async
-- [ ] Convert server/index.ts remaining execSync calls
+- [x] Convert specialists.ts to async ✅
+- [x] Convert health.ts functions to async ✅
+- [ ] Convert server/index.ts remaining execSync calls (IN PROGRESS)
 - [ ] Run tests to verify no regressions
 - [ ] Measure terminal latency (P95 < 50ms target)
