@@ -224,13 +224,13 @@ async function detectSpecialistCompletion(specialistName: string): Promise<{
           trimmedOutput.includes('send-feedback-to-agent') && trimmedOutput.includes('issue')) {
         return { completed: true, success: false, details: 'Review blocked - issues found', issueId };
       }
-      // Explicitly passed
-      if (trimmedOutput.includes('review task is already complete') ||
-          trimmedOutput.includes('Code is clean') ||
-          trimmedOutput.includes('LGTM') ||
-          trimmedOutput.includes('approved')) {
-        return { completed: true, success: true, details: 'Review passed', issueId };
-      }
+      // NOTE: We do NOT detect "passed" from terminal output alone.
+      // The review-agent should explicitly:
+      // 1. Call the API: POST /api/workspaces/:id/review-status with {"reviewStatus":"passed"}
+      // 2. Hand off to test-agent (detected above via "Waking Test Agent" pattern)
+      //
+      // Detecting "passed" from patterns like "LGTM", "approved" causes false positives
+      // because these words appear in prompts and intermediate output.
     }
 
     // Test agent completion patterns
