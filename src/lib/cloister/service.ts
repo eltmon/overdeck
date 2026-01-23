@@ -29,6 +29,14 @@ import { listRunningAgents, getAgentState } from '../agents.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
+import {
+  checkAgentForViolations,
+  sendNudge,
+  resolveViolation,
+  hasExceededMaxNudges,
+  clearOldViolations,
+  type FPPViolation,
+} from './fpp-violations.js';
 
 /**
  * Cloister service status
@@ -70,6 +78,9 @@ export type CloisterEvent =
   | { type: 'mass_death_detected'; deathCount: number; windowSeconds: number }
   | { type: 'spawn_paused'; reason: string }
   | { type: 'spawn_resumed' }
+  | { type: 'fpp_violation_detected'; agentId: string; violation: FPPViolation }
+  | { type: 'fpp_nudge_sent'; agentId: string; nudgeCount: number }
+  | { type: 'fpp_max_nudges_exceeded'; agentId: string; violation: FPPViolation }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
   | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
   | { type: 'emergency_stop'; killedAgents: string[] }
@@ -288,6 +299,15 @@ export class CloisterService {
       // Check for handoff triggers (Phase 4)
       // Note: Intentionally not awaiting - runs in background
       void this.checkHandoffTriggers(agentHealths);
+
+      // Check for FPP violations (Phase 6)
+      this.checkFPPViolations(agentIds);
+
+      // Clean up old resolved violations (daily)
+      if (Math.random() < 0.01) {
+        // ~1% chance each check = roughly once per day
+        clearOldViolations(24);
+      }
     } catch (error) {
       console.error('Cloister health check failed:', error);
       this.emit({ type: 'error', error: error as Error });
@@ -503,6 +523,44 @@ export class CloisterService {
    */
   isSpawnPaused(): boolean {
     return this.spawnsPaused;
+  }
+
+  /**
+   * Check for FPP violations and send nudges
+   */
+  private checkFPPViolations(agentIds: string[]): void {
+    for (const agentId of agentIds) {
+      const violation = checkAgentForViolations(agentId);
+      if (!violation) continue;
+
+      // New violation detected
+      if (violation.nudgeCount === 0) {
+        this.emit({ type: 'fpp_violation_detected', agentId, violation });
+      }
+
+      // Check if we should send a nudge
+      const timeSinceLastNudge = violation.lastNudgeAt
+        ? Date.now() - new Date(violation.lastNudgeAt).getTime()
+        : Infinity;
+
+      // Send nudge every 5 minutes until max nudges
+      const NUDGE_INTERVAL_MS = 5 * 60 * 1000;
+      if (timeSinceLastNudge >= NUDGE_INTERVAL_MS || violation.nudgeCount === 0) {
+        if (hasExceededMaxNudges(violation)) {
+          // Max nudges exceeded - alert user
+          this.emit({ type: 'fpp_max_nudges_exceeded', agentId, violation });
+          console.error(
+            `🔔 Agent ${agentId} exceeded max nudges for ${violation.type} - manual intervention required`
+          );
+        } else {
+          // Send nudge
+          const sent = sendNudge(violation);
+          if (sent) {
+            this.emit({ type: 'fpp_nudge_sent', agentId, nudgeCount: violation.nudgeCount });
+          }
+        }
+      }
+    }
   }
 
   /**
