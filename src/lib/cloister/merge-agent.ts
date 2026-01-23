@@ -546,6 +546,11 @@ INSTRUCTIONS:
 CRITICAL: You MUST complete this merge. The approve operation is waiting.
 When done, the merge commit should be pushed to origin/${targetBranch}.
 
+DO NOT:
+- Delete the feature branch (locally or remotely)
+- Clean up workspaces
+- Do anything beyond the merge, test, and push steps above
+
 Report any issues or conflicts you encountered.`;
 
   // Wake the merge-agent specialist
