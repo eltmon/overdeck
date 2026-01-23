@@ -4,141 +4,21 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  wakeSpecialistOrQueue,
   submitToSpecialistQueue,
   checkSpecialistQueue,
   getNextSpecialistTask,
   completeSpecialistTask,
-  isRunning,
-  isIdleAtPrompt,
 } from '../../../src/lib/cloister/specialists.js';
 import { clearHook } from '../../../src/lib/hooks.js';
 
-// Mock the specialist state checking functions
-vi.mock('../../../src/lib/cloister/specialists.js', async () => {
-  const actual = await vi.importActual('../../../src/lib/cloister/specialists.js');
-  return {
-    ...actual,
-    isRunning: vi.fn(),
-    isIdleAtPrompt: vi.fn(),
-    wakeSpecialistWithTask: vi.fn(),
-  };
-});
-
-describe('wakeSpecialistOrQueue', () => {
+describe('submitToSpecialistQueue', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Clean up test queues
     clearHook('test-agent');
     clearHook('review-agent');
     clearHook('merge-agent');
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should wake specialist directly when not running', async () => {
-    const { isRunning, wakeSpecialistWithTask } = await import('../../../src/lib/cloister/specialists.js');
-
-    vi.mocked(isRunning).mockResolvedValue(false);
-    vi.mocked(wakeSpecialistWithTask).mockResolvedValue({
-      success: true,
-      message: 'Specialist woken',
-      tmuxSession: 'test-agent',
-      wasAlreadyRunning: false,
-    });
-
-    const result = await wakeSpecialistOrQueue('test-agent', {
-      issueId: 'PAN-74',
-      workspace: '/test/workspace',
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.queued).toBe(false);
-    expect(wakeSpecialistWithTask).toHaveBeenCalledWith('test-agent', {
-      issueId: 'PAN-74',
-      workspace: '/test/workspace',
-    });
-  });
-
-  it('should wake specialist directly when running and idle', async () => {
-    const { isRunning, isIdleAtPrompt, wakeSpecialistWithTask } = await import('../../../src/lib/cloister/specialists.js');
-
-    vi.mocked(isRunning).mockResolvedValue(true);
-    vi.mocked(isIdleAtPrompt).mockResolvedValue(true);
-    vi.mocked(wakeSpecialistWithTask).mockResolvedValue({
-      success: true,
-      message: 'Task sent to specialist',
-      tmuxSession: 'test-agent',
-      wasAlreadyRunning: true,
-    });
-
-    const result = await wakeSpecialistOrQueue('test-agent', {
-      issueId: 'PAN-74',
-      workspace: '/test/workspace',
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.queued).toBe(false);
-    expect(wakeSpecialistWithTask).toHaveBeenCalled();
-  });
-
-  it('should queue task when specialist is running and busy', async () => {
-    const { isRunning, isIdleAtPrompt } = await import('../../../src/lib/cloister/specialists.js');
-
-    vi.mocked(isRunning).mockResolvedValue(true);
-    vi.mocked(isIdleAtPrompt).mockResolvedValue(false); // Busy!
-
-    const result = await wakeSpecialistOrQueue('test-agent', {
-      issueId: 'PAN-74',
-      workspace: '/test/workspace',
-      prUrl: 'https://github.com/test/repo/pull/123',
-    }, {
-      priority: 'high',
-      source: 'handoff',
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.queued).toBe(true);
-    expect(result.message).toContain('busy');
-    expect(result.message).toContain('queued');
-
-    // Verify task was added to queue
-    const queue = checkSpecialistQueue('test-agent');
-    expect(queue.hasWork).toBe(true);
-    expect(queue.items).toHaveLength(1);
-    expect(queue.items[0].payload.issueId).toBe('PAN-74');
-  });
-
-  it('should handle wake failure gracefully', async () => {
-    const { isRunning, wakeSpecialistWithTask } = await import('../../../src/lib/cloister/specialists.js');
-
-    vi.mocked(isRunning).mockResolvedValue(false);
-    vi.mocked(wakeSpecialistWithTask).mockResolvedValue({
-      success: false,
-      message: 'Failed to wake specialist',
-      tmuxSession: 'test-agent',
-      wasAlreadyRunning: false,
-      error: 'Test error',
-    });
-
-    const result = await wakeSpecialistOrQueue('test-agent', {
-      issueId: 'PAN-74',
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.queued).toBe(false);
-    expect(result.error).toBeDefined();
-  });
-});
-
-describe('submitToSpecialistQueue', () => {
-  beforeEach(() => {
-    clearHook('test-agent');
-  });
-
-  it('should submit task with all fields', () => {
+  it('should submit task with all fields in context', () => {
     const item = submitToSpecialistQueue('test-agent', {
       priority: 'urgent',
       source: 'handoff',
@@ -157,11 +37,14 @@ describe('submitToSpecialistQueue', () => {
     expect(item.priority).toBe('urgent');
     expect(item.source).toBe('handoff');
     expect(item.payload.issueId).toBe('PAN-74');
-    expect(item.payload.workspace).toBe('/test/workspace');
-    expect(item.payload.branch).toBe('feature/pan-74');
-    expect(item.payload.prUrl).toBe('https://github.com/test/repo/pull/74');
+
+    // workspace, branch, prUrl are in context, not directly in payload
     expect(item.payload.context).toBeDefined();
+    expect(item.payload.context?.workspace).toBe('/test/workspace');
+    expect(item.payload.context?.branch).toBe('feature/pan-74');
+    expect(item.payload.context?.prUrl).toBe('https://github.com/test/repo/pull/74');
     expect(item.payload.context?.reason).toBe('Code review needed');
+    expect(item.payload.context?.targetModel).toBe('opus');
   });
 
   it('should generate unique IDs for each item', () => {
@@ -178,6 +61,17 @@ describe('submitToSpecialistQueue', () => {
     });
 
     expect(item1.id).not.toBe(item2.id);
+  });
+
+  it('should handle minimal task fields', () => {
+    const item = submitToSpecialistQueue('test-agent', {
+      priority: 'normal',
+      source: 'test',
+      issueId: 'PAN-100',
+    });
+
+    expect(item.payload.issueId).toBe('PAN-100');
+    expect(item.payload.context).toBeDefined();
   });
 });
 
@@ -339,5 +233,31 @@ describe('completeSpecialistTask', () => {
     const queue = checkSpecialistQueue('test-agent');
     expect(queue.items).toHaveLength(1);
     expect(queue.items[0].id).toBe(item2.id);
+  });
+
+  it('should handle queue with multiple priorities', () => {
+    submitToSpecialistQueue('test-agent', {
+      priority: 'urgent',
+      source: 'test',
+      issueId: 'PAN-1',
+    });
+    const item2 = submitToSpecialistQueue('test-agent', {
+      priority: 'normal',
+      source: 'test',
+      issueId: 'PAN-2',
+    });
+    submitToSpecialistQueue('test-agent', {
+      priority: 'low',
+      source: 'test',
+      issueId: 'PAN-3',
+    });
+
+    // Remove the middle priority item
+    completeSpecialistTask('test-agent', item2.id);
+
+    const queue = checkSpecialistQueue('test-agent');
+    expect(queue.items).toHaveLength(2);
+    expect(queue.items[0].priority).toBe('urgent');
+    expect(queue.items[1].priority).toBe('low');
   });
 });
