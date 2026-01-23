@@ -10,7 +10,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { getCloisterService } from '../../lib/cloister/service.js';
-import { loadCloisterConfig, saveCloisterConfig } from '../../lib/cloister/config.js';
+import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
@@ -5779,6 +5779,12 @@ app.get('/api/metrics/tasks', (req, res) => {
 
 // Ensure tmux is running at startup
 ensureTmuxRunning();
+
+// Auto-start Cloister if configured
+if (shouldAutoStart()) {
+  console.log('🔔 Auto-starting Cloister...');
+  getCloisterService().start();
+}
 
 // In production, serve the frontend static files
 if (process.env.NODE_ENV === 'production') {
