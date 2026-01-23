@@ -21,9 +21,8 @@ import { getAgentState } from '../../lib/agents.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } from '../../lib/projects.js';
-
-// Promisified exec for non-blocking operations
-const execAsync = promisify(exec);
+import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
+import { normalizeModelName } from '../../lib/cost-parsers/jsonl-parser.js';
 
 // Ensure tmux server is running (starts one if not)
 async function ensureTmuxRunning(): Promise<void> {
@@ -2597,6 +2596,9 @@ app.get('/api/specialists/:name/cost', async (req, res) => {
     let cost = 0;
     let inputTokens = 0;
     let outputTokens = 0;
+    let cacheReadTokens = 0;
+    let cacheWriteTokens = 0;
+    let detectedModel = '';
 
     if (existsSync(sessionsIndexPath)) {
       const indexContent = JSON.parse(readFileSync(sessionsIndexPath, 'utf-8'));
@@ -2609,12 +2611,19 @@ app.get('/api/specialists/:name/cost', async (req, res) => {
         for (const line of lines) {
           try {
             const entry = JSON.parse(line);
-            if (entry.usage) {
-              inputTokens += entry.usage.input_tokens || 0;
-              outputTokens += entry.usage.output_tokens || 0;
+            // Extract usage from message.usage or top-level usage
+            const usage = entry.message?.usage || entry.usage;
+            const model = entry.message?.model || entry.model;
+
+            if (usage) {
+              inputTokens += usage.input_tokens || 0;
+              outputTokens += usage.output_tokens || 0;
+              cacheReadTokens += usage.cache_read_input_tokens || 0;
+              cacheWriteTokens += usage.cache_creation_input_tokens || 0;
             }
-            if (entry.costUSD !== undefined) {
-              cost += entry.costUSD;
+            // Track the model being used
+            if (model && !detectedModel) {
+              detectedModel = model;
             }
           } catch {
             // Skip malformed lines
@@ -2623,7 +2632,22 @@ app.get('/api/specialists/:name/cost', async (req, res) => {
       }
     }
 
-    res.json({ cost, inputTokens, outputTokens });
+    // Calculate cost from usage using pricing data
+    if (inputTokens > 0 || outputTokens > 0) {
+      const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
+      const pricing = getPricing(modelInfo.provider, modelInfo.model);
+      if (pricing) {
+        const usage: TokenUsage = {
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          cacheWriteTokens,
+        };
+        cost = calculateCost(usage, pricing);
+      }
+    }
+
+    res.json({ cost, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, model: detectedModel });
   } catch (error: any) {
     console.error('Error getting specialist cost:', error);
     res.json({ cost: 0, inputTokens: 0, outputTokens: 0 });
@@ -2813,7 +2837,7 @@ app.get('/api/handoffs/stats', (req, res) => {
   }
 });
 
-// Get agent cost (placeholder - to be implemented with actual cost tracking)
+// Get agent cost - parses actual session JSONL files for accurate cost
 app.get('/api/agents/:id/cost', (req, res) => {
   try {
     const agentId = req.params.id;
@@ -2823,16 +2847,89 @@ app.get('/api/agents/:id/cost', (req, res) => {
       return res.status(404).json({ error: 'Agent not found' });
     }
 
-    // Return cost from agent state
+    // Calculate cost from session JSONL files
+    let cost = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheReadTokens = 0;
+    let cacheWriteTokens = 0;
+    let detectedModel = agentState.model || '';
+
+    // Find the Claude project directory for this agent's workspace
+    const homeDir = process.env.HOME || homedir();
+    const claudeProjectsDir = join(homeDir, '.claude', 'projects');
+    const workspacePath = agentState.workspace;
+
+    if (workspacePath) {
+      // Claude uses the workspace path as the project directory hash
+      const projectDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
+      const projectDir = join(claudeProjectsDir, projectDirName);
+      const sessionsIndexPath = join(projectDir, 'sessions-index.json');
+
+      if (existsSync(sessionsIndexPath)) {
+        try {
+          const indexContent = JSON.parse(readFileSync(sessionsIndexPath, 'utf-8'));
+
+          // Parse ALL sessions for this workspace (agent may have multiple sessions)
+          for (const sessionEntry of (indexContent.entries || [])) {
+            if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
+              const jsonlContent = readFileSync(sessionEntry.fullPath, 'utf-8');
+              const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
+
+              for (const line of lines) {
+                try {
+                  const entry = JSON.parse(line);
+                  // Extract usage from message.usage or top-level usage
+                  const usage = entry.message?.usage || entry.usage;
+                  const model = entry.message?.model || entry.model;
+
+                  if (usage) {
+                    inputTokens += usage.input_tokens || 0;
+                    outputTokens += usage.output_tokens || 0;
+                    cacheReadTokens += usage.cache_read_input_tokens || 0;
+                    cacheWriteTokens += usage.cache_creation_input_tokens || 0;
+                  }
+                  // Track the model being used
+                  if (model && !detectedModel) {
+                    detectedModel = model;
+                  }
+                } catch {
+                  // Skip malformed lines
+                }
+              }
+            }
+          }
+        } catch {
+          // Failed to parse sessions index
+        }
+      }
+    }
+
+    // Calculate cost from usage using pricing data
+    if (inputTokens > 0 || outputTokens > 0) {
+      const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
+      const pricing = getPricing(modelInfo.provider, modelInfo.model);
+      if (pricing) {
+        const usage: TokenUsage = {
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          cacheWriteTokens,
+        };
+        cost = calculateCost(usage, pricing);
+      }
+    }
+
     res.json({
       agentId,
-      model: agentState.model,
+      model: detectedModel || agentState.model,
       tokens: {
-        input: 0,  // TODO: Parse from session JSONL
-        output: 0,
-        cacheRead: 0,
+        input: inputTokens,
+        output: outputTokens,
+        cacheRead: cacheReadTokens,
+        cacheWrite: cacheWriteTokens,
       },
-      cost: agentState.costSoFar || 0,
+      cost,
     });
   } catch (error: any) {
     console.error('Error getting agent cost:', error);
@@ -2907,58 +3004,6 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
       const uptime = isRunning ? match.output.replace(/^Up\s+/, '').split(/\s+/)[0] : null;
       status[displayName] = { running: isRunning, uptime };
     } else {
-      status[displayName] = { running: false, uptime: null };
-    }
-  }
-
-  return status;
-}
-
-// Synchronous version for backwards compatibility
-function getContainerStatus(issueId: string): Record<string, { running: boolean; uptime: string | null }> {
-  const issueLower = issueId.toLowerCase();
-  // Map display names to possible container suffixes
-  const containerMap: Record<string, string[]> = {
-    'frontend': ['frontend', 'fe'],  // MYN uses 'fe' for frontend
-    'api': ['api'],
-    'postgres': ['postgres'],
-    'redis': ['redis'],
-  };
-  const status: Record<string, { running: boolean; uptime: string | null }> = {};
-
-  for (const [displayName, suffixes] of Object.entries(containerMap)) {
-    try {
-      // Try multiple naming conventions and suffixes
-      const patterns: string[] = [];
-      for (const suffix of suffixes) {
-        patterns.push(
-          `myn-feature-${issueLower}-${suffix}-1`,
-          `feature-${issueLower}-${suffix}-1`,
-          `${issueLower}-${suffix}-1`,
-        );
-      }
-
-      let found = false;
-      for (const containerName of patterns) {
-        const { stdout: output } = await execAsync(
-          `docker ps -a --filter "name=${containerName}" --format "{{.Status}}" 2>/dev/null || echo ""`,
-          { encoding: 'utf-8' }
-        );
-        const trimmedOutput = output.trim();
-
-        if (trimmedOutput) {
-          const isRunning = trimmedOutput.startsWith('Up');
-          const uptime = isRunning ? trimmedOutput.replace(/^Up\s+/, '').split(/\s+/)[0] : null;
-          status[displayName] = { running: isRunning, uptime };
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
-        status[displayName] = { running: false, uptime: null };
-      }
-    } catch {
       status[displayName] = { running: false, uptime: null };
     }
   }
@@ -3064,56 +3109,6 @@ async function getRepoGitStatusAsync(workspacePath: string): Promise<{
         uncommittedFiles: parseInt(gitResult.uncommitted, 10) || 0,
         latestCommit: gitResult.latestCommit.slice(0, 60) + (gitResult.latestCommit.length > 60 ? '...' : ''),
       };
-    }
-  }
-
-  return result;
-}
-
-// Synchronous version for backwards compatibility
-function getRepoGitStatus(workspacePath: string): {
-  frontend: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
-  api: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
-} {
-  const result: {
-    frontend: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
-    api: { branch: string; uncommittedFiles: number; latestCommit: string } | null;
-  } = { frontend: null, api: null };
-
-  // Check for both 'fe'/'api' and 'frontend'/'backend' naming conventions
-  const repoPaths = [
-    { key: 'frontend', paths: ['fe', 'frontend'] },
-    { key: 'api', paths: ['api', 'backend'] },
-  ];
-
-  for (const { key, paths } of repoPaths) {
-    for (const subdir of paths) {
-      const repoDir = join(workspacePath, subdir);
-      if (!existsSync(repoDir)) continue;
-
-      try {
-        const { stdout: branch } = await execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null', {
-          cwd: repoDir,
-          encoding: 'utf-8',
-        });
-
-        const { stdout: uncommitted } = await execAsync('git status --porcelain 2>/dev/null | wc -l', {
-          cwd: repoDir,
-          encoding: 'utf-8',
-        });
-
-        const { stdout: latestCommit } = await execAsync('git log -1 --pretty=format:"%s" 2>/dev/null || echo ""', {
-          cwd: repoDir,
-          encoding: 'utf-8',
-        });
-
-        result[key as 'frontend' | 'api'] = {
-          branch: branch.trim(),
-          uncommittedFiles: parseInt(uncommitted.trim(), 10) || 0,
-          latestCommit: latestCommit.trim().slice(0, 60) + (latestCommit.trim().length > 60 ? '...' : ''),
-        };
-        break; // Found this repo, move to next
-      } catch {}
     }
   }
 
@@ -3286,7 +3281,7 @@ app.post('/api/workspaces', (req, res) => {
 
 // Preview what would be lost when cleaning a corrupted workspace
 // Includes diff analysis against main branch to identify actual changes
-app.get('/api/workspaces/:issueId/clean/preview', (req, res) => {
+app.get('/api/workspaces/:issueId/clean/preview', async (req, res) => {
   const { issueId } = req.params;
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
@@ -3527,7 +3522,7 @@ app.post('/api/workspaces/:issueId/clean', async (req, res) => {
 });
 
 // Containerize an existing workspace (runs project's new-feature script)
-app.post('/api/workspaces/:issueId/containerize', (req, res) => {
+app.post('/api/workspaces/:issueId/containerize', async (req, res) => {
   const { issueId } = req.params;
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
@@ -3664,7 +3659,7 @@ app.post('/api/workspaces/:issueId/containerize', (req, res) => {
 });
 
 // Start containers for an existing workspace
-app.post('/api/workspaces/:issueId/start', (req, res) => {
+app.post('/api/workspaces/:issueId/start', async (req, res) => {
   const { issueId } = req.params;
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
@@ -5281,7 +5276,7 @@ Start by exploring the codebase to understand the context, then begin the discov
 });
 
 // Get planning session status
-app.get('/api/planning/:issueId/status', (req, res) => {
+app.get('/api/planning/:issueId/status', async (req, res) => {
   const { issueId } = req.params;
   const sessionName = `planning-${issueId.toLowerCase()}`;
   const issueLower = issueId.toLowerCase();

@@ -314,9 +314,10 @@ function sendMessageToAgent(issueId: string, message: string): boolean {
     // Check if session exists
     execSync(`tmux has-session -t "${sessionName}" 2>/dev/null`, { encoding: 'utf-8' });
 
-    // Send the message
+    // Send the message (with delay before Enter to avoid race condition)
     const escapedMessage = message.replace(/'/g, "'\\''");
     execSync(`tmux send-keys -t "${sessionName}" '${escapedMessage}'`, { encoding: 'utf-8' });
+    execSync('sleep 0.2', { encoding: 'utf-8' }); // Small delay for terminal to process text
     execSync(`tmux send-keys -t "${sessionName}" C-m`, { encoding: 'utf-8' });
 
     console.log(`[merge-agent] Sent message to ${sessionName}`);

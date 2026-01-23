@@ -112,7 +112,7 @@ export function getAllSessionFiles(): string[] {
 /**
  * Normalize model name for pricing lookup
  */
-function normalizeModelName(model: string): { provider: AIProvider; model: string } {
+export function normalizeModelName(model: string): { provider: AIProvider; model: string } {
   // Claude models
   if (model.includes('claude')) {
     let normalizedModel = model;

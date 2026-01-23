@@ -46,6 +46,14 @@ import {
   checkAndRotateIfNeeded,
   type SessionRotationResult,
 } from './session-rotation.js';
+import {
+  startDeacon,
+  stopDeacon,
+  isDeaconRunning,
+  getDeaconStatus,
+  runPatrol,
+  type PatrolResult,
+} from './deacon.js';
 import { PANOPTICON_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -211,6 +219,15 @@ export class CloisterService {
       console.error('  ✗ Failed to initialize specialists:', error);
     }
 
+    // Start deacon health monitor for specialists
+    try {
+      console.log('  → Starting deacon health monitor...');
+      startDeacon();
+      console.log('  ✓ Deacon started');
+    } catch (error) {
+      console.error('  ✗ Failed to start deacon:', error);
+    }
+
     this.running = true;
     writeStateFile(true);
     this.emit({ type: 'started' });
@@ -238,6 +255,14 @@ export class CloisterService {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
+    }
+
+    // Stop deacon health monitor
+    try {
+      stopDeacon();
+      console.log('  ✓ Deacon stopped');
+    } catch (error) {
+      console.error('Failed to stop deacon:', error);
     }
 
     // Close database connection
@@ -880,6 +905,27 @@ export class CloisterService {
     }
 
     return agentHealths;
+  }
+
+  /**
+   * Get deacon (specialist health monitor) status
+   */
+  getDeaconStatus() {
+    return getDeaconStatus();
+  }
+
+  /**
+   * Run a manual deacon patrol
+   */
+  async runDeaconPatrol(): Promise<PatrolResult> {
+    return runPatrol();
+  }
+
+  /**
+   * Check if deacon is running
+   */
+  isDeaconRunning(): boolean {
+    return isDeaconRunning();
   }
 
   /**
