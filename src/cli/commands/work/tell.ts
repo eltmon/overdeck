@@ -5,7 +5,7 @@ export async function tellCommand(id: string, message: string): Promise<void> {
   const agentId = id.startsWith('agent-') ? id : `agent-${id.toLowerCase()}`;
 
   try {
-    messageAgent(agentId, message);
+    await messageAgent(agentId, message);
     console.log(chalk.green('Message sent to ' + agentId));
     console.log(chalk.dim(`  "${message}"`));
   } catch (error: any) {

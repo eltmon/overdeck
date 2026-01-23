@@ -337,9 +337,21 @@ export function stopAgent(agentId: string): void {
   }
 }
 
-export function messageAgent(agentId: string, message: string): void {
+export async function messageAgent(agentId: string, message: string): Promise<void> {
   // Normalize agent ID
   const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
+
+  // Check if agent is suspended - auto-resume if so (PAN-80)
+  const runtimeState = getAgentRuntimeState(normalizedId);
+  if (runtimeState?.state === 'suspended') {
+    console.log(`[agents] Auto-resuming suspended agent ${normalizedId} to deliver message`);
+    const result = await resumeAgent(normalizedId, message);
+    if (!result.success) {
+      throw new Error(`Failed to auto-resume agent: ${result.error}`);
+    }
+    // Message already sent during resume
+    return;
+  }
 
   if (!sessionExists(normalizedId)) {
     throw new Error(`Agent ${normalizedId} not running`);
@@ -356,6 +368,95 @@ export function messageAgent(agentId: string, message: string): void {
     join(mailDir, `${timestamp}.md`),
     `# Message\n\n${message}\n`
   );
+}
+
+/**
+ * Resume a suspended agent (PAN-80)
+ *
+ * Reads saved session ID and creates new tmux session with --resume flag.
+ * Optionally sends a message after resuming.
+ *
+ * Auto-resume triggers:
+ * - Specialists: When queued work arrives
+ * - Work agents: When message is sent via /work-tell
+ */
+export async function resumeAgent(agentId: string, message?: string): Promise<{ success: boolean; error?: string }> {
+  const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
+
+  // Check runtime state
+  const runtimeState = getAgentRuntimeState(normalizedId);
+  if (!runtimeState || runtimeState.state !== 'suspended') {
+    return {
+      success: false,
+      error: `Cannot resume agent in state: ${runtimeState?.state || 'unknown'}`
+    };
+  }
+
+  // Get saved session ID
+  const sessionId = getSessionId(normalizedId);
+  if (!sessionId) {
+    return {
+      success: false,
+      error: 'No saved session ID found'
+    };
+  }
+
+  // Get agent state for workspace info
+  const agentState = getAgentState(normalizedId);
+  if (!agentState) {
+    return {
+      success: false,
+      error: 'Agent state not found'
+    };
+  }
+
+  // Check if session already exists (shouldn't happen for suspended agents)
+  if (sessionExists(normalizedId)) {
+    return {
+      success: false,
+      error: 'Agent session already exists'
+    };
+  }
+
+  try {
+    // Create new tmux session with resume command
+    const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
+    createSession(normalizedId, agentState.workspace, claudeCmd, {
+      env: {
+        PANOPTICON_AGENT_ID: normalizedId
+      }
+    });
+
+    // If there's a message, send it after a brief delay
+    if (message) {
+      // Wait for Claude to be ready
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Send message
+      sendKeys(normalizedId, message);
+    }
+
+    // Update runtime state
+    saveAgentRuntimeState(normalizedId, {
+      state: 'active',
+      resumedAt: new Date().toISOString(),
+    });
+
+    // Update agent state
+    if (agentState) {
+      agentState.status = 'running';
+      agentState.lastActivity = new Date().toISOString();
+      saveAgentState(agentState);
+    }
+
+    return { success: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: `Failed to resume agent: ${msg}`
+    };
+  }
 }
 
 /**

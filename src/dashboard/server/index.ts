@@ -17,7 +17,7 @@ import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
-import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId } from '../../lib/agents.js';
+import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent } from '../../lib/agents.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } from '../../lib/projects.js';
@@ -2121,44 +2121,13 @@ app.post('/api/agents/:id/resume', async (req, res) => {
   const { message } = req.body; // Optional message to send after resume
 
   try {
-    const runtimeState = getAgentRuntimeState(id);
+    const result = await resumeAgent(id, message);
 
-    if (!runtimeState || runtimeState.state !== 'suspended') {
-      return res.status(400).json({ error: `Cannot resume agent in state: ${runtimeState?.state || 'unknown'}` });
+    if (result.success) {
+      res.json({ success: true });
+    } else {
+      res.status(400).json({ error: result.error });
     }
-
-    // Get saved session ID
-    const sessionId = getSessionId(id);
-    if (!sessionId) {
-      return res.status(400).json({ error: 'No saved session ID found' });
-    }
-
-    // Get workspace from agent state
-    const agentState = getAgentState(id);
-    if (!agentState) {
-      return res.status(400).json({ error: 'Agent state not found' });
-    }
-
-    // Create new tmux session with resume command
-    const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
-    await execAsync(
-      `tmux new-session -d -s "${id}" -c "${agentState.workspace}" "PANOPTICON_AGENT_ID=${id} ${claudeCmd}"`
-    );
-
-    // If there's a message, send it after a brief delay
-    if (message) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for Claude to be ready
-      await execAsync(`tmux send-keys -t "${id}" "${message.replace(/"/g, '\\"')}"`);
-      await execAsync(`tmux send-keys -t "${id}" Enter`);
-    }
-
-    // Update state
-    saveAgentRuntimeState(id, {
-      state: 'active',
-      resumedAt: new Date().toISOString(),
-    });
-
-    res.json({ success: true });
   } catch (error) {
     console.error('Error resuming agent:', error);
     res.status(500).json({ error: 'Failed to resume agent' });

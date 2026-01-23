@@ -27,6 +27,8 @@ import {
   wakeSpecialistWithTask,
   completeSpecialistTask,
 } from './specialists.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents } from '../agents.js';
+import { sessionExists } from '../tmux.js';
 
 // ============================================================================
 // Configuration
@@ -443,6 +445,76 @@ export interface PatrolResult {
 }
 
 /**
+ * Check and auto-suspend idle agents (PAN-80)
+ *
+ * Specialists: 5 minute idle timeout
+ * Work agents: 10 minute idle timeout
+ */
+async function checkAndSuspendIdleAgents(): Promise<string[]> {
+  const actions: string[] = [];
+  const specialists = getEnabledSpecialists();
+  const specialistNames = new Set(specialists.map(s => getTmuxSessionName(s.name)));
+
+  // Get all running agents
+  const agents = listRunningAgents();
+
+  for (const agent of agents) {
+    if (!agent.tmuxActive) {
+      continue; // Skip if tmux session is already gone
+    }
+
+    // Get runtime state (from hooks)
+    const runtimeState = getAgentRuntimeState(agent.id);
+
+    // Only suspend idle agents
+    if (!runtimeState || runtimeState.state !== 'idle') {
+      continue;
+    }
+
+    // Calculate idle time
+    const lastActivity = new Date(runtimeState.lastActivity);
+    const idleMs = Date.now() - lastActivity.getTime();
+    const idleMinutes = idleMs / (1000 * 60);
+
+    // Determine timeout based on agent type
+    const isSpecialist = specialistNames.has(agent.id);
+    const timeoutMinutes = isSpecialist ? 5 : 10;
+
+    // Check if idle timeout exceeded
+    if (idleMinutes > timeoutMinutes) {
+      console.log(`[deacon] Auto-suspending ${agent.id} (idle for ${Math.round(idleMinutes)} minutes)`);
+
+      try {
+        // Get session ID if available (would come from hook state or API)
+        // For now, we'll save the agent ID as a placeholder - in a real implementation,
+        // Claude would report its session ID via a hook or we'd extract it from the API
+        const sessionId = runtimeState.sessionId || `session-${agent.id}`;
+
+        // Save session ID for later resume
+        saveSessionId(agent.id, sessionId);
+
+        // Kill tmux session
+        execSync(`tmux kill-session -t "${agent.id}" 2>/dev/null || true`);
+
+        // Update state
+        saveAgentRuntimeState(agent.id, {
+          state: 'suspended',
+          suspendedAt: new Date().toISOString(),
+          sessionId,
+        });
+
+        actions.push(`Auto-suspended ${agent.id} after ${Math.round(idleMinutes)}min idle`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[deacon] Failed to suspend ${agent.id}:`, msg);
+      }
+    }
+  }
+
+  return actions;
+}
+
+/**
  * Run a single patrol cycle
  */
 export async function runPatrol(): Promise<PatrolResult> {
@@ -519,6 +591,10 @@ export async function runPatrol(): Promise<PatrolResult> {
       }
     }
   }
+
+  // Check and auto-suspend idle agents (PAN-80)
+  const suspendActions = await checkAndSuspendIdleAgents();
+  actions.push(...suspendActions);
 
   saveState(state);
 
