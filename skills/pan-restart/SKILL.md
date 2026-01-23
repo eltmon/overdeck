@@ -1,64 +1,53 @@
-# pan-restart
+---
+name: pan-restart
+description: Restart the Panopticon dashboard (frontend and API server)
+---
 
-Safely restart Panopticon dashboard services without killing your own process.
+# Restart Panopticon Dashboard
 
-## CRITICAL WARNING
+This skill restarts the Panopticon dashboard services.
 
-**NEVER** use `kill -9` or `xargs kill` on ports 3010/3011 directly!
+## Usage
 
-The Panopticon dashboard runs on these ports, and if you're a Claude Code agent spawned by the dashboard, killing these processes will terminate YOUR OWN SESSION.
+Run `/pan-restart` to restart both the frontend (port 3010) and API server (port 3011).
 
-## Safe Restart Pattern
+## What It Does
 
-Use `nohup` and background the process, then verify health:
+1. Kills any existing dashboard processes
+2. Starts `npm run dev` in the dashboard directory
+3. Waits for services to be ready
+4. Verifies both frontend and API are responding
+
+## Execution
 
 ```bash
-# 1. Stop existing processes gracefully (if needed)
-pkill -f "panopticon-dashboard" || true
+# Kill existing processes
+pkill -f "tsx.*server/index" 2>/dev/null
+pkill -f "vite.*dashboard" 2>/dev/null
+sleep 1
 
-# 2. Start dashboard in background with nohup
+# Start dashboard
 cd /home/eltmon/projects/panopticon/src/dashboard
-nohup npm run dev > /tmp/dashboard.log 2>&1 &
+nohup npm run dev > /tmp/panopticon-dashboard.log 2>&1 &
 
-# 3. Wait and verify
+# Wait for startup
 sleep 3
-curl -s http://localhost:3011/api/health | jq -r '.status'
+
+# Verify services
+echo "Checking frontend (port 3010)..."
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3010 && echo " OK" || echo " FAILED"
+
+echo "Checking API (port 3011)..."
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3011/api/health && echo " OK" || echo " FAILED"
+
+echo ""
+echo "Dashboard restarted. View at: http://localhost:3010"
 ```
 
-## What NOT To Do
+## Troubleshooting
 
-```bash
-# DANGEROUS - Will kill your own process if you're a dashboard-spawned agent!
-lsof -ti:3010 -ti:3011 | xargs -r kill -9
+If the dashboard fails to start:
 
-# DANGEROUS - Same problem
-fuser -k 3010/tcp 3011/tcp
-```
-
-## Why This Matters
-
-When you're running as:
-- A planning agent in the PlanDialog terminal
-- A work agent spawned via the dashboard
-- Any agent communicating through the dashboard's WebSocket
-
-...the dashboard is YOUR parent process. Killing it kills you.
-
-## Safe Alternatives
-
-1. **For code changes**: The dashboard uses `tsx watch` which auto-reloads on file changes
-2. **For full restart**: Use `nohup` pattern above
-3. **For development**: Run `npm run dev` in a separate terminal you control
-
-## Checking If Dashboard Is Running
-
-```bash
-# Check health endpoint
-curl -s http://localhost:3011/api/health
-
-# Check processes
-pgrep -f "panopticon-dashboard" || echo "Not running"
-
-# Check ports
-lsof -i:3010 -i:3011
-```
+1. Check logs: `tail -50 /tmp/panopticon-dashboard.log`
+2. Check for port conflicts: `lsof -i :3010 -i :3011`
+3. Ensure dependencies are installed: `cd /home/eltmon/projects/panopticon/src/dashboard && npm install`
