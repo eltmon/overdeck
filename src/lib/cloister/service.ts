@@ -37,6 +37,11 @@ import {
   clearOldViolations,
   type FPPViolation,
 } from './fpp-violations.js';
+import {
+  checkCostLimits,
+  getCostSummary,
+  type CostAlert,
+} from './cost-monitor.js';
 
 /**
  * Cloister service status
@@ -81,6 +86,7 @@ export type CloisterEvent =
   | { type: 'fpp_violation_detected'; agentId: string; violation: FPPViolation }
   | { type: 'fpp_nudge_sent'; agentId: string; nudgeCount: number }
   | { type: 'fpp_max_nudges_exceeded'; agentId: string; violation: FPPViolation }
+  | { type: 'cost_alert'; alert: CostAlert }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
   | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
   | { type: 'emergency_stop'; killedAgents: string[] }
@@ -302,6 +308,9 @@ export class CloisterService {
 
       // Check for FPP violations (Phase 6)
       this.checkFPPViolations(agentIds);
+
+      // Check cost limits (Phase 6)
+      this.checkCostAlerts(agentIds);
 
       // Clean up old resolved violations (daily)
       if (Math.random() < 0.01) {
@@ -561,6 +570,44 @@ export class CloisterService {
         }
       }
     }
+  }
+
+  /**
+   * Check for cost limit alerts
+   */
+  private checkCostAlerts(agentIds: string[]): void {
+    const config = this.config.cost_limits;
+    if (!config) return;
+
+    for (const agentId of agentIds) {
+      // Extract issue ID from agent ID (format: agent-issue-123 or issue-123)
+      const issueId = agentId.startsWith('agent-')
+        ? agentId.replace(/^agent-/, '')
+        : agentId;
+
+      const alerts = checkCostLimits(agentId, issueId, config);
+      for (const alert of alerts) {
+        this.emit({ type: 'cost_alert', alert });
+
+        // Log the alert
+        if (alert.level === 'limit_reached') {
+          console.error(
+            `🔔 COST LIMIT REACHED: ${alert.type} for ${alert.agentId || alert.issueId} - $${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)}`
+          );
+        } else {
+          console.warn(
+            `🔔 Cost warning: ${alert.type} for ${alert.agentId || alert.issueId} at ${alert.percentUsed.toFixed(0)}% ($${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)})`
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Get cost summary
+   */
+  getCostSummary() {
+    return getCostSummary();
   }
 
   /**

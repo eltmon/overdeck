@@ -147,6 +147,16 @@ export interface AutoRestartConfig {
 }
 
 /**
+ * Cost limits configuration
+ */
+export interface CostLimitsConfig {
+  per_agent_usd: number;
+  per_issue_usd: number;
+  daily_total_usd: number;
+  alert_threshold: number; // Fraction (0.0-1.0) at which to start alerting
+}
+
+/**
  * Complete Cloister configuration
  */
 export interface CloisterConfig {
@@ -160,6 +170,7 @@ export interface CloisterConfig {
   handoffs?: HandoffConfig;
   cost_tracking?: CostTrackingConfig;
   auto_restart?: AutoRestartConfig;
+  cost_limits?: CostLimitsConfig;
 }
 
 /**
@@ -249,6 +260,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     enabled: true,
     max_retries: 3,
     backoff_seconds: [30, 60, 120], // 30s, 1m, 2m
+  },
+  cost_limits: {
+    per_agent_usd: 10.0,
+    per_issue_usd: 25.0,
+    daily_total_usd: 100.0,
+    alert_threshold: 0.8, // Alert at 80%
   },
 };
 
