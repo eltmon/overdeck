@@ -287,7 +287,11 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
   };
 
   const handleReview = () => {
-    if (confirm(`Start review & test pipeline for ${issueId}?\n\nThis will:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.`)) {
+    const isReReview = reviewStatus?.readyForMerge || reviewStatus?.reviewStatus === 'passed' || reviewStatus?.testStatus === 'passed';
+    const message = isReReview
+      ? `Re-run review & test pipeline for ${issueId}?\n\nThis will reset the current status and:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.`
+      : `Start review & test pipeline for ${issueId}?\n\nThis will:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.`;
+    if (confirm(message)) {
       reviewMutation.mutate();
     }
   };
@@ -763,21 +767,23 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               </button>
             )}
 
-            {/* Review & Test button - shows when not ready for merge */}
-            {!reviewStatus?.readyForMerge && (
-              <button
-                onClick={handleReview}
-                disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
-                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-900/30 text-blue-400 rounded hover:bg-blue-900/50 disabled:opacity-50"
-              >
-                {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-3 h-3" />
-                )}
-                Review & Test
-              </button>
-            )}
+            {/* Review & Test button - available anytime to (re-)run the cycle */}
+            <button
+              onClick={handleReview}
+              disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
+              className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 ${
+                reviewStatus?.readyForMerge
+                  ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
+                  : 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50'
+              }`}
+            >
+              {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3 h-3" />
+              )}
+              {reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test'}
+            </button>
 
             <button
               onClick={handleKill}
