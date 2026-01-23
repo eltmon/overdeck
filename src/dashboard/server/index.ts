@@ -174,6 +174,45 @@ function clearReviewStatus(issueId: string): void {
   saveReviewStatuses(statuses);
 }
 
+/**
+ * Close an issue after successful merge
+ * Handles both GitHub issues (PAN-*) and Linear issues
+ */
+async function closeIssueAfterMerge(issueId: string): Promise<void> {
+  try {
+    // Check if it's a GitHub issue (PAN-* prefix)
+    if (issueId.toUpperCase().startsWith('PAN-')) {
+      const issueNumber = issueId.replace(/^PAN-/i, '');
+      console.log(`[merge] Closing GitHub issue #${issueNumber}...`);
+
+      // Use gh CLI to close the issue
+      await execAsync(`gh issue close ${issueNumber} --repo eltmon/panopticon-cli --comment "Merged to main"`, {
+        encoding: 'utf-8',
+      });
+      console.log(`[merge] GitHub issue #${issueNumber} closed`);
+    } else {
+      // Linear issue - update to Done state
+      console.log(`[merge] Moving Linear issue ${issueId} to Done...`);
+
+      // Use linear CLI or API to update the issue state
+      // For now, we'll try to find and call the Linear update
+      try {
+        await execAsync(`linear issue update ${issueId} --state "Done"`, {
+          encoding: 'utf-8',
+        });
+        console.log(`[merge] Linear issue ${issueId} moved to Done`);
+      } catch (linearErr) {
+        // Linear CLI might not be available, log but don't fail
+        console.warn(`[merge] Could not auto-close Linear issue ${issueId}: Linear CLI not available`);
+      }
+    }
+  } catch (error: unknown) {
+    // Log but don't fail the merge - closing is a nice-to-have
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[merge] Failed to close issue ${issueId}:`, message);
+  }
+}
+
 // ============================================================================
 // AUTOMATIC COMPLETION DETECTION
 // ============================================================================
@@ -3937,18 +3976,26 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       console.log(`[merge] Successfully merged ${issueId}`);
       clearReviewStatus(issueId); // Clear review status after successful merge
       completePendingOperation(issueId, null);
+
+      // Close the issue after successful merge
+      await closeIssueAfterMerge(issueId);
+
       return res.json({
         success: true,
-        message: `Successfully merged ${issueId} to main`,
+        message: `Successfully merged ${issueId} to main and closed issue`,
         testsStatus: 'PASS',
       });
     } else if (mergeResult.success) {
       console.log(`[merge] Merged ${issueId} (tests: ${mergeResult.testsStatus})`);
       clearReviewStatus(issueId);
       completePendingOperation(issueId, null);
+
+      // Close the issue after successful merge (even if tests skipped)
+      await closeIssueAfterMerge(issueId);
+
       return res.json({
         success: true,
-        message: `Merged ${issueId} to main`,
+        message: `Merged ${issueId} to main and closed issue`,
         testsStatus: mergeResult.testsStatus,
         note: mergeResult.testsStatus === 'SKIP' ? 'Tests were skipped' : undefined,
       });

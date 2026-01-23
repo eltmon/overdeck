@@ -543,6 +543,14 @@ export async function isIdleAtPrompt(name: SpecialistType): Promise<boolean> {
       return true; // Clean prompt line = idle
     }
 
+    // Check for prompt with unsent text in buffer (shows "↵ send" or "↵ enter" at end)
+    // Example: "❯ check test-agent status                                                ↵ send"
+    // This means idle at prompt with text typed but not submitted
+    const promptWithUnsentText = /^❯\s+.+↵\s*(send|enter)/m;
+    if (promptWithUnsentText.test(trimmedOutput)) {
+      return true; // At prompt with unsent text = still idle
+    }
+
     // Check if last meaningful line (before status) shows prompt
     // Status lines typically contain: MCPs, hooks, CLAUDE.md, permissions
     const nonStatusLines = lines.filter(line =>

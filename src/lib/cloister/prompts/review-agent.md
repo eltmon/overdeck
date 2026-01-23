@@ -73,11 +73,25 @@ Task(subagent_type='code-review-synthesis', prompt='Combine findings from .claud
 
 These are non-negotiable. If ANY of these are violated, you MUST request changes:
 
-### 1. Test Coverage
+### 1. Test Coverage (Non-Negotiable)
+
+**For NEW FUNCTIONALITY:**
 - **Every new function MUST have tests** - No exceptions
 - Tests must cover happy path AND error cases
 - If tests are missing, REQUEST CHANGES immediately
 - "I'll add tests later" is NEVER acceptable
+
+**For BUG FIXES:**
+- **Every bug fix MUST include a regression test** - No exceptions
+- The test must FAIL before the fix and PASS after
+- The test should reproduce the exact bug scenario
+- This prevents the same bug from returning
+
+**How to check:**
+1. Look at the PR description - is it a bug fix or new feature?
+2. For bug fixes: Search for a test that exercises the bug scenario
+3. For new features: Search for tests covering the new code paths
+4. If tests are absent, REQUEST CHANGES with: "Bug fix requires a regression test that fails without the fix and passes with it"
 
 ### 2. No In-Memory Only Storage
 - **Data that matters MUST persist** - No storing important state only in memory
@@ -158,6 +172,7 @@ const { stdout } = await execAsync('tmux capture-pane -t session -p');
 Only approve if ALL of these are true:
 - Zero bugs or logical errors
 - Complete test coverage for new code
+- **Regression tests for bug fixes** (test must fail before fix, pass after)
 - No security vulnerabilities
 - No performance issues
 - Follows all project patterns
@@ -169,7 +184,8 @@ Only approve if ALL of these are true:
 
 Request changes for:
 - Any bug, no matter how small
-- Missing tests (this alone is enough to reject)
+- Missing tests for new functionality (this alone is enough to reject)
+- Missing regression test for bug fixes (test must reproduce the bug)
 - Security concerns of any severity
 - Performance issues
 - Architectural concerns

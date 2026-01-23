@@ -5,7 +5,10 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn, execSync } from 'child_process';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -66,9 +69,9 @@ interface ReviewHistoryEntry {
 const REVIEW_TIMEOUT_MS = 20 * 60 * 1000;
 
 /**
- * Build the prompt for review-agent
+ * Build the prompt for review-agent (non-blocking)
  */
-function buildReviewPrompt(context: ReviewContext): string {
+async function buildReviewPrompt(context: ReviewContext): Promise<string> {
   const templatePath = join(__dirname, 'prompts', 'review-agent.md');
 
   if (!existsSync(templatePath)) {
@@ -77,10 +80,10 @@ function buildReviewPrompt(context: ReviewContext): string {
 
   const template = readFileSync(templatePath, 'utf-8');
 
-  // Get files changed from PR if not provided
+  // Get files changed from PR if not provided (non-blocking)
   let filesChanged = context.filesChanged || [];
   if (filesChanged.length === 0) {
-    filesChanged = getFilesChangedFromPR(context.prUrl, context.projectPath);
+    filesChanged = await getFilesChangedFromPR(context.prUrl, context.projectPath);
   }
 
   // Replace template variables
@@ -100,16 +103,16 @@ function buildReviewPrompt(context: ReviewContext): string {
 }
 
 /**
- * Get files changed in PR using gh CLI
+ * Get files changed in PR using gh CLI (non-blocking)
  */
-function getFilesChangedFromPR(prUrl: string, projectPath: string): string[] {
+async function getFilesChangedFromPR(prUrl: string, projectPath: string): Promise<string[]> {
   try {
-    const output = execSync(`gh pr view ${prUrl} --json files --jq '.files[].path'`, {
+    const { stdout } = await execAsync(`gh pr view ${prUrl} --json files --jq '.files[].path'`, {
       cwd: projectPath,
       encoding: 'utf-8',
     });
 
-    return output
+    return stdout
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
@@ -202,6 +205,60 @@ function parseAgentOutput(output: string): ReviewResult {
 }
 
 /**
+ * Send review feedback to the work agent via tmux
+ * This ensures the agent knows what to fix
+ */
+async function sendFeedbackToWorkAgent(
+  context: ReviewContext,
+  result: ReviewResult
+): Promise<void> {
+  const agentSession = `agent-${context.issueId.toLowerCase()}`;
+
+  try {
+    // Check if agent session exists (non-blocking)
+    await execAsync(`tmux has-session -t ${agentSession} 2>/dev/null`);
+  } catch {
+    console.log(`[review-agent] No agent session found for ${agentSession}, skipping feedback`);
+    return;
+  }
+
+  // Build feedback message
+  let feedback = `**Review Feedback from review-agent**\n\n`;
+  feedback += `**Status:** ${result.reviewResult}\n\n`;
+
+  if (result.notes) {
+    feedback += `**Issues Found:**\n${result.notes}\n\n`;
+  }
+
+  if (result.securityIssues && result.securityIssues.length > 0) {
+    feedback += `**Security Issues:**\n${result.securityIssues.map(i => `- ${i}`).join('\n')}\n\n`;
+  }
+
+  if (result.performanceIssues && result.performanceIssues.length > 0) {
+    feedback += `**Performance Issues:**\n${result.performanceIssues.map(i => `- ${i}`).join('\n')}\n\n`;
+  }
+
+  if (result.reviewResult === 'CHANGES_REQUESTED') {
+    feedback += `**Required Actions:**\nPlease address the issues above and push your changes. The review will re-run automatically.\n`;
+  } else if (result.reviewResult === 'APPROVED') {
+    feedback += `**Next Steps:**\nYour code has been approved! It will proceed to testing.\n`;
+  }
+
+  // Escape the feedback for tmux
+  const escapedFeedback = feedback.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+
+  try {
+    // Send the feedback message (non-blocking)
+    await execAsync(`tmux send-keys -t ${agentSession} "${escapedFeedback}"`);
+    // Send Enter to submit
+    await execAsync(`tmux send-keys -t ${agentSession} Enter`);
+    console.log(`[review-agent] Sent feedback to ${agentSession}`);
+  } catch (error) {
+    console.error(`[review-agent] Failed to send feedback to ${agentSession}:`, error);
+  }
+}
+
+/**
  * Log review to history
  */
 function logReviewHistory(
@@ -242,8 +299,8 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
   // Get existing session ID
   const sessionId = getSessionId('review-agent');
 
-  // Build prompt
-  const prompt = buildReviewPrompt(context);
+  // Build prompt (non-blocking)
+  const prompt = await buildReviewPrompt(context);
 
   // Build Claude command args
   const args = ['--model', 'sonnet', '--print', '-p', prompt];
@@ -326,6 +383,10 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
   // Race between timeout and completion
   try {
     const result = await Promise.race([completionPromise, timeoutPromise]);
+
+    // Send feedback to the work agent so they know what to fix
+    await sendFeedbackToWorkAgent(context, result);
+
     return result;
   } catch (error: any) {
     console.error(`[review-agent] Failed:`, error);
@@ -338,6 +399,9 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
     };
 
     logReviewHistory(context, result, sessionId || undefined);
+
+    // Send feedback even on failure so agent knows something went wrong
+    await sendFeedbackToWorkAgent(context, result);
 
     return result;
   }
