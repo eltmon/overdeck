@@ -42,6 +42,10 @@ import {
   getCostSummary,
   type CostAlert,
 } from './cost-monitor.js';
+import {
+  checkAndRotateIfNeeded,
+  type SessionRotationResult,
+} from './session-rotation.js';
 
 /**
  * Cloister service status
@@ -87,6 +91,7 @@ export type CloisterEvent =
   | { type: 'fpp_nudge_sent'; agentId: string; nudgeCount: number }
   | { type: 'fpp_max_nudges_exceeded'; agentId: string; violation: FPPViolation }
   | { type: 'cost_alert'; alert: CostAlert }
+  | { type: 'session_rotated'; specialistName: string; result: SessionRotationResult }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
   | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
   | { type: 'emergency_stop'; killedAgents: string[] }
@@ -311,6 +316,12 @@ export class CloisterService {
 
       // Check cost limits (Phase 6)
       this.checkCostAlerts(agentIds);
+
+      // Check for specialist session rotation needs (Phase 6)
+      // Only check periodically (every ~10 checks)
+      if (Math.random() < 0.1) {
+        void this.checkSpecialistRotations();
+      }
 
       // Clean up old resolved violations (daily)
       if (Math.random() < 0.01) {
@@ -608,6 +619,27 @@ export class CloisterService {
    */
   getCostSummary() {
     return getCostSummary();
+  }
+
+  /**
+   * Check if any specialists need session rotation
+   */
+  private async checkSpecialistRotations(): Promise<void> {
+    // Check merge-agent (the main candidate for rotation)
+    const mergeAgentResult = await checkAndRotateIfNeeded('merge-agent', process.cwd());
+    if (mergeAgentResult) {
+      this.emit({ type: 'session_rotated', specialistName: 'merge-agent', result: mergeAgentResult });
+
+      if (mergeAgentResult.success) {
+        console.log(
+          `🔔 Rotated merge-agent session: ${mergeAgentResult.oldSessionId.substring(0, 8)} → ${mergeAgentResult.newSessionId?.substring(0, 8)}`
+        );
+      } else {
+        console.error(`🔔 Failed to rotate merge-agent: ${mergeAgentResult.error}`);
+      }
+    }
+
+    // Could check other specialists here if needed
   }
 
   /**
