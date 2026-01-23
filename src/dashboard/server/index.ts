@@ -2693,6 +2693,131 @@ app.get('/api/specialists/:name/cost', async (req, res) => {
   }
 });
 
+// ============================================================================
+// Specialist Queue Management (PAN-74)
+// ============================================================================
+
+// Get all specialist queues with counts and items
+app.get('/api/specialists/queues', async (_req, res) => {
+  try {
+    const { getAllSpecialists, checkSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+    const specialists = getAllSpecialists();
+
+    const queues = await Promise.all(
+      specialists.map(async (specialist) => {
+        const queue = checkSpecialistQueue(specialist.name);
+        return {
+          specialistName: specialist.name,
+          hasWork: queue.hasWork,
+          urgentCount: queue.urgentCount,
+          totalCount: queue.items.length,
+          items: queue.items,
+        };
+      })
+    );
+
+    res.json({ queues });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Error getting specialist queues:', error);
+    res.status(500).json({ error: 'Failed to get specialist queues: ' + msg });
+  }
+});
+
+// Get specific specialist's queue
+app.get('/api/specialists/:name/queue', async (req, res) => {
+  const { name } = req.params;
+
+  try {
+    const { checkSpecialistQueue, type SpecialistType } = await import('../../lib/cloister/specialists.js');
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
+    const queue = checkSpecialistQueue(name as SpecialistType);
+
+    res.json({
+      specialistName: name,
+      hasWork: queue.hasWork,
+      urgentCount: queue.urgentCount,
+      totalCount: queue.items.length,
+      items: queue.items,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error getting queue for ${name}:`, error);
+    res.status(500).json({ error: `Failed to get queue for ${name}: ${msg}` });
+  }
+});
+
+// Remove item from specialist's queue
+app.delete('/api/specialists/:name/queue/:itemId', async (req, res) => {
+  const { name, itemId } = req.params;
+
+  try {
+    const { completeSpecialistTask, type SpecialistType } = await import('../../lib/cloister/specialists.js');
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
+    const success = completeSpecialistTask(name as SpecialistType, itemId);
+
+    if (!success) {
+      return res.status(404).json({ error: `Item ${itemId} not found in queue for ${name}` });
+    }
+
+    res.json({
+      success: true,
+      message: `Removed item ${itemId} from ${name}'s queue`,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error removing item from ${name}'s queue:`, error);
+    res.status(500).json({ error: `Failed to remove item: ${msg}` });
+  }
+});
+
+// Reorder specialist's queue
+app.put('/api/specialists/:name/queue/reorder', async (req, res) => {
+  const { name } = req.params;
+  const { itemIds } = req.body;
+
+  if (!Array.isArray(itemIds)) {
+    return res.status(400).json({ error: 'itemIds must be an array' });
+  }
+
+  try {
+    const { reorderHookItems } = await import('../../lib/hooks.js');
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
+    const success = reorderHookItems(name, itemIds);
+
+    if (!success) {
+      return res.status(400).json({ error: 'Failed to reorder queue. Check that all item IDs are valid.' });
+    }
+
+    res.json({
+      success: true,
+      message: `Reordered queue for ${name}`,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error reordering queue for ${name}:`, error);
+    res.status(500).json({ error: `Failed to reorder queue: ${msg}` });
+  }
+});
+
 // Get agent health (Cloister-based)
 app.get('/api/agents/:id/cloister-health', (req, res) => {
   try {

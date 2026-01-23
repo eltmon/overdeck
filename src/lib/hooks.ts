@@ -186,6 +186,44 @@ export function clearHook(agentId: string): void {
 }
 
 /**
+ * Reorder hook items by providing a new order of item IDs
+ * Used for manual queue management from dashboard
+ */
+export function reorderHookItems(agentId: string, orderedItemIds: string[]): boolean {
+  const hook = getHook(agentId);
+  if (!hook) return false;
+
+  // Validate that all provided IDs exist in the hook
+  const existingIds = new Set(hook.items.map((item) => item.id));
+  const providedIds = new Set(orderedItemIds);
+
+  // Check if all provided IDs exist
+  for (const id of orderedItemIds) {
+    if (!existingIds.has(id)) {
+      console.error(`[hooks] Cannot reorder: item ${id} not found in hook`);
+      return false;
+    }
+  }
+
+  // Check if all existing IDs are provided
+  if (existingIds.size !== providedIds.size) {
+    console.error(`[hooks] Cannot reorder: mismatch in item count (existing: ${existingIds.size}, provided: ${providedIds.size})`);
+    return false;
+  }
+
+  // Build a map for quick lookup
+  const itemMap = new Map(hook.items.map((item) => [item.id, item]));
+
+  // Reorder items based on provided IDs
+  hook.items = orderedItemIds.map((id) => itemMap.get(id)!);
+
+  // Write back to file
+  writeFileSync(getHookFile(agentId), JSON.stringify(hook, null, 2));
+
+  return true;
+}
+
+/**
  * Send a message to an agent's mailbox
  */
 export function sendMail(

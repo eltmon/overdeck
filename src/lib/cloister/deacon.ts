@@ -20,7 +20,12 @@ import {
   getEnabledSpecialists,
   getTmuxSessionName,
   isRunning,
+  isIdleAtPrompt,
   initializeSpecialist,
+  checkSpecialistQueue,
+  getNextSpecialistTask,
+  wakeSpecialistWithTask,
+  completeSpecialistTask,
 } from './specialists.js';
 
 // ============================================================================
@@ -363,10 +368,11 @@ export function forceKillSpecialist(name: SpecialistType): {
       success: true,
       message: `Specialist ${name} force-killed after ${healthState.forceKillCount} total kills`,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      message: `Failed to kill specialist ${name}: ${error.message}`,
+      message: `Failed to kill specialist ${name}: ${msg}`,
     };
   }
 }
@@ -478,6 +484,38 @@ export async function runPatrol(): Promise<PatrolResult> {
         actions.push(`Auto-started ${specialist.name}`);
       } else if (initResult.error !== 'already_running') {
         actions.push(`Failed to start ${specialist.name}: ${initResult.message}`);
+      }
+    }
+
+    // Check for queued work if specialist is idle (PAN-74)
+    if (result.wasRunning && await isIdleAtPrompt(specialist.name)) {
+      const queue = checkSpecialistQueue(specialist.name);
+      if (queue.hasWork) {
+        const nextTask = getNextSpecialistTask(specialist.name);
+        if (nextTask) {
+          console.log(`[deacon] ${specialist.name} idle with queued work, waking for ${nextTask.payload.issueId}`);
+          try {
+            // Extract task details from payload
+            // Note: branch, workspace, prUrl are stored in context by submitToSpecialistQueue
+            const taskDetails = {
+              issueId: nextTask.payload.issueId || '',
+              branch: nextTask.payload.context?.branch,
+              workspace: nextTask.payload.context?.workspace,
+              prUrl: nextTask.payload.context?.prUrl,
+              context: nextTask.payload.context,
+            };
+            const wakeResult = await wakeSpecialistWithTask(specialist.name, taskDetails);
+            if (wakeResult.success) {
+              completeSpecialistTask(specialist.name, nextTask.id);
+              actions.push(`Processed queued task for ${specialist.name}: ${nextTask.payload.issueId}`);
+            } else {
+              console.error(`[deacon] Failed to wake ${specialist.name} for queued task: ${wakeResult.error}`);
+            }
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            console.error(`[deacon] Error processing queue for ${specialist.name}:`, msg);
+          }
+        }
       }
     }
   }

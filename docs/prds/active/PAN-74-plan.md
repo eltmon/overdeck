@@ -122,16 +122,16 @@ Update `SpecialistAgentCard.tsx`:
 
 ## Acceptance Criteria
 
-- [x] Tasks queued when specialist is busy (not dropped)
-- [x] Queued tasks processed when specialist becomes idle
-- [x] Queue persists across dashboard restarts (using hooks system)
-- [x] API endpoint to view all specialist queues
-- [x] API endpoint to remove items from queue
-- [x] API endpoint to reorder queue items
-- [x] Dashboard shows queue count per specialist
-- [x] Dashboard allows viewing queued issues
-- [x] Dashboard allows removing queued items
-- [x] Dashboard allows reordering queued items
+- [ ] Tasks queued when specialist is busy (not dropped)
+- [ ] Queued tasks processed when specialist becomes idle
+- [ ] Queue persists across dashboard restarts (using hooks system)
+- [ ] API endpoint to view all specialist queues
+- [ ] API endpoint to remove items from queue
+- [ ] API endpoint to reorder queue items
+- [ ] Dashboard shows queue count per specialist
+- [ ] Dashboard allows viewing queued issues
+- [ ] Dashboard allows removing queued items
+- [ ] Dashboard allows reordering queued items
 
 ## Implementation Order
 
@@ -150,17 +150,3 @@ Update `SpecialistAgentCard.tsx`:
 - Test removal operation from dashboard
 - Test reorder operation from dashboard
 - Verify deacon patrol picks up queued tasks when specialist becomes idle
-
-## Implementation Status
-
-**Status:** ✅ COMPLETE
-
-All implementation tasks completed:
-1. ✅ Added `reorderHookItems()` to hooks.ts
-2. ✅ Added `wakeSpecialistOrQueue()` to specialists.ts
-3. ✅ Integrated queue processing into deacon patrol loop
-4. ✅ Updated performHandoff() to use wakeSpecialistOrQueue()
-5. ✅ Added 4 queue management API endpoints to dashboard server
-6. ✅ Added queue visibility and controls to SpecialistAgentCard.tsx
-
-All acceptance criteria met. Ready for testing and merge.

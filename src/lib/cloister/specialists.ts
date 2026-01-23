@@ -844,12 +844,13 @@ export async function wakeSpecialist(
         // Wait for Claude to be ready
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       return {
         success: false,
-        message: `Failed to start specialist ${name}: ${error.message}`,
+        message: `Failed to start specialist ${name}: ${msg}`,
         wasAlreadyRunning: false,
-        error: error.message,
+        error: msg,
       };
     }
   }
@@ -876,13 +877,14 @@ export async function wakeSpecialist(
       tmuxSession,
       wasAlreadyRunning,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      message: `Failed to send task to specialist ${name}: ${error.message}`,
+      message: `Failed to send task to specialist ${name}: ${msg}`,
       tmuxSession,
       wasAlreadyRunning,
-      error: error.message,
+      error: msg,
     };
   }
 }
@@ -903,7 +905,7 @@ export async function wakeSpecialistWithTask(
     branch?: string;
     workspace?: string;
     prUrl?: string;
-    context?: Record<string, any>;
+    context?: TaskContext;
   }
 ): Promise<ReturnType<typeof wakeSpecialist>> {
   // Build context-aware prompt based on specialist type and task
@@ -982,6 +984,109 @@ Use the send-feedback-to-agent skill to report findings back to the issue agent.
 }
 
 /**
+ * Task context interface for handoffs and specialist tasks
+ */
+export interface TaskContext {
+  prUrl?: string;
+  workspace?: string;
+  branch?: string;
+  filesChanged?: string[];
+  reason?: string;
+  targetModel?: string;
+  additionalInstructions?: string;
+  [key: string]: string | string[] | undefined;
+}
+
+/**
+ * Wake a specialist or queue the task if busy
+ *
+ * This wrapper checks if the specialist is busy before waking.
+ * If the specialist is running but not idle, the task is queued instead.
+ *
+ * @param name - Specialist name
+ * @param task - Task details
+ * @param priority - Task priority (default: 'normal')
+ * @param source - Source of the task (default: 'handoff')
+ * @returns Promise with result indicating whether task was queued or executed
+ */
+export async function wakeSpecialistOrQueue(
+  name: SpecialistType,
+  task: {
+    issueId: string;
+    branch?: string;
+    workspace?: string;
+    prUrl?: string;
+    context?: TaskContext;
+  },
+  options: {
+    priority?: 'urgent' | 'high' | 'normal' | 'low';
+    source?: string;
+  } = {}
+): Promise<{
+  success: boolean;
+  queued: boolean;
+  message: string;
+  error?: string;
+}> {
+  const { priority = 'normal', source = 'handoff' } = options;
+
+  // Check if specialist is running
+  const running = await isRunning(name);
+  const idle = running ? await isIdleAtPrompt(name) : false;
+
+  // If running and busy, queue the task
+  if (running && !idle) {
+    try {
+      submitToSpecialistQueue(name, {
+        priority,
+        source,
+        issueId: task.issueId,
+        workspace: task.workspace,
+        branch: task.branch,
+        prUrl: task.prUrl,
+        context: task.context,
+      });
+
+      console.log(`[specialist] ${name} busy, queued task for ${task.issueId} (priority: ${priority})`);
+
+      return {
+        success: true,
+        queued: true,
+        message: `Specialist ${name} is busy. Task queued with ${priority} priority.`,
+      };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        queued: false,
+        message: `Failed to queue task for ${name}: ${msg}`,
+        error: msg,
+      };
+    }
+  }
+
+  // Otherwise, wake the specialist directly
+  try {
+    const wakeResult = await wakeSpecialistWithTask(name, task);
+
+    return {
+      success: wakeResult.success,
+      queued: false,
+      message: wakeResult.message,
+      error: wakeResult.error,
+    };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      queued: false,
+      message: `Failed to wake specialist ${name}: ${msg}`,
+      error: msg,
+    };
+  }
+}
+
+/**
  * ===========================================================================
  * Specialist Queue Helpers
  * ===========================================================================
@@ -1000,7 +1105,7 @@ export interface SpecialistQueueItem extends HookItem {
     workspace?: string;
     branch?: string;
     filesChanged?: string[];
-    context?: Record<string, any>;
+    context?: TaskContext;
   };
 }
 
@@ -1021,7 +1126,7 @@ export function submitToSpecialistQueue(
     workspace?: string;
     branch?: string;
     filesChanged?: string[];
-    context?: Record<string, any>;
+    context?: TaskContext;
   }
 ): HookItem {
   // Put specialist-specific fields into context to match HookItem type

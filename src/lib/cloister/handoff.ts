@@ -16,6 +16,7 @@ import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js'
 import { sessionExists } from '../tmux.js';
 import {
   wakeSpecialist,
+  wakeSpecialistOrQueue,
   getSessionId,
   getTmuxSessionName,
   isRunning,
@@ -228,20 +229,37 @@ async function performSpecialistWake(
 
     console.log(`[handoff] Waking specialist ${specialistName} (session: ${sessionId || 'none'})`);
 
-    // Wake the specialist with the task prompt
-    const wakeResult = await wakeSpecialist(specialistName, prompt, {
-      waitForReady: true,
-      startIfNotRunning: true,
+    // Build task details for wakeSpecialistOrQueue
+    const taskDetails = {
+      issueId: state.issueId || 'unknown',
+      branch: context.branch,
+      workspace: state.workspace,
+      prUrl: context.prUrl,
+      context: {
+        reason: options.reason,
+        targetModel: options.targetModel,
+        additionalInstructions: options.additionalInstructions,
+      },
+    };
+
+    // Use wakeSpecialistOrQueue to handle busy specialists (PAN-74)
+    const wakeResult = await wakeSpecialistOrQueue(specialistName, taskDetails, {
+      priority: 'normal',
+      source: 'handoff',
     });
 
     if (!wakeResult.success) {
-      console.error(`[handoff] Failed to wake specialist: ${wakeResult.error}`);
+      console.error(`[handoff] Failed to wake or queue specialist: ${wakeResult.error}`);
       // Fall back to kill-spawn if specialist wake fails
       console.warn(`[handoff] Falling back to kill-spawn`);
       return await performKillAndSpawn(state, options);
     }
 
-    console.log(`[handoff] Successfully woke specialist ${specialistName}`);
+    if (wakeResult.queued) {
+      console.log(`[handoff] Specialist ${specialistName} was busy, task queued`);
+    } else {
+      console.log(`[handoff] Successfully woke specialist ${specialistName}`);
+    }
 
     return {
       success: true,
