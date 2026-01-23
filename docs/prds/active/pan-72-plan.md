@@ -1,6 +1,6 @@
 # PAN-72: Cloister - Convert remaining execSync calls to async
 
-## Status: IMPLEMENTATION COMPLETE
+## Status: PLANNING COMPLETE
 
 ## Problem Statement
 
@@ -88,43 +88,10 @@ const { stdout: output } = await execAsync(`bd list --json -l ${label}`, { encod
 
 ## Acceptance Criteria
 
-- [x] All execSync calls converted to execAsync in all 3 files
-- [x] Functions properly propagate async to callers
-- [x] `npm test` passes (251 tests pass, 1 pre-existing failure in service.test.ts due to missing deacon.js file)
-- [x] No regressions in dashboard functionality
-
-## Implementation Summary
-
-Successfully converted all 13 execSync calls to async:
-
-**triggers.ts** (3 calls):
-- ✅ checkPlanningComplete() - converted to async with execAsync
-- ✅ checkTaskCompletion() - converted to async with execAsync (2 calls)
-- ✅ checkAllTriggers() - made async to propagate awaits
-
-**handoff-context.ts** (4 calls):
-- ✅ captureGitState() - converted 3 execSync calls to execAsync
-- ✅ captureBeadsTasks() - converted 1 execSync call to execAsync
-
-**plan.ts** (6 calls):
-- ✅ findPRDFiles() - converted to async with execAsync
-- ✅ createBeadsTasks() - converted to async with execAsync (3 calls: which, bd create, bd flush)
-- ✅ planCommand() - added await to async function calls
-
-**Callers updated**:
-- ✅ server/index.ts:2724 - added await to checkAllTriggers()
-- ✅ service.ts:783 - added await to checkAllTriggers()
-
-## Test Results
-
-All tests pass except for a pre-existing issue:
-- ✅ 251 tests passed
-- ⚠️ 1 test failed (service.test.ts) - pre-existing bug: missing deacon.js file
-- The failing test is unrelated to the async conversion
-
-## Notes
-
-The service.test.ts failure is caused by service.ts importing from './deacon.js' which doesn't exist in the codebase. This is a pre-existing issue that should be addressed in a separate ticket.
+- [ ] All execSync calls converted to execAsync in all 3 files
+- [ ] Functions properly propagate async to callers
+- [ ] `npm test` passes
+- [ ] No regressions in dashboard functionality
 
 ## Out of Scope
 

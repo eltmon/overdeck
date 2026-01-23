@@ -6,11 +6,14 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import type { TokenUsage } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
 import { getAgentDir } from '../agents.js';
+
+const execAsync = promisify(exec);
 
 /**
  * Beads task snapshot for handoff
@@ -134,14 +137,14 @@ async function captureFiles(context: HandoffContext, workspace: string): Promise
 async function captureGitState(context: HandoffContext, workspace: string): Promise<void> {
   try {
     // Get current branch
-    const branch = execSync('git branch --show-current', {
+    const { stdout: branch } = await execAsync('git branch --show-current', {
       cwd: workspace,
       encoding: 'utf-8',
-    }).trim();
-    context.gitBranch = branch;
+    });
+    context.gitBranch = branch.trim();
 
     // Get uncommitted files
-    const status = execSync('git status --porcelain', {
+    const { stdout: status } = await execAsync('git status --porcelain', {
       cwd: workspace,
       encoding: 'utf-8',
     });
@@ -151,11 +154,11 @@ async function captureGitState(context: HandoffContext, workspace: string): Prom
       .map(line => line.substring(3)); // Remove status prefix
 
     // Get last commit
-    const lastCommit = execSync('git log -1 --oneline', {
+    const { stdout: lastCommit } = await execAsync('git log -1 --oneline', {
       cwd: workspace,
       encoding: 'utf-8',
-    }).trim();
-    context.lastCommit = lastCommit;
+    });
+    context.lastCommit = lastCommit.trim();
   } catch (error) {
     console.error('Error capturing git state:', error);
   }
@@ -168,7 +171,7 @@ async function captureBeadsTasks(context: HandoffContext, issueId: string): Prom
   try {
     // List all tasks with this issue's label
     const label = issueId.toLowerCase();
-    const output = execSync(`bd list --json -l ${label}`, {
+    const { stdout: output } = await execAsync(`bd list --json -l ${label}`, {
       encoding: 'utf-8',
     });
 

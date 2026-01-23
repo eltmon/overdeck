@@ -10,10 +10,13 @@
 
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfig } from './config.js';
+
+const execAsync = promisify(exec);
 
 /**
  * Trigger type
@@ -140,12 +143,12 @@ export function checkStuckEscalation(
  * @param config - Cloister configuration
  * @returns Trigger detection result
  */
-export function checkPlanningComplete(
+export async function checkPlanningComplete(
   agentId: string,
   workspace: string,
   issueId: string,
   config?: CloisterConfig
-): TriggerDetection {
+): Promise<TriggerDetection> {
   const conf = config || loadCloisterConfig();
 
   // Get planning complete config
@@ -164,7 +167,7 @@ export function checkPlanningComplete(
 
   // Signal 1: Check for closed beads task with "plan" in title
   try {
-    const output = execSync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
+    const { stdout: output } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
       encoding: 'utf-8',
     });
     const tasks = JSON.parse(output);
@@ -328,10 +331,10 @@ function detectTestFailure(workspace: string): {
  * @param config - Cloister configuration
  * @returns Trigger detection result
  */
-export function checkTaskCompletion(
+export async function checkTaskCompletion(
   issueId: string,
   config?: CloisterConfig
-): TriggerDetection {
+): Promise<TriggerDetection> {
   const conf = config || loadCloisterConfig();
 
   // Get task completion config
@@ -347,7 +350,7 @@ export function checkTaskCompletion(
 
   // Check for closed implementation task
   try {
-    const output = execSync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
+    const { stdout: output } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
       encoding: 'utf-8',
     });
     const tasks = JSON.parse(output);
@@ -358,7 +361,7 @@ export function checkTaskCompletion(
 
     if (implementTask) {
       // Check if there are remaining open tasks
-      const openOutput = execSync(`bd list --json -l ${issueId.toLowerCase()} --status open`, {
+      const { stdout: openOutput } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status open`, {
         encoding: 'utf-8',
       });
       const openTasks = JSON.parse(openOutput);
@@ -403,27 +406,27 @@ export function checkTaskCompletion(
  * @param config - Cloister configuration
  * @returns Array of triggered detections
  */
-export function checkAllTriggers(
+export async function checkAllTriggers(
   agentId: string,
   workspace: string,
   issueId: string,
   currentModel: string,
   health: AgentHealth,
   config?: CloisterConfig
-): TriggerDetection[] {
+): Promise<TriggerDetection[]> {
   const triggers: TriggerDetection[] = [];
 
   // Check each trigger type
   const stuckCheck = checkStuckEscalation(health, currentModel, config);
   if (stuckCheck.triggered) triggers.push(stuckCheck);
 
-  const planningCheck = checkPlanningComplete(agentId, workspace, issueId, config);
+  const planningCheck = await checkPlanningComplete(agentId, workspace, issueId, config);
   if (planningCheck.triggered) triggers.push(planningCheck);
 
   const testCheck = checkTestFailure(workspace, currentModel, config);
   if (testCheck.triggered) triggers.push(testCheck);
 
-  const completionCheck = checkTaskCompletion(issueId, config);
+  const completionCheck = await checkTaskCompletion(issueId, config);
   if (completionCheck.triggered) triggers.push(completionCheck);
 
   return triggers;

@@ -780,7 +780,7 @@ export class CloisterService {
         if (!agentState.workspace) continue;
 
         // Check all triggers
-        const triggers = checkAllTriggers(
+        const triggers = await checkAllTriggers(
           health.agentId,
           agentState.workspace,
           agentState.issueId,
