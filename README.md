@@ -1390,6 +1390,42 @@ If you're both developing Panopticon AND using it for your own projects:
 3. **Config is shared** - workspaces/agents work the same either way
 4. **Test in a real project** - your own usage is the best test
 
+### Testing the Specialist System
+
+Panopticon includes a Claude Code skill for end-to-end testing of the specialist handoff pipeline.
+
+**Location:** `.claude/skills/test-specialist-workflow/skill.md`
+
+**What it tests:**
+- Full approve workflow: review-agent → test-agent → merge-agent
+- Specialist handoffs via `pan specialists wake --task`
+- Merge completion and branch preservation
+
+**Usage:**
+
+```bash
+# In Claude Code, invoke the skill
+/test-specialist-workflow
+```
+
+The skill guides you through:
+
+1. **Prerequisites check** - Dashboard running, specialists available
+2. **Create test issue** - GitHub issue for tracking
+3. **Create workspace** - Git worktree for the test
+4. **Make test change** - Trivial commit to verify merge
+5. **Trigger approve** - Kicks off the specialist pipeline
+6. **Monitor handoffs** - Watch each specialist complete and hand off
+7. **Verify merge** - Confirm change reached main branch
+8. **Cleanup** - Close issue, remove workspace
+
+**Expected timeline:** 2-4 minutes total
+
+**When to use:**
+- After making changes to the specialist system
+- After modifying the approve workflow
+- As a smoke test before releases
+
 ## Troubleshooting
 
 ### Slow Vite/React Frontend with Multiple Workspaces
