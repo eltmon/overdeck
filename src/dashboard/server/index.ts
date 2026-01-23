@@ -6133,9 +6133,9 @@ function parseWorkspaceSessionUsage(workspacePath: string): {
   startTime: string | null;
   endTime: string | null;
 } {
-  // Claude Code session directory name format: path with / replaced by -
+  // Claude Code session directory name format: path with leading / removed and / replaced by -
   // e.g., /home/eltmon/projects/foo -> -home-eltmon-projects-foo
-  const sessionDirName = workspacePath.replace(/\//g, '-');
+  const sessionDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
   const sessionDir = join(homedir(), '.claude', 'projects', sessionDirName);
 
   let totalInputTokens = 0;
@@ -6382,40 +6382,84 @@ app.get('/api/costs/summary', (_req, res) => {
   }
 });
 
-// GET /api/costs/by-issue - Costs grouped by issue
+// GET /api/costs/by-issue - Costs grouped by issue (calculated from actual session files)
 app.get('/api/costs/by-issue', (_req, res) => {
   try {
-    // Merge data from both session-map (legacy) and runtime-metrics (new)
-    const sessionMap = loadSessionMap();
-    const runtimeMetrics = loadRuntimeMetrics();
     const issueMap: Record<string, { totalCost: number; tokenCount: number; sessionCount: number; model?: string; durationMinutes?: number }> = {};
 
-    // Add from session-map (legacy format)
+    // Read all agent state files and calculate costs from actual session data
+    // Include both regular agents (agent-*) and planning agents (planning-*)
+    const agentsDir = join(homedir(), '.panopticon', 'agents');
+    if (existsSync(agentsDir)) {
+      const agentDirs = readdirSync(agentsDir).filter(name => name.startsWith('agent-') || name.startsWith('planning-'));
+
+      for (const agentDir of agentDirs) {
+        try {
+          const stateFile = join(agentsDir, agentDir, 'state.json');
+          if (!existsSync(stateFile)) continue;
+
+          const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+          if (!state.issueId || !state.workspace) continue;
+
+          const key = state.issueId.toLowerCase();
+
+          // Parse actual session data from workspace
+          const sessionData = parseWorkspaceSessionUsage(state.workspace);
+
+          if (!issueMap[key]) {
+            issueMap[key] = { totalCost: 0, tokenCount: 0, sessionCount: 0 };
+          }
+
+          // Add costs from this agent's sessions
+          issueMap[key].totalCost += sessionData.cost;
+          issueMap[key].tokenCount += sessionData.tokenCount;
+          issueMap[key].sessionCount += 1;
+          issueMap[key].model = sessionData.model;
+
+          // Calculate duration if we have timestamps
+          if (sessionData.startTime && sessionData.endTime) {
+            const start = new Date(sessionData.startTime).getTime();
+            const end = new Date(sessionData.endTime).getTime();
+            const minutes = (end - start) / (1000 * 60);
+            issueMap[key].durationMinutes = (issueMap[key].durationMinutes || 0) + minutes;
+          }
+        } catch {
+          // Skip agents with invalid state
+        }
+      }
+    }
+
+    // Also check legacy tracking files for any historical data
+    const sessionMap = loadSessionMap();
+    const runtimeMetrics = loadRuntimeMetrics();
+
+    // Add from session-map (legacy format) if not already present
     for (const [issueId, issueData] of Object.entries(sessionMap.issues || {})) {
       const data = issueData as any;
       const key = issueId.toLowerCase();
-      issueMap[key] = {
-        totalCost: data.totalCost || 0,
-        tokenCount: data.totalTokens || 0,
-        sessionCount: data.sessions?.length || 0,
-      };
+      if (!issueMap[key] && (data.totalCost || 0) > 0) {
+        issueMap[key] = {
+          totalCost: data.totalCost || 0,
+          tokenCount: data.totalTokens || 0,
+          sessionCount: data.sessions?.length || 0,
+        };
+      }
     }
 
-    // Add/merge from runtime-metrics (new format with tasks)
+    // Add from runtime-metrics if it has higher values (legacy)
     for (const task of runtimeMetrics.tasks || []) {
       if (task.issueId) {
         const key = task.issueId.toLowerCase();
         if (!issueMap[key]) {
           issueMap[key] = { totalCost: 0, tokenCount: 0, sessionCount: 0 };
         }
-        // If this is a new entry or has more data, update it
+        // Only use if higher than what we calculated from sessions
         if (task.cost > issueMap[key].totalCost) {
           issueMap[key].totalCost = task.cost;
           issueMap[key].tokenCount = task.tokenCount;
           issueMap[key].model = task.model;
           issueMap[key].durationMinutes = task.durationMinutes;
         }
-        issueMap[key].sessionCount = Math.max(issueMap[key].sessionCount, 1);
       }
     }
 
