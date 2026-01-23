@@ -5,7 +5,7 @@
  * Does NOT automatically stop agents - just provides visibility and warnings.
  */
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { PANOPTICON_HOME } from '../paths.js';
 import { loadCloisterConfig, type CostLimitsConfig } from './config.js';
@@ -113,8 +113,11 @@ function saveCostData(data: CostData): void {
 
     // Clean up temp file
     try {
-      require('fs').unlinkSync(tempFile);
-    } catch {}
+      unlinkSync(tempFile);
+    } catch (unlinkError: unknown) {
+      // Non-critical: temp file cleanup failure is logged but doesn't block operation
+      console.debug('Failed to cleanup temp file:', unlinkError instanceof Error ? unlinkError.message : unlinkError);
+    }
   } catch (error) {
     console.error('Failed to save cost data:', error);
   }
