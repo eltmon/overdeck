@@ -53,6 +53,13 @@ interface ActivityEntry {
 const activities: ActivityEntry[] = [];
 const MAX_ACTIVITIES = 50;
 
+// Cache for agents list to avoid repeated subprocess calls
+let agentsCache: { data: any[] | null; timestamp: number } = {
+  data: null,
+  timestamp: 0,
+};
+const AGENTS_CACHE_TTL_MS = 2000; // 2 seconds
+
 function logActivity(entry: ActivityEntry) {
   activities.unshift(entry);
   if (activities.length > MAX_ACTIVITIES) {
@@ -267,6 +274,7 @@ function detectSpecialistCompletion(specialistName: string): {
  */
 function pollReviewStatus(): void {
   const statuses = loadReviewStatuses();
+  const STALE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes without activity = stale
 
   for (const [issueId, status] of Object.entries(statuses)) {
     // Skip if already complete or failed
@@ -274,6 +282,57 @@ function pollReviewStatus(): void {
         status.reviewStatus === 'failed' ||
         (status.reviewStatus === 'blocked' && status.testStatus !== 'testing')) {
       continue;
+    }
+
+    // Check for stale status (reviewing/testing for too long without heartbeat)
+    const statusAge = Date.now() - new Date(status.updatedAt).getTime();
+    if (statusAge > STALE_TIMEOUT_MS) {
+      // Check if the specialist has a recent heartbeat
+      const specialistName = status.reviewStatus === 'reviewing' ? 'review-agent' :
+                            status.testStatus === 'testing' ? 'test-agent' : null;
+      if (specialistName) {
+        const heartbeatFile = join(homedir(), '.panopticon', 'heartbeats', `specialist-${specialistName}.json`);
+        let hasRecentActivity = false;
+        if (existsSync(heartbeatFile)) {
+          try {
+            const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf-8'));
+            const heartbeatAge = Date.now() - new Date(heartbeat.timestamp).getTime();
+            hasRecentActivity = heartbeatAge < STALE_TIMEOUT_MS;
+          } catch {}
+        }
+
+        if (!hasRecentActivity) {
+          console.log(`[auto-detect] ${issueId} status is stale (${specialistName} inactive for ${Math.round(statusAge / 1000)}s)`);
+
+          // Notify the issue agent about the timeout so they know what happened
+          const agentSession = `agent-${issueId.toLowerCase()}`;
+          try {
+            execSync(`tmux has-session -t "${agentSession}" 2>/dev/null`, { encoding: 'utf-8' });
+            const timeoutMsg = status.reviewStatus === 'reviewing'
+              ? `**Review Timeout Notification**\n\nThe review-agent did not respond within the timeout period.\nYour review has been marked as failed.\n\n**Action Required:** Please re-trigger the review from the dashboard, or check the review-agent status with: tmux attach -t specialist-review-agent`
+              : `**Test Timeout Notification**\n\nThe test-agent did not respond within the timeout period.\nTests have been marked as failed.\n\n**Action Required:** Please re-trigger tests from the dashboard, or check the test-agent status.`;
+            const escapedMsg = timeoutMsg.replace(/'/g, "'\\''");
+            execSync(`tmux send-keys -t "${agentSession}" '${escapedMsg}'`, { encoding: 'utf-8' });
+            execSync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
+            console.log(`[auto-detect] Notified ${agentSession} about ${specialistName} timeout`);
+          } catch {
+            // Agent session doesn't exist, can't notify
+          }
+
+          if (status.reviewStatus === 'reviewing') {
+            setReviewStatus(issueId, {
+              reviewStatus: 'failed',
+              reviewNotes: `Review timed out - ${specialistName} did not respond`
+            });
+          } else if (status.testStatus === 'testing') {
+            setReviewStatus(issueId, {
+              testStatus: 'failed',
+              testNotes: `Tests timed out - ${specialistName} did not respond`
+            });
+          }
+          continue;
+        }
+      }
     }
 
     // Check review-agent if reviewing
@@ -725,19 +784,22 @@ function mapGitHubStateToCanonical(state: string, labels: string[]): string {
   }
 
   // For open issues, check labels for workflow state
+  // Order matters: more progressed states take precedence
   const labelNames = labels.map(l => l.toLowerCase());
 
+  // Most progressed states first (in_review > in_progress)
+  if (labelNames.some(l => l.includes('in review') || l.includes('in-review') || l.includes('review') || l.includes('qa'))) {
+    return 'in_review';
+  }
+  if (labelNames.some(l => l.includes('in progress') || l.includes('in-progress') || l.includes('wip'))) {
+    return 'in_progress';
+  }
+  // Early workflow stages
   if (labelNames.some(l => l.includes('planning') || l.includes('discovery'))) {
     return 'planning';
   }
   if (labelNames.some(l => l === 'planned')) {
     return 'planned';
-  }
-  if (labelNames.some(l => l.includes('in review') || l.includes('review') || l.includes('qa'))) {
-    return 'in_review';
-  }
-  if (labelNames.some(l => l.includes('in progress') || l.includes('wip'))) {
-    return 'in_progress';
   }
   if (labelNames.some(l => l.includes('backlog') || l.includes('icebox'))) {
     return 'backlog';
@@ -1661,6 +1723,13 @@ function getGitStatus(workspacePath: string): { branch: string; uncommittedFiles
 // Get running agents from tmux sessions
 app.get('/api/agents', async (_req, res) => {
   try {
+    const now = Date.now();
+
+    // Return cached data if still fresh
+    if (agentsCache.data && (now - agentsCache.timestamp) < AGENTS_CACHE_TTL_MS) {
+      return res.json(agentsCache.data);
+    }
+
     const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}|#{session_created}" 2>/dev/null || true');
 
     const agentLines = stdout
@@ -1717,6 +1786,8 @@ app.get('/api/agents', async (_req, res) => {
       })
     );
 
+    // Cache the result
+    agentsCache = { data: agents, timestamp: now };
     res.json(agents);
   } catch (error) {
     console.error('Error listing agents:', error);
@@ -2162,6 +2233,34 @@ app.put('/api/cloister/config', (req, res) => {
 });
 
 // ============================================================================
+// Deacon API Endpoints (PAN-33 Phase 6 - Specialist Health Monitor)
+// ============================================================================
+
+// Get deacon status
+app.get('/api/deacon/status', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const status = service.getDeaconStatus();
+    res.json(status);
+  } catch (error: any) {
+    console.error('Error getting deacon status:', error);
+    res.status(500).json({ error: 'Failed to get deacon status: ' + error.message });
+  }
+});
+
+// Run manual patrol
+app.post('/api/deacon/patrol', async (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const result = await service.runDeaconPatrol();
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error running deacon patrol:', error);
+    res.status(500).json({ error: 'Failed to run patrol: ' + error.message });
+  }
+});
+
+// ============================================================================
 // Metrics API Endpoints (PAN-33 Phase 6)
 // ============================================================================
 
@@ -2355,6 +2454,51 @@ app.post('/api/specialists/:name/wake', async (req, res) => {
   } catch (error: any) {
     console.error('Error waking specialist:', error);
     res.status(500).json({ error: 'Failed to wake specialist: ' + error.message });
+  }
+});
+
+// Reset all specialist agents (kills running ones first)
+// NOTE: Must come BEFORE :name/reset to avoid matching "reset-all" as a name
+app.post('/api/specialists/reset-all', async (_req, res) => {
+  try {
+    const {
+      getAllSpecialists,
+      clearSessionId,
+      isRunning,
+      getTmuxSessionName
+    } = await import('../../lib/cloister/specialists.js');
+
+    const specialists = getAllSpecialists();
+    const results: { name: string; killed: boolean; sessionCleared: boolean }[] = [];
+
+    for (const specialist of specialists) {
+      const name = specialist.name;
+      let killed = false;
+
+      // Kill if running
+      if (isRunning(name)) {
+        const tmuxSession = getTmuxSessionName(name);
+        try {
+          execSync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' });
+          killed = true;
+        } catch {
+          // Session might not exist, continue
+        }
+      }
+
+      // Clear session file
+      const sessionCleared = clearSessionId(name);
+      results.push({ name, killed, sessionCleared });
+    }
+
+    res.json({
+      success: true,
+      message: `Reset ${results.length} specialists`,
+      results,
+    });
+  } catch (error: any) {
+    console.error('Error resetting all specialists:', error);
+    res.status(500).json({ error: 'Failed to reset specialists: ' + error.message });
   }
 });
 

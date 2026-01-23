@@ -22,8 +22,14 @@ TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"' 2>/dev/null || e
 TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""' 2>/dev/null || echo "")
 
 # Get agent ID from env (set by pan work issue) or tmux session name
-# Wrap in subshell to prevent any tmux errors from propagating
-AGENT_ID="${PANOPTICON_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || true)}"
+# Only use tmux session name if we're actually INSIDE a tmux session ($TMUX is set)
+if [ -n "$PANOPTICON_AGENT_ID" ]; then
+  AGENT_ID="$PANOPTICON_AGENT_ID"
+elif [ -n "$TMUX" ]; then
+  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
+else
+  AGENT_ID="main-cli"
+fi
 AGENT_ID="${AGENT_ID:-unknown}"
 
 # Get current beads task from cache (if exists)
