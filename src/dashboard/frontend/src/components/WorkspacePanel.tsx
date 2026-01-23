@@ -246,13 +246,13 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
   };
 
   const handleApprove = () => {
-    if (confirm(`Approve and clean up workspace for ${issueId}? This will:\n- Merge the feature branch\n- Update issue to Done\n- Remove the workspace\n- Delete the feature branch`)) {
+    if (confirm(`Approve and clean up workspace for ${issueId}? This will:\n- Merge the feature branch to main\n- Update issue to Done\n- Remove the workspace\n(Feature branch is preserved for history)`)) {
       approveMutation.mutate();
     }
   };
 
   const handleClose = () => {
-    if (confirm(`Close ${issueId} without merging? This will:\n- Close the issue (no merge)\n- Stop any running agent\n- Remove the workspace\n- Delete the feature branch`)) {
+    if (confirm(`Close ${issueId} without merging? This will:\n- Close the issue (no merge)\n- Stop any running agent\n- Remove the workspace\n(Feature branch is preserved for history)`)) {
       closeMutation.mutate();
     }
   };

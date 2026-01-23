@@ -88,15 +88,15 @@ Or use the Linear MCP tool to update the issue:
 ### 5. Clean Up
 
 ```bash
-# Delete the feature branch
-git branch -d feature/ISSUE-123-description
-git push origin --delete feature/ISSUE-123-description
-
 # Stop the agent if still running
 pan work kill ISSUE-123
 
 # Optionally remove the workspace
 rm -rf /path/to/workspace
+
+# NOTE: Feature branches are NOT deleted automatically.
+# They are preserved for history and debugging.
+# If you want to delete them, do so manually.
 ```
 
 ## Quick Command
