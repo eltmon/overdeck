@@ -12,7 +12,9 @@ import {
   TRAEFIK_DIR,
   TRAEFIK_DYNAMIC_DIR,
   TRAEFIK_CERTS_DIR,
-  SOURCE_TRAEFIK_TEMPLATES
+  SKILLS_DIR,
+  SOURCE_TRAEFIK_TEMPLATES,
+  SOURCE_SKILLS_DIR
 } from '../../lib/paths.js';
 import { getDefaultConfig, saveConfig } from '../../lib/config.js';
 
@@ -211,6 +213,39 @@ async function installCommand(options: InstallOptions): Promise<void> {
     mkdirSync(dir, { recursive: true });
   }
   spinner.succeed('Directories initialized');
+
+  // Step 2b: Install bundled skills to ~/.panopticon/skills/
+  if (existsSync(SOURCE_SKILLS_DIR)) {
+    spinner.start('Installing bundled skills...');
+    try {
+      const skillDirs = readdirSync(SOURCE_SKILLS_DIR, { withFileTypes: true })
+        .filter((d) => d.isDirectory());
+
+      let installed = 0;
+      let skipped = 0;
+
+      for (const skillDir of skillDirs) {
+        const sourcePath = join(SOURCE_SKILLS_DIR, skillDir.name);
+        const destPath = join(SKILLS_DIR, skillDir.name);
+
+        // Only copy if skill doesn't exist (don't overwrite user modifications)
+        if (!existsSync(destPath)) {
+          copyDirectoryRecursive(sourcePath, destPath);
+          installed++;
+        } else {
+          skipped++;
+        }
+      }
+
+      if (installed > 0) {
+        spinner.succeed(`Installed ${installed} skills${skipped > 0 ? ` (${skipped} already exist)` : ''}`);
+      } else {
+        spinner.info(`Skills already installed (${skipped} skills)`);
+      }
+    } catch (error) {
+      spinner.warn(`Failed to install bundled skills: ${error}`);
+    }
+  }
 
   // Step 3: Docker network
   if (!options.skipDocker) {

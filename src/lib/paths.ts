@@ -87,6 +87,7 @@ if (currentDir.includes('/src/')) {
 export const SOURCE_TEMPLATES_DIR = join(packageRoot, 'templates');
 export const SOURCE_TRAEFIK_TEMPLATES = join(SOURCE_TEMPLATES_DIR, 'traefik');
 export const SOURCE_SCRIPTS_DIR = join(packageRoot, 'scripts');
+export const SOURCE_SKILLS_DIR = join(packageRoot, 'skills');
 export const SOURCE_DEV_SKILLS_DIR = join(packageRoot, 'dev-skills');
 
 /**
