@@ -5,8 +5,8 @@
  * Does NOT automatically stop agents - just provides visibility and warnings.
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 import { PANOPTICON_HOME } from '../paths.js';
 import { loadCloisterConfig, type CostLimitsConfig } from './config.js';
 
@@ -30,7 +30,17 @@ export interface CostAlert {
 }
 
 /**
- * Cost tracking data
+ * Cost tracking data (persisted format)
+ */
+interface CostDataPersisted {
+  perAgent: Record<string, number>;
+  perIssue: Record<string, number>;
+  dailyTotal: number;
+  lastResetDate: string; // ISO date string (YYYY-MM-DD)
+}
+
+/**
+ * Cost tracking data (runtime format)
  */
 interface CostData {
   perAgent: Map<string, number>;
@@ -39,13 +49,79 @@ interface CostData {
   lastResetDate: string; // ISO date string (YYYY-MM-DD)
 }
 
-// In-memory cost tracking (resets on service restart)
-let costData: CostData = {
-  perAgent: new Map(),
-  perIssue: new Map(),
-  dailyTotal: 0,
-  lastResetDate: new Date().toISOString().split('T')[0],
-};
+/**
+ * Path to cost data file
+ */
+const COST_DATA_FILE = join(PANOPTICON_HOME, 'cost-data.json');
+
+/**
+ * Load cost data from file
+ */
+function loadCostData(): CostData {
+  if (!existsSync(COST_DATA_FILE)) {
+    return {
+      perAgent: new Map(),
+      perIssue: new Map(),
+      dailyTotal: 0,
+      lastResetDate: new Date().toISOString().split('T')[0],
+    };
+  }
+
+  try {
+    const fileContent = readFileSync(COST_DATA_FILE, 'utf-8');
+    const persisted: CostDataPersisted = JSON.parse(fileContent);
+
+    return {
+      perAgent: new Map(Object.entries(persisted.perAgent || {})),
+      perIssue: new Map(Object.entries(persisted.perIssue || {})),
+      dailyTotal: persisted.dailyTotal || 0,
+      lastResetDate: persisted.lastResetDate || new Date().toISOString().split('T')[0],
+    };
+  } catch (error) {
+    console.error('Failed to load cost data, starting fresh:', error);
+    return {
+      perAgent: new Map(),
+      perIssue: new Map(),
+      dailyTotal: 0,
+      lastResetDate: new Date().toISOString().split('T')[0],
+    };
+  }
+}
+
+/**
+ * Save cost data to file (atomic write)
+ */
+function saveCostData(data: CostData): void {
+  try {
+    // Ensure directory exists
+    const dir = dirname(COST_DATA_FILE);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const persisted: CostDataPersisted = {
+      perAgent: Object.fromEntries(data.perAgent),
+      perIssue: Object.fromEntries(data.perIssue),
+      dailyTotal: data.dailyTotal,
+      lastResetDate: data.lastResetDate,
+    };
+
+    // Atomic write: write to temp file, then rename
+    const tempFile = `${COST_DATA_FILE}.tmp`;
+    writeFileSync(tempFile, JSON.stringify(persisted, null, 2));
+    writeFileSync(COST_DATA_FILE, readFileSync(tempFile));
+
+    // Clean up temp file
+    try {
+      require('fs').unlinkSync(tempFile);
+    } catch {}
+  } catch (error) {
+    console.error('Failed to save cost data:', error);
+  }
+}
+
+// Load cost data on module initialization
+let costData: CostData = loadCostData();
 
 /**
  * Get today's date as ISO string (YYYY-MM-DD)
@@ -63,6 +139,7 @@ function checkDailyReset(): void {
     costData.dailyTotal = 0;
     costData.lastResetDate = today;
     console.log(`🔔 Cost monitor: Daily totals reset for ${today}`);
+    saveCostData(costData);
   }
 }
 
@@ -88,6 +165,9 @@ export function recordCost(agentId: string, cost: number, issueId?: string): voi
 
   // Update daily total
   costData.dailyTotal += cost;
+
+  // Persist to disk
+  saveCostData(costData);
 }
 
 /**
@@ -268,4 +348,5 @@ export function resetCostTracking(): void {
     dailyTotal: 0,
     lastResetDate: getTodayDate(),
   };
+  saveCostData(costData);
 }
