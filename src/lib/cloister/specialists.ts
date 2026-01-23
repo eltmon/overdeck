@@ -689,6 +689,39 @@ export async function initializeEnabledSpecialists(): Promise<Array<{
 }
 
 /**
+ * Reset specialist state before sending a new task
+ *
+ * Clears stale state from previous tasks:
+ * 1. Sends Ctrl+C to cancel any pending command
+ * 2. Runs 'cd ~' to reset working directory
+ * 3. Sends Ctrl+U to clear the prompt buffer
+ *
+ * @param name - Specialist name
+ */
+async function resetSpecialist(name: SpecialistType): Promise<void> {
+  const tmuxSession = getTmuxSessionName(name);
+
+  try {
+    // 1. Cancel any pending command with Ctrl+C
+    execSync(`tmux send-keys -t "${tmuxSession}" C-c`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // 2. Reset working directory
+    execSync(`tmux send-keys -t "${tmuxSession}" 'cd ~'`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    execSync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // 3. Clear the prompt buffer with Ctrl+U
+    execSync(`tmux send-keys -t "${tmuxSession}" C-u`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } catch (error) {
+    console.error(`[specialist] Failed to reset ${name}:`, error);
+    // Non-fatal - continue with wake
+  }
+}
+
+/**
  * Wake a specialist to process a task
  *
  * Sends a task prompt to a running specialist. If the specialist isn't running,
@@ -755,6 +788,9 @@ export async function wakeSpecialist(
       };
     }
   }
+
+  // Reset specialist state to clear stale context from previous tasks
+  await resetSpecialist(name);
 
   // Send the task prompt
   try {
