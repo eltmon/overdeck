@@ -1,6 +1,31 @@
 # PAN-33: Cloister Phase 6 - Advanced Features
 
-## Status: PLANNING COMPLETE
+## Status: IN PROGRESS
+
+## Current Progress
+
+### ✅ Completed (3/11 tasks)
+
+1. ✅ **1.1 Cloister Auto-Start** - Dashboard now auto-starts Cloister on launch when configured
+2. ✅ **1.2 Specialist State Reset** - Specialists reset working directory and prompt buffer between tasks
+3. ✅ **1.3 Confirmation Dialog UI** - Modal confirmation system for destructive actions
+
+### 🚧 In Progress
+
+None - Ready to start next task (2.1 Auto-restart on crash)
+
+### 📋 Remaining (8/11 tasks)
+
+4. 2.1 Auto-restart on crash with exponential backoff
+5. 2.2 Mass death detection (3+ agents in 30s)
+6. 2.3 FPP violation detection with escalating nudges
+7. 3.1 Cost limits and alerts
+8. 4.1 Session rotation for merge-agent
+9. 5.1 Metrics API endpoints
+10. 5.2 Metrics summary widgets
+11. 5.3 Dedicated /metrics page
+
+---
 
 ## Decision Log
 
