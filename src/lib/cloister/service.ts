@@ -67,6 +67,9 @@ export type CloisterEvent =
   | { type: 'agent_restarting'; agentId: string; crashCount: number; backoffSeconds: number }
   | { type: 'agent_restart_failed'; agentId: string; crashCount: number; error: string }
   | { type: 'agent_gave_up'; agentId: string; maxRetries: number }
+  | { type: 'mass_death_detected'; deathCount: number; windowSeconds: number }
+  | { type: 'spawn_paused'; reason: string }
+  | { type: 'spawn_resumed' }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
   | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
   | { type: 'emergency_stop'; killedAgents: string[] }
@@ -91,6 +94,8 @@ export class CloisterService {
   private previousStates: Map<string, HealthState> = new Map();
   private crashTrackers: Map<string, AgentCrashTracker> = new Map();
   private previousRunningAgents: Set<string> = new Set();
+  private deathTimestamps: Date[] = []; // Rolling window of agent death times
+  private spawnsPaused: boolean = false;
 
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfig();
@@ -338,13 +343,18 @@ export class CloisterService {
     const config = this.config.auto_restart;
     if (!config?.enabled) return;
 
+    // Record death timestamp for mass death detection
+    const now = new Date();
+    this.deathTimestamps.push(now);
+    this.checkForMassDeaths();
+
     // Get or create crash tracker
     let tracker = this.crashTrackers.get(agentId);
     if (!tracker) {
       tracker = {
         agentId,
         crashCount: 0,
-        lastCrash: new Date(),
+        lastCrash: now,
         gaveUp: false,
       };
       this.crashTrackers.set(agentId, tracker);
@@ -355,7 +365,7 @@ export class CloisterService {
 
     // Increment crash count
     tracker.crashCount++;
-    tracker.lastCrash = new Date();
+    tracker.lastCrash = now;
 
     this.emit({ type: 'agent_crashed', agentId, crashCount: tracker.crashCount });
     console.log(`🔔 Agent ${agentId} crashed (crash #${tracker.crashCount})`);
@@ -429,6 +439,70 @@ export class CloisterService {
       runtime: runtime.name,
     });
     console.log(`🔔 Successfully restarted ${agentId}`);
+  }
+
+  /**
+   * Check for mass death events
+   *
+   * Detects when 3+ agents die within 30 seconds and pauses spawns.
+   */
+  private checkForMassDeaths(): void {
+    const MASS_DEATH_THRESHOLD = 3;
+    const WINDOW_SECONDS = 30;
+
+    const now = Date.now();
+    const windowStart = now - WINDOW_SECONDS * 1000;
+
+    // Clean up old timestamps outside the window
+    this.deathTimestamps = this.deathTimestamps.filter(
+      (timestamp) => timestamp.getTime() >= windowStart
+    );
+
+    // Check if we have mass deaths
+    if (this.deathTimestamps.length >= MASS_DEATH_THRESHOLD) {
+      // Trigger mass death alert
+      this.emit({
+        type: 'mass_death_detected',
+        deathCount: this.deathTimestamps.length,
+        windowSeconds: WINDOW_SECONDS,
+      });
+
+      // Pause spawns
+      if (!this.spawnsPaused) {
+        this.pauseSpawns('Mass death detected - system stability concern');
+        console.error(
+          `🔔 MASS DEATH DETECTED: ${this.deathTimestamps.length} agents died in ${WINDOW_SECONDS}s - spawns paused`
+        );
+      }
+    }
+  }
+
+  /**
+   * Pause new agent spawns
+   */
+  private pauseSpawns(reason: string): void {
+    this.spawnsPaused = true;
+    this.emit({ type: 'spawn_paused', reason });
+    console.log(`🔔 Agent spawns paused: ${reason}`);
+  }
+
+  /**
+   * Resume agent spawns
+   *
+   * Called manually after user acknowledges mass death alert.
+   */
+  resumeSpawns(): void {
+    this.spawnsPaused = false;
+    this.deathTimestamps = []; // Clear death window
+    this.emit({ type: 'spawn_resumed' });
+    console.log(`🔔 Agent spawns resumed`);
+  }
+
+  /**
+   * Check if spawns are currently paused
+   */
+  isSpawnPaused(): boolean {
+    return this.spawnsPaused;
   }
 
   /**

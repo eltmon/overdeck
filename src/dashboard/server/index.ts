@@ -1877,6 +1877,30 @@ app.post('/api/cloister/emergency-stop', (_req, res) => {
   }
 });
 
+// Resume spawns after mass death (PAN-33)
+app.post('/api/cloister/resume-spawns', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    service.resumeSpawns();
+    res.json({ success: true, message: 'Agent spawns resumed' });
+  } catch (error: any) {
+    console.error('Error resuming spawns:', error);
+    res.status(500).json({ error: 'Failed to resume spawns: ' + error.message });
+  }
+});
+
+// Check if spawns are paused (PAN-33)
+app.get('/api/cloister/spawn-status', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const isPaused = service.isSpawnPaused();
+    res.json({ spawnsPaused: isPaused });
+  } catch (error: any) {
+    console.error('Error checking spawn status:', error);
+    res.status(500).json({ error: 'Failed to check spawn status: ' + error.message });
+  }
+});
+
 // Get Cloister configuration
 app.get('/api/cloister/config', (_req, res) => {
   try {
