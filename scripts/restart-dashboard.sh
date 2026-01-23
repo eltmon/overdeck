@@ -2,17 +2,18 @@
 # Restart Panopticon dashboard cleanly
 # Usage: ./restart-dashboard.sh
 
-set -e
-
 DASHBOARD_DIR="$(dirname "$0")/../src/dashboard"
 LOG_FILE="/tmp/dashboard.log"
 
 echo "🛑 Stopping dashboard..."
 
-# Kill any existing dashboard processes
-pkill -9 -f "tsx.*server/index.ts" 2>/dev/null || true
-pkill -9 -f "vite.*dashboard/frontend" 2>/dev/null || true
-pkill -9 -f "concurrently.*dashboard" 2>/dev/null || true
+# Kill dashboard processes by matching patterns in the full command line
+# The patterns need to match what `ps aux` shows
+pids=$(ps aux | grep -E "panopticon.*dashboard|tsx watch index|concurrently.*dev:server" | grep -v grep | awk '{print $2}')
+if [ -n "$pids" ]; then
+  echo "   Killing $(echo "$pids" | wc -w) processes..."
+  echo "$pids" | xargs -r kill -9 2>/dev/null || true
+fi
 
 # Also kill by port if processes are orphaned
 fuser -k 3010/tcp 2>/dev/null || true
@@ -20,10 +21,19 @@ fuser -k 3011/tcp 2>/dev/null || true
 
 sleep 2
 
+# Double-check and force kill any stragglers
+pids=$(ps aux | grep -E "panopticon.*dashboard|tsx watch index|concurrently.*dev:server" | grep -v grep | awk '{print $2}')
+if [ -n "$pids" ]; then
+  echo "   Force killing stragglers..."
+  echo "$pids" | xargs -r kill -9 2>/dev/null || true
+  sleep 1
+fi
+
 # Verify ports are free
-if fuser 3010/tcp 3011/tcp 2>/dev/null; then
-  echo "❌ Ports still in use, force killing..."
-  fuser -k -9 3010/tcp 3011/tcp 2>/dev/null || true
+if fuser 3010/tcp 2>/dev/null || fuser 3011/tcp 2>/dev/null; then
+  echo "❌ Ports still in use, force killing by port..."
+  fuser -k -9 3010/tcp 2>/dev/null || true
+  fuser -k -9 3011/tcp 2>/dev/null || true
   sleep 1
 fi
 
