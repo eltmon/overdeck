@@ -13,6 +13,7 @@ import { CloisterStatusBar } from './components/CloisterStatusBar';
 import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { MetricsSummary } from './components/MetricsSummary';
+import { MetricsPage } from './components/MetricsPage';
 import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft } from 'lucide-react';
 import { Agent, Issue } from './types';
 
@@ -278,7 +279,7 @@ export default function App() {
         )}
         {activeTab === 'metrics' && (
           <div className="w-full overflow-auto">
-            <RuntimeComparison />
+            <MetricsPage />
           </div>
         )}
         {activeTab === 'handoffs' && (
