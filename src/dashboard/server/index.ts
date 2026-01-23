@@ -348,13 +348,13 @@ async function pollReviewStatus(): Promise<void> {
           // Notify the issue agent about the timeout so they know what happened
           const agentSession = `agent-${issueId.toLowerCase()}`;
           try {
-            execSync(`tmux has-session -t "${agentSession}" 2>/dev/null`, { encoding: 'utf-8' });
+            await execAsync(`tmux has-session -t "${agentSession}" 2>/dev/null`);
             const timeoutMsg = status.reviewStatus === 'reviewing'
               ? `**Review Timeout Notification**\n\nThe review-agent did not respond within the timeout period.\nYour review has been marked as failed.\n\n**Action Required:** Please re-trigger the review from the dashboard, or check the review-agent status with: tmux attach -t specialist-review-agent`
               : `**Test Timeout Notification**\n\nThe test-agent did not respond within the timeout period.\nTests have been marked as failed.\n\n**Action Required:** Please re-trigger tests from the dashboard, or check the test-agent status.`;
             const escapedMsg = timeoutMsg.replace(/'/g, "'\\''");
-            execSync(`tmux send-keys -t "${agentSession}" '${escapedMsg}'`, { encoding: 'utf-8' });
-            execSync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
+            await execAsync(`tmux send-keys -t "${agentSession}" '${escapedMsg}'`);
+            await execAsync(`tmux send-keys -t "${agentSession}" C-m`);
             console.log(`[auto-detect] Notified ${agentSession} about ${specialistName} timeout`);
           } catch {
             // Agent session doesn't exist, can't notify
@@ -2524,7 +2524,7 @@ app.post('/api/specialists/reset-all', async (_req, res) => {
       if (isRunning(name)) {
         const tmuxSession = getTmuxSessionName(name);
         try {
-          execSync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' });
+          await execAsync(`tmux kill-session -t "${tmuxSession}"`);
           killed = true;
         } catch {
           // Session might not exist, continue
