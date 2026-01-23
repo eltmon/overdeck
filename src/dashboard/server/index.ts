@@ -83,11 +83,84 @@ function appendActivityOutput(id: string, line: string) {
 // ============================================================================
 
 interface PendingOperation {
-  type: 'approve' | 'close' | 'containerize' | 'start';
+  type: 'approve' | 'close' | 'containerize' | 'start' | 'review' | 'merge';
   issueId: string;
   startedAt: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   error?: string;
+}
+
+// ============================================================================
+// Review Status Tracking - Tracks review/test pipeline progress
+// ============================================================================
+
+interface ReviewStatus {
+  issueId: string;
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
+  reviewNotes?: string;
+  testNotes?: string;
+  updatedAt: string;
+  readyForMerge: boolean;
+}
+
+const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
+
+function loadReviewStatuses(): Record<string, ReviewStatus> {
+  try {
+    if (existsSync(REVIEW_STATUS_FILE)) {
+      return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+    }
+  } catch (err) {
+    console.error('Failed to load review statuses:', err);
+  }
+  return {};
+}
+
+function saveReviewStatuses(statuses: Record<string, ReviewStatus>): void {
+  try {
+    const dir = dirname(REVIEW_STATUS_FILE);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2));
+  } catch (err) {
+    console.error('Failed to save review statuses:', err);
+  }
+}
+
+function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): ReviewStatus {
+  const statuses = loadReviewStatuses();
+  const existing = statuses[issueId] || {
+    issueId,
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    updatedAt: new Date().toISOString(),
+    readyForMerge: false,
+  };
+
+  const updated: ReviewStatus = {
+    ...existing,
+    ...update,
+    issueId,
+    updatedAt: new Date().toISOString(),
+    readyForMerge: update.reviewStatus === 'passed' && update.testStatus === 'passed',
+  };
+
+  statuses[issueId] = updated;
+  saveReviewStatuses(statuses);
+  return updated;
+}
+
+function getReviewStatus(issueId: string): ReviewStatus | null {
+  const statuses = loadReviewStatuses();
+  return statuses[issueId] || null;
+}
+
+function clearReviewStatus(issueId: string): void {
+  const statuses = loadReviewStatuses();
+  delete statuses[issueId];
+  saveReviewStatuses(statuses);
 }
 
 const PENDING_OPS_FILE = join(homedir(), '.panopticon', 'pending-operations.json');
@@ -3367,8 +3440,228 @@ app.post('/api/workspaces/:issueId/start', (req, res) => {
   }
 });
 
-// Approve workspace: merge, update Linear, clean up
+// Get review status for a workspace
+app.get('/api/workspaces/:issueId/review-status', (req, res) => {
+  const { issueId } = req.params;
+  const status = getReviewStatus(issueId);
+  res.json(status || {
+    issueId,
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    readyForMerge: false,
+  });
+});
+
+// Update review status (called by specialists via CLI)
+app.post('/api/workspaces/:issueId/review-status', (req, res) => {
+  const { issueId } = req.params;
+  const { reviewStatus, testStatus, reviewNotes, testNotes } = req.body;
+
+  const update: Partial<ReviewStatus> = {};
+  if (reviewStatus) update.reviewStatus = reviewStatus;
+  if (testStatus) update.testStatus = testStatus;
+  if (reviewNotes) update.reviewNotes = reviewNotes;
+  if (testNotes) update.testNotes = testNotes;
+
+  const status = setReviewStatus(issueId, update);
+  console.log(`[review-status] Updated ${issueId}:`, status);
+  res.json(status);
+});
+
+// Start review pipeline: triggers review-agent → test-agent
+// Does NOT merge - just reviews and tests
+app.post('/api/workspaces/:issueId/review', async (req, res) => {
+  const { issueId } = req.params;
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const branchName = `feature/${issueLower}`;
+
+  // Mark review as starting
+  setPendingOperation(issueId, 'review');
+  setReviewStatus(issueId, { reviewStatus: 'reviewing', testStatus: 'pending' });
+
+  try {
+    // 1. Check workspace exists
+    if (!existsSync(workspacePath)) {
+      completePendingOperation(issueId, 'Workspace does not exist');
+      setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: 'Workspace does not exist' });
+      return res.status(400).json({ error: 'Workspace does not exist' });
+    }
+
+    // 2. Push the feature branch to remote first
+    try {
+      execSync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', stdio: 'pipe' });
+      console.log(`Pushed ${branchName} to remote`);
+    } catch (pushErr: any) {
+      console.log(`Feature branch push note: ${pushErr.message}`);
+    }
+
+    // 3. Start the review pipeline (review-agent → test-agent)
+    const { wakeSpecialist } = await import('../../lib/cloister/specialists.js');
+
+    console.log(`[review] Starting review pipeline for ${issueId}...`);
+
+    const reviewPrompt = `STRICT REVIEW for ${issueId}
+
+You are a DEMANDING code reviewer. Find EVERY issue before code can proceed to testing.
+DO NOT BE NICE. BE THOROUGH.
+
+=== CONTEXT ===
+ISSUE: ${issueId}
+WORKSPACE: ${workspacePath}
+BRANCH: ${branchName}
+PROJECT: ${projectPath}
+
+=== MANDATORY REQUIREMENTS (Block if ANY violated) ===
+1. **Tests Required** - Every new function MUST have tests. No exceptions.
+2. **No In-Memory Only Storage** - Important data MUST persist to files/DB.
+3. **No Dead Code** - Remove unused imports, functions, variables.
+4. **Error Handling** - All async operations must handle errors.
+5. **Type Safety** - No \`any\` without justification.
+
+=== YOUR TASK ===
+1. cd ${workspacePath}
+2. Review ALL changes: git diff main...${branchName}
+3. Check EVERY file for issues
+4. List EVERY issue found with file:line references
+
+=== WHEN DONE ===
+**IF ANY ISSUES FOUND:**
+- Update status: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[list issues]"}'
+- Use /send-feedback-to-agent to notify agent-${issueLower}
+- DO NOT hand off to test-agent
+
+**IF CODE IS PERFECT:**
+- Update status: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
+- Hand off to test-agent:
+
+pan specialists wake test-agent --task "TEST for ${issueId}:
+WORKSPACE: ${workspacePath}
+BRANCH: ${branchName}
+
+1. cd ${workspacePath}
+2. Run tests: npm test
+3. Update status based on results:
+   - PASS: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H 'Content-Type: application/json' -d '{\"testStatus\":\"passed\"}'
+   - FAIL: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H 'Content-Type: application/json' -d '{\"testStatus\":\"failed\",\"testNotes\":\"[failure details]\"}'"`;
+
+    const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
+      waitForReady: true,
+      startIfNotRunning: true,
+    });
+
+    if (!reviewResult.success) {
+      console.warn(`[review] review-agent failed to wake: ${reviewResult.message}`);
+      completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
+      setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: reviewResult.message });
+      return res.status(500).json({ error: `Failed to start review: ${reviewResult.message}` });
+    }
+
+    console.log(`[review] Review pipeline started for ${issueId}`);
+    completePendingOperation(issueId, null);
+
+    return res.json({
+      success: true,
+      message: `Review started for ${issueId}`,
+      pipeline: 'review → test',
+      note: 'Watch the specialists panel for progress. MERGE button will appear when review+test pass.',
+    });
+
+  } catch (error: any) {
+    console.error(`[review] Error starting review:`, error);
+    completePendingOperation(issueId, error.message);
+    setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: error.message });
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Merge workspace: ONLY merges (requires review+test to have passed first)
 // SAFETY: Never delete remote branches. Always push before cleanup. Abort on any error.
+app.post('/api/workspaces/:issueId/merge', async (req, res) => {
+  const { issueId } = req.params;
+
+  // Check review status - must be ready for merge
+  const reviewStatus = getReviewStatus(issueId);
+  if (!reviewStatus?.readyForMerge) {
+    return res.status(400).json({
+      error: 'Cannot merge: review and tests have not passed yet',
+      reviewStatus: reviewStatus?.reviewStatus || 'pending',
+      testStatus: reviewStatus?.testStatus || 'pending',
+    });
+  }
+
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const branchName = `feature/${issueLower}`;
+
+  // Mark operation as pending
+  setPendingOperation(issueId, 'merge');
+
+  try {
+    // 1. Check workspace exists
+    if (!existsSync(workspacePath)) {
+      completePendingOperation(issueId, 'Workspace does not exist');
+      return res.status(400).json({ error: 'Workspace does not exist' });
+    }
+
+    // 2. Push the feature branch to remote BEFORE merging (preserve work)
+    try {
+      execSync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', stdio: 'pipe' });
+      console.log(`Pushed ${branchName} to remote`);
+    } catch (pushErr: any) {
+      console.log(`Feature branch push note: ${pushErr.message}`);
+    }
+
+    // 3. Spawn merge-agent to handle the merge
+    const { spawnMergeAgentForBranches } = await import('../../lib/cloister/merge-agent.js');
+
+    console.log(`[merge] Starting merge-agent for ${issueId}...`);
+
+    const mergeResult = await spawnMergeAgentForBranches(
+      projectPath,
+      branchName,
+      'main',
+      issueId
+    );
+
+    if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
+      console.log(`[merge] Successfully merged ${issueId}`);
+      clearReviewStatus(issueId); // Clear review status after successful merge
+      completePendingOperation(issueId, null);
+      return res.json({
+        success: true,
+        message: `Successfully merged ${issueId} to main`,
+        testsStatus: 'PASS',
+      });
+    } else if (mergeResult.success) {
+      console.log(`[merge] Merged ${issueId} (tests: ${mergeResult.testsStatus})`);
+      clearReviewStatus(issueId);
+      completePendingOperation(issueId, null);
+      return res.json({
+        success: true,
+        message: `Merged ${issueId} to main`,
+        testsStatus: mergeResult.testsStatus,
+        note: mergeResult.testsStatus === 'SKIP' ? 'Tests were skipped' : undefined,
+      });
+    } else {
+      const error = mergeResult.notes || 'Merge failed';
+      completePendingOperation(issueId, error);
+      return res.status(500).json({ error, mergeResult });
+    }
+
+  } catch (error: any) {
+    console.error(`[merge] Error:`, error);
+    completePendingOperation(issueId, error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// DEPRECATED: Old approve endpoint - redirects to review flow
+// TODO: Remove after frontend is updated
 app.post('/api/workspaces/:issueId/approve', async (req, res) => {
   const { issueId } = req.params;
   const issuePrefix = issueId.split('-')[0];

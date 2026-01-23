@@ -28,11 +28,21 @@ interface ContainerStatus {
 }
 
 interface PendingOperation {
-  type: 'approve' | 'close' | 'containerize' | 'start';
+  type: 'approve' | 'close' | 'containerize' | 'start' | 'review' | 'merge';
   issueId: string;
   startedAt: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   error?: string;
+}
+
+interface ReviewStatus {
+  issueId: string;
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
+  reviewNotes?: string;
+  testNotes?: string;
+  updatedAt: string;
+  readyForMerge: boolean;
 }
 
 interface WorkspaceInfo {
@@ -117,6 +127,16 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
     refetchInterval: 5000, // Check for container changes
   });
 
+  // Fetch review status
+  const { data: reviewStatus } = useQuery<ReviewStatus>({
+    queryKey: ['review-status', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/review-status`);
+      if (!res.ok) throw new Error('Failed to fetch review status');
+      return res.json();
+    },
+    refetchInterval: 3000, // Check frequently during review
+  });
 
   const startContainersMutation = useMutation({
     mutationFn: async () => {
@@ -156,15 +176,35 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
     },
   });
 
-  const approveMutation = useMutation({
+  // Start review pipeline (review-agent → test-agent)
+  const reviewMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/approve`, {
+      const res = await fetch(`/api/workspaces/${issueId}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Failed to approve workspace');
+        throw new Error(err.error || 'Failed to start review');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
+    },
+  });
+
+  // Merge (only after review+test pass)
+  const mergeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to merge');
       }
       return res.json();
     },
@@ -172,6 +212,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['issues'] });
+      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
       onClose();
     },
   });
@@ -245,9 +286,15 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
     containerizeMutation.mutate();
   };
 
-  const handleApprove = () => {
-    if (confirm(`Approve and clean up workspace for ${issueId}? This will:\n- Merge the feature branch to main\n- Update issue to Done\n- Remove the workspace\n(Feature branch is preserved for history)`)) {
-      approveMutation.mutate();
+  const handleReview = () => {
+    if (confirm(`Start review & test pipeline for ${issueId}?\n\nThis will:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.`)) {
+      reviewMutation.mutate();
+    }
+  };
+
+  const handleMerge = () => {
+    if (confirm(`Merge ${issueId} to main?\n\nReview and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`)) {
+      mergeMutation.mutate();
     }
   };
 
@@ -657,19 +704,81 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               </div>
             </div>
           )}
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              onClick={handleApprove}
-              disabled={approveMutation.isPending || (workspace?.pendingOperation?.type === 'approve' && workspace.pendingOperation.status === 'running')}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-green-900/30 text-green-400 rounded hover:bg-green-900/50 disabled:opacity-50"
-            >
-              {(approveMutation.isPending || (workspace?.pendingOperation?.type === 'approve' && workspace.pendingOperation.status === 'running')) ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <CheckCircle className="w-3 h-3" />
+          {/* Review Status Display */}
+          {reviewStatus && (reviewStatus.reviewStatus !== 'pending' || reviewStatus.testStatus !== 'pending') && (
+            <div className="mb-2 p-2 bg-gray-900/50 rounded text-xs">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-gray-400">Review:</span>
+                <span className={
+                  reviewStatus.reviewStatus === 'passed' ? 'text-green-400' :
+                  reviewStatus.reviewStatus === 'blocked' || reviewStatus.reviewStatus === 'failed' ? 'text-red-400' :
+                  reviewStatus.reviewStatus === 'reviewing' ? 'text-yellow-400' :
+                  'text-gray-500'
+                }>
+                  {reviewStatus.reviewStatus === 'passed' ? '✓ Passed' :
+                   reviewStatus.reviewStatus === 'blocked' ? '✗ Blocked' :
+                   reviewStatus.reviewStatus === 'failed' ? '✗ Failed' :
+                   reviewStatus.reviewStatus === 'reviewing' ? '⟳ Reviewing...' :
+                   'Pending'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400">Tests:</span>
+                <span className={
+                  reviewStatus.testStatus === 'passed' ? 'text-green-400' :
+                  reviewStatus.testStatus === 'failed' ? 'text-red-400' :
+                  reviewStatus.testStatus === 'testing' ? 'text-yellow-400' :
+                  'text-gray-500'
+                }>
+                  {reviewStatus.testStatus === 'passed' ? '✓ Passed' :
+                   reviewStatus.testStatus === 'failed' ? '✗ Failed' :
+                   reviewStatus.testStatus === 'testing' ? '⟳ Testing...' :
+                   reviewStatus.testStatus === 'skipped' ? '⊘ Skipped' :
+                   'Pending'}
+                </span>
+              </div>
+              {reviewStatus.reviewNotes && (
+                <div className="mt-1 text-gray-400 text-xs">{reviewStatus.reviewNotes}</div>
               )}
-              Approve & Merge
-            </button>
+              {reviewStatus.testNotes && (
+                <div className="mt-1 text-gray-400 text-xs">{reviewStatus.testNotes}</div>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            {/* MERGE button - only shows when review+test passed */}
+            {reviewStatus?.readyForMerge && (
+              <button
+                onClick={handleMerge}
+                disabled={mergeMutation.isPending}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-500 disabled:opacity-50 font-medium"
+              >
+                {mergeMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <CheckCircle className="w-3 h-3" />
+                )}
+                MERGE
+              </button>
+            )}
+
+            {/* Review & Test button - shows when not ready for merge */}
+            {!reviewStatus?.readyForMerge && (
+              <button
+                onClick={handleReview}
+                disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-900/30 text-blue-400 rounded hover:bg-blue-900/50 disabled:opacity-50"
+              >
+                {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3 h-3" />
+                )}
+                Review & Test
+              </button>
+            )}
+
             <button
               onClick={handleKill}
               disabled={killMutation.isPending}
@@ -691,11 +800,18 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               Close (No Merge)
             </button>
           </div>
-          {approveMutation.isError && !workspace?.pendingOperation?.error && (
+          {reviewMutation.isError && (
             <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded mt-2">
-              {approveMutation.error instanceof Error
-                ? approveMutation.error.message
-                : 'Failed to approve'}
+              {reviewMutation.error instanceof Error
+                ? reviewMutation.error.message
+                : 'Failed to start review'}
+            </div>
+          )}
+          {mergeMutation.isError && (
+            <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded mt-2">
+              {mergeMutation.error instanceof Error
+                ? mergeMutation.error.message
+                : 'Failed to merge'}
             </div>
           )}
           {closeMutation.isError && (
