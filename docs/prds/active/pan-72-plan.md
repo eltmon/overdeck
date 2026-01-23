@@ -1,26 +1,10 @@
 # PAN-72: Cloister - Convert remaining execSync calls to async
 
-## Status: IMPLEMENTATION COMPLETE
+## Status: PLANNING COMPLETE
 
 ## Problem Statement
 
 PAN-70 converted execSync calls in `server/index.ts`, `specialists.ts`, and `health.ts`, but there are still blocking execSync calls in the cloister code that cause the dashboard to hang on startup.
-
-**Review Feedback Round 1 (2026-01-23):** All critical issues addressed:
-1. ✅ **Persistence Added** - Cost and FPP violation data now persisted to JSON files with atomic writes
-2. ✅ **Unit Tests Added** - 21 comprehensive tests for cost-monitor, fpp-violations, and session-rotation
-3. ✅ **Import Validation Fixed** - Added try-catch error handling for checkHook runtime import
-
-**Review Feedback Round 2 (2026-01-23):** All code review issues fixed:
-1. ✅ **Empty Catch Blocks Fixed** - Replaced `require('fs').unlinkSync` with proper import and error logging
-2. ✅ **Dead Code Removed** - Removed unused FPPViolationType values (pr_stale, review_pending, status_mismatch)
-3. ✅ **Dead Code Removed** - Removed unused MergeRecord.files and .diff struct fields
-4. ✅ **Untyped Any Fixed** - Replaced `error: any` with `error: unknown` + proper type guards in 3 files
-5. ✅ **Comprehensive Tests Added** - 35 new tests covering all flagged functions:
-   - session-rotation.ts: needsSessionRotation(), buildMergeAgentMemory(), rotateSpecialistSession(), checkAndRotateIfNeeded()
-   - fpp-violations.ts: checkAgentForViolations(), sendNudge(), resolveViolation(), getActiveViolations(), getAgentViolations(), clearOldViolations()
-
-**Test Suite:** 286 tests passing (up from 251)
 
 ## Decisions Made
 
@@ -33,8 +17,6 @@ PAN-70 converted execSync calls in `server/index.ts`, `specialists.ts`, and `hea
 - **Propagate async upward** to parent functions
 - `checkAllTriggers()` becomes async so callers can await properly
 - Clean, idiomatic async/await throughout
-
-### ✅ Completed (11/11 tasks)
 
 ### Files to Modify
 
@@ -106,43 +88,10 @@ const { stdout: output } = await execAsync(`bd list --json -l ${label}`, { encod
 
 ## Acceptance Criteria
 
-- [x] All execSync calls converted to execAsync in all 3 files
-- [x] Functions properly propagate async to callers
-- [x] `npm test` passes (251 tests pass, 1 pre-existing failure in service.test.ts due to missing deacon.js file)
-- [x] No regressions in dashboard functionality
-
-## Implementation Summary
-
-Successfully converted all 13 execSync calls to async:
-
-**triggers.ts** (3 calls):
-- ✅ checkPlanningComplete() - converted to async with execAsync
-- ✅ checkTaskCompletion() - converted to async with execAsync (2 calls)
-- ✅ checkAllTriggers() - made async to propagate awaits
-
-**handoff-context.ts** (4 calls):
-- ✅ captureGitState() - converted 3 execSync calls to execAsync
-- ✅ captureBeadsTasks() - converted 1 execSync call to execAsync
-
-**plan.ts** (6 calls):
-- ✅ findPRDFiles() - converted to async with execAsync
-- ✅ createBeadsTasks() - converted to async with execAsync (3 calls: which, bd create, bd flush)
-- ✅ planCommand() - added await to async function calls
-
-**Callers updated**:
-- ✅ server/index.ts:2724 - added await to checkAllTriggers()
-- ✅ service.ts:783 - added await to checkAllTriggers()
-
-## Test Results
-
-All tests pass except for a pre-existing issue:
-- ✅ 251 tests passed
-- ⚠️ 1 test failed (service.test.ts) - pre-existing bug: missing deacon.js file
-- The failing test is unrelated to the async conversion
-
-## Notes
-
-The service.test.ts failure is caused by service.ts importing from './deacon.js' which doesn't exist in the codebase. This is a pre-existing issue that should be addressed in a separate ticket.
+- [ ] All execSync calls converted to execAsync in all 3 files
+- [ ] Functions properly propagate async to callers
+- [ ] `npm test` passes
+- [ ] No regressions in dashboard functionality
 
 ## Out of Scope
 

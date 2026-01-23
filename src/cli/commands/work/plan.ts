@@ -4,7 +4,10 @@ import inquirer from 'inquirer';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 interface PlanOptions {
   output?: string;
@@ -54,7 +57,7 @@ function getLinearApiKey(): string | null {
   return process.env.LINEAR_API_KEY || null;
 }
 
-function findPRDFiles(issueId: string): string[] {
+async function findPRDFiles(issueId: string): Promise<string[]> {
   const found: string[] = [];
   const cwd = process.cwd();
 
@@ -74,7 +77,7 @@ function findPRDFiles(issueId: string): string[] {
     if (!existsSync(fullPath)) continue;
 
     try {
-      const result = execSync(
+      const { stdout: result } = await execAsync(
         `find "${fullPath}" -type f -name "*.md" 2>/dev/null | xargs grep -l -i "${issueIdLower}" 2>/dev/null || true`,
         { encoding: 'utf-8' }
       );
@@ -459,14 +462,14 @@ function generateWorkspaceFile(issue: LinearIssue, prdFiles: string[]): string {
 /**
  * Create Beads tasks with dependencies
  */
-function createBeadsTasks(issue: LinearIssue, tasks: PlanTask[]): { success: boolean; created: string[]; errors: string[] } {
+async function createBeadsTasks(issue: LinearIssue, tasks: PlanTask[]): Promise<{ success: boolean; created: string[]; errors: string[] }> {
   const created: string[] = [];
   const errors: string[] = [];
   const taskIds: Map<string, string> = new Map();
 
   // Check if bd is available
   try {
-    execSync('which bd', { encoding: 'utf-8' });
+    await execAsync('which bd', { encoding: 'utf-8' });
   } catch {
     return { success: false, created: [], errors: ['bd (beads) CLI not found in PATH'] };
   }
@@ -495,7 +498,7 @@ function createBeadsTasks(issue: LinearIssue, tasks: PlanTask[]): { success: boo
         cmd += ` -d "${escapedDesc}"`;
       }
 
-      const result = execSync(cmd, { encoding: 'utf-8', cwd: process.cwd() });
+      const { stdout: result } = await execAsync(cmd, { encoding: 'utf-8', cwd: process.cwd() });
 
       // Extract ID from output - bd outputs "Created: bd-XXXX" or similar
       const idMatch = result.match(/bd-[a-f0-9]+/i) || result.match(/([a-f0-9-]{8,})/i);
@@ -514,7 +517,7 @@ function createBeadsTasks(issue: LinearIssue, tasks: PlanTask[]): { success: boo
   // Sync beads to git (bd uses 'bd flush' to export to JSONL)
   if (created.length > 0) {
     try {
-      execSync('bd flush', { encoding: 'utf-8', cwd: process.cwd() });
+      await execAsync('bd flush', { encoding: 'utf-8', cwd: process.cwd() });
     } catch {
       // Flush might fail if no changes, that's OK
     }
@@ -601,7 +604,7 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
 
     // Look for related PRD files
     spinner.text = 'Searching for related PRDs...';
-    const prdFiles = findPRDFiles(id);
+    const prdFiles = await findPRDFiles(id);
 
     // Analyze complexity
     spinner.text = 'Analyzing complexity...';
@@ -697,7 +700,7 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
 
     // Create Beads tasks
     const spinnerBeads = ora('Creating Beads tasks...').start();
-    const beadsResult = createBeadsTasks(issueData, tasks);
+    const beadsResult = await createBeadsTasks(issueData, tasks);
 
     if (beadsResult.success) {
       spinnerBeads.succeed(`Created ${beadsResult.created.length} Beads tasks`);

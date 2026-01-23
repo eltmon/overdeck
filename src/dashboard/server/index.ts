@@ -2721,7 +2721,7 @@ app.get('/api/agents/:id/handoff/suggestion', async (req, res) => {
     const health = getAgentHealth(agentId, runtime);
 
     // Check all triggers
-    const triggers = checkAllTriggers(
+    const triggers = await checkAllTriggers(
       agentId,
       agentState.workspace,
       agentState.issueId,
