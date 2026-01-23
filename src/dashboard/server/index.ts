@@ -10,7 +10,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { getCloisterService } from '../../lib/cloister/service.js';
-import { loadCloisterConfig, saveCloisterConfig } from '../../lib/cloister/config.js';
+import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
@@ -1877,6 +1877,30 @@ app.post('/api/cloister/emergency-stop', (_req, res) => {
   }
 });
 
+// Resume spawns after mass death (PAN-33)
+app.post('/api/cloister/resume-spawns', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    service.resumeSpawns();
+    res.json({ success: true, message: 'Agent spawns resumed' });
+  } catch (error: any) {
+    console.error('Error resuming spawns:', error);
+    res.status(500).json({ error: 'Failed to resume spawns: ' + error.message });
+  }
+});
+
+// Check if spawns are paused (PAN-33)
+app.get('/api/cloister/spawn-status', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const isPaused = service.isSpawnPaused();
+    res.json({ spawnsPaused: isPaused });
+  } catch (error: any) {
+    console.error('Error checking spawn status:', error);
+    res.status(500).json({ error: 'Failed to check spawn status: ' + error.message });
+  }
+});
+
 // Get Cloister configuration
 app.get('/api/cloister/config', (_req, res) => {
   try {
@@ -1904,6 +1928,136 @@ app.put('/api/cloister/config', (req, res) => {
   } catch (error: any) {
     console.error('Error updating Cloister config:', error);
     res.status(500).json({ error: 'Failed to update Cloister config: ' + error.message });
+  }
+});
+
+// ============================================================================
+// Metrics API Endpoints (PAN-33 Phase 6)
+// ============================================================================
+
+// Get metrics summary
+app.get('/api/metrics/summary', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const costSummary = service.getCostSummary();
+    const status = service.getStatus();
+
+    res.json({
+      today: {
+        totalCost: costSummary.dailyTotal,
+        agentCount: status.summary.total,
+        activeCount: status.summary.active,
+        stuckCount: status.summary.stuck,
+        warningCount: status.summary.warning,
+      },
+      topSpenders: {
+        agents: costSummary.topAgents.slice(0, 5),
+        issues: costSummary.topIssues.slice(0, 5),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error getting metrics summary:', error);
+    res.status(500).json({ error: 'Failed to get metrics summary: ' + error.message });
+  }
+});
+
+// Get cost metrics (date range)
+app.get('/api/metrics/costs', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const costSummary = service.getCostSummary();
+
+    res.json({
+      dailyTotal: costSummary.dailyTotal,
+      topAgents: costSummary.topAgents,
+      topIssues: costSummary.topIssues,
+    });
+  } catch (error: any) {
+    console.error('Error getting cost metrics:', error);
+    res.status(500).json({ error: 'Failed to get cost metrics: ' + error.message });
+  }
+});
+
+// Get handoff metrics
+app.get('/api/metrics/handoffs', (_req, res) => {
+  try {
+    // Placeholder - would need handoff stats from handoff-logger
+    res.json({
+      totalHandoffs: 0,
+      successRate: 0,
+      byType: {},
+    });
+  } catch (error: any) {
+    console.error('Error getting handoff metrics:', error);
+    res.status(500).json({ error: 'Failed to get handoff metrics: ' + error.message });
+  }
+});
+
+// Get stuck agent incidents
+app.get('/api/metrics/stuck', (_req, res) => {
+  try {
+    const service = getCloisterService();
+    const status = service.getStatus();
+
+    res.json({
+      current: status.summary.stuck,
+      incidents: [], // Placeholder - would need historical tracking
+    });
+  } catch (error: any) {
+    console.error('Error getting stuck agent metrics:', error);
+    res.status(500).json({ error: 'Failed to get stuck agent metrics: ' + error.message });
+  }
+});
+
+// ============================================================================
+// Confirmation Dialog System (PAN-33)
+// ============================================================================
+
+/**
+ * In-memory store for pending confirmation requests.
+ * In the future, this could be enhanced with tmux output polling to automatically
+ * detect confirmation prompts from agents.
+ */
+interface ConfirmationRequest {
+  id: string;
+  agentId: string;
+  sessionName: string;
+  action: string;
+  details?: string;
+  timestamp: string;
+}
+
+const pendingConfirmations = new Map<string, ConfirmationRequest>();
+
+// Get pending confirmation requests
+app.get('/api/confirmations', (_req, res) => {
+  res.json(Array.from(pendingConfirmations.values()));
+});
+
+// Respond to a confirmation request
+app.post('/api/confirmations/:id/respond', async (req, res) => {
+  const { id } = req.params;
+  const { confirmed } = req.body;
+
+  const request = pendingConfirmations.get(id);
+  if (!request) {
+    return res.status(404).json({ error: 'Confirmation request not found' });
+  }
+
+  try {
+    // Send response to the agent's tmux session
+    const response = confirmed ? 'y' : 'n';
+    execSync(`tmux send-keys -t "${request.sessionName}" '${response}'`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    execSync(`tmux send-keys -t "${request.sessionName}" C-m`, { encoding: 'utf-8' });
+
+    // Remove from pending
+    pendingConfirmations.delete(id);
+
+    res.json({ success: true, confirmed });
+  } catch (error: any) {
+    console.error('Error sending confirmation response:', error);
+    res.status(500).json({ error: 'Failed to send response: ' + error.message });
   }
 });
 
@@ -5779,6 +5933,12 @@ app.get('/api/metrics/tasks', (req, res) => {
 
 // Ensure tmux is running at startup
 ensureTmuxRunning();
+
+// Auto-start Cloister if configured
+if (shouldAutoStart()) {
+  console.log('🔔 Auto-starting Cloister...');
+  getCloisterService().start();
+}
 
 // In production, serve the frontend static files
 if (process.env.NODE_ENV === 'production') {
