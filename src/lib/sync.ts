@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync } from 'fs';
 import { join, basename } from 'path';
-import { SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, SOURCE_SCRIPTS_DIR, SYNC_TARGETS, type Runtime } from './paths.js';
+import { SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SYNC_TARGETS, isDevMode, type Runtime } from './paths.js';
 
 export interface SyncItem {
   name: string;
@@ -14,6 +14,7 @@ export interface SyncPlan {
   skills: SyncItem[];
   commands: SyncItem[];
   agents: SyncItem[];
+  devSkills: SyncItem[];  // Developer-only skills (only synced in dev mode)
 }
 
 /**
@@ -58,6 +59,7 @@ export function planSync(runtime: Runtime): SyncPlan {
     skills: [],
     commands: [],
     agents: [],
+    devSkills: [],
   };
 
   // Plan skills sync
@@ -80,6 +82,29 @@ export function planSync(runtime: Runtime): SyncPlan {
       }
 
       plan.skills.push({ name: skill.name, sourcePath, targetPath, status });
+    }
+  }
+
+  // Plan dev-skills sync (only in dev mode)
+  if (isDevMode() && existsSync(SOURCE_DEV_SKILLS_DIR)) {
+    const devSkills = readdirSync(SOURCE_DEV_SKILLS_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory());
+
+    for (const skill of devSkills) {
+      const sourcePath = join(SOURCE_DEV_SKILLS_DIR, skill.name);
+      const targetPath = join(targets.skills, skill.name);
+
+      let status: SyncItem['status'] = 'new';
+
+      if (existsSync(targetPath)) {
+        if (isPanopticonSymlink(targetPath)) {
+          status = 'symlink';  // Already managed by us
+        } else {
+          status = 'conflict';  // User content exists
+        }
+      }
+
+      plan.devSkills.push({ name: skill.name, sourcePath, targetPath, status });
     }
   }
 
@@ -233,6 +258,30 @@ export function executeSync(runtime: Runtime, options: SyncOptions = {}): SyncRe
 
     symlinkSync(item.sourcePath, item.targetPath);
     result.created.push(item.name);
+  }
+
+  // Process dev-skills (only in dev mode)
+  for (const item of plan.devSkills) {
+    if (options.dryRun) {
+      if (item.status === 'new' || item.status === 'symlink') {
+        result.created.push(`${item.name} (dev)`);
+      } else {
+        result.conflicts.push(`${item.name} (dev)`);
+      }
+      continue;
+    }
+
+    if (item.status === 'conflict' && !options.force) {
+      result.conflicts.push(`${item.name} (dev)`);
+      continue;
+    }
+
+    if (existsSync(item.targetPath)) {
+      removeTarget(item.targetPath);
+    }
+
+    symlinkSync(item.sourcePath, item.targetPath);
+    result.created.push(`${item.name} (dev)`);
   }
 
   return result;

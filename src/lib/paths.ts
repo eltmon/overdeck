@@ -1,5 +1,6 @@
 import { homedir } from 'os';
 import { join } from 'path';
+import { existsSync } from 'fs';
 
 // Panopticon home directory (can be overridden for testing)
 export const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
@@ -86,6 +87,23 @@ if (currentDir.includes('/src/')) {
 export const SOURCE_TEMPLATES_DIR = join(packageRoot, 'templates');
 export const SOURCE_TRAEFIK_TEMPLATES = join(SOURCE_TEMPLATES_DIR, 'traefik');
 export const SOURCE_SCRIPTS_DIR = join(packageRoot, 'scripts');
+export const SOURCE_DEV_SKILLS_DIR = join(packageRoot, 'dev-skills');
+
+/**
+ * Detect if running in development mode (from npm link or panopticon repo)
+ *
+ * Dev mode is detected if:
+ * 1. Running from the panopticon source directory (npm link)
+ * 2. The SOURCE_DEV_SKILLS_DIR exists (only present in repo, not in npm package)
+ */
+export function isDevMode(): boolean {
+  try {
+    // Check if dev-skills directory exists - this is only in the repo, not npm package
+    return existsSync(SOURCE_DEV_SKILLS_DIR);
+  } catch {
+    return false;
+  }
+}
 
 // All directories to create on init
 export const INIT_DIRS = [

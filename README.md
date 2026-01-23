@@ -1390,11 +1390,35 @@ If you're both developing Panopticon AND using it for your own projects:
 3. **Config is shared** - workspaces/agents work the same either way
 4. **Test in a real project** - your own usage is the best test
 
+### Developer Skills (dev-skills/)
+
+Panopticon has two types of skills:
+
+| Directory | Purpose | Synced When |
+|-----------|---------|-------------|
+| `skills/` | User-facing skills for all Panopticon users | Always via `pan sync` |
+| `dev-skills/` | Developer-only skills for Panopticon contributors | Only in dev mode |
+
+**Dev mode is automatically detected** when running from the Panopticon source repo (npm link). Skills in `dev-skills/` are:
+- Checked into the repo and version-controlled
+- Only synced to developers' machines, not end users
+- Shown with `[dev]` label in `pan sync --dry-run`
+
+```bash
+# Check what will be synced (including dev-skills)
+pan sync --dry-run
+
+# Output shows:
+# Developer mode detected - dev-skills will be synced
+# ...
+#   + skill/test-specialist-workflow [dev]
+```
+
 ### Testing the Specialist System
 
-Panopticon includes a Claude Code skill for end-to-end testing of the specialist handoff pipeline.
+The `test-specialist-workflow` skill provides end-to-end testing for the specialist handoff pipeline.
 
-**Location:** `.claude/skills/test-specialist-workflow/skill.md`
+**Location:** `dev-skills/test-specialist-workflow/SKILL.md`
 
 **What it tests:**
 - Full approve workflow: review-agent → test-agent → merge-agent
@@ -1404,6 +1428,9 @@ Panopticon includes a Claude Code skill for end-to-end testing of the specialist
 **Usage:**
 
 ```bash
+# First sync to get dev-skills
+pan sync
+
 # In Claude Code, invoke the skill
 /test-specialist-workflow
 ```

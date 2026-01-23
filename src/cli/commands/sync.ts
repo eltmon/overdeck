@@ -3,7 +3,7 @@ import ora from 'ora';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
 import { planSync, executeSync, planHooksSync, syncHooks } from '../../lib/sync.js';
-import { SYNC_TARGETS, Runtime } from '../../lib/paths.js';
+import { SYNC_TARGETS, Runtime, isDevMode } from '../../lib/paths.js';
 
 interface SyncOptions {
   dryRun?: boolean;
@@ -30,6 +30,11 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (options.dryRun) {
     console.log(chalk.bold('Sync Plan (dry run):\n'));
 
+    // Show dev mode status
+    if (isDevMode()) {
+      console.log(chalk.magenta('Developer mode detected - dev-skills will be synced\n'));
+    }
+
     // Show hooks plan
     const hooksPlan = planHooksSync();
     if (hooksPlan.length > 0) {
@@ -47,7 +52,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
       console.log(chalk.cyan(`${runtime}:`));
 
-      if (plan.skills.length === 0 && plan.commands.length === 0 && plan.agents.length === 0) {
+      if (plan.skills.length === 0 && plan.commands.length === 0 && plan.agents.length === 0 && plan.devSkills.length === 0) {
         console.log(chalk.dim('  (nothing to sync)'));
         continue;
       }
@@ -55,6 +60,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       for (const item of plan.skills) {
         const icon = item.status === 'conflict' ? chalk.yellow('!') : chalk.green('+');
         const status = item.status === 'conflict' ? chalk.yellow('[conflict]') : '';
+        console.log(`  ${icon} skill/${item.name} ${status}`);
+      }
+
+      // Show dev-skills with special label
+      for (const item of plan.devSkills) {
+        const icon = item.status === 'conflict' ? chalk.yellow('!') : chalk.magenta('+');
+        const status = item.status === 'conflict' ? chalk.yellow('[conflict]') : chalk.magenta('[dev]');
         console.log(`  ${icon} skill/${item.name} ${status}`);
       }
 
