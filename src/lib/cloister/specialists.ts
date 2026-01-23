@@ -483,76 +483,74 @@ export function isIdleAtPrompt(name: SpecialistType): boolean {
   try {
     // Capture the last few lines of the tmux pane
     const output = execSync(
-      `tmux capture-pane -t "${tmuxSession}" -p | tail -8`,
+      `tmux capture-pane -t "${tmuxSession}" -p | tail -12`,
       { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
     ).trim();
 
     const lines = output.split('\n').filter(line => line.trim());
     if (lines.length === 0) return false;
 
-    const lastLine = lines[lines.length - 1].trim();
-    const lastFewLines = lines.slice(-4).join('\n');
+    const allText = lines.join('\n');
 
-    // PRIMARY CHECK: Is the prompt visible?
-    // When Claude Code is idle, the last line shows the prompt (❯)
-    // or the statusline with bypass permissions hint
-    const hasPrompt = lastLine === '❯' ||
-                      lastLine.endsWith('❯') ||
-                      lastLine.includes('bypass permissions') ||
-                      lastLine.includes('shift+tab to cycle');
+    // FIRST: Check for active work indicators ANYWHERE in recent output
+    // These take priority over any prompt detection
+    const activeIndicators = [
+      'esc to interrupt',      // Active task
+      'Choreographing',        // Thinking
+      'Nebulizing',            // Processing
+      'Baking',                // Processing
+      '◐', '◑', '◒', '◓',      // Quarter spinners
+      '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏', // Braille spinners
+      'thinking)',             // "(thinking)" indicator
+      '↓.*tokens',             // Token streaming indicator
+    ];
 
-    if (hasPrompt) {
-      // Prompt is showing - likely idle, but verify no spinner
-      // Spinners appear on the LAST line when actively processing
-      const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-      const hasSpinner = spinnerChars.some(char => lastLine.includes(char));
-
-      if (hasSpinner) {
-        return false; // Spinner on last line = actively working
+    for (const indicator of activeIndicators) {
+      if (allText.includes(indicator)) {
+        return false; // Definitely active
       }
-
-      return true; // Prompt visible, no spinner = idle
     }
 
-    // SECONDARY CHECK: Look for active work indicators on the last line
-    // These indicate the agent is mid-task
+    // Check for active patterns with regex
     const activePatterns = [
-      /Writing.*\.\.\./i,      // "Writing tests..."
-      /Reading.*\.\.\./i,      // "Reading file..."
-      /Editing.*\.\.\./i,      // "Editing..."
-      /Running.*\.\.\./i,      // "Running tests..."
-      /Searching.*\.\.\./i,    // "Searching..."
-      /Analyzing.*\.\.\./i,    // "Analyzing..."
-      /Processing.*\.\.\./i,   // "Processing..."
-      /Nebulizing/i,           // Claude-specific
-      /Generating/i,           // Claude-specific
-      /esc to interrupt/i,     // Active task indicator
+      /Writing.*\.\.\./i,
+      /Reading.*\.\.\./i,
+      /Editing.*\.\.\./i,
+      /Running.*\.\.\./i,
+      /Searching.*\.\.\./i,
+      /Analyzing.*\.\.\./i,
+      /Processing.*\.\.\./i,
+      /Generating/i,
+      /tokens\s*\)/i,          // "tokens)" at end of thinking indicator
     ];
 
     for (const pattern of activePatterns) {
-      if (pattern.test(lastLine) || pattern.test(lastFewLines)) {
+      if (pattern.test(allText)) {
         return false; // Active work indicator found
       }
     }
 
-    // TERTIARY CHECK: Other idle indicators in recent output
-    const idleIndicators = [
-      'How can I help',
-      'Waiting for',
-      'Ready for',
-    ];
+    // NOW check if we're at idle prompt
+    // Look for the prompt character on its own line (not in status bar)
+    const promptLinePattern = /^❯\s*$/m;
+    const hasCleanPrompt = promptLinePattern.test(output);
 
-    for (const indicator of idleIndicators) {
-      if (lastFewLines.includes(indicator)) {
-        return true;
-      }
+    if (hasCleanPrompt) {
+      return true; // Clean prompt line = idle
     }
 
-    // If we can't determine state, check if output looks like completion
-    // (task done messages, checkmarks, etc. followed by prompt area)
-    if (lastFewLines.includes('✔') || lastFewLines.includes('✓') || lastFewLines.includes('Complete')) {
-      // Recent completion - check if prompt is somewhere in last lines
-      if (lastFewLines.includes('❯')) {
+    // Check if last meaningful line (before status) shows prompt
+    // Status lines typically contain: MCPs, hooks, CLAUDE.md, permissions
+    const nonStatusLines = lines.filter(line =>
+      !line.includes('MCPs') &&
+      !line.includes('hooks') &&
+      !line.includes('CLAUDE.md') &&
+      !line.includes('bypass permissions')
+    );
+
+    if (nonStatusLines.length > 0) {
+      const lastMeaningful = nonStatusLines[nonStatusLines.length - 1].trim();
+      if (lastMeaningful === '❯' || lastMeaningful.endsWith('❯')) {
         return true;
       }
     }
