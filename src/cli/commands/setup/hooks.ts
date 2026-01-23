@@ -4,15 +4,19 @@ import { join } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
 
+interface HookConfig {
+  matcher: string;  // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
+  hooks: Array<{
+    type: string;
+    command: string;
+  }>;
+}
+
 interface ClaudeSettings {
   hooks?: {
-    PostToolUse?: Array<{
-      matcher: string;  // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
-      hooks: Array<{
-        type: string;
-        command: string;
-      }>;
-    }>;
+    PreToolUse?: HookConfig[];
+    PostToolUse?: HookConfig[];
+    Stop?: HookConfig[];
   };
   [key: string]: any;
 }
@@ -76,17 +80,26 @@ function installJq(): boolean {
 }
 
 /**
- * Check if Panopticon heartbeat hook is already configured
+ * Check if Panopticon hooks are already configured
  */
-function hookAlreadyConfigured(settings: ClaudeSettings, hookPath: string): boolean {
-  const postToolUse = settings?.hooks?.PostToolUse || [];
-  return postToolUse.some((hookConfig) =>
-    hookConfig.hooks?.some((hook) =>
-      hook.command === hookPath ||
-      hook.command?.includes('panopticon') ||
-      hook.command?.includes('heartbeat-hook')
-    )
-  );
+function hooksAlreadyConfigured(settings: ClaudeSettings, binDir: string): boolean {
+  const hookTypes: Array<keyof ClaudeSettings['hooks']> = ['PreToolUse', 'PostToolUse', 'Stop'];
+
+  for (const hookType of hookTypes) {
+    const hooks = settings?.hooks?.[hookType] || [];
+    const hasHook = hooks.some((hookConfig) =>
+      hookConfig.hooks?.some((hook) =>
+        hook.command?.includes('panopticon') ||
+        hook.command?.includes(binDir)
+      )
+    );
+
+    if (hasHook) {
+      return true; // At least one hook type is configured
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -127,33 +140,38 @@ export async function setupHooksCommand(): Promise<void> {
     console.log(chalk.green('✓ Created ~/.panopticon/heartbeats/'));
   }
 
-  // 3. Copy heartbeat-hook script to ~/.panopticon/bin/
-  // Find the script in the Panopticon installation
-  const scriptSource = join(process.cwd(), 'scripts', 'heartbeat-hook');
-  const scriptDest = join(binDir, 'heartbeat-hook');
+  // 3. Copy hook scripts to ~/.panopticon/bin/
+  const hookScripts = ['pre-tool-hook', 'heartbeat-hook', 'stop-hook'];
+  const { fileURLToPath } = await import('url');
+  const { dirname } = await import('path');
+  const __dirname = dirname(fileURLToPath(import.meta.url));
 
-  // Check if script exists in cwd/scripts (development mode)
-  let sourcePath = scriptSource;
-  if (!existsSync(sourcePath)) {
-    // Try finding it relative to CLI location (installed mode)
-    const { fileURLToPath } = await import('url');
-    const { dirname } = await import('path');
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const installedSource = join(__dirname, '..', '..', '..', 'scripts', 'heartbeat-hook');
+  for (const scriptName of hookScripts) {
+    // Find the script in the Panopticon installation
+    const devSource = join(process.cwd(), 'scripts', scriptName);
+    const installedSource = join(__dirname, '..', '..', '..', 'scripts', scriptName);
+    const scriptDest = join(binDir, scriptName);
 
-    if (existsSync(installedSource)) {
+    // Check if script exists (try dev mode first, then installed mode)
+    let sourcePath: string | null = null;
+    if (existsSync(devSource)) {
+      sourcePath = devSource;
+    } else if (existsSync(installedSource)) {
       sourcePath = installedSource;
-    } else {
-      console.log(chalk.red('✗ Could not find heartbeat-hook script'));
-      console.log(chalk.dim(`  Checked: ${scriptSource}`));
+    }
+
+    if (!sourcePath) {
+      console.log(chalk.red(`✗ Could not find ${scriptName} script`));
+      console.log(chalk.dim(`  Checked: ${devSource}`));
       console.log(chalk.dim(`  Checked: ${installedSource}`));
       process.exit(1);
     }
+
+    copyFileSync(sourcePath, scriptDest);
+    chmodSync(scriptDest, 0o755); // Make executable
   }
 
-  copyFileSync(sourcePath, scriptDest);
-  chmodSync(scriptDest, 0o755); // Make executable
-  console.log(chalk.green('✓ Installed heartbeat-hook script'));
+  console.log(chalk.green('✓ Installed hook scripts (pre-tool, post-tool, stop)'));
 
   // 4. Read or create Claude Code settings.json
   const claudeDir = join(homedir(), '.claude');
@@ -177,29 +195,56 @@ export async function setupHooksCommand(): Promise<void> {
     }
   }
 
-  // 5. Check if hook is already configured
-  if (hookAlreadyConfigured(settings, scriptDest)) {
-    console.log(chalk.cyan('\n✓ Panopticon heartbeat hook already configured'));
+  // 5. Check if hooks are already configured
+  if (hooksAlreadyConfigured(settings, binDir)) {
+    console.log(chalk.cyan('\n✓ Panopticon hooks already configured'));
     console.log(chalk.dim('  No changes needed\n'));
     return;
   }
 
-  // 6. Add Panopticon hook to settings
+  // 6. Add Panopticon hooks to settings
   if (!settings.hooks) {
     settings.hooks = {};
   }
 
+  // Configure PreToolUse hook (sets state to "active")
+  if (!settings.hooks.PreToolUse) {
+    settings.hooks.PreToolUse = [];
+  }
+  settings.hooks.PreToolUse.push({
+    matcher: '.*',
+    hooks: [
+      {
+        type: 'command',
+        command: join(binDir, 'pre-tool-hook')
+      }
+    ]
+  });
+
+  // Configure PostToolUse hook (logs activity)
   if (!settings.hooks.PostToolUse) {
     settings.hooks.PostToolUse = [];
   }
-
-  // Append Panopticon hook (matcher: ".*" matches all tools)
   settings.hooks.PostToolUse.push({
     matcher: '.*',
     hooks: [
       {
         type: 'command',
-        command: scriptDest
+        command: join(binDir, 'heartbeat-hook')
+      }
+    ]
+  });
+
+  // Configure Stop hook (sets state to "idle")
+  if (!settings.hooks.Stop) {
+    settings.hooks.Stop = [];
+  }
+  settings.hooks.Stop.push({
+    matcher: '.*',
+    hooks: [
+      {
+        type: 'command',
+        command: join(binDir, 'stop-hook')
       }
     ]
   });
@@ -210,7 +255,10 @@ export async function setupHooksCommand(): Promise<void> {
 
   // 8. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));
-  console.log(chalk.dim('Heartbeat hooks are now active. When you run agents via'));
-  console.log(chalk.dim('`pan work issue`, they will send real-time activity updates'));
-  console.log(chalk.dim('to the Panopticon dashboard.\n'));
+  console.log(chalk.dim('Claude Code hooks are now configured:'));
+  console.log(chalk.dim('  • PreToolUse  - Sets agent state to "active"'));
+  console.log(chalk.dim('  • PostToolUse - Logs activity to activity.jsonl'));
+  console.log(chalk.dim('  • Stop       - Sets agent state to "idle"\n'));
+  console.log(chalk.dim('When you run agents via `pan work issue`, they will report'));
+  console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));
 }

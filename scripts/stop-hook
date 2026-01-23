@@ -1,0 +1,51 @@
+#!/bin/bash
+# ~/.panopticon/bin/stop-hook
+# Called by Claude Code when it finishes responding (waiting for input)
+#
+# This hook sets agent state to "idle" for auto-suspend detection
+
+# Don't use set -e - we want the hook to be resilient to failures
+# and never break Claude Code execution
+
+# Get agent ID from env (set by pan work issue) or tmux session name
+if [ -n "$PANOPTICON_AGENT_ID" ]; then
+  AGENT_ID="$PANOPTICON_AGENT_ID"
+elif [ -n "$TMUX" ]; then
+  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
+else
+  AGENT_ID="main-cli"
+fi
+AGENT_ID="${AGENT_ID:-unknown}"
+
+# Check if jq is available
+if ! command -v jq &> /dev/null; then
+  exit 0  # Silent failure - don't break Claude Code execution
+fi
+
+# Ensure state directory exists
+STATE_DIR="$HOME/.panopticon/agents/$AGENT_ID"
+mkdir -p "$STATE_DIR"
+
+# Write state to file (atomic write via temp file)
+TEMP_FILE="$STATE_DIR/state.json.tmp"
+jq -n \
+  --arg timestamp "$(date -Iseconds)" \
+  --arg state "idle" \
+  '{
+    state: $state,
+    lastActivity: $timestamp
+  }' > "$TEMP_FILE" 2>/dev/null || true
+
+mv "$TEMP_FILE" "$STATE_DIR/state.json" 2>/dev/null || true
+
+# Optionally send heartbeat to API server (non-blocking)
+# Only if dashboard is running
+if curl -s -f --max-time 0.5 "http://localhost:3011/health" > /dev/null 2>&1; then
+  curl -s -X POST "http://localhost:3011/api/agents/$AGENT_ID/heartbeat" \
+    -H "Content-Type: application/json" \
+    -d "{\"state\":\"idle\",\"timestamp\":\"$(date -Iseconds)\"}" \
+    > /dev/null 2>&1 &
+fi
+
+# Always exit successfully
+exit 0

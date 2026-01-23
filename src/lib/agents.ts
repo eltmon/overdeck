@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
@@ -45,6 +45,150 @@ export function saveAgentState(state: AgentState): void {
     join(dir, 'state.json'),
     JSON.stringify(state, null, 2)
   );
+}
+
+// ============================================================================
+// Hook-based State Management (PAN-80)
+// ============================================================================
+
+/**
+ * Agent runtime state (hook-based tracking)
+ */
+export interface AgentRuntimeState {
+  state: 'active' | 'idle' | 'suspended' | 'uninitialized';
+  lastActivity: string;
+  currentTool?: string;
+  sessionId?: string;
+  suspendedAt?: string;
+  resumedAt?: string;
+}
+
+/**
+ * Activity log entry
+ */
+export interface ActivityEntry {
+  ts: string;
+  tool: string;
+  action?: string;
+  state?: 'active' | 'idle';
+}
+
+/**
+ * Get agent runtime state (from hooks)
+ */
+export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null {
+  const stateFile = join(getAgentDir(agentId), 'state.json');
+
+  // If file doesn't exist, agent is uninitialized
+  if (!existsSync(stateFile)) {
+    return {
+      state: 'uninitialized',
+      lastActivity: new Date().toISOString(),
+    };
+  }
+
+  try {
+    const content = readFileSync(stateFile, 'utf8');
+    return JSON.parse(content) as AgentRuntimeState;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save agent runtime state
+ */
+export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRuntimeState>): void {
+  const dir = getAgentDir(agentId);
+  mkdirSync(dir, { recursive: true });
+
+  // Merge with existing state
+  const existing = getAgentRuntimeState(agentId);
+  const merged: AgentRuntimeState = {
+    ...(existing || { state: 'uninitialized', lastActivity: new Date().toISOString() }),
+    ...state,
+  };
+
+  writeFileSync(
+    join(dir, 'state.json'),
+    JSON.stringify(merged, null, 2)
+  );
+}
+
+/**
+ * Append to activity log with automatic pruning to 100 entries
+ */
+export function appendActivity(agentId: string, entry: ActivityEntry): void {
+  const dir = getAgentDir(agentId);
+  mkdirSync(dir, { recursive: true });
+
+  const activityFile = join(dir, 'activity.jsonl');
+
+  // Append entry
+  appendFileSync(activityFile, JSON.stringify(entry) + '\n');
+
+  // Prune to last 100 entries
+  if (existsSync(activityFile)) {
+    try {
+      const lines = readFileSync(activityFile, 'utf8').trim().split('\n');
+      if (lines.length > 100) {
+        const trimmed = lines.slice(-100);
+        writeFileSync(activityFile, trimmed.join('\n') + '\n');
+      }
+    } catch (error) {
+      // Ignore pruning errors - activity log is non-critical
+    }
+  }
+}
+
+/**
+ * Read activity log (last N entries)
+ */
+export function getActivity(agentId: string, limit = 100): ActivityEntry[] {
+  const activityFile = join(getAgentDir(agentId), 'activity.jsonl');
+
+  if (!existsSync(activityFile)) {
+    return [];
+  }
+
+  try {
+    const lines = readFileSync(activityFile, 'utf8').trim().split('\n');
+    const entries = lines
+      .filter(line => line.trim())
+      .map(line => JSON.parse(line) as ActivityEntry)
+      .slice(-limit);
+
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Save Claude session ID for later resume
+ */
+export function saveSessionId(agentId: string, sessionId: string): void {
+  const dir = getAgentDir(agentId);
+  mkdirSync(dir, { recursive: true });
+
+  writeFileSync(join(dir, 'session.id'), sessionId);
+}
+
+/**
+ * Get saved Claude session ID
+ */
+export function getSessionId(agentId: string): string | null {
+  const sessionFile = join(getAgentDir(agentId), 'session.id');
+
+  if (!existsSync(sessionFile)) {
+    return null;
+  }
+
+  try {
+    return readFileSync(sessionFile, 'utf8').trim();
+  } catch {
+    return null;
+  }
 }
 
 export interface SpawnOptions {

@@ -17,7 +17,7 @@ import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
-import { getAgentState } from '../../lib/agents.js';
+import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId } from '../../lib/agents.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } from '../../lib/projects.js';
@@ -2041,6 +2041,127 @@ app.post('/api/agents/:id/answer-question', async (req, res) => {
   } catch (error) {
     console.error('Error sending answer:', error);
     res.status(500).json({ error: 'Failed to send answer' });
+  }
+});
+
+// ============================================================================
+// Agent State Management Endpoints (PAN-80)
+// ============================================================================
+
+// Receive heartbeat from hooks (PreToolUse, Stop)
+app.post('/api/agents/:id/heartbeat', async (req, res) => {
+  const { id } = req.params;
+  const { state, tool, timestamp } = req.body;
+
+  try {
+    // Update runtime state
+    saveAgentRuntimeState(id, {
+      state,
+      lastActivity: timestamp || new Date().toISOString(),
+      currentTool: tool,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving heartbeat:', error);
+    res.status(500).json({ error: 'Failed to save heartbeat' });
+  }
+});
+
+// Get activity log for an agent
+app.get('/api/agents/:id/activity', (req, res) => {
+  const { id } = req.params;
+  const limit = parseInt(req.query.limit as string) || 100;
+
+  try {
+    const activity = getActivity(id, limit);
+    res.json({ activity });
+  } catch (error) {
+    console.error('Error reading activity:', error);
+    res.status(500).json({ error: 'Failed to read activity' });
+  }
+});
+
+// Suspend an agent (save session ID, kill tmux)
+app.post('/api/agents/:id/suspend', async (req, res) => {
+  const { id } = req.params;
+  const { sessionId } = req.body;
+
+  try {
+    // Get current session ID from API call or try to read from hook state
+    const effectiveSessionId = sessionId || getSessionId(id);
+
+    if (!effectiveSessionId) {
+      return res.status(400).json({ error: 'Session ID required for suspend' });
+    }
+
+    // Save session ID for later resume
+    saveSessionId(id, effectiveSessionId);
+
+    // Kill tmux session
+    await execAsync(`tmux kill-session -t "${id}" 2>/dev/null || true`);
+
+    // Update state
+    saveAgentRuntimeState(id, {
+      state: 'suspended',
+      suspendedAt: new Date().toISOString(),
+      sessionId: effectiveSessionId,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error suspending agent:', error);
+    res.status(500).json({ error: 'Failed to suspend agent' });
+  }
+});
+
+// Resume a suspended agent
+app.post('/api/agents/:id/resume', async (req, res) => {
+  const { id } = req.params;
+  const { message } = req.body; // Optional message to send after resume
+
+  try {
+    const runtimeState = getAgentRuntimeState(id);
+
+    if (!runtimeState || runtimeState.state !== 'suspended') {
+      return res.status(400).json({ error: `Cannot resume agent in state: ${runtimeState?.state || 'unknown'}` });
+    }
+
+    // Get saved session ID
+    const sessionId = getSessionId(id);
+    if (!sessionId) {
+      return res.status(400).json({ error: 'No saved session ID found' });
+    }
+
+    // Get workspace from agent state
+    const agentState = getAgentState(id);
+    if (!agentState) {
+      return res.status(400).json({ error: 'Agent state not found' });
+    }
+
+    // Create new tmux session with resume command
+    const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
+    await execAsync(
+      `tmux new-session -d -s "${id}" -c "${agentState.workspace}" "PANOPTICON_AGENT_ID=${id} ${claudeCmd}"`
+    );
+
+    // If there's a message, send it after a brief delay
+    if (message) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for Claude to be ready
+      await execAsync(`tmux send-keys -t "${id}" "${message.replace(/"/g, '\\"')}"`);
+      await execAsync(`tmux send-keys -t "${id}" Enter`);
+    }
+
+    // Update state
+    saveAgentRuntimeState(id, {
+      state: 'active',
+      resumedAt: new Date().toISOString(),
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error resuming agent:', error);
+    res.status(500).json({ error: 'Failed to resume agent' });
   }
 });
 

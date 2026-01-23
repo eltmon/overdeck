@@ -22,57 +22,6 @@ Two related issues with specialist/agent management:
 | Terminal parsing cleanup | Remove completely | Clean break, no fallback to old approach |
 | Dashboard changes | Full update | New states, activity history panel, resume button, queue depth |
 
-## Current Status
-
-**Last Updated:** 2026-01-23 15:55
-
-### Completed (Layer 1 - Foundation)
-
-✅ **Hook Infrastructure** (panopticon-5sas)
-- Created `pre-tool-hook` script (sets state=active)
-- Created `stop-hook` script (sets state=idle)
-- Updated `heartbeat-hook` to append to activity.jsonl with 100-entry pruning
-- Updated `hooks.ts` to support PreToolUse, PostToolUse, Stop hook types
-- All hooks write to `~/.panopticon/agents/{id}/` directory
-- Hooks include optional API heartbeat to dashboard (non-blocking)
-
-✅ **State Management** (panopticon-gm8y)
-- Added `AgentRuntimeState` interface (active/idle/suspended/uninitialized)
-- Added `ActivityEntry` interface for activity log
-- Implemented `getAgentRuntimeState()` and `saveAgentRuntimeState()`
-- Implemented `appendActivity()` with automatic 100-entry pruning
-- Implemented `getActivity()` to read activity log
-- Implemented `saveSessionId()` and `getSessionId()` for resume support
-
-✅ **API Endpoints** (panopticon-4if2)
-- POST `/api/agents/:id/heartbeat` - Receive state updates from hooks
-- GET `/api/agents/:id/activity` - Fetch activity log entries
-- POST `/api/agents/:id/suspend` - Save session ID and kill tmux
-- POST `/api/agents/:id/resume` - Resume from saved session ID (with optional message)
-
-### In Progress (Layer 2 - Core Logic)
-
-🔄 **Ready to Start:**
-- Auto-suspend logic (panopticon-eqs2) - Add idle timeout checking to deacon
-- Agent resume implementation (panopticon-k6fh) - Implement resume with session ID
-
-### Remaining Work (Layers 3-4)
-
-**Layer 3 - UI & Cleanup:**
-- Dashboard frontend updates (panopticon-t8k2) - Activity history, resume button, new states
-- Terminal parsing cleanup (panopticon-r6tp) - Remove `isIdleAtPrompt()` and related code
-
-**Layer 4 - Testing:**
-- Integration tests (panopticon-wk6m) - State transitions, suspend/resume, auto-suspend
-
-### Next Steps
-
-1. Implement auto-suspend logic in deacon patrol loop
-2. Implement agent resume functionality
-3. Update dashboard frontend with new UI components
-4. Remove all terminal parsing code
-5. Write integration tests
-
 ## Technical Approach
 
 ### 1. Hook Infrastructure

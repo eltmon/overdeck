@@ -50,6 +50,10 @@ WORKSPACE=$(pwd)
 HEARTBEAT_DIR="$HOME/.panopticon/heartbeats"
 mkdir -p "$HEARTBEAT_DIR"
 
+# Ensure agent state directory exists for activity log
+AGENT_DIR="$HOME/.panopticon/agents/$AGENT_ID"
+mkdir -p "$AGENT_DIR"
+
 # Write heartbeat atomically (write to temp file, then move)
 # Use jq to properly escape all strings in the JSON output
 TEMP_FILE="$HEARTBEAT_DIR/$AGENT_ID.json.tmp"
@@ -75,6 +79,31 @@ jq -n \
 
 # Atomic move to avoid race conditions
 mv "$TEMP_FILE" "$HEARTBEAT_DIR/$AGENT_ID.json" 2>/dev/null || true
+
+# Append to activity log (JSONL format)
+ACTIVITY_FILE="$AGENT_DIR/activity.jsonl"
+
+# Create activity entry
+ACTIVITY_ENTRY=$(jq -n \
+  --arg ts "$(date -Iseconds)" \
+  --arg tool "$TOOL_NAME" \
+  --arg action "$TOOL_INPUT" \
+  '{
+    ts: $ts,
+    tool: $tool,
+    action: $action
+  }' 2>/dev/null || echo "")
+
+# Append to activity log if we successfully created the entry
+if [ -n "$ACTIVITY_ENTRY" ]; then
+  echo "$ACTIVITY_ENTRY" >> "$ACTIVITY_FILE" 2>/dev/null || true
+
+  # Prune to last 100 entries (use tail for atomic operation)
+  if [ -f "$ACTIVITY_FILE" ]; then
+    TEMP_ACTIVITY="$ACTIVITY_FILE.tmp"
+    tail -n 100 "$ACTIVITY_FILE" > "$TEMP_ACTIVITY" 2>/dev/null && mv "$TEMP_ACTIVITY" "$ACTIVITY_FILE" 2>/dev/null || true
+  fi
+fi
 
 # Always exit successfully - never break Claude Code execution
 exit 0
