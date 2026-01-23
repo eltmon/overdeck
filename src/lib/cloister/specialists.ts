@@ -7,9 +7,12 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, appendFileSync } from 'fs';
 import { join, basename } from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
+
+const execAsync = promisify(exec);
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
@@ -456,11 +459,11 @@ export function countContextTokens(name: SpecialistType): number | null {
  * @param name - Specialist name
  * @returns True if specialist has an active tmux session
  */
-export function isRunning(name: SpecialistType): boolean {
+export async function isRunning(name: SpecialistType): Promise<boolean> {
   const tmuxSession = getTmuxSessionName(name);
 
   try {
-    execSync(`tmux has-session -t ${tmuxSession}`, { stdio: 'ignore' });
+    await execAsync(`tmux has-session -t ${tmuxSession}`);
     return true;
   } catch {
     return false;
@@ -477,17 +480,18 @@ export function isRunning(name: SpecialistType): boolean {
  * @param name - Specialist name
  * @returns true if specialist appears to be at the idle prompt
  */
-export function isIdleAtPrompt(name: SpecialistType): boolean {
+export async function isIdleAtPrompt(name: SpecialistType): Promise<boolean> {
   const tmuxSession = getTmuxSessionName(name);
 
   try {
     // Capture the last few lines of the tmux pane
-    const output = execSync(
+    const { stdout: output } = await execAsync(
       `tmux capture-pane -t "${tmuxSession}" -p | tail -12`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
-    ).trim();
+      { encoding: 'utf-8' }
+    );
+    const trimmedOutput = output.trim();
 
-    const lines = output.split('\n').filter(line => line.trim());
+    const lines = trimmedOutput.split('\n').filter(line => line.trim());
     if (lines.length === 0) return false;
 
     const allText = lines.join('\n');
@@ -533,7 +537,7 @@ export function isIdleAtPrompt(name: SpecialistType): boolean {
     // NOW check if we're at idle prompt
     // Look for the prompt character on its own line (not in status bar)
     const promptLinePattern = /^❯\s*$/m;
-    const hasCleanPrompt = promptLinePattern.test(output);
+    const hasCleanPrompt = promptLinePattern.test(trimmedOutput);
 
     if (hasCleanPrompt) {
       return true; // Clean prompt line = idle
@@ -571,7 +575,7 @@ export function isIdleAtPrompt(name: SpecialistType): boolean {
  * @param name - Specialist name
  * @returns Complete specialist status
  */
-export function getSpecialistStatus(name: SpecialistType): SpecialistStatus {
+export async function getSpecialistStatus(name: SpecialistType): Promise<SpecialistStatus> {
   const metadata = getSpecialistMetadata(name) || {
     name,
     displayName: name,
@@ -581,7 +585,7 @@ export function getSpecialistStatus(name: SpecialistType): SpecialistStatus {
   };
 
   const sessionId = getSessionId(name);
-  const running = isRunning(name);
+  const running = await isRunning(name);
   const contextTokens = countContextTokens(name);
 
   // Determine state by checking if the specialist is at the idle prompt
@@ -589,7 +593,7 @@ export function getSpecialistStatus(name: SpecialistType): SpecialistStatus {
   // If running and NOT at prompt, they're active (working on something)
   let state: SpecialistState;
   if (running) {
-    const idle = isIdleAtPrompt(name);
+    const idle = await isIdleAtPrompt(name);
     state = idle ? 'sleeping' : 'active';
   } else if (sessionId) {
     // Has session ID but not running = sleeping
@@ -613,8 +617,9 @@ export function getSpecialistStatus(name: SpecialistType): SpecialistStatus {
  *
  * @returns Array of specialist statuses
  */
-export function getAllSpecialistStatus(): SpecialistStatus[] {
-  return getAllSpecialists().map((metadata) => getSpecialistStatus(metadata.name));
+export async function getAllSpecialistStatus(): Promise<SpecialistStatus[]> {
+  const specialists = getAllSpecialists();
+  return Promise.all(specialists.map((metadata) => getSpecialistStatus(metadata.name)));
 }
 
 /**
@@ -633,7 +638,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   error?: string;
 }> {
   // Check if already running
-  if (isRunning(name)) {
+  if (await isRunning(name)) {
     return {
       success: false,
       message: `Specialist ${name} is already running`,
@@ -664,7 +669,7 @@ Say: "I am the ${name} specialist, ready and waiting for tasks."`;
 
   try {
     // Spawn Claude Code fresh in tmux
-    execSync(
+    await execAsync(
       `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude --dangerously-skip-permissions"`,
       { encoding: 'utf-8' }
     );
@@ -674,9 +679,9 @@ Say: "I am the ${name} specialist, ready and waiting for tasks."`;
 
     const escapedPrompt = identityPrompt.replace(/'/g, "'\\''");
     // Send text and Enter SEPARATELY to avoid Enter being interpreted as newline
-    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 500));
-    execSync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
 
     // Record wake event
     recordWake(name);
@@ -754,17 +759,17 @@ async function resetSpecialist(name: SpecialistType): Promise<void> {
 
   try {
     // 1. Cancel any pending command with Ctrl+C
-    execSync(`tmux send-keys -t "${tmuxSession}" C-c`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" C-c`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // 2. Reset working directory
-    execSync(`tmux send-keys -t "${tmuxSession}" 'cd ~'`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" 'cd ~'`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 100));
-    execSync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // 3. Clear the prompt buffer with Ctrl+U
-    execSync(`tmux send-keys -t "${tmuxSession}" C-u`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" C-u`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 100));
   } catch (error) {
     console.error(`[specialist] Failed to reset ${name}:`, error);
@@ -800,7 +805,7 @@ export async function wakeSpecialist(
   const { waitForReady = true, startIfNotRunning = true } = options;
   const tmuxSession = getTmuxSessionName(name);
   const sessionId = getSessionId(name);
-  const wasAlreadyRunning = isRunning(name);
+  const wasAlreadyRunning = await isRunning(name);
 
   // If not running, start it first
   if (!wasAlreadyRunning) {
@@ -821,7 +826,7 @@ export async function wakeSpecialist(
         ? `claude --resume "${sessionId}" --dangerously-skip-permissions`
         : `claude --dangerously-skip-permissions`;
 
-      execSync(
+      await execAsync(
         `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${claudeCmd}"`,
         { encoding: 'utf-8' }
       );
@@ -847,9 +852,9 @@ export async function wakeSpecialist(
   try {
     const escapedPrompt = taskPrompt.replace(/'/g, "'\\''");
     // Send text and Enter SEPARATELY (critical for tmux)
-    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 200));
-    execSync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
 
     // Record wake event
     recordWake(name, sessionId || undefined);
@@ -1107,9 +1112,9 @@ const FEEDBACK_LOG = join(FEEDBACK_DIR, 'feedback.jsonl');
  * @param feedback - The feedback to send
  * @returns True if feedback was sent successfully
  */
-export function sendFeedbackToAgent(
+export async function sendFeedbackToAgent(
   feedback: Omit<SpecialistFeedback, 'id' | 'timestamp'>
-): boolean {
+): Promise<boolean> {
   const { fromSpecialist, toIssueId, summary, details } = feedback;
 
   // Ensure feedback directory exists
@@ -1136,15 +1141,15 @@ export function sendFeedbackToAgent(
   const agentSession = `agent-${toIssueId.toLowerCase()}`;
 
   try {
-    execSync(`tmux has-session -t "${agentSession}" 2>/dev/null`, { encoding: 'utf-8' });
+    await execAsync(`tmux has-session -t "${agentSession}" 2>/dev/null`, { encoding: 'utf-8' });
 
     // Format feedback message for the agent
     const feedbackMessage = formatFeedbackForAgent(fullFeedback);
     const escapedMessage = feedbackMessage.replace(/'/g, "'\\''");
 
     // Send to agent
-    execSync(`tmux send-keys -t "${agentSession}" '${escapedMessage}'`, { encoding: 'utf-8' });
-    execSync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${agentSession}" '${escapedMessage}'`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
 
     console.log(`[specialist] Sent feedback from ${fromSpecialist} to ${agentSession}`);
     return true;

@@ -99,7 +99,7 @@ export async function healthCommand(
       const agentId = arg.startsWith('agent-') ? arg : `agent-${arg.toLowerCase()}`;
       console.log(chalk.dim(`Pinging ${agentId}...`));
 
-      const health = pingAgent(agentId, config);
+      const health = await pingAgent(agentId, config);
 
       if (options.json) {
         console.log(JSON.stringify(health, null, 2));

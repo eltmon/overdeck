@@ -3,13 +3,15 @@ import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
-import { execSync, exec, spawn } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { getCloisterService } from '../../lib/cloister/service.js';
+
+const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
@@ -24,13 +26,13 @@ import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } fro
 const execAsync = promisify(exec);
 
 // Ensure tmux server is running (starts one if not)
-function ensureTmuxRunning(): void {
+async function ensureTmuxRunning(): Promise<void> {
   try {
-    execSync('tmux list-sessions 2>/dev/null', { encoding: 'utf-8' });
+    await execAsync('tmux list-sessions 2>/dev/null', { encoding: 'utf-8' });
   } catch (e) {
     // Tmux server not running, start it with a dummy session
     try {
-      execSync('tmux new-session -d -s panopticon-init', { encoding: 'utf-8' });
+      await execAsync('tmux new-session -d -s panopticon-init', { encoding: 'utf-8' });
       console.log('Started tmux server');
     } catch (startErr) {
       console.error('Failed to start tmux server:', startErr);
@@ -191,42 +193,43 @@ const activeReviews: Map<string, ActiveReview> = new Map();
 /**
  * Detect completion patterns from specialist tmux output
  */
-function detectSpecialistCompletion(specialistName: string): {
+async function detectSpecialistCompletion(specialistName: string): Promise<{
   completed: boolean;
   success: boolean | null;
   details: string;
   handoffTo?: string;
   issueId?: string;
-} {
+}> {
   try {
-    const output = execSync(
+    const { stdout: output } = await execAsync(
       `tmux capture-pane -t "specialist-${specialistName}" -p | tail -50`,
-      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
-    ).trim();
+      { encoding: 'utf-8' }
+    );
+    const trimmedOutput = output.trim();
 
     // Extract issue ID from output (look for PAN-XX, MIN-XX, etc.)
-    const issueMatch = output.match(/\b(PAN|MIN|MYN)-\d+\b/i);
+    const issueMatch = trimmedOutput.match(/\b(PAN|MIN|MYN)-\d+\b/i);
     const issueId = issueMatch ? issueMatch[0].toUpperCase() : undefined;
 
     // Review agent completion patterns
     if (specialistName === 'review-agent') {
       // Success: handed off to test-agent
-      if (output.includes('handed off to test-agent') ||
-          output.includes('Hand off to test-agent') ||
-          output.includes('wake test-agent') ||
-          output.includes('Waking Test Agent')) {
+      if (trimmedOutput.includes('handed off to test-agent') ||
+          trimmedOutput.includes('Hand off to test-agent') ||
+          trimmedOutput.includes('wake test-agent') ||
+          trimmedOutput.includes('Waking Test Agent')) {
         return { completed: true, success: true, details: 'Review passed, handed to test-agent', handoffTo: 'test-agent', issueId };
       }
       // Blocked: issues found
-      if (output.includes('BLOCKED') || output.includes('issues found') ||
-          output.includes('send-feedback-to-agent') && output.includes('issue')) {
+      if (trimmedOutput.includes('BLOCKED') || trimmedOutput.includes('issues found') ||
+          trimmedOutput.includes('send-feedback-to-agent') && trimmedOutput.includes('issue')) {
         return { completed: true, success: false, details: 'Review blocked - issues found', issueId };
       }
       // Explicitly passed
-      if (output.includes('review task is already complete') ||
-          output.includes('Code is clean') ||
-          output.includes('LGTM') ||
-          output.includes('approved')) {
+      if (trimmedOutput.includes('review task is already complete') ||
+          trimmedOutput.includes('Code is clean') ||
+          trimmedOutput.includes('LGTM') ||
+          trimmedOutput.includes('approved')) {
         return { completed: true, success: true, details: 'Review passed', issueId };
       }
     }
@@ -234,18 +237,18 @@ function detectSpecialistCompletion(specialistName: string): {
     // Test agent completion patterns
     if (specialistName === 'test-agent') {
       // Success: tests passed, handed to merge
-      if ((output.includes('Test Results: PASS') || output.includes('tests passed')) &&
-          (output.includes('merge-agent') || output.includes('Handoff'))) {
+      if ((trimmedOutput.includes('Test Results: PASS') || trimmedOutput.includes('tests passed')) &&
+          (trimmedOutput.includes('merge-agent') || trimmedOutput.includes('Handoff'))) {
         return { completed: true, success: true, details: 'Tests passed, handed to merge-agent', handoffTo: 'merge-agent', issueId };
       }
       // Tests passed without handoff
-      if (output.includes('Test Results: PASS') ||
-          (output.includes('passed') && output.includes('skipped') && !output.includes('failed'))) {
+      if (trimmedOutput.includes('Test Results: PASS') ||
+          (trimmedOutput.includes('passed') && trimmedOutput.includes('skipped') && !trimmedOutput.includes('failed'))) {
         return { completed: true, success: true, details: 'Tests passed', issueId };
       }
       // Tests failed
-      if (output.includes('Test Results: FAIL') || output.includes('FAILED') ||
-          output.includes('tests failed')) {
+      if (trimmedOutput.includes('Test Results: FAIL') || trimmedOutput.includes('FAILED') ||
+          trimmedOutput.includes('tests failed')) {
         return { completed: true, success: false, details: 'Tests failed', issueId };
       }
     }
@@ -253,12 +256,12 @@ function detectSpecialistCompletion(specialistName: string): {
     // Merge agent completion patterns
     if (specialistName === 'merge-agent') {
       // Success: merge complete
-      if (output.includes('Merge complete') || output.includes('pushed to main') ||
-          output.includes('main -> main')) {
+      if (trimmedOutput.includes('Merge complete') || trimmedOutput.includes('pushed to main') ||
+          trimmedOutput.includes('main -> main')) {
         return { completed: true, success: true, details: 'Merge completed successfully', issueId };
       }
       // Merge failed
-      if (output.includes('merge failed') || output.includes('conflict') && output.includes('error')) {
+      if (trimmedOutput.includes('merge failed') || trimmedOutput.includes('conflict') && trimmedOutput.includes('error')) {
         return { completed: true, success: false, details: 'Merge failed', issueId };
       }
     }
@@ -272,7 +275,7 @@ function detectSpecialistCompletion(specialistName: string): {
 /**
  * Poll active reviews and update status automatically
  */
-function pollReviewStatus(): void {
+async function pollReviewStatus(): Promise<void> {
   const statuses = loadReviewStatuses();
   const STALE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes without activity = stale
 
@@ -337,7 +340,7 @@ function pollReviewStatus(): void {
 
     // Check review-agent if reviewing
     if (status.reviewStatus === 'reviewing') {
-      const detection = detectSpecialistCompletion('review-agent');
+      const detection = await detectSpecialistCompletion('review-agent');
       if (detection.completed && detection.issueId?.toUpperCase() === issueId.toUpperCase()) {
         if (detection.success) {
           console.log(`[auto-detect] Review passed for ${issueId}`);
@@ -358,7 +361,7 @@ function pollReviewStatus(): void {
     // Check test-agent if testing
     if (status.testStatus === 'testing' ||
         (status.reviewStatus === 'passed' && status.testStatus === 'pending')) {
-      const detection = detectSpecialistCompletion('test-agent');
+      const detection = await detectSpecialistCompletion('test-agent');
       if (detection.completed && detection.issueId?.toUpperCase() === issueId.toUpperCase()) {
         if (detection.success) {
           console.log(`[auto-detect] Tests passed for ${issueId}`);
@@ -376,7 +379,11 @@ function pollReviewStatus(): void {
 }
 
 // Start polling for review status updates (every 5 seconds)
-setInterval(pollReviewStatus, 5000);
+setInterval(() => {
+  pollReviewStatus().catch((error) => {
+    console.error('[auto-detect] Error in pollReviewStatus:', error);
+  });
+}, 5000);
 console.log('[auto-detect] Started automatic review status polling');
 
 const PENDING_OPS_FILE = join(homedir(), '.panopticon', 'pending-operations.json');
@@ -1475,8 +1482,8 @@ app.post('/api/issues/:id/plan', async (req, res) => {
     // Create Beads tasks
     const beadsResult = { success: false, created: [] as string[], errors: [] as string[] };
     try {
-      const bdPath = execSync('which bd', { encoding: 'utf-8' }).trim();
-      if (bdPath) {
+      const { stdout: bdPath } = await execAsync('which bd', { encoding: 'utf-8' });
+      if (bdPath.trim()) {
         const taskIds = new Map<string, string>();
 
         for (const task of tasks) {
@@ -1496,7 +1503,7 @@ app.post('/api/issues/:id/plan', async (req, res) => {
               cmd += ` -d "${task.description.replace(/"/g, '\\"')}"`;
             }
 
-            const result = execSync(cmd, { encoding: 'utf-8', cwd: projectPath });
+            const { stdout: result } = await execAsync(cmd, { encoding: 'utf-8', cwd: projectPath });
             const idMatch = result.match(/bd-[a-f0-9]+/i) || result.match(/([a-f0-9-]{8,})/i);
             if (idMatch) {
               taskIds.set(fullName, idMatch[0]);
@@ -1509,7 +1516,7 @@ app.post('/api/issues/:id/plan', async (req, res) => {
 
         if (beadsResult.created.length > 0) {
           try {
-            execSync('bd flush', { encoding: 'utf-8', cwd: projectPath });
+            await execAsync('bd flush', { encoding: 'utf-8', cwd: projectPath });
           } catch {}
         }
 
@@ -1690,30 +1697,30 @@ async function getGitStatusAsync(workspacePath: string): Promise<{ branch: strin
   }
 }
 
-// Synchronous version for backwards compatibility (use async where possible)
-function getGitStatus(workspacePath: string): { branch: string; uncommittedFiles: number; latestCommit: string } | null {
+// Async version for non-blocking git operations
+async function getGitStatus(workspacePath: string): Promise<{ branch: string; uncommittedFiles: number; latestCommit: string } | null> {
   try {
     if (!existsSync(workspacePath)) return null;
 
-    const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', {
+    const { stdout: branch } = await execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null', {
       cwd: workspacePath,
       encoding: 'utf-8',
-    }).trim();
+    });
 
-    const uncommitted = execSync('git status --porcelain 2>/dev/null | wc -l', {
+    const { stdout: uncommitted } = await execAsync('git status --porcelain 2>/dev/null | wc -l', {
       cwd: workspacePath,
       encoding: 'utf-8',
-    }).trim();
+    });
 
-    const latestCommit = execSync('git log -1 --pretty=format:"%s" 2>/dev/null', {
+    const { stdout: latestCommit } = await execAsync('git log -1 --pretty=format:"%s" 2>/dev/null', {
       cwd: workspacePath,
       encoding: 'utf-8',
-    }).trim();
+    });
 
     return {
-      branch,
-      uncommittedFiles: parseInt(uncommitted) || 0,
-      latestCommit: latestCommit.slice(0, 60) + (latestCommit.length > 60 ? '...' : ''),
+      branch: branch.trim(),
+      uncommittedFiles: parseInt(uncommitted.trim()) || 0,
+      latestCommit: latestCommit.trim().slice(0, 60) + (latestCommit.trim().length > 60 ? '...' : ''),
     };
   } catch {
     return null;
@@ -2376,9 +2383,9 @@ app.post('/api/confirmations/:id/respond', async (req, res) => {
   try {
     // Send response to the agent's tmux session
     const response = confirmed ? 'y' : 'n';
-    execSync(`tmux send-keys -t "${request.sessionName}" '${response}'`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${request.sessionName}" '${response}'`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 100));
-    execSync(`tmux send-keys -t "${request.sessionName}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${request.sessionName}" C-m`, { encoding: 'utf-8' });
 
     // Remove from pending
     pendingConfirmations.delete(id);
@@ -2398,7 +2405,7 @@ app.post('/api/confirmations/:id/respond', async (req, res) => {
 app.get('/api/specialists', async (_req, res) => {
   try {
     const { getAllSpecialistStatus } = await import('../../lib/cloister/specialists.js');
-    const specialists = getAllSpecialistStatus();
+    const specialists = await getAllSpecialistStatus();
     res.json(specialists);
   } catch (error: any) {
     console.error('Error getting specialists:', error);
@@ -2420,7 +2427,7 @@ app.post('/api/specialists/:name/wake', async (req, res) => {
     } = await import('../../lib/cloister/specialists.js');
 
     // Check if already running
-    if (isRunning(name as any)) {
+    if (await isRunning(name as any)) {
       return res.status(400).json({ error: `Specialist ${name} is already running` });
     }
 
@@ -2437,7 +2444,7 @@ app.post('/api/specialists/:name/wake', async (req, res) => {
 
     // Spawn Claude Code with resume flag in tmux
     const cwd = homedir();
-    execSync(
+    await execAsync(
       `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude --resume ${useSessionId}"`,
       { encoding: 'utf-8' }
     );
@@ -2515,7 +2522,7 @@ app.post('/api/specialists/:name/reset', async (req, res) => {
     } = await import('../../lib/cloister/specialists.js');
 
     // Check if running - must be stopped first
-    if (isRunning(name as any)) {
+    if (await isRunning(name as any)) {
       const tmuxSession = getTmuxSessionName(name as any);
       return res.status(400).json({
         error: `Specialist ${name} is currently running. Stop it first (tmux kill-session -t ${tmuxSession})`
@@ -2933,14 +2940,15 @@ function getContainerStatus(issueId: string): Record<string, { running: boolean;
 
       let found = false;
       for (const containerName of patterns) {
-        const output = execSync(
+        const { stdout: output } = await execAsync(
           `docker ps -a --filter "name=${containerName}" --format "{{.Status}}" 2>/dev/null || echo ""`,
           { encoding: 'utf-8' }
-        ).trim();
+        );
+        const trimmedOutput = output.trim();
 
-        if (output) {
-          const isRunning = output.startsWith('Up');
-          const uptime = isRunning ? output.replace(/^Up\s+/, '').split(/\s+/)[0] : null;
+        if (trimmedOutput) {
+          const isRunning = trimmedOutput.startsWith('Up');
+          const uptime = isRunning ? trimmedOutput.replace(/^Up\s+/, '').split(/\s+/)[0] : null;
           status[displayName] = { running: isRunning, uptime };
           found = true;
           break;
@@ -2979,10 +2987,10 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
 }
 
 // Synchronous version for backwards compatibility
-function getMrUrl(issueId: string, workspacePath: string): string | null {
+async function getMrUrl(issueId: string, workspacePath: string): Promise<string | null> {
   try {
     // Try to get MR from glab
-    const output = execSync(`glab mr list -A -F json 2>/dev/null || echo "[]"`, {
+    const { stdout: output } = await execAsync(`glab mr list -A -F json 2>/dev/null || echo "[]"`, {
       encoding: 'utf-8',
       cwd: workspacePath,
       maxBuffer: 10 * 1024 * 1024,
@@ -3084,25 +3092,25 @@ function getRepoGitStatus(workspacePath: string): {
       if (!existsSync(repoDir)) continue;
 
       try {
-        const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', {
+        const { stdout: branch } = await execAsync('git rev-parse --abbrev-ref HEAD 2>/dev/null', {
           cwd: repoDir,
           encoding: 'utf-8',
-        }).trim();
+        });
 
-        const uncommitted = execSync('git status --porcelain 2>/dev/null | wc -l', {
+        const { stdout: uncommitted } = await execAsync('git status --porcelain 2>/dev/null | wc -l', {
           cwd: repoDir,
           encoding: 'utf-8',
-        }).trim();
+        });
 
-        const latestCommit = execSync('git log -1 --pretty=format:"%s" 2>/dev/null || echo ""', {
+        const { stdout: latestCommit } = await execAsync('git log -1 --pretty=format:"%s" 2>/dev/null || echo ""', {
           cwd: repoDir,
           encoding: 'utf-8',
-        }).trim();
+        });
 
         result[key as 'frontend' | 'api'] = {
-          branch,
-          uncommittedFiles: parseInt(uncommitted, 10) || 0,
-          latestCommit: latestCommit.slice(0, 60) + (latestCommit.length > 60 ? '...' : ''),
+          branch: branch.trim(),
+          uncommittedFiles: parseInt(uncommitted.trim(), 10) || 0,
+          latestCommit: latestCommit.trim().slice(0, 60) + (latestCommit.trim().length > 60 ? '...' : ''),
         };
         break; // Found this repo, move to next
       } catch {}
@@ -3297,14 +3305,15 @@ app.get('/api/workspaces/:issueId/clean/preview', (req, res) => {
 
     // Find all files, excluding build artifacts
     const findCmd = `find "${workspacePath}" \\( ${excludePattern} \\) -o -type f -print 2>/dev/null | head -500`;
-    const filesOutput = execSync(findCmd, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }).trim();
-    const files = filesOutput ? filesOutput.split('\n').map(f => f.replace(workspacePath + '/', '')) : [];
+    const { stdout: filesOutput } = await execAsync(findCmd, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+    const files = filesOutput.trim() ? filesOutput.trim().split('\n').map(f => f.replace(workspacePath + '/', '')) : [];
 
     // Get total size (excluding node_modules etc)
     let totalSize = '0';
     try {
       const duCmd = `du -sh "${workspacePath}" --exclude=node_modules --exclude=target --exclude=dist --exclude=.git 2>/dev/null | cut -f1`;
-      totalSize = execSync(duCmd, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }).trim() || '0';
+      const { stdout: sizeOutput } = await execAsync(duCmd, { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+      totalSize = sizeOutput.trim() || '0';
     } catch {
       totalSize = 'unknown';
     }
@@ -3388,19 +3397,19 @@ app.get('/api/workspaces/:issueId/clean/preview', (req, res) => {
           const branchName = `feature/${issueLower}`;
           let compareRef = 'main';
           try {
-            execSync(`git rev-parse --verify ${branchName} 2>/dev/null`, { cwd: gitRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+            await execAsync(`git rev-parse --verify ${branchName} 2>/dev/null`, { cwd: gitRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
             compareRef = branchName;
           } catch {
             // Try master if main doesn't exist
             try {
-              execSync(`git rev-parse --verify main 2>/dev/null`, { cwd: gitRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
+              await execAsync(`git rev-parse --verify main 2>/dev/null`, { cwd: gitRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
             } catch {
               compareRef = 'master';
             }
           }
 
           // Try to get file content from git
-          const gitContent = execSync(
+          const { stdout: gitContent } = await execAsync(
             `git show ${compareRef}:${relativePath} 2>/dev/null`,
             { cwd: gitRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
           );
@@ -3543,7 +3552,7 @@ app.post('/api/workspaces/:issueId/containerize', (req, res) => {
 
   // Check if Docker is running (required for containerization)
   try {
-    execSync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+    await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
   } catch {
     return res.status(400).json({
       error: 'Docker is not running. Start Docker Desktop first.',
@@ -3555,7 +3564,7 @@ app.post('/api/workspaces/:issueId/containerize', (req, res) => {
     // The new-feature script will create a proper containerized one
     if (existsSync(workspacePath)) {
       // Run pan workspace destroy first to clean up the git worktree
-      execSync(`pan workspace destroy ${issueId} --force 2>/dev/null || true`, {
+      await execAsync(`pan workspace destroy ${issueId} --force 2>/dev/null || true`, {
         cwd: projectPath,
         encoding: 'utf-8',
       });
@@ -3675,7 +3684,7 @@ app.post('/api/workspaces/:issueId/start', (req, res) => {
 
   // Check if Docker is running
   try {
-    execSync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+    await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
   } catch {
     return res.status(400).json({ error: 'Docker is not running. Start Docker Desktop first.' });
   }
@@ -3793,7 +3802,7 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
 
     // 2. Push the feature branch to remote first
     try {
-      execSync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', stdio: 'pipe' });
+      await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
       console.log(`Pushed ${branchName} to remote`);
     } catch (pushErr: any) {
       console.log(`Feature branch push note: ${pushErr.message}`);
@@ -3911,7 +3920,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
 
     // 2. Push the feature branch to remote BEFORE merging (preserve work)
     try {
-      execSync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', stdio: 'pipe' });
+      await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
       console.log(`Pushed ${branchName} to remote`);
     } catch (pushErr: any) {
       console.log(`Feature branch push note: ${pushErr.message}`);
@@ -3987,7 +3996,7 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
 
     // 2. Verify the feature branch exists
     try {
-      execSync(`git rev-parse --verify ${branchName}`, { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+      await execAsync(`git rev-parse --verify ${branchName}`, { cwd: projectPath, encoding: 'utf-8' });
     } catch {
       completePendingOperation(issueId, `Branch ${branchName} does not exist`);
       return res.status(400).json({ error: `Branch ${branchName} does not exist` });
@@ -3997,7 +4006,7 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
     // Use -uno to ignore untracked files - they don't block merges and are often
     // Panopticon-managed symlinks that haven't been added to .gitignore yet
     try {
-      const status = execSync('git status --porcelain -uno', { cwd: workspacePath, encoding: 'utf-8' });
+      const { stdout: status } = await execAsync('git status --porcelain -uno', { cwd: workspacePath, encoding: 'utf-8' });
       if (status.trim()) {
         const error = `Workspace has uncommitted changes. Please commit or stash them first:\ncd ${workspacePath}\ngit status`;
         completePendingOperation(issueId, error);
@@ -4010,7 +4019,7 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
 
     // 4. Push the feature branch to remote BEFORE merging (preserve work)
     try {
-      execSync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', stdio: 'pipe' });
+      await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
       console.log(`Pushed ${branchName} to remote`);
     } catch (pushErr: any) {
       // If push fails, it might already be up to date - that's okay
@@ -4019,9 +4028,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
 
     // 5. Switch to main and pull latest
     try {
-      execSync('git checkout main', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+      await execAsync('git checkout main', { cwd: projectPath, encoding: 'utf-8' });
       // Use explicit origin main to avoid tracking branch issues in worktrees
-      execSync('git pull origin main --ff-only', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+      await execAsync('git pull origin main --ff-only', { cwd: projectPath, encoding: 'utf-8' });
     } catch (checkoutErr: any) {
       const error = `Failed to checkout/update main branch: ${checkoutErr.message}`;
       completePendingOperation(issueId, error);
@@ -4144,7 +4153,7 @@ PROJECT: ${projectPath}
       } else if (mergeResult.success && mergeResult.testsStatus === 'FAIL') {
         // merge-agent completed merge but tests failed
         try {
-          execSync('git reset --hard HEAD~1', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync('git reset --hard HEAD~1', { cwd: projectPath, encoding: 'utf-8' });
         } catch {}
         const error = `merge-agent completed merge but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`;
         completePendingOperation(issueId, error);
@@ -4152,10 +4161,10 @@ PROJECT: ${projectPath}
       } else {
         // merge-agent failed (conflicts it couldn't resolve, or other issue)
         try {
-          execSync('git merge --abort', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
         } catch {}
         try {
-          execSync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8' });
         } catch {}
         const error = `merge-agent could not complete merge.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
         completePendingOperation(issueId, error);
@@ -4164,10 +4173,10 @@ PROJECT: ${projectPath}
     } catch (agentError: any) {
       // merge-agent itself failed (timeout, crash, etc.)
       try {
-        execSync('git merge --abort', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+        await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
       } catch {}
       try {
-        execSync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+        await execAsync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8' });
       } catch {}
       const error = `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
       completePendingOperation(issueId, error);
@@ -4176,7 +4185,7 @@ PROJECT: ${projectPath}
 
     // 7. CRITICAL: Push merged main to remote BEFORE any cleanup
     try {
-      execSync('git push origin main', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+      await execAsync('git push origin main', { cwd: projectPath, encoding: 'utf-8' });
       pushCompleted = true;
       console.log('Pushed merged main to remote');
     } catch (pushErr: any) {
@@ -4189,7 +4198,7 @@ PROJECT: ${projectPath}
     // 8. Stop any running agent
     const agentId = `agent-${issueLower}`;
     try {
-      execSync(`tmux has-session -t ${agentId} 2>/dev/null && tmux kill-session -t ${agentId}`, {
+      await execAsync(`tmux has-session -t ${agentId} 2>/dev/null && tmux kill-session -t ${agentId}`, {
         encoding: 'utf-8',
         shell: '/bin/bash'
       });
@@ -4215,12 +4224,11 @@ PROJECT: ${projectPath}
 
         // Commit the PRD move
         try {
-          execSync(`git add docs/prds && git commit -m "docs: move ${issueId} PRD to completed"`, {
+          await execAsync(`git add docs/prds && git commit -m "docs: move ${issueId} PRD to completed"`, {
             cwd: projectPath,
-            encoding: 'utf-8',
-            stdio: 'pipe'
+            encoding: 'utf-8'
           });
-          execSync('git push origin main', { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync('git push origin main', { cwd: projectPath, encoding: 'utf-8' });
           console.log('Committed and pushed PRD move');
         } catch (commitErr: any) {
           // Non-fatal - PRD move is nice to have
@@ -4234,10 +4242,9 @@ PROJECT: ${projectPath}
 
     // 9. Remove the workspace (git worktree) - ONLY after successful push
     try {
-      execSync(`git worktree remove workspaces/feature-${issueLower} --force`, {
+      await execAsync(`git worktree remove workspaces/feature-${issueLower} --force`, {
         cwd: projectPath,
-        encoding: 'utf-8',
-        stdio: 'pipe'
+        encoding: 'utf-8'
       });
       console.log(`Removed workspace for ${issueId}`);
     } catch (wtError: any) {
@@ -4364,7 +4371,7 @@ PROJECT: ${projectPath}
     if (isGitHubIssue || issueId.toUpperCase().startsWith('PAN-')) {
       try {
         console.log('Running pan sync for Panopticon issue...');
-        execSync('pan sync', { encoding: 'utf-8', timeout: 30000 });
+        await execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 });
         console.log('pan sync completed');
       } catch (syncError: any) {
         console.error('pan sync failed (non-fatal):', syncError.message);
@@ -4419,7 +4426,7 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
 
       try {
         // Use gh CLI for better auth handling
-        execSync(`gh issue close ${number} --repo ${repoPath} --reason completed`, {
+        await execAsync(`gh issue close ${number} --repo ${repoPath} --reason completed`, {
           encoding: 'utf-8',
           timeout: 30000,
         });
@@ -4473,7 +4480,7 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
     // 2. Stop any running agent
     const agentId = `agent-${issueLower}`;
     try {
-      execSync(`tmux has-session -t ${agentId} 2>/dev/null && tmux kill-session -t ${agentId}`, {
+      await execAsync(`tmux has-session -t ${agentId} 2>/dev/null && tmux kill-session -t ${agentId}`, {
         encoding: 'utf-8',
         shell: '/bin/bash'
       });
@@ -4485,7 +4492,7 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
     // 3. Clean up workspace if it exists
     if (existsSync(workspacePath)) {
       try {
-        execSync(`git worktree remove workspaces/feature-${issueLower} --force`, {
+        await execAsync(`git worktree remove workspaces/feature-${issueLower} --force`, {
           cwd: projectPath,
           encoding: 'utf-8'
         });
@@ -4501,7 +4508,7 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
     // 5. Run pan sync for Panopticon issues
     if (isGitHubIssue) {
       try {
-        execSync('pan sync', { encoding: 'utf-8', timeout: 30000 });
+        await execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 });
         console.log('pan sync completed');
       } catch {}
     }
@@ -4550,28 +4557,28 @@ app.post('/api/agents', async (req, res) => {
           : projectPath;
 
         // Git add planning and beads directories
-        execSync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8', stdio: 'pipe' });
+        await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
         // Also add .beads/ if it exists
         if (existsSync(join(gitRoot, '.beads'))) {
-          execSync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
         }
         // Also add STATE.md and WORKSPACE.md if they exist
         if (existsSync(join(gitRoot, 'STATE.md'))) {
-          execSync(`git add STATE.md`, { cwd: gitRoot, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync(`git add STATE.md`, { cwd: gitRoot, encoding: 'utf-8' });
         }
         if (existsSync(join(gitRoot, 'WORKSPACE.md'))) {
-          execSync(`git add WORKSPACE.md`, { cwd: gitRoot, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync(`git add WORKSPACE.md`, { cwd: gitRoot, encoding: 'utf-8' });
         }
 
         // Check if there are changes to commit
         try {
-          execSync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' });
           // No changes to commit
           console.log(`No planning changes to commit for ${issueId}`);
         } catch (diffErr) {
           // There are changes, commit and push them
-          execSync(`git commit -m "Planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8', stdio: 'pipe' });
-          execSync(`git push`, { cwd: gitRoot, encoding: 'utf-8', stdio: 'pipe' });
+          await execAsync(`git commit -m "Planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' });
+          await execAsync(`git push`, { cwd: gitRoot, encoding: 'utf-8' });
           console.log(`Committed and pushed planning artifacts for ${issueId}`);
         }
       } catch (gitErr) {
@@ -4698,7 +4705,7 @@ app.post('/api/agents', async (req, res) => {
       // Check if Docker is running
       let dockerRunning = false;
       try {
-        execSync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+        await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
         dockerRunning = true;
       } catch {
         console.log('Docker not running, skipping container start');
@@ -5198,7 +5205,7 @@ Start by exploring the codebase to understand the context, then begin the discov
       const claudeCommand = `cd "${agentCwd}" && claude --dangerously-skip-permissions`;
 
       // Ensure tmux is running before starting session
-      ensureTmuxRunning();
+      await ensureTmuxRunning();
       await execAsync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
 
       // Create agent state file so QuestionDialog can find the JSONL path
@@ -5284,9 +5291,10 @@ app.get('/api/planning/:issueId/status', (req, res) => {
 
   try {
     // Check if tmux session exists
-    const sessions = execSync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
+    const { stdout: sessionsOutput } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
       encoding: 'utf-8',
-    }).trim().split('\n').filter(Boolean);
+    });
+    const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
 
     const sessionExists = sessions.includes(sessionName);
 
@@ -5319,7 +5327,7 @@ app.post('/api/planning/:issueId/message', async (req, res) => {
   try {
     // Kill any existing session first (Claude with --print will have exited anyway)
     try {
-      execSync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
+      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
     } catch (e) {
       // Session might not exist
     }
@@ -5480,8 +5488,8 @@ Continue the PLANNING session. Do NOT implement anything.
 
     const claudeCommand = `cd "${agentCwd}" && claude --dangerously-skip-permissions --print --verbose --output-format stream-json -p "${continuationPromptPath}" 2>&1 | tee "${outputFile}"`;
 
-    ensureTmuxRunning();
-    execSync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
+    await ensureTmuxRunning();
+    await execAsync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
 
     res.json({ success: true, sessionName, message: 'Planning session continued' });
   } catch (error: any) {
@@ -5491,13 +5499,13 @@ Continue the PLANNING session. Do NOT implement anything.
 });
 
 // Stop planning session (kills tmux session)
-app.delete('/api/planning/:issueId', (req, res) => {
+app.delete('/api/planning/:issueId', async (req, res) => {
   const { issueId } = req.params;
   const sessionName = `planning-${issueId.toLowerCase()}`;
 
   try {
     // Kill tmux session
-    execSync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+    await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
 
     res.json({ success: true });
   } catch (error: any) {
@@ -5630,7 +5638,7 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
     }
 
     // Kill the tmux session
-    execSync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+    await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
 
     // Clean up agent state files to prevent stale "running" status
     const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
@@ -5678,7 +5686,7 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
 
           if (existsSync(workspacePath)) {
             // Remove the git worktree
-            execSync(`git worktree remove "${workspacePath}" --force`, {
+            await execAsync(`git worktree remove "${workspacePath}" --force`, {
               cwd: projectPath,
               encoding: 'utf-8',
             });
@@ -5719,7 +5727,7 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
   try {
     // Kill any running planning session
     try {
-      execSync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
+      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
     } catch (e) {
       // Session might not exist
     }
@@ -5773,23 +5781,23 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
             : projectPath;
 
           // Git add planning and beads directories
-          execSync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
+          await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
           // Also add .beads/ if it exists (planning may create beads tasks)
           if (existsSync(join(gitRoot, '.beads'))) {
-            execSync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
+            await execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
           }
 
           // Check if there are changes to commit
           try {
-            execSync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' });
+            await execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' });
             // No changes to commit
           } catch (diffErr) {
             // There are changes, commit them
-            execSync(`git commit -m "Complete planning for ${id}"`, { cwd: gitRoot, encoding: 'utf-8' });
+            await execAsync(`git commit -m "Complete planning for ${id}"`, { cwd: gitRoot, encoding: 'utf-8' });
           }
 
           // Push to remote
-          execSync(`git push`, { cwd: gitRoot, encoding: 'utf-8' });
+          await execAsync(`git push`, { cwd: gitRoot, encoding: 'utf-8' });
           gitPushed = true;
         } catch (gitErr) {
           console.error('Git commit/push failed:', gitErr);
@@ -6542,7 +6550,9 @@ app.get('/api/metrics/tasks', (req, res) => {
 });
 
 // Ensure tmux is running at startup
-ensureTmuxRunning();
+ensureTmuxRunning().catch((err) => {
+  console.error('Failed to ensure tmux is running:', err);
+});
 
 // Auto-start Cloister if configured
 if (shouldAutoStart()) {

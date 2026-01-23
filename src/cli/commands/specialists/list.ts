@@ -11,8 +11,8 @@ interface ListOptions {
   json?: boolean;
 }
 
-export function listCommand(options: ListOptions): void {
-  const specialists = getAllSpecialistStatus();
+export async function listCommand(options: ListOptions): Promise<void> {
+  const specialists = await getAllSpecialistStatus();
 
   if (options.json) {
     console.log(JSON.stringify(specialists, null, 2));

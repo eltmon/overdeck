@@ -9,9 +9,12 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgent, getAgentState } from './agents.js';
+
+const execAsync = promisify(exec);
 
 // Deacon pattern defaults
 export const DEFAULT_PING_TIMEOUT_MS = 30 * 1000; // 30 seconds
@@ -80,9 +83,9 @@ export function saveAgentHealth(health: AgentHealth): void {
 /**
  * Check if agent's tmux session is alive
  */
-export function isAgentAlive(agentId: string): boolean {
+export async function isAgentAlive(agentId: string): Promise<boolean> {
   try {
-    execSync(`tmux has-session -t "${agentId}" 2>/dev/null`, { encoding: 'utf-8' });
+    await execAsync(`tmux has-session -t "${agentId}" 2>/dev/null`, { encoding: 'utf-8' });
     return true;
   } catch {
     return false;
@@ -92,9 +95,9 @@ export function isAgentAlive(agentId: string): boolean {
 /**
  * Get recent output from agent's terminal
  */
-export function getAgentOutput(agentId: string, lines: number = 20): string | null {
+export async function getAgentOutput(agentId: string, lines: number = 20): Promise<string | null> {
   try {
-    const output = execSync(
+    const { stdout: output } = await execAsync(
       `tmux capture-pane -t "${agentId}" -p -S -${lines} 2>/dev/null`,
       { encoding: 'utf-8', maxBuffer: 1024 * 1024 }
     );
@@ -108,13 +111,13 @@ export function getAgentOutput(agentId: string, lines: number = 20): string | nu
  * Send a health check nudge to the agent
  * Returns true if we detect activity, false otherwise
  */
-export function sendHealthNudge(agentId: string): boolean {
-  if (!isAgentAlive(agentId)) {
+export async function sendHealthNudge(agentId: string): Promise<boolean> {
+  if (!(await isAgentAlive(agentId))) {
     return false;
   }
 
   // Capture output before nudge
-  const outputBefore = getAgentOutput(agentId, 5);
+  const outputBefore = await getAgentOutput(agentId, 5);
 
   // Send a gentle nudge - just check if the session is responsive
   // We don't want to interrupt actual work, just verify the session exists
@@ -130,7 +133,7 @@ export function sendHealthNudge(agentId: string): boolean {
 /**
  * Ping an agent and update health status
  */
-export function pingAgent(
+export async function pingAgent(
   agentId: string,
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
@@ -138,12 +141,12 @@ export function pingAgent(
     cooldownMs: DEFAULT_COOLDOWN_MS,
     checkIntervalMs: DEFAULT_CHECK_INTERVAL_MS,
   }
-): AgentHealth {
+): Promise<AgentHealth> {
   const health = getAgentHealth(agentId);
   health.lastPing = new Date().toISOString();
 
   // Check if session is alive
-  const alive = isAgentAlive(agentId);
+  const alive = await isAgentAlive(agentId);
 
   if (!alive) {
     // Session is dead
@@ -281,7 +284,7 @@ export async function runHealthCheck(
   // Get all agent sessions
   let sessions: string[] = [];
   try {
-    const output = execSync(
+    const { stdout: output } = await execAsync(
       'tmux list-sessions -F "#{session_name}" 2>/dev/null || true',
       { encoding: 'utf-8' }
     );
@@ -309,7 +312,7 @@ export async function runHealthCheck(
   for (const agentId of sessions) {
     results.checked++;
 
-    const health = pingAgent(agentId, config);
+    const health = await pingAgent(agentId, config);
 
     switch (health.status) {
       case 'healthy':
