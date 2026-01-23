@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Brain, RotateCcw, Power, Square, Loader2 } from 'lucide-react';
+import { Brain, RotateCcw, Power, Square, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown } from 'lucide-react';
+import { useState } from 'react';
 
 export interface SpecialistAgent {
   name: 'merge-agent' | 'review-agent' | 'test-agent';
@@ -88,6 +89,68 @@ function useSpecialistCost(name: string, enabled: boolean) {
   });
 }
 
+// Queue types and functions (PAN-74)
+interface QueueItem {
+  id: string;
+  type: 'task' | 'message' | 'notification';
+  priority: 'urgent' | 'high' | 'normal' | 'low';
+  source: string;
+  payload: {
+    issueId?: string;
+    message?: string;
+    action?: string;
+    context?: Record<string, any>;
+  };
+  createdAt: string;
+  expiresAt?: string;
+}
+
+interface QueueData {
+  specialistName: string;
+  hasWork: boolean;
+  urgentCount: number;
+  totalCount: number;
+  items: QueueItem[];
+}
+
+async function fetchSpecialistQueue(name: string): Promise<QueueData> {
+  const res = await fetch(`/api/specialists/${name}/queue`);
+  if (!res.ok) {
+    return { specialistName: name, hasWork: false, urgentCount: 0, totalCount: 0, items: [] };
+  }
+  return res.json();
+}
+
+async function removeQueueItem(specialistName: string, itemId: string): Promise<void> {
+  const res = await fetch(`/api/specialists/${specialistName}/queue/${itemId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to remove queue item');
+  }
+}
+
+async function reorderQueue(specialistName: string, itemIds: string[]): Promise<void> {
+  const res = await fetch(`/api/specialists/${specialistName}/queue/reorder`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ itemIds }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to reorder queue');
+  }
+}
+
+function useSpecialistQueue(name: string) {
+  return useQuery({
+    queryKey: ['specialist-queue', name],
+    queryFn: () => fetchSpecialistQueue(name),
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+}
+
 function formatTokens(tokens: number): string {
   if (tokens >= 1000000) {
     return `${(tokens / 1000000).toFixed(1)}M`;
@@ -125,6 +188,8 @@ export function SpecialistAgentCard({
 }: SpecialistAgentCardProps) {
   const queryClient = useQueryClient();
   const { data: costData } = useSpecialistCost(specialist.name, specialist.state !== 'uninitialized');
+  const { data: queueData } = useSpecialistQueue(specialist.name);
+  const [queueExpanded, setQueueExpanded] = useState(false);
 
   const wakeMutation = useMutation({
     mutationFn: () => wakeSpecialist(specialist.name),
@@ -155,6 +220,26 @@ export function SpecialistAgentCard({
     },
   });
 
+  const removeQueueItemMutation = useMutation({
+    mutationFn: (itemId: string) => removeQueueItem(specialist.name, itemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['specialist-queue', specialist.name] });
+    },
+    onError: (error: Error) => {
+      alert(`Failed to remove queue item: ${error.message}`);
+    },
+  });
+
+  const reorderQueueMutation = useMutation({
+    mutationFn: (itemIds: string[]) => reorderQueue(specialist.name, itemIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['specialist-queue', specialist.name] });
+    },
+    onError: (error: Error) => {
+      alert(`Failed to reorder queue: ${error.message}`);
+    },
+  });
+
   const handleWake = (e: React.MouseEvent) => {
     e.stopPropagation();
     wakeMutation.mutate();
@@ -178,6 +263,39 @@ export function SpecialistAgentCard({
     }
   };
 
+  const handleRemoveQueueItem = (e: React.MouseEvent, itemId: string) => {
+    e.stopPropagation();
+    removeQueueItemMutation.mutate(itemId);
+  };
+
+  const handleMoveUp = (e: React.MouseEvent, index: number) => {
+    e.stopPropagation();
+    if (!queueData || index === 0) return;
+    const newOrder = [...queueData.items];
+    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+    reorderQueueMutation.mutate(newOrder.map(item => item.id));
+  };
+
+  const handleMoveDown = (e: React.MouseEvent, index: number) => {
+    e.stopPropagation();
+    if (!queueData || index === queueData.items.length - 1) return;
+    const newOrder = [...queueData.items];
+    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+    reorderQueueMutation.mutate(newOrder.map(item => item.id));
+  };
+
+  const toggleQueueExpanded = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setQueueExpanded(!queueExpanded);
+  };
+
+  const priorityColors = {
+    urgent: 'text-red-400',
+    high: 'text-orange-400',
+    normal: 'text-blue-400',
+    low: 'text-gray-400',
+  };
+
   return (
     <div
       onClick={onSelect}
@@ -197,6 +315,20 @@ export function SpecialistAgentCard({
                 <span className={`text-xs ${STATE_COLOR[specialist.state]}`}>
                   {STATE_EMOJI[specialist.state]}
                 </span>
+              )}
+              {queueData && queueData.totalCount > 0 && (
+                <button
+                  onClick={toggleQueueExpanded}
+                  className="text-xs text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
+                  title={`${queueData.totalCount} queued task${queueData.totalCount > 1 ? 's' : ''}`}
+                >
+                  ({queueData.totalCount})
+                  {queueExpanded ? (
+                    <ChevronDown className="w-3 h-3" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3" />
+                  )}
+                </button>
               )}
             </div>
             <div className="text-sm text-gray-400">{specialist.description}</div>
@@ -273,6 +405,62 @@ export function SpecialistAgentCard({
           </div>
         </div>
       </div>
+
+      {/* Queue section (PAN-74) */}
+      {queueExpanded && queueData && queueData.totalCount > 0 && (
+        <div className="mt-3 pl-8 border-l-2 border-gray-600">
+          <div className="text-xs text-gray-400 font-medium mb-2">
+            Queued Tasks ({queueData.totalCount})
+          </div>
+          <div className="space-y-2">
+            {queueData.items.map((item, index) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between bg-gray-750 px-3 py-2 rounded text-xs"
+              >
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-gray-500">{index + 1}.</span>
+                  <span className="text-white font-mono">
+                    {item.payload.issueId || item.payload.message || item.id.substring(0, 8)}
+                  </span>
+                  <span className={`${priorityColors[item.priority]} font-medium`}>
+                    [{item.priority}]
+                  </span>
+                  <span className="text-gray-500 text-xs">
+                    {item.source}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => handleMoveUp(e, index)}
+                    disabled={index === 0 || reorderQueueMutation.isPending}
+                    className="p-1 text-gray-400 hover:text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Move up"
+                  >
+                    <MoveUp className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => handleMoveDown(e, index)}
+                    disabled={index === queueData.items.length - 1 || reorderQueueMutation.isPending}
+                    className="p-1 text-gray-400 hover:text-blue-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Move down"
+                  >
+                    <MoveDown className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => handleRemoveQueueItem(e, item.id)}
+                    disabled={removeQueueItemMutation.isPending}
+                    className="p-1 text-gray-400 hover:text-red-400 disabled:opacity-50"
+                    title="Remove from queue"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
