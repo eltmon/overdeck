@@ -4,19 +4,19 @@
 
 ## Current Progress
 
-### ✅ Completed (3/11 tasks)
+### ✅ Completed (4/11 tasks)
 
 1. ✅ **1.1 Cloister Auto-Start** - Dashboard now auto-starts Cloister on launch when configured
 2. ✅ **1.2 Specialist State Reset** - Specialists reset working directory and prompt buffer between tasks
 3. ✅ **1.3 Confirmation Dialog UI** - Modal confirmation system for destructive actions
+4. ✅ **2.1 Auto-Restart on Crash** - Agents automatically restart after crashes with exponential backoff (30/60/120s)
 
 ### 🚧 In Progress
 
-None - Ready to start next task (2.1 Auto-restart on crash)
+None - Ready to start next task (2.2 Mass death detection)
 
-### 📋 Remaining (8/11 tasks)
+### 📋 Remaining (7/11 tasks)
 
-4. 2.1 Auto-restart on crash with exponential backoff
 5. 2.2 Mass death detection (3+ agents in 30s)
 6. 2.3 FPP violation detection with escalating nudges
 7. 3.1 Cost limits and alerts
