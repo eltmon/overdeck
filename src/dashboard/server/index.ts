@@ -2729,7 +2729,8 @@ app.get('/api/specialists/:name/queue', async (req, res) => {
   const { name } = req.params;
 
   try {
-    const { checkSpecialistQueue, type SpecialistType } = await import('../../lib/cloister/specialists.js');
+    const { checkSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
 
     // Validate specialist name
     const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
@@ -2758,7 +2759,8 @@ app.delete('/api/specialists/:name/queue/:itemId', async (req, res) => {
   const { name, itemId } = req.params;
 
   try {
-    const { completeSpecialistTask, type SpecialistType } = await import('../../lib/cloister/specialists.js');
+    const { completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
 
     // Validate specialist name
     const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
