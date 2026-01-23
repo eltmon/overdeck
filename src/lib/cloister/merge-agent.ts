@@ -486,34 +486,11 @@ export async function spawnMergeAgentForBranches(
       return { success: false, reason: message };
     }
 
-    // Check for uncommitted changes (ignore untracked files and .beads/ metadata)
-    try {
-      const statusOutput = execSync(`git status --porcelain -uno`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-        stdio: 'pipe',
-      });
-
-      if (statusOutput.trim()) {
-        // Filter out .beads/ files - they're task tracking metadata, not code
-        const significantChanges = statusOutput
-          .trim()
-          .split('\n')
-          .filter(line => !line.includes('.beads/'));
-
-        if (significantChanges.length > 0) {
-          const changedFiles = significantChanges.slice(0, 5).join(', ');
-          const message = `Cannot merge: uncommitted changes (${changedFiles})`;
-          console.error(`[merge-agent] ${message}`);
-          logActivity('merge_blocked', message);
-          return { success: false, reason: message };
-        }
-        // Only .beads/ changes - that's fine, continue with merge
-        console.log(`[merge-agent] Ignoring uncommitted .beads/ metadata files`);
-      }
-    } catch {
-      // If git status fails, continue anyway
-    }
+    // NOTE: We don't check for uncommitted changes in the main repo here.
+    // The merge happens via git merge which will fail if there are conflicts.
+    // Uncommitted changes in main are the user's own work and shouldn't block
+    // merging a feature branch. The dashboard server already checks the
+    // workspace for uncommitted changes before initiating the merge.
   } catch (error: any) {
     return { success: false, reason: `Pre-flight check failed: ${error.message}` };
   }
