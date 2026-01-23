@@ -1,16 +1,34 @@
 # PAN-70: Convert remaining execSync calls to async
 
-## Status: COMPLETE
+## Status: ✅ COMPLETE (All Review Feedback Addressed)
 
 ## Problem Statement
 
 The dashboard server has ~70 blocking `execSync` calls that can cause event loop starvation and perceived hangs/slowness. This is a follow-up to PAN-35 (Terminal latency: Phase 2).
+
+**Review Feedback Round 1 (2026-01-23):** All critical issues addressed:
+1. ✅ **Persistence Added** - Cost and FPP violation data now persisted to JSON files with atomic writes
+2. ✅ **Unit Tests Added** - 21 comprehensive tests for cost-monitor, fpp-violations, and session-rotation
+3. ✅ **Import Validation Fixed** - Added try-catch error handling for checkHook runtime import
+
+**Review Feedback Round 2 (2026-01-23):** All code review issues fixed:
+1. ✅ **Empty Catch Blocks Fixed** - Replaced `require('fs').unlinkSync` with proper import and error logging
+2. ✅ **Dead Code Removed** - Removed unused FPPViolationType values (pr_stale, review_pending, status_mismatch)
+3. ✅ **Dead Code Removed** - Removed unused MergeRecord.files and .diff struct fields
+4. ✅ **Untyped Any Fixed** - Replaced `error: any` with `error: unknown` + proper type guards in 3 files
+5. ✅ **Comprehensive Tests Added** - 35 new tests covering all flagged functions:
+   - session-rotation.ts: needsSessionRotation(), buildMergeAgentMemory(), rotateSpecialistSession(), checkAndRotateIfNeeded()
+   - fpp-violations.ts: checkAgentForViolations(), sendNudge(), resolveViolation(), getActiveViolations(), getAgentViolations(), clearOldViolations()
+
+**Test Suite:** 286 tests passing (up from 251)
 
 ## Decisions Made
 
 ### Scope
 - **Convert ALL remaining execSync calls** across three files
 - Focus on making calls non-blocking, not tuning polling intervals
+
+### ✅ Completed (11/11 tasks)
 
 ### Files to Modify
 1. `src/dashboard/server/index.ts` (~51 execSync calls)

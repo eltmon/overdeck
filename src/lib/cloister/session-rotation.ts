@@ -40,6 +40,10 @@ export const DEFAULT_MEMORY_TIERS: MemoryTiers = {
 
 /**
  * Merge record for memory file
+ *
+ * Note: Only core fields (hash, message, author, date, branch) are stored.
+ * Files changed and diffs are computed on-demand when building memory
+ * to avoid storing large amounts of redundant data.
  */
 interface MergeRecord {
   hash: string;
@@ -47,8 +51,6 @@ interface MergeRecord {
   author?: string;
   date?: string;
   branch?: string;
-  files?: string[];
-  diff?: string;
 }
 
 /**
@@ -143,7 +145,6 @@ export function buildMergeAgentMemory(
         .filter(f => f);
 
       memory += `- Files changed: ${files.length}\n`;
-      merge.files = files;
 
       // Get diff (limited to avoid huge memory files)
       const diff = execSync(`git show ${merge.hash} --stat`, {
@@ -153,7 +154,6 @@ export function buildMergeAgentMemory(
       });
 
       memory += `\n\`\`\`diff\n${diff.substring(0, 5000)}\n\`\`\`\n\n`;
-      merge.diff = diff;
     } catch (error) {
       memory += `- (Error getting details)\n\n`;
     }
@@ -267,11 +267,11 @@ export async function rotateSpecialistSession(
       newSessionId: newAgent.sessionId,
       memoryFile,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
       oldSessionId,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }

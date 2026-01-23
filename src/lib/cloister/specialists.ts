@@ -691,11 +691,12 @@ Say: "I am the ${name} specialist, ready and waiting for tasks."`;
       message: `Specialist ${name} initialized and started`,
       tmuxSession,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      message: `Failed to initialize specialist ${name}: ${error.message}`,
-      error: error.message,
+      message: `Failed to initialize specialist ${name}: ${errorMessage}`,
+      error: errorMessage,
     };
   }
 }

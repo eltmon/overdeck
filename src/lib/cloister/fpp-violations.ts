@@ -5,7 +5,7 @@
  * escalating nudges to get them back on track.
  */
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { checkHook } from '../hooks.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
@@ -14,8 +14,11 @@ import { PANOPTICON_HOME } from '../paths.js';
 
 /**
  * FPP violation types
+ *
+ * Currently only 'hook_idle' is implemented. Additional types can be added
+ * when detection logic is implemented for PR staleness, review pending, etc.
  */
-export type FPPViolationType = 'hook_idle' | 'pr_stale' | 'review_pending' | 'status_mismatch';
+export type FPPViolationType = 'hook_idle';
 
 /**
  * FPP violation record
@@ -102,8 +105,11 @@ function saveViolations(violations: Map<string, FPPViolation>): void {
 
     // Clean up temp file
     try {
-      require('fs').unlinkSync(tempFile);
-    } catch {}
+      unlinkSync(tempFile);
+    } catch (unlinkError: unknown) {
+      // Non-critical: temp file cleanup failure is logged but doesn't block operation
+      console.debug('Failed to cleanup temp file:', unlinkError instanceof Error ? unlinkError.message : unlinkError);
+    }
   } catch (error) {
     console.error('Failed to save violations data:', error);
   }
@@ -116,46 +122,21 @@ const activeViolations = loadViolations();
 
 /**
  * Get escalating nudge message based on nudge count
+ *
+ * Currently only supports 'hook_idle' type. Messages escalate from
+ * a gentle status check to a direct action request.
  */
-function getNudgeMessage(violation: FPPViolation, nudgeCount: number): string {
-  const { type } = violation;
-
+function getNudgeMessage(_violation: FPPViolation, nudgeCount: number): string {
+  // Currently only 'hook_idle' is implemented, so messages are tailored for that case
   if (nudgeCount === 1) {
     // Nudge 1: Status check
-    switch (type) {
-      case 'hook_idle':
-        return "What's your current status? You have pending work on your hook.";
-      case 'pr_stale':
-        return "What's your current status? Your PR has been approved but not merged yet.";
-      case 'review_pending':
-        return "What's your current status? You have a review request pending.";
-      default:
-        return "What's your current status? Please provide an update.";
-    }
+    return "What's your current status? You have pending work on your hook.";
   } else if (nudgeCount === 2) {
     // Nudge 2: Gentle reminder
-    switch (type) {
-      case 'hook_idle':
-        return "I notice you've been idle while having pending work. Do you need help with the task on your hook?";
-      case 'pr_stale':
-        return "I notice you've been idle with an approved PR. Do you need help merging it?";
-      case 'review_pending':
-        return "I notice you've been idle with a pending review request. Do you need help addressing the feedback?";
-      default:
-        return "I notice you've been idle with pending work. Do you need assistance?";
-    }
+    return "I notice you've been idle while having pending work. Do you need help with the task on your hook?";
   } else {
     // Nudge 3: Direct action
-    switch (type) {
-      case 'hook_idle':
-        return "You have pending work on your hook that needs attention. Execute it now or explain why you're blocked.";
-      case 'pr_stale':
-        return "Your PR is approved and ready to merge. Merge it now or explain any blockers.";
-      case 'review_pending':
-        return "You have review feedback that needs to be addressed. Work on it now or explain why you can't proceed.";
-      default:
-        return "You have pending work that requires immediate attention. Take action now or explain the blocker.";
-    }
+    return "You have pending work on your hook that needs attention. Execute it now or explain why you're blocked.";
   }
 }
 

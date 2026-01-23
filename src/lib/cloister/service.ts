@@ -520,12 +520,13 @@ export class CloisterService {
     setTimeout(async () => {
       try {
         await this.restartAgent(agentId);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.emit({
           type: 'agent_restart_failed',
           agentId,
           crashCount: tracker!.crashCount,
-          error: error.message,
+          error: errorMessage,
         });
         console.error(`🔔 Failed to restart ${agentId}:`, error);
       }
