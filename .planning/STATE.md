@@ -1,234 +1,152 @@
-# PAN-70: Convert remaining execSync calls to async
-
-## Status: ✅ COMPLETE (All Review Feedback Addressed)
+# PAN-74: Specialists Task Queue Integration
 
 ## Problem Statement
 
-The dashboard server has ~70 blocking `execSync` calls that can cause event loop starvation and perceived hangs/slowness. This is a follow-up to PAN-35 (Terminal latency: Phase 2).
-
-**Review Feedback Round 1 (2026-01-23):** All critical issues addressed:
-1. ✅ **Persistence Added** - Cost and FPP violation data now persisted to JSON files with atomic writes
-2. ✅ **Unit Tests Added** - 21 comprehensive tests for cost-monitor, fpp-violations, and session-rotation
-3. ✅ **Import Validation Fixed** - Added try-catch error handling for checkHook runtime import
-
-**Review Feedback Round 2 (2026-01-23):** All code review issues fixed:
-1. ✅ **Empty Catch Blocks Fixed** - Replaced `require('fs').unlinkSync` with proper import and error logging
-2. ✅ **Dead Code Removed** - Removed unused FPPViolationType values (pr_stale, review_pending, status_mismatch)
-3. ✅ **Dead Code Removed** - Removed unused MergeRecord.files and .diff struct fields
-4. ✅ **Untyped Any Fixed** - Replaced `error: any` with `error: unknown` + proper type guards in 3 files
-5. ✅ **Comprehensive Tests Added** - 35 new tests covering all flagged functions:
-   - session-rotation.ts: needsSessionRotation(), buildMergeAgentMemory(), rotateSpecialistSession(), checkAndRotateIfNeeded()
-   - fpp-violations.ts: checkAgentForViolations(), sendNudge(), resolveViolation(), getActiveViolations(), getAgentViolations(), clearOldViolations()
-
-**Test Suite:** 286 tests passing (up from 251)
+When a specialist is handed a task while already busy, the task is lost. The existing queue infrastructure (`submitToSpecialistQueue`, etc.) exists but isn't wired into the handoff flow or deacon patrol loop.
 
 ## Decisions Made
 
-### Scope
-- **Convert ALL remaining execSync calls** across three files
-- Focus on making calls non-blocking, not tuning polling intervals
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Busy notification | Silent queue only | Don't disturb busy specialists |
+| Queue ordering | Priority-based | Use existing priority field (urgent > high > normal > low) |
+| Stale task handling | Process anyway | Let specialist discover issue state - keeps logic simple |
+| Queue size limit | No limit | Rely on priority and manual cleanup |
+| Queue check frequency | On idle detection | Check queue when `isIdleAtPrompt()` returns true |
+| Queue persistence | Hooks system (JSON files) | Already persistent at `~/.panopticon/agents/{specialist}/hook.json` |
+| Dashboard UI depth | Count + expandable list | Badge with count, expand to see queued issue IDs |
+| Queue management | Full control | View, remove, and reorder from dashboard |
 
-### ✅ Completed (11/11 tasks)
+## Technical Approach
 
-### Files to Modify
-1. `src/dashboard/server/index.ts` (~51 execSync calls)
-2. `src/lib/cloister/specialists.ts` (~15 execSync calls)
-3. `src/lib/health.ts` (~3 execSync calls)
+### 1. Integrate Queue into Handoff Flow
 
-### API Changes
-- **Make existing functions async directly** (not backward-compatible variants)
-- Update all callers to use `await`
-- Functions affected:
-  - `specialists.ts`: `isRunning()`, `isIdleAtPrompt()`, `initializeSpecialist()`, `resetSpecialist()`, `wakeSpecialist()`, `sendFeedbackToAgent()`
-  - `health.ts`: `isAgentAlive()`, `getAgentOutput()`, `sendHealthNudge()`, `pingAgent()`, `handleStuckAgent()`, `runHealthCheck()`
-
-### Error Handling
-- **Keep same try/catch pattern**, just make it async
-- Return `false`/`null` on error (same as current behavior)
-
-### Acceptance Criteria
-- All existing tests pass
-- **Run `terminal-latency.spec.ts` tests**
-- **P95 latency < 50ms** (hard requirement)
-
-## High-Impact Calls (Priority Order)
-
-These are called frequently and should be converted first:
-
-1. **`detectSpecialistCompletion()`** (server/index.ts:195)
-   - Called every 5 seconds by `pollReviewStatus()`
-   - Uses: `tmux capture-pane`
-
-2. **`isIdleAtPrompt()`** (specialists.ts:485)
-   - Called on every specialist status check
-   - Uses: `tmux capture-pane`
-
-3. **`isRunning()`** (specialists.ts:463)
-   - Called frequently for status checks
-   - Uses: `tmux has-session`
-
-4. **`isAgentAlive()`** (health.ts:85)
-   - Called during health check cycles
-   - Uses: `tmux has-session`
-
-5. **`getAgentOutput()`** (health.ts:97)
-   - Called during health check cycles
-   - Uses: `tmux capture-pane`
-
-## Implementation Approach
-
-### Pattern to Follow
-The codebase already has `execAsync = promisify(exec)` and uses it in many places. Follow the existing pattern:
+Modify the handoff/wake flow to check if specialist is busy:
 
 ```typescript
-// Before
-function isRunning(name: SpecialistType): boolean {
-  try {
-    execSync(`tmux has-session -t ${session}`, { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
+// In the handoff/wake call path
+const running = await isRunning(name);
+const idle = running ? await isIdleAtPrompt(name) : false;
+
+if (running && !idle) {
+  // Specialist is busy - queue the task
+  submitToSpecialistQueue(name, {
+    priority: options.priority || 'normal',
+    source: options.source || 'handoff',
+    issueId: task.issueId,
+    workspace: task.workspace,
+    branch: task.branch,
+    prUrl: task.prUrl,
+    context: task.context,
+  });
+  console.log(`[handoff] ${name} busy, queued task for ${task.issueId}`);
+  return { success: true, queued: true, message: `Task queued for ${name}` };
 }
 
-// After
-async function isRunning(name: SpecialistType): Promise<boolean> {
-  try {
-    await execAsync(`tmux has-session -t ${session}`);
-    return true;
-  } catch {
-    return false;
+// Otherwise proceed with normal wake
+return wakeSpecialist(name, taskPrompt, options);
+```
+
+### 2. Process Queue in Deacon Patrol
+
+Extend `runPatrol()` in deacon.ts:
+
+```typescript
+// After health check for each specialist
+if (result.wasRunning && await isIdleAtPrompt(specialist.name)) {
+  const queue = checkSpecialistQueue(specialist.name);
+  if (queue.hasWork) {
+    const nextTask = getNextSpecialistTask(specialist.name);
+    if (nextTask) {
+      console.log(`[deacon] ${specialist.name} idle with queued work, waking for ${nextTask.payload.issueId}`);
+      const wakeResult = await wakeSpecialistWithTask(specialist.name, nextTask.payload);
+      if (wakeResult.success) {
+        completeSpecialistTask(specialist.name, nextTask.id);
+        actions.push(`Processed queued task for ${specialist.name}: ${nextTask.payload.issueId}`);
+      }
+    }
   }
 }
 ```
 
-### Order of Operations
-1. **specialists.ts first** - Convert low-level utility functions
-2. **health.ts second** - Depends on some patterns from specialists.ts
-3. **server/index.ts last** - Update callers to use await
+### 3. API Endpoints
 
-### Special Considerations
+Add new endpoints to dashboard server:
 
-#### pollReviewStatus()
-Currently synchronous, calls `detectSpecialistCompletion()` in a loop. After conversion:
-- Make `pollReviewStatus()` async
-- Use `Promise.all()` for parallel specialist checks where possible
-- Keep `setInterval(pollReviewStatus, 5000)` but handle async properly
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/specialists/queues` | GET | Get all specialist queues with counts and items |
+| `/api/specialists/:name/queue` | GET | Get specific specialist's queue |
+| `/api/specialists/:name/queue/:itemId` | DELETE | Remove item from queue |
+| `/api/specialists/:name/queue/reorder` | PUT | Reorder queue items (body: `{ itemIds: string[] }`) |
 
-#### getSpecialistStatus()
-Called by multiple API endpoints. After `isRunning()` and `isIdleAtPrompt()` become async:
-- Make `getSpecialistStatus()` async
-- Update all API handlers that call it
+### 4. Dashboard UI
 
-## Categorized execSync Calls
+Update `SpecialistAgentCard.tsx`:
+- Add queue count badge next to specialist state (e.g., "(2)" for 2 queued items)
+- Add expandable section showing queued issue IDs
+- Add trash icon to remove items from queue
+- Add drag-and-drop or up/down arrows for reordering
 
-### specialists.ts (15 calls)
+```
+┌─────────────────────────────────────────┐
+│ Specialists                              │
+├─────────────────────────────────────────┤
+│ 🟢 review-agent    [idle]               │
+│ 🟡 test-agent      [busy: PAN-70] (2)   │  ← "(2)" = 2 queued
+│    └─ Queue:                             │
+│       1. PAN-72 [urgent] ⬆️ ⬇️ 🗑️        │
+│       2. PAN-33 [normal] ⬆️ ⬇️ 🗑️        │
+│ 🟢 merge-agent     [idle]               │
+└─────────────────────────────────────────┘
+```
 
-| Line | Function | Command | Priority |
-|------|----------|---------|----------|
-| 463 | isRunning | `tmux has-session` | HIGH |
-| 485 | isIdleAtPrompt | `tmux capture-pane \| tail` | HIGH |
-| 667-679 | initializeSpecialist | `tmux new-session`, `send-keys` x2 | MEDIUM |
-| 756-767 | resetSpecialist | `send-keys` x5 | MEDIUM |
-| 824 | wakeSpecialist | `tmux new-session` | MEDIUM |
-| 850-852 | wakeSpecialist | `send-keys` x2 | MEDIUM |
-| 1139-1147 | sendFeedbackToAgent | `has-session`, `send-keys` x2 | LOW |
+## Files to Modify
 
-### health.ts (3 calls)
-
-| Line | Function | Command | Priority |
-|------|----------|---------|----------|
-| 85 | isAgentAlive | `tmux has-session` | HIGH |
-| 97 | getAgentOutput | `tmux capture-pane` | HIGH |
-| 284 | runHealthCheck | `tmux list-sessions` | MEDIUM |
-
-### server/index.ts (~51 calls)
-
-| Category | Count | Priority |
-|----------|-------|----------|
-| Polling (detectSpecialistCompletion) | 1 | HIGH |
-| tmux operations (send-keys, has-session) | ~15 | MEDIUM |
-| Git operations | ~12 | MEDIUM |
-| Workspace management | ~8 | LOW |
-| Docker checks | ~3 | LOW |
-| beads (bd) commands | ~4 | LOW |
-| Other | ~8 | LOW |
-
-## Risk Mitigation
-
-1. **Cascading changes**: Many functions call the utilities being changed. Plan for significant caller updates.
-2. **Race conditions**: Async operations could introduce race conditions where sync was safe. Review polling loops carefully.
-3. **Error propagation**: Ensure all async errors are caught at appropriate levels.
+| File | Changes |
+|------|---------|
+| `src/lib/cloister/deacon.ts` | Add queue processing to patrol loop, import queue helpers |
+| `src/lib/cloister/specialists.ts` | Add helper function `wakeSpecialistOrQueue()` |
+| `src/lib/cloister/handoff.ts` | Use `wakeSpecialistOrQueue()` in performHandoff() |
+| `src/dashboard/server/index.ts` | Add 4 queue API endpoints |
+| `src/dashboard/frontend/src/components/SpecialistAgentCard.tsx` | Add queue UI with count badge, expandable list, controls |
+| `src/lib/hooks.ts` | Add `reorderHookItems()` function for queue reordering |
 
 ## Out of Scope
 
-- Polling interval tuning (explicitly excluded)
-- New features or functionality
-- Performance optimizations beyond async conversion
+- Queue expiration/TTL
+- Cross-specialist queue balancing
+- Queue metrics/analytics
+- Notification system for queue events
+- Maximum queue size limits
 
-## Current Status
+## Acceptance Criteria
 
-### Completed (2026-01-23)
+- [ ] Tasks queued when specialist is busy (not dropped)
+- [ ] Queued tasks processed when specialist becomes idle
+- [ ] Queue persists across dashboard restarts (using hooks system)
+- [ ] API endpoint to view all specialist queues
+- [ ] API endpoint to remove items from queue
+- [ ] API endpoint to reorder queue items
+- [ ] Dashboard shows queue count per specialist
+- [ ] Dashboard allows viewing queued issues
+- [ ] Dashboard allows removing queued items
+- [ ] Dashboard allows reordering queued items
 
-✅ **specialists.ts** (beads: panopticon-btbw)
-- Added `execAsync = promisify(exec)` import
-- Converted all functions to async:
-  - `isRunning()` → returns `Promise<boolean>`
-  - `isIdleAtPrompt()` → returns `Promise<boolean>`
-  - `getSpecialistStatus()` → returns `Promise<SpecialistStatus>`
-  - `getAllSpecialistStatus()` → returns `Promise<SpecialistStatus[]>`
-  - `sendFeedbackToAgent()` → returns `Promise<boolean>`
-  - `initializeSpecialist()` - converted internal execSync calls
-  - `resetSpecialist()` - converted internal execSync calls
-  - `wakeSpecialist()` - converted internal execSync calls
-- Updated all callers:
-  - `src/dashboard/server/index.ts`: API endpoints `/api/specialists`, `/api/specialists/:name/wake`, `/api/specialists/:name/reset`
-  - `src/cli/commands/specialists/list.ts`: `listCommand()`
-  - `src/cli/commands/specialists/reset.ts`: `resetCommand()` and `resetAllSpecialists()`
-  - `src/cli/commands/specialists/wake.ts`: `wakeCommand()`
+## Implementation Order
 
-✅ **health.ts** (beads: panopticon-dy2a)
-- Added `execAsync = promisify(exec)` import
-- Converted all functions to async:
-  - `isAgentAlive()` → returns `Promise<boolean>`
-  - `getAgentOutput()` → returns `Promise<string | null>`
-  - `sendHealthNudge()` → returns `Promise<boolean>`
-  - `pingAgent()` → returns `Promise<AgentHealth>`
-  - `runHealthCheck()` - converted internal execSync call
-- Updated all callers:
-  - `src/cli/commands/work/health.ts`: `healthCommand()` ping action
+1. **Backend: hooks.ts** - Add `reorderHookItems()` function
+2. **Backend: specialists.ts** - Add `wakeSpecialistOrQueue()` wrapper
+3. **Backend: deacon.ts** - Add queue processing to patrol loop
+4. **Backend: handoff.ts** - Update performHandoff() to use queue wrapper
+5. **Backend: server/index.ts** - Add 4 queue API endpoints
+6. **Frontend: SpecialistAgentCard.tsx** - Add queue UI
 
-✅ **server/index.ts** (beads: panopticon-0cyo) - COMPLETE
-- Added `execAsync = promisify(exec)` import
-- Removed `execSync` from import (no longer used)
-- Converted ALL execSync calls to async:
-  - **High priority**: `detectSpecialistCompletion()`, `pollReviewStatus()` (called every 5s)
-  - **Medium priority**: All tmux, git, and Docker operations
-  - **Low priority**: Workspace management, beads commands, utilities
-- Converted helper functions:
-  - `getGitStatus()` → async (3 git commands)
-  - `ensureTmuxRunning()` → async
-  - `getMrUrl()` → async
-- **Impact**: ALL 69 blocking execSync calls in server/index.ts are now non-blocking
-- **Total converted**: ~87 execSync calls across all three target files
+## Testing Notes
 
-✅ **CLI command callers** (bonus)
-- `src/cli/commands/specialists/wake.ts` → async (replaced sleep with Promise-based delay)
-- `src/cli/commands/specialists/reset.ts` → async
-
-### Summary
-
-✅ All execSync calls converted in the three target files:
-- specialists.ts: 15 calls → async
-- health.ts: 3 calls → async
-- server/index.ts: 69 calls → async
-- CLI callers: 12 calls → async (bonus)
-
-### Remaining Work
-
-- [x] Convert specialists.ts to async ✅
-- [x] Convert health.ts functions to async ✅
-- [x] Convert high-priority polling in server/index.ts ✅
-- [x] Convert ALL remaining server/index.ts execSync calls ✅
-- [ ] Run tests to verify no regressions
-- [ ] Measure terminal latency (P95 < 50ms target)
+- Test with mock busy specialist (send task while specialist is working)
+- Test queue persistence by restarting dashboard
+- Test priority ordering (urgent tasks should be processed first)
+- Test removal operation from dashboard
+- Test reorder operation from dashboard
+- Verify deacon patrol picks up queued tasks when specialist becomes idle

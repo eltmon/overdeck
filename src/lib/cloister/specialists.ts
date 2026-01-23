@@ -974,6 +974,93 @@ Use the send-feedback-to-agent skill to report findings back to the issue agent.
 }
 
 /**
+ * Wake a specialist or queue the task if busy
+ *
+ * This wrapper checks if the specialist is busy before waking.
+ * If the specialist is running but not idle, the task is queued instead.
+ *
+ * @param name - Specialist name
+ * @param task - Task details
+ * @param priority - Task priority (default: 'normal')
+ * @param source - Source of the task (default: 'handoff')
+ * @returns Promise with result indicating whether task was queued or executed
+ */
+export async function wakeSpecialistOrQueue(
+  name: SpecialistType,
+  task: {
+    issueId: string;
+    branch?: string;
+    workspace?: string;
+    prUrl?: string;
+    context?: Record<string, any>;
+  },
+  options: {
+    priority?: 'urgent' | 'high' | 'normal' | 'low';
+    source?: string;
+  } = {}
+): Promise<{
+  success: boolean;
+  queued: boolean;
+  message: string;
+  error?: string;
+}> {
+  const { priority = 'normal', source = 'handoff' } = options;
+
+  // Check if specialist is running
+  const running = await isRunning(name);
+  const idle = running ? await isIdleAtPrompt(name) : false;
+
+  // If running and busy, queue the task
+  if (running && !idle) {
+    try {
+      submitToSpecialistQueue(name, {
+        priority,
+        source,
+        issueId: task.issueId,
+        workspace: task.workspace,
+        branch: task.branch,
+        prUrl: task.prUrl,
+        context: task.context,
+      });
+
+      console.log(`[specialist] ${name} busy, queued task for ${task.issueId} (priority: ${priority})`);
+
+      return {
+        success: true,
+        queued: true,
+        message: `Specialist ${name} is busy. Task queued with ${priority} priority.`,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        queued: false,
+        message: `Failed to queue task for ${name}: ${error.message}`,
+        error: error.message,
+      };
+    }
+  }
+
+  // Otherwise, wake the specialist directly
+  try {
+    const wakeResult = await wakeSpecialistWithTask(name, task);
+
+    return {
+      success: wakeResult.success,
+      queued: false,
+      message: wakeResult.message,
+      error: wakeResult.error,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      queued: false,
+      message: `Failed to wake specialist ${name}: ${error.message}`,
+      error: error.message,
+    };
+  }
+}
+
+/**
  * ===========================================================================
  * Specialist Queue Helpers
  * ===========================================================================
