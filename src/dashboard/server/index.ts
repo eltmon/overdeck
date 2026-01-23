@@ -139,12 +139,15 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
     readyForMerge: false,
   };
 
+  // Merge existing with update
+  const merged = { ...existing, ...update };
+
   const updated: ReviewStatus = {
-    ...existing,
-    ...update,
+    ...merged,
     issueId,
     updatedAt: new Date().toISOString(),
-    readyForMerge: update.reviewStatus === 'passed' && update.testStatus === 'passed',
+    // Calculate readyForMerge from merged state (not just the update)
+    readyForMerge: merged.reviewStatus === 'passed' && merged.testStatus === 'passed',
   };
 
   statuses[issueId] = updated;
@@ -162,6 +165,160 @@ function clearReviewStatus(issueId: string): void {
   delete statuses[issueId];
   saveReviewStatuses(statuses);
 }
+
+// ============================================================================
+// AUTOMATIC COMPLETION DETECTION
+// ============================================================================
+// Monitors specialist output and automatically updates review status
+// instead of relying on agents to call curl commands manually.
+
+interface ActiveReview {
+  issueId: string;
+  startedAt: string;
+  lastChecked: string;
+  phase: 'review' | 'test' | 'merge';
+}
+
+const activeReviews: Map<string, ActiveReview> = new Map();
+
+/**
+ * Detect completion patterns from specialist tmux output
+ */
+function detectSpecialistCompletion(specialistName: string): {
+  completed: boolean;
+  success: boolean | null;
+  details: string;
+  handoffTo?: string;
+  issueId?: string;
+} {
+  try {
+    const output = execSync(
+      `tmux capture-pane -t "specialist-${specialistName}" -p | tail -50`,
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
+
+    // Extract issue ID from output (look for PAN-XX, MIN-XX, etc.)
+    const issueMatch = output.match(/\b(PAN|MIN|MYN)-\d+\b/i);
+    const issueId = issueMatch ? issueMatch[0].toUpperCase() : undefined;
+
+    // Review agent completion patterns
+    if (specialistName === 'review-agent') {
+      // Success: handed off to test-agent
+      if (output.includes('handed off to test-agent') ||
+          output.includes('Hand off to test-agent') ||
+          output.includes('wake test-agent') ||
+          output.includes('Waking Test Agent')) {
+        return { completed: true, success: true, details: 'Review passed, handed to test-agent', handoffTo: 'test-agent', issueId };
+      }
+      // Blocked: issues found
+      if (output.includes('BLOCKED') || output.includes('issues found') ||
+          output.includes('send-feedback-to-agent') && output.includes('issue')) {
+        return { completed: true, success: false, details: 'Review blocked - issues found', issueId };
+      }
+      // Explicitly passed
+      if (output.includes('review task is already complete') ||
+          output.includes('Code is clean') ||
+          output.includes('LGTM') ||
+          output.includes('approved')) {
+        return { completed: true, success: true, details: 'Review passed', issueId };
+      }
+    }
+
+    // Test agent completion patterns
+    if (specialistName === 'test-agent') {
+      // Success: tests passed, handed to merge
+      if ((output.includes('Test Results: PASS') || output.includes('tests passed')) &&
+          (output.includes('merge-agent') || output.includes('Handoff'))) {
+        return { completed: true, success: true, details: 'Tests passed, handed to merge-agent', handoffTo: 'merge-agent', issueId };
+      }
+      // Tests passed without handoff
+      if (output.includes('Test Results: PASS') ||
+          (output.includes('passed') && output.includes('skipped') && !output.includes('failed'))) {
+        return { completed: true, success: true, details: 'Tests passed', issueId };
+      }
+      // Tests failed
+      if (output.includes('Test Results: FAIL') || output.includes('FAILED') ||
+          output.includes('tests failed')) {
+        return { completed: true, success: false, details: 'Tests failed', issueId };
+      }
+    }
+
+    // Merge agent completion patterns
+    if (specialistName === 'merge-agent') {
+      // Success: merge complete
+      if (output.includes('Merge complete') || output.includes('pushed to main') ||
+          output.includes('main -> main')) {
+        return { completed: true, success: true, details: 'Merge completed successfully', issueId };
+      }
+      // Merge failed
+      if (output.includes('merge failed') || output.includes('conflict') && output.includes('error')) {
+        return { completed: true, success: false, details: 'Merge failed', issueId };
+      }
+    }
+
+    return { completed: false, success: null, details: 'Still working' };
+  } catch {
+    return { completed: false, success: null, details: 'Could not read specialist output' };
+  }
+}
+
+/**
+ * Poll active reviews and update status automatically
+ */
+function pollReviewStatus(): void {
+  const statuses = loadReviewStatuses();
+
+  for (const [issueId, status] of Object.entries(statuses)) {
+    // Skip if already complete or failed
+    if (status.readyForMerge ||
+        status.reviewStatus === 'failed' ||
+        (status.reviewStatus === 'blocked' && status.testStatus !== 'testing')) {
+      continue;
+    }
+
+    // Check review-agent if reviewing
+    if (status.reviewStatus === 'reviewing') {
+      const detection = detectSpecialistCompletion('review-agent');
+      if (detection.completed && detection.issueId?.toUpperCase() === issueId.toUpperCase()) {
+        if (detection.success) {
+          console.log(`[auto-detect] Review passed for ${issueId}`);
+          setReviewStatus(issueId, {
+            reviewStatus: 'passed',
+            testStatus: detection.handoffTo === 'test-agent' ? 'testing' : status.testStatus
+          });
+        } else {
+          console.log(`[auto-detect] Review blocked for ${issueId}: ${detection.details}`);
+          setReviewStatus(issueId, {
+            reviewStatus: 'blocked',
+            reviewNotes: detection.details
+          });
+        }
+      }
+    }
+
+    // Check test-agent if testing
+    if (status.testStatus === 'testing' ||
+        (status.reviewStatus === 'passed' && status.testStatus === 'pending')) {
+      const detection = detectSpecialistCompletion('test-agent');
+      if (detection.completed && detection.issueId?.toUpperCase() === issueId.toUpperCase()) {
+        if (detection.success) {
+          console.log(`[auto-detect] Tests passed for ${issueId}`);
+          setReviewStatus(issueId, { testStatus: 'passed' });
+        } else {
+          console.log(`[auto-detect] Tests failed for ${issueId}: ${detection.details}`);
+          setReviewStatus(issueId, {
+            testStatus: 'failed',
+            testNotes: detection.details
+          });
+        }
+      }
+    }
+  }
+}
+
+// Start polling for review status updates (every 5 seconds)
+setInterval(pollReviewStatus, 5000);
+console.log('[auto-detect] Started automatic review status polling');
 
 const PENDING_OPS_FILE = join(homedir(), '.panopticon', 'pending-operations.json');
 
