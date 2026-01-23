@@ -138,6 +138,15 @@ export interface CostTrackingConfig {
 }
 
 /**
+ * Auto-restart configuration
+ */
+export interface AutoRestartConfig {
+  enabled: boolean;
+  max_retries: number;
+  backoff_seconds: number[]; // Array of backoff delays (e.g., [30, 60, 120])
+}
+
+/**
  * Complete Cloister configuration
  */
 export interface CloisterConfig {
@@ -150,6 +159,7 @@ export interface CloisterConfig {
   model_selection?: ModelSelectionConfig;
   handoffs?: HandoffConfig;
   cost_tracking?: CostTrackingConfig;
+  auto_restart?: AutoRestartConfig;
 }
 
 /**
@@ -234,6 +244,11 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   cost_tracking: {
     display_enabled: true,
     log_to_jsonl: true,
+  },
+  auto_restart: {
+    enabled: true,
+    max_retries: 3,
+    backoff_seconds: [30, 60, 120], // 30s, 1m, 2m
   },
 };
 

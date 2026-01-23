@@ -42,6 +42,17 @@ export interface CloisterStatus {
 }
 
 /**
+ * Agent crash tracker for auto-restart
+ */
+interface AgentCrashTracker {
+  agentId: string;
+  crashCount: number;
+  lastCrash: Date;
+  nextRetryAt?: Date;
+  gaveUp: boolean;
+}
+
+/**
  * Cloister service event
  */
 export type CloisterEvent =
@@ -52,6 +63,10 @@ export type CloisterEvent =
   | { type: 'agent_stuck'; agentId: string; health: AgentHealth }
   | { type: 'poked_agent'; agentId: string }
   | { type: 'killed_agent'; agentId: string }
+  | { type: 'agent_crashed'; agentId: string; crashCount: number }
+  | { type: 'agent_restarting'; agentId: string; crashCount: number; backoffSeconds: number }
+  | { type: 'agent_restart_failed'; agentId: string; crashCount: number; error: string }
+  | { type: 'agent_gave_up'; agentId: string; maxRetries: number }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
   | { type: 'handoff_completed'; agentId: string; result: HandoffResult }
   | { type: 'emergency_stop'; killedAgents: string[] }
@@ -74,6 +89,8 @@ export class CloisterService {
   private config: CloisterConfig;
   private listeners: CloisterEventListener[] = [];
   private previousStates: Map<string, HealthState> = new Map();
+  private crashTrackers: Map<string, AgentCrashTracker> = new Map();
+  private previousRunningAgents: Set<string> = new Set();
 
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfig();
@@ -205,6 +222,20 @@ export class CloisterService {
     try {
       const runningAgents = listRunningAgents().filter((a) => a.tmuxActive);
       const agentIds = runningAgents.map((a) => a.id);
+      const currentRunningSet = new Set(agentIds);
+
+      // Detect crashed agents (were running before, not running now)
+      if (this.previousRunningAgents.size > 0 && this.config.auto_restart?.enabled) {
+        for (const previousAgentId of this.previousRunningAgents) {
+          if (!currentRunningSet.has(previousAgentId)) {
+            // Agent crashed!
+            await this.handleAgentCrash(previousAgentId);
+          }
+        }
+      }
+
+      // Update the set of running agents for next check
+      this.previousRunningAgents = currentRunningSet;
 
       if (agentIds.length === 0) {
         this.lastCheck = new Date();
@@ -298,6 +329,106 @@ export class CloisterService {
     } catch (error) {
       console.error(`Failed to kill ${agentId}:`, error);
     }
+  }
+
+  /**
+   * Handle agent crash with auto-restart logic
+   */
+  private async handleAgentCrash(agentId: string): Promise<void> {
+    const config = this.config.auto_restart;
+    if (!config?.enabled) return;
+
+    // Get or create crash tracker
+    let tracker = this.crashTrackers.get(agentId);
+    if (!tracker) {
+      tracker = {
+        agentId,
+        crashCount: 0,
+        lastCrash: new Date(),
+        gaveUp: false,
+      };
+      this.crashTrackers.set(agentId, tracker);
+    }
+
+    // Skip if we've already given up on this agent
+    if (tracker.gaveUp) return;
+
+    // Increment crash count
+    tracker.crashCount++;
+    tracker.lastCrash = new Date();
+
+    this.emit({ type: 'agent_crashed', agentId, crashCount: tracker.crashCount });
+    console.log(`🔔 Agent ${agentId} crashed (crash #${tracker.crashCount})`);
+
+    // Check if we've exceeded max retries
+    if (tracker.crashCount > config.max_retries) {
+      tracker.gaveUp = true;
+      this.emit({ type: 'agent_gave_up', agentId, maxRetries: config.max_retries });
+      console.error(`🔔 Gave up on restarting ${agentId} after ${config.max_retries} attempts`);
+      return;
+    }
+
+    // Calculate backoff delay
+    const backoffIndex = Math.min(tracker.crashCount - 1, config.backoff_seconds.length - 1);
+    const backoffSeconds = config.backoff_seconds[backoffIndex];
+    const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000);
+    tracker.nextRetryAt = nextRetryAt;
+
+    this.emit({
+      type: 'agent_restarting',
+      agentId,
+      crashCount: tracker.crashCount,
+      backoffSeconds,
+    });
+
+    console.log(
+      `🔔 Will restart ${agentId} in ${backoffSeconds}s (attempt ${tracker.crashCount}/${config.max_retries})`
+    );
+
+    // Schedule restart after backoff
+    setTimeout(async () => {
+      try {
+        await this.restartAgent(agentId);
+      } catch (error: any) {
+        this.emit({
+          type: 'agent_restart_failed',
+          agentId,
+          crashCount: tracker!.crashCount,
+          error: error.message,
+        });
+        console.error(`🔔 Failed to restart ${agentId}:`, error);
+      }
+    }, backoffSeconds * 1000);
+  }
+
+  /**
+   * Restart an agent using its saved session
+   */
+  private async restartAgent(agentId: string): Promise<void> {
+    const runtime = getRuntimeForAgent(agentId);
+    if (!runtime) {
+      throw new Error(`No runtime found for agent ${agentId}`);
+    }
+
+    // Get agent state to find session ID and workspace
+    const agentState = getAgentState(agentId);
+    if (!agentState?.sessionId) {
+      throw new Error(`No session ID found for agent ${agentId}`);
+    }
+
+    if (!agentState.workspace) {
+      throw new Error(`No workspace found for agent ${agentId}`);
+    }
+
+    // Restart with --resume using spawnAgent with sessionId
+    console.log(`🔔 Restarting ${agentId} with session ${agentState.sessionId.substring(0, 8)}...`);
+    runtime.spawnAgent({
+      agentId,
+      workspace: agentState.workspace,
+      sessionId: agentState.sessionId,
+      runtime: runtime.name,
+    });
+    console.log(`🔔 Successfully restarted ${agentId}`);
   }
 
   /**
