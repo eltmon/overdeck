@@ -11,13 +11,17 @@
  * Inspired by gastown's deacon pattern.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, execSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { homedir } from 'os';
 
 const execAsync = promisify(exec);
 import { PANOPTICON_HOME } from '../paths.js';
+
+// Review status file location (same as dashboard server)
+const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 import {
   SpecialistType,
   getEnabledSpecialists,
@@ -517,6 +521,72 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
 }
 
 /**
+ * Check for orphaned review/test statuses (PAN-88 follow-up)
+ *
+ * Detects when an issue has reviewStatus='reviewing' or testStatus='testing'
+ * but the corresponding specialist isn't actually running. This can happen if:
+ * - The specialist crashed mid-review
+ * - The specialist was killed
+ * - The wake failed but status wasn't rolled back
+ *
+ * Resets orphaned statuses to 'pending' so the work can be retried.
+ */
+export async function checkOrphanedReviewStatuses(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    if (!existsSync(REVIEW_STATUS_FILE)) {
+      return actions;
+    }
+
+    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
+    const statuses: Record<string, { reviewStatus?: string; testStatus?: string }> = JSON.parse(content);
+
+    // Check review-agent status
+    const reviewAgentSession = getTmuxSessionName('review-agent');
+    const reviewAgentRunning = sessionExists(reviewAgentSession);
+    const reviewAgentState = getAgentRuntimeState(reviewAgentSession);
+    const reviewAgentActive = reviewAgentRunning && reviewAgentState?.state === 'active';
+
+    // Check test-agent status
+    const testAgentSession = getTmuxSessionName('test-agent');
+    const testAgentRunning = sessionExists(testAgentSession);
+    const testAgentState = getAgentRuntimeState(testAgentSession);
+    const testAgentActive = testAgentRunning && testAgentState?.state === 'active';
+
+    let modified = false;
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      // Check for orphaned reviewing status
+      if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
+        console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but review-agent is not active`);
+        status.reviewStatus = 'pending';
+        modified = true;
+        actions.push(`Reset orphaned review for ${issueId} (review-agent not active)`);
+      }
+
+      // Check for orphaned testing status
+      if (status.testStatus === 'testing' && !testAgentActive) {
+        console.log(`[deacon] Orphaned test detected: ${issueId} shows 'testing' but test-agent is not active`);
+        status.testStatus = 'pending';
+        modified = true;
+        actions.push(`Reset orphaned test for ${issueId} (test-agent not active)`);
+      }
+    }
+
+    // Save changes if any
+    if (modified) {
+      writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error checking orphaned review statuses:', msg);
+  }
+
+  return actions;
+}
+
+/**
  * Run a single patrol cycle
  */
 export async function runPatrol(): Promise<PatrolResult> {
@@ -621,6 +691,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Check and auto-suspend idle agents (PAN-80)
   const suspendActions = await checkAndSuspendIdleAgents();
   actions.push(...suspendActions);
+
+  // Check for orphaned review/test statuses (PAN-88)
+  const orphanActions = await checkOrphanedReviewStatuses();
+  actions.push(...orphanActions);
 
   saveState(state);
 
