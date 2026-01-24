@@ -46,6 +46,18 @@ You have access to specialized review agents. **You MUST use these for every rev
 Task(subagent_type='code-review-performance', prompt='Review for performance issues including execSync usage: [files]')
 ```
 
+### MANDATORY: Beads Completion Check (Final Step)
+
+**Before approving ANY PR, verify all beads (tracked tasks) are closed.** Agents create beads to track sub-tasks during implementation. Open beads = incomplete work.
+
+```
+# Run this BEFORE approval - catches forgotten tasks
+Task(subagent_type='beads-completion-check', prompt='Check if all beads are closed in workspace: {{projectPath}}')
+```
+
+- If beads check returns **PASS**: Proceed with approval decision
+- If beads check returns **BLOCKED**: REQUEST CHANGES - agent must close or document open beads
+
 ### How to Use Parallel Reviews
 
 For all PRs with code changes, spawn specialists in parallel:
@@ -134,6 +146,12 @@ const { stdout } = await execAsync('tmux capture-pane -t session -p');
 - This applies to ALL shell commands: tmux, git, bd (beads), docker, etc.
 - The ONLY exception is one-time startup initialization code that runs before the server starts listening
 
+### 7. All Beads Must Be Closed
+- **Before approval, run `beads-completion-check` subagent**
+- All beads (tracked tasks) created during implementation must be closed
+- Open beads indicate incomplete work, forgotten sub-tasks, or unfinished documentation
+- If beads exist but are legitimately not applicable, agent must explicitly close them with reason
+
 ## Review Checklist
 
 ### Code Correctness
@@ -165,6 +183,11 @@ const { stdout } = await execAsync('tmux capture-pane -t session -p');
 - [ ] Are variable names descriptive?
 - [ ] Does it follow existing project patterns?
 
+### Work Completion (Final Check)
+- [ ] **All beads closed** - Run `beads-completion-check` subagent
+- [ ] **No open tasks** - Agent completed everything they set out to do
+- [ ] **Documentation updated** - If applicable
+
 ## Decision Criteria
 
 ### APPROVED (Use RARELY - only for excellent code)
@@ -177,6 +200,7 @@ Only approve if ALL of these are true:
 - No performance issues
 - Follows all project patterns
 - Clean, readable, maintainable
+- **All beads (tracked tasks) are closed** - Run beads-completion-check first!
 
 **If you're unsure, DO NOT APPROVE.**
 
@@ -272,31 +296,39 @@ NOTES: Excellent implementation. Full test coverage. Clean code. Ready for produ
 
 The issue agent cannot see your review. They will only know what's wrong if you tell them directly.
 
-### Step 1: Send feedback via tmux (ALWAYS do this first)
+### Step 1: Send feedback via pan work tell (ALWAYS do this first)
+
+**Use `pan work tell` - it handles Enter key correctly. DO NOT use raw tmux send-keys.**
 
 ```bash
-# Find the issue agent session
-tmux list-sessions | grep agent
+# Send your findings directly to the agent (Enter is sent automatically)
+pan work tell <issue-id> "CODE REVIEW BLOCKED for <ISSUE-ID>:
 
-# Send your findings directly to the agent
-tmux send-keys -t agent-<issue-id> "
-**Review Feedback from review-agent**
-
-**Status:** CHANGES_REQUESTED (or APPROVED)
-
-**Issues Found:**
+CRITICAL ISSUES:
 1. [file:line] - Description of issue
 2. [file:line] - Description of issue
 
-**Required Actions:**
+REQUIRED ACTIONS:
 - Fix X in file Y
 - Add tests for Z
 
-**Notes:**
-[Any additional context]
-"
-tmux send-keys -t agent-<issue-id> Enter
+Reply when fixes complete."
 ```
+
+**Example:**
+```bash
+pan work tell pan-80 "CODE REVIEW BLOCKED for PAN-80:
+
+1. Missing tests for new functions
+2. Type safety violation at line 42
+
+Fix these issues and reply when done."
+```
+
+**Why `pan work tell` instead of raw tmux:**
+- Automatically sends Enter key (agents often forget this step)
+- Properly escapes special characters
+- Saves message to mail queue as backup
 
 ### Step 2: Update the review status API
 

@@ -13,7 +13,10 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 import { PANOPTICON_HOME } from '../paths.js';
 import {
   SpecialistType,
@@ -327,10 +330,10 @@ export function checkSpecialistHealth(name: SpecialistType): HealthCheckResult {
 /**
  * Force-kill a stuck specialist
  */
-export function forceKillSpecialist(name: SpecialistType): {
+export async function forceKillSpecialist(name: SpecialistType): Promise<{
   success: boolean;
   message: string;
-} {
+}> {
   const tmuxSession = getTmuxSessionName(name);
   const state = loadState();
   const healthState = getSpecialistState(state, name);
@@ -345,8 +348,8 @@ export function forceKillSpecialist(name: SpecialistType): {
   }
 
   try {
-    // Kill the tmux session
-    execSync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' });
+    // Kill the tmux session (non-blocking)
+    await execAsync(`tmux kill-session -t "${tmuxSession}"`);
 
     // Update state
     healthState.lastForceKillTime = new Date().toISOString();

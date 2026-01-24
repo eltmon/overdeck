@@ -6,6 +6,7 @@ import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync } from 'fs';
+import { readFile, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
@@ -228,6 +229,7 @@ interface ActiveReview {
 
 const activeReviews: Map<string, ActiveReview> = new Map();
 
+<<<<<<< HEAD
 // ============================================================================
 // PAN-80: Terminal Parsing Removed
 // ============================================================================
@@ -235,6 +237,203 @@ const activeReviews: Map<string, ActiveReview> = new Map();
 //   POST /api/specialists/:name/report-status
 // This replaces unreliable terminal output parsing (detectSpecialistCompletion).
 // ============================================================================
+=======
+/**
+ * Detect completion patterns from specialist tmux output
+ */
+async function detectSpecialistCompletion(specialistName: string): Promise<{
+  completed: boolean;
+  success: boolean | null;
+  details: string;
+  handoffTo?: string;
+  issueId?: string;
+}> {
+  try {
+    const { stdout: output } = await execAsync(
+      `tmux capture-pane -t "specialist-${specialistName}" -p | tail -50`,
+      { encoding: 'utf-8' }
+    );
+    const trimmedOutput = output.trim();
+
+    // Extract issue ID from output (look for PAN-XX, MIN-XX, etc.)
+    const issueMatch = trimmedOutput.match(/\b(PAN|MIN|MYN)-\d+\b/i);
+    const issueId = issueMatch ? issueMatch[0].toUpperCase() : undefined;
+
+    // Review agent completion patterns
+    if (specialistName === 'review-agent') {
+      // Success: handed off to test-agent
+      if (trimmedOutput.includes('handed off to test-agent') ||
+          trimmedOutput.includes('Hand off to test-agent') ||
+          trimmedOutput.includes('wake test-agent') ||
+          trimmedOutput.includes('Waking Test Agent')) {
+        return { completed: true, success: true, details: 'Review passed, handed to test-agent', handoffTo: 'test-agent', issueId };
+      }
+      // Blocked: issues found
+      if (trimmedOutput.includes('BLOCKED') || trimmedOutput.includes('issues found') ||
+          trimmedOutput.includes('send-feedback-to-agent') && trimmedOutput.includes('issue')) {
+        return { completed: true, success: false, details: 'Review blocked - issues found', issueId };
+      }
+      // NOTE: We do NOT detect "passed" from terminal output alone.
+      // The review-agent should explicitly:
+      // 1. Call the API: POST /api/workspaces/:id/review-status with {"reviewStatus":"passed"}
+      // 2. Hand off to test-agent (detected above via "Waking Test Agent" pattern)
+      //
+      // Detecting "passed" from patterns like "LGTM", "approved" causes false positives
+      // because these words appear in prompts and intermediate output.
+    }
+
+    // Test agent completion patterns
+    if (specialistName === 'test-agent') {
+      // Success: tests passed, handed to merge
+      if ((trimmedOutput.includes('Test Results: PASS') || trimmedOutput.includes('tests passed')) &&
+          (trimmedOutput.includes('merge-agent') || trimmedOutput.includes('Handoff'))) {
+        return { completed: true, success: true, details: 'Tests passed, handed to merge-agent', handoffTo: 'merge-agent', issueId };
+      }
+      // Tests passed without handoff
+      if (trimmedOutput.includes('Test Results: PASS') ||
+          (trimmedOutput.includes('passed') && trimmedOutput.includes('skipped') && !trimmedOutput.includes('failed'))) {
+        return { completed: true, success: true, details: 'Tests passed', issueId };
+      }
+      // Tests failed
+      if (trimmedOutput.includes('Test Results: FAIL') || trimmedOutput.includes('FAILED') ||
+          trimmedOutput.includes('tests failed')) {
+        return { completed: true, success: false, details: 'Tests failed', issueId };
+      }
+    }
+
+    // Merge agent completion patterns
+    if (specialistName === 'merge-agent') {
+      // Success: merge complete
+      if (trimmedOutput.includes('Merge complete') || trimmedOutput.includes('pushed to main') ||
+          trimmedOutput.includes('main -> main')) {
+        return { completed: true, success: true, details: 'Merge completed successfully', issueId };
+      }
+      // Merge failed
+      if (trimmedOutput.includes('merge failed') || trimmedOutput.includes('conflict') && trimmedOutput.includes('error')) {
+        return { completed: true, success: false, details: 'Merge failed', issueId };
+      }
+    }
+
+    return { completed: false, success: null, details: 'Still working' };
+  } catch {
+    return { completed: false, success: null, details: 'Could not read specialist output' };
+  }
+}
+
+/**
+ * Poll active reviews and update status automatically
+ */
+async function pollReviewStatus(): Promise<void> {
+  const statuses = loadReviewStatuses();
+  const STALE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes without activity = stale
+
+  for (const [issueId, status] of Object.entries(statuses)) {
+    // Skip if already complete or failed
+    if (status.readyForMerge ||
+        status.reviewStatus === 'failed' ||
+        (status.reviewStatus === 'blocked' && status.testStatus !== 'testing')) {
+      continue;
+    }
+
+    // Check for stale status (reviewing/testing for too long without heartbeat)
+    const statusAge = Date.now() - new Date(status.updatedAt).getTime();
+    if (statusAge > STALE_TIMEOUT_MS) {
+      // Check if the specialist has a recent heartbeat
+      const specialistName = status.reviewStatus === 'reviewing' ? 'review-agent' :
+                            status.testStatus === 'testing' ? 'test-agent' : null;
+      if (specialistName) {
+        const heartbeatFile = join(homedir(), '.panopticon', 'heartbeats', `specialist-${specialistName}.json`);
+        let hasRecentActivity = false;
+        if (existsSync(heartbeatFile)) {
+          try {
+            const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf-8'));
+            const heartbeatAge = Date.now() - new Date(heartbeat.timestamp).getTime();
+            hasRecentActivity = heartbeatAge < STALE_TIMEOUT_MS;
+          } catch {}
+        }
+
+        if (!hasRecentActivity) {
+          console.log(`[auto-detect] ${issueId} status is stale (${specialistName} inactive for ${Math.round(statusAge / 1000)}s)`);
+
+          // Notify the issue agent about the timeout so they know what happened
+          const agentSession = `agent-${issueId.toLowerCase()}`;
+          try {
+            await execAsync(`tmux has-session -t "${agentSession}" 2>/dev/null`);
+            const timeoutMsg = status.reviewStatus === 'reviewing'
+              ? `**Review Timeout Notification**\n\nThe review-agent did not respond within the timeout period.\nYour review has been marked as failed.\n\n**Action Required:** Please re-trigger the review from the dashboard, or check the review-agent status with: tmux attach -t specialist-review-agent`
+              : `**Test Timeout Notification**\n\nThe test-agent did not respond within the timeout period.\nTests have been marked as failed.\n\n**Action Required:** Please re-trigger tests from the dashboard, or check the test-agent status.`;
+            const escapedMsg = timeoutMsg.replace(/'/g, "'\\''");
+            await execAsync(`tmux send-keys -t "${agentSession}" '${escapedMsg}'`);
+            await execAsync(`tmux send-keys -t "${agentSession}" C-m`);
+            console.log(`[auto-detect] Notified ${agentSession} about ${specialistName} timeout`);
+          } catch {
+            // Agent session doesn't exist, can't notify
+          }
+
+          if (status.reviewStatus === 'reviewing') {
+            setReviewStatus(issueId, {
+              reviewStatus: 'failed',
+              reviewNotes: `Review timed out - ${specialistName} did not respond`
+            });
+          } else if (status.testStatus === 'testing') {
+            setReviewStatus(issueId, {
+              testStatus: 'failed',
+              testNotes: `Tests timed out - ${specialistName} did not respond`
+            });
+          }
+          continue;
+        }
+      }
+    }
+
+    // Check review-agent if reviewing
+    if (status.reviewStatus === 'reviewing') {
+      const detection = await detectSpecialistCompletion('review-agent');
+      if (detection.completed && detection.issueId?.toUpperCase() === issueId.toUpperCase()) {
+        if (detection.success) {
+          console.log(`[auto-detect] Review passed for ${issueId}`);
+          setReviewStatus(issueId, {
+            reviewStatus: 'passed',
+            testStatus: detection.handoffTo === 'test-agent' ? 'testing' : status.testStatus
+          });
+        } else {
+          console.log(`[auto-detect] Review blocked for ${issueId}: ${detection.details}`);
+          setReviewStatus(issueId, {
+            reviewStatus: 'blocked',
+            reviewNotes: detection.details
+          });
+        }
+      }
+    }
+
+    // Check test-agent if testing
+    if (status.testStatus === 'testing' ||
+        (status.reviewStatus === 'passed' && status.testStatus === 'pending')) {
+      const detection = await detectSpecialistCompletion('test-agent');
+      if (detection.completed && detection.issueId?.toUpperCase() === issueId.toUpperCase()) {
+        if (detection.success) {
+          console.log(`[auto-detect] Tests passed for ${issueId}`);
+          setReviewStatus(issueId, { testStatus: 'passed' });
+        } else {
+          console.log(`[auto-detect] Tests failed for ${issueId}: ${detection.details}`);
+          setReviewStatus(issueId, {
+            testStatus: 'failed',
+            testNotes: detection.details
+          });
+        }
+      }
+    }
+  }
+}
+
+// Start polling for review status updates (every 5 seconds)
+setInterval(() => {
+  pollReviewStatus().catch((error) => {
+    console.error('[auto-detect] Error in pollReviewStatus:', error);
+  });
+}, 5000);
+console.log('[auto-detect] Started automatic review status polling');
+>>>>>>> origin/main
 
 const PENDING_OPS_FILE = join(homedir(), '.panopticon', 'pending-operations.json');
 
@@ -2426,7 +2625,7 @@ app.post('/api/specialists/reset-all', async (_req, res) => {
       if (isRunning(name)) {
         const tmuxSession = getTmuxSessionName(name);
         try {
-          execSync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' });
+          await execAsync(`tmux kill-session -t "${tmuxSession}"`);
           killed = true;
         } catch {
           // Session might not exist, continue
@@ -4488,8 +4687,8 @@ PROJECT: ${projectPath}
       }
     }
 
-    // Record task metrics for the completed work
-    recordApprovedTask(issueId, workspacePath, 'success');
+    // Record task metrics for the completed work (async to avoid blocking)
+    await recordApprovedTask(issueId, workspacePath, 'success');
 
     // Clear pending operation on success
     completePendingOperation(issueId);
@@ -6239,14 +6438,14 @@ function saveRuntimeMetrics(data: any): void {
   writeFileSync(METRICS_FILE, JSON.stringify(data, null, 2));
 }
 
-// Parse Claude Code session files for a workspace and return aggregated usage
-function parseWorkspaceSessionUsage(workspacePath: string): {
+// Parse Claude Code session files for a workspace and return aggregated usage (ASYNC to avoid blocking)
+async function parseWorkspaceSessionUsageAsync(workspacePath: string): Promise<{
   tokenCount: number;
   cost: number;
   model: string;
   startTime: string | null;
   endTime: string | null;
-} {
+}> {
   // Claude Code session directory name format: path with leading / removed and / replaced by -
   // e.g., /home/eltmon/projects/foo -> -home-eltmon-projects-foo
   const sessionDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
@@ -6266,42 +6465,57 @@ function parseWorkspaceSessionUsage(workspacePath: string): {
   }
 
   try {
-    const files = readdirSync(sessionDir).filter(f => f.endsWith('.jsonl'));
+    const allFiles = await readdir(sessionDir);
+    const files = allFiles.filter(f => f.endsWith('.jsonl'));
 
-    for (const file of files) {
-      const filePath = join(sessionDir, file);
-      const content = readFileSync(filePath, 'utf-8');
-      const lines = content.split('\n').filter(l => l.trim());
+    // Read files in parallel but with concurrency limit to avoid memory issues
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      const batch = files.slice(i, i + BATCH_SIZE);
+      const contents = await Promise.all(
+        batch.map(async (file) => {
+          const filePath = join(sessionDir, file);
+          try {
+            return await readFile(filePath, 'utf-8');
+          } catch {
+            return '';
+          }
+        })
+      );
 
-      for (const line of lines) {
-        try {
-          const entry = JSON.parse(line);
+      for (const content of contents) {
+        const lines = content.split('\n').filter(l => l.trim());
 
-          // Track timestamps
-          if (entry.timestamp) {
-            if (!startTime || entry.timestamp < startTime) {
-              startTime = entry.timestamp;
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+
+            // Track timestamps
+            if (entry.timestamp) {
+              if (!startTime || entry.timestamp < startTime) {
+                startTime = entry.timestamp;
+              }
+              if (!endTime || entry.timestamp > endTime) {
+                endTime = entry.timestamp;
+              }
             }
-            if (!endTime || entry.timestamp > endTime) {
-              endTime = entry.timestamp;
+
+            // Extract model
+            if (entry.message?.model || entry.model) {
+              model = entry.message?.model || entry.model;
             }
-          }
 
-          // Extract model
-          if (entry.message?.model || entry.model) {
-            model = entry.message?.model || entry.model;
+            // Extract usage - can be at top level or in message
+            const usage = entry.usage || entry.message?.usage;
+            if (usage) {
+              totalInputTokens += usage.input_tokens || 0;
+              totalOutputTokens += usage.output_tokens || 0;
+              totalCacheReadTokens += usage.cache_read_input_tokens || 0;
+              totalCacheWriteTokens += usage.cache_creation_input_tokens || 0;
+            }
+          } catch {
+            // Skip malformed lines
           }
-
-          // Extract usage - can be at top level or in message
-          const usage = entry.usage || entry.message?.usage;
-          if (usage) {
-            totalInputTokens += usage.input_tokens || 0;
-            totalOutputTokens += usage.output_tokens || 0;
-            totalCacheReadTokens += usage.cache_read_input_tokens || 0;
-            totalCacheWriteTokens += usage.cache_creation_input_tokens || 0;
-          }
-        } catch {
-          // Skip malformed lines
         }
       }
     }
@@ -6331,10 +6545,10 @@ function parseWorkspaceSessionUsage(workspacePath: string): {
   }
 }
 
-// Record a completed task in runtime metrics
-function recordApprovedTask(issueId: string, workspacePath: string, outcome: 'success' | 'failure' | 'partial'): void {
+// Record a completed task in runtime metrics (async to avoid blocking)
+async function recordApprovedTask(issueId: string, workspacePath: string, outcome: 'success' | 'failure' | 'partial'): Promise<void> {
   try {
-    const usage = parseWorkspaceSessionUsage(workspacePath);
+    const usage = await parseWorkspaceSessionUsageAsync(workspacePath);
     const data = loadRuntimeMetrics();
 
     const startedAt = usage.startTime || new Date().toISOString();
@@ -6497,7 +6711,7 @@ app.get('/api/costs/summary', (_req, res) => {
 });
 
 // GET /api/costs/by-issue - Costs grouped by issue (calculated from actual session files)
-app.get('/api/costs/by-issue', (_req, res) => {
+app.get('/api/costs/by-issue', async (_req, res) => {
   try {
     const issueMap: Record<string, { totalCost: number; tokenCount: number; sessionCount: number; model?: string; durationMinutes?: number }> = {};
 
@@ -6507,38 +6721,48 @@ app.get('/api/costs/by-issue', (_req, res) => {
     if (existsSync(agentsDir)) {
       const agentDirs = readdirSync(agentsDir).filter(name => name.startsWith('agent-') || name.startsWith('planning-'));
 
-      for (const agentDir of agentDirs) {
-        try {
-          const stateFile = join(agentsDir, agentDir, 'state.json');
-          if (!existsSync(stateFile)) continue;
+      // Process agents in parallel batches to avoid blocking (ASYNC)
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < agentDirs.length; i += BATCH_SIZE) {
+        const batch = agentDirs.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map(async (agentDir) => {
+            try {
+              const stateFile = join(agentsDir, agentDir, 'state.json');
+              if (!existsSync(stateFile)) return null;
 
-          const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-          if (!state.issueId || !state.workspace) continue;
+              const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+              if (!state.issueId || !state.workspace) return null;
 
-          const key = state.issueId.toLowerCase();
+              const sessionData = await parseWorkspaceSessionUsageAsync(state.workspace);
+              return { issueId: state.issueId, sessionData };
+            } catch {
+              return null;
+            }
+          })
+        );
 
-          // Parse actual session data from workspace
-          const sessionData = parseWorkspaceSessionUsage(state.workspace);
+        // Aggregate results
+        for (const result of results) {
+          if (!result) continue;
+          const key = result.issueId.toLowerCase();
+          const sessionData = result.sessionData;
 
           if (!issueMap[key]) {
             issueMap[key] = { totalCost: 0, tokenCount: 0, sessionCount: 0 };
           }
 
-          // Add costs from this agent's sessions
           issueMap[key].totalCost += sessionData.cost;
           issueMap[key].tokenCount += sessionData.tokenCount;
           issueMap[key].sessionCount += 1;
           issueMap[key].model = sessionData.model;
 
-          // Calculate duration if we have timestamps
           if (sessionData.startTime && sessionData.endTime) {
             const start = new Date(sessionData.startTime).getTime();
             const end = new Date(sessionData.endTime).getTime();
             const minutes = (end - start) / (1000 * 60);
             issueMap[key].durationMinutes = (issueMap[key].durationMinutes || 0) + minutes;
           }
-        } catch {
-          // Skip agents with invalid state
         }
       }
     }
