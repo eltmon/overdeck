@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
 import { homedir } from 'os';
 import { AGENTS_DIR } from './paths.js';
 import { createSession, killSession, sendKeys, sessionExists, getAgentSessions } from './tmux.js';
@@ -34,14 +33,14 @@ function clearReadySignal(agentId: string): void {
 }
 
 /**
- * Wait for SessionStart hook to signal ready
+ * Wait for SessionStart hook to signal ready (async - non-blocking)
  * Returns true if ready signal received, false if timeout
  */
-function waitForReadySignal(agentId: string, timeoutSeconds = 30): boolean {
+async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
 
   for (let i = 0; i < timeoutSeconds; i++) {
-    execSync('sleep 1');
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
 
     if (existsSync(readyPath)) {
       try {
@@ -477,7 +476,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // If there's a message, wait for ready signal then send
     if (message) {
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
-      const ready = waitForReadySignal(normalizedId, 30);
+      const ready = await waitForReadySignal(normalizedId, 30);
 
       if (ready) {
         // Send message

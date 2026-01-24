@@ -58,7 +58,7 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -30
 Give the agent a chance to save state:
 
 ```bash
-# Send shutdown message (use pan work tell - handles Enter automatically)
+# Send shutdown message (ALWAYS use pan work tell, NOT raw tmux)
 pan work tell ISSUE-123 "Please save your progress to STATE.md and stop working."
 
 # Wait for acknowledgment
@@ -68,6 +68,8 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -10
 # Then kill the session
 tmux kill-session -t agent-ISSUE-123
 ```
+
+**WARNING:** DO NOT use raw `tmux send-keys` - agents often forget the Enter key. Always use `pan work tell` which handles this correctly.
 
 ### 3. Immediate Stop (If Needed)
 

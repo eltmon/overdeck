@@ -4115,6 +4115,20 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   const branchName = `feature/${issueLower}`;
 
+  // Check if issue was already reviewed with feedback that needs addressing
+  const existingStatus = getReviewStatus(issueId);
+  if (existingStatus?.reviewNotes && ['blocked', 'failed'].includes(existingStatus.reviewStatus)) {
+    // Issue has existing review feedback - don't reset to reviewing
+    // Return info about existing review so user knows to address feedback first
+    return res.json({
+      success: false,
+      alreadyReviewed: true,
+      message: `Review already completed with status: ${existingStatus.reviewStatus}`,
+      reviewNotes: existingStatus.reviewNotes,
+      hint: 'Address the review feedback before requesting another review',
+    });
+  }
+
   // Mark review as starting
   setPendingOperation(issueId, 'review');
   setReviewStatus(issueId, { reviewStatus: 'reviewing', testStatus: 'pending' });

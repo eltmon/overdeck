@@ -9,6 +9,7 @@ import { listCommand } from './list.js';
 import { wakeCommand } from './wake.js';
 import { queueCommand } from './queue.js';
 import { resetCommand } from './reset.js';
+import { clearQueueCommand } from './clear-queue.js';
 
 export function registerSpecialistsCommands(program: Command): void {
   const specialists = program
@@ -43,4 +44,12 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--force', 'Skip confirmation prompt')
     .option('--all', 'Reset ALL specialists (wipe all context)')
     .action(resetCommand);
+
+  // pan specialists clear-queue <name>
+  specialists
+    .command('clear-queue <name>')
+    .description('Clear all items from a specialist\'s queue')
+    .option('--force', 'Skip confirmation prompt')
+    .option('--reset-status', 'Reset review statuses to pending')
+    .action(clearQueueCommand);
 }
