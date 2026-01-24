@@ -260,31 +260,32 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     return `${workspacePath}/docs/${issue.identifier}-plan.md`;
   };
 
+  // When minimized, only render the floating bar (no full-screen wrapper)
+  if (minimized) {
+    return (
+      <div
+        className="fixed bottom-4 right-4 z-50 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-gray-700 transition-colors"
+        onClick={() => setMinimized(false)}
+      >
+        <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+          <Sparkles className="w-3 h-3 text-white" />
+        </div>
+        <span className="text-sm text-white font-medium">Plan: {issue.identifier}</span>
+        {step === 'planning' && (
+          <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50">
-      {/* Backdrop - only show when not minimized */}
-      {!minimized && (
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      )}
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Minimized state - small floating bar */}
-      {minimized ? (
-        <div
-          className="fixed bottom-4 right-4 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-gray-700 transition-colors"
-          onClick={() => setMinimized(false)}
-        >
-          <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-            <Sparkles className="w-3 h-3 text-white" />
-          </div>
-          <span className="text-sm text-white font-medium">Plan: {issue.identifier}</span>
-          {step === 'planning' && (
-            <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
-          )}
-        </div>
-      ) : (
-        /* Dialog with Rnd for drag/resize */
-        <Rnd
-          position={{ x: centeredX, y: centeredY }}
+      {/* Dialog with Rnd for drag/resize */}
+      <Rnd
+        position={{ x: centeredX, y: centeredY }}
           size={size}
           onDragStop={(_e, d) => setPosition({ x: d.x, y: d.y })}
           onResizeStop={(_e, _direction, ref, _delta, pos) => {
@@ -637,7 +638,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
             </div>
           </div>
         </Rnd>
-      )}
     </div>
   );
 }
