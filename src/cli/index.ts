@@ -16,6 +16,7 @@ import { registerSpecialistsCommands } from './commands/specialists/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
+import { registerDbCommands } from './commands/db.js';
 
 const program = new Command();
 
@@ -83,6 +84,9 @@ registerSetupCommands(program);
 
 // Register install command
 registerInstallCommand(program);
+
+// Register db commands (pan db snapshot, pan db seed, etc.)
+registerDbCommands(program);
 
 // Shorthand: pan status = pan work status
 program

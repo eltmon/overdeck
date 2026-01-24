@@ -929,6 +929,104 @@ pan project add /path/to/project --name myproject --linear-team PRJ
 pan project remove myproject
 ```
 
+### Database Seeding
+
+Many projects need a pre-populated database for development and testing. Panopticon provides database seeding commands that work with your existing infrastructure.
+
+**Problem:** Development databases often need:
+- Schema with 100+ migrations already applied
+- Seed data for testing (users, reference data)
+- External QA database connections
+- Database snapshots from staging/production (sanitized)
+
+**Solution:** Configure database seeding in `projects.yaml`:
+
+```yaml
+projects:
+  myapp:
+    workspace:
+      database:
+        # Path to seed file (loaded on first container start)
+        seed_file: /path/to/sanitized-seed.sql
+
+        # Command to create new snapshots from external source
+        snapshot_command: "kubectl exec -n prod pod/postgres -- pg_dump -U app mydb"
+
+        # Or connect to external database directly
+        external_db:
+          host: qa-db.example.com
+          database: myapp_qa
+          user: readonly
+          password_env: QA_DB_PASSWORD
+
+        # Container naming pattern
+        container_name: "{{PROJECT}}-postgres-1"
+
+        # Migration tool (for status checks)
+        migrations:
+          type: flyway  # flyway | liquibase | prisma | typeorm | custom
+          path: src/main/resources/db/migration
+```
+
+**Commands:**
+
+```bash
+# Create a snapshot from production/staging
+pan db snapshot --project myapp --output /path/to/seed.sql
+
+# Seed a workspace database
+pan db seed MIN-123
+
+# Check database status
+pan db status MIN-123
+
+# Clean kubectl noise from pg_dump files
+pan db clean /path/to/dump.sql
+
+# View database configuration
+pan db config myapp
+```
+
+**Workflow for capturing production data:**
+
+1. **Create snapshot** from production (via kubectl or direct connection):
+   ```bash
+   pan db snapshot --project myapp --sanitize
+   ```
+
+2. **Verify** the seed file:
+   ```bash
+   pan db clean /path/to/seed.sql --dry-run
+   ```
+
+3. **Update projects.yaml** with seed file path
+
+4. **Workspaces** automatically seed on first postgres container start
+
+**Container integration:**
+
+Your Docker Compose template should mount the seed directory:
+
+```yaml
+# compose.infra.yml
+services:
+  postgres:
+    image: postgres:16
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Seed database on first startup
+      - /path/to/project/infra/seed:/docker-entrypoint-initdb.d:ro
+```
+
+**Troubleshooting:**
+
+| Issue | Solution |
+|-------|----------|
+| "relation does not exist" | Seed file missing or incomplete - run `pan db snapshot` |
+| Slow database startup | Large seed file - consider pruning old data |
+| kubectl garbage in dump | Run `pan db clean <file>` to remove stderr noise |
+| Migrations fail after seed | Check Flyway version matches seed file's schema_history |
+
 ### Agent Completion Notifications
 
 Panopticon includes a notification system that alerts you when agents complete their work.

@@ -88,6 +88,32 @@ export interface TestConfig {
   env?: Record<string, string>;
 }
 
+export interface DatabaseConfig {
+  /** Path to seed file for database initialization */
+  seed_file?: string;
+  /** Command to run after loading seed (e.g., sanitization script) */
+  seed_command?: string;
+  /** Command to create snapshots from external source (e.g., kubectl exec pg_dump) */
+  snapshot_command?: string;
+  /** External database connection for direct access */
+  external_db?: {
+    host: string;
+    port?: number;
+    database: string;
+    user?: string;
+    /** Environment variable name containing password */
+    password_env?: string;
+  };
+  /** Container name pattern (supports {{PROJECT}} placeholder) */
+  container_name?: string;
+  /** Migration tool configuration */
+  migrations?: {
+    type: 'flyway' | 'liquibase' | 'prisma' | 'typeorm' | 'custom';
+    path?: string;
+    command?: string;
+  };
+}
+
 export interface WorkspaceConfig {
   /** Workspace type: 'polyrepo' (multiple git repos) or 'monorepo' (single repo, default) */
   type?: 'polyrepo' | 'monorepo';
@@ -101,6 +127,8 @@ export interface WorkspaceConfig {
   ports?: Record<string, PortConfig>;
   /** Docker configuration */
   docker?: DockerConfig;
+  /** Database seeding configuration */
+  database?: DatabaseConfig;
   /** Agent configuration templates */
   agent?: AgentTemplateConfig;
   /** Environment variables */
