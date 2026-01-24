@@ -25,6 +25,33 @@ Graph-based issue tracker that survives conversation compaction. Provides persis
 
 **Decision test**: "Will I need this context in 2 weeks?" → YES = bd
 
+## ID Systems
+
+**Beads uses a unique ID format** that differs from GitHub/Linear issue IDs:
+
+| System | Format | Example |
+|--------|--------|---------|
+| **Beads** | `repo-hash` | `panopticon-3eb7`, `panopticon-6ax` |
+| **Beads (hierarchical)** | `repo-hash.N` | `panopticon-3eb7.4` |
+| **GitHub Issues** | `PREFIX-number` | `PAN-84`, `PAN-73` |
+| **Linear Issues** | `PREFIX-number` | `MIN-123`, `HH-456` |
+
+**CRITICAL**: Commands like `bd dep add`, `--parent`, and `--deps` expect **beads IDs** (e.g., `panopticon-abc1`), NOT external tracker IDs (e.g., `PAN-5`).
+
+### Linking to External Trackers
+
+To link a beads issue to a GitHub or Linear issue, use `--external-ref` when creating:
+
+```bash
+# Link beads issue to GitHub issue PAN-84
+bd create "Fix auth bug" --external-ref PAN-84 --json
+
+# Link to Linear issue
+bd create "Add feature" --external-ref MIN-123 --json
+```
+
+**Current limitation**: No `bd list --external-ref PAN-84` filter exists. Use labels or title conventions as workaround until upstream feature is available.
+
 **When to use bd**:
 - Work spans multiple sessions or days
 - Tasks have dependencies or blockers
@@ -91,8 +118,8 @@ bd create "Title" --deps blocks:pan-1 --json            # with dependency
 # Make issue-A blocked by issue-B (A cannot start until B is done)
 bd dep add <blocked-issue> <blocker-issue> --type blocks
 
-# Example: PAN-5 is blocked by PAN-1
-bd dep add pan-5 pan-1 --type blocks
+# Example: panopticon-abc1 is blocked by panopticon-def2
+bd dep add panopticon-abc1 panopticon-def2 --type blocks
 
 # View dependency tree
 bd dep tree <id>

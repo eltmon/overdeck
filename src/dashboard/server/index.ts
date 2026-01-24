@@ -4048,7 +4048,7 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     }
   }
 
-  if (testStatus && ['passed', 'failed'].includes(testStatus)) {
+  if (testStatus && ['passed', 'failed', 'skipped'].includes(testStatus)) {
     const tmuxSession = getTmuxSessionName('test-agent');
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',

@@ -389,6 +389,90 @@ The merge-agent uses a specialized prompt template that instructs it to:
 - Document conflict resolution decisions
 - Provide detailed feedback on what was merged
 
+#### Review Pipeline Flow
+
+The review pipeline is a sequential handoff between specialists:
+
+```
+Human clicks "Review"
+        │
+        ▼
+┌───────────────────┐
+│   review-agent    │ Reviews code, checks for issues
+└─────────┬─────────┘
+          │ If PASSED: queues test-agent
+          │ If BLOCKED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│    test-agent     │ Runs test suite, analyzes failures
+└─────────┬─────────┘
+          │ If PASSED: marks ready for merge
+          │ If FAILED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│  (Human clicks    │ Human approval required
+│  "Approve & Merge"│ before merge
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│   merge-agent     │ Performs merge, resolves conflicts
+└───────────────────┘
+```
+
+**Key Points:**
+- **Human-initiated start** - A human must click "Review" to start the pipeline
+- **Automatic handoffs** - review-agent → test-agent happens automatically
+- **Human approval for merge** - Merge is NOT automatic; human clicks "Approve & Merge"
+- **Feedback loops** - Failed reviews/tests send feedback back to the work-agent
+
+#### Queue Processing
+
+Each specialist has a task queue (`~/.panopticon/specialists/{name}/hook.json`) managed via the FPP (Fixed Point Principle):
+
+```
+1. Task arrives (via API or handoff)
+        │
+        ▼
+2. wakeSpecialistOrQueue() checks if specialist is busy
+        │
+        ├── If IDLE: Wake specialist immediately with task
+        │
+        └── If BUSY: Add task to queue (hook.json)
+                │
+                ▼
+3. When specialist completes current task:
+        │
+        ├── Updates status via API (passed/failed/skipped)
+        │
+        └── Dashboard automatically wakes specialist for next queued task
+```
+
+**Queue priority order:** `urgent` > `high` > `normal` > `low`
+
+**Completion triggers:** When a specialist reports status (`passed`, `failed`, or `skipped`), the dashboard:
+1. Sets the specialist state to `idle`
+2. Checks the specialist's queue for pending work
+3. If work exists, immediately wakes the specialist with the next task
+
+#### Agent Self-Requeue (Circuit Breaker)
+
+After a human initiates the first review, work-agents can request re-review up to 3 times automatically:
+
+```bash
+# Work-agent requests re-review after fixing issues
+pan work request-review MIN-123 -m "Fixed: added tests for edge cases"
+```
+
+**Circuit breaker behavior:**
+- First human click resets the counter to 0
+- Each `pan work request-review` increments the counter
+- After 3 automatic re-requests, returns HTTP 429
+- Human must click "Review" in dashboard to continue
+
+This prevents infinite loops where an agent repeatedly fails review.
+
+**API endpoint:** `POST /api/workspaces/:issueId/request-review`
+
 #### Specialist Auto-Initialization
 
 When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures the test-agent, review-agent, and merge-agent are ready to receive wake signals without manual setup.
