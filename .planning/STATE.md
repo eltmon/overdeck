@@ -1,6 +1,6 @@
 # PAN-93: Merge-agent should detect and resolve merge conflicts before completing
 
-## Status: CORE IMPLEMENTATION COMPLETE
+## Status: IMPLEMENTATION COMPLETE ✅
 
 **Progress:**
 - ✅ Created scripts/validate-merge.sh
@@ -10,8 +10,8 @@
   - Added post-merge validation in both code paths
   - Auto-revert on validation failure
   - Force-push revert to remote
-- ⏳ Add unit tests (remaining)
-- ⏳ Add integration tests (remaining)
+- ✅ Added unit tests (9 tests, all passing)
+- ✅ Added integration tests (6 tests, all passing)
 
 ## Problem Statement
 
