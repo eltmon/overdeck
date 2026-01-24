@@ -794,6 +794,18 @@ volumes:
 - Set `PNPM_HOME=/path` to configure the pnpm store location
 - Mount a named volume for the store to share across containers
 
+#### Coming Soon: Template-Based Workspaces
+
+A comprehensive template system for Docker orchestration is in development ([#96](https://github.com/eltmon/panopticon-cli/issues/96)). This will provide:
+
+- **Zero-config for common stacks** - Spring Boot + React, Next.js, Python + FastAPI
+- **Full customization** - Custom templates, port strategies, cache sharing
+- **Polyrepo support** - Multiple git repos in one workspace
+- **Database isolation options** - Shared or per-workspace databases
+- **Interactive setup** - `/pan-docker` skill to guide configuration
+
+Until then, use `workspace_command` to point to your project's custom setup script.
+
 ### Managing Projects
 
 ```bash
