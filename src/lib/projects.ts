@@ -28,6 +28,8 @@ export interface ProjectConfig {
   path: string;
   linear_team?: string;
   issue_routing?: IssueRoutingRule[];
+  /** Custom command to create workspaces (e.g., infra/new-feature for MYN) */
+  workspace_command?: string;
 }
 
 /**

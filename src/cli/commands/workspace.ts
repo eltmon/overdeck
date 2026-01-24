@@ -10,7 +10,13 @@ import {
   resolveProjectFromIssue,
   hasProjects,
   PROJECTS_CONFIG_FILE,
+  findProjectByTeam,
+  extractTeamPrefix,
 } from '../../lib/projects.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export function registerWorkspaceCommands(program: Command): void {
   const workspace = program.command('workspace').description('Workspace management');
@@ -111,6 +117,43 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       process.exit(1);
     }
 
+    // Check if project has a custom workspace command (e.g., MYN's new-feature script)
+    const teamPrefix = extractTeamPrefix(issueId);
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+    if (projectConfig?.workspace_command) {
+      // Use custom workspace command
+      spinner.text = `Running custom workspace command...`;
+
+      // The command receives the normalized issue ID (e.g., "min-123")
+      const cmd = `${projectConfig.workspace_command} ${normalizedId}`;
+      try {
+        const { stdout, stderr } = await execAsync(cmd, {
+          cwd: projectConfig.path,
+          encoding: 'utf-8',
+          timeout: 120000, // 2 minute timeout
+        });
+
+        if (stdout) {
+          console.log(stdout);
+        }
+
+        spinner.succeed('Workspace created via custom command!');
+        console.log('');
+        console.log(chalk.bold('Workspace Details:'));
+        console.log(`  Path:   ${chalk.cyan(workspacePath)}`);
+        console.log(`  Branch: ${chalk.dim(branchName)}`);
+        return;
+      } catch (error: any) {
+        spinner.fail(`Custom workspace command failed: ${error.message}`);
+        if (error.stderr) {
+          console.error(error.stderr);
+        }
+        process.exit(1);
+      }
+    }
+
+    // Standard workspace creation via git worktree
     // Check if we're in a git repo
     if (!existsSync(join(projectRoot, '.git'))) {
       spinner.fail('Not a git repository. Run this from the project root.');

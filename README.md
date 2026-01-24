@@ -726,6 +726,74 @@ Issues are routed to different subdirectories based on their labels:
 
 Example: An issue with label "splash" in the MIN team would create its workspace at `/home/user/projects/myn/splash/workspaces/feature-min-xxx/`.
 
+### Custom Workspace Commands
+
+For complex projects that need more than a simple git worktree (e.g., polyrepos, multi-container setups), you can specify a custom workspace creation script:
+
+```yaml
+projects:
+  myn:
+    name: "Mind Your Now"
+    path: /home/user/projects/myn
+    linear_team: MIN
+    # Custom script handles complex workspace setup
+    workspace_command: /home/user/projects/myn/infra/new-feature
+```
+
+When `workspace_command` is specified, Panopticon calls your script instead of creating a standard git worktree. The script receives the normalized issue ID (e.g., `min-123`) as an argument.
+
+**What your custom script should handle:**
+- Creating git worktrees for multiple repositories (polyrepo structure)
+- Setting up Docker Compose files and dev containers
+- Configuring environment variables and `.env` files
+- Setting up DNS entries for workspace-specific URLs (e.g., Traefik routing)
+- Creating a `./dev` script for container management
+- Copying agent configuration templates (CLAUDE.md, .mcp.json, etc.)
+
+**Example script flow:**
+```bash
+#!/bin/bash
+# new-feature script for a polyrepo project
+ISSUE_ID=$1  # e.g., "min-123"
+
+# Create worktrees for frontend and api repos
+git -C /path/to/frontend worktree add ../workspaces/feature-$ISSUE_ID/fe feature/$ISSUE_ID
+git -C /path/to/api worktree add ../workspaces/feature-$ISSUE_ID/api feature/$ISSUE_ID
+
+# Generate docker-compose from templates
+sed "s/{{FEATURE_FOLDER}}/feature-$ISSUE_ID/g" template.yml > workspace/docker-compose.yml
+
+# Set up DNS and Traefik routing
+# ... additional setup
+```
+
+The standard `pan workspace create` command will automatically detect and use your custom script.
+
+#### Container Configuration Tips
+
+When setting up Docker containers for workspaces, avoid these common pitfalls:
+
+**Maven projects:**
+- DO NOT set `MAVEN_CONFIG=/some/path` as an environment variable
+- Maven interprets `MAVEN_CONFIG` as additional CLI arguments, not a directory path
+- This causes "Unknown lifecycle phase" errors (e.g., "Unknown lifecycle phase /maven-cache")
+- Instead, use `-Dmaven.repo.local=/path/to/cache` in the Maven command
+
+```yaml
+# WRONG - causes Maven startup failure
+environment:
+  - MAVEN_CONFIG=/maven-cache
+
+# CORRECT - use command line argument
+command: ./mvnw spring-boot:run -Dmaven.repo.local=/maven-cache/repository
+volumes:
+  - ~/.m2:/maven-cache:cached
+```
+
+**pnpm projects:**
+- Set `PNPM_HOME=/path` to configure the pnpm store location
+- Mount a named volume for the store to share across containers
+
 ### Managing Projects
 
 ```bash

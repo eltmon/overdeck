@@ -5752,11 +5752,11 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
             output: [],
           });
 
-          // Run pan workspace create
+          // Run pan workspace create (may call custom workspace_command for complex projects)
           await execAsync(`pan workspace create ${issue.identifier}`, {
             cwd: projectPath,
             encoding: 'utf-8',
-            timeout: 60000,
+            timeout: 120000, // 2 minutes for complex scripts like MYN's new-feature
           });
           workspaceCreated = true;
           appendActivityOutput(activityId, 'Workspace created successfully');
