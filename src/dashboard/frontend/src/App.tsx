@@ -13,6 +13,7 @@ import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { MetricsSummary } from './components/MetricsSummary';
 import { MetricsPage } from './components/MetricsPage';
+import { SearchModal } from './components/search/SearchModal';
 import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft } from 'lucide-react';
 import { Agent, Issue } from './types';
 
@@ -57,6 +58,7 @@ export default function App() {
   const [isResizing, setIsResizing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch agents to find if selected issue has an agent
@@ -154,6 +156,25 @@ export default function App() {
 
   const handleCloseConfirmation = useCallback(() => {
     setCurrentConfirmation(null);
+  }, []);
+
+  // Global keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Open search with '/' key (but not when typing in an input/textarea)
+      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSelectIssueFromSearch = useCallback((issueId: string) => {
+    setSelectedIssue(issueId);
+    setActiveTab('kanban'); // Switch to kanban tab if not already there
   }, []);
 
   // Calculate actual panel width (expanded = full width minus a small margin for kanban)
@@ -295,6 +316,15 @@ export default function App() {
         onConfirm={handleConfirm}
         onDeny={handleDeny}
         onClose={handleCloseConfirmation}
+      />
+
+      {/* Search Modal */}
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelectIssue={handleSelectIssueFromSearch}
+        cycleFilter="current"
+        includeCompletedFilter={false}
       />
     </div>
   );
