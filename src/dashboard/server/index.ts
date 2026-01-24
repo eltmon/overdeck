@@ -24,6 +24,19 @@ import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } from '../../lib/projects.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName } from '../../lib/cost-parsers/jsonl-parser.js';
+import type { Issue } from '../frontend/src/types.js';
+
+/**
+ * Get a Date object representing 24 hours ago from now.
+ * Used for filtering recently completed issues.
+ */
+function getOneDayAgo(): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
+  return date;
+}
+
+import type { Issue } from '../frontend/src/types.js';
 
 // Ensure tmux server is running (starts one if not)
 async function ensureTmuxRunning(): Promise<void> {
@@ -3975,15 +3988,43 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
 
   // Set specialist state to idle when they report completion
   // Infer which specialist based on which field was updated
-  const { getTmuxSessionName } = await import('../../lib/cloister/specialists.js');
-  if (reviewStatus && ['passed', 'blocked'].includes(reviewStatus)) {
+  const { getTmuxSessionName, checkSpecialistQueue, completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
+
+  if (reviewStatus && ['passed', 'blocked', 'failed'].includes(reviewStatus)) {
     const tmuxSession = getTmuxSessionName('review-agent');
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
       lastActivity: new Date().toISOString(),
     });
     console.log(`[review-status] Set review-agent to idle`);
+
+    // Clear this issue from review-agent queue (prevents orphaned queue items)
+    const queue = checkSpecialistQueue('review-agent');
+    for (const item of queue.items) {
+      if (item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()) {
+        completeSpecialistTask('review-agent', item.id);
+        console.log(`[review-status] Cleared ${issueId} from review-agent queue`);
+      }
+    }
+
+    // Auto-send feedback to work agent when blocked/failed (guarantees delivery)
+    if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      try {
+        const { sessionExists, sendToTmux } = await import('../../lib/tmux.js');
+        if (sessionExists(agentId)) {
+          const feedback = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nPlease address these issues and re-request review.`;
+          sendToTmux(agentId, feedback);
+          console.log(`[review-status] Auto-sent feedback to ${agentId}`);
+        } else {
+          console.log(`[review-status] Work agent ${agentId} not running, feedback saved to review-status only`);
+        }
+      } catch (err) {
+        console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
+      }
+    }
   }
+
   if (testStatus && ['passed', 'failed'].includes(testStatus)) {
     const tmuxSession = getTmuxSessionName('test-agent');
     saveAgentRuntimeState(tmuxSession, {
@@ -3991,6 +4032,30 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
       lastActivity: new Date().toISOString(),
     });
     console.log(`[review-status] Set test-agent to idle`);
+
+    // Clear this issue from test-agent queue
+    const queue = checkSpecialistQueue('test-agent');
+    for (const item of queue.items) {
+      if (item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()) {
+        completeSpecialistTask('test-agent', item.id);
+        console.log(`[review-status] Cleared ${issueId} from test-agent queue`);
+      }
+    }
+
+    // Auto-send test failure feedback to work agent
+    if (testStatus === 'failed' && testNotes) {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      try {
+        const { sessionExists, sendToTmux } = await import('../../lib/tmux.js');
+        if (sessionExists(agentId)) {
+          const feedback = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nPlease fix the failing tests and re-request review.`;
+          sendToTmux(agentId, feedback);
+          console.log(`[review-status] Auto-sent test failure to ${agentId}`);
+        }
+      } catch (err) {
+        console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
+      }
+    }
   }
 
   res.json(status);
