@@ -68,26 +68,13 @@ export interface Issue {
 - Different treatment for canceled vs done
 - Rally integration (follows same pattern if needed later)
 
-## Current Status
-
-**COMPLETED** - All changes implemented and ready for testing.
-
-### Changes Made
-
-1. ✅ Added `completedAt?: string` field to Issue interface (types.ts:25)
-2. ✅ Added `completedAt` to Linear GraphQL query (server/index.ts:1083)
-3. ✅ Optimized GitHub fetch to only get issues closed in last 24 hours (server/index.ts:860-870)
-4. ✅ Added `completedAt` mapping from GitHub's closedAt field (server/index.ts:934)
-5. ✅ Implemented server-side filtering to exclude done/canceled items older than 24h (server/index.ts:1200-1220)
-6. ✅ Documented filtering behavior in README.md (README.md:929-937)
-
 ## Acceptance Criteria
 
-- [x] Done column only shows items completed in last 24 hours
-- [x] Count badge reflects filtered count (automatic - uses grouped array length)
-- [x] GitHub fetch optimized to only get recently closed issues
-- [x] README documents the filtering behavior
-- [x] Canceled items follow same 24h filter
+- [ ] Done column only shows items completed in last 24 hours
+- [ ] Count badge reflects filtered count (automatic - uses grouped array length)
+- [ ] GitHub fetch optimized to only get recently closed issues
+- [ ] README documents the filtering behavior
+- [ ] Canceled items follow same 24h filter
 
 ## Testing Notes
 
@@ -96,5 +83,3 @@ To verify:
 2. Complete an issue, verify it appears in Done
 3. Wait 24+ hours (or adjust filter temporarily), verify it disappears
 4. Check network tab - GitHub fetch should have date filter in search query
-
-**Ready for:** Testing, commit, and merge.
