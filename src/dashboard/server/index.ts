@@ -3971,7 +3971,7 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     }
 
     // 3. Start the review pipeline (review-agent → test-agent)
-    const { wakeSpecialist } = await import('../../lib/cloister/specialists.js');
+    const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
 
     console.log(`[review] Starting review pipeline for ${issueId}...`);
 
@@ -4019,9 +4019,14 @@ BRANCH: ${branchName}
    - PASS: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H 'Content-Type: application/json' -d '{\"testStatus\":\"passed\"}'
    - FAIL: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H 'Content-Type: application/json' -d '{\"testStatus\":\"failed\",\"testNotes\":\"[failure details]\"}'"`;
 
-    const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
-      waitForReady: true,
-      startIfNotRunning: true,
+    const reviewResult = await wakeSpecialistOrQueue('review-agent', {
+      issueId,
+      branch: branchName,
+      workspace: workspacePath,
+      customPrompt: reviewPrompt,
+    }, {
+      priority: 'normal',
+      source: 'dashboard-review',
     });
 
     if (!reviewResult.success) {
@@ -4029,6 +4034,11 @@ BRANCH: ${branchName}
       completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
       setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: reviewResult.message });
       return res.status(500).json({ error: `Failed to start review: ${reviewResult.message}` });
+    }
+
+    if (reviewResult.queued) {
+      console.log(`[review] Review queued for ${issueId} (specialist busy)`);
+      return res.json({ success: true, queued: true, message: reviewResult.message });
     }
 
     console.log(`[review] Review pipeline started for ${issueId}`);
@@ -4209,7 +4219,7 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
 
     // 6. SPECIALIST WORKFLOW: review-agent → test-agent → merge-agent
     // Kick off review-agent with handoff instructions - it will wake the next specialists
-    const { wakeSpecialist } = await import('../../lib/cloister/specialists.js');
+    const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
 
     // Build the full pipeline prompt for review-agent
     // It will hand off to test-agent, which hands off to merge-agent
@@ -4271,15 +4281,31 @@ PROJECT: ${projectPath}
 - "It works" is NOT enough - code must be EXCELLENT
 - Find EVERYTHING. The agent should learn from your feedback.`;
 
-    const reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
-      waitForReady: true,
-      startIfNotRunning: true,
+    const reviewResult = await wakeSpecialistOrQueue('review-agent', {
+      issueId,
+      branch: branchName,
+      workspace: workspacePath,
+      customPrompt: pipelinePrompt,
+    }, {
+      priority: 'normal',
+      source: 'dashboard-approve',
     });
 
     if (!reviewResult.success) {
       console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}`);
       // Fall back to direct merge if specialists aren't available
       console.log(`[approve] Falling back to direct merge...`);
+    } else if (reviewResult.queued) {
+      // Task was queued because specialist is busy
+      console.log(`[approve] Pipeline queued for ${issueId} (specialist busy)`);
+      completePendingOperation(issueId, null);
+      return res.json({
+        success: true,
+        queued: true,
+        message: `Approval pipeline queued for ${issueId}. Specialist is busy, will process when available.`,
+        pipeline: 'queued',
+        note: 'Watch the specialists panel for progress. Merge will complete automatically when processed.',
+      });
     } else {
       console.log(`[approve] Pipeline started - review-agent will hand off to test-agent → merge-agent`);
       // Don't wait - the specialists will handle the rest

@@ -906,8 +906,14 @@ export async function wakeSpecialistWithTask(
     workspace?: string;
     prUrl?: string;
     context?: TaskContext;
+    customPrompt?: string;  // Allow callers to provide a full custom prompt
   }
 ): Promise<ReturnType<typeof wakeSpecialist>> {
+  // If a custom prompt is provided, use it directly
+  if (task.customPrompt) {
+    return wakeSpecialist(name, task.customPrompt);
+  }
+
   // Build context-aware prompt based on specialist type and task
   let prompt: string;
 
@@ -1017,6 +1023,7 @@ export async function wakeSpecialistOrQueue(
     workspace?: string;
     prUrl?: string;
     context?: TaskContext;
+    customPrompt?: string;  // Allow callers to provide a full custom prompt
   },
   options: {
     priority?: 'urgent' | 'high' | 'normal' | 'low';
@@ -1045,6 +1052,7 @@ export async function wakeSpecialistOrQueue(
         branch: task.branch,
         prUrl: task.prUrl,
         context: task.context,
+        customPrompt: task.customPrompt,
       });
 
       console.log(`[specialist] ${name} busy, queued task for ${task.issueId} (priority: ${priority})`);
@@ -1106,6 +1114,7 @@ export interface SpecialistQueueItem extends HookItem {
     branch?: string;
     filesChanged?: string[];
     context?: TaskContext;
+    customPrompt?: string;  // Full custom prompt for the specialist
   };
 }
 
@@ -1127,6 +1136,7 @@ export function submitToSpecialistQueue(
     branch?: string;
     filesChanged?: string[];
     context?: TaskContext;
+    customPrompt?: string;
   }
 ): HookItem {
   // Put specialist-specific fields into context to match HookItem type
@@ -1136,6 +1146,7 @@ export function submitToSpecialistQueue(
     source: task.source,
     payload: {
       issueId: task.issueId,
+      customPrompt: task.customPrompt,
       context: {
         ...task.context,
         prUrl: task.prUrl,

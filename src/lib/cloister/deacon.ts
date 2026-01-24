@@ -506,6 +506,7 @@ export async function runPatrol(): Promise<PatrolResult> {
               workspace: nextTask.payload.context?.workspace,
               prUrl: nextTask.payload.context?.prUrl,
               context: nextTask.payload.context,
+              customPrompt: nextTask.payload.customPrompt,
             };
             const wakeResult = await wakeSpecialistWithTask(specialist.name, taskDetails);
             if (wakeResult.success) {
