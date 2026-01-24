@@ -125,6 +125,11 @@ All changes implemented in `src/dashboard/server/index.ts`:
 - Added PR comment clarifying test coverage
 - All 10 requested test scenarios present and passing
 
+**Round 3 (import path fix):**
+- ✅ Fixed incorrect import path in `src/dashboard/server/index.ts:18`
+- Changed from `./lib/health-filtering.js` to `../lib/health-filtering.js`
+- All 372 tests still passing after fix (commit a82569d)
+
 ## Out of Scope
 
 - Cleanup/archiving of old agent directories (follow-up PAN-XX)
