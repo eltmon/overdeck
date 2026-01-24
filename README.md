@@ -806,7 +806,9 @@ volumes:
 
 ### What Your Project Needs to Provide
 
-Panopticon is an orchestration layer - it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**. Here's what you need:
+Panopticon is an orchestration layer - it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**.
+
+Projects can be as simple as just a git repo (for worktree-only workspaces) or as complex as a full polyrepo with Docker, Traefik, and database seeding. Here's what you need for each level:
 
 ### Required: Workspace Templates
 
