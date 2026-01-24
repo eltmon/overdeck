@@ -3960,7 +3960,7 @@ app.get('/api/workspaces/:issueId/review-status', (req, res) => {
 });
 
 // Update review status (called by specialists via CLI)
-app.post('/api/workspaces/:issueId/review-status', (req, res) => {
+app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
   const { issueId } = req.params;
   const { reviewStatus, testStatus, reviewNotes, testNotes } = req.body;
 
@@ -3972,6 +3972,27 @@ app.post('/api/workspaces/:issueId/review-status', (req, res) => {
 
   const status = setReviewStatus(issueId, update);
   console.log(`[review-status] Updated ${issueId}:`, status);
+
+  // Set specialist state to idle when they report completion
+  // Infer which specialist based on which field was updated
+  const { getTmuxSessionName } = await import('../../lib/cloister/specialists.js');
+  if (reviewStatus && ['passed', 'blocked'].includes(reviewStatus)) {
+    const tmuxSession = getTmuxSessionName('review-agent');
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+    console.log(`[review-status] Set review-agent to idle`);
+  }
+  if (testStatus && ['passed', 'failed'].includes(testStatus)) {
+    const tmuxSession = getTmuxSessionName('test-agent');
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+    console.log(`[review-status] Set test-agent to idle`);
+  }
+
   res.json(status);
 });
 

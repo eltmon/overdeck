@@ -745,10 +745,13 @@ export async function wakeSpecialist(
     const cwd = process.env.HOME || '/home/eltmon';
 
     try {
+      // Use Opus for merge-agent (complex conflict resolution), default for others
+      const modelFlag = name === 'merge-agent' ? '--model opus' : '';
+
       // Start with --resume if we have a session, otherwise fresh
       const claudeCmd = sessionId
-        ? `claude --resume "${sessionId}" --dangerously-skip-permissions`
-        : `claude --dangerously-skip-permissions`;
+        ? `claude --resume "${sessionId}" ${modelFlag} --dangerously-skip-permissions`
+        : `claude ${modelFlag} --dangerously-skip-permissions`;
 
       await execAsync(
         `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${claudeCmd}"`,
