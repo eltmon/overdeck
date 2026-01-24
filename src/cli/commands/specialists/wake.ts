@@ -7,6 +7,8 @@
 import chalk from 'chalk';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import {
   getSpecialistStatus,
   getSessionId,
@@ -15,11 +17,40 @@ import {
   isEnabled,
   type SpecialistType,
 } from '../../../lib/cloister/specialists.js';
+import { PANOPTICON_HOME } from '../../../lib/paths.js';
 
 const execAsync = promisify(exec);
+const TASKS_DIR = join(PANOPTICON_HOME, 'specialists', 'tasks');
 
 // Helper for async sleep
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Send a task to a specialist via tmux
+ * For large prompts, writes to a file to avoid tmux paste issues
+ */
+async function sendTask(tmuxSession: string, specialistName: string, task: string): Promise<void> {
+  const isLargeTask = task.length > 500 || task.includes('\n');
+
+  if (isLargeTask) {
+    // Write to file to avoid tmux paste issues ("[Pasted text #1 +N lines]")
+    if (!existsSync(TASKS_DIR)) {
+      mkdirSync(TASKS_DIR, { recursive: true });
+    }
+    const taskFile = join(TASKS_DIR, `${specialistName}-${Date.now()}.md`);
+    writeFileSync(taskFile, task, 'utf-8');
+
+    const shortMessage = `Read and execute the task in: ${taskFile}`;
+    await execAsync(`tmux send-keys -t "${tmuxSession}" '${shortMessage}'`, { encoding: 'utf-8' });
+    await sleep(200);
+    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+  } else {
+    const escapedTask = task.replace(/'/g, "'\\''");
+    await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedTask}'`, { encoding: 'utf-8' });
+    await sleep(200);
+    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+  }
+}
 
 interface WakeOptions {
   task?: string;
@@ -46,12 +77,7 @@ export async function wakeCommand(name: string, options: WakeOptions): Promise<v
     if (options.task) {
       console.log(chalk.dim('\nSending task message...'));
       try {
-        const escapedTask = options.task.replace(/'/g, "'\\''");
-        // CRITICAL: Send text and Enter SEPARATELY (per CLAUDE.md)
-        await execAsync(`tmux send-keys -t "${status.tmuxSession}" '${escapedTask}'`, { encoding: 'utf-8' });
-        // Small delay before sending Enter
-        await sleep(200);
-        await execAsync(`tmux send-keys -t "${status.tmuxSession}" Enter`, { encoding: 'utf-8' });
+        await sendTask(status.tmuxSession!, specialistName, options.task);
         console.log(chalk.green('✓ Task message sent'));
       } catch (error: any) {
         console.log(chalk.red(`Failed to send message: ${error.message}`));
@@ -99,12 +125,7 @@ export async function wakeCommand(name: string, options: WakeOptions): Promise<v
     // Send task if provided
     if (options.task) {
       console.log(chalk.dim('Sending task message...'));
-      const escapedTask = options.task.replace(/'/g, "'\\''");
-      // CRITICAL: Send text and Enter SEPARATELY (per CLAUDE.md)
-      await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedTask}'`, { encoding: 'utf-8' });
-      // Small delay before sending Enter
-      await sleep(200);
-      await execAsync(`tmux send-keys -t "${tmuxSession}" Enter`, { encoding: 'utf-8' });
+      await sendTask(tmuxSession, specialistName, options.task);
     }
 
     // Record wake event
