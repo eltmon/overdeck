@@ -736,11 +736,19 @@ projects:
     name: "Mind Your Now"
     path: /home/user/projects/myn
     linear_team: MIN
-    # Custom script handles complex workspace setup
+    # Custom scripts handle complex workspace setup
     workspace_command: /home/user/projects/myn/infra/new-feature
+    workspace_remove_command: /home/user/projects/myn/infra/remove-feature
 ```
 
 When `workspace_command` is specified, Panopticon calls your script instead of creating a standard git worktree. The script receives the normalized issue ID (e.g., `min-123`) as an argument.
+
+When `workspace_remove_command` is specified, Panopticon calls your script when deleting workspaces (e.g., aborting planning with "delete workspace" enabled). This is important for complex setups that need to:
+- Stop Docker containers and remove volumes
+- Clean up root-owned files created by containers
+- Remove git worktrees from multiple repositories
+- Release port assignments
+- Remove DNS entries
 
 **What your custom script should handle:**
 - Creating git worktrees for multiple repositories (polyrepo structure)
@@ -817,6 +825,36 @@ pan project add /path/to/project --name myproject --linear-team PRJ
 
 # Remove a project
 pan project remove myproject
+```
+
+### Agent Completion Notifications
+
+Panopticon includes a notification system that alerts you when agents complete their work.
+
+**Desktop Notifications:**
+
+The `notify-complete` script sends desktop notifications across platforms:
+
+| Platform | Notification Method |
+|----------|---------------------|
+| WSL2/Windows | PowerShell toast notifications |
+| macOS | osascript display notification |
+| Linux | notify-send |
+
+**Usage:**
+```bash
+# Send a completion notification
+~/.panopticon/bin/notify-complete MIN-123 "Fixed login button" "https://gitlab.com/mr/456"
+```
+
+**Completion log:** All notifications are logged to `~/.panopticon/agent-completed.log` with timestamps.
+
+**Integration with agent workflows:**
+
+Agents can call `notify-complete` at the end of their work:
+```bash
+# In agent completion script or /work-complete skill
+notify-complete "$ISSUE_ID" "$SUMMARY" "$MR_URL"
 ```
 
 ---
@@ -994,6 +1032,9 @@ pan work plan MIN-123 --continue
 # Create a workspace (git worktree) without starting an agent
 pan workspace create MIN-123
 
+# Create workspace and start Docker containers
+pan workspace create MIN-123 --docker
+
 # List all workspaces
 pan workspace list
 
@@ -1002,6 +1043,58 @@ pan workspace destroy MIN-123
 
 # Force destroy (even with uncommitted changes)
 pan workspace destroy MIN-123 --force
+```
+
+#### Docker Integration
+
+The `--docker` flag automatically starts containers after workspace creation:
+
+```bash
+pan workspace create MIN-123 --docker
+```
+
+**What it does:**
+1. Creates the workspace (git worktree or custom command)
+2. Looks for `docker-compose.yml` in:
+   - `{workspace}/docker-compose.yml`
+   - `{workspace}/docker-compose.yaml`
+   - `{workspace}/.devcontainer/docker-compose.yml`
+3. Runs `docker compose up -d --build` to start containers in background
+
+**Why this matters:**
+- Containers start warming up while you review the issue
+- Environment is ready when the planning agent starts asking questions
+- You can test assumptions during planning without waiting for builds
+
+**Dashboard integration:**
+
+The planning dialog includes a "Start Docker containers" checkbox:
+- **Default:** Enabled (containers start automatically)
+- **Preference saved:** Your choice is remembered in browser localStorage
+- **Key:** `panopticon.planning.startDocker`
+
+To change the default via browser console:
+```javascript
+// Disable Docker by default
+localStorage.setItem('panopticon.planning.startDocker', 'false');
+
+// Enable Docker by default (this is the out-of-box default)
+localStorage.setItem('panopticon.planning.startDocker', 'true');
+```
+
+**Example workflow:**
+```bash
+# From dashboard: click "Start Planning" (Docker enabled by default)
+# Or from CLI:
+pan workspace create MIN-123 --docker
+
+# While containers build in background:
+# - Review the Linear issue
+# - Check related PRs
+# - Think about approach
+
+# By the time you're ready to engage with the planning agent,
+# the dev environment is warm and ready for testing
 ```
 
 ### Project Management

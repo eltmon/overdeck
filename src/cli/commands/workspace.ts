@@ -28,6 +28,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--no-skills', 'Skip skills symlink setup')
     .option('--labels <labels>', 'Comma-separated labels for routing (e.g., docs,marketing)')
     .option('--project <path>', 'Explicit project path (overrides registry)')
+    .option('--docker', 'Start Docker containers after workspace creation')
     .action(createCommand);
 
   workspace
@@ -50,6 +51,7 @@ interface CreateOptions {
   skills?: boolean;
   labels?: string;
   project?: string;
+  docker?: boolean;
 }
 
 async function createCommand(issueId: string, options: CreateOptions): Promise<void> {
@@ -138,11 +140,51 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
           console.log(stdout);
         }
 
+        // Start Docker containers if requested
+        let dockerStarted = false;
+        let dockerError: string | undefined;
+        if (options.docker) {
+          const composeLocations = [
+            join(workspacePath, 'docker-compose.yml'),
+            join(workspacePath, 'docker-compose.yaml'),
+            join(workspacePath, '.devcontainer', 'docker-compose.yml'),
+          ];
+
+          const composeFile = composeLocations.find(f => existsSync(f));
+
+          if (composeFile) {
+            spinner.text = 'Starting Docker containers...';
+            try {
+              const composeDir = join(composeFile, '..');
+              await execAsync('docker compose up -d --build', {
+                cwd: composeDir,
+                encoding: 'utf-8',
+                timeout: 300000, // 5 minute timeout
+              });
+              dockerStarted = true;
+            } catch (err: any) {
+              dockerError = err.message;
+            }
+          } else {
+            dockerError = 'No docker-compose.yml found in workspace';
+          }
+        }
+
         spinner.succeed('Workspace created via custom command!');
         console.log('');
         console.log(chalk.bold('Workspace Details:'));
         console.log(`  Path:   ${chalk.cyan(workspacePath)}`);
         console.log(`  Branch: ${chalk.dim(branchName)}`);
+
+        if (options.docker) {
+          console.log('');
+          console.log(chalk.bold('Docker:'));
+          if (dockerStarted) {
+            console.log(`  Status: ${chalk.green('Containers started')}`);
+          } else {
+            console.log(`  Status: ${chalk.yellow('Not started')} - ${dockerError}`);
+          }
+        }
         return;
       } catch (error: any) {
         spinner.fail(`Custom workspace command failed: ${error.message}`);
@@ -187,6 +229,37 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       skillsResult = mergeSkillsIntoWorkspace(workspacePath);
     }
 
+    // Start Docker containers if requested
+    let dockerStarted = false;
+    let dockerError: string | undefined;
+    if (options.docker) {
+      // Look for docker-compose.yml in workspace or project root
+      const composeLocations = [
+        join(workspacePath, 'docker-compose.yml'),
+        join(workspacePath, 'docker-compose.yaml'),
+        join(workspacePath, '.devcontainer', 'docker-compose.yml'),
+      ];
+
+      const composeFile = composeLocations.find(f => existsSync(f));
+
+      if (composeFile) {
+        spinner.text = 'Starting Docker containers...';
+        try {
+          const composeDir = join(composeFile, '..');
+          await execAsync('docker compose up -d --build', {
+            cwd: composeDir,
+            encoding: 'utf-8',
+            timeout: 300000, // 5 minute timeout for container builds
+          });
+          dockerStarted = true;
+        } catch (err: any) {
+          dockerError = err.message;
+        }
+      } else {
+        dockerError = 'No docker-compose.yml found in workspace';
+      }
+    }
+
     spinner.succeed('Workspace created!');
 
     console.log('');
@@ -203,6 +276,16 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       console.log(`  Added:   ${skillsResult.added.length} Panopticon skills`);
       if (skillsResult.skipped.length > 0) {
         console.log(`  Skipped: ${chalk.dim(skillsResult.skipped.join(', '))}`);
+      }
+      console.log('');
+    }
+
+    if (options.docker) {
+      console.log(chalk.bold('Docker:'));
+      if (dockerStarted) {
+        console.log(`  Status: ${chalk.green('Containers started')}`);
+      } else {
+        console.log(`  Status: ${chalk.yellow('Not started')} - ${dockerError}`);
       }
       console.log('');
     }

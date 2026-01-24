@@ -41,6 +41,12 @@ interface PlanningStatus {
 
 type Step = 'checking' | 'ready' | 'starting' | 'planning' | 'complete' | 'error';
 
+// Default for startDocker - can be overridden by localStorage
+const getDefaultStartDocker = (): boolean => {
+  const stored = localStorage.getItem('panopticon.planning.startDocker');
+  return stored !== null ? stored === 'true' : true; // Default to true
+};
+
 export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogProps) {
   const [step, setStep] = useState<Step>('checking');
   const [result, setResult] = useState<StartPlanningResult | null>(null);
@@ -48,6 +54,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [minimized, setMinimized] = useState(false);
   const [position, setPosition] = useState({ x: -1, y: -1 }); // -1 means centered
   const [size, setSize] = useState({ width: 900, height: 600 });
+  const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   
   // Track if we've actually connected to a planning session in THIS dialog instance
   // This prevents stale cache from incorrectly triggering 'complete' state
@@ -60,7 +67,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ startDocker }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -443,6 +450,23 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                           </li>
                         </ul>
                       </div>
+
+                      {/* Docker option */}
+                      <label className="flex items-center gap-3 mb-6 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={startDocker}
+                          onChange={(e) => {
+                            setStartDocker(e.target.checked);
+                            localStorage.setItem('panopticon.planning.startDocker', String(e.target.checked));
+                          }}
+                          className="w-4 h-4 rounded border-gray-500 bg-gray-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                        />
+                        <span className="text-sm text-gray-300">
+                          Start Docker containers
+                          <span className="text-gray-500 ml-1">(dev environment ready for testing)</span>
+                        </span>
+                      </label>
 
                       <button
                         onClick={handleStartPlanning}

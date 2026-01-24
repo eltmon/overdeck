@@ -5563,7 +5563,7 @@ async function addGitHubPlanningLabel(owner: string, repo: string, number: numbe
 // Start planning for an issue - moves to "In Planning", creates workspace, spawns planning agent
 app.post('/api/issues/:id/start-planning', async (req, res) => {
   const { id } = req.params;
-  const { skipWorkspace = false } = req.body;
+  const { skipWorkspace = false, startDocker = false } = req.body;
 
   try {
     // Check if this is a GitHub issue
@@ -5742,24 +5742,30 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
     if (!skipWorkspace) {
       try {
         if (!existsSync(workspacePath)) {
-          // Create workspace using pan workspace create (git worktree only, no docker)
+          // Create workspace using pan workspace create
+          const dockerFlag = startDocker ? ' --docker' : '';
+          const createCmd = `pan workspace create ${issue.identifier}${dockerFlag}`;
           const activityId = Date.now().toString();
           logActivity({
             id: activityId,
             timestamp: new Date().toISOString(),
-            command: `pan workspace create ${issue.identifier}`,
+            command: createCmd,
             status: 'running',
             output: [],
           });
 
           // Run pan workspace create (may call custom workspace_command for complex projects)
-          await execAsync(`pan workspace create ${issue.identifier}`, {
+          // With --docker, containers start in background (up to 5 min timeout for builds)
+          await execAsync(createCmd, {
             cwd: projectPath,
             encoding: 'utf-8',
-            timeout: 120000, // 2 minutes for complex scripts like MYN's new-feature
+            timeout: startDocker ? 300000 : 120000, // 5 min with docker, 2 min without
           });
           workspaceCreated = true;
-          appendActivityOutput(activityId, 'Workspace created successfully');
+          const successMsg = startDocker
+            ? 'Workspace created, Docker containers starting in background'
+            : 'Workspace created successfully';
+          appendActivityOutput(activityId, successMsg);
         } else {
           workspaceCreated = true; // Already exists
         }
@@ -6357,15 +6363,53 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
         }
 
         if (projectPath) {
-          const workspacePath = join(projectPath, 'workspaces', id.toLowerCase());
+          // Try both naming conventions: feature-{id} and just {id}
+          const featureWorkspacePath = join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`);
+          const plainWorkspacePath = join(projectPath, 'workspaces', id.toLowerCase());
+          const workspacePath = existsSync(featureWorkspacePath) ? featureWorkspacePath : plainWorkspacePath;
 
           if (existsSync(workspacePath)) {
-            // Remove the git worktree
-            await execAsync(`git worktree remove "${workspacePath}" --force`, {
-              cwd: projectPath,
-              encoding: 'utf-8',
-            });
-            workspaceDeleted = true;
+            // Check for custom workspace_remove_command in projects.yaml
+            const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+            let customRemoveCmd: string | undefined;
+
+            if (existsSync(projectsYamlPath)) {
+              try {
+                const yaml = await import('js-yaml');
+                const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
+                const prefix = id.split('-')[0].toLowerCase();
+
+                // Find project by linear_team prefix
+                for (const [, config] of Object.entries(projectsConfig.projects || {})) {
+                  const projConfig = config as any;
+                  if (projConfig.linear_team?.toLowerCase() === prefix && projConfig.workspace_remove_command) {
+                    customRemoveCmd = projConfig.workspace_remove_command;
+                    break;
+                  }
+                }
+              } catch (yamlErr) {
+                console.log('Could not parse projects.yaml:', yamlErr);
+              }
+            }
+
+            if (customRemoveCmd) {
+              // Use custom remove command (e.g., MYN's remove-feature script)
+              // Extract the feature name from the id (e.g., min-665 -> min-665)
+              const featureName = id.toLowerCase();
+              await execAsync(`${customRemoveCmd} ${featureName}`, {
+                cwd: projectPath,
+                encoding: 'utf-8',
+                timeout: 60000, // 1 minute timeout
+              });
+              workspaceDeleted = true;
+            } else {
+              // Default: remove git worktree
+              await execAsync(`git worktree remove "${workspacePath}" --force`, {
+                cwd: projectPath,
+                encoding: 'utf-8',
+              });
+              workspaceDeleted = true;
+            }
           } else {
             workspaceError = 'Workspace not found';
           }
