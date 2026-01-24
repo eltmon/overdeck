@@ -311,7 +311,16 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       // Mock tmux functions
       const tmuxMock = await import('../../src/lib/tmux.js');
       vi.spyOn(tmuxMock, 'sessionExists').mockReturnValue(false);
-      vi.spyOn(tmuxMock, 'createSession').mockImplementation(() => {});
+
+      // Mock createSession to simulate SessionStart hook creating ready signal
+      const readyPath = join(agentDir, 'ready.json');
+      vi.spyOn(tmuxMock, 'createSession').mockImplementation(() => {
+        // Simulate SessionStart hook creating ready.json after session starts
+        setTimeout(() => {
+          writeFileSync(readyPath, JSON.stringify({ ready: true }));
+        }, 100);
+      });
+
       const sendKeysSpy = vi.spyOn(tmuxMock, 'sendKeys').mockImplementation(() => {});
 
       await resumeAgent(agentId, message);
