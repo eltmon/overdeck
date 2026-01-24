@@ -24,9 +24,9 @@ Two related issues with specialist/agent management:
 
 ## Current Status
 
-**Last Updated:** 2026-01-23 16:10
+**Last Updated:** 2026-01-23 17:45
 
-### Completed (Layers 1-2 - Foundation + Core Logic)
+### Completed (Layers 1-3 - Foundation, Core Logic, and UI)
 
 ✅ **Hook Infrastructure** (panopticon-5sas)
 - Created `pre-tool-hook` script (sets state=active)
@@ -71,14 +71,15 @@ Two related issues with specialist/agent management:
 - Updated all state checks to use hook-based `getAgentRuntimeState()`
 - Fixes false positive from PAN-73 (review showed "Passed" when prompt mentioned handoff)
 
-### Remaining Work (Layers 3-4)
+✅ **Dashboard Frontend Updates** (panopticon-t8k2)
+- Updated SpecialistAgentCard.tsx with suspended state, activity history, resume button
+- Updated IssueAgentCard.tsx with suspended state, activity history, resume button
+- Added Activity icon button to show/hide activity history panel
+- Added Resume (Play) button for suspended agents
+- Activity history shows last 20 tool executions with timestamps
+- Suspended state shows ⏸️ emoji with blue color
 
-**Layer 3 - UI (in progress):**
-- 🔄 Dashboard frontend updates (panopticon-t8k2) - Activity history, resume button, new states
-  - Need to update IssueAgentCard.tsx and SpecialistAgentCard.tsx
-  - Add activity history panel (collapsible)
-  - Add Resume button for suspended agents
-  - Show state icons (active/idle/suspended/uninitialized)
+### Remaining Work (Layer 4)
 
 **Layer 4 - Testing:**
 - ⏳ Integration tests (panopticon-wk6m) - State transitions, suspend/resume, auto-suspend
@@ -87,12 +88,12 @@ Two related issues with specialist/agent management:
 
 1. ~~Implement auto-suspend logic in deacon patrol loop~~ ✅
 2. ~~Implement agent resume functionality~~ ✅
-3. Update dashboard frontend with new UI components
-4. **CRITICAL**: Remove terminal parsing - especially `detectSpecialistCompletion()`
-   - False positives: PAN-73 showed "Review Passed" when prompt mentioned "hand off to test-agent"
-   - Solution: Specialists should POST status to API endpoint instead of terminal parsing
-   - Add endpoint: `POST /api/specialists/:name/report-status` with `{issueId, status, notes}`
-5. Write integration tests
+3. ~~Update dashboard frontend with new UI components~~ ✅
+4. ~~**CRITICAL**: Remove terminal parsing - especially `detectSpecialistCompletion()`~~ ✅
+   - ~~False positives: PAN-73 showed "Review Passed" when prompt mentioned "hand off to test-agent"~~ ✅
+   - ~~Solution: Specialists should POST status to API endpoint instead of terminal parsing~~ ✅
+   - ~~Add endpoint: `POST /api/specialists/:name/report-status` with `{issueId, status, notes}`~~ ✅
+5. Write integration tests (panopticon-wk6m)
 
 ### Critical Issue: detectSpecialistCompletion() False Positives
 
