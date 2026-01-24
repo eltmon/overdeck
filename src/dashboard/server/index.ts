@@ -6,6 +6,7 @@ import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync } from 'fs';
+import { readFile, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
@@ -4548,8 +4549,8 @@ PROJECT: ${projectPath}
       }
     }
 
-    // Record task metrics for the completed work
-    recordApprovedTask(issueId, workspacePath, 'success');
+    // Record task metrics for the completed work (async to avoid blocking)
+    await recordApprovedTask(issueId, workspacePath, 'success');
 
     // Clear pending operation on success
     completePendingOperation(issueId);
@@ -6299,14 +6300,14 @@ function saveRuntimeMetrics(data: any): void {
   writeFileSync(METRICS_FILE, JSON.stringify(data, null, 2));
 }
 
-// Parse Claude Code session files for a workspace and return aggregated usage
-function parseWorkspaceSessionUsage(workspacePath: string): {
+// Parse Claude Code session files for a workspace and return aggregated usage (ASYNC to avoid blocking)
+async function parseWorkspaceSessionUsageAsync(workspacePath: string): Promise<{
   tokenCount: number;
   cost: number;
   model: string;
   startTime: string | null;
   endTime: string | null;
-} {
+}> {
   // Claude Code session directory name format: path with leading / removed and / replaced by -
   // e.g., /home/eltmon/projects/foo -> -home-eltmon-projects-foo
   const sessionDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
@@ -6326,42 +6327,57 @@ function parseWorkspaceSessionUsage(workspacePath: string): {
   }
 
   try {
-    const files = readdirSync(sessionDir).filter(f => f.endsWith('.jsonl'));
+    const allFiles = await readdir(sessionDir);
+    const files = allFiles.filter(f => f.endsWith('.jsonl'));
 
-    for (const file of files) {
-      const filePath = join(sessionDir, file);
-      const content = readFileSync(filePath, 'utf-8');
-      const lines = content.split('\n').filter(l => l.trim());
+    // Read files in parallel but with concurrency limit to avoid memory issues
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      const batch = files.slice(i, i + BATCH_SIZE);
+      const contents = await Promise.all(
+        batch.map(async (file) => {
+          const filePath = join(sessionDir, file);
+          try {
+            return await readFile(filePath, 'utf-8');
+          } catch {
+            return '';
+          }
+        })
+      );
 
-      for (const line of lines) {
-        try {
-          const entry = JSON.parse(line);
+      for (const content of contents) {
+        const lines = content.split('\n').filter(l => l.trim());
 
-          // Track timestamps
-          if (entry.timestamp) {
-            if (!startTime || entry.timestamp < startTime) {
-              startTime = entry.timestamp;
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+
+            // Track timestamps
+            if (entry.timestamp) {
+              if (!startTime || entry.timestamp < startTime) {
+                startTime = entry.timestamp;
+              }
+              if (!endTime || entry.timestamp > endTime) {
+                endTime = entry.timestamp;
+              }
             }
-            if (!endTime || entry.timestamp > endTime) {
-              endTime = entry.timestamp;
+
+            // Extract model
+            if (entry.message?.model || entry.model) {
+              model = entry.message?.model || entry.model;
             }
-          }
 
-          // Extract model
-          if (entry.message?.model || entry.model) {
-            model = entry.message?.model || entry.model;
+            // Extract usage - can be at top level or in message
+            const usage = entry.usage || entry.message?.usage;
+            if (usage) {
+              totalInputTokens += usage.input_tokens || 0;
+              totalOutputTokens += usage.output_tokens || 0;
+              totalCacheReadTokens += usage.cache_read_input_tokens || 0;
+              totalCacheWriteTokens += usage.cache_creation_input_tokens || 0;
+            }
+          } catch {
+            // Skip malformed lines
           }
-
-          // Extract usage - can be at top level or in message
-          const usage = entry.usage || entry.message?.usage;
-          if (usage) {
-            totalInputTokens += usage.input_tokens || 0;
-            totalOutputTokens += usage.output_tokens || 0;
-            totalCacheReadTokens += usage.cache_read_input_tokens || 0;
-            totalCacheWriteTokens += usage.cache_creation_input_tokens || 0;
-          }
-        } catch {
-          // Skip malformed lines
         }
       }
     }
@@ -6391,10 +6407,10 @@ function parseWorkspaceSessionUsage(workspacePath: string): {
   }
 }
 
-// Record a completed task in runtime metrics
-function recordApprovedTask(issueId: string, workspacePath: string, outcome: 'success' | 'failure' | 'partial'): void {
+// Record a completed task in runtime metrics (async to avoid blocking)
+async function recordApprovedTask(issueId: string, workspacePath: string, outcome: 'success' | 'failure' | 'partial'): Promise<void> {
   try {
-    const usage = parseWorkspaceSessionUsage(workspacePath);
+    const usage = await parseWorkspaceSessionUsageAsync(workspacePath);
     const data = loadRuntimeMetrics();
 
     const startedAt = usage.startTime || new Date().toISOString();
@@ -6557,7 +6573,7 @@ app.get('/api/costs/summary', (_req, res) => {
 });
 
 // GET /api/costs/by-issue - Costs grouped by issue (calculated from actual session files)
-app.get('/api/costs/by-issue', (_req, res) => {
+app.get('/api/costs/by-issue', async (_req, res) => {
   try {
     const issueMap: Record<string, { totalCost: number; tokenCount: number; sessionCount: number; model?: string; durationMinutes?: number }> = {};
 
@@ -6567,38 +6583,48 @@ app.get('/api/costs/by-issue', (_req, res) => {
     if (existsSync(agentsDir)) {
       const agentDirs = readdirSync(agentsDir).filter(name => name.startsWith('agent-') || name.startsWith('planning-'));
 
-      for (const agentDir of agentDirs) {
-        try {
-          const stateFile = join(agentsDir, agentDir, 'state.json');
-          if (!existsSync(stateFile)) continue;
+      // Process agents in parallel batches to avoid blocking (ASYNC)
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < agentDirs.length; i += BATCH_SIZE) {
+        const batch = agentDirs.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map(async (agentDir) => {
+            try {
+              const stateFile = join(agentsDir, agentDir, 'state.json');
+              if (!existsSync(stateFile)) return null;
 
-          const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-          if (!state.issueId || !state.workspace) continue;
+              const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+              if (!state.issueId || !state.workspace) return null;
 
-          const key = state.issueId.toLowerCase();
+              const sessionData = await parseWorkspaceSessionUsageAsync(state.workspace);
+              return { issueId: state.issueId, sessionData };
+            } catch {
+              return null;
+            }
+          })
+        );
 
-          // Parse actual session data from workspace
-          const sessionData = parseWorkspaceSessionUsage(state.workspace);
+        // Aggregate results
+        for (const result of results) {
+          if (!result) continue;
+          const key = result.issueId.toLowerCase();
+          const sessionData = result.sessionData;
 
           if (!issueMap[key]) {
             issueMap[key] = { totalCost: 0, tokenCount: 0, sessionCount: 0 };
           }
 
-          // Add costs from this agent's sessions
           issueMap[key].totalCost += sessionData.cost;
           issueMap[key].tokenCount += sessionData.tokenCount;
           issueMap[key].sessionCount += 1;
           issueMap[key].model = sessionData.model;
 
-          // Calculate duration if we have timestamps
           if (sessionData.startTime && sessionData.endTime) {
             const start = new Date(sessionData.startTime).getTime();
             const end = new Date(sessionData.endTime).getTime();
             const minutes = (end - start) / (1000 * 60);
             issueMap[key].durationMinutes = (issueMap[key].durationMinutes || 0) + minutes;
           }
-        } catch {
-          // Skip agents with invalid state
         }
       }
     }
