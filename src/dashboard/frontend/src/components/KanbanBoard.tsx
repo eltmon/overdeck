@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 
 // Cost data for an issue
@@ -684,6 +684,16 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
               >
                 <CheckCheck className="w-3 h-3" />
                 Ready
+              </span>
+            )}
+            {/* Awaiting Input badge - agent is waiting for user response */}
+            {agent?.hasPendingQuestion && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-white animate-pulse"
+                title={`Agent is waiting for user input (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
+              >
+                <HelpCircle className="w-3 h-3" />
+                Input
               </span>
             )}
             {/* Cost badge */}

@@ -141,7 +141,7 @@ export async function setupHooksCommand(): Promise<void> {
   }
 
   // 3. Copy hook scripts to ~/.panopticon/bin/
-  const hookScripts = ['pre-tool-hook', 'heartbeat-hook', 'stop-hook'];
+  const hookScripts = ['pre-tool-hook', 'heartbeat-hook', 'stop-hook', 'specialist-stop-hook'];
   const { fileURLToPath } = await import('url');
   const { dirname } = await import('path');
   const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -171,7 +171,7 @@ export async function setupHooksCommand(): Promise<void> {
     chmodSync(scriptDest, 0o755); // Make executable
   }
 
-  console.log(chalk.green('✓ Installed hook scripts (pre-tool, post-tool, stop)'));
+  console.log(chalk.green('✓ Installed hook scripts (pre-tool, post-tool, stop, specialist-stop)'));
 
   // 4. Read or create Claude Code settings.json
   const claudeDir = join(homedir(), '.claude');

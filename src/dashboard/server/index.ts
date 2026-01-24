@@ -1682,6 +1682,9 @@ app.get('/api/agents', async (_req, res) => {
           ? name.replace('planning-', '').toUpperCase()
           : name.replace('agent-', '').toUpperCase();
 
+        // Check for pending AskUserQuestion (agent waiting for user input)
+        const pendingQuestions = getAgentPendingQuestions(name);
+
         return {
           id: name,
           issueId,
@@ -1694,6 +1697,8 @@ app.get('/api/agents', async (_req, res) => {
           workspace: state.workspace || null,
           git: gitStatus,
           type: isPlanning ? 'planning' : 'agent',
+          hasPendingQuestion: pendingQuestions.length > 0,
+          pendingQuestionCount: pendingQuestions.length,
         };
       })
     );
@@ -2867,6 +2872,119 @@ app.put('/api/specialists/:name/queue/reorder', async (req, res) => {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`Error reordering queue for ${name}:`, error);
     res.status(500).json({ error: `Failed to reorder queue: ${msg}` });
+  }
+});
+
+// Auto-complete: Hook-triggered specialist completion detection
+// Called by specialist-stop-hook when it detects completion patterns in terminal output
+app.post('/api/specialists/:name/auto-complete', async (req, res) => {
+  const { name } = req.params;
+  const { issueId, status } = req.body;
+
+  if (!issueId || !status) {
+    return res.status(400).json({ error: 'issueId and status required' });
+  }
+
+  console.log(`[specialists] Auto-detected completion for ${name}: ${issueId} -> ${status}`);
+
+  try {
+    const {
+      getTmuxSessionName,
+      completeSpecialistTask,
+      getNextSpecialistTask,
+      wakeSpecialistWithTask,
+      checkSpecialistQueue,
+      submitToSpecialistQueue,
+    } = await import('../../lib/cloister/specialists.js');
+
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
+    const tmuxSession = getTmuxSessionName(name as SpecialistType);
+
+    // Set specialist to idle and clear currentIssue
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+      currentIssue: undefined,
+    });
+
+    // Update review/test status based on specialist type
+    if (name === 'review-agent') {
+      setReviewStatus(issueId, {
+        reviewStatus: status === 'passed' ? 'passed' : 'blocked',
+        reviewNotes: `Auto-detected: ${status}`,
+      });
+
+      // If passed, queue test-agent
+      if (status === 'passed') {
+        // Get workspace info from work agent state
+        const workAgentId = `agent-${issueId.toLowerCase()}`;
+        const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
+        let workspace: string | undefined;
+        let branch: string | undefined;
+
+        if (existsSync(workStateFile)) {
+          try {
+            const workState = JSON.parse(readFileSync(workStateFile, 'utf-8'));
+            workspace = workState.workspace;
+            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+          } catch {}
+        }
+
+        submitToSpecialistQueue('test-agent', {
+          priority: 'high',
+          source: 'review-agent-auto',
+          issueId,
+          workspace,
+          branch,
+        });
+        console.log(`[specialists] Queued test-agent for ${issueId} after review passed`);
+      }
+    } else if (name === 'test-agent') {
+      setReviewStatus(issueId, {
+        testStatus: status === 'passed' ? 'passed' : 'failed',
+        testNotes: `Auto-detected: ${status}`,
+      });
+    }
+
+    // Clear the current task from queue (if it matches)
+    const queueStatus = checkSpecialistQueue(name as SpecialistType);
+    for (const item of queueStatus.items) {
+      if (item.payload?.issueId?.toUpperCase() === issueId.toUpperCase()) {
+        completeSpecialistTask(name as SpecialistType, item.id);
+        console.log(`[specialists] Cleared ${issueId} from ${name} queue`);
+        break;
+      }
+    }
+
+    // Check for next queued task and wake if available
+    const nextTask = getNextSpecialistTask(name as SpecialistType);
+    if (nextTask) {
+      console.log(`[specialists] Waking ${name} for next task: ${nextTask.payload.issueId}`);
+      await wakeSpecialistWithTask(name as SpecialistType, {
+        issueId: nextTask.payload.issueId!,
+        workspace: nextTask.payload.context?.workspace,
+        branch: nextTask.payload.context?.branch,
+      });
+      completeSpecialistTask(name as SpecialistType, nextTask.id);
+    }
+
+    res.json({
+      success: true,
+      status,
+      issueId,
+      nextTaskQueued: !!nextTask,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error processing auto-complete for ${name}:`, error);
+    res.status(500).json({ error: msg });
   }
 });
 

@@ -1,0 +1,106 @@
+#!/bin/bash
+# ~/.panopticon/bin/specialist-stop-hook
+# Called when a specialist agent goes idle - detects completion patterns
+#
+# This hook is chained from stop-hook and only runs for specialist agents.
+# It captures the last 50 lines of terminal output and looks for completion
+# patterns to auto-trigger status updates.
+
+# Don't use set -e - we want the hook to be resilient to failures
+# and never break Claude Code execution
+
+# Get agent ID from env or tmux session name
+if [ -n "$PANOPTICON_AGENT_ID" ]; then
+  AGENT_ID="$PANOPTICON_AGENT_ID"
+elif [ -n "$TMUX" ]; then
+  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
+else
+  exit 0  # Not in a tracked session
+fi
+
+# Check if this is a specialist agent
+case "$AGENT_ID" in
+  specialist-review-agent|specialist-test-agent|specialist-merge-agent)
+    ;;
+  *)
+    exit 0  # Not a specialist, skip
+    ;;
+esac
+
+# Get the specialist type from agent ID
+SPECIALIST_TYPE="${AGENT_ID#specialist-}"
+
+# Capture the last 50 lines of terminal output
+OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -50 2>/dev/null || echo "")
+
+if [ -z "$OUTPUT" ]; then
+  exit 0  # No output to analyze
+fi
+
+# Define completion patterns for each specialist (case-insensitive grep -E patterns)
+case "$SPECIALIST_TYPE" in
+  review-agent)
+    # Patterns that indicate review passed
+    PASS_PATTERN="[Rr]eview (passed|complete|PASSED|COMPLETE)|LGTM|[Nn]o issues found|[Cc]ode review complete|✓.*[Pp]assed"
+    # Patterns that indicate review failed/blocked
+    FAIL_PATTERN="[Rr]eview (failed|blocked|FAILED|BLOCKED)|[Ii]ssues found|[Nn]eeds changes|[Bb]locked"
+    STATUS_FIELD="reviewStatus"
+    ;;
+  test-agent)
+    # Patterns that indicate tests passed
+    PASS_PATTERN="(all )?[Tt]ests? passed|test suite passed|0 failed|✓.*[Pp]assed|Tests PASSED"
+    # Patterns that indicate tests failed
+    FAIL_PATTERN="[Tt]ests? failed|test failures|[0-9]+ failed|✗.*[Ff]ailed|Tests FAILED"
+    STATUS_FIELD="testStatus"
+    ;;
+  merge-agent)
+    # Patterns that indicate merge complete
+    PASS_PATTERN="[Mm]erge (complete|successful)|[Pp]ushed to|[Mm]erged to main|[Mm]erged successfully"
+    # Patterns that indicate merge failed
+    FAIL_PATTERN="[Mm]erge conflict|[Cc]annot merge|[Mm]erge failed"
+    STATUS_FIELD="mergeStatus"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+# Check for completion patterns (look at output)
+STATUS=""
+if echo "$OUTPUT" | grep -qE "$PASS_PATTERN"; then
+  STATUS="passed"
+elif echo "$OUTPUT" | grep -qE "$FAIL_PATTERN"; then
+  STATUS="failed"
+fi
+
+if [ -z "$STATUS" ]; then
+  exit 0  # No recognized completion pattern - specialist is just idle
+fi
+
+# Get current issue from specialist state file
+STATE_FILE="$HOME/.panopticon/agents/$AGENT_ID/state.json"
+ISSUE_ID=""
+
+if [ -f "$STATE_FILE" ] && command -v jq &> /dev/null; then
+  ISSUE_ID=$(jq -r '.currentIssue // ""' "$STATE_FILE" 2>/dev/null || echo "")
+fi
+
+if [ -z "$ISSUE_ID" ] || [ "$ISSUE_ID" = "null" ]; then
+  # No issue ID - cannot report completion
+  exit 0
+fi
+
+# Report completion to dashboard API (non-blocking background process)
+# Only if dashboard is running
+if curl -s -f --max-time 0.5 "http://localhost:3011/health" > /dev/null 2>&1; then
+  curl -s -X POST "http://localhost:3011/api/specialists/$SPECIALIST_TYPE/auto-complete" \
+    -H "Content-Type: application/json" \
+    -d "{\"issueId\":\"$ISSUE_ID\",\"status\":\"$STATUS\"}" \
+    > /dev/null 2>&1 &
+
+  # Log the completion detection
+  echo "[specialist-stop-hook] Detected completion: $SPECIALIST_TYPE -> $ISSUE_ID -> $STATUS" \
+    >> "$HOME/.panopticon/logs/hooks.log" 2>/dev/null || true
+fi
+
+exit 0

@@ -47,6 +47,8 @@ export interface Agent {
   workspace?: string;
   git?: GitStatus;
   type?: 'agent' | 'planning';
+  hasPendingQuestion?: boolean;
+  pendingQuestionCount?: number;
 }
 
 export interface AgentHealth {

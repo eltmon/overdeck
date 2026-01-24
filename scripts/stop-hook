@@ -47,5 +47,12 @@ if curl -s -f --max-time 0.5 "http://localhost:3011/health" > /dev/null 2>&1; th
     > /dev/null 2>&1 &
 fi
 
+# Chain to specialist-specific hook for auto-completion detection
+# This runs in background and only affects specialist agents
+SPECIALIST_HOOK="$HOME/.panopticon/bin/specialist-stop-hook"
+if [ -x "$SPECIALIST_HOOK" ]; then
+  "$SPECIALIST_HOOK" &
+fi
+
 # Always exit successfully
 exit 0
