@@ -34,23 +34,39 @@ For each conflict:
 - **Maintain code style consistency** - Follow existing patterns in the project
 - **Do NOT modify files that don't have conflicts** - Only touch the files listed above
 
-### 3. Run Tests
+### 3. Validate Resolution
 
-After resolving all conflicts, run the project's test suite:
+**CRITICAL:** Before committing, you MUST verify the merge is complete and valid.
+
+Run the validation script to check for:
+- Conflict markers that weren't resolved
+- Build errors
+- Test failures
 
 ```bash
-{{testCommand}}
+bash scripts/validate-merge.sh
 ```
 
-If the test command is not available or is "skip", you may skip this step.
+The validation script will check:
+1. **Conflict Markers:** No `<<<<<<<`, `=======`, or `>>>>>>>` markers remain in any tracked file
+2. **Build:** Project builds without errors
+3. **Tests:** All tests pass
+
+**If validation fails:**
+- Review the error output
+- Fix the issues
+- Re-run validation
+- **DO NOT commit until validation passes**
 
 ### 4. Stage and Commit
 
-If tests pass (or are skipped):
+**Only after validation passes:**
 1. Stage all resolved conflict files
 2. Complete the merge commit (it's already started by the caller)
 
-**Do NOT:**
+**CRITICAL - Do NOT:**
+- Commit if validation script fails
+- Leave conflict markers in any file (even in comments or docs)
 - Create additional commits beyond the merge commit
 - Modify files outside the conflict resolution
 - Push to remote (the caller handles pushing)
@@ -62,7 +78,7 @@ When you're done (or if you encounter an error), report your results in this EXA
 ```
 MERGE_RESULT: SUCCESS
 RESOLVED_FILES: path/to/file1.ts, path/to/file2.ts
-TESTS: PASS
+VALIDATION: PASS
 NOTES: Brief description of what was resolved
 ```
 
@@ -71,6 +87,7 @@ Or if you failed:
 ```
 MERGE_RESULT: FAILURE
 FAILED_FILES: path/to/file1.ts, path/to/file2.ts
+VALIDATION: FAIL
 REASON: Why the resolution failed
 NOTES: Additional context
 ```
@@ -80,7 +97,7 @@ NOTES: Additional context
 - **MERGE_RESULT:** Either `SUCCESS` or `FAILURE`
 - **RESOLVED_FILES:** Comma-separated list of files you successfully resolved (only if SUCCESS)
 - **FAILED_FILES:** Comma-separated list of files you couldn't resolve (only if FAILURE)
-- **TESTS:** Either `PASS`, `FAIL`, or `SKIP` (only if SUCCESS)
+- **VALIDATION:** Either `PASS` or `FAIL` - Result of running validation script (required)
 - **REASON:** Brief explanation of why resolution failed (only if FAILURE)
 - **NOTES:** Any important observations or context
 
@@ -93,9 +110,11 @@ NOTES: Additional context
 
 ## What Success Looks Like
 
-1. All conflict files are resolved
-2. Tests pass (or are skipped if test command unavailable)
+1. All conflict files are resolved (no conflict markers remain)
+2. Validation script passes (no conflicts, build succeeds, tests pass)
 3. Merge commit is completed
-4. Result is reported in the structured format
+4. Result is reported in the structured format with VALIDATION: PASS
+
+**Remember:** The validation script is your final gate before committing. If it fails, the merge is NOT complete.
 
 Begin analyzing the conflicts now.

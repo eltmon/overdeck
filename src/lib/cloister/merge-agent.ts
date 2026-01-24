@@ -21,6 +21,7 @@ import {
   wakeSpecialist,
   isRunning,
 } from './specialists.js';
+import { runMergeValidation, autoRevertMerge } from './validation.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -46,6 +47,7 @@ export interface MergeResult {
   resolvedFiles?: string[];
   failedFiles?: string[];
   testsStatus?: 'PASS' | 'FAIL' | 'SKIP';
+  validationStatus?: 'PASS' | 'FAIL' | 'NOT_RUN';
   reason?: string;
   notes?: string;
   output?: string;
@@ -142,6 +144,7 @@ function parseAgentOutput(output: string): MergeResult {
   let resolvedFiles: string[] = [];
   let failedFiles: string[] = [];
   let testsStatus: 'PASS' | 'FAIL' | 'SKIP' | null = null;
+  let validationStatus: 'PASS' | 'FAIL' | null = null;
   let reason = '';
   let notes = '';
 
@@ -182,6 +185,14 @@ function parseAgentOutput(output: string): MergeResult {
       }
     }
 
+    // Match VALIDATION
+    if (trimmed.startsWith('VALIDATION:')) {
+      const value = trimmed.substring('VALIDATION:'.length).trim();
+      if (value === 'PASS' || value === 'FAIL') {
+        validationStatus = value;
+      }
+    }
+
     // Match REASON
     if (trimmed.startsWith('REASON:')) {
       reason = trimmed.substring('REASON:'.length).trim();
@@ -199,6 +210,7 @@ function parseAgentOutput(output: string): MergeResult {
       success: true,
       resolvedFiles,
       testsStatus: testsStatus || 'SKIP',
+      validationStatus: validationStatus || 'NOT_RUN',
       notes,
       output,
     };
@@ -206,6 +218,7 @@ function parseAgentOutput(output: string): MergeResult {
     return {
       success: false,
       failedFiles,
+      validationStatus: validationStatus || 'NOT_RUN',
       reason,
       notes,
       output,
@@ -214,6 +227,7 @@ function parseAgentOutput(output: string): MergeResult {
     // No result markers found - assume failure
     return {
       success: false,
+      validationStatus: 'NOT_RUN',
       reason: 'Agent did not report result in expected format',
       output,
     };
@@ -400,15 +414,61 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
           console.log(`[merge-agent] Found result markers in output`);
 
           const result = parseAgentOutput(output);
-          logMergeHistory(context, result);
 
+          // If agent reports success, run post-merge validation
           if (result.success) {
-            logActivity('merge_success', `Merge completed for ${context.issueId}`);
-          } else {
-            logActivity('merge_failure', `Merge failed for ${context.issueId}: ${result.reason}`);
-          }
+            console.log(`[merge-agent] Agent reported success, running post-merge validation...`);
+            logActivity('merge_validation_start', `Running validation for ${context.issueId}`);
 
-          return result;
+            const validationResult = await runMergeValidation({
+              projectPath: context.projectPath,
+              issueId: context.issueId,
+            });
+
+            if (validationResult.valid) {
+              // Validation passed
+              console.log(`[merge-agent] ✓ Validation passed`);
+              logActivity('merge_success', `Merge and validation completed for ${context.issueId}`);
+
+              // Update result with validation status
+              result.validationStatus = 'PASS';
+              logMergeHistory(context, result);
+
+              return result;
+            } else {
+              // Validation failed - auto-revert
+              console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
+              logActivity('merge_validation_fail', `Validation failed for ${context.issueId}: ${validationResult.failures.map(f => f.type).join(', ')}`);
+
+              // Attempt auto-revert
+              const revertSuccess = await autoRevertMerge(context.projectPath);
+
+              const failureReason = validationResult.failures.map(f => `${f.type}: ${f.message}`).join('; ');
+              const revertNote = revertSuccess
+                ? 'Merge auto-reverted to clean state'
+                : 'WARNING: Auto-revert failed - manual cleanup required';
+
+              console.log(`[merge-agent] ${revertNote}`);
+              logActivity('merge_auto_revert', revertNote);
+
+              // Return failure with validation details
+              const failedResult: MergeResult = {
+                success: false,
+                validationStatus: 'FAIL',
+                reason: `Validation failed: ${failureReason}. ${revertNote}`,
+                notes: result.notes,
+                output,
+              };
+
+              logMergeHistory(context, failedResult);
+              return failedResult;
+            }
+          } else {
+            // Agent reported failure
+            logActivity('merge_failure', `Merge failed for ${context.issueId}: ${result.reason}`);
+            logMergeHistory(context, result);
+            return result;
+          }
         }
       }
 
@@ -599,13 +659,60 @@ Report any issues or conflicts you encountered.`;
             const remoteHead = remoteHeadRaw.trim();
 
             if (remoteHead === currentHead) {
-              console.log(`[merge-agent] Merge completed and pushed successfully`);
-              logActivity('merge_complete', `Merge completed by specialist`);
-              return {
-                success: true,
-                testsStatus: 'SKIP', // Specialist ran tests, we trust the result
-                notes: 'Merge completed by merge-agent specialist',
-              };
+              console.log(`[merge-agent] Merge completed and pushed, running validation...`);
+              logActivity('merge_validation_start', `Running post-merge validation for ${issueId}`);
+
+              // Run validation
+              const validationResult = await runMergeValidation({
+                projectPath,
+                issueId,
+              });
+
+              if (validationResult.valid) {
+                // Validation passed
+                console.log(`[merge-agent] ✓ Merge validation passed`);
+                logActivity('merge_complete', `Merge and validation completed by specialist`);
+                return {
+                  success: true,
+                  validationStatus: 'PASS',
+                  testsStatus: 'SKIP', // Specialist ran tests, we trust the result
+                  notes: 'Merge completed by merge-agent specialist and validation passed',
+                };
+              } else {
+                // Validation failed - auto-revert
+                console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
+                logActivity('merge_validation_fail', `Validation failed: ${validationResult.failures.map(f => f.type).join(', ')}`);
+
+                // Attempt auto-revert
+                const revertSuccess = await autoRevertMerge(projectPath);
+
+                // Force push to revert the remote as well
+                if (revertSuccess) {
+                  try {
+                    await execAsync(`git push --force-with-lease origin ${targetBranch}`, {
+                      cwd: projectPath,
+                      encoding: 'utf-8',
+                    });
+                    console.log(`[merge-agent] ✓ Auto-revert pushed to remote`);
+                    logActivity('merge_auto_revert', 'Merge auto-reverted and pushed to remote');
+                  } catch (pushError: any) {
+                    console.error(`[merge-agent] ✗ Failed to push revert: ${pushError.message}`);
+                    logActivity('merge_revert_push_fail', 'Auto-revert successful but push failed');
+                  }
+                }
+
+                const failureReason = validationResult.failures.map(f => `${f.type}: ${f.message}`).join('; ');
+                const revertNote = revertSuccess
+                  ? 'Merge auto-reverted and force-pushed to remote'
+                  : 'WARNING: Auto-revert failed - manual cleanup required';
+
+                return {
+                  success: false,
+                  validationStatus: 'FAIL',
+                  reason: `Validation failed: ${failureReason}. ${revertNote}`,
+                  notes: 'Merge completed but validation failed, auto-reverted',
+                };
+              }
             }
           } catch {
             // Remote check failed, but local merge is done
