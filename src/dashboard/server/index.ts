@@ -4012,7 +4012,7 @@ BRANCH: ${branchName}
 PROJECT: ${projectPath}
 
 === MANDATORY REQUIREMENTS (Block if ANY violated) ===
-1. **Tests Required** - Every new function MUST have tests. No exceptions.
+1. **Tests Required** - Every new function MUST have test files. No exceptions.
 2. **No In-Memory Only Storage** - Important data MUST persist to files/DB.
 3. **No Dead Code** - Remove unused imports, functions, variables.
 4. **Error Handling** - All async operations must handle errors.
@@ -4023,6 +4023,9 @@ PROJECT: ${projectPath}
 2. Review ALL changes: git diff main...${branchName}
 3. Check EVERY file for issues
 4. List EVERY issue found with file:line references
+
+**IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.**
+**The TEST agent will run tests in the next step. Just verify test FILES exist.**
 
 === WHEN DONE ===
 **IF ANY ISSUES FOUND:**
@@ -4244,7 +4247,7 @@ BRANCH: ${branchName}
 PROJECT: ${projectPath}
 
 === MANDATORY REQUIREMENTS (Block if ANY violated) ===
-1. **Tests Required** - Every new function MUST have tests. No exceptions.
+1. **Tests Required** - Every new function MUST have test files. No exceptions.
 2. **No In-Memory Only Storage** - Important data MUST persist to files/DB.
 3. **No Dead Code** - Remove unused imports, functions, variables.
 4. **Error Handling** - All async operations must handle errors.
@@ -4254,12 +4257,15 @@ PROJECT: ${projectPath}
 1. cd ${workspacePath}
 2. Review ALL changes: git diff main...${branchName}
 3. Check EVERY file for:
-   - Missing tests (AUTOMATIC REJECTION)
+   - Missing test FILES (AUTOMATIC REJECTION)
    - In-memory storage for persistent data (AUTOMATIC REJECTION)
    - Security vulnerabilities
    - Performance issues
    - Code quality problems
 4. List EVERY issue found with file:line references
+
+**IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.**
+**The TEST agent will run tests in the next step. Just verify test FILES exist.**
 
 === DECISION ===
 **IF ANY ISSUES FOUND:**

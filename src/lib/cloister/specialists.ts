@@ -860,8 +860,11 @@ ${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
 Your task:
 1. Review all changes in the branch
 2. Check for code quality issues, security concerns, and best practices
-3. Verify test coverage is adequate
+3. Verify test FILES exist for new code (DO NOT run tests - test-agent does that)
 4. Provide specific, actionable feedback
+
+IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.
+The TEST agent will run tests in the next step.
 
 If issues found:
 - Update status: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[issues]"}'
