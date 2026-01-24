@@ -3,29 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
-
-// Difficulty levels
-type DifficultyLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
-
-// Parse difficulty label from issue labels
-function parseDifficultyLabel(labels: string[]): DifficultyLevel | null {
-  const difficultyLabel = labels.find(label => label.startsWith('difficulty:'));
-  if (!difficultyLabel) {
-    return null;
-  }
-
-  const level = difficultyLabel.split(':')[1] as DifficultyLevel;
-  const validLevels: DifficultyLevel[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
-
-  if (validLevels.includes(level)) {
-    return level;
-  }
-
-  return null;
-}
+import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 
 // Difficulty badge colors
-const DIFFICULTY_COLORS: Record<DifficultyLevel, string> = {
+const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
   trivial: 'bg-green-900/50 text-green-400',
   simple: 'bg-green-900/50 text-green-400',
   medium: 'bg-yellow-900/50 text-yellow-400',
@@ -34,7 +15,7 @@ const DIFFICULTY_COLORS: Record<DifficultyLevel, string> = {
 };
 
 // Difficulty badge component
-function DifficultyBadge({ level }: { level: DifficultyLevel }) {
+function DifficultyBadge({ level }: { level: ComplexityLevel }) {
   const color = DIFFICULTY_COLORS[level];
   return (
     <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${color}`}>

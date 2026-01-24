@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { ComplexityLevel } from '../../lib/cloister/complexity.js';
 
 const execAsync = promisify(exec);
 
@@ -40,7 +41,7 @@ interface PlanTask {
   name: string;
   description: string;
   dependsOn?: string;
-  difficulty?: 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+  difficulty?: ComplexityLevel;
 }
 
 interface DiscoveryDecision {
@@ -463,7 +464,7 @@ function generateWorkspaceFile(issue: LinearIssue, prdFiles: string[]): string {
 /**
  * Estimate task difficulty based on name and description
  */
-function estimateDifficulty(task: PlanTask): 'trivial' | 'simple' | 'medium' | 'complex' | 'expert' {
+function estimateDifficulty(task: PlanTask): ComplexityLevel {
   // If difficulty already specified, use it
   if (task.difficulty) {
     return task.difficulty;
