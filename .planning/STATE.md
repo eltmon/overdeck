@@ -1,191 +1,118 @@
-# PAN-73: Dashboard Issue Search with Command Palette
+# PAN-84: Health tab shows all historical agents as 'dead'
 
-## Current Status
+## Status: Implementation Complete
 
-**Status**: ✅ Implementation Complete - Rebased & Ready for Review
+## Problem
 
-All components have been implemented and verified:
-- ✅ Installed cmdk dependency
-- ✅ Created useSearch hook with debounced search and relevance scoring
-- ✅ Created SearchModal component with filter toggles
-- ✅ Created SearchResults component with grouping and external links
-- ✅ Integrated search into App.tsx with global '/' keyboard shortcut
-- ✅ Build successful with no TypeScript errors
-- ✅ Fixed vitest config to exclude Playwright E2E tests
-- ✅ Rebased onto main (was 34 commits behind, resolved STATE.md conflict)
-- ✅ All 28 unit tests passing after rebase
+The Health tab shows 60+ agents as "dead" (red status) with "Session not found" reason. These are historical agents whose work completed normally - they're not actually failures.
 
-Ready for test-agent review.
+**Root cause:** The `determineHealthStatusAsync` function only checks for tmux sessions. If no session exists, it returns `{status: 'dead', reason: 'Session not found'}`. It ignores the `status` field in state.json that indicates whether the agent completed normally or crashed.
 
-## Summary
-
-Add a search feature to the Panopticon dashboard using the `cmdk` library for a command palette UI. Search will filter issues client-side from the React Query cache, respecting current board filters.
+**Current state.json values:**
+- `"running"` (55 agents) - agent should be active
+- `"stopped"` (4 agents) - agent was intentionally stopped
+- `"in_progress"` (1 agent) - agent is working
 
 ## Decisions Made
 
-### 1. Data Sources
-**Decision**: Search all issues displayed on the dashboard (Linear + GitHub + Rally)
+### 1. Filter Only Approach (No Cleanup)
+**Decision:** Only filter the health API response. Do not delete or archive agent directories.
 
-The `/api/issues` endpoint already aggregates issues from all configured sources. Search will operate on whatever issues are currently loaded in the TanStack Query cache.
+**Rationale:** Cost calculation (`/api/costs/by-issue`) depends on agent directories to find workspace paths for session file parsing. Archiving would break cost tracking until PAN-81 (event-sourced costs) is implemented.
 
-### 2. UI Library
-**Decision**: Use `cmdk` library
+### 2. Filter Criteria
+An agent should appear in health checks if:
+- Has running tmux session (regardless of state.json status), OR
+- Has `status: "running"` or `status: "in_progress"` in state.json but NO tmux session (= actually crashed)
 
-- Standard command palette UX with built-in keyboard navigation
-- Well-maintained, lightweight dependency
-- Consistent with MYN's approach
+An agent should be HIDDEN if:
+- Has `status: "stopped"` in state.json (intentionally stopped)
+- Has `status: "completed"` in state.json (work done)
+- Has no state.json file (test artifact or corrupted)
+- Directory doesn't start with `agent-` or `planning-`
 
-### 3. Search Strategy
-**Decision**: Client-side filtering
+### 3. Include Planning Agents
+**Decision:** Include `planning-*` directories in health checks (currently only `agent-*` is checked).
 
-- Filter issues already in React Query cache
-- Instant results, no network latency
-- No backend changes needed
-- Suitable for typical issue counts (< 1000)
+### 4. Status Mapping
+| Condition | Health Status | Reason |
+|-----------|---------------|--------|
+| tmux session + recent activity | healthy | - |
+| tmux session + 15-30 min stale | warning | Low activity |
+| tmux session + >30 min stale | stuck | No activity for X minutes |
+| No tmux + status="running"/"in_progress" | dead | Agent crashed unexpectedly |
+| No tmux + status="stopped"/"completed" | (hidden) | - |
+| No tmux + no state.json | (hidden) | - |
 
-### 4. Result Behavior
-**Decision**: Click selects on board + link icon opens external URL
+### 5. Follow-up Issue Required
+Create PAN-XX after this work to implement cleanup/archiving, blocked on PAN-81 (event-sourced costs).
 
-- Clicking a result: closes search modal, highlights the issue card on kanban board
-- Link icon: opens issue URL in new tab (Linear/GitHub/Rally)
-- Provides both quick navigation and external access
+## Files to Modify
 
-### 5. Search Fields
-**Decision**: Title + identifier by default, with toggle for description
+### `src/dashboard/server/index.ts`
 
-- Default: search `title` and `identifier` fields (fast, low noise)
-- Optional "Deep search" toggle: also includes `description` field
-- Configurable in the search UI
+1. **Update agent name filter (line ~2053):**
+   ```typescript
+   // Before:
+   const agentNames = readdirSync(agentsDir).filter((name) => name.startsWith('agent-'));
 
-### 6. Filter Scope
-**Decision**: Respect current board filters
+   // After:
+   const agentNames = readdirSync(agentsDir).filter((name) =>
+     name.startsWith('agent-') || name.startsWith('planning-')
+   );
+   ```
 
-- Search operates within what's visible on the board
-- Honors current cycle, project, and "include completed" filters
-- Consistent mental model with the board view
+2. **Update `determineHealthStatusAsync` function (line ~2013):**
+   - Read state.json to get the `status` field
+   - If no tmux session AND status is "stopped"/"completed" → return null (exclude from results)
+   - If no tmux session AND status is "running"/"in_progress" → return dead (actual crash)
+   - If no tmux session AND no state.json → return null (exclude from results)
 
-### 7. Search Filters in Command Palette
-**Decision**: Source + Status filters
+3. **Update `/api/health/agents` endpoint (line ~2046):**
+   - Filter out null results from the array
+   - Only return agents that should be visible
 
-- Source toggle: Linear / GitHub / Rally (show/hide by source)
-- Status toggle: show/hide completed issues
-- Clean UI, most useful filters without clutter
+### No Frontend Changes Required
+The frontend (`HealthDashboard.tsx`) already handles all 4 statuses correctly. It just needs fewer agents in the response.
 
-## Technical Approach
+## Edge Cases
 
-### Files to Create
+1. **Agent directory exists but state.json is missing:** Exclude (probably test artifact or corrupted)
+2. **state.json exists but status field is missing:** Treat as "running" (assume crash if no tmux)
+3. **status has unexpected value:** Treat as "running" (conservative - show it)
 
-1. **`src/dashboard/frontend/src/components/search/SearchModal.tsx`**
-   - Command palette modal using `cmdk`
-   - Keyboard shortcut: `/` to open
-   - Filter toggles for source and status
-   - "Deep search" toggle for description search
+## Testing Plan
 
-2. **`src/dashboard/frontend/src/components/search/SearchResults.tsx`**
-   - Result list with grouping by source
-   - Shows: identifier, title, status badge, priority indicator
-   - Click handler for board selection
-   - External link icon
+1. Verify running agents still show as healthy/warning/stuck
+2. Verify stopped agents don't appear in health list
+3. Verify agents with state="running" but no tmux show as dead
+4. Verify planning agents are included
+5. Verify test artifacts (no state.json) are excluded
+6. Verify cost calculation still works (agent directories intact)
 
-3. **`src/dashboard/frontend/src/hooks/useSearch.ts`**
-   - Custom hook for search logic
-   - Filters issues from React Query cache
-   - Relevance scoring (identifier match > title match > description match)
-   - Debounced input handling
+## Implementation Summary
 
-### Files to Modify
+All changes implemented in `src/dashboard/server/index.ts`:
 
-1. **`src/dashboard/frontend/src/App.tsx`**
-   - Add global keyboard listener for `/` key
-   - Render SearchModal component
-   - Pass board state (selected issue, filters) to search
+1. **Updated `determineHealthStatusAsync` function (lines 2012-2065):**
+   - Now returns `null` for agents that should be hidden
+   - Checks state.json `status` field to differentiate crashes from intentional stops
+   - Returns `dead` only if status is "running"/"in_progress" but no tmux session exists
+   - Returns `null` if status is "stopped"/"completed" or if no state.json exists
 
-2. **`src/dashboard/frontend/package.json`**
-   - Add `cmdk` dependency
+2. **Updated agent name filter (lines 2075-2077):**
+   - Now includes both `agent-*` and `planning-*` directories
 
-### Keyboard Shortcuts
+3. **Updated `/api/health/agents` endpoint (lines 2096-2118):**
+   - Handles null results from `determineHealthStatusAsync`
+   - Filters out null results before returning response
 
-| Key | Action |
-|-----|--------|
-| `/` | Open search modal (from anywhere) |
-| `Esc` | Close search modal |
-| `↑`/`↓` | Navigate results |
-| `Enter` | Select result (closes modal, highlights on board) |
-| `⌘+Enter` | Open external URL in new tab |
-
-### Search Algorithm
-
-1. Get issues from React Query cache (`queryKey: ['issues']`)
-2. Apply board filters (cycle, project, completed)
-3. Apply search filters (source, status)
-4. Text match against title + identifier (+ description if deep search)
-5. Score and sort results:
-   - Exact identifier match: score 100
-   - Identifier starts with query: score 80
-   - Title contains query: score 50
-   - Description contains query: score 20
-6. Return top 20 results
-
-### UI Layout
-
-```
-┌─────────────────────────────────────────┐
-│ 🔍 Search issues...               [⌘K] │
-├─────────────────────────────────────────┤
-│ Filters: [Linear] [GitHub] [✓ Open]     │
-│          [□ Deep search]                │
-├─────────────────────────────────────────┤
-│ Linear                                  │
-│ ┌─────────────────────────────────────┐ │
-│ │ PAN-73  Add issue search to dash   │ │
-│ │ Todo • Priority 3           [↗]    │ │
-│ └─────────────────────────────────────┘ │
-│ ┌─────────────────────────────────────┐ │
-│ │ PAN-72  Fix merge detection        │ │
-│ │ Done • Priority 2           [↗]    │ │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ GitHub                                  │
-│ ┌─────────────────────────────────────┐ │
-│ │ #73  Dashboard search feature      │ │
-│ │ Open • Priority 3           [↗]    │ │
-│ └─────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-```
-
-## Acceptance Criteria
-
-- [ ] `/` opens search modal from anywhere in dashboard
-- [ ] Search filters issues by title and identifier
-- [ ] "Deep search" toggle includes description in search
-- [ ] Results grouped by source (Linear, GitHub, Rally)
-- [ ] Results show identifier, title, status, priority
-- [ ] Clicking result closes modal and selects issue on board
-- [ ] Link icon opens external URL in new tab
-- [ ] Source and status filter toggles work correctly
-- [ ] Search respects current board filters
-- [ ] ESC closes modal
-- [ ] Debounced input (no excessive re-renders)
-- [ ] Minimum 2 characters before search triggers
+**Test Results:**
+- All 362 tests pass
+- No test changes required (implementation is backend-only)
 
 ## Out of Scope
 
-- Server-side search endpoint (not needed with current data volume)
-- Full-text search with ranking algorithms (simple substring matching is sufficient)
-- Search history / recent searches
-- Saved searches / bookmarks
-- Fuzzy matching (may add later if requested)
-
-## Dependencies to Install
-
-```bash
-npm install cmdk
-```
-
-## Risks & Mitigations
-
-| Risk | Mitigation |
-|------|------------|
-| Large issue count slows search | React 18's `useDeferredValue` for non-blocking renders |
-| cmdk styling conflicts | Use Tailwind classes, override defaults |
-| Keyboard shortcut conflicts | `/` is standard; disable when input is focused |
+- Cleanup/archiving of old agent directories (follow-up PAN-XX)
+- Adding filter controls to the UI
+- Changing how state.json status values are set

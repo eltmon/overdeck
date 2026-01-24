@@ -1,5 +1,6 @@
 # Panopticon-managed symlinks (not committed)
 beads
+beads-completion-check
 bug-fix
 code-review
 code-review-performance

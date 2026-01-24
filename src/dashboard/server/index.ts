@@ -2010,17 +2010,39 @@ async function checkAgentHealthAsync(agentId: string): Promise<{
 }
 
 // Determine health status based on activity (ASYNC)
+// Returns null if agent should be hidden (completed/stopped/no state.json)
 async function determineHealthStatusAsync(
   agentId: string,
   stateFile: string
-): Promise<{ status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string }> {
+): Promise<{ status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string } | null> {
   const health = await checkAgentHealthAsync(agentId);
 
-  if (!health.alive) {
-    return { status: 'dead', reason: 'Session not found' };
+  // Read state.json to check agent status
+  let agentStatus: string | undefined;
+  if (existsSync(stateFile)) {
+    try {
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+      agentStatus = state.status;
+    } catch {}
   }
 
-  // Check if there's been recent output
+  // No tmux session - check state.json to determine if crash or intentional
+  if (!health.alive) {
+    // No state.json - exclude (test artifact or corrupted)
+    if (!agentStatus) {
+      return null;
+    }
+
+    // Intentionally stopped or completed - exclude
+    if (agentStatus === 'stopped' || agentStatus === 'completed') {
+      return null;
+    }
+
+    // Status is "running" or "in_progress" but no tmux - actual crash
+    return { status: 'dead', reason: 'Agent crashed unexpectedly' };
+  }
+
+  // Tmux session exists - check activity
   if (existsSync(stateFile)) {
     try {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
@@ -2050,7 +2072,9 @@ app.get('/api/health/agents', async (_req, res) => {
       return res.json([]);
     }
 
-    const agentNames = readdirSync(agentsDir).filter((name) => name.startsWith('agent-'));
+    const agentNames = readdirSync(agentsDir).filter((name) =>
+      name.startsWith('agent-') || name.startsWith('planning-')
+    );
 
     // Process agents in parallel to avoid blocking
     const agents = await Promise.all(
@@ -2070,12 +2094,17 @@ app.get('/api/health/agents', async (_req, res) => {
         }
 
         // Check live status (ASYNC)
-        const { status, reason } = await determineHealthStatusAsync(name, stateFile);
+        const healthStatus = await determineHealthStatusAsync(name, stateFile);
+
+        // Filter out agents that should be hidden (completed/stopped)
+        if (!healthStatus) {
+          return null;
+        }
 
         return {
           agentId: name,
-          status,
-          reason,
+          status: healthStatus.status,
+          reason: healthStatus.reason,
           lastPing: new Date().toISOString(),
           consecutiveFailures: storedHealth.consecutiveFailures,
           killCount: storedHealth.killCount,
@@ -2083,7 +2112,10 @@ app.get('/api/health/agents', async (_req, res) => {
       })
     );
 
-    res.json(agents);
+    // Filter out null results (hidden agents)
+    const visibleAgents = agents.filter((agent) => agent !== null);
+
+    res.json(visibleAgents);
   } catch (error) {
     console.error('Error fetching health:', error);
     res.json([]);
