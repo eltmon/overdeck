@@ -2477,9 +2477,10 @@ app.post('/api/specialists/reset-all', async (_req, res) => {
       isRunning,
       getTmuxSessionName
     } = await import('../../lib/cloister/specialists.js');
+    const { clearHook } = await import('../../lib/hooks.js');
 
     const specialists = getAllSpecialists();
-    const results: { name: string; killed: boolean; sessionCleared: boolean }[] = [];
+    const results: { name: string; killed: boolean; sessionCleared: boolean; queueCleared: boolean }[] = [];
 
     for (const specialist of specialists) {
       const name = specialist.name;
@@ -2498,13 +2499,38 @@ app.post('/api/specialists/reset-all', async (_req, res) => {
 
       // Clear session file
       const sessionCleared = clearSessionId(name);
-      results.push({ name, killed, sessionCleared });
+
+      // Clear queue
+      clearHook(name);
+
+      results.push({ name, killed, sessionCleared, queueCleared: true });
+    }
+
+    // Reset any "reviewing" statuses to "pending"
+    let reviewStatusesReset = 0;
+    if (existsSync(REVIEW_STATUS_FILE)) {
+      try {
+        const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+        for (const key of Object.keys(statuses)) {
+          if (statuses[key].reviewStatus === 'reviewing') {
+            statuses[key].reviewStatus = 'pending';
+            statuses[key].updatedAt = new Date().toISOString();
+            reviewStatusesReset++;
+          }
+        }
+        if (reviewStatusesReset > 0) {
+          writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2));
+        }
+      } catch (e) {
+        console.error('Failed to reset review statuses:', e);
+      }
     }
 
     res.json({
       success: true,
-      message: `Reset ${results.length} specialists`,
+      message: `Reset ${results.length} specialists, cleared queues, reset ${reviewStatusesReset} review statuses`,
       results,
+      reviewStatusesReset,
     });
   } catch (error: any) {
     console.error('Error resetting all specialists:', error);
