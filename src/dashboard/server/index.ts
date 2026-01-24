@@ -3997,6 +3997,48 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       return res.status(400).json({ error: 'Workspace does not exist' });
     }
 
+    // 1b. Update Linear issue to "In Review" status
+    const linearApiKey = process.env.LINEAR_API_KEY;
+    if (linearApiKey && !issueId.toUpperCase().startsWith('PAN-')) {
+      try {
+        const getIssueQuery = `
+          query GetIssue($id: String!) {
+            issue(id: $id) {
+              id
+              state { id name type }
+              team { states { nodes { id name type } } }
+            }
+          }
+        `;
+        const issueResponse = await fetch('https://api.linear.app/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': linearApiKey },
+          body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
+        });
+        const issueJson = await issueResponse.json();
+        const states = issueJson.data?.issue?.team?.states?.nodes || [];
+        const linearId = issueJson.data?.issue?.id;
+        const inReviewState = states.find((s: any) => s.name.toLowerCase() === 'in review' || s.name.toLowerCase() === 'review');
+
+        if (linearId && inReviewState) {
+          const updateMutation = `
+            mutation UpdateIssue($id: String!, $stateId: String!) {
+              issueUpdate(id: $id, input: { stateId: $stateId }) { success }
+            }
+          `;
+          await fetch('https://api.linear.app/graphql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': linearApiKey },
+            body: JSON.stringify({ query: updateMutation, variables: { id: linearId, stateId: inReviewState.id } }),
+          });
+          console.log(`[review] Updated ${issueId} to In Review in Linear`);
+        }
+      } catch (linearError) {
+        console.error('[review] Error updating Linear to In Review:', linearError);
+        // Non-fatal - continue with review
+      }
+    }
+
     // 2. Push the feature branch to remote first
     try {
       await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
