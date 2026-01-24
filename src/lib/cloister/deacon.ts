@@ -20,7 +20,6 @@ import {
   getEnabledSpecialists,
   getTmuxSessionName,
   isRunning,
-  isIdleAtPrompt,
   initializeSpecialist,
   checkSpecialistQueue,
   getNextSpecialistTask,
@@ -559,14 +558,39 @@ export async function runPatrol(): Promise<PatrolResult> {
       }
     }
 
-    // Check for queued work if specialist is idle (PAN-74)
-    if (result.wasRunning && await isIdleAtPrompt(specialist.name)) {
-      const queue = checkSpecialistQueue(specialist.name);
-      if (queue.hasWork) {
-        const nextTask = getNextSpecialistTask(specialist.name);
-        if (nextTask) {
-          console.log(`[deacon] ${specialist.name} idle with queued work, waking for ${nextTask.payload.issueId}`);
-          try {
+    // Check for queued work if specialist is idle or suspended (PAN-74, updated for PAN-80)
+    const specialistSession = getTmuxSessionName(specialist.name);
+    const runtimeState = getAgentRuntimeState(specialistSession);
+    const queue = checkSpecialistQueue(specialist.name);
+
+    // Auto-resume suspended specialists if they have queued work (PAN-80)
+    if (runtimeState?.state === 'suspended' && queue.hasWork) {
+      const nextTask = getNextSpecialistTask(specialist.name);
+      if (nextTask) {
+        console.log(`[deacon] Auto-resuming suspended ${specialist.name} for queued task: ${nextTask.payload.issueId}`);
+        try {
+          const { resumeAgent } = await import('../agents.js');
+          const message = `# Queued Work\n\nProcessing queued task: ${nextTask.payload.issueId}`;
+          const resumeResult = await resumeAgent(specialistSession, message);
+
+          if (resumeResult.success) {
+            actions.push(`Auto-resumed ${specialist.name} for queued task: ${nextTask.payload.issueId}`);
+            completeSpecialistTask(specialist.name, nextTask.id);
+          } else {
+            console.error(`[deacon] Failed to auto-resume ${specialist.name}: ${resumeResult.error}`);
+          }
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error(`[deacon] Error auto-resuming ${specialist.name}:`, msg);
+        }
+      }
+    }
+    // Wake idle specialists if they have queued work
+    else if (result.wasRunning && runtimeState?.state === 'idle' && queue.hasWork) {
+      const nextTask = getNextSpecialistTask(specialist.name);
+      if (nextTask) {
+        console.log(`[deacon] ${specialist.name} idle with queued work, waking for ${nextTask.payload.issueId}`);
+        try {
             // Extract task details from payload
             // Note: branch, workspace, prUrl are stored in context by submitToSpecialistQueue
             const taskDetails = {

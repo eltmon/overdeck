@@ -471,114 +471,9 @@ export async function isRunning(name: SpecialistType): Promise<boolean> {
 }
 
 /**
- * Check if a specialist is idle (waiting at the prompt)
- *
- * Checks the tmux pane output to see if the last line is the idle prompt (❯).
- * This is more reliable than heartbeat timing since it directly detects
- * when Claude Code is waiting for input.
- *
- * @param name - Specialist name
- * @returns true if specialist appears to be at the idle prompt
- */
-export async function isIdleAtPrompt(name: SpecialistType): Promise<boolean> {
-  const tmuxSession = getTmuxSessionName(name);
-
-  try {
-    // Capture the last few lines of the tmux pane
-    const { stdout: output } = await execAsync(
-      `tmux capture-pane -t "${tmuxSession}" -p | tail -12`,
-      { encoding: 'utf-8' }
-    );
-    const trimmedOutput = output.trim();
-
-    const lines = trimmedOutput.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return false;
-
-    const allText = lines.join('\n');
-
-    // FIRST: Check for active work indicators ANYWHERE in recent output
-    // These take priority over any prompt detection
-    const activeIndicators = [
-      'esc to interrupt',      // Active task
-      'Choreographing',        // Thinking
-      'Nebulizing',            // Processing
-      'Baking',                // Processing
-      '◐', '◑', '◒', '◓',      // Quarter spinners
-      '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏', // Braille spinners
-      'thinking)',             // "(thinking)" indicator
-      '↓.*tokens',             // Token streaming indicator
-    ];
-
-    for (const indicator of activeIndicators) {
-      if (allText.includes(indicator)) {
-        return false; // Definitely active
-      }
-    }
-
-    // Check for active patterns with regex
-    const activePatterns = [
-      /Writing.*\.\.\./i,
-      /Reading.*\.\.\./i,
-      /Editing.*\.\.\./i,
-      /Running.*\.\.\./i,
-      /Searching.*\.\.\./i,
-      /Analyzing.*\.\.\./i,
-      /Processing.*\.\.\./i,
-      /Generating/i,
-      /tokens\s*\)/i,          // "tokens)" at end of thinking indicator
-    ];
-
-    for (const pattern of activePatterns) {
-      if (pattern.test(allText)) {
-        return false; // Active work indicator found
-      }
-    }
-
-    // NOW check if we're at idle prompt
-    // Look for the prompt character on its own line (not in status bar)
-    const promptLinePattern = /^❯\s*$/m;
-    const hasCleanPrompt = promptLinePattern.test(trimmedOutput);
-
-    if (hasCleanPrompt) {
-      return true; // Clean prompt line = idle
-    }
-
-    // Check for prompt with unsent text in buffer (shows "↵ send" or "↵ enter" at end)
-    // Example: "❯ check test-agent status                                                ↵ send"
-    // This means idle at prompt with text typed but not submitted
-    const promptWithUnsentText = /^❯\s+.+↵\s*(send|enter)/m;
-    if (promptWithUnsentText.test(trimmedOutput)) {
-      return true; // At prompt with unsent text = still idle
-    }
-
-    // Check if last meaningful line (before status) shows prompt
-    // Status lines typically contain: MCPs, hooks, CLAUDE.md, permissions
-    const nonStatusLines = lines.filter(line =>
-      !line.includes('MCPs') &&
-      !line.includes('hooks') &&
-      !line.includes('CLAUDE.md') &&
-      !line.includes('bypass permissions')
-    );
-
-    if (nonStatusLines.length > 0) {
-      const lastMeaningful = nonStatusLines[nonStatusLines.length - 1].trim();
-      if (lastMeaningful === '❯' || lastMeaningful.endsWith('❯')) {
-        return true;
-      }
-    }
-
-    // Default: if we can't tell, assume not idle (safer for showing "active")
-    return false;
-  } catch {
-    // If we can't capture the pane, assume not idle (safer)
-    return false;
-  }
-}
-
-/**
  * Get complete status for a specialist
  *
- * Combines metadata, session info, and runtime state.
+ * Combines metadata, session info, and runtime state (PAN-80: uses hook-based state).
  *
  * @param name - Specialist name
  * @returns Complete specialist status
@@ -596,18 +491,38 @@ export async function getSpecialistStatus(name: SpecialistType): Promise<Special
   const running = await isRunning(name);
   const contextTokens = countContextTokens(name);
 
-  // Determine state by checking if the specialist is at the idle prompt
-  // If running but idle at prompt (❯), they're sleeping
-  // If running and NOT at prompt, they're active (working on something)
+  // Determine state from hook-based runtime state (PAN-80)
+  const { getAgentRuntimeState } = await import('../agents.js');
+  const tmuxSession = getTmuxSessionName(name);
+  const runtimeState = getAgentRuntimeState(tmuxSession);
+
   let state: SpecialistState;
-  if (running) {
-    const idle = await isIdleAtPrompt(name);
-    state = idle ? 'sleeping' : 'active';
-  } else if (sessionId) {
-    // Has session ID but not running = sleeping
-    state = 'sleeping';
+  if (runtimeState) {
+    // Map runtime state to specialist state
+    switch (runtimeState.state) {
+      case 'active':
+        state = 'active';
+        break;
+      case 'idle':
+        state = 'sleeping'; // Idle = at prompt waiting
+        break;
+      case 'suspended':
+        state = 'sleeping'; // Suspended = session saved, not running
+        break;
+      case 'uninitialized':
+      default:
+        state = 'uninitialized';
+        break;
+    }
   } else {
-    state = 'uninitialized';
+    // Fallback if no runtime state available
+    if (running && sessionId) {
+      state = 'sleeping';
+    } else if (sessionId) {
+      state = 'sleeping';
+    } else {
+      state = 'uninitialized';
+    }
   }
 
   return {
@@ -1030,11 +945,14 @@ export async function wakeSpecialistOrQueue(
 }> {
   const { priority = 'normal', source = 'handoff' } = options;
 
-  // Check if specialist is running
+  // Check if specialist is running and get state (PAN-80)
   const running = await isRunning(name);
-  const idle = running ? await isIdleAtPrompt(name) : false;
+  const { getAgentRuntimeState } = await import('../agents.js');
+  const tmuxSession = getTmuxSessionName(name);
+  const runtimeState = getAgentRuntimeState(tmuxSession);
+  const idle = runtimeState?.state === 'idle' || runtimeState?.state === 'suspended';
 
-  // If running and busy, queue the task
+  // If running and busy (active), queue the task
   if (running && !idle) {
     try {
       submitToSpecialistQueue(name, {

@@ -228,201 +228,13 @@ interface ActiveReview {
 
 const activeReviews: Map<string, ActiveReview> = new Map();
 
-/**
- * Detect completion patterns from specialist tmux output
- */
-async function detectSpecialistCompletion(specialistName: string): Promise<{
-  completed: boolean;
-  success: boolean | null;
-  details: string;
-  handoffTo?: string;
-  issueId?: string;
-}> {
-  try {
-    const { stdout: output } = await execAsync(
-      `tmux capture-pane -t "specialist-${specialistName}" -p | tail -50`,
-      { encoding: 'utf-8' }
-    );
-    const trimmedOutput = output.trim();
-
-    // Extract issue ID from output (look for PAN-XX, MIN-XX, etc.)
-    const issueMatch = trimmedOutput.match(/\b(PAN|MIN|MYN)-\d+\b/i);
-    const issueId = issueMatch ? issueMatch[0].toUpperCase() : undefined;
-
-    // Review agent completion patterns
-    if (specialistName === 'review-agent') {
-      // Success: handed off to test-agent
-      if (trimmedOutput.includes('handed off to test-agent') ||
-          trimmedOutput.includes('Hand off to test-agent') ||
-          trimmedOutput.includes('wake test-agent') ||
-          trimmedOutput.includes('Waking Test Agent')) {
-        return { completed: true, success: true, details: 'Review passed, handed to test-agent', handoffTo: 'test-agent', issueId };
-      }
-      // Blocked: issues found
-      if (trimmedOutput.includes('BLOCKED') || trimmedOutput.includes('issues found') ||
-          trimmedOutput.includes('send-feedback-to-agent') && trimmedOutput.includes('issue')) {
-        return { completed: true, success: false, details: 'Review blocked - issues found', issueId };
-      }
-      // NOTE: We do NOT detect "passed" from terminal output alone.
-      // The review-agent should explicitly:
-      // 1. Call the API: POST /api/workspaces/:id/review-status with {"reviewStatus":"passed"}
-      // 2. Hand off to test-agent (detected above via "Waking Test Agent" pattern)
-      //
-      // Detecting "passed" from patterns like "LGTM", "approved" causes false positives
-      // because these words appear in prompts and intermediate output.
-    }
-
-    // Test agent completion patterns
-    if (specialistName === 'test-agent') {
-      // Success: tests passed, handed to merge
-      if ((trimmedOutput.includes('Test Results: PASS') || trimmedOutput.includes('tests passed')) &&
-          (trimmedOutput.includes('merge-agent') || trimmedOutput.includes('Handoff'))) {
-        return { completed: true, success: true, details: 'Tests passed, handed to merge-agent', handoffTo: 'merge-agent', issueId };
-      }
-      // Tests passed without handoff
-      if (trimmedOutput.includes('Test Results: PASS') ||
-          (trimmedOutput.includes('passed') && trimmedOutput.includes('skipped') && !trimmedOutput.includes('failed'))) {
-        return { completed: true, success: true, details: 'Tests passed', issueId };
-      }
-      // Tests failed
-      if (trimmedOutput.includes('Test Results: FAIL') || trimmedOutput.includes('FAILED') ||
-          trimmedOutput.includes('tests failed')) {
-        return { completed: true, success: false, details: 'Tests failed', issueId };
-      }
-    }
-
-    // Merge agent completion patterns
-    if (specialistName === 'merge-agent') {
-      // Success: merge complete
-      if (trimmedOutput.includes('Merge complete') || trimmedOutput.includes('pushed to main') ||
-          trimmedOutput.includes('main -> main')) {
-        return { completed: true, success: true, details: 'Merge completed successfully', issueId };
-      }
-      // Merge failed
-      if (trimmedOutput.includes('merge failed') || trimmedOutput.includes('conflict') && trimmedOutput.includes('error')) {
-        return { completed: true, success: false, details: 'Merge failed', issueId };
-      }
-    }
-
-    return { completed: false, success: null, details: 'Still working' };
-  } catch {
-    return { completed: false, success: null, details: 'Could not read specialist output' };
-  }
-}
-
-/**
- * Poll active reviews and update status automatically
- */
-async function pollReviewStatus(): Promise<void> {
-  const statuses = loadReviewStatuses();
-  const STALE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes without activity = stale
-
-  for (const [issueId, status] of Object.entries(statuses)) {
-    // Skip if already complete or failed
-    if (status.readyForMerge ||
-        status.reviewStatus === 'failed' ||
-        (status.reviewStatus === 'blocked' && status.testStatus !== 'testing')) {
-      continue;
-    }
-
-    // Check for stale status (reviewing/testing for too long without heartbeat)
-    const statusAge = Date.now() - new Date(status.updatedAt).getTime();
-    if (statusAge > STALE_TIMEOUT_MS) {
-      // Check if the specialist has a recent heartbeat
-      const specialistName = status.reviewStatus === 'reviewing' ? 'review-agent' :
-                            status.testStatus === 'testing' ? 'test-agent' : null;
-      if (specialistName) {
-        const heartbeatFile = join(homedir(), '.panopticon', 'heartbeats', `specialist-${specialistName}.json`);
-        let hasRecentActivity = false;
-        if (existsSync(heartbeatFile)) {
-          try {
-            const heartbeat = JSON.parse(readFileSync(heartbeatFile, 'utf-8'));
-            const heartbeatAge = Date.now() - new Date(heartbeat.timestamp).getTime();
-            hasRecentActivity = heartbeatAge < STALE_TIMEOUT_MS;
-          } catch {}
-        }
-
-        if (!hasRecentActivity) {
-          console.log(`[auto-detect] ${issueId} status is stale (${specialistName} inactive for ${Math.round(statusAge / 1000)}s)`);
-
-          // Notify the issue agent about the timeout so they know what happened
-          const agentSession = `agent-${issueId.toLowerCase()}`;
-          try {
-            execSync(`tmux has-session -t "${agentSession}" 2>/dev/null`, { encoding: 'utf-8' });
-            const timeoutMsg = status.reviewStatus === 'reviewing'
-              ? `**Review Timeout Notification**\n\nThe review-agent did not respond within the timeout period.\nYour review has been marked as failed.\n\n**Action Required:** Please re-trigger the review from the dashboard, or check the review-agent status with: tmux attach -t specialist-review-agent`
-              : `**Test Timeout Notification**\n\nThe test-agent did not respond within the timeout period.\nTests have been marked as failed.\n\n**Action Required:** Please re-trigger tests from the dashboard, or check the test-agent status.`;
-            const escapedMsg = timeoutMsg.replace(/'/g, "'\\''");
-            execSync(`tmux send-keys -t "${agentSession}" '${escapedMsg}'`, { encoding: 'utf-8' });
-            execSync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
-            console.log(`[auto-detect] Notified ${agentSession} about ${specialistName} timeout`);
-          } catch {
-            // Agent session doesn't exist, can't notify
-          }
-
-          if (status.reviewStatus === 'reviewing') {
-            setReviewStatus(issueId, {
-              reviewStatus: 'failed',
-              reviewNotes: `Review timed out - ${specialistName} did not respond`
-            });
-          } else if (status.testStatus === 'testing') {
-            setReviewStatus(issueId, {
-              testStatus: 'failed',
-              testNotes: `Tests timed out - ${specialistName} did not respond`
-            });
-          }
-          continue;
-        }
-      }
-    }
-
-    // Check review-agent if reviewing
-    if (status.reviewStatus === 'reviewing') {
-      const detection = await detectSpecialistCompletion('review-agent');
-      if (detection.completed && detection.issueId?.toUpperCase() === issueId.toUpperCase()) {
-        if (detection.success) {
-          console.log(`[auto-detect] Review passed for ${issueId}`);
-          setReviewStatus(issueId, {
-            reviewStatus: 'passed',
-            testStatus: detection.handoffTo === 'test-agent' ? 'testing' : status.testStatus
-          });
-        } else {
-          console.log(`[auto-detect] Review blocked for ${issueId}: ${detection.details}`);
-          setReviewStatus(issueId, {
-            reviewStatus: 'blocked',
-            reviewNotes: detection.details
-          });
-        }
-      }
-    }
-
-    // Check test-agent if testing
-    if (status.testStatus === 'testing' ||
-        (status.reviewStatus === 'passed' && status.testStatus === 'pending')) {
-      const detection = await detectSpecialistCompletion('test-agent');
-      if (detection.completed && detection.issueId?.toUpperCase() === issueId.toUpperCase()) {
-        if (detection.success) {
-          console.log(`[auto-detect] Tests passed for ${issueId}`);
-          setReviewStatus(issueId, { testStatus: 'passed' });
-        } else {
-          console.log(`[auto-detect] Tests failed for ${issueId}: ${detection.details}`);
-          setReviewStatus(issueId, {
-            testStatus: 'failed',
-            testNotes: detection.details
-          });
-        }
-      }
-    }
-  }
-}
-
-// Start polling for review status updates (every 5 seconds)
-setInterval(() => {
-  pollReviewStatus().catch((error) => {
-    console.error('[auto-detect] Error in pollReviewStatus:', error);
-  });
-}, 5000);
-console.log('[auto-detect] Started automatic review status polling');
+// ============================================================================
+// PAN-80: Terminal Parsing Removed
+// ============================================================================
+// Specialists now report status explicitly via:
+//   POST /api/specialists/:name/report-status
+// This replaces unreliable terminal output parsing (detectSpecialistCompletion).
+// ============================================================================
 
 const PENDING_OPS_FILE = join(homedir(), '.panopticon', 'pending-operations.json');
 
@@ -2698,6 +2510,44 @@ app.post('/api/specialists/:name/init', async (req, res) => {
   } catch (error: any) {
     console.error('Error initializing specialist:', error);
     res.status(500).json({ error: 'Failed to initialize specialist: ' + error.message });
+  }
+});
+
+// Specialist reports status (PAN-80 - replaces terminal parsing)
+app.post('/api/specialists/:name/report-status', async (req, res) => {
+  const { name } = req.params;
+  const { issueId, status, notes } = req.body;
+
+  if (!issueId || !status) {
+    return res.status(400).json({ error: 'issueId and status required' });
+  }
+
+  if (!['passed', 'blocked', 'failed', 'in-progress'].includes(status)) {
+    return res.status(400).json({ error: 'status must be: passed, blocked, failed, or in-progress' });
+  }
+
+  try {
+    // Write status to specialist's state directory
+    const specialistDir = join(homedir(), '.panopticon', 'specialists', name);
+    mkdirSync(specialistDir, { recursive: true });
+
+    const statusFile = join(specialistDir, `${issueId}-status.json`);
+    const statusData = {
+      issueId,
+      specialist: name,
+      status,
+      notes: notes || '',
+      timestamp: new Date().toISOString(),
+    };
+
+    writeFileSync(statusFile, JSON.stringify(statusData, null, 2));
+
+    console.log(`[specialists] ${name} reported status for ${issueId}: ${status}`);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error saving specialist status:', error);
+    res.status(500).json({ error: 'Failed to save status: ' + error.message });
   }
 });
 
