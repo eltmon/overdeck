@@ -24,9 +24,9 @@ Two related issues with specialist/agent management:
 
 ## Current Status
 
-**Last Updated:** 2026-01-23 15:55
+**Last Updated:** 2026-01-23 16:00
 
-### Completed (Layer 1 - Foundation)
+### Completed (Layers 1-2 - Foundation + Core Logic)
 
 ✅ **Hook Infrastructure** (panopticon-5sas)
 - Created `pre-tool-hook` script (sets state=active)
@@ -50,28 +50,53 @@ Two related issues with specialist/agent management:
 - POST `/api/agents/:id/suspend` - Save session ID and kill tmux
 - POST `/api/agents/:id/resume` - Resume from saved session ID (with optional message)
 
-### In Progress (Layer 2 - Core Logic)
+✅ **Auto-Suspend Logic** (panopticon-eqs2)
+- Added `checkAndSuspendIdleAgents()` to deacon patrol loop
+- Specialists: 5 minute timeout, Work agents: 10 minute timeout
+- Saves session ID, kills tmux, updates state to suspended
+- Runs every 30 seconds as part of patrol
 
-🔄 **Ready to Start:**
-- Auto-suspend logic (panopticon-eqs2) - Add idle timeout checking to deacon
-- Agent resume implementation (panopticon-k6fh) - Implement resume with session ID
+✅ **Agent Resume Implementation** (panopticon-k6fh)
+- Created `resumeAgent()` function in agents.ts
+- Reads saved session ID and creates tmux with `--resume` flag
+- Auto-resume on `/work-tell` for work agents
+- API endpoint simplified to use `resumeAgent()`
 
 ### Remaining Work (Layers 3-4)
 
 **Layer 3 - UI & Cleanup:**
 - Dashboard frontend updates (panopticon-t8k2) - Activity history, resume button, new states
-- Terminal parsing cleanup (panopticon-r6tp) - Remove `isIdleAtPrompt()` and related code
+- Terminal parsing cleanup (panopticon-r6tp) - Remove `isIdleAtPrompt()` and `detectSpecialistCompletion()`
 
 **Layer 4 - Testing:**
 - Integration tests (panopticon-wk6m) - State transitions, suspend/resume, auto-suspend
 
 ### Next Steps
 
-1. Implement auto-suspend logic in deacon patrol loop
-2. Implement agent resume functionality
+1. ~~Implement auto-suspend logic in deacon patrol loop~~ ✅
+2. ~~Implement agent resume functionality~~ ✅
 3. Update dashboard frontend with new UI components
-4. Remove all terminal parsing code
+4. **CRITICAL**: Remove terminal parsing - especially `detectSpecialistCompletion()`
+   - False positives: PAN-73 showed "Review Passed" when prompt mentioned "hand off to test-agent"
+   - Solution: Specialists should POST status to API endpoint instead of terminal parsing
+   - Add endpoint: `POST /api/specialists/:name/report-status` with `{issueId, status, notes}`
 5. Write integration tests
+
+### Critical Issue: detectSpecialistCompletion() False Positives
+
+**Problem:** The review-agent status detection parses terminal output for phrases like "hand off to test-agent", but these appear in PROMPTS causing false positives (PAN-73 showed "Review Passed" while still reviewing).
+
+**Root Cause:** Terminal output parsing is unreliable - can't distinguish between:
+- Agent saying "I will hand off to test-agent" (status update)
+- Prompt saying "When done, hand off to test-agent" (instruction)
+
+**Solution (PAN-80):**
+1. Add API endpoint: `POST /api/specialists/:name/report-status`
+   - Body: `{issueId: string, status: 'passed'|'blocked'|'failed', notes?: string}`
+   - Specialist agents call this API explicitly when work is complete
+2. Remove `detectSpecialistCompletion()` terminal parsing function
+3. Remove `pollReviewStatus()` and related polling logic
+4. Update specialists to call API endpoint instead of relying on terminal output
 
 ## Technical Approach
 
