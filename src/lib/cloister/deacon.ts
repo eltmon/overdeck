@@ -594,26 +594,25 @@ export async function runPatrol(): Promise<PatrolResult> {
       if (nextTask) {
         console.log(`[deacon] ${specialist.name} idle with queued work, waking for ${nextTask.payload.issueId}`);
         try {
-            // Extract task details from payload
-            // Note: branch, workspace, prUrl are stored in context by submitToSpecialistQueue
-            const taskDetails = {
-              issueId: nextTask.payload.issueId || '',
-              branch: nextTask.payload.context?.branch,
-              workspace: nextTask.payload.context?.workspace,
-              prUrl: nextTask.payload.context?.prUrl,
-              context: nextTask.payload.context,
-            };
-            const wakeResult = await wakeSpecialistWithTask(specialist.name, taskDetails);
-            if (wakeResult.success) {
-              completeSpecialistTask(specialist.name, nextTask.id);
-              actions.push(`Processed queued task for ${specialist.name}: ${nextTask.payload.issueId}`);
-            } else {
-              console.error(`[deacon] Failed to wake ${specialist.name} for queued task: ${wakeResult.error}`);
-            }
-          } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : String(error);
-            console.error(`[deacon] Error processing queue for ${specialist.name}:`, msg);
+          // Extract task details from payload
+          // Note: branch, workspace, prUrl are stored in context by submitToSpecialistQueue
+          const taskDetails = {
+            issueId: nextTask.payload.issueId || '',
+            branch: nextTask.payload.context?.branch,
+            workspace: nextTask.payload.context?.workspace,
+            prUrl: nextTask.payload.context?.prUrl,
+            context: nextTask.payload.context,
+          };
+          const wakeResult = await wakeSpecialistWithTask(specialist.name, taskDetails);
+          if (wakeResult.success) {
+            completeSpecialistTask(specialist.name, nextTask.id);
+            actions.push(`Processed queued task for ${specialist.name}: ${nextTask.payload.issueId}`);
+          } else {
+            console.error(`[deacon] Failed to wake ${specialist.name} for queued task: ${wakeResult.error}`);
           }
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error(`[deacon] Error processing queue for ${specialist.name}:`, msg);
         }
       }
     }

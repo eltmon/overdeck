@@ -2744,9 +2744,10 @@ app.post('/api/specialists/:name/report-status', async (req, res) => {
     console.log(`[specialists] ${name} reported status for ${issueId}: ${status}`);
 
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error saving specialist status:', error);
-    res.status(500).json({ error: 'Failed to save status: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to save status: ' + message });
   }
 });
 
