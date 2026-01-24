@@ -869,6 +869,7 @@ async function fetchGitHubIssues(): Promise<any[]> {
         }
       }
 
+      try {
         const dateFilter = getOneDayAgo().toISOString().split('T')[0]; // YYYY-MM-DD
 
         // Use async execAsync to avoid blocking event loop
