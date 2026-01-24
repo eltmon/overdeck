@@ -252,7 +252,7 @@ export async function rotateSpecialistSession(
       ? `You are resuming from a rotated session. Here's your memory:\n\n${memoryContent}\n\nContinue from where you left off.`
       : 'Session rotated. Continue from where you left off.';
 
-    const newAgent = runtime.spawnAgent({
+    const newAgent = await runtime.spawnAgent({
       agentId,
       workspace: agentState.workspace,
       prompt,

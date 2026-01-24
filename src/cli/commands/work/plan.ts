@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { ComplexityLevel } from '../../lib/cloister/complexity.js';
+import { ComplexityLevel } from '../../../lib/cloister/complexity.js';
 
 const execAsync = promisify(exec);
 

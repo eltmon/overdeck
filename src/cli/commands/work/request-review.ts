@@ -13,6 +13,15 @@ interface RequestReviewOptions {
   message?: string;
 }
 
+interface RequestReviewResponse {
+  message?: string;
+  error?: string;
+  hint?: string;
+  queued?: boolean;
+  autoRequeueCount?: number;
+  remainingRequeues?: number;
+}
+
 export async function requestReviewCommand(
   id: string,
   options: RequestReviewOptions
@@ -28,7 +37,7 @@ export async function requestReviewCommand(
       body: JSON.stringify({ message: options.message }),
     });
 
-    const result = await response.json();
+    const result = await response.json() as RequestReviewResponse;
 
     if (!response.ok) {
       if (response.status === 429) {

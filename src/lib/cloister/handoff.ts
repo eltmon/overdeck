@@ -232,9 +232,9 @@ async function performSpecialistWake(
     // Build task details for wakeSpecialistOrQueue
     const taskDetails = {
       issueId: state.issueId || 'unknown',
-      branch: context.branch,
+      branch: context.gitBranch || state.branch,
       workspace: state.workspace,
-      prUrl: context.prUrl,
+      prUrl: (context as any).prUrl,  // Optional field may not exist
       context: {
         reason: options.reason,
         targetModel: options.targetModel,

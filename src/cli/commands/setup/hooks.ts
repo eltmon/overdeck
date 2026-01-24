@@ -83,12 +83,12 @@ function installJq(): boolean {
  * Check if Panopticon hooks are already configured
  */
 function hooksAlreadyConfigured(settings: ClaudeSettings, binDir: string): boolean {
-  const hookTypes: Array<keyof ClaudeSettings['hooks']> = ['PreToolUse', 'PostToolUse', 'Stop'];
+  const hookTypes = ['PreToolUse', 'PostToolUse', 'Stop'] as const;
 
   for (const hookType of hookTypes) {
     const hooks = settings?.hooks?.[hookType] || [];
-    const hasHook = hooks.some((hookConfig) =>
-      hookConfig.hooks?.some((hook) =>
+    const hasHook = hooks.some((hookConfig: HookConfig) =>
+      hookConfig.hooks?.some((hook: { type: string; command: string }) =>
         hook.command?.includes('panopticon') ||
         hook.command?.includes(binDir)
       )

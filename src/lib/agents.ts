@@ -71,6 +71,7 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+  branch?: string; // Git branch name for this agent
 
   // Model routing & handoffs (Phase 4)
   complexity?: ComplexityLevel;
@@ -666,7 +667,7 @@ function checkAndSetupHooks(): void {
     console.log('Configuring Panopticon heartbeat hooks...');
     // Note: This runs during spawn which is now async, so we can use execAsync
     // But this is called from a sync context in checkAndSetupHooks, so we use fire-and-forget
-    exec('pan setup hooks', { stdio: 'pipe' }, (error) => {
+    exec('pan setup hooks', (error: Error | null) => {
       if (error) {
         console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
       } else {

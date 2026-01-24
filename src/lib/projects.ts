@@ -21,6 +21,34 @@ export interface IssueRoutingRule {
 }
 
 /**
+ * Workspace configuration (imported from workspace-config.ts for full details)
+ */
+export interface WorkspaceConfig {
+  type?: 'polyrepo' | 'monorepo';
+  workspaces_dir?: string;
+  repos?: Array<{ name: string; path: string; branch_prefix?: string }>;
+  dns?: { domain: string; entries: string[]; sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq' };
+  ports?: Record<string, { range: [number, number] }>;
+  docker?: { traefik?: string; compose_template?: string };
+  database?: { seed_file?: string; container_name?: string; [key: string]: any };
+  agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; symlinks?: string[] };
+  env?: { template?: string; secrets_file?: string };
+  services?: Array<{ name: string; path: string; start_command: string; docker_command?: string; health_url?: string; port?: number }>;
+}
+
+/**
+ * Test configuration
+ */
+export interface TestConfig {
+  type: string;
+  path: string;
+  command: string;
+  container?: boolean;
+  container_name?: string;
+  env?: Record<string, string>;
+}
+
+/**
  * Project configuration
  */
 export interface ProjectConfig {
@@ -28,8 +56,14 @@ export interface ProjectConfig {
   path: string;
   linear_team?: string;
   issue_routing?: IssueRoutingRule[];
+  /** Workspace configuration */
+  workspace?: WorkspaceConfig;
+  /** Test configuration by name */
+  tests?: Record<string, TestConfig>;
   /** Custom command to create workspaces (e.g., infra/new-feature for MYN) */
   workspace_command?: string;
+  /** Custom command to remove workspaces */
+  workspace_remove_command?: string;
 }
 
 /**

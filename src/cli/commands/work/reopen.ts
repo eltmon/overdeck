@@ -4,7 +4,7 @@ import inquirer from 'inquirer';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { LinearClient } from '@linear/sdk';
+import { LinearClient, Issue } from '@linear/sdk';
 import { planCommand } from './plan.js';
 
 interface ReopenOptions {
@@ -53,7 +53,7 @@ async function fetchIssueWithComments(
     throw new Error(`Issue not found: ${issueId}`);
   }
 
-  const linearIssue = results.nodes[0];
+  const linearIssue = results.nodes[0] as unknown as Issue;
   const state = await linearIssue.state;
 
   // Fetch comments
