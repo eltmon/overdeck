@@ -630,12 +630,15 @@ interface PendingQuestion {
  * Scan a JSONL file for pending (unanswered) AskUserQuestion tool calls
  * A question is pending if there's a tool_use with name='AskUserQuestion'
  * but no corresponding tool_result with matching tool_use_id
+ *
+ * NOTE: Uses async file reading to avoid blocking the event loop on large JSONL files
  */
-function getPendingQuestions(jsonlPath: string): PendingQuestion[] {
+async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
   if (!existsSync(jsonlPath)) return [];
 
   try {
-    const content = readFileSync(jsonlPath, 'utf-8');
+    // Use async readFile to avoid blocking on large JSONL files
+    const content = await readFile(jsonlPath, 'utf-8');
     const lines = content.split('\n').filter(line => line.trim());
 
     // Track tool calls and which ones have been answered
@@ -679,7 +682,7 @@ function getPendingQuestions(jsonlPath: string): PendingQuestion[] {
 /**
  * Get pending questions for an agent by ID
  */
-function getAgentPendingQuestions(agentId: string): PendingQuestion[] {
+async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
   const jsonlPath = getAgentJsonlPath(agentId);
   if (!jsonlPath) return [];
   return getPendingQuestions(jsonlPath);
@@ -1683,7 +1686,7 @@ app.get('/api/agents', async (_req, res) => {
           : name.replace('agent-', '').toUpperCase();
 
         // Check for pending AskUserQuestion (agent waiting for user input)
-        const pendingQuestions = getAgentPendingQuestions(name);
+        const pendingQuestions = await getAgentPendingQuestions(name);
 
         return {
           id: name,
@@ -1833,11 +1836,11 @@ app.post('/api/agents/:id/poke', async (req, res) => {
 // ============================================================================
 
 // Get pending questions for an agent (polls JSONL for unanswered AskUserQuestion calls)
-app.get('/api/agents/:id/pending-questions', (req, res) => {
+app.get('/api/agents/:id/pending-questions', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const questions = getAgentPendingQuestions(id);
+    const questions = await getAgentPendingQuestions(id);
     res.json({
       pending: questions.length > 0,
       questions
@@ -1860,7 +1863,7 @@ app.post('/api/agents/:id/answer-question', async (req, res) => {
 
   try {
     // Get the pending questions to map labels to option indices
-    const pendingQuestions = getAgentPendingQuestions(id);
+    const pendingQuestions = await getAgentPendingQuestions(id);
     if (pendingQuestions.length === 0) {
       return res.status(400).json({ error: 'No pending questions found' });
     }
