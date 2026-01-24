@@ -24,6 +24,19 @@ import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } fro
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName } from '../../lib/cost-parsers/jsonl-parser.js';
 
+import type { Issue } from '../frontend/src/types.js';
+
+/**
+ * Get a Date object representing 24 hours ago from now.
+ * Used for filtering recently completed issues.
+ */
+function getOneDayAgo(): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
+  return date;
+}
+
+
 // Ensure tmux server is running (starts one if not)
 async function ensureTmuxRunning(): Promise<void> {
   try {
@@ -856,11 +869,7 @@ async function fetchGitHubIssues(): Promise<any[]> {
         }
       }
 
-      try {
-        // Only fetch issues closed in the last 24 hours
-        const oneDayAgo = new Date();
-        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-        const dateFilter = oneDayAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+        const dateFilter = getOneDayAgo().toISOString().split('T')[0]; // YYYY-MM-DD
 
         // Use async execAsync to avoid blocking event loop
         const { stdout: closedJson } = await execAsync(
@@ -871,8 +880,7 @@ async function fetchGitHubIssues(): Promise<any[]> {
       } catch (ghError: any) {
         console.error(`gh CLI failed for ${owner}/${repo} closed issues:`, ghError.message);
         // Fallback to API
-        const oneDayAgo = new Date();
-        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+        const oneDayAgo = getOneDayAgo();
         const closedResponse = await fetch(
           `https://api.github.com/repos/${owner}/${repo}/issues?state=closed&since=${oneDayAgo.toISOString()}&per_page=50`,
           {
@@ -1197,12 +1205,9 @@ app.get('/api/issues', async (req, res) => {
     // Merge all issues
     let allFormatted = [...linearFormatted, ...githubIssues, ...rallyIssues];
 
-    // Filter out done/canceled issues older than 24 hours
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-    const oneDayAgoTime = oneDayAgo.getTime();
+    const oneDayAgoTime = getOneDayAgo().getTime();
 
-    allFormatted = allFormatted.filter((issue: any) => {
+    allFormatted = allFormatted.filter((issue: Issue) => {
       const isDone = issue.status === 'Done' || issue.status === 'Completed' || issue.status === 'Closed';
       const isCanceled = issue.status === 'Canceled' || issue.status === 'Cancelled';
 

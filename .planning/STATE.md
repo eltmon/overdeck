@@ -70,7 +70,7 @@ export interface Issue {
 
 ## Current Status
 
-**COMPLETED** - All changes implemented and ready for testing.
+**COMPLETED** - All changes implemented, code review feedback addressed, tests added.
 
 ### Changes Made
 
@@ -80,6 +80,15 @@ export interface Issue {
 4. ✅ Added `completedAt` mapping from GitHub's closedAt field (server/index.ts:934)
 5. ✅ Implemented server-side filtering to exclude done/canceled items older than 24h (server/index.ts:1200-1220)
 6. ✅ Documented filtering behavior in README.md (README.md:929-937)
+
+### Code Review Fixes (Round 2)
+
+1. ✅ Extracted `getOneDayAgo()` helper function to eliminate code duplication (server/index.ts:33-37)
+2. ✅ Fixed type safety: replaced `any` with `Issue` type in filter logic (server/index.ts:1210)
+3. ✅ Added comprehensive tests for 24-hour filtering logic (tests/dashboard/issue-filtering.test.ts)
+   - 12 tests covering all edge cases: active issues, recent/old done, recent/old canceled, missing completedAt
+4. ✅ Added tests for completedAt field handling (tests/dashboard/completedAt-field.test.ts)
+   - 9 tests covering Linear/GitHub mapping, missing values, date parsing
 
 ## Acceptance Criteria
 
