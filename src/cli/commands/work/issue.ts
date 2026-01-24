@@ -319,7 +319,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     spinner.text = 'Spawning agent...';
 
-    const agent = spawnAgent({
+    const agent = await spawnAgent({
       issueId: id,
       workspace,
       runtime: options.runtime,

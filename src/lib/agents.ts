@@ -1,11 +1,15 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { AGENTS_DIR } from './paths.js';
 import { createSession, killSession, sendKeys, sessionExists, getAgentSessions } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
+
+const execAsync = promisify(exec);
 
 // ============================================================================
 // Ready Signal Management (PAN-87)
@@ -249,7 +253,7 @@ export interface SpawnOptions {
   prompt?: string;
 }
 
-export function spawnAgent(options: SpawnOptions): AgentState {
+export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = `agent-${options.issueId.toLowerCase()}`;
 
   // Check if already running
@@ -315,16 +319,16 @@ export function spawnAgent(options: SpawnOptions): AgentState {
   if (prompt) {
     // Wait for SessionStart hook to signal ready (PAN-87: reliable prompt delivery)
     // The hook writes ready.json when Claude's session starts
-    const ready = waitForReadySignal(agentId, 30);
+    const ready = await waitForReadySignal(agentId, 30);
 
     if (ready) {
       // Use tmux load-buffer and paste-buffer to send the prompt
-      // This avoids all shell escaping issues
-      execSync(`tmux load-buffer "${promptFile}"`);
-      execSync(`tmux paste-buffer -t ${agentId}`);
+      // This avoids all shell escaping issues (using execAsync to not block event loop)
+      await execAsync(`tmux load-buffer "${promptFile}"`);
+      await execAsync(`tmux paste-buffer -t ${agentId}`);
       // Small delay to let paste complete, then send Enter
-      execSync('sleep 0.5');
-      execSync(`tmux send-keys -t ${agentId} Enter`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await execAsync(`tmux send-keys -t ${agentId} Enter`);
     } else {
       console.error('Claude SessionStart hook did not fire in time, prompt not sent. Check ~/.claude/settings.json has SessionStart hook configured.');
     }
@@ -657,8 +661,15 @@ function checkAndSetupHooks(): void {
   // Hooks not configured - run setup silently
   try {
     console.log('Configuring Panopticon heartbeat hooks...');
-    execSync('pan setup hooks', { stdio: 'pipe' });
-    console.log('✓ Heartbeat hooks configured');
+    // Note: This runs during spawn which is now async, so we can use execAsync
+    // But this is called from a sync context in checkAndSetupHooks, so we use fire-and-forget
+    exec('pan setup hooks', { stdio: 'pipe' }, (error) => {
+      if (error) {
+        console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
+      } else {
+        console.log('✓ Heartbeat hooks configured');
+      }
+    });
   } catch (error) {
     console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
   }

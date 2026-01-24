@@ -156,7 +156,7 @@ async function performKillAndSpawn(
 
     // Step 6: Spawn new agent with target model
     // Use same agent ID to preserve identity
-    const newState = spawnAgent({
+    const newState = await spawnAgent({
       issueId: state.issueId,
       workspace: state.workspace,
       runtime: state.runtime,
