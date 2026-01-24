@@ -124,6 +124,7 @@ interface ReviewStatus {
   testNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
+  autoRequeueCount?: number; // Circuit breaker: max 3 auto-requeues before human intervention required
 }
 
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -4129,9 +4130,9 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     });
   }
 
-  // Mark review as starting
+  // Mark review as starting (human-initiated: reset autoRequeueCount)
   setPendingOperation(issueId, 'review');
-  setReviewStatus(issueId, { reviewStatus: 'reviewing', testStatus: 'pending' });
+  setReviewStatus(issueId, { reviewStatus: 'reviewing', testStatus: 'pending', autoRequeueCount: 0 });
 
   try {
     // 1. Check workspace exists
@@ -4292,6 +4293,97 @@ curl -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-
     completePendingOperation(issueId, error.message);
     setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: error.message });
     return res.status(500).json({ error: error.message });
+  }
+});
+
+// Agent-initiated re-review request with circuit breaker (PAN-90)
+// Allows agents to request re-review after fixing feedback, max 3 times
+const MAX_AUTO_REQUEUE = 3;
+
+app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
+  const { issueId } = req.params;
+  const { message } = req.body; // Optional message for reviewers
+
+  const existingStatus = getReviewStatus(issueId);
+  const currentCount = existingStatus?.autoRequeueCount || 0;
+
+  // Circuit breaker: max 3 auto-requeues
+  if (currentCount >= MAX_AUTO_REQUEUE) {
+    console.log(`[request-review] Circuit breaker: ${issueId} exceeded max auto-requeues (${currentCount}/${MAX_AUTO_REQUEUE})`);
+    return res.status(429).json({
+      success: false,
+      error: 'Circuit breaker triggered',
+      message: `Maximum automatic re-review requests (${MAX_AUTO_REQUEUE}) exceeded. Human intervention required.`,
+      autoRequeueCount: currentCount,
+      hint: 'A human must click the Review button to continue.',
+    });
+  }
+
+  // Check if workspace exists
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const branchName = `feature/${issueLower}`;
+
+  if (!existsSync(workspacePath)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Workspace does not exist',
+    });
+  }
+
+  // Increment counter and queue for review
+  const newCount = currentCount + 1;
+  const reviewNotes = message ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}` : undefined;
+
+  setReviewStatus(issueId, {
+    reviewStatus: 'reviewing',
+    testStatus: 'pending',
+    autoRequeueCount: newCount,
+    reviewNotes,
+  });
+
+  console.log(`[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})`);
+
+  // Queue for review-agent (same logic as human-initiated review)
+  try {
+    const { wakeSpecialistOrQueue } = await import('../../../lib/cloister/specialists.js');
+
+    const result = await wakeSpecialistOrQueue('review-agent', {
+      issueId,
+      workspace: workspacePath,
+      branch: branchName,
+    }, {
+      priority: 'normal',
+      source: 'agent-request',
+    });
+
+    if (result.success) {
+      console.log(`[request-review] Queued ${issueId} for review-agent`);
+      return res.json({
+        success: true,
+        queued: result.queued,
+        message: result.queued
+          ? `Review queued (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`
+          : `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
+        autoRequeueCount: newCount,
+        remainingRequeues: MAX_AUTO_REQUEUE - newCount,
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to queue review',
+        autoRequeueCount: newCount,
+      });
+    }
+  } catch (error: any) {
+    console.error(`[request-review] Error:`, error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      autoRequeueCount: newCount,
+    });
   }
 });
 
