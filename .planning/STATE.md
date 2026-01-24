@@ -112,10 +112,18 @@ All changes implemented in `src/dashboard/server/index.ts`:
 - Created `tests/dashboard/health-api.test.ts` with comprehensive coverage
 
 **Code Review Feedback Addressed:**
+
+**Round 1:**
 1. ✅ Added 10 comprehensive tests for health filtering logic
 2. ✅ Extracted filtering logic to `src/dashboard/lib/health-filtering.ts` for testability
 3. ✅ Fixed duplicate state.json reads (read once, use throughout)
 4. ✅ Added comment to catch block explaining silent failure behavior
+
+**Round 2 (tests clarification):**
+- Reviewer initially blocked PR saying "no tests for modified functionality"
+- Tests already existed in commit 5d244d0 (`tests/dashboard/health-api.test.ts`)
+- Added PR comment clarifying test coverage
+- All 10 requested test scenarios present and passing
 
 ## Out of Scope
 
