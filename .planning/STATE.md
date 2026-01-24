@@ -130,6 +130,12 @@ All changes implemented in `src/dashboard/server/index.ts`:
 - Changed from `./lib/health-filtering.js` to `../lib/health-filtering.js`
 - All 372 tests still passing after fix (commit a82569d)
 
+**Round 4 (merge main):**
+- ✅ Merged main into feature/pan-84 to get missing specialists module (commit 1540a00)
+- All health API tests pass (10/10)
+- One flaky test timeout in agent-lifecycle.test.ts (unrelated to PAN-84)
+- Attempted automated re-review but dashboard froze (likely event loop blocking issue)
+
 ## Out of Scope
 
 - Cleanup/archiving of old agent directories (follow-up PAN-XX)
