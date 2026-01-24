@@ -5199,8 +5199,10 @@ app.post('/api/agents', async (req, res) => {
         } catch (diffErr) {
           // There are changes, commit and push them
           await execAsync(`git commit -m "Planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' });
-          await execAsync(`git push`, { cwd: gitRoot, encoding: 'utf-8' });
-          console.log(`Committed and pushed planning artifacts for ${issueId}`);
+          // Push in background (non-blocking to avoid freezing dashboard)
+          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
+          pushChild.unref();
+          console.log(`[start-agent] Committed and pushed planning artifacts for ${issueId} (push in background)`);
         }
       } catch (gitErr) {
         console.error('Git commit/push of planning artifacts failed:', gitErr);
@@ -6417,9 +6419,12 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
             await execAsync(`git commit -m "Complete planning for ${id}"`, { cwd: gitRoot, encoding: 'utf-8' });
           }
 
-          // Push to remote
-          await execAsync(`git push`, { cwd: gitRoot, encoding: 'utf-8' });
+          // Push to remote (non-blocking to avoid freezing dashboard)
+          // Spawn in background - don't await
+          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
+          pushChild.unref();
           gitPushed = true;
+          console.log(`[complete-planning] Git push started in background for ${id}`);
         } catch (gitErr) {
           console.error('Git commit/push failed:', gitErr);
           // Continue even if git fails
