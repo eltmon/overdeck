@@ -192,19 +192,59 @@ async function closeIssueAfterMerge(issueId: string): Promise<void> {
       });
       console.log(`[merge] GitHub issue #${issueNumber} closed`);
     } else {
-      // Linear issue - update to Done state
+      // Linear issue - update to Done state via GraphQL API
       console.log(`[merge] Moving Linear issue ${issueId} to Done...`);
 
-      // Use linear CLI or API to update the issue state
-      // For now, we'll try to find and call the Linear update
-      try {
-        await execAsync(`linear issue update ${issueId} --state "Done"`, {
-          encoding: 'utf-8',
-        });
+      const linearApiKey = process.env.LINEAR_API_KEY;
+      if (!linearApiKey) {
+        console.warn(`[merge] LINEAR_API_KEY not set, cannot auto-close Linear issue ${issueId}`);
+        return;
+      }
+
+      // First, get the issue to find its team and the Done state
+      const issueQuery = `query { issue(id: "${issueId}") { id team { id states { nodes { id name type } } } } }`;
+      const issueRes = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': linearApiKey,
+        },
+        body: JSON.stringify({ query: issueQuery }),
+      });
+
+      if (!issueRes.ok) {
+        throw new Error(`Linear API error: ${issueRes.status}`);
+      }
+
+      const issueData = await issueRes.json() as any;
+      const states = issueData.data?.issue?.team?.states?.nodes || [];
+      const doneState = states.find((s: any) => s.type === 'completed' || s.name === 'Done');
+
+      if (!doneState) {
+        console.warn(`[merge] Could not find Done state for Linear issue ${issueId}`);
+        return;
+      }
+
+      // Update the issue to Done state
+      const updateMutation = `mutation { issueUpdate(id: "${issueId}", input: { stateId: "${doneState.id}" }) { success } }`;
+      const updateRes = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': linearApiKey,
+        },
+        body: JSON.stringify({ query: updateMutation }),
+      });
+
+      if (!updateRes.ok) {
+        throw new Error(`Linear API update error: ${updateRes.status}`);
+      }
+
+      const updateData = await updateRes.json() as any;
+      if (updateData.data?.issueUpdate?.success) {
         console.log(`[merge] Linear issue ${issueId} moved to Done`);
-      } catch (linearErr) {
-        // Linear CLI might not be available, log but don't fail
-        console.warn(`[merge] Could not auto-close Linear issue ${issueId}: Linear CLI not available`);
+      } else {
+        console.warn(`[merge] Linear update returned success=false for ${issueId}`);
       }
     }
   } catch (error: unknown) {
