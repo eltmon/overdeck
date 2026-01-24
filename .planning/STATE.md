@@ -24,9 +24,9 @@ Two related issues with specialist/agent management:
 
 ## Current Status
 
-**Last Updated:** 2026-01-23 17:45
+**Last Updated:** 2026-01-24 01:27
 
-### Completed (Layers 1-3 - Foundation, Core Logic, and UI)
+### Completed (All Layers)
 
 ✅ **Hook Infrastructure** (panopticon-5sas)
 - Created `pre-tool-hook` script (sets state=active)
@@ -79,10 +79,23 @@ Two related issues with specialist/agent management:
 - Activity history shows last 20 tool executions with timestamps
 - Suspended state shows ⏸️ emoji with blue color
 
-### Remaining Work (Layer 4)
+✅ **Integration Tests** (panopticon-wk6m) - **COMPLETED**
+- Created comprehensive test suite at `tests/e2e/agent-lifecycle.test.ts`
+- 22 tests passing, 1 skipped (AGENTS_DIR module load time issue - covered in unit tests)
+- Tests cover:
+  - Full state transition lifecycle (uninitialized → active → idle → suspended → active)
+  - Suspend/resume flow with session ID persistence
+  - Auto-suspend after idle timeout (5 min specialists, 10 min work agents)
+  - Activity log persistence and automatic pruning to 100 entries
+  - State persistence across state changes
+  - Hook integration (PreToolUse, Stop, PostToolUse)
+  - Error handling for missing/corrupted state files
+- Fixed export of `checkAndSuspendIdleAgents()` in deacon.ts
+- All 362 tests passing across full test suite
 
-**Layer 4 - Testing:**
-- ⏳ Integration tests (panopticon-wk6m) - State transitions, suspend/resume, auto-suspend
+### Work Complete
+
+All layers completed and tested. PAN-80 is ready for review.
 
 ### Next Steps
 

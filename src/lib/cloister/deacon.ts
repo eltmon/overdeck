@@ -452,7 +452,7 @@ export interface PatrolResult {
  * Specialists: 5 minute idle timeout
  * Work agents: 10 minute idle timeout
  */
-async function checkAndSuspendIdleAgents(): Promise<string[]> {
+export async function checkAndSuspendIdleAgents(): Promise<string[]> {
   const actions: string[] = [];
   const specialists = getEnabledSpecialists();
   const specialistNames = new Set(specialists.map(s => getTmuxSessionName(s.name)));
