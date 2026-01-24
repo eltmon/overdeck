@@ -115,6 +115,7 @@ export interface AgentRuntimeState {
   sessionId?: string;
   suspendedAt?: string;
   resumedAt?: string;
+  currentIssue?: string; // Issue ID the agent is currently working on
 }
 
 /**
