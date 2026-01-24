@@ -15,7 +15,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
-import { checkAgentHealthAsync, determineHealthStatusAsync } from './lib/health-filtering.js';
+import { checkAgentHealthAsync, determineHealthStatusAsync } from '../lib/health-filtering.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
