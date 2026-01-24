@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, ChevronDown, ChevronRight } from 'lucide-react';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play } from 'lucide-react';
 import { useState } from 'react';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
@@ -193,7 +193,7 @@ export function IssueAgentCard({
 
   const handleResume = (e: React.MouseEvent) => {
     e.stopPropagation();
-    resumeMutation.mutate();
+    resumeMutation.mutate(undefined);
   };
 
   const toggleActivityExpanded = (e: React.MouseEvent) => {

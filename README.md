@@ -670,6 +670,10 @@ pan skills            # List available skills
 pan status            # Show running agents
 pan up                # Start dashboard (Docker or minimal)
 pan down              # Stop dashboard and services
+pan update            # Update Panopticon to latest version
+pan backup            # Create backup of ~/.panopticon/
+pan restore           # Restore from backup
+pan setup hooks       # Install Claude Code hooks (heartbeat, etc.)
 ```
 
 #### What `pan sync` Does
@@ -694,11 +698,30 @@ pan work issue MIN-123
 # List all running agents
 pan work status
 
-# Send a message to an agent
+# Send a message to an agent (handles Enter key automatically)
 pan work tell min-123 "Please also add tests"
 
 # Kill an agent
 pan work kill min-123
+
+# Show work completed and awaiting review
+pan work pending
+
+# Approve agent work, merge MR, update Linear
+pan work approve min-123
+
+# List issues from configured trackers
+pan work list
+
+# Triage issues from secondary tracker
+pan work triage
+
+# Reopen a closed issue and re-run planning
+pan work reopen min-123
+
+# Recover crashed agents
+pan work recover min-123
+pan work recover --all
 ```
 
 ### Health Monitoring
@@ -823,6 +846,12 @@ pan project add /path/to/project --name myproject
 # List managed projects
 pan project list
 
+# Show project details
+pan project show myproject
+
+# Initialize project config (creates .panopticon.json)
+pan project init
+
 # Remove a project
 pan project remove myproject
 ```
@@ -868,6 +897,9 @@ pan cloister start
 
 # Stop Cloister
 pan cloister stop
+
+# Emergency stop all agents (force kill)
+pan cloister emergency-stop
 
 # Check Cloister status
 pan cloister status

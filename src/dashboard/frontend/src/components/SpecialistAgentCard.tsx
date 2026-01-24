@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Brain, RotateCcw, Power, Square, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown, Pause, Play, Activity } from 'lucide-react';
+import { Brain, RotateCcw, Power, Square, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown, Play, Activity } from 'lucide-react';
 import { useState } from 'react';
 
 export interface SpecialistAgent {
@@ -358,7 +358,7 @@ export function SpecialistAgentCard({
 
   const handleResume = (e: React.MouseEvent) => {
     e.stopPropagation();
-    resumeMutation.mutate();
+    resumeMutation.mutate(undefined);
   };
 
   const priorityColors = {
