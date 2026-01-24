@@ -5179,10 +5179,33 @@ Use AskUserQuestion tool to ask contextual questions:
 - What does "done" look like?
 - Are there edge cases we need to handle?
 
+### Difficulty Estimation
+
+For each sub-task, estimate difficulty using this rubric:
+
+| Level | When to Use | Model |
+|-------|-------------|-------|
+| \`trivial\` | Typo, comment, formatting only | haiku |
+| \`simple\` | Bug fix, single file, obvious change | haiku |
+| \`medium\` | New feature, 3-5 files, standard patterns | sonnet |
+| \`complex\` | Refactor, migration, 6+ files, some risk | sonnet |
+| \`expert\` | Architecture, security, performance, high risk | opus |
+
+Consider these factors:
+- **Files to modify**: 1-2 (simple), 3-5 (medium), 6+ (complex/expert)
+- **Cross-cutting**: None (simple), Some (medium), Many (complex/expert)
+- **Risk level**: Low (simple), Medium (medium), High (expert)
+- **Domain knowledge**: Standard (simple), Research needed (medium), Deep expertise (expert)
+
+When creating beads tasks, include difficulty labels:
+\`\`\`bash
+bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -d "Description"
+\`\`\`
+
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
 1. Create STATE.md with decisions made
-2. Create beads tasks with dependencies using \`bd create\`
+2. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
 3. Summarize the plan and STOP
 
 **Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.

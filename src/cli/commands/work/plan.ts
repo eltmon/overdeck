@@ -40,6 +40,7 @@ interface PlanTask {
   name: string;
   description: string;
   dependsOn?: string;
+  difficulty?: 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 }
 
 interface DiscoveryDecision {
@@ -460,6 +461,45 @@ function generateWorkspaceFile(issue: LinearIssue, prdFiles: string[]): string {
 }
 
 /**
+ * Estimate task difficulty based on name and description
+ */
+function estimateDifficulty(task: PlanTask): 'trivial' | 'simple' | 'medium' | 'complex' | 'expert' {
+  // If difficulty already specified, use it
+  if (task.difficulty) {
+    return task.difficulty;
+  }
+
+  const combined = `${task.name} ${task.description || ''}`.toLowerCase();
+
+  // Expert-level patterns (architecture, security, performance)
+  const expertPatterns = ['architecture', 'security', 'performance optimization', 'distributed', 'auth system', 'redesign'];
+  if (expertPatterns.some(p => combined.includes(p))) {
+    return 'expert';
+  }
+
+  // Complex patterns (refactor, migration, multiple systems)
+  const complexPatterns = ['refactor', 'migration', 'overhaul', 'rewrite', 'integrate', 'multi-system'];
+  if (complexPatterns.some(p => combined.includes(p))) {
+    return 'complex';
+  }
+
+  // Medium patterns (new feature, component, API)
+  const mediumPatterns = ['implement', 'feature', 'endpoint', 'component', 'service', 'integration', 'add tests'];
+  if (mediumPatterns.some(p => combined.includes(p))) {
+    return 'medium';
+  }
+
+  // Trivial patterns (docs, comments, formatting)
+  const trivialPatterns = ['typo', 'rename', 'comment', 'documentation', 'readme', 'formatting'];
+  if (trivialPatterns.some(p => combined.includes(p))) {
+    return 'trivial';
+  }
+
+  // Default to simple
+  return 'simple';
+}
+
+/**
  * Create Beads tasks with dependencies
  */
 async function createBeadsTasks(issue: LinearIssue, tasks: PlanTask[]): Promise<{ success: boolean; created: string[]; errors: string[] }> {
@@ -478,10 +518,13 @@ async function createBeadsTasks(issue: LinearIssue, tasks: PlanTask[]): Promise<
     const fullName = `${issue.identifier}: ${task.name}`;
 
     try {
+      // Estimate difficulty for this task
+      const difficulty = estimateDifficulty(task);
+
       // Build bd create command with correct flags
       // bd create "title" --type task -l label1,label2 -d "description" --deps "blocks:id"
       const escapedName = fullName.replace(/"/g, '\\"');
-      let cmd = `bd create "${escapedName}" --type task -l "${issue.identifier},linear"`;
+      let cmd = `bd create "${escapedName}" --type task -l "${issue.identifier},linear,difficulty:${difficulty}"`;
 
       // Add dependency if specified (format: blocks:id)
       if (task.dependsOn) {

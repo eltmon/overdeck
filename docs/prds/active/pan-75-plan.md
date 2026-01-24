@@ -1,15 +1,6 @@
 # PAN-75: Add Task Difficulty Estimation for Model Selection
 
-## Status: IMPLEMENTATION COMPLETE ✅
-
-**Completed:** 2026-01-23
-
-All acceptance criteria met:
-- ✅ Planning agent prompt includes full difficulty estimation rubric
-- ✅ Beads tasks created with `difficulty:LEVEL` labels
-- ✅ Dashboard shows difficulty badges on task cards
-- ✅ Agent state files include difficulty field
-- ✅ All tests pass (286 passed, 0 failures)
+## Status: PLANNING COMPLETE
 
 ## Problem Statement
 
@@ -163,42 +154,8 @@ export function DifficultyBadge({ level }: { level: string }) {
 }
 ```
 
-## Implementation Summary
-
-### Files Modified
-
-1. **src/lib/cloister/complexity.ts**
-   - Added `parseDifficultyLabel()` utility function to extract difficulty from beads labels
-
-2. **src/lib/agents.ts**
-   - Added `difficulty` field to `SpawnOptions` interface
-   - Set `complexity` field in agent state during spawn
-
-3. **src/cli/commands/work/plan.ts**
-   - Added `difficulty` field to `PlanTask` interface
-   - Added `estimateDifficulty()` function to estimate based on keywords
-   - Updated bd create commands to include `difficulty:LEVEL` labels
-
-4. **src/dashboard/server/index.ts**
-   - Added difficulty estimation rubric to planning agent prompt
-   - Includes full table with levels, factors, and model recommendations
-   - Instructions for creating beads tasks with difficulty labels
-
-5. **src/dashboard/frontend/src/components/KanbanBoard.tsx**
-   - Added `DifficultyBadge` component with color-coded badges
-   - Added `parseDifficultyLabel()` function to extract difficulty from issue labels
-   - Integrated badge display in IssueCard component
-
-### Test Results
-
-- **286 tests passed**, 0 failures
-- All existing functionality preserved
-- New difficulty features ready for use
-
 ## Notes
 
 - Model selection stays as sonnet for now - difficulty is recorded for future use
 - No beads CLI changes needed - using labels as workaround
 - Difficulty badge colors match severity/risk intuition (green=easy, red=hard)
-- Dashboard badges appear next to agent model in issue cards
-- Planning agents will now estimate and label all sub-tasks with difficulty

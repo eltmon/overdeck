@@ -281,6 +281,31 @@ function getHigherComplexity(
 }
 
 /**
+ * Parse difficulty label from beads labels
+ *
+ * Extracts the difficulty level from labels in the format "difficulty:LEVEL"
+ * (e.g., "difficulty:medium", "difficulty:expert")
+ *
+ * @param labels - Array of label strings
+ * @returns Complexity level or null if no difficulty label found
+ */
+export function parseDifficultyLabel(labels: string[]): ComplexityLevel | null {
+  const difficultyLabel = labels.find(label => label.startsWith('difficulty:'));
+  if (!difficultyLabel) {
+    return null;
+  }
+
+  const level = difficultyLabel.split(':')[1] as ComplexityLevel;
+  const validLevels: ComplexityLevel[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
+
+  if (validLevels.includes(level)) {
+    return level;
+  }
+
+  return null;
+}
+
+/**
  * Map complexity level to recommended model
  *
  * @param level - Complexity level
