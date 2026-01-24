@@ -1214,11 +1214,22 @@ pan workspace create MIN-123 --docker
 
 **What it does:**
 1. Creates the workspace (git worktree or custom command)
-2. Looks for `docker-compose.yml` in:
+2. Looks for docker-compose files in:
    - `{workspace}/docker-compose.yml`
    - `{workspace}/docker-compose.yaml`
    - `{workspace}/.devcontainer/docker-compose.yml`
-3. Runs `docker compose up -d --build` to start containers in background
+   - `{workspace}/.devcontainer/docker-compose.devcontainer.yml`
+   - `{workspace}/.devcontainer/compose.yml`
+3. Runs `docker compose -p "{project}-feature-{issue}" -f {file} up -d --build`
+
+**Docker Project Naming:**
+
+Each workspace gets a unique Docker Compose project name to avoid container conflicts:
+- Format: `{project-name}-feature-{issue-id}` (e.g., `mind-your-now-feature-min-123`)
+- The project name comes from `name` in your `~/.panopticon/projects.yaml`
+- Container names follow: `{project}-{service}-1` (e.g., `mind-your-now-feature-min-123-api-1`)
+
+This allows multiple workspaces to run simultaneously without port or name conflicts.
 
 **Why this matters:**
 - Containers start warming up while you review the issue
