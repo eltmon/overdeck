@@ -252,6 +252,7 @@ export interface SpawnOptions {
   runtime?: string;
   model?: string;
   prompt?: string;
+  difficulty?: ComplexityLevel;
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
@@ -275,6 +276,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     status: 'starting',
     startedAt: new Date().toISOString(),
     // Initialize Phase 4 fields
+    complexity: options.difficulty,
     handoffCount: 0,
     costSoFar: 0,
   };

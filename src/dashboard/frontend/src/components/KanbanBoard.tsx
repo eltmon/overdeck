@@ -3,6 +3,26 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
+import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
+
+// Difficulty badge colors
+const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
+  trivial: 'bg-green-900/50 text-green-400',
+  simple: 'bg-green-900/50 text-green-400',
+  medium: 'bg-yellow-900/50 text-yellow-400',
+  complex: 'bg-orange-900/50 text-orange-400',
+  expert: 'bg-red-900/50 text-red-400',
+};
+
+// Difficulty badge component
+function DifficultyBadge({ level }: { level: ComplexityLevel }) {
+  const color = DIFFICULTY_COLORS[level];
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${color}`}>
+      {level}
+    </span>
+  );
+}
 
 // Cost data for an issue
 interface IssueCost {
@@ -696,6 +716,11 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
                 Input
               </span>
             )}
+            {/* Difficulty badge */}
+            {(() => {
+              const difficulty = parseDifficultyLabel(issue.labels);
+              return difficulty ? <DifficultyBadge level={difficulty} /> : null;
+            })()}
             {/* Cost badge */}
             {cost && cost.totalCost > 0 && (
               <span

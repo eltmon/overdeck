@@ -1,17 +1,8 @@
 # PAN-75: Add Task Difficulty Estimation for Model Selection
 
-## Status: IMPLEMENTATION COMPLETE ✅
+## Status: PLANNING COMPLETE
 
-**Completed:** 2026-01-23
-
-All acceptance criteria met:
-- ✅ Planning agent prompt includes full difficulty estimation rubric
-- ✅ Beads tasks created with `difficulty:LEVEL` labels
-- ✅ Dashboard shows difficulty badges on task cards
-- ✅ Agent state files include difficulty field
-- ✅ All tests pass (286 passed, 0 failures)
-
-## Summary
+## Problem Statement
 
 When spawning agents for tasks, we always use the same model regardless of task complexity. While we won't change model selection immediately (to preserve prompt caching benefits), we want to:
 1. Record task difficulty for future intelligent model selection
@@ -80,68 +71,91 @@ Log difficulty to `~/.panopticon/agents/agent-{issue-id}/state.json`:
 }
 ```
 
-## Files Modified
+## Files to Modify
 
 | File | Change |
 |------|--------|
 | `src/dashboard/server/index.ts` | Update planning prompt with rubric, add difficulty label to bd create |
 | `src/cli/commands/work/plan.ts` | Add difficulty label to bd create commands |
-| `src/dashboard/frontend/src/components/KanbanBoard.tsx` | Add difficulty badge display |
+| `src/dashboard/components/IssueCard.tsx` | Add difficulty badge display |
 | `src/lib/agents.ts` | Add difficulty to agent state tracking |
 | `src/lib/cloister/complexity.ts` | Add `parseDifficultyLabel()` utility function |
 
-## Implementation Summary
+## Acceptance Criteria
 
-### Files Modified
+- [ ] Planning agent prompt includes full difficulty estimation rubric
+- [ ] Planning agent output includes difficulty for each sub-task
+- [ ] Beads tasks created with `difficulty:LEVEL` labels
+- [ ] Dashboard shows difficulty badges on task cards
+- [ ] Agent state files include difficulty field
+- [ ] Existing tests pass (`npm test`)
 
-1. **src/lib/cloister/complexity.ts**
-   - Added `parseDifficultyLabel()` utility function to extract difficulty from beads labels
+## Tasks
 
-2. **src/lib/agents.ts**
-   - Added `difficulty` field to `SpawnOptions` interface
-   - Set `complexity` field in agent state during spawn
+| ID | Task | Difficulty |
+|----|------|------------|
+| `panopticon-or63` | Update planning prompt with difficulty rubric | medium |
+| `panopticon-hns3` | Update bd create commands with difficulty labels | simple |
+| `panopticon-ypqn` | Add DifficultyBadge component to dashboard | medium |
+| `panopticon-nmcw` | Add difficulty to agent state tracking | simple |
+| `panopticon-59kd` | Add parseDifficultyLabel utility | trivial |
+| `panopticon-tjsd` | Run tests and verify | trivial |
 
-3. **src/cli/commands/work/plan.ts**
-   - Added `difficulty` field to `PlanTask` interface
-   - Added `estimateDifficulty()` function to estimate based on keywords
-   - Updated bd create commands to include `difficulty:LEVEL` labels
+**Dependencies:** `panopticon-tjsd` (test) is blocked by all other tasks.
 
-4. **src/dashboard/server/index.ts**
-   - Added difficulty estimation rubric to planning agent prompt
-   - Includes full table with levels, factors, and model recommendations
-   - Instructions for creating beads tasks with difficulty labels
+## Planning Agent Prompt Addition
 
-5. **src/dashboard/frontend/src/components/KanbanBoard.tsx**
-   - Added `DifficultyBadge` component with color-coded badges
-   - Added `parseDifficultyLabel()` function to extract difficulty from issue labels
-   - Integrated badge display in IssueCard component
+Add this section to the planning agent prompt before Phase 3:
 
-### Test Results
+```markdown
+### Difficulty Estimation
 
-- **302 tests passed**, 0 failures (16 new tests added)
-- All existing functionality preserved
-- New difficulty features ready for use
+For each sub-task, estimate difficulty using this rubric:
 
-### Code Review Feedback (Addressed)
+| Level | When to Use | Model |
+|-------|-------------|-------|
+| `trivial` | Typo, comment, formatting only | haiku |
+| `simple` | Bug fix, single file, obvious change | haiku |
+| `medium` | New feature, 3-5 files, standard patterns | sonnet |
+| `complex` | Refactor, migration, 6+ files, some risk | sonnet |
+| `expert` | Architecture, security, performance, high risk | opus |
 
-**Review 1 Issues:**
-1. ❌ NO TESTS → ✅ Added 16 comprehensive tests
-   - `tests/unit/lib/difficulty-estimation.test.ts`: 6 tests for parseDifficultyLabel()
-   - `tests/unit/cli/plan-difficulty.test.ts`: 10 tests for estimateDifficulty()
-   - `tests/unit/frontend/DifficultyBadge.test.tsx`: 6 tests for component
+Consider these factors:
+- **Files to modify**: 1-2 (simple), 3-5 (medium), 6+ (complex/expert)
+- **Cross-cutting**: None (simple), Some (medium), Many (complex/expert)
+- **Risk level**: Low (simple), Medium (medium), High (expert)
+- **Domain knowledge**: Standard (simple), Research needed (medium), Deep expertise (expert)
 
-2. ❌ CODE DUPLICATION → ✅ Removed duplicate parseDifficultyLabel
-   - Frontend now imports from backend lib (complexity.ts)
-   - Single source of truth for difficulty parsing
+Format each task with difficulty:
+- "Add null check in UserService" [difficulty: simple]
+- "Implement rate limiting middleware" [difficulty: medium]
+- "Redesign authentication flow" [difficulty: expert]
+```
 
-3. ❌ TYPE INCONSISTENCY → ✅ Unified type naming
-   - Replaced `DifficultyLevel` with `ComplexityLevel` everywhere
-   - Consistent imports from complexity.ts module
+## Dashboard Badge Component
+
+```tsx
+// DifficultyBadge.tsx
+const BADGE_COLORS = {
+  trivial: 'bg-green-100 text-green-800',
+  simple: 'bg-green-100 text-green-800',
+  medium: 'bg-yellow-100 text-yellow-800',
+  complex: 'bg-orange-100 text-orange-800',
+  expert: 'bg-red-100 text-red-800',
+};
+
+export function DifficultyBadge({ level }: { level: string }) {
+  const color = BADGE_COLORS[level] || 'bg-gray-100 text-gray-800';
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
+      {level}
+    </span>
+  );
+}
+```
 
 ## Notes
 
 - Model selection stays as sonnet for now - difficulty is recorded for future use
 - No beads CLI changes needed - using labels as workaround
 - Difficulty badge colors match severity/risk intuition (green=easy, red=hard)
-- Dashboard badges appear next to agent model in issue cards
-- Planning agents will now estimate and label all sub-tasks with difficulty
