@@ -1,147 +1,224 @@
-# PAN-75: Add Task Difficulty Estimation for Model Selection
+# PAN-93: Merge-agent should detect and resolve merge conflicts before completing
 
-## Status: IMPLEMENTATION COMPLETE ✅
+## Status: PLANNING COMPLETE
 
-**Completed:** 2026-01-23
+## Problem Statement
 
-All acceptance criteria met:
-- ✅ Planning agent prompt includes full difficulty estimation rubric
-- ✅ Beads tasks created with `difficulty:LEVEL` labels
-- ✅ Dashboard shows difficulty badges on task cards
-- ✅ Agent state files include difficulty field
-- ✅ All tests pass (286 passed, 0 failures)
+When merging PAN-75, the merge-agent left unresolved merge conflicts in files, causing build failures:
+- `src/dashboard/frontend/src/components/KanbanBoard.tsx`
+- `.planning/STATE.md`
 
-## Summary
+The build failed with conflict markers (`<<<<<<< HEAD`) still in the code.
 
-When spawning agents for tasks, we always use the same model regardless of task complexity. While we won't change model selection immediately (to preserve prompt caching benefits), we want to:
-1. Record task difficulty for future intelligent model selection
-2. Have planning agents explicitly estimate difficulty for sub-tasks
-3. Display difficulty in the dashboard for visibility
+**Root cause:** The polling loop in `spawnMergeAgentForBranches()` only checks:
+- Did HEAD change?
+- Is commit message merge-like?
+- Is it pushed?
+
+It does NOT validate:
+- Conflict markers removed
+- Build passes
+- Tests pass
+
+## Solution Architecture
+
+### Two-Layer Validation (Belt + Suspenders)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Merge Request                            │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 1: Pre-Merge Validation (Subagent - Haiku)          │
+│  • Check workspace has no existing conflict markers         │
+│  • Verify workspace builds/tests before attempting merge    │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Merge Execution (Merge-Agent Specialist - Opus)           │
+│  • git merge                                                │
+│  • Resolve conflicts if any                                 │
+│  • Call validation subagent                                 │
+│  • Push if valid                                            │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 2: Post-Merge Validation (Subagent - Haiku)         │
+│  • Run scripts/validate-merge.sh                            │
+│  • Check for conflict markers (all tracked files)           │
+│  • Run build                                                 │
+│  • Run tests                                                 │
+│  • Report pass/fail to merge-agent                          │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 3: Polling Fallback (Pure Bash - No AI)             │
+│  • If specialist doesn't report, polling catches merge      │
+│  • Run same validation script                               │
+│  • Auto-revert if validation fails                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### On Validation Failure
+
+1. **Auto-revert**: `git reset --hard HEAD~1`
+2. **Report**: Return structured failure with:
+   - Which files have conflict markers
+   - Build errors (if applicable)
+   - Test failures (if applicable)
+3. **Leave clean state**: Repository is back to pre-merge state
 
 ## Decisions Made
 
-### Scope
+| Topic | Decision | Rationale |
+|-------|----------|-----------|
+| Validation level | Strict (conflicts + build + tests) | Prevent any broken code from reaching main |
+| Execution model | Subagent (Haiku) | Preserve Opus context for merge decisions |
+| Command format | Shell script `scripts/validate-merge.sh` | Per-project customizable, simple to maintain |
+| Validation layers | Both specialist + polling fallback | Redundancy catches edge cases |
+| Failure handling | Auto-revert + report | Clean state for retry |
+| Pre-merge check | Yes | Catch issues before merge complicates things |
+| File types | All tracked files | Conflict markers can appear anywhere |
+| Testing | Unit + integration tests | High-stakes feature needs thorough testing |
 
-**In Scope:**
-1. Planning agent prompt update with full difficulty estimation rubric
-2. Store difficulty in beads labels (e.g., `difficulty:complex`)
-3. Dashboard shows difficulty badges on tasks
-4. Basic tracking - log difficulty to agent state files
+## Implementation Details
 
-**Out of Scope:**
-- Actually changing model selection during agent spawn (future work)
-- Modifying beads CLI (use labels as workaround)
-- Cost tracking/analysis infrastructure (defer to future issue)
+### New Files
 
-### Complexity Levels
+1. **`scripts/validate-merge.sh`** - Main validation script
+   ```bash
+   #!/bin/bash
+   # Check for conflict markers in tracked files
+   # Run npm run build
+   # Run npm test
+   # Exit 0 on success, 1 on failure with details
+   ```
 
-Use existing cloister 5-level system:
-- `trivial` - typo, comment, formatting fixes
-- `simple` - bug fix, minor enhancement, single file
-- `medium` - new feature, component, integration
-- `complex` - refactor, migration, multi-system changes
-- `expert` - architecture, security, performance optimization
+2. **`src/lib/cloister/validation-subagent.ts`** - Subagent spawning logic
+   - Spawns Haiku subagent to run validation
+   - Parses results
+   - Returns structured pass/fail
 
-### Difficulty Storage
+3. **`tests/unit/lib/merge-validation.test.ts`** - Unit tests
+   - Test conflict marker detection regex
+   - Test result parsing
 
-Store in beads labels with format: `difficulty:LEVEL`
+4. **`tests/integration/merge-validation.test.ts`** - Integration tests
+   - Mock merge with conflicts scenario
+   - Verify auto-revert works
+   - Verify clean merge passes
 
-Example: `bd create "PAN-75: Task name" --type task -l "PAN-75,linear,difficulty:medium"`
+### Modified Files
 
-### Planning Agent Rubric
+1. **`src/lib/cloister/merge-agent.ts`**
+   - Add validation call after detecting merge completion
+   - Add auto-revert logic on validation failure
+   - Update `MergeResult` interface with validation details
 
-The planning prompt will include this estimation rubric:
+2. **`src/lib/cloister/prompts/merge-agent.md`**
+   - Add explicit instruction to run validation script
+   - Emphasize not committing with conflict markers
+   - Add validation result markers
 
-| Factor | Trivial/Simple (1-2) | Medium (3) | Complex/Expert (4-5) |
-|--------|---------------------|------------|---------------------|
-| Files to modify | 1-2 | 3-5 | 6+ |
-| Scope | Bug fix, tweak | New feature | New system/major refactor |
-| Cross-cutting concerns | None | Some (logging) | Many (auth, security) |
-| Test complexity | Unit tests only | Integration tests | E2E + security |
-| Domain knowledge | Standard patterns | Some research | Deep expertise |
-| Risk | Low | Medium | High (data, security) |
+3. **`src/dashboard/server/index.ts`**
+   - Update merge endpoint to handle validation failures
+   - Return detailed error info to frontend
 
-### Dashboard UI
+### Validation Script Details
 
-Add difficulty badges to task cards:
-- Color-coded chips: green (trivial/simple), yellow (medium), orange (complex), red (expert)
-- Show in task list and detail views
-- Filter/sort by difficulty (optional stretch)
+```bash
+#!/bin/bash
+# scripts/validate-merge.sh
 
-### Tracking
+set -e
 
-Log difficulty to `~/.panopticon/agents/agent-{issue-id}/state.json`:
-```json
-{
-  "issueId": "PAN-75",
-  "model": "sonnet",
-  "difficulty": "medium",
-  "startedAt": "2024-01-23T..."
-}
+PROJECT_ROOT="${1:-.}"
+cd "$PROJECT_ROOT"
+
+echo "=== Merge Validation ==="
+
+# 1. Check for conflict markers
+echo "Checking for conflict markers..."
+if git grep -l '<<<<<<< ' 2>/dev/null; then
+    echo "ERROR: Conflict markers found in files:"
+    git grep -l '<<<<<<< '
+    exit 1
+fi
+
+# Also check for ======= and >>>>>>> patterns
+if git grep -l '^=======$' 2>/dev/null; then
+    echo "ERROR: Conflict separator markers found"
+    exit 1
+fi
+
+if git grep -l '>>>>>>> ' 2>/dev/null; then
+    echo "ERROR: Conflict end markers found"
+    exit 1
+fi
+
+echo "No conflict markers found."
+
+# 2. Run build
+echo "Running build..."
+if [ -f "package.json" ]; then
+    npm run build || { echo "ERROR: Build failed"; exit 1; }
+elif [ -f "pom.xml" ]; then
+    mvn compile || { echo "ERROR: Build failed"; exit 1; }
+fi
+echo "Build passed."
+
+# 3. Run tests
+echo "Running tests..."
+if [ -f "package.json" ]; then
+    npm test || { echo "ERROR: Tests failed"; exit 1; }
+elif [ -f "pom.xml" ]; then
+    mvn test || { echo "ERROR: Tests failed"; exit 1; }
+fi
+echo "Tests passed."
+
+echo "=== Validation PASSED ==="
+exit 0
 ```
 
-## Files Modified
+## Out of Scope
 
-| File | Change |
-|------|--------|
-| `src/dashboard/server/index.ts` | Update planning prompt with rubric, add difficulty label to bd create |
-| `src/cli/commands/work/plan.ts` | Add difficulty label to bd create commands |
-| `src/dashboard/frontend/src/components/KanbanBoard.tsx` | Add difficulty badge display |
-| `src/lib/agents.ts` | Add difficulty to agent state tracking |
-| `src/lib/cloister/complexity.ts` | Add `parseDifficultyLabel()` utility function |
+- Changing the merge strategy itself (squash vs regular)
+- Changing the specialist system architecture
+- Adding new specialist types
+- UI changes for validation status display
 
-## Implementation Summary
+## Success Criteria
 
-### Files Modified
+1. Merge with unresolved conflicts is detected and rejected
+2. Failed build after merge is detected and rejected
+3. Failed tests after merge is detected and rejected
+4. Auto-revert leaves repository in clean state
+5. Detailed failure report helps debugging
+6. Tests cover conflict detection and revert logic
 
-1. **src/lib/cloister/complexity.ts**
-   - Added `parseDifficultyLabel()` utility function to extract difficulty from beads labels
+## Risk Assessment
 
-2. **src/lib/agents.ts**
-   - Added `difficulty` field to `SpawnOptions` interface
-   - Set `complexity` field in agent state during spawn
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| Validation adds latency | Medium | Low | Subagent runs in parallel, validation script is fast |
+| False positives (e.g., doc with `<<<<` example) | Low | Medium | Use proper git grep, could add allowlist |
+| Revert leaves orphaned state | Low | High | Verify revert works in tests, add state cleanup |
 
-3. **src/cli/commands/work/plan.ts**
-   - Added `difficulty` field to `PlanTask` interface
-   - Added `estimateDifficulty()` function to estimate based on keywords
-   - Updated bd create commands to include `difficulty:LEVEL` labels
+## Test Plan
 
-4. **src/dashboard/server/index.ts**
-   - Added difficulty estimation rubric to planning agent prompt
-   - Includes full table with levels, factors, and model recommendations
-   - Instructions for creating beads tasks with difficulty labels
+### Unit Tests
+- `parseConflictMarkers()` - detect markers in various formats
+- `validateMergeResult()` - parse validation script output
+- `shouldAutoRevert()` - decision logic
 
-5. **src/dashboard/frontend/src/components/KanbanBoard.tsx**
-   - Added `DifficultyBadge` component with color-coded badges
-   - Added `parseDifficultyLabel()` function to extract difficulty from issue labels
-   - Integrated badge display in IssueCard component
-
-### Test Results
-
-- **302 tests passed**, 0 failures (16 new tests added)
-- All existing functionality preserved
-- New difficulty features ready for use
-
-### Code Review Feedback (Addressed)
-
-**Review 1 Issues:**
-1. ❌ NO TESTS → ✅ Added 16 comprehensive tests
-   - `tests/unit/lib/difficulty-estimation.test.ts`: 6 tests for parseDifficultyLabel()
-   - `tests/unit/cli/plan-difficulty.test.ts`: 10 tests for estimateDifficulty()
-   - `tests/unit/frontend/DifficultyBadge.test.tsx`: 6 tests for component
-
-2. ❌ CODE DUPLICATION → ✅ Removed duplicate parseDifficultyLabel
-   - Frontend now imports from backend lib (complexity.ts)
-   - Single source of truth for difficulty parsing
-
-3. ❌ TYPE INCONSISTENCY → ✅ Unified type naming
-   - Replaced `DifficultyLevel` with `ComplexityLevel` everywhere
-   - Consistent imports from complexity.ts module
-
-## Notes
-
-- Model selection stays as sonnet for now - difficulty is recorded for future use
-- No beads CLI changes needed - using labels as workaround
-- Difficulty badge colors match severity/risk intuition (green=easy, red=hard)
-- Dashboard badges appear next to agent model in issue cards
-- Planning agents will now estimate and label all sub-tasks with difficulty
+### Integration Tests
+- Scenario: Clean merge, validation passes
+- Scenario: Merge with unresolved conflicts, auto-reverts
+- Scenario: Merge succeeds but build fails, auto-reverts
+- Scenario: Merge succeeds but tests fail, auto-reverts
+- Scenario: Validation script missing, graceful degradation
