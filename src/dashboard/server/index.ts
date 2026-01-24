@@ -4023,6 +4023,28 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
         console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
       }
     }
+
+    // Immediately process next queued item (don't wait for deacon patrol)
+    const remainingQueue = checkSpecialistQueue('review-agent');
+    if (remainingQueue.hasWork) {
+      const { getNextSpecialistTask, wakeSpecialistWithTask, completeSpecialistTask: completeTask } = await import('../../lib/cloister/specialists.js');
+      const nextTask = getNextSpecialistTask('review-agent');
+      if (nextTask) {
+        console.log(`[review-status] Immediately waking review-agent for next queued task: ${nextTask.payload.issueId}`);
+        const taskDetails = {
+          issueId: nextTask.payload.issueId || '',
+          branch: nextTask.payload.context?.branch,
+          workspace: nextTask.payload.context?.workspace,
+        };
+        const wakeResult = await wakeSpecialistWithTask('review-agent', taskDetails);
+        if (wakeResult.success) {
+          completeTask('review-agent', nextTask.id);
+          console.log(`[review-status] Review-agent woken for ${nextTask.payload.issueId}`);
+        } else {
+          console.error(`[review-status] Failed to wake review-agent for next task: ${wakeResult.error}`);
+        }
+      }
+    }
   }
 
   if (testStatus && ['passed', 'failed'].includes(testStatus)) {
@@ -4054,6 +4076,28 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
         }
       } catch (err) {
         console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
+      }
+    }
+
+    // Immediately process next queued item for test-agent
+    const remainingTestQueue = checkSpecialistQueue('test-agent');
+    if (remainingTestQueue.hasWork) {
+      const { getNextSpecialistTask, wakeSpecialistWithTask, completeSpecialistTask: completeTask } = await import('../../lib/cloister/specialists.js');
+      const nextTask = getNextSpecialistTask('test-agent');
+      if (nextTask) {
+        console.log(`[review-status] Immediately waking test-agent for next queued task: ${nextTask.payload.issueId}`);
+        const taskDetails = {
+          issueId: nextTask.payload.issueId || '',
+          branch: nextTask.payload.context?.branch,
+          workspace: nextTask.payload.context?.workspace,
+        };
+        const wakeResult = await wakeSpecialistWithTask('test-agent', taskDetails);
+        if (wakeResult.success) {
+          completeTask('test-agent', nextTask.id);
+          console.log(`[review-status] Test-agent woken for ${nextTask.payload.issueId}`);
+        } else {
+          console.error(`[review-status] Failed to wake test-agent for next task: ${wakeResult.error}`);
+        }
       }
     }
   }
