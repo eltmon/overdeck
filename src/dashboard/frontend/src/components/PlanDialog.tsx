@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, Minus, FileText, ExternalLink } from 'lucide-react';
+import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
@@ -169,14 +169,28 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     },
   });
 
-  // Reset state when dialog closes/opens
+  // Track previous issue to detect switches
+  const prevIssueRef = useRef<string | null>(null);
+
+  // Reset state when dialog closes/opens OR when switching to a different issue
   useEffect(() => {
+    const issueChanged = prevIssueRef.current !== null && prevIssueRef.current !== issue.identifier;
+    prevIssueRef.current = issue.identifier;
+
     if (!isOpen) {
       setStep('checking'); // Start with checking on reopen
       setResult(null);
       setError(null);
       setMinimized(false);
       hasConnectedToSession.current = false;
+    } else if (issueChanged) {
+      // Switching to a different issue - reset state and unminimize
+      setStep('checking');
+      setResult(null);
+      setError(null);
+      setMinimized(false);
+      hasConnectedToSession.current = false;
+      queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
     } else {
       // Dialog is opening - invalidate stale cache to prevent false 'complete' transitions
       queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
@@ -280,8 +294,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
 
   return (
     <div className="fixed inset-0 z-50">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      {/* Backdrop - clicking minimizes instead of closing */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMinimized(true)} />
 
       {/* Dialog with Rnd for drag/resize */}
       <Rnd
@@ -340,14 +354,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                 <button
                   onClick={() => setMinimized(true)}
                   className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                  title="Minimize"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={onClose}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                  title="Close"
+                  title="Hide (planning continues in background)"
                 >
                   <X className="w-5 h-5" />
                 </button>
