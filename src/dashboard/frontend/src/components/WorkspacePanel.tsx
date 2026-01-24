@@ -21,6 +21,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Agent } from '../types';
+import { useRequestLock } from '../contexts/RequestLockContext';
 
 interface ContainerStatus {
   running: boolean;
@@ -101,6 +102,7 @@ async function fetchOutput(agentId: string): Promise<string> {
 
 export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspacePanelProps) {
   const queryClient = useQueryClient();
+  const { isLocked, withLock } = useRequestLock();
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'logs' | 'status'>('logs');
@@ -177,17 +179,20 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
   });
 
   // Start review pipeline (review-agent → test-agent)
+  // Uses request lock to prevent concurrent API calls (PAN-88)
   const reviewMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      return withLock(`Starting review for ${issueId}`, async () => {
+        const res = await fetch(`/api/workspaces/${issueId}/review`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to start review');
+        }
+        return res.json();
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to start review');
-      }
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
@@ -196,17 +201,20 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
   });
 
   // Merge (only after review+test pass)
+  // Uses request lock to prevent concurrent API calls (PAN-88)
   const mergeMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/merge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      return withLock(`Merging ${issueId}`, async () => {
+        const res = await fetch(`/api/workspaces/${issueId}/merge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to merge');
+        }
+        return res.json();
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to merge');
-      }
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
@@ -217,18 +225,21 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
     },
   });
 
+  // Uses request lock to prevent concurrent API calls (PAN-88)
   const closeMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/close`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Closed manually' }),
+      return withLock(`Closing ${issueId}`, async () => {
+        const res = await fetch(`/api/issues/${issueId}/close`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'Closed manually' }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to close issue');
+        }
+        return res.json();
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to close issue');
-      }
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
@@ -755,7 +766,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             {reviewStatus?.readyForMerge && (
               <button
                 onClick={handleMerge}
-                disabled={mergeMutation.isPending}
+                disabled={isLocked || mergeMutation.isPending}
                 className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-500 disabled:opacity-50 font-medium"
               >
                 {mergeMutation.isPending ? (
@@ -770,7 +781,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             {/* Review & Test button - available anytime to (re-)run the cycle */}
             <button
               onClick={handleReview}
-              disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
+              disabled={isLocked || reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
               className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 ${
                 reviewStatus?.readyForMerge
                   ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
@@ -787,7 +798,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
             <button
               onClick={handleKill}
-              disabled={killMutation.isPending}
+              disabled={isLocked || killMutation.isPending}
               className="flex items-center gap-1 px-2 py-1 text-xs bg-red-900/30 text-red-400 rounded hover:bg-red-900/50"
             >
               <Square className="w-3 h-3" />
@@ -795,7 +806,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             </button>
             <button
               onClick={handleClose}
-              disabled={closeMutation.isPending}
+              disabled={isLocked || closeMutation.isPending}
               className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-900/30 text-orange-400 rounded hover:bg-orange-900/50 disabled:opacity-50"
             >
               {closeMutation.isPending ? (

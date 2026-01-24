@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Brain, RotateCcw, Power, XCircle, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown, Play, Activity } from 'lucide-react';
 import { useState } from 'react';
+import { useRequestLock } from '../contexts/RequestLockContext';
 
 export interface SpecialistAgent {
   name: 'merge-agent' | 'review-agent' | 'test-agent';
@@ -236,14 +237,16 @@ export function SpecialistAgentCard({
   isSelected,
 }: SpecialistAgentCardProps) {
   const queryClient = useQueryClient();
+  const { isLocked, withLock } = useRequestLock();
   const { data: costData } = useSpecialistCost(specialist.name, specialist.state !== 'uninitialized');
   const { data: queueData } = useSpecialistQueue(specialist.name);
   const { data: activityData } = useActivity(specialist.tmuxSession, specialist.state !== 'uninitialized');
   const [queueExpanded, setQueueExpanded] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
 
+  // Uses request lock to prevent concurrent API calls (PAN-88)
   const wakeMutation = useMutation({
-    mutationFn: () => wakeSpecialist(specialist.name),
+    mutationFn: () => withLock(`Waking ${specialist.displayName}`, () => wakeSpecialist(specialist.name)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['specialists'] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
@@ -271,8 +274,9 @@ export function SpecialistAgentCard({
     },
   });
 
+  // Uses request lock to prevent concurrent API calls (PAN-88)
   const resumeMutation = useMutation({
-    mutationFn: (message?: string) => resumeAgent(specialist.tmuxSession, message),
+    mutationFn: (message?: string) => withLock(`Resuming ${specialist.displayName}`, () => resumeAgent(specialist.tmuxSession, message)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['specialists'] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
@@ -450,7 +454,7 @@ export function SpecialistAgentCard({
             {specialist.state === 'suspended' && (
               <button
                 onClick={handleResume}
-                disabled={resumeMutation.isPending}
+                disabled={isLocked || resumeMutation.isPending}
                 className="p-2 text-gray-400 hover:text-green-400 hover:bg-gray-600 rounded disabled:opacity-50"
                 title="Resume specialist"
               >
@@ -462,7 +466,7 @@ export function SpecialistAgentCard({
             {(specialist.state === 'sleeping' || specialist.state === 'uninitialized') && (
               <button
                 onClick={handleWake}
-                disabled={wakeMutation.isPending || specialist.state === 'uninitialized'}
+                disabled={isLocked || wakeMutation.isPending || specialist.state === 'uninitialized'}
                 className="p-2 text-gray-400 hover:text-green-400 hover:bg-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 title={
                   specialist.state === 'uninitialized'
@@ -478,8 +482,8 @@ export function SpecialistAgentCard({
             {specialist.state === 'active' && (
               <button
                 onClick={handleKill}
-                disabled={killMutation.isPending}
-                className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded"
+                disabled={isLocked || killMutation.isPending}
+                className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded disabled:opacity-50"
                 title="Kill specialist"
               >
                 <XCircle className="w-4 h-4" />

@@ -5,6 +5,7 @@ import { tellCommand } from './tell.js';
 import { killCommand } from './kill.js';
 import { pendingCommand } from './pending.js';
 import { approveCommand } from './approve.js';
+import { doneCommand } from './done.js';
 import { planCommand } from './plan.js';
 import { listCommand } from './list.js';
 import { triageCommand } from './triage.js';
@@ -56,6 +57,13 @@ export function registerWorkCommands(program: Command): void {
     .option('--no-merge', 'Skip MR merge')
     .option('--no-linear', 'Skip Linear status update')
     .action(approveCommand);
+
+  work
+    .command('done <id>')
+    .description('Mark work complete, update Linear to In Review')
+    .option('-c, --comment <text>', 'Completion comment for Linear')
+    .option('--no-linear', 'Skip Linear status update')
+    .action(doneCommand);
 
   work
     .command('plan <id>')
