@@ -719,6 +719,9 @@ pan work triage
 # Reopen a closed issue and re-run planning
 pan work reopen min-123
 
+# Request re-review after fixing feedback (for agents, max 3 auto-requeues)
+pan work request-review min-123 -m "Fixed: added tests and removed duplication"
+
 # Recover crashed agents
 pan work recover min-123
 pan work recover --all
