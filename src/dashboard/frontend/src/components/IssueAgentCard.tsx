@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft } from 'lucide-react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
@@ -15,7 +15,7 @@ export interface IssueAgent {
 
 export interface CloisterHealth {
   agentId: string;
-  state: 'active' | 'stale' | 'warning' | 'stuck';
+  state: 'active' | 'stale' | 'warning' | 'stuck' | 'suspended';
   lastActivity: string | null;
   timeSinceActivity: number | null;
   isRunning: boolean;
@@ -40,6 +40,7 @@ const HEALTH_STATE_EMOJI = {
   stale: '🟡',
   warning: '🟠',
   stuck: '🔴',
+  suspended: '⏸️',
 };
 
 const HEALTH_STATE_LABEL = {
@@ -47,6 +48,7 @@ const HEALTH_STATE_LABEL = {
   stale: 'Stale',
   warning: 'Warning',
   stuck: 'Stuck',
+  suspended: 'Suspended',
 };
 
 const HEALTH_STATE_COLOR = {
@@ -54,6 +56,7 @@ const HEALTH_STATE_COLOR = {
   stale: 'text-yellow-400',
   warning: 'text-orange-400',
   stuck: 'text-red-400',
+  suspended: 'text-blue-400',
 };
 
 async function killAgent(agentId: string): Promise<void> {
@@ -70,6 +73,41 @@ async function pokeAgent(agentId: string): Promise<void> {
     const error = await res.json();
     throw new Error(error.error || 'Failed to poke agent');
   }
+}
+
+async function resumeAgent(agentId: string, message?: string): Promise<void> {
+  const res = await fetch(`/api/agents/${agentId}/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to resume agent');
+  }
+}
+
+interface ActivityEntry {
+  ts: string;
+  tool: string;
+  action?: string;
+  state?: 'active' | 'idle';
+}
+
+async function fetchActivity(agentId: string): Promise<ActivityEntry[]> {
+  const res = await fetch(`/api/agents/${agentId}/activity?limit=20`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.activity || [];
+}
+
+function useActivity(agentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['activity', agentId],
+    queryFn: () => fetchActivity(agentId),
+    enabled,
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
 }
 
 function formatDuration(startedAt: string): string {
@@ -109,7 +147,9 @@ export function IssueAgentCard({
 }: IssueAgentCardProps) {
   const queryClient = useQueryClient();
   const [showHandoffPanel, setShowHandoffPanel] = useState(false);
+  const [activityExpanded, setActivityExpanded] = useState(false);
   const { data: costData } = useAgentCost(agent.id);
+  const { data: activityData } = useActivity(agent.id, health?.isRunning || health?.state === 'suspended');
 
   const killMutation = useMutation({
     mutationFn: () => killAgent(agent.id),
@@ -129,6 +169,16 @@ export function IssueAgentCard({
     },
   });
 
+  const resumeMutation = useMutation({
+    mutationFn: (message?: string) => resumeAgent(agent.id, message),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    },
+    onError: (error: Error) => {
+      alert(`Failed to resume ${agent.id}: ${error.message}`);
+    },
+  });
+
   const handleKill = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm(`Kill agent ${agent.id}?`)) {
@@ -139,6 +189,16 @@ export function IssueAgentCard({
   const handlePoke = (e: React.MouseEvent) => {
     e.stopPropagation();
     pokeMutation.mutate();
+  };
+
+  const handleResume = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resumeMutation.mutate();
+  };
+
+  const toggleActivityExpanded = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActivityExpanded(!activityExpanded);
   };
 
   const needsPoke = health?.state === 'warning' || health?.state === 'stuck';
@@ -206,6 +266,17 @@ export function IssueAgentCard({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Activity button - for all running/suspended agents */}
+            {health && (health.isRunning || health.state === 'suspended') && activityData && activityData.length > 0 && (
+              <button
+                onClick={toggleActivityExpanded}
+                className="p-2 text-gray-400 hover:text-blue-400 hover:bg-gray-600 rounded"
+                title={`Show activity history (${activityData.length} entries)`}
+              >
+                <Activity className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Handoff button */}
             <button
               onClick={toggleHandoffPanel}
@@ -216,6 +287,18 @@ export function IssueAgentCard({
             >
               <ArrowRightLeft className="w-4 h-4" />
             </button>
+
+            {/* Resume button - only for suspended */}
+            {health?.state === 'suspended' && (
+              <button
+                onClick={handleResume}
+                disabled={resumeMutation.isPending}
+                className="p-2 text-gray-400 hover:text-green-400 hover:bg-gray-600 rounded disabled:opacity-50"
+                title="Resume agent"
+              >
+                <Play className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Poke button - only for warning/stuck */}
             {needsPoke && (
@@ -229,15 +312,17 @@ export function IssueAgentCard({
               </button>
             )}
 
-            {/* Kill button */}
-            <button
-              onClick={handleKill}
-              disabled={killMutation.isPending}
-              className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded"
-              title="Kill agent"
-            >
-              <Square className="w-4 h-4" />
-            </button>
+            {/* Kill button - not for suspended */}
+            {health?.state !== 'suspended' && (
+              <button
+                onClick={handleKill}
+                disabled={killMutation.isPending}
+                className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded"
+                title="Kill agent"
+              >
+                <Square className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -246,6 +331,30 @@ export function IssueAgentCard({
       {showHandoffPanel && (
         <div className="mt-3 pt-3 border-t border-gray-700">
           <HandoffPanel agentId={agent.id} />
+        </div>
+      )}
+
+      {/* Activity history section (PAN-80) */}
+      {activityExpanded && activityData && activityData.length > 0 && (
+        <div className="mt-3 pl-8 border-l-2 border-gray-600">
+          <div className="text-xs text-gray-400 font-medium mb-2">
+            Recent Activity ({activityData.length})
+          </div>
+          <div className="space-y-1">
+            {activityData.slice().reverse().map((entry, index) => (
+              <div key={index} className="flex items-center gap-2 bg-gray-750 px-3 py-1.5 rounded text-xs">
+                <span className="text-gray-500">
+                  {new Date(entry.ts).toLocaleTimeString()}
+                </span>
+                <span className="text-blue-400 font-mono">{entry.tool}</span>
+                {entry.action && (
+                  <span className="text-gray-400 truncate">
+                    {entry.action.substring(0, 50)}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

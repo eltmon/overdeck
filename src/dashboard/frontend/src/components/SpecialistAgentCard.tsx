@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Brain, RotateCcw, Power, Square, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown } from 'lucide-react';
+import { Brain, RotateCcw, Power, Square, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown, Pause, Play, Activity } from 'lucide-react';
 import { useState } from 'react';
 
 export interface SpecialistAgent {
@@ -11,7 +11,7 @@ export interface SpecialistAgent {
   sessionId?: string;
   lastWake?: string;
   contextTokens?: number;
-  state: 'sleeping' | 'active' | 'uninitialized';
+  state: 'sleeping' | 'active' | 'uninitialized' | 'suspended';
   isRunning: boolean;
   tmuxSession: string;
 }
@@ -26,18 +26,21 @@ const STATE_EMOJI = {
   sleeping: '😴',
   active: '🟢',
   uninitialized: '⚪',
+  suspended: '⏸️',
 };
 
 const STATE_LABEL = {
   sleeping: 'Sleeping',
   active: 'Active',
   uninitialized: 'Not Initialized',
+  suspended: 'Suspended',
 };
 
 const STATE_COLOR = {
   sleeping: 'text-blue-400',
   active: 'text-green-400',
   uninitialized: 'text-gray-500',
+  suspended: 'text-yellow-400',
 };
 
 async function wakeSpecialist(name: string): Promise<void> {
@@ -66,6 +69,32 @@ async function resetSpecialist(name: string): Promise<void> {
 async function killSpecialist(tmuxSession: string): Promise<void> {
   const res = await fetch(`/api/agents/${tmuxSession}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to kill specialist');
+}
+
+async function resumeAgent(tmuxSession: string, message?: string): Promise<void> {
+  const res = await fetch(`/api/agents/${tmuxSession}/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to resume agent');
+  }
+}
+
+interface ActivityEntry {
+  ts: string;
+  tool: string;
+  action?: string;
+  state?: 'active' | 'idle';
+}
+
+async function fetchActivity(tmuxSession: string): Promise<ActivityEntry[]> {
+  const res = await fetch(`/api/agents/${tmuxSession}/activity?limit=20`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.activity || [];
 }
 
 interface SpecialistCost {
@@ -162,6 +191,15 @@ function useSpecialistQueue(name: string) {
   });
 }
 
+function useActivity(tmuxSession: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['activity', tmuxSession],
+    queryFn: () => fetchActivity(tmuxSession),
+    enabled,
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+}
+
 function formatTokens(tokens: number): string {
   if (tokens >= 1000000) {
     return `${(tokens / 1000000).toFixed(1)}M`;
@@ -200,7 +238,9 @@ export function SpecialistAgentCard({
   const queryClient = useQueryClient();
   const { data: costData } = useSpecialistCost(specialist.name, specialist.state !== 'uninitialized');
   const { data: queueData } = useSpecialistQueue(specialist.name);
+  const { data: activityData } = useActivity(specialist.tmuxSession, specialist.state !== 'uninitialized');
   const [queueExpanded, setQueueExpanded] = useState(false);
+  const [activityExpanded, setActivityExpanded] = useState(false);
 
   const wakeMutation = useMutation({
     mutationFn: () => wakeSpecialist(specialist.name),
@@ -228,6 +268,17 @@ export function SpecialistAgentCard({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['specialists'] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: (message?: string) => resumeAgent(specialist.tmuxSession, message),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['specialists'] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    },
+    onError: (error: Error) => {
+      alert(`Failed to resume ${specialist.displayName}: ${error.message}`);
     },
   });
 
@@ -298,6 +349,16 @@ export function SpecialistAgentCard({
   const toggleQueueExpanded = (e: React.MouseEvent) => {
     e.stopPropagation();
     setQueueExpanded(!queueExpanded);
+  };
+
+  const toggleActivityExpanded = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActivityExpanded(!activityExpanded);
+  };
+
+  const handleResume = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resumeMutation.mutate();
   };
 
   const priorityColors = {
@@ -374,6 +435,29 @@ export function SpecialistAgentCard({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Activity button - for all states except uninitialized */}
+            {specialist.state !== 'uninitialized' && activityData && activityData.length > 0 && (
+              <button
+                onClick={toggleActivityExpanded}
+                className="p-2 text-gray-400 hover:text-blue-400 hover:bg-gray-600 rounded"
+                title={`Show activity history (${activityData.length} entries)`}
+              >
+                <Activity className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Resume button - only for suspended */}
+            {specialist.state === 'suspended' && (
+              <button
+                onClick={handleResume}
+                disabled={resumeMutation.isPending}
+                className="p-2 text-gray-400 hover:text-green-400 hover:bg-gray-600 rounded disabled:opacity-50"
+                title="Resume specialist"
+              >
+                <Play className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Wake button - only for sleeping or uninitialized */}
             {(specialist.state === 'sleeping' || specialist.state === 'uninitialized') && (
               <button
@@ -467,6 +551,30 @@ export function SpecialistAgentCard({
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Activity history section (PAN-80) */}
+      {activityExpanded && activityData && activityData.length > 0 && (
+        <div className="mt-3 pl-8 border-l-2 border-gray-600">
+          <div className="text-xs text-gray-400 font-medium mb-2">
+            Recent Activity ({activityData.length})
+          </div>
+          <div className="space-y-1">
+            {activityData.slice().reverse().map((entry, index) => (
+              <div key={index} className="flex items-center gap-2 bg-gray-750 px-3 py-1.5 rounded text-xs">
+                <span className="text-gray-500">
+                  {new Date(entry.ts).toLocaleTimeString()}
+                </span>
+                <span className="text-blue-400 font-mono">{entry.tool}</span>
+                {entry.action && (
+                  <span className="text-gray-400 truncate">
+                    {entry.action.substring(0, 50)}
+                  </span>
+                )}
               </div>
             ))}
           </div>
