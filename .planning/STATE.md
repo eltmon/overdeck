@@ -1,6 +1,17 @@
 # PAN-93: Merge-agent should detect and resolve merge conflicts before completing
 
-## Status: PLANNING COMPLETE
+## Status: CORE IMPLEMENTATION COMPLETE
+
+**Progress:**
+- ✅ Created scripts/validate-merge.sh
+- ✅ Created src/lib/cloister/validation.ts
+- ✅ Updated src/lib/cloister/prompts/merge-agent.md
+- ✅ Updated src/lib/cloister/merge-agent.ts
+  - Added post-merge validation in both code paths
+  - Auto-revert on validation failure
+  - Force-push revert to remote
+- ⏳ Add unit tests (remaining)
+- ⏳ Add integration tests (remaining)
 
 ## Problem Statement
 
