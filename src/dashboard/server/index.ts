@@ -15,6 +15,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
+import { checkAgentHealthAsync, determineHealthStatusAsync } from './lib/health-filtering.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
@@ -1986,83 +1987,6 @@ app.post('/api/agents/:id/resume', async (req, res) => {
     res.status(500).json({ error: 'Failed to resume agent' });
   }
 });
-
-// Check if a tmux session is alive and active (ASYNC - doesn't block event loop)
-async function checkAgentHealthAsync(agentId: string): Promise<{
-  alive: boolean;
-  lastOutput?: string;
-  outputAge?: number;
-}> {
-  try {
-    // Check if session exists
-    await execAsync(`tmux has-session -t "${agentId}" 2>/dev/null`);
-
-    // Get recent output to check if active
-    const { stdout } = await execAsync(
-      `tmux capture-pane -t "${agentId}" -p -S -5 2>/dev/null`,
-      { maxBuffer: 1024 * 1024 }
-    );
-
-    return { alive: true, lastOutput: stdout.trim() };
-  } catch {
-    return { alive: false };
-  }
-}
-
-// Determine health status based on activity (ASYNC)
-// Returns null if agent should be hidden (completed/stopped/no state.json)
-async function determineHealthStatusAsync(
-  agentId: string,
-  stateFile: string
-): Promise<{ status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string } | null> {
-  const health = await checkAgentHealthAsync(agentId);
-
-  // Read state.json to check agent status
-  let agentStatus: string | undefined;
-  if (existsSync(stateFile)) {
-    try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-      agentStatus = state.status;
-    } catch {}
-  }
-
-  // No tmux session - check state.json to determine if crash or intentional
-  if (!health.alive) {
-    // No state.json - exclude (test artifact or corrupted)
-    if (!agentStatus) {
-      return null;
-    }
-
-    // Intentionally stopped or completed - exclude
-    if (agentStatus === 'stopped' || agentStatus === 'completed') {
-      return null;
-    }
-
-    // Status is "running" or "in_progress" but no tmux - actual crash
-    return { status: 'dead', reason: 'Agent crashed unexpectedly' };
-  }
-
-  // Tmux session exists - check activity
-  if (existsSync(stateFile)) {
-    try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-      const lastActivity = state.lastActivity ? new Date(state.lastActivity) : null;
-
-      if (lastActivity) {
-        const ageMs = Date.now() - lastActivity.getTime();
-        const ageMinutes = ageMs / (1000 * 60);
-
-        if (ageMinutes > 30) {
-          return { status: 'stuck', reason: `No activity for ${Math.round(ageMinutes)} minutes` };
-        } else if (ageMinutes > 15) {
-          return { status: 'warning', reason: `Low activity (${Math.round(ageMinutes)} minutes)` };
-        }
-      }
-    } catch {}
-  }
-
-  return { status: 'healthy' };
-}
 
 // Get agent health status (ASYNC - doesn't block event loop)
 app.get('/api/health/agents', async (_req, res) => {
