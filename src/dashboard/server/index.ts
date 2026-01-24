@@ -2696,6 +2696,50 @@ app.get('/api/specialists/:name/queue', async (req, res) => {
   }
 });
 
+// Queue work to a specialist (uses wakeSpecialistOrQueue - handles busy specialists)
+app.post('/api/specialists/:name/queue', async (req, res) => {
+  const { name } = req.params;
+  const { issueId, workspace, branch, customPrompt, priority = 'normal' } = req.body;
+
+  try {
+    const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
+    if (!issueId) {
+      return res.status(400).json({ error: 'issueId is required' });
+    }
+
+    const result = await wakeSpecialistOrQueue(
+      name as SpecialistType,
+      {
+        issueId,
+        workspace,
+        branch,
+        customPrompt,
+      },
+      {
+        priority: priority as 'urgent' | 'normal' | 'low',
+        source: 'api-queue',
+      }
+    );
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error queuing work to ${name}:`, error);
+    res.status(500).json({ error: `Failed to queue work to ${name}: ${msg}` });
+  }
+});
+
 // Remove item from specialist's queue
 app.delete('/api/specialists/:name/queue/:itemId', async (req, res) => {
   const { name, itemId } = req.params;
@@ -3948,17 +3992,9 @@ PROJECT: ${projectPath}
 
 **IF CODE IS PERFECT:**
 - Update status: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
-- Hand off to test-agent:
+- Queue test-agent (DO NOT use pan specialists wake directly):
 
-pan specialists wake test-agent --task "TEST for ${issueId}:
-WORKSPACE: ${workspacePath}
-BRANCH: ${branchName}
-
-1. cd ${workspacePath}
-2. Run tests: npm test
-3. Update status based on results:
-   - PASS: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H 'Content-Type: application/json' -d '{\"testStatus\":\"passed\"}'
-   - FAIL: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H 'Content-Type: application/json' -d '{\"testStatus\":\"failed\",\"testNotes\":\"[failure details]\"}'"`;
+curl -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","customPrompt":"TEST for ${issueId}:\\nWORKSPACE: ${workspacePath}\\nBRANCH: ${branchName}\\n\\n1. cd ${workspacePath}\\n2. Run tests: npm test\\n3. Update status:\\n   - PASS: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Just update status. Human will click Merge."}'`;
 
     const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
       waitForReady: true,
@@ -4192,18 +4228,10 @@ PROJECT: ${projectPath}
 - Report: "REVIEW BLOCKED: [list of issues that must be fixed]"
 
 **ONLY IF CODE IS PERFECT (rare):**
-Hand off to test-agent:
+- Update status: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
+- Queue test-agent (DO NOT use pan specialists wake directly):
 
-pan specialists wake test-agent --task "TEST TASK for ${issueId}:
-WORKSPACE: ${workspacePath}
-BRANCH: ${branchName}
-PROJECT: ${projectPath}
-
-1. cd ${workspacePath}
-2. Run tests: npm test
-3. If PASS: Hand off to merge-agent with:
-   pan specialists wake merge-agent --task \\"MERGE TASK for ${issueId}: PROJECT=${projectPath} BRANCH=${branchName} - merge to main, run tests, push\\"
-4. If FAIL: Report failures and DO NOT hand off to merge-agent"
+curl -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","customPrompt":"TEST TASK for ${issueId}:\\nWORKSPACE: ${workspacePath}\\nBRANCH: ${branchName}\\n\\n1. cd ${workspacePath}\\n2. Run tests: npm test\\n3. Update status via API:\\n   - PASS: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready."}'
 
 === REVIEW PHILOSOPHY ===
 - Your default answer is BLOCK, not PASS
@@ -4222,17 +4250,17 @@ PROJECT: ${projectPath}
       // Fall back to direct merge if specialists aren't available
       console.log(`[approve] Falling back to direct merge...`);
     } else {
-      console.log(`[approve] Pipeline started - review-agent will hand off to test-agent → merge-agent`);
+      console.log(`[approve] Pipeline started - review-agent will queue test-agent when done`);
       // Don't wait - the specialists will handle the rest
-      // The merge-agent will complete the merge when it runs
+      // Human clicks Merge button when review+test pass
 
       // Return early with pipeline status
       completePendingOperation(issueId, null);
       return res.json({
         success: true,
-        message: `Approval pipeline started for ${issueId}. Specialists: review → test → merge`,
+        message: `Approval pipeline started for ${issueId}. Specialists: review → test`,
         pipeline: 'running',
-        note: 'Watch the specialists panel for progress. Merge will complete automatically.',
+        note: 'Watch the specialists panel for progress. Click Merge when review+test pass.',
       });
     }
 

@@ -863,12 +863,15 @@ Your task:
 3. Verify test coverage is adequate
 4. Provide specific, actionable feedback
 
-When done, provide feedback on:
-- Critical issues that must be fixed
-- Suggestions for improvement
-- Patterns that should be documented
+If issues found:
+- Update status: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[issues]"}'
+- Use send-feedback-to-agent skill to notify issue agent
 
-Use the send-feedback-to-agent skill to report findings back to the issue agent.`;
+If review passes:
+- Update status: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
+- Queue test-agent: curl -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${task.issueId}","workspace":"${task.workspace}","branch":"${task.branch}"}'
+
+IMPORTANT: Use the queue API, not 'pan specialists wake' directly.`;
       break;
 
     case 'test-agent':
@@ -881,14 +884,14 @@ Your task:
 1. Run the full test suite
 2. Analyze any failures in detail
 3. Identify root causes (code bug vs test bug vs environment issue)
-4. Suggest fixes
+4. Update status via API when done
 
-When done, provide feedback on:
-- Test results summary
-- Root cause analysis for any failures
-- Recommended fixes
+When done:
+- If PASS: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed"}'
+- If FAIL: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[details]"}'
+- Use send-feedback-to-agent skill to notify issue agent of any failures
 
-Use the send-feedback-to-agent skill to report findings back to the issue agent.`;
+IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
       break;
 
     default:
