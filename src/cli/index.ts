@@ -8,6 +8,7 @@ import { backupListCommand, backupCleanCommand } from './commands/backup.js';
 import { skillsCommand } from './commands/skills.js';
 import { registerWorkCommands, statusCommand } from './commands/work/index.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
+import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerCloisterCommands } from './commands/cloister/index.js';
 import { registerSetupCommands } from './commands/setup/index.js';
@@ -67,6 +68,9 @@ registerWorkCommands(program);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);
+
+// Register test commands (pan test run, pan test list)
+registerTestCommands(program);
 
 // Register cloister commands (pan cloister status, pan cloister start, etc.)
 registerCloisterCommands(program);

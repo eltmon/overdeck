@@ -802,17 +802,76 @@ volumes:
 - Set `PNPM_HOME=/path` to configure the pnpm store location
 - Mount a named volume for the store to share across containers
 
-#### Coming Soon: Template-Based Workspaces
+### Polyrepo Workspace Configuration
 
-A comprehensive template system for Docker orchestration is in development ([#96](https://github.com/eltmon/panopticon-cli/issues/96)). This will provide:
+For projects with multiple git repositories, configure workspace settings directly in `projects.yaml`:
 
-- **Zero-config for common stacks** - Spring Boot + React, Next.js, Python + FastAPI
-- **Full customization** - Custom templates, port strategies, cache sharing
-- **Polyrepo support** - Multiple git repos in one workspace
-- **Database isolation options** - Shared or per-workspace databases
-- **Interactive setup** - `/pan-docker` skill to guide configuration
+```yaml
+projects:
+  myapp:
+    name: "My App"
+    path: /home/user/projects/myapp
+    linear_team: APP
 
-Until then, use `workspace_command` to point to your project's custom setup script.
+    workspace:
+      type: polyrepo
+      workspaces_dir: workspaces
+
+      # Git repositories to include in each workspace
+      repos:
+        - name: fe
+          path: frontend
+          branch_prefix: "feature/"
+        - name: api
+          path: backend
+          branch_prefix: "feature/"
+
+      # DNS entries for local development
+      dns:
+        domain: myapp.test
+        entries:
+          - "{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          - "api-{{FEATURE_FOLDER}}.{{DOMAIN}}"
+        sync_method: wsl2hosts  # or: hosts_file, dnsmasq
+
+      # Port assignments for services
+      ports:
+        redis:
+          range: [6380, 6499]
+
+      # Docker configuration
+      docker:
+        traefik: infra/docker-compose.traefik.yml
+        compose_template: infra/.devcontainer-template
+
+      # Agent configuration templates
+      agent:
+        template_dir: infra/.agent-template
+        templates:
+          - source: CLAUDE.md.template
+            target: CLAUDE.md
+        symlinks:
+          - .claude/commands
+          - .claude/skills
+
+      # Environment template
+      env:
+        template: |
+          COMPOSE_PROJECT_NAME={{COMPOSE_PROJECT}}
+          FRONTEND_URL=https://{{FEATURE_FOLDER}}.{{DOMAIN}}
+```
+
+**Template Placeholders:**
+
+| Placeholder | Example | Description |
+|------------|---------|-------------|
+| `{{FEATURE_NAME}}` | `min-123` | Normalized issue ID |
+| `{{FEATURE_FOLDER}}` | `feature-min-123` | Workspace folder name |
+| `{{BRANCH_NAME}}` | `feature/min-123` | Git branch name |
+| `{{COMPOSE_PROJECT}}` | `myapp-feature-min-123` | Docker Compose project |
+| `{{DOMAIN}}` | `myapp.test` | DNS domain |
+
+See `/pan-workspace-config` skill for complete documentation.
 
 ### Managing Projects
 
@@ -941,6 +1000,63 @@ pan work health status
 # Start the health daemon (background monitoring)
 pan work health daemon --interval 30
 ```
+
+### Test Runner
+
+```bash
+# Run all tests for a workspace
+pan test run min-123
+
+# Run tests for main branch
+pan test run main
+
+# Run specific test suites only
+pan test run min-123 --tests backend,frontend_unit
+
+# List configured tests for a project
+pan test list
+
+# List tests for specific project
+pan test list myproject
+```
+
+**Test Configuration:**
+
+Configure test suites in `projects.yaml`:
+
+```yaml
+projects:
+  myapp:
+    tests:
+      backend:
+        type: maven           # maven, vitest, jest, playwright, pytest, cargo
+        path: api             # Path relative to workspace
+        command: ./mvnw test  # Command to run
+
+      frontend_unit:
+        type: vitest
+        path: fe
+        command: pnpm test:unit --run
+        container: true       # Run inside Docker container
+        container_name: "{{COMPOSE_PROJECT}}-fe-1"
+
+      frontend_e2e:
+        type: playwright
+        path: fe
+        command: pnpm test:e2e
+        env:
+          BASE_URL: "https://{{FEATURE_FOLDER}}.myapp.test"
+```
+
+**Reports:**
+
+Test results are saved to `{project}/reports/test-run-{target}-{timestamp}.md` with detailed logs for each suite.
+
+**Notifications:**
+
+Desktop notifications are sent when tests complete (disable with `--no-notify`).
+
+See `/pan-test-config` skill for complete documentation.
 
 ### FPP Hooks (Fixed Point Principle)
 
@@ -1332,6 +1448,8 @@ Panopticon ships with 25+ skills organized into categories:
 | `pan-convoy-synthesis` | Synthesize convoy coordination |
 | `pan-subagent-creator` | Create specialized subagents |
 | `pan-skill-creator` | Create new skills (guided) |
+| `pan-workspace-config` | Configure polyrepo workspaces, DNS, ports |
+| `pan-test-config` | Configure project test suites |
 
 ### Utilities
 
