@@ -11,7 +11,7 @@
  * Inspired by gastown's deacon pattern.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, execSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -499,8 +499,8 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
         // Save session ID for later resume
         saveSessionId(agent.id, sessionId);
 
-        // Kill tmux session
-        execSync(`tmux kill-session -t "${agent.id}" 2>/dev/null || true`);
+        // Kill tmux session (async to avoid blocking event loop - PAN-72)
+        await execAsync(`tmux kill-session -t "${agent.id}" 2>/dev/null || true`);
 
         // Update state
         saveAgentRuntimeState(agent.id, {
