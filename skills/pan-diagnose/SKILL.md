@@ -150,9 +150,8 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -50
 # - Long-running commands
 # - Error messages
 
-# Try sending a message
-tmux send-keys -t agent-ISSUE-123 "What is your current status?"
-tmux send-keys -t agent-ISSUE-123 Enter
+# Try sending a message (use pan work tell - handles Enter automatically)
+pan work tell ISSUE-123 "What is your current status?"
 ```
 
 ### Agent crashed
