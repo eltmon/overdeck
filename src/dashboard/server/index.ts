@@ -4348,7 +4348,7 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
 
   // Queue for review-agent (same logic as human-initiated review)
   try {
-    const { wakeSpecialistOrQueue } = await import('../../../lib/cloister/specialists.js');
+    const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
 
     const result = await wakeSpecialistOrQueue('review-agent', {
       issueId,
