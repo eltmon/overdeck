@@ -296,31 +296,39 @@ NOTES: Excellent implementation. Full test coverage. Clean code. Ready for produ
 
 The issue agent cannot see your review. They will only know what's wrong if you tell them directly.
 
-### Step 1: Send feedback via tmux (ALWAYS do this first)
+### Step 1: Send feedback via pan work tell (ALWAYS do this first)
+
+**Use `pan work tell` - it handles Enter key correctly. DO NOT use raw tmux send-keys.**
 
 ```bash
-# Find the issue agent session
-tmux list-sessions | grep agent
+# Send your findings directly to the agent (Enter is sent automatically)
+pan work tell <issue-id> "CODE REVIEW BLOCKED for <ISSUE-ID>:
 
-# Send your findings directly to the agent
-tmux send-keys -t agent-<issue-id> "
-**Review Feedback from review-agent**
-
-**Status:** CHANGES_REQUESTED (or APPROVED)
-
-**Issues Found:**
+CRITICAL ISSUES:
 1. [file:line] - Description of issue
 2. [file:line] - Description of issue
 
-**Required Actions:**
+REQUIRED ACTIONS:
 - Fix X in file Y
 - Add tests for Z
 
-**Notes:**
-[Any additional context]
-"
-tmux send-keys -t agent-<issue-id> Enter
+Reply when fixes complete."
 ```
+
+**Example:**
+```bash
+pan work tell pan-80 "CODE REVIEW BLOCKED for PAN-80:
+
+1. Missing tests for new functions
+2. Type safety violation at line 42
+
+Fix these issues and reply when done."
+```
+
+**Why `pan work tell` instead of raw tmux:**
+- Automatically sends Enter key (agents often forget this step)
+- Properly escapes special characters
+- Saves message to mail queue as backup
 
 ### Step 2: Update the review status API
 

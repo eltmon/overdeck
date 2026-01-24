@@ -34,30 +34,18 @@ This skill guides you through sending messages to running autonomous agents via 
 ## Quick Command
 
 ```bash
-# Using pan CLI
+# ALWAYS use pan work tell - it handles Enter correctly
 pan work tell ISSUE-123 "Your message here"
-
-# Or directly via tmux (IMPORTANT: Two separate commands!)
-tmux send-keys -t agent-ISSUE-123 "Your message here"
-tmux send-keys -t agent-ISSUE-123 Enter
 ```
 
-## Important: tmux Message Format
+**DO NOT use raw `tmux send-keys`** - agents frequently forget the separate Enter command, causing messages to sit unsent in the terminal.
 
-**CRITICAL:** Always send the message and Enter as SEPARATE commands:
+## Why pan work tell?
 
-```bash
-# ✅ CORRECT - Two separate send-keys commands
-tmux send-keys -t agent-ISSUE-123 "Your message here"
-tmux send-keys -t agent-ISSUE-123 Enter
-
-# ✅ ALSO CORRECT - Using C-m (Enter keycode)
-tmux send-keys -t agent-ISSUE-123 "Your message here"
-tmux send-keys -t agent-ISSUE-123 C-m
-
-# ❌ WRONG - This does NOT work (Enter is treated as literal text)
-tmux send-keys -t agent-ISSUE-123 "Your message here" Enter
-```
+1. **Automatically sends Enter** - No forgotten second command
+2. **Properly escapes quotes** - Handles special characters
+3. **Saves to mail queue** - Backup if agent misses the message
+4. **Validates session exists** - Fails fast if agent not running
 
 ## Workflow
 
@@ -82,9 +70,8 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -20
 ### 3. Send Your Message
 
 ```bash
-# Send the message
-tmux send-keys -t agent-ISSUE-123 "Please focus on the login bug first, then the signup flow."
-tmux send-keys -t agent-ISSUE-123 Enter
+# Send the message (Enter is sent automatically)
+pan work tell ISSUE-123 "Please focus on the login bug first, then the signup flow."
 ```
 
 ### 4. Verify Message Was Received
@@ -100,36 +87,31 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -10
 ### Provide Additional Context
 
 ```bash
-tmux send-keys -t agent-ISSUE-123 "Additional context: The user table has a unique constraint on email. Make sure to handle duplicates."
-tmux send-keys -t agent-ISSUE-123 Enter
+pan work tell ISSUE-123 "Additional context: The user table has a unique constraint on email. Make sure to handle duplicates."
 ```
 
 ### Report Errors
 
 ```bash
-tmux send-keys -t agent-ISSUE-123 "Error from testing: TypeError: Cannot read property 'id' of undefined at line 45 in UserService.ts"
-tmux send-keys -t agent-ISSUE-123 Enter
+pan work tell ISSUE-123 "Error from testing: TypeError: Cannot read property 'id' of undefined at line 45 in UserService.ts"
 ```
 
 ### Change Priorities
 
 ```bash
-tmux send-keys -t agent-ISSUE-123 "Pause current work. Priority change: Fix the production bug first, then return to this feature."
-tmux send-keys -t agent-ISSUE-123 Enter
+pan work tell ISSUE-123 "Pause current work. Priority change: Fix the production bug first, then return to this feature."
 ```
 
 ### Request Status Update
 
 ```bash
-tmux send-keys -t agent-ISSUE-123 "Please update STATE.md with your current progress and any blockers."
-tmux send-keys -t agent-ISSUE-123 Enter
+pan work tell ISSUE-123 "Please update STATE.md with your current progress and any blockers."
 ```
 
 ### Provide Approval/Feedback
 
 ```bash
-tmux send-keys -t agent-ISSUE-123 "Looks good! Please commit your changes and update the issue status."
-tmux send-keys -t agent-ISSUE-123 Enter
+pan work tell ISSUE-123 "Looks good! Please commit your changes and update the issue status."
 ```
 
 ## Tips
@@ -152,8 +134,9 @@ pan work status
 
 **Message not received:**
 ```bash
-# Make sure you sent Enter separately
-tmux send-keys -t agent-ISSUE-123 Enter
+# If you used raw tmux, the Enter was probably forgotten
+# Always use pan work tell instead:
+pan work tell ISSUE-123 "Your message here"
 
 # Check the pane
 tmux capture-pane -t agent-ISSUE-123 -p | tail -20
