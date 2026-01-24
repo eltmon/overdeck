@@ -18,6 +18,7 @@ export interface TokenUsage {
   outputTokens: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
+  cacheTTL?: '5m' | '1h';  // Cache write TTL (default: '5m')
 }
 
 export interface CostEntry {
@@ -50,6 +51,8 @@ export interface CostSummary {
   totalTokens: {
     input: number;
     output: number;
+    cacheRead: number;
+    cacheWrite: number;
     total: number;
   };
 }
@@ -71,17 +74,24 @@ export interface ModelPricing {
   inputPer1k: number;
   outputPer1k: number;
   cacheReadPer1k?: number;
-  cacheWritePer1k?: number;
+  cacheWrite5mPer1k?: number;  // 5-minute TTL (default)
+  cacheWrite1hPer1k?: number;  // 1-hour TTL
   currency: string;
 }
 
 // ============== Pricing Data ==============
 
 export const DEFAULT_PRICING: ModelPricing[] = [
-  // Anthropic
-  { provider: 'anthropic', model: 'claude-opus-4', inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.00175, cacheWritePer1k: 0.01875, currency: 'USD' },
-  { provider: 'anthropic', model: 'claude-sonnet-4', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWritePer1k: 0.00375, currency: 'USD' },
-  { provider: 'anthropic', model: 'claude-haiku-3.5', inputPer1k: 0.0008, outputPer1k: 0.004, cacheReadPer1k: 0.00008, cacheWritePer1k: 0.001, currency: 'USD' },
+  // Anthropic - 4.5 series
+  { provider: 'anthropic', model: 'claude-opus-4.5', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
+  { provider: 'anthropic', model: 'claude-sonnet-4.5', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006, currency: 'USD' },
+  { provider: 'anthropic', model: 'claude-haiku-4.5', inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.0001, cacheWrite5mPer1k: 0.00125, cacheWrite1hPer1k: 0.002, currency: 'USD' },
+  // Anthropic - 4.x series
+  { provider: 'anthropic', model: 'claude-opus-4-1', inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03, currency: 'USD' },
+  { provider: 'anthropic', model: 'claude-opus-4', inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03, currency: 'USD' },
+  { provider: 'anthropic', model: 'claude-sonnet-4', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006, currency: 'USD' },
+  // Anthropic - Legacy
+  { provider: 'anthropic', model: 'claude-haiku-3', inputPer1k: 0.00025, outputPer1k: 0.00125, cacheReadPer1k: 0.00003, cacheWrite5mPer1k: 0.0003, cacheWrite1hPer1k: 0.0005, currency: 'USD' },
   // OpenAI
   { provider: 'openai', model: 'gpt-4-turbo', inputPer1k: 0.01, outputPer1k: 0.03, currency: 'USD' },
   { provider: 'openai', model: 'gpt-4o', inputPer1k: 0.005, outputPer1k: 0.015, currency: 'USD' },
@@ -98,19 +108,41 @@ export const DEFAULT_PRICING: ModelPricing[] = [
  */
 export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number {
   let cost = 0;
+  let inputMultiplier = 1;
+  let outputMultiplier = 1;
+
+  // Long-context pricing for Sonnet 4/4.5 (>200K total input tokens)
+  // Total input includes: inputTokens + cacheReadTokens + cacheWriteTokens
+  const totalInputTokens = usage.inputTokens
+    + (usage.cacheReadTokens || 0)
+    + (usage.cacheWriteTokens || 0);
+
+  if ((pricing.model === 'claude-sonnet-4' || pricing.model === 'claude-sonnet-4.5')
+      && totalInputTokens > 200000) {
+    inputMultiplier = 2;    // $6/MTok vs $3/MTok
+    outputMultiplier = 1.5; // $22.50/MTok vs $15/MTok
+  }
 
   // Input tokens
-  cost += (usage.inputTokens / 1000) * pricing.inputPer1k;
+  cost += (usage.inputTokens / 1000) * pricing.inputPer1k * inputMultiplier;
 
   // Output tokens
-  cost += (usage.outputTokens / 1000) * pricing.outputPer1k;
+  cost += (usage.outputTokens / 1000) * pricing.outputPer1k * outputMultiplier;
 
-  // Cache tokens (if applicable)
+  // Cache read tokens (not affected by long-context multiplier)
   if (usage.cacheReadTokens && pricing.cacheReadPer1k) {
     cost += (usage.cacheReadTokens / 1000) * pricing.cacheReadPer1k;
   }
-  if (usage.cacheWriteTokens && pricing.cacheWritePer1k) {
-    cost += (usage.cacheWriteTokens / 1000) * pricing.cacheWritePer1k;
+
+  // Cache write tokens - use TTL-appropriate pricing
+  if (usage.cacheWriteTokens) {
+    const ttl = usage.cacheTTL || '5m';
+    const cacheWritePrice = ttl === '1h'
+      ? pricing.cacheWrite1hPer1k
+      : pricing.cacheWrite5mPer1k;
+    if (cacheWritePrice) {
+      cost += (usage.cacheWriteTokens / 1000) * cacheWritePrice;
+    }
   }
 
   return Math.round(cost * 1000000) / 1000000; // Round to 6 decimal places
@@ -277,6 +309,8 @@ export function summarizeCosts(entries: CostEntry[]): CostSummary {
     totalTokens: {
       input: 0,
       output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
       total: 0,
     },
   };
@@ -307,9 +341,15 @@ export function summarizeCosts(entries: CostEntry[]): CostSummary {
     // Tokens
     summary.totalTokens.input += entry.usage.inputTokens;
     summary.totalTokens.output += entry.usage.outputTokens;
+    summary.totalTokens.cacheRead += entry.usage.cacheReadTokens || 0;
+    summary.totalTokens.cacheWrite += entry.usage.cacheWriteTokens || 0;
   }
 
-  summary.totalTokens.total = summary.totalTokens.input + summary.totalTokens.output;
+  // Total includes all token types
+  summary.totalTokens.total = summary.totalTokens.input
+    + summary.totalTokens.output
+    + summary.totalTokens.cacheRead
+    + summary.totalTokens.cacheWrite;
   summary.totalCost = Math.round(summary.totalCost * 100) / 100;
 
   return summary;

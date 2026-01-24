@@ -6243,10 +6243,17 @@ const SESSION_MAP_FILE = join(homedir(), '.panopticon', 'session-map.json');
 const METRICS_FILE = join(homedir(), '.panopticon', 'runtime-metrics.json');
 
 // Model pricing data
-const MODEL_PRICING: Record<string, { inputPer1k: number; outputPer1k: number; cacheReadPer1k?: number; cacheWritePer1k?: number }> = {
-  'claude-opus-4': { inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.00175, cacheWritePer1k: 0.01875 },
-  'claude-sonnet-4': { inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWritePer1k: 0.00375 },
-  'claude-haiku-3.5': { inputPer1k: 0.0008, outputPer1k: 0.004, cacheReadPer1k: 0.00008, cacheWritePer1k: 0.001 },
+const MODEL_PRICING: Record<string, { inputPer1k: number; outputPer1k: number; cacheReadPer1k?: number; cacheWrite5mPer1k?: number; cacheWrite1hPer1k?: number }> = {
+  // 4.5 series
+  'claude-opus-4.5': { inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01 },
+  'claude-sonnet-4.5': { inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006 },
+  'claude-haiku-4.5': { inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.0001, cacheWrite5mPer1k: 0.00125, cacheWrite1hPer1k: 0.002 },
+  // 4.x series
+  'claude-opus-4-1': { inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03 },
+  'claude-opus-4': { inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03 },
+  'claude-sonnet-4': { inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006 },
+  // Legacy
+  'claude-haiku-3': { inputPer1k: 0.00025, outputPer1k: 0.00125, cacheReadPer1k: 0.00003, cacheWrite5mPer1k: 0.0003, cacheWrite1hPer1k: 0.0005 },
 };
 
 function readCostFiles(startDate: string, endDate: string): any[] {
@@ -6387,14 +6394,14 @@ async function parseWorkspaceSessionUsageAsync(workspacePath: string): Promise<{
     if (model.includes('opus')) {
       pricing = MODEL_PRICING['claude-opus-4'];
     } else if (model.includes('haiku')) {
-      pricing = MODEL_PRICING['claude-haiku-3.5'];
+      pricing = MODEL_PRICING['claude-haiku-4.5'];
     }
 
     const cost =
       (totalInputTokens / 1000) * pricing.inputPer1k +
       (totalOutputTokens / 1000) * pricing.outputPer1k +
       (totalCacheReadTokens / 1000) * (pricing.cacheReadPer1k || 0) +
-      (totalCacheWriteTokens / 1000) * (pricing.cacheWritePer1k || 0);
+      (totalCacheWriteTokens / 1000) * (pricing.cacheWrite5mPer1k || 0);  // Default to 5-minute TTL
 
     const tokenCount = totalInputTokens + totalOutputTokens + totalCacheReadTokens + totalCacheWriteTokens;
 

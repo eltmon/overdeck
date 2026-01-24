@@ -76,7 +76,7 @@ By Session:
 By Model:
 - claude-opus-4: $0.85 (34%)
 - claude-sonnet-4: $1.12 (45%)
-- claude-haiku-3.5: $0.50 (21%)
+- claude-haiku-4.5: $0.50 (21%)
 ```
 
 ---
