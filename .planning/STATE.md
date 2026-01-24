@@ -24,7 +24,7 @@ Two related issues with specialist/agent management:
 
 ## Current Status
 
-**Last Updated:** 2026-01-23 16:00
+**Last Updated:** 2026-01-23 16:10
 
 ### Completed (Layers 1-2 - Foundation + Core Logic)
 
@@ -62,14 +62,26 @@ Two related issues with specialist/agent management:
 - Auto-resume on `/work-tell` for work agents
 - API endpoint simplified to use `resumeAgent()`
 
+✅ **Terminal Parsing Cleanup** (panopticon-r6tp) - **CRITICAL FIX**
+- Added POST `/api/specialists/:name/report-status` endpoint
+- Removed `isIdleAtPrompt()` from specialists.ts (94 lines)
+- Removed `detectSpecialistCompletion()` from server (78 lines)
+- Removed `pollReviewStatus()` polling loop (102 lines)
+- Total: 280 lines of unreliable parsing code removed
+- Updated all state checks to use hook-based `getAgentRuntimeState()`
+- Fixes false positive from PAN-73 (review showed "Passed" when prompt mentioned handoff)
+
 ### Remaining Work (Layers 3-4)
 
-**Layer 3 - UI & Cleanup:**
-- Dashboard frontend updates (panopticon-t8k2) - Activity history, resume button, new states
-- Terminal parsing cleanup (panopticon-r6tp) - Remove `isIdleAtPrompt()` and `detectSpecialistCompletion()`
+**Layer 3 - UI (in progress):**
+- 🔄 Dashboard frontend updates (panopticon-t8k2) - Activity history, resume button, new states
+  - Need to update IssueAgentCard.tsx and SpecialistAgentCard.tsx
+  - Add activity history panel (collapsible)
+  - Add Resume button for suspended agents
+  - Show state icons (active/idle/suspended/uninitialized)
 
 **Layer 4 - Testing:**
-- Integration tests (panopticon-wk6m) - State transitions, suspend/resume, auto-suspend
+- ⏳ Integration tests (panopticon-wk6m) - State transitions, suspend/resume, auto-suspend
 
 ### Next Steps
 
