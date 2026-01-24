@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Brain, RotateCcw, Power, Square, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown, Play, Activity } from 'lucide-react';
+import { Brain, RotateCcw, Power, XCircle, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown, Play, Activity } from 'lucide-react';
 import { useState } from 'react';
 
 export interface SpecialistAgent {
@@ -482,7 +482,7 @@ export function SpecialistAgentCard({
                 className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded"
                 title="Kill specialist"
               >
-                <Square className="w-4 h-4" />
+                <XCircle className="w-4 h-4" />
               </button>
             )}
 
