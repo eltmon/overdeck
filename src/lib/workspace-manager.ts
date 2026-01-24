@@ -555,26 +555,54 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   }
 
   // Stop Docker containers
-  const composeLocations = [
-    join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
-    join(workspacePath, '.devcontainer', 'docker-compose.yml'),
-    join(workspacePath, 'docker-compose.yml'),
-  ];
-
   // Construct docker-compose project name (must match what was used at startup)
   const projectPrefix = projectConfig.name?.toLowerCase().replace(/\s+/g, '-') || 'workspace';
   const composeProject = `${projectPrefix}-feature-${featureName}`;
 
-  for (const composePath of composeLocations) {
-    if (existsSync(composePath)) {
-      try {
-        // Stop containers and remove volumes (use -p and -f flags to match startup)
-        await execAsync(`docker compose -p "${composeProject}" -f "${composePath}" down -v`, { cwd: dirname(composePath) });
-        result.steps.push(`Stopped Docker containers (project: ${composeProject})`);
-      } catch {
-        // Containers might not be running
+  // Find all compose files in devcontainer directory (some projects use multiple)
+  const devcontainerDir = join(workspacePath, '.devcontainer');
+  const composeFiles: string[] = [];
+
+  if (existsSync(devcontainerDir)) {
+    // Look for common compose file patterns
+    const possibleFiles = [
+      'docker-compose.devcontainer.yml',
+      'docker-compose.yml',
+      'compose.yml',
+      'compose.infra.yml',
+      'compose.override.yml',
+    ];
+    for (const file of possibleFiles) {
+      const fullPath = join(devcontainerDir, file);
+      if (existsSync(fullPath)) {
+        composeFiles.push(fullPath);
       }
-      break;
+    }
+  }
+
+  // Fallback: check for compose file in workspace root
+  if (composeFiles.length === 0) {
+    const rootCompose = join(workspacePath, 'docker-compose.yml');
+    if (existsSync(rootCompose)) {
+      composeFiles.push(rootCompose);
+    }
+  }
+
+  if (composeFiles.length > 0) {
+    try {
+      // Build -f flags for all compose files
+      const fileFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
+      const cwd = existsSync(devcontainerDir) ? devcontainerDir : workspacePath;
+
+      // Stop containers and remove volumes
+      await execAsync(`docker compose -p "${composeProject}" ${fileFlags} down -v --remove-orphans`, {
+        cwd,
+        timeout: 60000,  // 60 second timeout
+      });
+      result.steps.push(`Stopped Docker containers (project: ${composeProject}, ${composeFiles.length} compose files)`);
+    } catch (error: any) {
+      // Log but don't fail - containers might not be running
+      result.steps.push(`Docker cleanup attempted (${error.message?.split('\n')[0] || 'containers may not be running'})`);
     }
   }
 
