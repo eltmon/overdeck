@@ -108,8 +108,14 @@ All changes implemented in `src/dashboard/server/index.ts`:
    - Filters out null results before returning response
 
 **Test Results:**
-- All 362 tests pass
-- No test changes required (implementation is backend-only)
+- All 372 tests pass (10 new tests added)
+- Created `tests/dashboard/health-api.test.ts` with comprehensive coverage
+
+**Code Review Feedback Addressed:**
+1. ✅ Added 10 comprehensive tests for health filtering logic
+2. ✅ Extracted filtering logic to `src/dashboard/lib/health-filtering.ts` for testability
+3. ✅ Fixed duplicate state.json reads (read once, use throughout)
+4. ✅ Added comment to catch block explaining silent failure behavior
 
 ## Out of Scope
 
