@@ -804,7 +804,169 @@ volumes:
 - Set `PNPM_HOME=/path` to configure the pnpm store location
 - Mount a named volume for the store to share across containers
 
-### Polyrepo Workspace Configuration
+### What Your Project Needs to Provide
+
+Panopticon is an orchestration layer - it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**. Here's what you need:
+
+### Required: Workspace Templates
+
+Your project needs a `.devcontainer/` or template directory with:
+
+```
+your-project/
+├── infra/
+│   └── .devcontainer-template/      # Template for workspace containers
+│       ├── docker-compose.devcontainer.yml.template
+│       ├── compose.infra.yml.template   # Optional: separate infra services
+│       ├── Dockerfile
+│       └── devcontainer.json.template
+└── ...
+```
+
+**Docker Compose templates** should use placeholders that Panopticon will replace:
+
+```yaml
+# docker-compose.devcontainer.yml.template
+services:
+  api:
+    build: ./api
+    labels:
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-api.rule=Host(`api-{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
+    environment:
+      - DATABASE_URL=postgres://app:app@postgres:5432/mydb
+
+  frontend:
+    build: ./fe
+    labels:
+      - "traefik.http.routers.{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
+```
+
+### Required for HTTPS: Traefik Configuration
+
+If you want local HTTPS (recommended), provide a Traefik compose file:
+
+```
+your-project/
+├── infra/
+│   └── docker-compose.traefik.yml   # Traefik reverse proxy
+└── ...
+```
+
+Example Traefik config:
+```yaml
+# infra/docker-compose.traefik.yml
+services:
+  traefik:
+    image: traefik:v2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ~/.panopticon/traefik/certs:/certs:ro
+    command:
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+```
+
+### Required for Database Seeding: Seed Directory
+
+For projects with databases:
+
+```
+your-project/
+├── infra/
+│   └── seed/
+│       └── seed.sql              # Sanitized production data
+└── ...
+```
+
+Your compose template should mount this:
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    volumes:
+      - /path/to/project/infra/seed:/docker-entrypoint-initdb.d:ro
+```
+
+### Optional: Agent Templates
+
+For customizing how agents work in your project:
+
+```
+your-project/
+├── infra/
+│   └── .agent-template/
+│       ├── CLAUDE.md.template    # Project-specific AI instructions
+│       └── .mcp.json.template    # MCP server configuration
+└── .claude/
+    └── skills/                   # Project-specific skills
+        └── my-project-standards/
+            └── SKILL.md
+```
+
+### Configuration in projects.yaml
+
+Point Panopticon to your templates:
+
+```yaml
+# ~/.panopticon/projects.yaml
+projects:
+  myproject:
+    name: "My Project"
+    path: /home/user/projects/myproject
+    linear_team: PRJ
+
+    workspace:
+      type: polyrepo  # or monorepo
+      workspaces_dir: workspaces
+
+      docker:
+        traefik: infra/docker-compose.traefik.yml
+        compose_template: infra/.devcontainer-template
+
+      database:
+        seed_file: /home/user/projects/myproject/infra/seed/seed.sql
+        container_name: "{{PROJECT}}-postgres-1"
+
+      agent:
+        template_dir: infra/.agent-template
+        templates:
+          - source: CLAUDE.md.template
+            target: CLAUDE.md
+```
+
+### Quick Checklist
+
+| Component | Required? | Location | Purpose |
+|-----------|-----------|----------|---------|
+| Docker Compose template | Yes (for Docker workspaces) | `infra/.devcontainer-template/` | Container configuration |
+| Traefik config | Only for HTTPS | `infra/docker-compose.traefik.yml` | Reverse proxy |
+| Seed file | Only if database needed | `infra/seed/seed.sql` | Pre-populate database |
+| Agent template | Recommended | `infra/.agent-template/` | AI instructions |
+| Project skills | Optional | `.claude/skills/` | Project-specific workflows |
+
+### Example: Minimal Setup
+
+For a simple monorepo with no Docker:
+
+```yaml
+# ~/.panopticon/projects.yaml
+projects:
+  simple-app:
+    name: "Simple App"
+    path: /home/user/projects/simple-app
+    linear_team: APP
+    # No workspace config needed - uses git worktrees
+```
+
+Panopticon creates workspaces as git worktrees. Docker, HTTPS, and seeding are opt-in.
+
+---
+
+## Polyrepo Workspace Configuration
 
 For projects with multiple git repositories, configure workspace settings directly in `projects.yaml`:
 

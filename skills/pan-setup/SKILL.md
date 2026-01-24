@@ -351,6 +351,87 @@ pan down
 pan up
 ```
 
+## What Your Project Repository Needs
+
+After adding a project, you may need to create templates in your project for Docker-based workspaces to work. **This is optional if you only need git worktrees without Docker.**
+
+### For Docker-Based Workspaces
+
+Your project needs to provide templates that Panopticon copies/processes when creating workspaces:
+
+```
+your-project/
+├── infra/
+│   └── .devcontainer-template/
+│       ├── docker-compose.devcontainer.yml.template
+│       ├── compose.infra.yml.template   # Optional: for postgres, redis, etc.
+│       ├── Dockerfile
+│       └── devcontainer.json.template   # Optional: VS Code integration
+└── ...
+```
+
+### Docker Compose Template Example
+
+```yaml
+# docker-compose.devcontainer.yml.template
+services:
+  app:
+    build: .
+    labels:
+      - "traefik.http.routers.{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
+    volumes:
+      - ../..:/workspace:cached
+```
+
+**Available placeholders:**
+- `{{FEATURE_NAME}}` - Issue ID (e.g., `min-123`)
+- `{{FEATURE_FOLDER}}` - Workspace folder (e.g., `feature-min-123`)
+- `{{BRANCH_NAME}}` - Git branch (e.g., `feature/min-123`)
+- `{{COMPOSE_PROJECT}}` - Docker project name
+- `{{DOMAIN}}` - Configured domain (e.g., `myapp.test`)
+
+### For Database Seeding
+
+If your project uses a database:
+
+```
+your-project/
+├── infra/
+│   └── seed/
+│       └── seed.sql          # Pre-populated database dump
+└── ...
+```
+
+Mount in your compose template:
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    volumes:
+      - /path/to/project/infra/seed:/docker-entrypoint-initdb.d:ro
+```
+
+### Minimal Setup (Git Worktrees Only)
+
+For simple projects that don't need Docker:
+
+```yaml
+# In ~/.panopticon/projects.yaml
+projects:
+  simple-app:
+    name: "Simple App"
+    path: /home/user/projects/simple-app
+    linear_team: APP
+    # No workspace config = uses plain git worktrees
+```
+
+### Full Configuration
+
+See README section "What Your Project Needs to Provide" for complete documentation:
+https://github.com/eltmon/panopticon#what-your-project-needs-to-provide
+
+---
+
 ## Post-Setup
 
 After configuration:
