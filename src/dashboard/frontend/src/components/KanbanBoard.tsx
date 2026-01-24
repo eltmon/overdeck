@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 
 // Cost data for an issue
@@ -489,6 +489,11 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
   const [showAbortConfirm, setShowAbortConfirm] = useState(false);
   const [deleteWorkspace, setDeleteWorkspace] = useState(false);
 
+  // Check if issue has "Review Ready" label (agent completed work)
+  const isReviewReady = issue.labels.some(
+    (label) => label.toLowerCase() === 'review ready'
+  );
+
   const priorityColors: Record<number, string> = {
     0: 'border-l-gray-500',
     1: 'border-l-red-500',
@@ -671,6 +676,16 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
             {agent && (
               <span className="text-xs text-blue-400">{agent.model}</span>
             )}
+            {/* Review Ready badge - prominent indicator that agent completed work */}
+            {isReviewReady && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-600 text-white animate-pulse"
+                title="Agent completed work - ready for human review"
+              >
+                <CheckCheck className="w-3 h-3" />
+                Ready
+              </span>
+            )}
             {/* Cost badge */}
             {cost && cost.totalCost > 0 && (
               <span
@@ -693,15 +708,18 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
             {issue.assignee.name.split(' ')[0]}
           </span>
         )}
-        {issue.labels.slice(0, 2).map((label) => (
-          <span
-            key={label}
-            className="inline-flex items-center gap-1 text-xs bg-gray-600 text-gray-300 px-2 py-0.5 rounded"
-          >
-            <Tag className="w-3 h-3" />
-            {label}
-          </span>
-        ))}
+        {issue.labels
+          .filter((label) => label.toLowerCase() !== 'review ready') // Hide Review Ready (has prominent badge)
+          .slice(0, 2)
+          .map((label) => (
+            <span
+              key={label}
+              className="inline-flex items-center gap-1 text-xs bg-gray-600 text-gray-300 px-2 py-0.5 rounded"
+            >
+              <Tag className="w-3 h-3" />
+              {label}
+            </span>
+          ))}
       </div>
 
       {/* Action buttons for running agents */}

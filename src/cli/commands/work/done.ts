@@ -57,6 +57,33 @@ async function updateLinearToInReview(apiKey: string, issueIdentifier: string, c
       await issue.update({ stateId: inReviewState.id });
     }
 
+    // Add "Review Ready" label to indicate agent completed work
+    const labels = await team.labels();
+    let reviewReadyLabel = labels.nodes.find((l) => l.name === 'Review Ready');
+
+    // Create the label if it doesn't exist
+    if (!reviewReadyLabel) {
+      const created = await client.createIssueLabel({
+        teamId: team.id,
+        name: 'Review Ready',
+        color: '#22c55e', // Green
+        description: 'Agent has completed work and is ready for human review',
+      });
+      if (created.issueLabel) {
+        reviewReadyLabel = await created.issueLabel;
+      }
+    }
+
+    // Add label to issue (preserving existing labels)
+    if (reviewReadyLabel) {
+      const existingLabels = await issue.labels();
+      const labelIds = existingLabels.nodes.map((l) => l.id);
+      if (!labelIds.includes(reviewReadyLabel.id)) {
+        labelIds.push(reviewReadyLabel.id);
+        await issue.update({ labelIds });
+      }
+    }
+
     // Add completion comment if provided
     if (comment) {
       await client.createComment({
