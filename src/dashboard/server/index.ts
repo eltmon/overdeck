@@ -25,6 +25,19 @@ import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } from '../../lib/projects.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName } from '../../lib/cost-parsers/jsonl-parser.js';
+import type { Issue } from '../frontend/src/types.js';
+
+/**
+ * Get a Date object representing 24 hours ago from now.
+ * Used for filtering recently completed issues.
+ */
+function getOneDayAgo(): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
+  return date;
+}
+
+import type { Issue } from '../frontend/src/types.js';
 
 // Ensure tmux server is running (starts one if not)
 async function ensureTmuxRunning(): Promise<void> {
@@ -112,6 +125,7 @@ interface ReviewStatus {
   testNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
+  autoRequeueCount?: number; // Circuit breaker: max 3 auto-requeues before human intervention required
 }
 
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -3931,15 +3945,65 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
 
   // Set specialist state to idle when they report completion
   // Infer which specialist based on which field was updated
-  const { getTmuxSessionName } = await import('../../lib/cloister/specialists.js');
-  if (reviewStatus && ['passed', 'blocked'].includes(reviewStatus)) {
+  const { getTmuxSessionName, checkSpecialistQueue, completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
+
+  if (reviewStatus && ['passed', 'blocked', 'failed'].includes(reviewStatus)) {
     const tmuxSession = getTmuxSessionName('review-agent');
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
       lastActivity: new Date().toISOString(),
     });
     console.log(`[review-status] Set review-agent to idle`);
+
+    // Clear this issue from review-agent queue (prevents orphaned queue items)
+    const queue = checkSpecialistQueue('review-agent');
+    for (const item of queue.items) {
+      if (item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()) {
+        completeSpecialistTask('review-agent', item.id);
+        console.log(`[review-status] Cleared ${issueId} from review-agent queue`);
+      }
+    }
+
+    // Auto-send feedback to work agent when blocked/failed (guarantees delivery)
+    if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      try {
+        const { sessionExists, sendToTmux } = await import('../../lib/tmux.js');
+        if (sessionExists(agentId)) {
+          const feedback = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nPlease address these issues and re-request review.`;
+          sendToTmux(agentId, feedback);
+          console.log(`[review-status] Auto-sent feedback to ${agentId}`);
+        } else {
+          console.log(`[review-status] Work agent ${agentId} not running, feedback saved to review-status only`);
+        }
+      } catch (err) {
+        console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
+      }
+    }
+
+    // Immediately process next queued item (don't wait for deacon patrol)
+    const remainingQueue = checkSpecialistQueue('review-agent');
+    if (remainingQueue.hasWork) {
+      const { getNextSpecialistTask, wakeSpecialistWithTask, completeSpecialistTask: completeTask } = await import('../../lib/cloister/specialists.js');
+      const nextTask = getNextSpecialistTask('review-agent');
+      if (nextTask) {
+        console.log(`[review-status] Immediately waking review-agent for next queued task: ${nextTask.payload.issueId}`);
+        const taskDetails = {
+          issueId: nextTask.payload.issueId || '',
+          branch: nextTask.payload.context?.branch,
+          workspace: nextTask.payload.context?.workspace,
+        };
+        const wakeResult = await wakeSpecialistWithTask('review-agent', taskDetails);
+        if (wakeResult.success) {
+          completeTask('review-agent', nextTask.id);
+          console.log(`[review-status] Review-agent woken for ${nextTask.payload.issueId}`);
+        } else {
+          console.error(`[review-status] Failed to wake review-agent for next task: ${wakeResult.error}`);
+        }
+      }
+    }
   }
+
   if (testStatus && ['passed', 'failed'].includes(testStatus)) {
     const tmuxSession = getTmuxSessionName('test-agent');
     saveAgentRuntimeState(tmuxSession, {
@@ -3947,6 +4011,52 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
       lastActivity: new Date().toISOString(),
     });
     console.log(`[review-status] Set test-agent to idle`);
+
+    // Clear this issue from test-agent queue
+    const queue = checkSpecialistQueue('test-agent');
+    for (const item of queue.items) {
+      if (item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()) {
+        completeSpecialistTask('test-agent', item.id);
+        console.log(`[review-status] Cleared ${issueId} from test-agent queue`);
+      }
+    }
+
+    // Auto-send test failure feedback to work agent
+    if (testStatus === 'failed' && testNotes) {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      try {
+        const { sessionExists, sendToTmux } = await import('../../lib/tmux.js');
+        if (sessionExists(agentId)) {
+          const feedback = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nPlease fix the failing tests and re-request review.`;
+          sendToTmux(agentId, feedback);
+          console.log(`[review-status] Auto-sent test failure to ${agentId}`);
+        }
+      } catch (err) {
+        console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
+      }
+    }
+
+    // Immediately process next queued item for test-agent
+    const remainingTestQueue = checkSpecialistQueue('test-agent');
+    if (remainingTestQueue.hasWork) {
+      const { getNextSpecialistTask, wakeSpecialistWithTask, completeSpecialistTask: completeTask } = await import('../../lib/cloister/specialists.js');
+      const nextTask = getNextSpecialistTask('test-agent');
+      if (nextTask) {
+        console.log(`[review-status] Immediately waking test-agent for next queued task: ${nextTask.payload.issueId}`);
+        const taskDetails = {
+          issueId: nextTask.payload.issueId || '',
+          branch: nextTask.payload.context?.branch,
+          workspace: nextTask.payload.context?.workspace,
+        };
+        const wakeResult = await wakeSpecialistWithTask('test-agent', taskDetails);
+        if (wakeResult.success) {
+          completeTask('test-agent', nextTask.id);
+          console.log(`[review-status] Test-agent woken for ${nextTask.payload.issueId}`);
+        } else {
+          console.error(`[review-status] Failed to wake test-agent for next task: ${wakeResult.error}`);
+        }
+      }
+    }
   }
 
   res.json(status);
@@ -3962,9 +4072,23 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   const branchName = `feature/${issueLower}`;
 
-  // Mark review as starting
+  // Check if issue was already reviewed with feedback that needs addressing
+  const existingStatus = getReviewStatus(issueId);
+  if (existingStatus?.reviewNotes && ['blocked', 'failed'].includes(existingStatus.reviewStatus)) {
+    // Issue has existing review feedback - don't reset to reviewing
+    // Return info about existing review so user knows to address feedback first
+    return res.json({
+      success: false,
+      alreadyReviewed: true,
+      message: `Review already completed with status: ${existingStatus.reviewStatus}`,
+      reviewNotes: existingStatus.reviewNotes,
+      hint: 'Address the review feedback before requesting another review',
+    });
+  }
+
+  // Mark review as starting (human-initiated: reset autoRequeueCount)
   setPendingOperation(issueId, 'review');
-  setReviewStatus(issueId, { reviewStatus: 'reviewing', testStatus: 'pending' });
+  setReviewStatus(issueId, { reviewStatus: 'reviewing', testStatus: 'pending', autoRequeueCount: 0 });
 
   try {
     // 1. Check workspace exists
@@ -4025,9 +4149,39 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     }
 
     // 3. Start the review pipeline (review-agent → test-agent)
-    const { wakeSpecialist } = await import('../../lib/cloister/specialists.js');
+    // PAN-88: Check if review-agent is busy BEFORE waking
+    const { wakeSpecialist, isRunning, getTmuxSessionName, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+    const { getAgentRuntimeState, saveAgentRuntimeState } = await import('../../lib/agents.js');
 
-    console.log(`[review] Starting review pipeline for ${issueId}...`);
+    const reviewSession = getTmuxSessionName('review-agent');
+    const reviewRunning = await isRunning('review-agent');
+    const reviewState = getAgentRuntimeState(reviewSession);
+    const reviewIdle = reviewState?.state === 'idle' || reviewState?.state === 'suspended' || !reviewRunning;
+
+    // If review-agent is busy, queue this task instead
+    if (!reviewIdle) {
+      console.log(`[review] review-agent busy, queuing ${issueId}`);
+      submitToSpecialistQueue('review-agent', {
+        priority: 'normal',
+        source: 'review-endpoint',
+        issueId,
+        workspace: workspacePath,
+        branch: branchName,
+      });
+      completePendingOperation(issueId, null);
+      return res.json({
+        success: true,
+        queued: true,
+        message: `Review queued for ${issueId} - review-agent is busy`,
+      });
+    }
+
+    // Set state to active IMMEDIATELY to prevent concurrent wakes (PAN-88)
+    saveAgentRuntimeState(reviewSession, {
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    });
+    console.log(`[review] Marked review-agent active, starting pipeline for ${issueId}...`);
 
     const reviewPrompt = `STRICT REVIEW for ${issueId}
 
@@ -4095,6 +4249,97 @@ curl -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-
     completePendingOperation(issueId, error.message);
     setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: error.message });
     return res.status(500).json({ error: error.message });
+  }
+});
+
+// Agent-initiated re-review request with circuit breaker (PAN-90)
+// Allows agents to request re-review after fixing feedback, max 3 times
+const MAX_AUTO_REQUEUE = 3;
+
+app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
+  const { issueId } = req.params;
+  const { message } = req.body; // Optional message for reviewers
+
+  const existingStatus = getReviewStatus(issueId);
+  const currentCount = existingStatus?.autoRequeueCount || 0;
+
+  // Circuit breaker: max 3 auto-requeues
+  if (currentCount >= MAX_AUTO_REQUEUE) {
+    console.log(`[request-review] Circuit breaker: ${issueId} exceeded max auto-requeues (${currentCount}/${MAX_AUTO_REQUEUE})`);
+    return res.status(429).json({
+      success: false,
+      error: 'Circuit breaker triggered',
+      message: `Maximum automatic re-review requests (${MAX_AUTO_REQUEUE}) exceeded. Human intervention required.`,
+      autoRequeueCount: currentCount,
+      hint: 'A human must click the Review button to continue.',
+    });
+  }
+
+  // Check if workspace exists
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const branchName = `feature/${issueLower}`;
+
+  if (!existsSync(workspacePath)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Workspace does not exist',
+    });
+  }
+
+  // Increment counter and queue for review
+  const newCount = currentCount + 1;
+  const reviewNotes = message ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}` : undefined;
+
+  setReviewStatus(issueId, {
+    reviewStatus: 'reviewing',
+    testStatus: 'pending',
+    autoRequeueCount: newCount,
+    reviewNotes,
+  });
+
+  console.log(`[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})`);
+
+  // Queue for review-agent (same logic as human-initiated review)
+  try {
+    const { wakeSpecialistOrQueue } = await import('../../../lib/cloister/specialists.js');
+
+    const result = await wakeSpecialistOrQueue('review-agent', {
+      issueId,
+      workspace: workspacePath,
+      branch: branchName,
+    }, {
+      priority: 'normal',
+      source: 'agent-request',
+    });
+
+    if (result.success) {
+      console.log(`[request-review] Queued ${issueId} for review-agent`);
+      return res.json({
+        success: true,
+        queued: result.queued,
+        message: result.queued
+          ? `Review queued (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`
+          : `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
+        autoRequeueCount: newCount,
+        remainingRequeues: MAX_AUTO_REQUEUE - newCount,
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to queue review',
+        autoRequeueCount: newCount,
+      });
+    }
+  } catch (error: any) {
+    console.error(`[request-review] Error:`, error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      autoRequeueCount: newCount,
+    });
   }
 });
 

@@ -5,7 +5,10 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn, execSync } from 'child_process';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -218,11 +221,11 @@ function parseAgentOutput(output: string): MergeResult {
 }
 
 /**
- * Get conflict files from git status
+ * Get conflict files from git status (async)
  */
-function getConflictFiles(projectPath: string): string[] {
+async function getConflictFiles(projectPath: string): Promise<string[]> {
   try {
-    const status = execSync('git diff --name-only --diff-filter=U', {
+    const { stdout: status } = await execAsync('git diff --name-only --diff-filter=U', {
       cwd: projectPath,
       encoding: 'utf-8',
     });
@@ -281,22 +284,23 @@ function logActivity(action: string, details: string): void {
 }
 
 /**
- * Capture tmux output and look for result markers
+ * Capture tmux output and look for result markers (async)
  */
-function captureTmuxOutput(sessionName: string): string {
+async function captureTmuxOutput(sessionName: string): Promise<string> {
   try {
-    return execSync(`tmux capture-pane -t "${sessionName}" -p`, { encoding: 'utf-8' });
+    const { stdout } = await execAsync(`tmux capture-pane -t "${sessionName}" -p`, { encoding: 'utf-8' });
+    return stdout;
   } catch {
     return '';
   }
 }
 
 /**
- * Check if specialist-merge-agent tmux session is running
+ * Check if specialist-merge-agent tmux session is running (async)
  */
-function isMergeAgentRunning(): boolean {
+async function isMergeAgentRunning(): Promise<boolean> {
   try {
-    execSync(`tmux has-session -t specialist-merge-agent 2>/dev/null`, { encoding: 'utf-8' });
+    await execAsync(`tmux has-session -t specialist-merge-agent 2>/dev/null`, { encoding: 'utf-8' });
     return true;
   } catch {
     return false;
@@ -304,21 +308,21 @@ function isMergeAgentRunning(): boolean {
 }
 
 /**
- * Send a message to an agent's tmux session
+ * Send a message to an agent's tmux session (async)
  */
-function sendMessageToAgent(issueId: string, message: string): boolean {
+async function sendMessageToAgent(issueId: string, message: string): Promise<boolean> {
   // Agent sessions are typically named agent-{issueId} (lowercase)
   const sessionName = `agent-${issueId.toLowerCase()}`;
 
   try {
     // Check if session exists
-    execSync(`tmux has-session -t "${sessionName}" 2>/dev/null`, { encoding: 'utf-8' });
+    await execAsync(`tmux has-session -t "${sessionName}" 2>/dev/null`, { encoding: 'utf-8' });
 
     // Send the message (with delay before Enter to avoid race condition)
     const escapedMessage = message.replace(/'/g, "'\\''");
-    execSync(`tmux send-keys -t "${sessionName}" '${escapedMessage}'`, { encoding: 'utf-8' });
-    execSync('sleep 0.2', { encoding: 'utf-8' }); // Small delay for terminal to process text
-    execSync(`tmux send-keys -t "${sessionName}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${sessionName}" '${escapedMessage}'`, { encoding: 'utf-8' });
+    await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for terminal to process text
+    await execAsync(`tmux send-keys -t "${sessionName}" C-m`, { encoding: 'utf-8' });
 
     console.log(`[merge-agent] Sent message to ${sessionName}`);
     logActivity('agent_message', `Sent to ${sessionName}: ${message.slice(0, 100)}...`);
@@ -349,7 +353,7 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
   console.log(`[merge-agent] Test command: ${context.testCommand}`);
 
   // Check if merge-agent session is running
-  if (!isMergeAgentRunning()) {
+  if (!(await isMergeAgentRunning())) {
     console.log(`[merge-agent] Session not running, cannot proceed`);
     logActivity('merge_error', `Session ${tmuxSession} not running`);
     return {
@@ -367,9 +371,9 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
   try {
     // Send prompt to tmux session
     console.log(`[merge-agent] Sending task to ${tmuxSession}...`);
-    execSync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 500));
-    execSync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
 
     // Record wake event
     recordWake('merge-agent');
@@ -385,7 +389,7 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
     while (Date.now() - startTime < MERGE_TIMEOUT_MS) {
       await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
 
-      const output = captureTmuxOutput(tmuxSession);
+      const output = await captureTmuxOutput(tmuxSession);
 
       // Check if we have new output with result markers
       if (output !== lastOutput) {
@@ -466,17 +470,16 @@ export async function spawnMergeAgentForBranches(
   try {
     // Check that source branch is pushed to remote
     try {
-      const remoteBranches = execSync(`git ls-remote --heads origin ${sourceBranch}`, {
+      const { stdout: remoteBranches } = await execAsync(`git ls-remote --heads origin ${sourceBranch}`, {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: 'pipe',
       });
 
       if (!remoteBranches.trim()) {
         const message = `Branch ${sourceBranch} is not pushed to remote.`;
         console.error(`[merge-agent] ${message}`);
         logActivity('merge_blocked', message);
-        sendMessageToAgent(issueId, `⚠️ MERGE BLOCKED: Branch "${sourceBranch}" is not pushed. Run: git push -u origin ${sourceBranch}`);
+        await sendMessageToAgent(issueId, `⚠️ MERGE BLOCKED: Branch "${sourceBranch}" is not pushed. Run: git push -u origin ${sourceBranch}`);
         return { success: false, reason: message };
       }
     } catch {
@@ -496,11 +499,11 @@ export async function spawnMergeAgentForBranches(
   }
 
   // Record current HEAD before merge
-  const headBefore = execSync('git rev-parse HEAD', {
+  const { stdout: headBeforeRaw } = await execAsync('git rev-parse HEAD', {
     cwd: projectPath,
     encoding: 'utf-8',
-    stdio: 'pipe',
-  }).trim();
+  });
+  const headBefore = headBeforeRaw.trim();
 
   // Build the task prompt for the merge-agent specialist
   const taskPrompt = `MERGE TASK for ${issueId}:
@@ -560,11 +563,11 @@ Report any issues or conflicts you encountered.`;
 
     try {
       // Check if we're still on target branch
-      const currentBranch = execSync('git branch --show-current', {
+      const { stdout: currentBranchRaw } = await execAsync('git branch --show-current', {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: 'pipe',
-      }).trim();
+      });
+      const currentBranch = currentBranchRaw.trim();
 
       if (currentBranch !== targetBranch) {
         // Specialist might still be working, continue polling
@@ -572,28 +575,28 @@ Report any issues or conflicts you encountered.`;
       }
 
       // Check if HEAD has changed (merge happened)
-      const currentHead = execSync('git rev-parse HEAD', {
+      const { stdout: currentHeadRaw } = await execAsync('git rev-parse HEAD', {
         cwd: projectPath,
         encoding: 'utf-8',
-        stdio: 'pipe',
-      }).trim();
+      });
+      const currentHead = currentHeadRaw.trim();
 
       if (currentHead !== headBefore) {
         // HEAD changed - check if it's a merge commit
-        const commitMessage = execSync('git log -1 --pretty=%s', {
+        const { stdout: commitMessageRaw } = await execAsync('git log -1 --pretty=%s', {
           cwd: projectPath,
           encoding: 'utf-8',
-          stdio: 'pipe',
-        }).trim().toLowerCase();
+        });
+        const commitMessage = commitMessageRaw.trim().toLowerCase();
 
         if (commitMessage.includes('merge') || commitMessage.includes(sourceBranch.toLowerCase())) {
           // Verify it's pushed
           try {
-            const remoteHead = execSync(`git rev-parse origin/${targetBranch}`, {
+            const { stdout: remoteHeadRaw } = await execAsync(`git rev-parse origin/${targetBranch}`, {
               cwd: projectPath,
               encoding: 'utf-8',
-              stdio: 'pipe',
-            }).trim();
+            });
+            const remoteHead = remoteHeadRaw.trim();
 
             if (remoteHead === currentHead) {
               console.log(`[merge-agent] Merge completed and pushed successfully`);

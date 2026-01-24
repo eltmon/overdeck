@@ -45,6 +45,9 @@ function displaySpecialist(specialist: SpecialistStatus): void {
 
   if (specialist.isRunning) {
     console.log(`  Running: ${chalk.cyan(specialist.tmuxSession)}`);
+    if (specialist.currentIssue) {
+      console.log(`  Working on: ${chalk.cyan(specialist.currentIssue)}`);
+    }
   }
 
   if (specialist.sessionId) {

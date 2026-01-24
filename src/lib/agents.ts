@@ -1,12 +1,66 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
 import { homedir } from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { AGENTS_DIR } from './paths.js';
 import { createSession, killSession, sendKeys, sessionExists, getAgentSessions } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
+
+const execAsync = promisify(exec);
+
+// ============================================================================
+// Ready Signal Management (PAN-87)
+// ============================================================================
+
+/**
+ * Get path to agent's ready signal file (written by SessionStart hook)
+ */
+function getReadySignalPath(agentId: string): string {
+  return join(getAgentDir(agentId), 'ready.json');
+}
+
+/**
+ * Clear ready signal before spawning (clean slate)
+ */
+function clearReadySignal(agentId: string): void {
+  const readyPath = getReadySignalPath(agentId);
+  if (existsSync(readyPath)) {
+    try {
+      unlinkSync(readyPath);
+    } catch {
+      // Ignore errors - non-critical
+    }
+  }
+}
+
+/**
+ * Wait for SessionStart hook to signal ready (async - non-blocking)
+ * Returns true if ready signal received, false if timeout
+ */
+async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
+  const readyPath = getReadySignalPath(agentId);
+
+  for (let i = 0; i < timeoutSeconds; i++) {
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
+
+    if (existsSync(readyPath)) {
+      try {
+        const content = readFileSync(readyPath, 'utf-8');
+        const signal = JSON.parse(content);
+        if (signal.ready === true) {
+          return true;
+        }
+      } catch {
+        // File exists but invalid - keep waiting
+      }
+    }
+  }
+
+  return false;
+}
 
 export interface AgentState {
   id: string;
@@ -61,6 +115,7 @@ export interface AgentRuntimeState {
   sessionId?: string;
   suspendedAt?: string;
   resumedAt?: string;
+  currentIssue?: string; // Issue ID the agent is currently working on
 }
 
 /**
@@ -199,7 +254,7 @@ export interface SpawnOptions {
   prompt?: string;
 }
 
-export function spawnAgent(options: SpawnOptions): AgentState {
+export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = `agent-${options.issueId.toLowerCase()}`;
 
   // Check if already running
@@ -250,6 +305,9 @@ export function spawnAgent(options: SpawnOptions): AgentState {
   // Write initial task cache for heartbeat hook
   writeTaskCache(agentId, options.issueId);
 
+  // Clear ready signal before spawning (clean slate for PAN-87 fix)
+  clearReadySignal(agentId);
+
   // Create tmux session and start claude
   const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`;
   createSession(agentId, options.workspace, claudeCmd, {
@@ -260,30 +318,20 @@ export function spawnAgent(options: SpawnOptions): AgentState {
 
   // If there's a prompt, load it via tmux buffer after claude starts
   if (prompt) {
-    // Wait for claude to be ready by checking for the prompt character
-    // Claude shows "❯" when ready for input
-    let ready = false;
-    for (let i = 0; i < 15; i++) {  // Max 15 seconds
-      execSync('sleep 1');
-      try {
-        const pane = execSync(`tmux capture-pane -t ${agentId} -p`, { encoding: 'utf-8' });
-        if (pane.includes('❯') || pane.includes('>')) {
-          ready = true;
-          break;
-        }
-      } catch {}
-    }
+    // Wait for SessionStart hook to signal ready (PAN-87: reliable prompt delivery)
+    // The hook writes ready.json when Claude's session starts
+    const ready = await waitForReadySignal(agentId, 30);
 
     if (ready) {
       // Use tmux load-buffer and paste-buffer to send the prompt
-      // This avoids all shell escaping issues
-      execSync(`tmux load-buffer "${promptFile}"`);
-      execSync(`tmux paste-buffer -t ${agentId}`);
+      // This avoids all shell escaping issues (using execAsync to not block event loop)
+      await execAsync(`tmux load-buffer "${promptFile}"`);
+      await execAsync(`tmux paste-buffer -t ${agentId}`);
       // Small delay to let paste complete, then send Enter
-      execSync('sleep 0.5');
-      execSync(`tmux send-keys -t ${agentId} Enter`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await execAsync(`tmux send-keys -t ${agentId} Enter`);
     } else {
-      console.error('Claude did not become ready in time, prompt not sent');
+      console.error('Claude SessionStart hook did not fire in time, prompt not sent. Check ~/.claude/settings.json has SessionStart hook configured.');
     }
   }
 
@@ -419,6 +467,9 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
   }
 
   try {
+    // Clear ready signal before resuming (clean slate for PAN-87 fix)
+    clearReadySignal(normalizedId);
+
     // Create new tmux session with resume command
     const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
     createSession(normalizedId, agentState.workspace, claudeCmd, {
@@ -427,13 +478,17 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
       }
     });
 
-    // If there's a message, send it after a brief delay
+    // If there's a message, wait for ready signal then send
     if (message) {
-      // Wait for Claude to be ready
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
+      const ready = await waitForReadySignal(normalizedId, 30);
 
-      // Send message
-      sendKeys(normalizedId, message);
+      if (ready) {
+        // Send message
+        sendKeys(normalizedId, message);
+      } else {
+        console.error('Claude SessionStart hook did not fire during resume, message not sent');
+      }
     }
 
     // Update runtime state
@@ -607,8 +662,15 @@ function checkAndSetupHooks(): void {
   // Hooks not configured - run setup silently
   try {
     console.log('Configuring Panopticon heartbeat hooks...');
-    execSync('pan setup hooks', { stdio: 'pipe' });
-    console.log('✓ Heartbeat hooks configured');
+    // Note: This runs during spawn which is now async, so we can use execAsync
+    // But this is called from a sync context in checkAndSetupHooks, so we use fire-and-forget
+    exec('pan setup hooks', { stdio: 'pipe' }, (error) => {
+      if (error) {
+        console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
+      } else {
+        console.log('✓ Heartbeat hooks configured');
+      }
+    });
   } catch (error) {
     console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
   }

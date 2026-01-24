@@ -255,12 +255,15 @@ function buildAgentPrompt(issueId: string, workspacePath: string, projectRoot: s
   lines.push('3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`');
   lines.push('');
   lines.push('**Before declaring work complete, run:**');
-  lines.push('```');
+  lines.push('```bash');
   lines.push('npm test                                         # Run tests');
   lines.push('git add -A && git commit -m "feat: description"  # Commit ALL changes');
   lines.push('git push -u origin $(git branch --show-current)  # Push');
   lines.push('git status                                       # Must show "nothing to commit"');
+  lines.push(`pan work done ${issueId} -c "Brief summary"      # Signal completion`);
   lines.push('```');
+  lines.push('');
+  lines.push('**IMPORTANT:** Run `pan work done` when finished - this updates the issue to "In Review" so the user knows to review your work.');
   lines.push('');
   lines.push('**Uncommitted changes = NOT COMPLETE. Do not say you are done if `git status` shows changes.**');
   lines.push('');
@@ -316,7 +319,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     spinner.text = 'Spawning agent...';
 
-    const agent = spawnAgent({
+    const agent = await spawnAgent({
       issueId: id,
       workspace,
       runtime: options.runtime,

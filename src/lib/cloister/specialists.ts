@@ -48,6 +48,7 @@ export interface SpecialistStatus extends SpecialistMetadata {
   state: SpecialistState;
   isRunning: boolean;
   tmuxSession?: string;
+  currentIssue?: string; // Issue ID currently being worked on
 }
 
 /**
@@ -532,6 +533,7 @@ export async function getSpecialistStatus(name: SpecialistType): Promise<Special
     state,
     isRunning: running,
     tmuxSession: getTmuxSessionName(name),
+    currentIssue: runtimeState?.currentIssue,
   };
 }
 
@@ -718,6 +720,7 @@ export async function wakeSpecialist(
   options: {
     waitForReady?: boolean; // Wait for agent to be ready before sending prompt (default: true)
     startIfNotRunning?: boolean; // Start the agent if not running (default: true)
+    issueId?: string; // Issue ID being worked on (for tracking)
   } = {}
 ): Promise<{
   success: boolean;
@@ -726,7 +729,7 @@ export async function wakeSpecialist(
   wasAlreadyRunning: boolean;
   error?: string;
 }> {
-  const { waitForReady = true, startIfNotRunning = true } = options;
+  const { waitForReady = true, startIfNotRunning = true, issueId } = options;
   const tmuxSession = getTmuxSessionName(name);
   const sessionId = getSessionId(name);
   const wasAlreadyRunning = await isRunning(name);
@@ -792,6 +795,7 @@ export async function wakeSpecialist(
     saveAgentRuntimeState(tmuxSession, {
       state: 'active',
       lastActivity: new Date().toISOString(),
+      currentIssue: issueId,
     });
 
     return {
@@ -911,7 +915,7 @@ IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.
       prompt = `Task for ${task.issueId}: Please process this task and report findings.`;
   }
 
-  return wakeSpecialist(name, prompt);
+  return wakeSpecialist(name, prompt, { issueId: task.issueId });
 }
 
 /**
@@ -1000,8 +1004,25 @@ export async function wakeSpecialistOrQueue(
   }
 
   // Otherwise, wake the specialist directly
+  // PAN-88: Set state to 'active' IMMEDIATELY to prevent race conditions
+  // This must happen BEFORE the actual wake to block concurrent requests
+  const { saveAgentRuntimeState } = await import('../agents.js');
+  saveAgentRuntimeState(tmuxSession, {
+    state: 'active',
+    lastActivity: new Date().toISOString(),
+  });
+  console.log(`[specialist] ${name} marked active (preventing concurrent wakes)`);
+
   try {
     const wakeResult = await wakeSpecialistWithTask(name, task);
+
+    if (!wakeResult.success) {
+      // Wake failed - revert state to idle
+      saveAgentRuntimeState(tmuxSession, {
+        state: 'idle',
+        lastActivity: new Date().toISOString(),
+      });
+    }
 
     return {
       success: wakeResult.success,
@@ -1010,6 +1031,12 @@ export async function wakeSpecialistOrQueue(
       error: wakeResult.error,
     };
   } catch (error: unknown) {
+    // Exception - revert state to idle
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+
     const msg = error instanceof Error ? error.message : String(error);
     return {
       success: false,
