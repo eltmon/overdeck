@@ -96,16 +96,27 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     refetchInterval: step === 'planning' ? 2000 : false, // Only poll during active session
   });
 
-  // Stop planning mutation (keeps state as "In Planning")
+  // Stop planning mutation - stops agent AND marks planning as complete (changes to "Planned")
   const stopPlanningMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/planning/${issue.identifier}`, {
+      // First stop the planning agent
+      const stopRes = await fetch(`/api/planning/${issue.identifier}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to stop planning');
-      return res.json();
+      if (!stopRes.ok) throw new Error('Failed to stop planning');
+
+      // Then mark planning as complete (changes label from "Planning" to "Planned")
+      const completeRes = await fetch(`/api/issues/${issue.identifier}/complete-planning`, {
+        method: 'POST',
+      });
+      if (!completeRes.ok) {
+        console.warn('Failed to mark planning complete, continuing anyway');
+      }
+
+      return stopRes.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
       setStep('complete');
     },
   });
