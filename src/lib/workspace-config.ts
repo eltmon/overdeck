@@ -58,6 +58,21 @@ export interface EnvConfig {
   secrets_file?: string;
 }
 
+export interface ServiceConfig {
+  /** Service name (e.g., 'api', 'frontend') */
+  name: string;
+  /** Path relative to workspace (e.g., 'api', 'fe') */
+  path: string;
+  /** Command to start the service natively (e.g., './run-dev.sh', 'pnpm start') */
+  start_command: string;
+  /** Command to start inside Docker container (if different) */
+  docker_command?: string;
+  /** Health check URL pattern (supports placeholders) */
+  health_url?: string;
+  /** Port the service runs on */
+  port?: number;
+}
+
 export interface TestConfig {
   /** Test type: 'maven' | 'vitest' | 'playwright' | 'jest' | 'pytest' | 'cargo' */
   type: string;
@@ -90,6 +105,8 @@ export interface WorkspaceConfig {
   agent?: AgentTemplateConfig;
   /** Environment variables */
   env?: EnvConfig;
+  /** Service definitions for startup commands */
+  services?: ServiceConfig[];
 }
 
 export interface TestsConfig {
@@ -157,5 +174,103 @@ export function getDefaultWorkspaceConfig(): WorkspaceConfig {
   return {
     type: 'monorepo',
     workspaces_dir: 'workspaces',
+  };
+}
+
+/**
+ * Service templates for common project types
+ * These provide sensible defaults that can be overridden
+ */
+export const SERVICE_TEMPLATES: Record<string, Partial<ServiceConfig>> = {
+  // Frontend frameworks
+  'react': {
+    start_command: 'npm start',
+    docker_command: 'npm start',
+    port: 3000,
+  },
+  'react-vite': {
+    start_command: 'npm run dev',
+    docker_command: 'npm run dev',
+    port: 5173,
+  },
+  'react-pnpm': {
+    start_command: 'pnpm start',
+    docker_command: 'pnpm start',
+    port: 3000,
+  },
+  'nextjs': {
+    start_command: 'npm run dev',
+    docker_command: 'npm run dev',
+    port: 3000,
+  },
+  'vue': {
+    start_command: 'npm run dev',
+    docker_command: 'npm run dev',
+    port: 5173,
+  },
+  'angular': {
+    start_command: 'ng serve',
+    docker_command: 'ng serve',
+    port: 4200,
+  },
+
+  // Backend frameworks
+  'spring-boot-maven': {
+    start_command: './mvnw spring-boot:run',
+    docker_command: './mvnw spring-boot:run',
+    port: 8080,
+  },
+  'spring-boot-gradle': {
+    start_command: './gradlew bootRun',
+    docker_command: './gradlew bootRun',
+    port: 8080,
+  },
+  'express': {
+    start_command: 'npm start',
+    docker_command: 'npm start',
+    port: 3000,
+  },
+  'fastapi': {
+    start_command: 'uvicorn main:app --reload',
+    docker_command: 'uvicorn main:app --host 0.0.0.0 --reload',
+    port: 8000,
+  },
+  'django': {
+    start_command: 'python manage.py runserver',
+    docker_command: 'python manage.py runserver 0.0.0.0:8000',
+    port: 8000,
+  },
+  'rails': {
+    start_command: 'rails server',
+    docker_command: 'rails server -b 0.0.0.0',
+    port: 3000,
+  },
+  'go': {
+    start_command: 'go run .',
+    docker_command: 'go run .',
+    port: 8080,
+  },
+  'rust-cargo': {
+    start_command: 'cargo run',
+    docker_command: 'cargo run',
+    port: 8080,
+  },
+};
+
+/**
+ * Get service config from template with overrides
+ */
+export function getServiceFromTemplate(
+  templateName: string,
+  overrides: Partial<ServiceConfig>
+): ServiceConfig {
+  const template = SERVICE_TEMPLATES[templateName] || {};
+  return {
+    name: overrides.name || templateName,
+    path: overrides.path || '.',
+    start_command: overrides.start_command || template.start_command || 'npm start',
+    docker_command: overrides.docker_command || template.docker_command,
+    health_url: overrides.health_url,
+    port: overrides.port || template.port,
   };
 }

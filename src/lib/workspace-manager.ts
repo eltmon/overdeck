@@ -75,6 +75,9 @@ async function createWorktree(
     // Fetch latest from origin
     await execAsync('git fetch origin', { cwd: repoPath });
 
+    // Prune stale worktree entries (e.g., from deleted workspaces)
+    await execAsync('git worktree prune', { cwd: repoPath });
+
     // Check if branch exists locally or remotely
     const { stdout: localBranches } = await execAsync('git branch --list', { cwd: repoPath });
     const { stdout: remoteBranches } = await execAsync('git branch -r --list', { cwd: repoPath });
@@ -490,11 +493,16 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
     ];
 
+    // Construct docker-compose project name from project config and feature name
+    const projectPrefix = projectConfig.name?.toLowerCase().replace(/\s+/g, '-') || 'workspace';
+    const composeProject = `${projectPrefix}-feature-${featureName}`;
+
     for (const composePath of composeLocations) {
       if (existsSync(composePath)) {
         try {
-          await execAsync('docker compose up -d --build', { cwd: dirname(composePath), timeout: 300000 });
-          result.steps.push(`Started containers from ${basename(composePath)}`);
+          // Use -p for project name (unique container names) and -f for compose file
+          await execAsync(`docker compose -p "${composeProject}" -f "${composePath}" up -d --build`, { cwd: dirname(composePath), timeout: 300000 });
+          result.steps.push(`Started containers from ${basename(composePath)} (project: ${composeProject})`);
         } catch (error) {
           result.errors.push(`Failed to start containers: ${error}`);
         }
@@ -553,12 +561,16 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
     join(workspacePath, 'docker-compose.yml'),
   ];
 
+  // Construct docker-compose project name (must match what was used at startup)
+  const projectPrefix = projectConfig.name?.toLowerCase().replace(/\s+/g, '-') || 'workspace';
+  const composeProject = `${projectPrefix}-feature-${featureName}`;
+
   for (const composePath of composeLocations) {
     if (existsSync(composePath)) {
       try {
-        // Stop containers and remove volumes
-        await execAsync('docker compose down -v', { cwd: dirname(composePath) });
-        result.steps.push('Stopped Docker containers');
+        // Stop containers and remove volumes (use -p and -f flags to match startup)
+        await execAsync(`docker compose -p "${composeProject}" -f "${composePath}" down -v`, { cwd: dirname(composePath) });
+        result.steps.push(`Stopped Docker containers (project: ${composeProject})`);
       } catch {
         // Containers might not be running
       }
@@ -569,8 +581,8 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   // Clean up Docker-created files (root-owned in containers)
   try {
     await execAsync(
-      `docker run --rm -v "${workspacePath}:/workspace" alpine sh -c "find /workspace -user root -delete 2>/dev/null || true"`,
-      { timeout: 30000 }
+      `docker run --rm -v "${workspacePath}:/workspace" alpine sh -c "find /workspace -user root -delete 2>&1 | tail -100 || true"`,
+      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }
     );
     result.steps.push('Cleaned up Docker-created files');
   } catch {
@@ -627,7 +639,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
 
   // Remove workspace directory
   try {
-    await execAsync(`rm -rf "${workspacePath}"`);
+    await execAsync(`rm -rf "${workspacePath}"`, { maxBuffer: 10 * 1024 * 1024 });
     result.steps.push('Removed workspace directory');
   } catch (error) {
     result.errors.push(`Failed to remove workspace directory: ${error}`);

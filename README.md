@@ -726,9 +726,11 @@ Issues are routed to different subdirectories based on their labels:
 
 Example: An issue with label "splash" in the MIN team would create its workspace at `/home/user/projects/myn/splash/workspaces/feature-min-xxx/`.
 
-### Custom Workspace Commands
+### Custom Workspace Commands (Legacy)
 
-For complex projects that need more than a simple git worktree (e.g., polyrepos, multi-container setups), you can specify a custom workspace creation script:
+> **Note:** For most polyrepo projects, use the built-in `workspace` configuration (see below) instead of custom scripts. Custom commands are only needed for highly specialized setups.
+
+For projects that need logic beyond what the configuration supports, you can specify custom workspace scripts:
 
 ```yaml
 projects:
@@ -839,6 +841,21 @@ projects:
         redis:
           range: [6380, 6499]
 
+      # Service definitions - how to start each service
+      services:
+        - name: api
+          path: api
+          start_command: ./mvnw spring-boot:run
+          docker_command: ./mvnw spring-boot:run
+          health_url: "https://api-{{FEATURE_FOLDER}}.{{DOMAIN}}/actuator/health"
+          port: 8080
+        - name: frontend
+          path: fe
+          start_command: pnpm start
+          docker_command: pnpm start
+          health_url: "https://{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          port: 3000
+
       # Docker configuration
       docker:
         traefik: infra/docker-compose.traefik.yml
@@ -870,6 +887,32 @@ projects:
 | `{{BRANCH_NAME}}` | `feature/min-123` | Git branch name |
 | `{{COMPOSE_PROJECT}}` | `myapp-feature-min-123` | Docker Compose project |
 | `{{DOMAIN}}` | `myapp.test` | DNS domain |
+
+**Service Templates:**
+
+Panopticon provides built-in templates for common frameworks. Use these to avoid boilerplate:
+
+| Template | Start Command | Port |
+|----------|--------------|------|
+| `react` | `npm start` | 3000 |
+| `react-vite` | `npm run dev` | 5173 |
+| `react-pnpm` | `pnpm start` | 3000 |
+| `nextjs` | `npm run dev` | 3000 |
+| `spring-boot-maven` | `./mvnw spring-boot:run` | 8080 |
+| `spring-boot-gradle` | `./gradlew bootRun` | 8080 |
+| `express` | `npm start` | 3000 |
+| `fastapi` | `uvicorn main:app --reload` | 8000 |
+| `django` | `python manage.py runserver` | 8000 |
+
+Use a template by referencing it in your service config:
+
+```yaml
+services:
+  - name: api
+    template: spring-boot-maven
+    path: api
+    health_url: "https://api-{{FEATURE_FOLDER}}.myapp.test/health"
+```
 
 See `/pan-workspace-config` skill for complete documentation.
 

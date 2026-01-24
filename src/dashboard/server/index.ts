@@ -3328,15 +3328,20 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
   const containerMap: Record<string, string[]> = {
     'frontend': ['frontend', 'fe'],
     'api': ['api'],
+    'dev': ['dev'],
     'postgres': ['postgres'],
     'redis': ['redis'],
   };
 
   // Build all possible container patterns
+  // Project names are slugified (e.g., "Mind Your Now" -> "mind-your-now")
   const checks: Array<{ displayName: string; containerName: string }> = [];
   for (const [displayName, suffixes] of Object.entries(containerMap)) {
     for (const suffix of suffixes) {
       checks.push(
+        // New naming: ${projectName}-feature-${issueLower}-${suffix}-1
+        { displayName, containerName: `mind-your-now-feature-${issueLower}-${suffix}-1` },
+        // Legacy naming patterns
         { displayName, containerName: `myn-feature-${issueLower}-${suffix}-1` },
         { displayName, containerName: `feature-${issueLower}-${suffix}-1` },
         { displayName, containerName: `${issueLower}-${suffix}-1` },
@@ -5741,7 +5746,12 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
 
     if (!skipWorkspace) {
       try {
-        if (!existsSync(workspacePath)) {
+        // Check if workspace needs to be created
+        // A workspace with only .planning is incomplete (from a failed previous attempt)
+        const workspaceNeedsCreation = !existsSync(workspacePath) ||
+          (existsSync(workspacePath) && readdirSync(workspacePath).every(f => f === '.planning'));
+
+        if (workspaceNeedsCreation) {
           // Create workspace using pan workspace create
           const dockerFlag = startDocker ? ' --docker' : '';
           const createCmd = `pan workspace create ${issue.identifier}${dockerFlag}`;
@@ -6214,15 +6224,20 @@ async function removeGitHubPlanningLabel(owner: string, repo: string, number: nu
 app.post('/api/issues/:id/abort-planning', async (req, res) => {
   const { id } = req.params;
   const { deleteWorkspace } = req.body || {};
-  const sessionName = `planning-${id.toLowerCase()}`;
 
   try {
     // Check if this is a GitHub issue
     const githubCheck = isGitHubIssue(id);
 
     let revertedState = 'Todo';
+    let issueIdentifier: string | undefined; // e.g., "MIN-665"
+    let sessionName: string; // Will be set based on identifier
 
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+      // GitHub: set identifier from the ID (which is like "PAN-123")
+      issueIdentifier = id;
+      sessionName = `planning-${id.toLowerCase()}`;
+
       // GitHub: remove "planning" label
       try {
         await removeGitHubPlanningLabel(githubCheck.owner, githubCheck.repo, githubCheck.number);
@@ -6235,11 +6250,12 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
       // Linear: move back to Todo state
       const apiKey = getLinearApiKey();
       if (apiKey) {
-        // Fetch issue to get team
+        // Fetch issue to get team and identifier
         const issueQuery = `
           query GetIssue($id: String!) {
             issue(id: $id) {
               id
+              identifier
               team { id }
             }
           }
@@ -6257,6 +6273,10 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
         const issue = issueJson.data?.issue;
 
         if (issue) {
+          // Store the issue identifier for workspace deletion and session name
+          issueIdentifier = issue.identifier;
+          sessionName = `planning-${issue.identifier.toLowerCase()}`;
+
           // Find "Todo" state for this team
           const statesQuery = `
             query GetTeamStates($teamId: String!) {
@@ -6318,14 +6338,18 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
       }
     }
 
-    // Kill the tmux session
-    await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+    // Kill the tmux session (try both possible session names if needed)
+    if (sessionName) {
+      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+    }
+    // Also try with UUID-based session name (fallback)
+    await execAsync(`tmux kill-session -t planning-${id.toLowerCase()} 2>/dev/null || true`, { encoding: 'utf-8' });
 
     // Clean up agent state files to prevent stale "running" status
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    const agentStateDir = sessionName ? join(homedir(), '.panopticon', 'agents', sessionName) : null;
     const workAgentStateDir = join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
     try {
-      if (existsSync(agentStateDir)) {
+      if (agentStateDir && existsSync(agentStateDir)) {
         rmSync(agentStateDir, { recursive: true, force: true });
       }
       if (existsSync(workAgentStateDir)) {
@@ -6347,25 +6371,47 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
         if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
           const localPaths = getGitHubLocalPaths();
           projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
-        } else {
-          // For Linear issues, we need to find the project path
+        } else if (issueIdentifier) {
+          // For Linear issues, use the identifier to find the project path
           // Check project mappings
           const mappingsPath = join(homedir(), '.panopticon', 'project-mappings.json');
           if (existsSync(mappingsPath)) {
             const mappings = JSON.parse(readFileSync(mappingsPath, 'utf-8'));
             // Try to match by issue prefix (e.g., MIN-123 -> MIN)
-            const prefix = id.split('-')[0];
-            const mapping = mappings.find((m: any) => m.linearPrefix === prefix);
+            const prefix = issueIdentifier.split('-')[0];
+            const mapping = mappings.find((m: any) => m.linearPrefix?.toUpperCase() === prefix.toUpperCase());
             if (mapping) {
               projectPath = mapping.localPath;
             }
           }
+
+          // Also check projects.yaml
+          if (!projectPath) {
+            const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+            if (existsSync(projectsYamlPath)) {
+              try {
+                const yaml = await import('js-yaml');
+                const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
+                const prefix = issueIdentifier.split('-')[0].toUpperCase();
+
+                for (const [, config] of Object.entries(projectsConfig.projects || {})) {
+                  const projConfig = config as any;
+                  if (projConfig.linear_team?.toUpperCase() === prefix) {
+                    projectPath = projConfig.path;
+                    break;
+                  }
+                }
+              } catch {
+                // Ignore YAML errors
+              }
+            }
+          }
         }
 
-        if (projectPath) {
-          // Try both naming conventions: feature-{id} and just {id}
-          const featureWorkspacePath = join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`);
-          const plainWorkspacePath = join(projectPath, 'workspaces', id.toLowerCase());
+        if (projectPath && issueIdentifier) {
+          // Try both naming conventions: feature-{identifier} and just {identifier}
+          const featureWorkspacePath = join(projectPath, 'workspaces', `feature-${issueIdentifier.toLowerCase()}`);
+          const plainWorkspacePath = join(projectPath, 'workspaces', issueIdentifier.toLowerCase());
           const workspacePath = existsSync(featureWorkspacePath) ? featureWorkspacePath : plainWorkspacePath;
 
           if (existsSync(workspacePath)) {
@@ -6377,7 +6423,7 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
               try {
                 const yaml = await import('js-yaml');
                 const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
-                const prefix = id.split('-')[0].toLowerCase();
+                const prefix = issueIdentifier.split('-')[0].toLowerCase();
 
                 // Find project by linear_team prefix
                 for (const [, config] of Object.entries(projectsConfig.projects || {})) {
@@ -6393,9 +6439,8 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
             }
 
             if (customRemoveCmd) {
-              // Use custom remove command (e.g., MYN's remove-feature script)
-              // Extract the feature name from the id (e.g., min-665 -> min-665)
-              const featureName = id.toLowerCase();
+              // Use custom remove command (legacy)
+              const featureName = issueIdentifier.toLowerCase();
               await execAsync(`${customRemoveCmd} ${featureName}`, {
                 cwd: projectPath,
                 encoding: 'utf-8',
@@ -6403,10 +6448,13 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
               });
               workspaceDeleted = true;
             } else {
-              // Default: remove git worktree
-              await execAsync(`git worktree remove "${workspacePath}" --force`, {
+              // Use pan workspace destroy command (handles polyrepo, Docker cleanup, etc.)
+              const featureName = issueIdentifier.toLowerCase();
+              await execAsync(`pan workspace destroy ${featureName} --force`, {
                 cwd: projectPath,
                 encoding: 'utf-8',
+                timeout: 120000, // 2 minute timeout for Docker cleanup
+                maxBuffer: 10 * 1024 * 1024, // 10MB buffer for verbose Docker output
               });
               workspaceDeleted = true;
             }
