@@ -1000,8 +1000,25 @@ export async function wakeSpecialistOrQueue(
   }
 
   // Otherwise, wake the specialist directly
+  // PAN-88: Set state to 'active' IMMEDIATELY to prevent race conditions
+  // This must happen BEFORE the actual wake to block concurrent requests
+  const { saveAgentRuntimeState } = await import('../agents.js');
+  saveAgentRuntimeState(tmuxSession, {
+    state: 'active',
+    lastActivity: new Date().toISOString(),
+  });
+  console.log(`[specialist] ${name} marked active (preventing concurrent wakes)`);
+
   try {
     const wakeResult = await wakeSpecialistWithTask(name, task);
+
+    if (!wakeResult.success) {
+      // Wake failed - revert state to idle
+      saveAgentRuntimeState(tmuxSession, {
+        state: 'idle',
+        lastActivity: new Date().toISOString(),
+      });
+    }
 
     return {
       success: wakeResult.success,
@@ -1010,6 +1027,12 @@ export async function wakeSpecialistOrQueue(
       error: wakeResult.error,
     };
   } catch (error: unknown) {
+    // Exception - revert state to idle
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+
     const msg = error instanceof Error ? error.message : String(error);
     return {
       success: false,

@@ -4069,9 +4069,39 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     }
 
     // 3. Start the review pipeline (review-agent → test-agent)
-    const { wakeSpecialist } = await import('../../lib/cloister/specialists.js');
+    // PAN-88: Check if review-agent is busy BEFORE waking
+    const { wakeSpecialist, isRunning, getTmuxSessionName, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+    const { getAgentRuntimeState, saveAgentRuntimeState } = await import('../../lib/agents.js');
 
-    console.log(`[review] Starting review pipeline for ${issueId}...`);
+    const reviewSession = getTmuxSessionName('review-agent');
+    const reviewRunning = await isRunning('review-agent');
+    const reviewState = getAgentRuntimeState(reviewSession);
+    const reviewIdle = reviewState?.state === 'idle' || reviewState?.state === 'suspended' || !reviewRunning;
+
+    // If review-agent is busy, queue this task instead
+    if (!reviewIdle) {
+      console.log(`[review] review-agent busy, queuing ${issueId}`);
+      submitToSpecialistQueue('review-agent', {
+        priority: 'normal',
+        source: 'review-endpoint',
+        issueId,
+        workspace: workspacePath,
+        branch: branchName,
+      });
+      completePendingOperation(issueId, null);
+      return res.json({
+        success: true,
+        queued: true,
+        message: `Review queued for ${issueId} - review-agent is busy`,
+      });
+    }
+
+    // Set state to active IMMEDIATELY to prevent concurrent wakes (PAN-88)
+    saveAgentRuntimeState(reviewSession, {
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    });
+    console.log(`[review] Marked review-agent active, starting pipeline for ${issueId}...`);
 
     const reviewPrompt = `STRICT REVIEW for ${issueId}
 
