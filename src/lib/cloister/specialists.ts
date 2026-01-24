@@ -784,6 +784,13 @@ export async function wakeSpecialist(
     // Record wake event
     recordWake(name, sessionId || undefined);
 
+    // Set state to active immediately (PAN-80: spinner should show right away)
+    const { saveAgentRuntimeState } = await import('../agents.js');
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    });
+
     return {
       success: true,
       message: wasAlreadyRunning

@@ -2585,6 +2585,16 @@ app.post('/api/specialists/:name/report-status', async (req, res) => {
 
     console.log(`[specialists] ${name} reported status for ${issueId}: ${status}`);
 
+    // When specialist reports completion (passed/blocked/failed), set state to idle
+    if (['passed', 'blocked', 'failed'].includes(status)) {
+      const { getTmuxSessionName } = await import('../../lib/cloister/specialists.js');
+      const tmuxSession = getTmuxSessionName(name as any);
+      saveAgentRuntimeState(tmuxSession, {
+        state: 'idle',
+        lastActivity: new Date().toISOString(),
+      });
+    }
+
     res.json({ success: true });
   } catch (error: unknown) {
     console.error('Error saving specialist status:', error);
