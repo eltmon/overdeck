@@ -1242,6 +1242,41 @@ pan restore           # Restore from backup
 pan setup hooks       # Install Claude Code hooks (heartbeat, etc.)
 ```
 
+### Beads Management
+
+Beads is an optional git-backed issue tracker for persistent task tracking. Panopticon includes commands to manage beads databases and automatic cleanup after merges.
+
+```bash
+# Show beads statistics (total, open, closed, old)
+pan beads stats
+
+# Compact beads - remove closed issues older than 30 days
+pan beads compact
+
+# Customize the threshold (e.g., 60 days)
+pan beads compact --days 60
+
+# Preview what would be removed (dry run)
+pan beads compact --dry-run
+```
+
+**Automatic Compaction:**
+
+After every successful merge, the merge-agent automatically:
+1. Checks for closed beads older than 30 days
+2. If found, runs `bd admin compact --days 30`
+3. Commits the compacted beads
+4. Pushes to remote
+
+This keeps the beads database clean without manual intervention.
+
+**Why compact beads?**
+
+Beads are committed to git for collaborative planning (see "Git-Backed Collaborative Planning" section). Over time, closed issues accumulate. Compaction removes old closed issues while preserving:
+- Open issues (always kept)
+- Recently closed issues (< 30 days by default)
+- All issue history in git commits
+
 #### What `pan sync` Does
 
 `pan sync` synchronizes Panopticon assets to all supported AI tools:

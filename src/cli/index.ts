@@ -17,6 +17,7 @@ import { projectAddCommand, projectListCommand, projectRemoveCommand, projectIni
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
 import { registerDbCommands } from './commands/db.js';
+import { registerBeadsCommands } from './commands/beads.js';
 
 const program = new Command();
 
@@ -87,6 +88,9 @@ registerInstallCommand(program);
 
 // Register db commands (pan db snapshot, pan db seed, etc.)
 registerDbCommands(program);
+
+// Register beads commands (pan beads compact, pan beads stats)
+registerBeadsCommands(program);
 
 // Shorthand: pan status = pan work status
 program

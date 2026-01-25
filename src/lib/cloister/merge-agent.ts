@@ -135,6 +135,72 @@ function detectTestCommand(projectPath: string): string {
 }
 
 /**
+ * Conditionally compact beads if there are old closed issues
+ * Runs as a background task to avoid blocking merge completion
+ */
+async function conditionalBeadsCompaction(projectPath: string): Promise<void> {
+  console.log(`[merge-agent] Checking if beads compaction is needed...`);
+
+  try {
+    // Check if bd is available
+    try {
+      await execAsync('which bd', { encoding: 'utf-8' });
+    } catch {
+      console.log(`[merge-agent] bd not available, skipping compaction`);
+      return;
+    }
+
+    // Check if .beads exists
+    const beadsDir = join(projectPath, '.beads');
+    if (!existsSync(beadsDir)) {
+      console.log(`[merge-agent] No .beads directory, skipping compaction`);
+      return;
+    }
+
+    // Check for closed issues older than 30 days
+    const { stdout: oldClosedCount } = await execAsync(
+      `bd list --status closed --json 2>/dev/null | jq '[.[] | select(.closed_at != null) | select((now - (.closed_at | fromdateiso8601)) > (30 * 24 * 60 * 60))] | length' 2>/dev/null || echo "0"`,
+      { cwd: projectPath, encoding: 'utf-8' }
+    );
+
+    const count = parseInt(oldClosedCount.trim(), 10) || 0;
+    if (count === 0) {
+      console.log(`[merge-agent] No old closed beads to compact`);
+      return;
+    }
+
+    console.log(`[merge-agent] Found ${count} closed beads older than 30 days, running compaction...`);
+    logActivity('beads_compaction_start', `Compacting ${count} old closed beads`);
+
+    // Run compaction
+    await execAsync(`bd admin compact --days 30`, { cwd: projectPath, encoding: 'utf-8' });
+
+    // Commit the compacted beads
+    await execAsync(`git add .beads/`, { cwd: projectPath, encoding: 'utf-8' });
+
+    // Check if there are changes to commit
+    try {
+      await execAsync(`git diff --cached --quiet`, { cwd: projectPath, encoding: 'utf-8' });
+      // No changes
+      console.log(`[merge-agent] Compaction complete, no changes to commit`);
+    } catch {
+      // There are changes, commit them
+      await execAsync(
+        `git commit -m "chore: compact beads (remove closed issues > 30 days)"`,
+        { cwd: projectPath, encoding: 'utf-8' }
+      );
+      await execAsync(`git push`, { cwd: projectPath, encoding: 'utf-8' });
+      console.log(`[merge-agent] ✓ Beads compacted and committed`);
+      logActivity('beads_compaction_complete', `Compacted and committed beads cleanup`);
+    }
+  } catch (err: any) {
+    // Non-fatal - log and continue
+    console.warn(`[merge-agent] Beads compaction failed: ${err.message}`);
+    logActivity('beads_compaction_error', `Compaction failed: ${err.message}`);
+  }
+}
+
+/**
  * Post-merge cleanup: move PRD to completed, update issue status
  */
 async function postMergeCleanup(issueId: string, projectPath: string): Promise<void> {
@@ -192,6 +258,9 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
       console.warn(`[merge-agent] Could not update Linear issue: ${err}`);
     }
   }
+
+  // 3. Conditionally compact old beads (non-blocking cleanup)
+  await conditionalBeadsCompaction(projectPath);
 
   console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}`);
 }
