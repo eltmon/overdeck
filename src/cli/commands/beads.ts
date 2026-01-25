@@ -255,100 +255,92 @@ export function registerBeadsCommands(program: Command): void {
  * Upgrade beads CLI to latest version
  */
 async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
-  const spinner = ora('Checking beads version...').start();
+  console.log(chalk.dim('Checking beads version...'));
+
+  // Get current version
+  let currentVersion = 'not installed';
+  try {
+    const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
+    const match = stdout.match(/(\d+\.\d+\.\d+)/);
+    if (match) {
+      currentVersion = match[1];
+    }
+  } catch {}
+
+  // Get latest version from GitHub
+  let latestVersion = 'unknown';
+  try {
+    const { stdout } = await execAsync(
+      'curl -sL https://api.github.com/repos/steveyegge/beads/releases/latest | jq -r .tag_name',
+      { encoding: 'utf-8' }
+    );
+    latestVersion = stdout.trim().replace(/^v/, '');
+  } catch {}
+
+  console.log('');
+  console.log(chalk.bold('Beads CLI Version'));
+  console.log('');
+  console.log(`  Current: ${currentVersion === 'not installed' ? chalk.red(currentVersion) : chalk.cyan(currentVersion)}`);
+  console.log(`  Latest:  ${chalk.green(latestVersion)}`);
+  console.log('');
+
+  if (currentVersion === latestVersion) {
+    console.log(chalk.green('✓ Already on latest version'));
+    return;
+  }
+
+  if (checkOnly) {
+    if (currentVersion !== latestVersion && currentVersion !== 'not installed') {
+      console.log(chalk.yellow(`Update available: ${currentVersion} → ${latestVersion}`));
+      console.log(chalk.dim(`Run 'pan beads upgrade' to install`));
+    }
+    return;
+  }
+
+  // Perform upgrade
+  const spinner = ora('Upgrading beads...').start();
+  const plat = detectPlatform();
 
   try {
-    // Get current version
-    let currentVersion = 'not installed';
-    try {
-      const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
-      const match = stdout.match(/(\d+\.\d+\.\d+)/);
-      if (match) {
-        currentVersion = match[1];
-      }
-    } catch {}
-
-    // Get latest version from GitHub
-    let latestVersion = 'unknown';
-    try {
-      const { stdout } = await execAsync(
-        'curl -sL https://api.github.com/repos/steveyegge/beads/releases/latest | jq -r .tag_name',
-        { encoding: 'utf-8' }
-      );
-      latestVersion = stdout.trim().replace(/^v/, '');
-    } catch {}
-
-    spinner.stop();
-
-    console.log('');
-    console.log(chalk.bold('Beads CLI Version'));
-    console.log('');
-    console.log(`  Current: ${currentVersion === 'not installed' ? chalk.red(currentVersion) : chalk.cyan(currentVersion)}`);
-    console.log(`  Latest:  ${chalk.green(latestVersion)}`);
-    console.log('');
-
-    if (currentVersion === latestVersion) {
-      console.log(chalk.green('✓ Already on latest version'));
-      return;
-    }
-
-    if (checkOnly) {
-      if (currentVersion !== latestVersion && currentVersion !== 'not installed') {
-        console.log(chalk.yellow(`Update available: ${currentVersion} → ${latestVersion}`));
-        console.log(chalk.dim(`Run 'pan beads upgrade' to install`));
-      }
-      return;
-    }
-
-    // Perform upgrade
-    spinner.start('Upgrading beads...');
-    const plat = detectPlatform();
-
-    try {
-      if (plat === 'darwin') {
-        // macOS - try homebrew upgrade
-        try {
-          execSync('brew upgrade steveyegge/beads/bd 2>/dev/null || brew install steveyegge/beads/bd', {
-            stdio: 'pipe',
-            timeout: 120000,
-          });
-          spinner.succeed('beads upgraded via Homebrew');
-        } catch {
-          // Fall back to install script
-          execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
-            stdio: 'pipe',
-            timeout: 120000,
-          });
-          spinner.succeed('beads upgraded via install script');
-        }
-      } else {
-        // Linux/WSL - use install script
+    if (plat === 'darwin') {
+      // macOS - try homebrew upgrade
+      try {
+        execSync('brew upgrade steveyegge/beads/bd 2>/dev/null || brew install steveyegge/beads/bd', {
+          stdio: 'pipe',
+          timeout: 120000,
+        });
+        spinner.succeed('beads upgraded via Homebrew');
+      } catch {
+        // Fall back to install script
         execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
           stdio: 'pipe',
           timeout: 120000,
         });
         spinner.succeed('beads upgraded via install script');
       }
-
-      // Verify new version
-      try {
-        const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
-        const match = stdout.match(/(\d+\.\d+\.\d+)/);
-        if (match) {
-          console.log(chalk.green(`\n✓ Now running beads v${match[1]}`));
-        }
-      } catch {}
-    } catch (error: any) {
-      spinner.fail('Upgrade failed');
-      console.error(chalk.red(error.message));
-      console.log('');
-      console.log(chalk.dim('Manual upgrade:'));
-      console.log(chalk.dim('  curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash'));
-      process.exit(1);
+    } else {
+      // Linux/WSL - use install script
+      execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
+        stdio: 'pipe',
+        timeout: 120000,
+      });
+      spinner.succeed('beads upgraded via install script');
     }
+
+    // Verify new version
+    try {
+      const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
+      const match = stdout.match(/(\d+\.\d+\.\d+)/);
+      if (match) {
+        console.log(chalk.green(`\n✓ Now running beads v${match[1]}`));
+      }
+    } catch {}
   } catch (error: any) {
-    spinner.fail('Version check failed');
+    spinner.fail('Upgrade failed');
     console.error(chalk.red(error.message));
+    console.log('');
+    console.log(chalk.dim('Manual upgrade:'));
+    console.log(chalk.dim('  curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash'));
     process.exit(1);
   }
 }
