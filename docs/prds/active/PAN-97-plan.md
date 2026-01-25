@@ -1,39 +1,6 @@
 # PAN-97: Convoy Runtime for Multi-Agent Orchestration
 
-## Status: IMPLEMENTATION IN PROGRESS
-
-**Current Phase**: Phase 2 - CLI Commands
-
-### Completed Work
-- ✅ Phase 1: Core convoy runtime (`src/lib/convoy.ts`)
-  - Full state management with file-based persistence
-  - Agent spawning in tmux sessions
-  - Phase execution orchestration with dependency management
-  - Background monitoring for phase transitions
-  - Agent template parsing with frontmatter support
-
-- ✅ Phase 2: CLI commands (`src/cli/commands/convoy/`)
-  - start.ts, status.ts, list.ts, stop.ts
-  - Registered in main CLI
-  - Full options support
-
-- ✅ Phase 3: Review pipeline replacement
-  - Updated review-agent.ts to use convoy system
-  - Removed invalid Task() references from prompts
-  - Review now uses parallel convoy agents
-
-- ✅ Phase 5: Skills updates
-  - Updated pan-code-review to use convoy commands
-  - Updated pan-convoy-synthesis with automatic behavior
-
-- ✅ Phase 6: README documentation
-  - Comprehensive convoy section added
-  - Explains why convoys, how they work, synthesis process
-  - Full command reference and custom template examples
-
-### Remaining (Deferred)
-- Phase 4: Dashboard integration (complex - deferred)
-- Tests for convoy runtime (medium - deferred)
+## Status: PLANNING COMPLETE
 
 ---
 
