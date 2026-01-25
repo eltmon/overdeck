@@ -14,10 +14,18 @@ export interface SpecialistAgent {
   state: 'sleeping' | 'active' | 'uninitialized' | 'suspended';
   isRunning: boolean;
   tmuxSession: string;
+  currentIssue?: string; // Issue ID currently being worked on
+}
+
+export interface IssueInfo {
+  id: string;
+  identifier: string;
+  title: string;
 }
 
 interface SpecialistAgentCardProps {
   specialist: SpecialistAgent;
+  issueInfo?: IssueInfo; // Info about the current issue being worked on
   onSelect?: () => void;
   isSelected?: boolean;
 }
@@ -232,6 +240,7 @@ function formatLastWake(timestamp: string | undefined): string {
 
 export function SpecialistAgentCard({
   specialist,
+  issueInfo,
   onSelect,
   isSelected,
 }: SpecialistAgentCardProps) {
@@ -404,7 +413,19 @@ export function SpecialistAgentCard({
               )}
             </div>
             <div className="text-sm text-gray-400">{specialist.description}</div>
-            {specialist.sessionId && (
+            {/* Show current issue being worked on */}
+            {specialist.currentIssue && (
+              <div className="text-xs text-cyan-400 mt-1 flex items-center gap-1">
+                <span className="text-gray-500">Working on:</span>
+                <span className="font-mono">{specialist.currentIssue}</span>
+                {issueInfo && (
+                  <span className="text-gray-400 truncate max-w-[200px]" title={issueInfo.title}>
+                    - {issueInfo.title}
+                  </span>
+                )}
+              </div>
+            )}
+            {specialist.sessionId && !specialist.currentIssue && (
               <div className="text-xs text-gray-500 font-mono mt-1">
                 Session: {specialist.sessionId.slice(0, 8)}...
               </div>
