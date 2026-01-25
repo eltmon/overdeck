@@ -15,6 +15,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
+import { checkAgentHealthAsync, determineHealthStatusAsync } from '../lib/health-filtering.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
@@ -2035,61 +2036,6 @@ app.post('/api/agents/:id/resume', async (req, res) => {
   }
 });
 
-// Check if a tmux session is alive and active (ASYNC - doesn't block event loop)
-async function checkAgentHealthAsync(agentId: string): Promise<{
-  alive: boolean;
-  lastOutput?: string;
-  outputAge?: number;
-}> {
-  try {
-    // Check if session exists
-    await execAsync(`tmux has-session -t "${agentId}" 2>/dev/null`);
-
-    // Get recent output to check if active
-    const { stdout } = await execAsync(
-      `tmux capture-pane -t "${agentId}" -p -S -5 2>/dev/null`,
-      { maxBuffer: 1024 * 1024 }
-    );
-
-    return { alive: true, lastOutput: stdout.trim() };
-  } catch {
-    return { alive: false };
-  }
-}
-
-// Determine health status based on activity (ASYNC)
-async function determineHealthStatusAsync(
-  agentId: string,
-  stateFile: string
-): Promise<{ status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string }> {
-  const health = await checkAgentHealthAsync(agentId);
-
-  if (!health.alive) {
-    return { status: 'dead', reason: 'Session not found' };
-  }
-
-  // Check if there's been recent output
-  if (existsSync(stateFile)) {
-    try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-      const lastActivity = state.lastActivity ? new Date(state.lastActivity) : null;
-
-      if (lastActivity) {
-        const ageMs = Date.now() - lastActivity.getTime();
-        const ageMinutes = ageMs / (1000 * 60);
-
-        if (ageMinutes > 30) {
-          return { status: 'stuck', reason: `No activity for ${Math.round(ageMinutes)} minutes` };
-        } else if (ageMinutes > 15) {
-          return { status: 'warning', reason: `Low activity (${Math.round(ageMinutes)} minutes)` };
-        }
-      }
-    } catch {}
-  }
-
-  return { status: 'healthy' };
-}
-
 // Get agent health status (ASYNC - doesn't block event loop)
 app.get('/api/health/agents', async (_req, res) => {
   try {
@@ -2098,7 +2044,9 @@ app.get('/api/health/agents', async (_req, res) => {
       return res.json([]);
     }
 
-    const agentNames = readdirSync(agentsDir).filter((name) => name.startsWith('agent-'));
+    const agentNames = readdirSync(agentsDir).filter((name) =>
+      name.startsWith('agent-') || name.startsWith('planning-')
+    );
 
     // Process agents in parallel to avoid blocking
     const agents = await Promise.all(
@@ -2118,12 +2066,17 @@ app.get('/api/health/agents', async (_req, res) => {
         }
 
         // Check live status (ASYNC)
-        const { status, reason } = await determineHealthStatusAsync(name, stateFile);
+        const healthStatus = await determineHealthStatusAsync(name, stateFile);
+
+        // Filter out agents that should be hidden (completed/stopped)
+        if (!healthStatus) {
+          return null;
+        }
 
         return {
           agentId: name,
-          status,
-          reason,
+          status: healthStatus.status,
+          reason: healthStatus.reason,
           lastPing: new Date().toISOString(),
           consecutiveFailures: storedHealth.consecutiveFailures,
           killCount: storedHealth.killCount,
@@ -2131,7 +2084,10 @@ app.get('/api/health/agents', async (_req, res) => {
       })
     );
 
-    res.json(agents);
+    // Filter out null results (hidden agents)
+    const visibleAgents = agents.filter((agent) => agent !== null);
+
+    res.json(visibleAgents);
   } catch (error) {
     console.error('Error fetching health:', error);
     res.json([]);
