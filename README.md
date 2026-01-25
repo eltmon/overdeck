@@ -1083,7 +1083,50 @@ Panopticon creates workspaces as git worktrees. Docker, HTTPS, and seeding are o
 
 ## Polyrepo Workspace Configuration
 
-For projects with multiple git repositories (like separate frontend/backend repos), configure workspace settings directly in `projects.yaml`:
+For projects with multiple git repositories (like separate frontend/backend repos), configure workspace settings directly in `projects.yaml`.
+
+### Recommended: Separate Infra Repository
+
+For polyrepo projects, we strongly recommend maintaining a **dedicated infrastructure repository** alongside your code repos:
+
+```
+myproject/
+├── infra/                    # Infrastructure repo (git)
+│   ├── .devcontainer-template/   # Templates for workspace creation
+│   │   ├── dev.template          # Dev script template
+│   │   ├── compose.infra.yml.template
+│   │   └── docker-compose.devcontainer.yml.template
+│   ├── new-feature              # Script to create workspaces
+│   ├── remove-feature           # Script to clean up workspaces
+│   ├── certs/                   # SSL certificates
+│   └── traefik/                 # Traefik config
+├── frontend/                 # Frontend repo (git)
+├── backend/                  # Backend repo (git)
+└── workspaces/               # Feature workspaces (git worktrees)
+    └── feature-xxx/
+        ├── fe/               # Worktree of frontend
+        ├── api/              # Worktree of backend
+        └── .devcontainer/    # Generated from templates
+```
+
+**Benefits of a separate infra repo:**
+
+1. **Version-controlled templates** - Dev script changes are tracked and shared
+2. **Centralized configuration** - DNS, ports, Traefik rules in one place
+3. **Workspace consistency** - All workspaces use the same templates
+4. **Team collaboration** - Infra changes go through normal PR review
+5. **Easy updates** - Fix a template once, regenerate affected workspaces
+
+**Key files in the infra repo:**
+
+| File | Purpose |
+|------|---------|
+| `dev.template` | Template for `./dev` script (container management) |
+| `new-feature` | Creates workspace with git worktrees + devcontainer |
+| `remove-feature` | Cleans up workspace and worktrees |
+| `.devcontainer-template/` | Docker Compose and devcontainer templates |
+
+
 
 ```yaml
 projects:
