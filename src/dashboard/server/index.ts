@@ -631,12 +631,15 @@ interface PendingQuestion {
  * Scan a JSONL file for pending (unanswered) AskUserQuestion tool calls
  * A question is pending if there's a tool_use with name='AskUserQuestion'
  * but no corresponding tool_result with matching tool_use_id
+ *
+ * NOTE: Uses async file reading to avoid blocking the event loop on large JSONL files
  */
-function getPendingQuestions(jsonlPath: string): PendingQuestion[] {
+async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
   if (!existsSync(jsonlPath)) return [];
 
   try {
-    const content = readFileSync(jsonlPath, 'utf-8');
+    // Use async readFile to avoid blocking on large JSONL files
+    const content = await readFile(jsonlPath, 'utf-8');
     const lines = content.split('\n').filter(line => line.trim());
 
     // Track tool calls and which ones have been answered
@@ -680,7 +683,7 @@ function getPendingQuestions(jsonlPath: string): PendingQuestion[] {
 /**
  * Get pending questions for an agent by ID
  */
-function getAgentPendingQuestions(agentId: string): PendingQuestion[] {
+async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
   const jsonlPath = getAgentJsonlPath(agentId);
   if (!jsonlPath) return [];
   return getPendingQuestions(jsonlPath);
@@ -1683,6 +1686,9 @@ app.get('/api/agents', async (_req, res) => {
           ? name.replace('planning-', '').toUpperCase()
           : name.replace('agent-', '').toUpperCase();
 
+        // Check for pending AskUserQuestion (agent waiting for user input)
+        const pendingQuestions = await getAgentPendingQuestions(name);
+
         return {
           id: name,
           issueId,
@@ -1695,6 +1701,8 @@ app.get('/api/agents', async (_req, res) => {
           workspace: state.workspace || null,
           git: gitStatus,
           type: isPlanning ? 'planning' : 'agent',
+          hasPendingQuestion: pendingQuestions.length > 0,
+          pendingQuestionCount: pendingQuestions.length,
         };
       })
     );
@@ -1815,7 +1823,7 @@ app.post('/api/agents/:id/poke', async (req, res) => {
     // Send message via tmux (two separate commands: text then Enter)
     const escapedMsg = pokeMsg.replace(/"/g, '\\"').replace(/'/g, "\\'");
     await execAsync(`tmux send-keys -t "${id}" "${escapedMsg}"`);
-    await execAsync(`tmux send-keys -t "${id}" Enter`);
+    await execAsync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
 
     res.json({ success: true, message: 'Agent poked successfully' });
   } catch (error) {
@@ -1829,11 +1837,11 @@ app.post('/api/agents/:id/poke', async (req, res) => {
 // ============================================================================
 
 // Get pending questions for an agent (polls JSONL for unanswered AskUserQuestion calls)
-app.get('/api/agents/:id/pending-questions', (req, res) => {
+app.get('/api/agents/:id/pending-questions', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const questions = getAgentPendingQuestions(id);
+    const questions = await getAgentPendingQuestions(id);
     res.json({
       pending: questions.length > 0,
       questions
@@ -1856,7 +1864,7 @@ app.post('/api/agents/:id/answer-question', async (req, res) => {
 
   try {
     // Get the pending questions to map labels to option indices
-    const pendingQuestions = getAgentPendingQuestions(id);
+    const pendingQuestions = await getAgentPendingQuestions(id);
     if (pendingQuestions.length === 0) {
       return res.status(400).json({ error: 'No pending questions found' });
     }
@@ -2425,9 +2433,10 @@ app.post('/api/specialists/reset-all', async (_req, res) => {
       isRunning,
       getTmuxSessionName
     } = await import('../../lib/cloister/specialists.js');
+    const { clearHook } = await import('../../lib/hooks.js');
 
     const specialists = getAllSpecialists();
-    const results: { name: string; killed: boolean; sessionCleared: boolean }[] = [];
+    const results: { name: string; killed: boolean; sessionCleared: boolean; queueCleared: boolean }[] = [];
 
     for (const specialist of specialists) {
       const name = specialist.name;
@@ -2446,13 +2455,38 @@ app.post('/api/specialists/reset-all', async (_req, res) => {
 
       // Clear session file
       const sessionCleared = clearSessionId(name);
-      results.push({ name, killed, sessionCleared });
+
+      // Clear queue
+      clearHook(name);
+
+      results.push({ name, killed, sessionCleared, queueCleared: true });
+    }
+
+    // Reset any "reviewing" statuses to "pending"
+    let reviewStatusesReset = 0;
+    if (existsSync(REVIEW_STATUS_FILE)) {
+      try {
+        const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+        for (const key of Object.keys(statuses)) {
+          if (statuses[key].reviewStatus === 'reviewing') {
+            statuses[key].reviewStatus = 'pending';
+            statuses[key].updatedAt = new Date().toISOString();
+            reviewStatusesReset++;
+          }
+        }
+        if (reviewStatusesReset > 0) {
+          writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2));
+        }
+      } catch (e) {
+        console.error('Failed to reset review statuses:', e);
+      }
     }
 
     res.json({
       success: true,
-      message: `Reset ${results.length} specialists`,
+      message: `Reset ${results.length} specialists, cleared queues, reset ${reviewStatusesReset} review statuses`,
       results,
+      reviewStatusesReset,
     });
   } catch (error: any) {
     console.error('Error resetting all specialists:', error);
@@ -2826,6 +2860,119 @@ app.put('/api/specialists/:name/queue/reorder', async (req, res) => {
   }
 });
 
+// Auto-complete: Hook-triggered specialist completion detection
+// Called by specialist-stop-hook when it detects completion patterns in terminal output
+app.post('/api/specialists/:name/auto-complete', async (req, res) => {
+  const { name } = req.params;
+  const { issueId, status } = req.body;
+
+  if (!issueId || !status) {
+    return res.status(400).json({ error: 'issueId and status required' });
+  }
+
+  console.log(`[specialists] Auto-detected completion for ${name}: ${issueId} -> ${status}`);
+
+  try {
+    const {
+      getTmuxSessionName,
+      completeSpecialistTask,
+      getNextSpecialistTask,
+      wakeSpecialistWithTask,
+      checkSpecialistQueue,
+      submitToSpecialistQueue,
+    } = await import('../../lib/cloister/specialists.js');
+
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
+
+    // Validate specialist name
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    if (!validNames.includes(name)) {
+      return res.status(400).json({ error: `Invalid specialist name: ${name}` });
+    }
+
+    const tmuxSession = getTmuxSessionName(name as SpecialistType);
+
+    // Set specialist to idle and clear currentIssue
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+      currentIssue: undefined,
+    });
+
+    // Update review/test status based on specialist type
+    if (name === 'review-agent') {
+      setReviewStatus(issueId, {
+        reviewStatus: status === 'passed' ? 'passed' : 'blocked',
+        reviewNotes: `Auto-detected: ${status}`,
+      });
+
+      // If passed, queue test-agent
+      if (status === 'passed') {
+        // Get workspace info from work agent state
+        const workAgentId = `agent-${issueId.toLowerCase()}`;
+        const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
+        let workspace: string | undefined;
+        let branch: string | undefined;
+
+        if (existsSync(workStateFile)) {
+          try {
+            const workState = JSON.parse(readFileSync(workStateFile, 'utf-8'));
+            workspace = workState.workspace;
+            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+          } catch {}
+        }
+
+        submitToSpecialistQueue('test-agent', {
+          priority: 'high',
+          source: 'review-agent-auto',
+          issueId,
+          workspace,
+          branch,
+        });
+        console.log(`[specialists] Queued test-agent for ${issueId} after review passed`);
+      }
+    } else if (name === 'test-agent') {
+      setReviewStatus(issueId, {
+        testStatus: status === 'passed' ? 'passed' : 'failed',
+        testNotes: `Auto-detected: ${status}`,
+      });
+    }
+
+    // Clear the current task from queue (if it matches)
+    const queueStatus = checkSpecialistQueue(name as SpecialistType);
+    for (const item of queueStatus.items) {
+      if (item.payload?.issueId?.toUpperCase() === issueId.toUpperCase()) {
+        completeSpecialistTask(name as SpecialistType, item.id);
+        console.log(`[specialists] Cleared ${issueId} from ${name} queue`);
+        break;
+      }
+    }
+
+    // Check for next queued task and wake if available
+    const nextTask = getNextSpecialistTask(name as SpecialistType);
+    if (nextTask) {
+      console.log(`[specialists] Waking ${name} for next task: ${nextTask.payload.issueId}`);
+      await wakeSpecialistWithTask(name as SpecialistType, {
+        issueId: nextTask.payload.issueId!,
+        workspace: nextTask.payload.context?.workspace,
+        branch: nextTask.payload.context?.branch,
+      });
+      completeSpecialistTask(name as SpecialistType, nextTask.id);
+    }
+
+    res.json({
+      success: true,
+      status,
+      issueId,
+      nextTaskQueued: !!nextTask,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error processing auto-complete for ${name}:`, error);
+    res.status(500).json({ error: msg });
+  }
+});
+
 // Get agent health (Cloister-based)
 app.get('/api/agents/:id/cloister-health', (req, res) => {
   try {
@@ -3137,15 +3284,20 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
   const containerMap: Record<string, string[]> = {
     'frontend': ['frontend', 'fe'],
     'api': ['api'],
+    'dev': ['dev'],
     'postgres': ['postgres'],
     'redis': ['redis'],
   };
 
   // Build all possible container patterns
+  // Project names are slugified (e.g., "Mind Your Now" -> "mind-your-now")
   const checks: Array<{ displayName: string; containerName: string }> = [];
   for (const [displayName, suffixes] of Object.entries(containerMap)) {
     for (const suffix of suffixes) {
       checks.push(
+        // New naming: ${projectName}-feature-${issueLower}-${suffix}-1
+        { displayName, containerName: `mind-your-now-feature-${issueLower}-${suffix}-1` },
+        // Legacy naming patterns
         { displayName, containerName: `myn-feature-${issueLower}-${suffix}-1` },
         { displayName, containerName: `feature-${issueLower}-${suffix}-1` },
         { displayName, containerName: `${issueLower}-${suffix}-1` },
@@ -3917,6 +4069,107 @@ app.post('/api/workspaces/:issueId/start', async (req, res) => {
   }
 });
 
+// Control individual container (start/stop/restart)
+app.post('/api/workspaces/:issueId/containers/:containerName/:action', async (req, res) => {
+  const { issueId, containerName, action } = req.params;
+
+  // Validate action
+  if (!['start', 'stop', 'restart'].includes(action)) {
+    return res.status(400).json({ error: 'Invalid action. Must be start, stop, or restart.' });
+  }
+
+  // Find workspace and compose file
+  const projectPaths = [
+    join(homedir(), 'projects/myn/workspaces', `feature-${issueId.toLowerCase()}`),
+    join(homedir(), 'projects/panopticon/workspaces', `feature-${issueId.toLowerCase()}`),
+  ];
+
+  let workspacePath: string | null = null;
+  let composeFile: string | null = null;
+
+  for (const path of projectPaths) {
+    if (existsSync(path)) {
+      workspacePath = path;
+      // Check for compose file in common locations
+      const composePaths = [
+        join(path, '.devcontainer/docker-compose.devcontainer.yml'),
+        join(path, 'docker-compose.yml'),
+        join(path, 'docker-compose.yaml'),
+      ];
+      for (const cp of composePaths) {
+        if (existsSync(cp)) {
+          composeFile = cp;
+          break;
+        }
+      }
+      break;
+    }
+  }
+
+  if (!workspacePath) {
+    return res.status(404).json({ error: `Workspace not found for ${issueId}` });
+  }
+
+  if (!composeFile) {
+    return res.status(404).json({ error: `No docker-compose file found in workspace` });
+  }
+
+  // Check Docker is running
+  try {
+    await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+  } catch {
+    return res.status(400).json({ error: 'Docker is not running. Start Docker Desktop first.' });
+  }
+
+  // Map display name to service name(s) - some services have aliases
+  const serviceMap: Record<string, string[]> = {
+    'frontend': ['fe', 'frontend'],
+    'api': ['api'],
+    'dev': ['dev'],
+    'postgres': ['postgres'],
+    'redis': ['redis'],
+    'fe': ['fe', 'frontend'],
+  };
+
+  const serviceNames = serviceMap[containerName.toLowerCase()] || [containerName.toLowerCase()];
+
+  try {
+    // Get the project name from compose
+    const { stdout: projectNameOut } = await execAsync(
+      `docker compose -f "${composeFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+      { encoding: 'utf-8' }
+    );
+    const projectName = projectNameOut.trim();
+
+    // Try each possible service name
+    let success = false;
+    let lastError = '';
+
+    for (const serviceName of serviceNames) {
+      try {
+        const cmd = `docker compose -f "${composeFile}" ${projectName ? `--project-name "${projectName}"` : ''} ${action} ${serviceName}`;
+        console.log(`[container-control] Running: ${cmd}`);
+        await execAsync(cmd, { encoding: 'utf-8', timeout: 30000 });
+        success = true;
+        console.log(`[container-control] Successfully ${action}ed ${serviceName} for ${issueId}`);
+        break;
+      } catch (err: any) {
+        lastError = err.message || String(err);
+        // Continue trying other service names
+      }
+    }
+
+    if (success) {
+      res.json({ success: true, message: `Container ${containerName} ${action}ed successfully` });
+    } else {
+      res.status(500).json({ error: `Failed to ${action} ${containerName}: ${lastError}` });
+    }
+  } catch (error: any) {
+    console.error(`Error ${action}ing container:`, error);
+    res.status(500).json({ error: `Failed to ${action} container: ${error.message}` });
+  }
+});
+
 // Get review status for a workspace
 app.get('/api/workspaces/:issueId/review-status', (req, res) => {
   const { issueId } = req.params;
@@ -4004,7 +4257,7 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     }
   }
 
-  if (testStatus && ['passed', 'failed'].includes(testStatus)) {
+  if (testStatus && ['passed', 'failed', 'skipped'].includes(testStatus)) {
     const tmuxSession = getTmuxSessionName('test-agent');
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
@@ -4304,7 +4557,7 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
 
   // Queue for review-agent (same logic as human-initiated review)
   try {
-    const { wakeSpecialistOrQueue } = await import('../../../lib/cloister/specialists.js');
+    const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
 
     const result = await wakeSpecialistOrQueue('review-agent', {
       issueId,
@@ -5037,8 +5290,10 @@ app.post('/api/agents', async (req, res) => {
         } catch (diffErr) {
           // There are changes, commit and push them
           await execAsync(`git commit -m "Planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' });
-          await execAsync(`git push`, { cwd: gitRoot, encoding: 'utf-8' });
-          console.log(`Committed and pushed planning artifacts for ${issueId}`);
+          // Push in background (non-blocking to avoid freezing dashboard)
+          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
+          pushChild.unref();
+          console.log(`[start-agent] Committed and pushed planning artifacts for ${issueId} (push in background)`);
         }
       } catch (gitErr) {
         console.error('Git commit/push of planning artifacts failed:', gitErr);
@@ -5370,7 +5625,7 @@ async function addGitHubPlanningLabel(owner: string, repo: string, number: numbe
 // Start planning for an issue - moves to "In Planning", creates workspace, spawns planning agent
 app.post('/api/issues/:id/start-planning', async (req, res) => {
   const { id } = req.params;
-  const { skipWorkspace = false } = req.body;
+  const { skipWorkspace = false, startDocker = false } = req.body;
 
   try {
     // Check if this is a GitHub issue
@@ -5548,25 +5803,36 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
 
     if (!skipWorkspace) {
       try {
-        if (!existsSync(workspacePath)) {
-          // Create workspace using pan workspace create (git worktree only, no docker)
+        // Check if workspace needs to be created
+        // A workspace with only .planning is incomplete (from a failed previous attempt)
+        const workspaceNeedsCreation = !existsSync(workspacePath) ||
+          (existsSync(workspacePath) && readdirSync(workspacePath).every(f => f === '.planning'));
+
+        if (workspaceNeedsCreation) {
+          // Create workspace using pan workspace create
+          const dockerFlag = startDocker ? ' --docker' : '';
+          const createCmd = `pan workspace create ${issue.identifier}${dockerFlag}`;
           const activityId = Date.now().toString();
           logActivity({
             id: activityId,
             timestamp: new Date().toISOString(),
-            command: `pan workspace create ${issue.identifier}`,
+            command: createCmd,
             status: 'running',
             output: [],
           });
 
-          // Run pan workspace create
-          await execAsync(`pan workspace create ${issue.identifier}`, {
+          // Run pan workspace create (may call custom workspace_command for complex projects)
+          // With --docker, containers start in background (up to 5 min timeout for builds)
+          await execAsync(createCmd, {
             cwd: projectPath,
             encoding: 'utf-8',
-            timeout: 60000,
+            timeout: startDocker ? 300000 : 120000, // 5 min with docker, 2 min without
           });
           workspaceCreated = true;
-          appendActivityOutput(activityId, 'Workspace created successfully');
+          const successMsg = startDocker
+            ? 'Workspace created, Docker containers starting in background'
+            : 'Workspace created successfully';
+          appendActivityOutput(activityId, successMsg);
         } else {
           workspaceCreated = true; // Already exists
         }
@@ -5643,10 +5909,33 @@ Use AskUserQuestion tool to ask contextual questions:
 - What does "done" look like?
 - Are there edge cases we need to handle?
 
+### Difficulty Estimation
+
+For each sub-task, estimate difficulty using this rubric:
+
+| Level | When to Use | Model |
+|-------|-------------|-------|
+| \`trivial\` | Typo, comment, formatting only | haiku |
+| \`simple\` | Bug fix, single file, obvious change | haiku |
+| \`medium\` | New feature, 3-5 files, standard patterns | sonnet |
+| \`complex\` | Refactor, migration, 6+ files, some risk | sonnet |
+| \`expert\` | Architecture, security, performance, high risk | opus |
+
+Consider these factors:
+- **Files to modify**: 1-2 (simple), 3-5 (medium), 6+ (complex/expert)
+- **Cross-cutting**: None (simple), Some (medium), Many (complex/expert)
+- **Risk level**: Low (simple), Medium (medium), High (expert)
+- **Domain knowledge**: Standard (simple), Research needed (medium), Deep expertise (expert)
+
+When creating beads tasks, include difficulty labels:
+\`\`\`bash
+bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -d "Description"
+\`\`\`
+
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
 1. Create STATE.md with decisions made
-2. Create beads tasks with dependencies using \`bd create\`
+2. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
 3. Summarize the plan and STOP
 
 **Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
@@ -5992,15 +6281,20 @@ async function removeGitHubPlanningLabel(owner: string, repo: string, number: nu
 app.post('/api/issues/:id/abort-planning', async (req, res) => {
   const { id } = req.params;
   const { deleteWorkspace } = req.body || {};
-  const sessionName = `planning-${id.toLowerCase()}`;
 
   try {
     // Check if this is a GitHub issue
     const githubCheck = isGitHubIssue(id);
 
     let revertedState = 'Todo';
+    let issueIdentifier: string | undefined; // e.g., "MIN-665"
+    let sessionName: string; // Will be set based on identifier
 
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+      // GitHub: set identifier from the ID (which is like "PAN-123")
+      issueIdentifier = id;
+      sessionName = `planning-${id.toLowerCase()}`;
+
       // GitHub: remove "planning" label
       try {
         await removeGitHubPlanningLabel(githubCheck.owner, githubCheck.repo, githubCheck.number);
@@ -6013,11 +6307,12 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
       // Linear: move back to Todo state
       const apiKey = getLinearApiKey();
       if (apiKey) {
-        // Fetch issue to get team
+        // Fetch issue to get team and identifier
         const issueQuery = `
           query GetIssue($id: String!) {
             issue(id: $id) {
               id
+              identifier
               team { id }
             }
           }
@@ -6035,6 +6330,10 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
         const issue = issueJson.data?.issue;
 
         if (issue) {
+          // Store the issue identifier for workspace deletion and session name
+          issueIdentifier = issue.identifier;
+          sessionName = `planning-${issue.identifier.toLowerCase()}`;
+
           // Find "Todo" state for this team
           const statesQuery = `
             query GetTeamStates($teamId: String!) {
@@ -6096,14 +6395,18 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
       }
     }
 
-    // Kill the tmux session
-    await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+    // Kill the tmux session (try both possible session names if needed)
+    if (sessionName) {
+      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+    }
+    // Also try with UUID-based session name (fallback)
+    await execAsync(`tmux kill-session -t planning-${id.toLowerCase()} 2>/dev/null || true`, { encoding: 'utf-8' });
 
     // Clean up agent state files to prevent stale "running" status
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    const agentStateDir = sessionName ? join(homedir(), '.panopticon', 'agents', sessionName) : null;
     const workAgentStateDir = join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
     try {
-      if (existsSync(agentStateDir)) {
+      if (agentStateDir && existsSync(agentStateDir)) {
         rmSync(agentStateDir, { recursive: true, force: true });
       }
       if (existsSync(workAgentStateDir)) {
@@ -6125,31 +6428,93 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
         if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
           const localPaths = getGitHubLocalPaths();
           projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
-        } else {
-          // For Linear issues, we need to find the project path
+        } else if (issueIdentifier) {
+          // For Linear issues, use the identifier to find the project path
           // Check project mappings
           const mappingsPath = join(homedir(), '.panopticon', 'project-mappings.json');
           if (existsSync(mappingsPath)) {
             const mappings = JSON.parse(readFileSync(mappingsPath, 'utf-8'));
             // Try to match by issue prefix (e.g., MIN-123 -> MIN)
-            const prefix = id.split('-')[0];
-            const mapping = mappings.find((m: any) => m.linearPrefix === prefix);
+            const prefix = issueIdentifier.split('-')[0];
+            const mapping = mappings.find((m: any) => m.linearPrefix?.toUpperCase() === prefix.toUpperCase());
             if (mapping) {
               projectPath = mapping.localPath;
             }
           }
+
+          // Also check projects.yaml
+          if (!projectPath) {
+            const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+            if (existsSync(projectsYamlPath)) {
+              try {
+                const yaml = await import('js-yaml');
+                const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
+                const prefix = issueIdentifier.split('-')[0].toUpperCase();
+
+                for (const [, config] of Object.entries(projectsConfig.projects || {})) {
+                  const projConfig = config as any;
+                  if (projConfig.linear_team?.toUpperCase() === prefix) {
+                    projectPath = projConfig.path;
+                    break;
+                  }
+                }
+              } catch {
+                // Ignore YAML errors
+              }
+            }
+          }
         }
 
-        if (projectPath) {
-          const workspacePath = join(projectPath, 'workspaces', id.toLowerCase());
+        if (projectPath && issueIdentifier) {
+          // Try both naming conventions: feature-{identifier} and just {identifier}
+          const featureWorkspacePath = join(projectPath, 'workspaces', `feature-${issueIdentifier.toLowerCase()}`);
+          const plainWorkspacePath = join(projectPath, 'workspaces', issueIdentifier.toLowerCase());
+          const workspacePath = existsSync(featureWorkspacePath) ? featureWorkspacePath : plainWorkspacePath;
 
           if (existsSync(workspacePath)) {
-            // Remove the git worktree
-            await execAsync(`git worktree remove "${workspacePath}" --force`, {
-              cwd: projectPath,
-              encoding: 'utf-8',
-            });
-            workspaceDeleted = true;
+            // Check for custom workspace_remove_command in projects.yaml
+            const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+            let customRemoveCmd: string | undefined;
+
+            if (existsSync(projectsYamlPath)) {
+              try {
+                const yaml = await import('js-yaml');
+                const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
+                const prefix = issueIdentifier.split('-')[0].toLowerCase();
+
+                // Find project by linear_team prefix
+                for (const [, config] of Object.entries(projectsConfig.projects || {})) {
+                  const projConfig = config as any;
+                  if (projConfig.linear_team?.toLowerCase() === prefix && projConfig.workspace_remove_command) {
+                    customRemoveCmd = projConfig.workspace_remove_command;
+                    break;
+                  }
+                }
+              } catch (yamlErr) {
+                console.log('Could not parse projects.yaml:', yamlErr);
+              }
+            }
+
+            if (customRemoveCmd) {
+              // Use custom remove command (legacy)
+              const featureName = issueIdentifier.toLowerCase();
+              await execAsync(`${customRemoveCmd} ${featureName}`, {
+                cwd: projectPath,
+                encoding: 'utf-8',
+                timeout: 60000, // 1 minute timeout
+              });
+              workspaceDeleted = true;
+            } else {
+              // Use pan workspace destroy command (handles polyrepo, Docker cleanup, etc.)
+              const featureName = issueIdentifier.toLowerCase();
+              await execAsync(`pan workspace destroy ${featureName} --force`, {
+                cwd: projectPath,
+                encoding: 'utf-8',
+                timeout: 120000, // 2 minute timeout for Docker cleanup
+                maxBuffer: 10 * 1024 * 1024, // 10MB buffer for verbose Docker output
+              });
+              workspaceDeleted = true;
+            }
           } else {
             workspaceError = 'Workspace not found';
           }
@@ -6255,9 +6620,12 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
             await execAsync(`git commit -m "Complete planning for ${id}"`, { cwd: gitRoot, encoding: 'utf-8' });
           }
 
-          // Push to remote
-          await execAsync(`git push`, { cwd: gitRoot, encoding: 'utf-8' });
+          // Push to remote (non-blocking to avoid freezing dashboard)
+          // Spawn in background - don't await
+          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
+          pushChild.unref();
           gitPushed = true;
+          console.log(`[complete-planning] Git push started in background for ${id}`);
         } catch (gitErr) {
           console.error('Git commit/push failed:', gitErr);
           // Continue even if git fails
@@ -6532,10 +6900,17 @@ const SESSION_MAP_FILE = join(homedir(), '.panopticon', 'session-map.json');
 const METRICS_FILE = join(homedir(), '.panopticon', 'runtime-metrics.json');
 
 // Model pricing data
-const MODEL_PRICING: Record<string, { inputPer1k: number; outputPer1k: number; cacheReadPer1k?: number; cacheWritePer1k?: number }> = {
-  'claude-opus-4': { inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.00175, cacheWritePer1k: 0.01875 },
-  'claude-sonnet-4': { inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWritePer1k: 0.00375 },
-  'claude-haiku-3.5': { inputPer1k: 0.0008, outputPer1k: 0.004, cacheReadPer1k: 0.00008, cacheWritePer1k: 0.001 },
+const MODEL_PRICING: Record<string, { inputPer1k: number; outputPer1k: number; cacheReadPer1k?: number; cacheWrite5mPer1k?: number; cacheWrite1hPer1k?: number }> = {
+  // 4.5 series
+  'claude-opus-4.5': { inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01 },
+  'claude-sonnet-4.5': { inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006 },
+  'claude-haiku-4.5': { inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.0001, cacheWrite5mPer1k: 0.00125, cacheWrite1hPer1k: 0.002 },
+  // 4.x series
+  'claude-opus-4-1': { inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03 },
+  'claude-opus-4': { inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03 },
+  'claude-sonnet-4': { inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006 },
+  // Legacy
+  'claude-haiku-3': { inputPer1k: 0.00025, outputPer1k: 0.00125, cacheReadPer1k: 0.00003, cacheWrite5mPer1k: 0.0003, cacheWrite1hPer1k: 0.0005 },
 };
 
 function readCostFiles(startDate: string, endDate: string): any[] {
@@ -6676,14 +7051,14 @@ async function parseWorkspaceSessionUsageAsync(workspacePath: string): Promise<{
     if (model.includes('opus')) {
       pricing = MODEL_PRICING['claude-opus-4'];
     } else if (model.includes('haiku')) {
-      pricing = MODEL_PRICING['claude-haiku-3.5'];
+      pricing = MODEL_PRICING['claude-haiku-4.5'];
     }
 
     const cost =
       (totalInputTokens / 1000) * pricing.inputPer1k +
       (totalOutputTokens / 1000) * pricing.outputPer1k +
       (totalCacheReadTokens / 1000) * (pricing.cacheReadPer1k || 0) +
-      (totalCacheWriteTokens / 1000) * (pricing.cacheWritePer1k || 0);
+      (totalCacheWriteTokens / 1000) * (pricing.cacheWrite5mPer1k || 0);  // Default to 5-minute TTL
 
     const tokenCount = totalInputTokens + totalOutputTokens + totalCacheReadTokens + totalCacheWriteTokens;
 

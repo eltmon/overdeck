@@ -16,6 +16,7 @@ const execAsync = promisify(exec);
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
+const TASKS_DIR = join(SPECIALISTS_DIR, 'tasks');
 
 /**
  * Supported specialist types
@@ -751,10 +752,15 @@ export async function wakeSpecialist(
       // Use Opus for merge-agent (complex conflict resolution), default for others
       const modelFlag = name === 'merge-agent' ? '--model opus' : '';
 
+      // merge-agent needs full bypass to handle git stash drop, reset, etc.
+      const permissionFlags = name === 'merge-agent'
+        ? '--dangerously-skip-permissions --permission-mode bypassPermissions'
+        : '--dangerously-skip-permissions';
+
       // Start with --resume if we have a session, otherwise fresh
       const claudeCmd = sessionId
-        ? `claude --resume "${sessionId}" ${modelFlag} --dangerously-skip-permissions`
-        : `claude ${modelFlag} --dangerously-skip-permissions`;
+        ? `claude --resume "${sessionId}" ${modelFlag} ${permissionFlags}`
+        : `claude ${modelFlag} ${permissionFlags}`;
 
       await execAsync(
         `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${claudeCmd}"`,
@@ -781,11 +787,32 @@ export async function wakeSpecialist(
 
   // Send the task prompt
   try {
-    const escapedPrompt = taskPrompt.replace(/'/g, "'\\''");
-    // Send text and Enter SEPARATELY (critical for tmux)
-    await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 200));
-    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    // For large prompts (>500 chars or multiline), write to file to avoid tmux paste issues
+    // Tmux send-keys with large text shows as "[Pasted text #1 +N lines]" which Claude doesn't process
+    const isLargePrompt = taskPrompt.length > 500 || taskPrompt.includes('\n');
+
+    if (isLargePrompt) {
+      // Ensure tasks directory exists
+      if (!existsSync(TASKS_DIR)) {
+        mkdirSync(TASKS_DIR, { recursive: true });
+      }
+
+      // Write task to file with timestamp
+      const taskFile = join(TASKS_DIR, `${name}-${Date.now()}.md`);
+      writeFileSync(taskFile, taskPrompt, 'utf-8');
+
+      // Send a short message pointing to the task file
+      const shortMessage = `Read and execute the task in: ${taskFile}`;
+      await execAsync(`tmux send-keys -t "${tmuxSession}" '${shortMessage}'`, { encoding: 'utf-8' });
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    } else {
+      // For short prompts, send directly via tmux
+      const escapedPrompt = taskPrompt.replace(/'/g, "'\\''");
+      await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    }
 
     // Record wake event
     recordWake(name, sessionId || undefined);

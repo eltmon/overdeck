@@ -1,0 +1,79 @@
+#!/bin/bash
+# notify-complete: Send desktop notification when agent completes work
+# Part of Panopticon - works on WSL2/Windows, Linux, and macOS
+#
+# Usage: notify-complete <issue-id> <title> [mr-url]
+#
+# Examples:
+#   notify-complete MIN-665 "Fixed login button"
+#   notify-complete PAN-96 "Implemented templates" "https://gitlab.com/mr/123"
+
+ISSUE_ID="${1:-UNKNOWN}"
+TITLE="${2:-Agent completed work}"
+MR_URL="${3:-}"
+
+# Log to completion file
+COMPLETION_LOG="$HOME/.panopticon/agent-completed.log"
+mkdir -p "$(dirname "$COMPLETION_LOG")"
+echo "$(date '+%Y-%m-%d %H:%M:%S') | ${ISSUE_ID} | ${TITLE} | ${MR_URL}" >> "$COMPLETION_LOG"
+
+# Detect platform and send notification
+send_notification() {
+  local title="$1"
+  local message="$2"
+
+  # WSL2/Windows - use PowerShell toast notifications
+  if command -v powershell.exe &>/dev/null; then
+    powershell.exe -Command "
+\$xml = @\"
+<toast>
+  <visual>
+    <binding template=\"ToastText02\">
+      <text id=\"1\">${title}</text>
+      <text id=\"2\">${message}</text>
+    </binding>
+  </visual>
+  <audio src=\"ms-winsoundevent:Notification.Default\"/>
+</toast>
+\"@
+
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+
+\$template = New-Object Windows.Data.Xml.Dom.XmlDocument
+\$template.LoadXml(\$xml)
+\$toast = New-Object Windows.UI.Notifications.ToastNotification \$template
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Panopticon').Show(\$toast)
+" 2>/dev/null && return 0
+
+    # Fallback: MessageBox
+    powershell.exe -Command "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms'); [System.Windows.Forms.MessageBox]::Show('${message}', '${title}', 'OK', 'Information')" 2>/dev/null &
+    return 0
+  fi
+
+  # macOS - use osascript
+  if command -v osascript &>/dev/null; then
+    osascript -e "display notification \"${message}\" with title \"${title}\"" 2>/dev/null
+    return 0
+  fi
+
+  # Linux - use notify-send
+  if command -v notify-send &>/dev/null; then
+    notify-send "${title}" "${message}" 2>/dev/null
+    return 0
+  fi
+
+  # Fallback - just print to console
+  echo "[NOTIFICATION] ${title}: ${message}"
+}
+
+# Build notification message
+if [ -n "$MR_URL" ]; then
+  MESSAGE="${TITLE} - Ready for review"
+else
+  MESSAGE="${TITLE} - Work complete"
+fi
+
+send_notification "Panopticon: ${ISSUE_ID}" "$MESSAGE"
+
+echo "Notification sent for ${ISSUE_ID}"

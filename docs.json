@@ -1,0 +1,24 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Panopticon",
+  "theme": "maple",
+  "colors": {
+    "primary": "#D4A27F",
+    "light": "#E5C4A8",
+    "dark": "#B8886A"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["introduction"]
+          }
+        ]
+      }
+    ]
+  }
+}

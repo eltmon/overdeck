@@ -607,7 +607,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     // Handle stuck specialists
     if (result.shouldForceKill) {
       console.log(`[deacon] ${specialist.name} stuck (${result.consecutiveFailures} failures), force-killing`);
-      const killResult = forceKillSpecialist(specialist.name);
+      const killResult = await forceKillSpecialist(specialist.name);
       actions.push(`Force-killed ${specialist.name}: ${killResult.message}`);
 
       // Auto-restart if specialist was initialized

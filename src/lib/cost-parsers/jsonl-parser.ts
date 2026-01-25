@@ -118,14 +118,31 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     let normalizedModel = model;
 
     // Map full model IDs to pricing model names
+    // Order matters - check more specific patterns first
+
+    // Opus models
     if (model.includes('opus-4-5') || model.includes('opus-4.5')) {
-      normalizedModel = 'claude-opus-4';
+      normalizedModel = 'claude-opus-4.5';
+    } else if (model.includes('opus-4-1') || model.includes('opus-4.1')) {
+      normalizedModel = 'claude-opus-4-1';
     } else if (model.includes('opus-4') || model.includes('opus')) {
       normalizedModel = 'claude-opus-4';
+    }
+
+    // Sonnet models
+    if (model.includes('sonnet-4-5') || model.includes('sonnet-4.5')) {
+      normalizedModel = 'claude-sonnet-4.5';
     } else if (model.includes('sonnet-4') || model.includes('sonnet')) {
       normalizedModel = 'claude-sonnet-4';
+    }
+
+    // Haiku models - default to 4.5 (current), support 3 for legacy
+    if (model.includes('haiku-4-5') || model.includes('haiku-4.5')) {
+      normalizedModel = 'claude-haiku-4.5';
+    } else if (model.includes('haiku-3')) {
+      normalizedModel = 'claude-haiku-3';
     } else if (model.includes('haiku')) {
-      normalizedModel = 'claude-haiku-3.5';
+      normalizedModel = 'claude-haiku-4.5';  // Default to current model
     }
 
     return { provider: 'anthropic', model: normalizedModel };

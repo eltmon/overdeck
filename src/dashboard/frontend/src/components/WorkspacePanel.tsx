@@ -157,6 +157,55 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
     },
   });
 
+  // Container context menu state
+  const [containerMenu, setContainerMenu] = useState<{
+    x: number;
+    y: number;
+    containerName: string;
+    isRunning: boolean;
+  } | null>(null);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => setContainerMenu(null);
+    if (containerMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [containerMenu]);
+
+  // Container control mutation
+  const containerControlMutation = useMutation({
+    mutationFn: async ({ containerName, action }: { containerName: string; action: 'start' | 'stop' | 'restart' }) => {
+      const res = await fetch(`/api/workspaces/${issueId}/containers/${containerName}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `Failed to ${action} container`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setContainerMenu(null);
+      // Refresh container status after a short delay
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      }, 2000);
+    },
+  });
+
+  const handleContainerContextMenu = (e: React.MouseEvent, containerName: string, isRunning: boolean) => {
+    e.preventDefault();
+    setContainerMenu({
+      x: e.clientX,
+      y: e.clientY,
+      containerName,
+      isRunning,
+    });
+  };
+
   const containerizeMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/containerize`, {
@@ -545,11 +594,11 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
           </div>
         )}
 
-        {/* Container Controls - Start containers button when not running */}
-        {workspace?.hasDocker && (!workspace.containers || !Object.values(workspace.containers).some(c => c.running)) && (
+        {/* Container Controls - Start containers button when ANY container is stopped */}
+        {workspace?.hasDocker && workspace.containers && Object.values(workspace.containers).some(c => !c.running) && (
           <div className="px-3 py-2 border-b border-gray-700">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-yellow-500">Containers not running</span>
+              <span className="text-xs text-yellow-500">Some containers stopped</span>
               <button
                 onClick={handleStartContainers}
                 disabled={startContainersMutation.isPending}
@@ -623,22 +672,28 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
         {/* Container Status - show when containers exist */}
         {workspace?.containers && Object.keys(workspace.containers).length > 0 && (
           <div className="px-3 py-2 border-b border-gray-700 text-xs">
-            <div className="text-gray-500 uppercase tracking-wider mb-2">Containers</div>
+            <div className="text-gray-500 uppercase tracking-wider mb-2">
+              Containers
+              <span className="text-gray-600 font-normal ml-2">(right-click for options)</span>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(workspace.containers).map(([name, status]) => {
                 const isStarting = startContainersMutation.isPending && !status.running;
+                const isControlling = containerControlMutation.isPending && containerMenu?.containerName === name;
                 return (
                   <span
                     key={name}
-                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
+                    onContextMenu={(e) => handleContainerContextMenu(e, name, status.running)}
+                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] cursor-context-menu select-none ${
                       status.running
-                        ? 'bg-green-900/30 text-green-400'
-                        : isStarting
+                        ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50'
+                        : isStarting || isControlling
                         ? 'bg-yellow-900/30 text-yellow-400 animate-pulse'
-                        : 'bg-gray-700 text-gray-500'
+                        : 'bg-gray-700 text-gray-500 hover:bg-gray-600'
                     }`}
+                    title="Right-click for start/stop/restart options"
                   >
-                    {isStarting ? (
+                    {isStarting || isControlling ? (
                       <Loader2 className="w-2.5 h-2.5 animate-spin" />
                     ) : name === 'postgres' || name === 'redis' ? (
                       <Database className="w-2.5 h-2.5" />
@@ -649,8 +704,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                     {status.running && status.uptime && (
                       <span className="text-gray-400 ml-1">{status.uptime}</span>
                     )}
-                    {isStarting && (
-                      <span className="text-yellow-500 ml-1">starting...</span>
+                    {(isStarting || isControlling) && (
+                      <span className="text-yellow-500 ml-1">...</span>
                     )}
                   </span>
                 );
@@ -955,6 +1010,55 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
         )}
       </div>
     </div>
+
+    {/* Container Context Menu */}
+    {containerMenu && (
+      <div
+        className="fixed z-50 bg-gray-800 border border-gray-600 rounded shadow-lg py-1 min-w-[140px]"
+        style={{ left: containerMenu.x, top: containerMenu.y }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-700 mb-1">
+          {containerMenu.containerName}
+        </div>
+        {containerMenu.isRunning ? (
+          <>
+            <button
+              onClick={() => containerControlMutation.mutate({ containerName: containerMenu.containerName, action: 'restart' })}
+              disabled={containerControlMutation.isPending}
+              className="w-full text-left px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Restart
+            </button>
+            <button
+              onClick={() => containerControlMutation.mutate({ containerName: containerMenu.containerName, action: 'stop' })}
+              disabled={containerControlMutation.isPending}
+              className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
+            >
+              <Square className="w-3 h-3" />
+              Stop
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => containerControlMutation.mutate({ containerName: containerMenu.containerName, action: 'start' })}
+            disabled={containerControlMutation.isPending}
+            className="w-full text-left px-3 py-1.5 text-xs text-green-400 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
+          >
+            <Play className="w-3 h-3" />
+            Start
+          </button>
+        )}
+        {containerControlMutation.isError && (
+          <div className="px-3 py-1 text-xs text-red-400 border-t border-gray-700 mt-1">
+            {containerControlMutation.error instanceof Error
+              ? containerControlMutation.error.message
+              : 'Action failed'}
+          </div>
+        )}
+      </div>
+    )}
     </>
   );
 }

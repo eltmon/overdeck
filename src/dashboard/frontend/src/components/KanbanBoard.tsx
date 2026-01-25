@@ -1,8 +1,28 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
+import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
+
+// Difficulty badge colors
+const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
+  trivial: 'bg-green-900/50 text-green-400',
+  simple: 'bg-green-900/50 text-green-400',
+  medium: 'bg-yellow-900/50 text-yellow-400',
+  complex: 'bg-orange-900/50 text-orange-400',
+  expert: 'bg-red-900/50 text-red-400',
+};
+
+// Difficulty badge component
+function DifficultyBadge({ level }: { level: ComplexityLevel }) {
+  const color = DIFFICULTY_COLORS[level];
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${color}`}>
+      {level}
+    </span>
+  );
+}
 
 // Cost data for an issue
 interface IssueCost {
@@ -686,6 +706,21 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
                 Ready
               </span>
             )}
+            {/* Awaiting Input badge - agent is waiting for user response */}
+            {agent?.hasPendingQuestion && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-white animate-pulse"
+                title={`Agent is waiting for user input (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
+              >
+                <HelpCircle className="w-3 h-3" />
+                Input
+              </span>
+            )}
+            {/* Difficulty badge */}
+            {(() => {
+              const difficulty = parseDifficultyLabel(issue.labels);
+              return difficulty ? <DifficultyBadge level={difficulty} /> : null;
+            })()}
             {/* Cost badge */}
             {cost && cost.totalCost > 0 && (
               <span

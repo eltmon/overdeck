@@ -10,7 +10,18 @@ import {
   resolveProjectFromIssue,
   hasProjects,
   PROJECTS_CONFIG_FILE,
+  findProjectByTeam,
+  extractTeamPrefix,
+  listProjects,
 } from '../../lib/projects.js';
+import {
+  createWorkspace as createWorkspaceFromConfig,
+  removeWorkspace as removeWorkspaceFromConfig,
+} from '../../lib/workspace-manager.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export function registerWorkspaceCommands(program: Command): void {
   const workspace = program.command('workspace').description('Workspace management');
@@ -22,6 +33,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--no-skills', 'Skip skills symlink setup')
     .option('--labels <labels>', 'Comma-separated labels for routing (e.g., docs,marketing)')
     .option('--project <path>', 'Explicit project path (overrides registry)')
+    .option('--docker', 'Start Docker containers after workspace creation')
     .action(createCommand);
 
   workspace
@@ -44,6 +56,7 @@ interface CreateOptions {
   skills?: boolean;
   labels?: string;
   project?: string;
+  docker?: boolean;
 }
 
 async function createCommand(issueId: string, options: CreateOptions): Promise<void> {
@@ -60,27 +73,132 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       ? options.labels.split(',').map((l) => l.trim())
       : [];
 
-    // Resolve project root - try registry first, fall back to cwd
+    // Try to find project config from registry
+    const teamPrefix = extractTeamPrefix(issueId);
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+    // Priority 1: Use workspace-manager if project has workspace config
+    if (projectConfig?.workspace) {
+      spinner.text = 'Creating workspace from config...';
+
+      const result = await createWorkspaceFromConfig({
+        projectConfig,
+        featureName: normalizedId,
+        startDocker: options.docker,
+        dryRun: options.dryRun,
+      });
+
+      if (options.dryRun) {
+        spinner.info('Dry run - no changes made');
+        console.log('');
+        for (const step of result.steps) {
+          console.log(chalk.dim(`  ${step}`));
+        }
+        return;
+      }
+
+      if (result.success) {
+        spinner.succeed('Workspace created!');
+        console.log('');
+        console.log(chalk.bold('Workspace Details:'));
+        console.log(`  Project: ${chalk.green(projectConfig.name)}`);
+        console.log(`  Path:    ${chalk.cyan(result.workspacePath)}`);
+        console.log(`  Branch:  ${chalk.dim(branchName)}`);
+        console.log('');
+
+        // Show steps
+        console.log(chalk.bold('Completed Steps:'));
+        for (const step of result.steps) {
+          console.log(`  ${chalk.green('✓')} ${step}`);
+        }
+
+        // Show services if configured
+        if (projectConfig.workspace.services && projectConfig.workspace.services.length > 0) {
+          console.log('');
+          console.log(chalk.bold('To start services:'));
+          const composeProject = `${basename(projectConfig.path)}-${folderName}`;
+          for (const service of projectConfig.workspace.services) {
+            const containerName = `${composeProject}-${service.name}-1`;
+            const cmd = service.docker_command || service.start_command;
+            console.log(`  ${chalk.cyan(service.name)}: docker exec -it ${containerName} ${cmd}`);
+          }
+        }
+
+        // Show URLs if DNS configured
+        if (projectConfig.workspace.dns) {
+          console.log('');
+          console.log(chalk.bold('URLs:'));
+          for (const entry of projectConfig.workspace.dns.entries) {
+            const url = entry
+              .replace('{{FEATURE_FOLDER}}', folderName)
+              .replace('{{DOMAIN}}', projectConfig.workspace.dns.domain);
+            console.log(`  https://${url}`);
+          }
+        }
+
+        if (result.errors.length > 0) {
+          console.log('');
+          console.log(chalk.yellow('Warnings:'));
+          for (const error of result.errors) {
+            console.log(`  ${chalk.yellow('⚠')} ${error}`);
+          }
+        }
+      } else {
+        spinner.fail('Workspace creation failed');
+        for (const error of result.errors) {
+          console.error(chalk.red(`  ${error}`));
+        }
+        process.exit(1);
+      }
+      return;
+    }
+
+    // Priority 2: Use custom workspace_command (legacy)
+    if (projectConfig?.workspace_command) {
+      spinner.text = 'Running custom workspace command...';
+
+      const dockerFlag = options.docker ? ' --docker' : '';
+      const cmd = `${projectConfig.workspace_command} ${normalizedId}${dockerFlag}`;
+      try {
+        const { stdout } = await execAsync(cmd, {
+          cwd: projectConfig.path,
+          encoding: 'utf-8',
+          timeout: options.docker ? 300000 : 120000,
+        });
+
+        if (stdout) {
+          console.log(stdout);
+        }
+
+        spinner.succeed('Workspace created via custom command!');
+        return;
+      } catch (error: any) {
+        spinner.fail(`Custom workspace command failed: ${error.message}`);
+        if (error.stderr) {
+          console.error(error.stderr);
+        }
+        process.exit(1);
+      }
+    }
+
+    // Priority 3: Simple git worktree creation (no config)
+    // Resolve project root
     let projectRoot: string;
     let projectName: string | undefined;
 
     if (options.project) {
-      // Explicit project path provided
       projectRoot = options.project;
     } else {
-      // Try to resolve from project registry
       const resolved = resolveProjectFromIssue(issueId, labels);
       if (resolved) {
         projectRoot = resolved.projectPath;
         projectName = resolved.projectName;
         spinner.text = `Resolved project: ${projectName} (${projectRoot})`;
       } else if (hasProjects()) {
-        // Registry exists but no match found - warn user
         spinner.warn(`No project found for ${issueId} in registry. Using current directory.`);
         spinner.start('Creating workspace...');
         projectRoot = process.cwd();
       } else {
-        // No registry - use cwd (backward compatible)
         projectRoot = process.cwd();
       }
     }
@@ -98,20 +216,14 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       console.log(`  Root:      ${chalk.dim(projectRoot)}`);
       console.log(`  Workspace: ${chalk.cyan(workspacePath)}`);
       console.log(`  Branch:    ${chalk.cyan(branchName)}`);
-      console.log(`  CLAUDE.md: ${chalk.dim(join(workspacePath, 'CLAUDE.md'))}`);
-      if (options.skills !== false) {
-        console.log(`  Skills:    ${chalk.dim(join(workspacePath, '.claude', 'skills'))}`);
-      }
       return;
     }
 
-    // Check if already exists
     if (existsSync(workspacePath)) {
       spinner.fail(`Workspace already exists: ${workspacePath}`);
       process.exit(1);
     }
 
-    // Check if we're in a git repo
     if (!existsSync(join(projectRoot, '.git'))) {
       spinner.fail('Not a git repository. Run this from the project root.');
       process.exit(1);
@@ -144,6 +256,44 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       skillsResult = mergeSkillsIntoWorkspace(workspacePath);
     }
 
+    // Start Docker containers if requested
+    let dockerStarted = false;
+    let dockerError: string | undefined;
+    if (options.docker) {
+      const composeLocations = [
+        join(workspacePath, 'docker-compose.yml'),
+        join(workspacePath, 'docker-compose.yaml'),
+        join(workspacePath, '.devcontainer', 'docker-compose.yml'),
+        join(workspacePath, '.devcontainer', 'docker-compose.yaml'),
+        join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
+        join(workspacePath, '.devcontainer', 'compose.yml'),
+        join(workspacePath, '.devcontainer', 'compose.yaml'),
+      ];
+
+      const composeFile = composeLocations.find(f => existsSync(f));
+
+      if (composeFile) {
+        spinner.text = 'Starting Docker containers...';
+        try {
+          const composeDir = join(composeFile, '..');
+          // Construct project name from project name and feature folder
+          const projectPrefix = (projectName || 'workspace').toLowerCase().replace(/\s+/g, '-');
+          const composeProject = `${projectPrefix}-${folderName}`;
+          // Use -p for project name (unique container names) and -f for compose file
+          await execAsync(`docker compose -p "${composeProject}" -f "${composeFile}" up -d --build`, {
+            cwd: composeDir,
+            encoding: 'utf-8',
+            timeout: 300000,
+          });
+          dockerStarted = true;
+        } catch (err: any) {
+          dockerError = err.message;
+        }
+      } else {
+        dockerError = 'No docker-compose.yml found in workspace';
+      }
+    }
+
     spinner.succeed('Workspace created!');
 
     console.log('');
@@ -164,6 +314,16 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       console.log('');
     }
 
+    if (options.docker) {
+      console.log(chalk.bold('Docker:'));
+      if (dockerStarted) {
+        console.log(`  Status: ${chalk.green('Containers started')}`);
+      } else {
+        console.log(`  Status: ${chalk.yellow('Not started')} - ${dockerError}`);
+      }
+      console.log('');
+    }
+
     console.log(chalk.dim(`Next: cd ${workspacePath}`));
 
   } catch (error: any) {
@@ -178,7 +338,6 @@ interface ListOptions {
 }
 
 async function listCommand(options: ListOptions): Promise<void> {
-  const { listProjects } = await import('../../lib/projects.js');
   const projects = listProjects();
 
   // If we have registered projects and --all is specified, list across all projects
@@ -235,7 +394,6 @@ async function listCommand(options: ListOptions): Promise<void> {
   // Default behavior: list from current directory
   const projectRoot = process.cwd();
 
-  // Check if we're in a git repo
   if (!existsSync(join(projectRoot, '.git'))) {
     console.error(chalk.red('Not a git repository.'));
     if (projects.length > 0) {
@@ -289,13 +447,65 @@ async function destroyCommand(issueId: string, options: DestroyOptions): Promise
     const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const folderName = `feature-${normalizedId}`;
 
-    // Resolve project root - try registry first, then explicit option, then cwd
+    // Try to find project config from registry
+    const teamPrefix = extractTeamPrefix(issueId);
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+    // Priority 1: Use workspace-manager if project has workspace config
+    if (projectConfig?.workspace) {
+      spinner.text = 'Removing workspace...';
+
+      const result = await removeWorkspaceFromConfig({
+        projectConfig,
+        featureName: normalizedId,
+      });
+
+      if (result.success) {
+        spinner.succeed('Workspace destroyed!');
+        console.log('');
+        for (const step of result.steps) {
+          console.log(`  ${chalk.green('✓')} ${step}`);
+        }
+      } else {
+        spinner.fail('Workspace destruction failed');
+        for (const error of result.errors) {
+          console.error(chalk.red(`  ${error}`));
+        }
+        process.exit(1);
+      }
+      return;
+    }
+
+    // Priority 2: Use custom workspace_remove_command (legacy)
+    if (projectConfig?.workspace_remove_command) {
+      spinner.text = 'Running custom remove command...';
+
+      const cmd = `${projectConfig.workspace_remove_command} ${normalizedId}`;
+      try {
+        const { stdout } = await execAsync(cmd, {
+          cwd: projectConfig.path,
+          encoding: 'utf-8',
+          timeout: 120000,
+        });
+
+        if (stdout) {
+          console.log(stdout);
+        }
+
+        spinner.succeed('Workspace destroyed via custom command!');
+        return;
+      } catch (error: any) {
+        spinner.fail(`Custom remove command failed: ${error.message}`);
+        process.exit(1);
+      }
+    }
+
+    // Priority 3: Simple worktree removal
     let projectRoot: string;
 
     if (options.project) {
       projectRoot = options.project;
     } else {
-      // Try to resolve from project registry
       const resolved = resolveProjectFromIssue(issueId);
       if (resolved) {
         projectRoot = resolved.projectPath;
@@ -307,7 +517,6 @@ async function destroyCommand(issueId: string, options: DestroyOptions): Promise
     const workspacePath = join(projectRoot, 'workspaces', folderName);
 
     if (!existsSync(workspacePath)) {
-      // If not found and we resolved from registry, also check cwd
       const cwdPath = join(process.cwd(), 'workspaces', folderName);
       if (projectRoot !== process.cwd() && existsSync(cwdPath)) {
         projectRoot = process.cwd();

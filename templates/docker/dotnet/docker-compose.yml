@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   app:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -27,6 +28,7 @@ services:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME:-dotnet}.loadbalancer.server.port=5000"
 
   sqlserver:
+    restart: unless-stopped
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       - ACCEPT_EULA=Y

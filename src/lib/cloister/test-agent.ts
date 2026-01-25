@@ -93,8 +93,8 @@ export function detectTestCommand(projectPath: string): string {
   // Check cloister config first
   try {
     const config = loadCloisterConfig();
-    if (config.specialists?.['test-agent']?.test_command) {
-      return config.specialists['test-agent'].test_command;
+    if (config.specialists?.test_agent?.test_command) {
+      return config.specialists.test_agent.test_command;
     }
   } catch {
     // Config not available, continue with auto-detection

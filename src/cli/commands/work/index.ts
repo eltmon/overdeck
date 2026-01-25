@@ -15,6 +15,7 @@ import { cvCommand } from './cv.js';
 import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
 import { reopenCommand } from './reopen.js';
+import { requestReviewCommand } from './request-review.js';
 
 export function registerWorkCommands(program: Command): void {
   const work = program
@@ -140,6 +141,12 @@ export function registerWorkCommands(program: Command): void {
     .option('--json', 'Output as JSON')
     .option('--force', 'Skip confirmation')
     .action(reopenCommand);
+
+  work
+    .command('request-review <id>')
+    .description('Request re-review after fixing feedback (max 3 auto-requeues)')
+    .option('-m, --message <text>', 'Message for reviewers describing fixes')
+    .action(requestReviewCommand);
 }
 
 // Re-export individual commands for direct use

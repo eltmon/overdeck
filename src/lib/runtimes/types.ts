@@ -204,7 +204,7 @@ export interface AgentRuntime {
    * @returns Agent information
    * @throws Error if spawn fails
    */
-  spawnAgent(config: SpawnConfig): Agent;
+  spawnAgent(config: SpawnConfig): Agent | Promise<Agent>;
 
   /**
    * List all sessions for this runtime

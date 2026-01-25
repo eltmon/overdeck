@@ -21,7 +21,13 @@ Use this skill after completing a task (merge, test, review) to:
 
 ## How to Send Feedback
 
-To send feedback, format a structured message to the issue agent's tmux session.
+**ALWAYS use `pan work tell` to send messages to issue agents:**
+
+```bash
+pan work tell ISSUE-123 "Your feedback message here"
+```
+
+**DO NOT use raw `tmux send-keys`** - agents frequently forget the separate Enter command, causing messages to sit unsent in the terminal. `pan work tell` handles this correctly.
 
 ### Feedback Types
 

@@ -251,7 +251,7 @@ async function sendFeedbackToWorkAgent(
     // Send the feedback message (non-blocking)
     await execAsync(`tmux send-keys -t ${agentSession} "${escapedFeedback}"`);
     // Send Enter to submit
-    await execAsync(`tmux send-keys -t ${agentSession} Enter`);
+    await execAsync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
     console.log(`[review-agent] Sent feedback to ${agentSession}`);
   } catch (error) {
     console.error(`[review-agent] Failed to send feedback to ${agentSession}:`, error);

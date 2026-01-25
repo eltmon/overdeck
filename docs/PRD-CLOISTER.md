@@ -62,7 +62,7 @@ Cloister intelligently routes tasks to the most cost-effective model based on ta
 |------|-------|------|----------|
 | 💎 **Opus** | claude-opus-4 | $$$$$ | Architecture, complex debugging, planning, ambiguous requirements |
 | 🔷 **Sonnet** | claude-sonnet-4 | $$$ | Feature implementation, bug fixes, code review, most development work |
-| 💠 **Haiku** | claude-haiku-3.5 | $ | Tests, simple fixes, formatting, docs, repetitive tasks |
+| 💠 **Haiku** | claude-haiku-4.5 | $ | Tests, simple fixes, formatting, docs, repetitive tasks |
 
 **Cost ratio:** Opus is ~15x more expensive than Haiku, Sonnet is ~5x more expensive than Haiku.
 

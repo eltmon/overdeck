@@ -334,9 +334,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   /**
    * Spawn a new agent
    */
-  spawnAgent(config: SpawnConfig): Agent {
+  async spawnAgent(config: SpawnConfig): Promise<Agent> {
     // Use the existing spawnAgent implementation from agents.ts
-    const state = spawnAgentImpl({
+    const state = await spawnAgentImpl({
       issueId: config.agentId.replace(/^agent-/, ''),
       workspace: config.workspace,
       runtime: 'claude',

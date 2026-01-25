@@ -71,7 +71,43 @@ export async function projectAddCommand(
     console.log(chalk.dim(`  Linear team: ${linearTeam}`));
   }
   console.log('');
-  console.log(chalk.dim(`Edit ${PROJECTS_CONFIG_FILE} to add issue routing rules.`));
+
+  // Check what the project has and guide them on next steps
+  const hasDevcontainer = existsSync(join(fullPath, '.devcontainer'));
+  const hasInfra = existsSync(join(fullPath, 'infra'));
+  const hasDevcontainerTemplate =
+    existsSync(join(fullPath, 'infra', '.devcontainer-template')) ||
+    existsSync(join(fullPath, '.devcontainer-template'));
+
+  console.log(chalk.bold('Next Steps:\n'));
+
+  // Step 1: Configure workspace in projects.yaml
+  console.log(chalk.cyan('1. Configure workspace settings'));
+  console.log(chalk.dim(`   Edit ${PROJECTS_CONFIG_FILE}`));
+  console.log(chalk.dim('   Add workspace, dns, docker, and service configuration'));
+  console.log('');
+
+  // Step 2: Create templates if needed
+  if (!hasDevcontainerTemplate && !hasDevcontainer) {
+    console.log(chalk.cyan('2. Create workspace templates (for Docker-based workspaces)'));
+    console.log(chalk.dim('   Your project needs:'));
+    console.log(chalk.dim('   • infra/.devcontainer-template/docker-compose.devcontainer.yml.template'));
+    console.log(chalk.dim('   • infra/.devcontainer-template/Dockerfile'));
+    console.log(chalk.dim('   See README "What Your Project Needs to Provide" section'));
+    console.log('');
+  } else {
+    console.log(chalk.green('✓ Found existing container templates'));
+    console.log('');
+  }
+
+  // Step 3: Sync and test
+  console.log(chalk.cyan(`${hasDevcontainerTemplate || hasDevcontainer ? '2' : '3'}. Test workspace creation`));
+  console.log(chalk.dim('   pan workspace create TEST-123'));
+  console.log(chalk.dim('   pan workspace destroy TEST-123'));
+  console.log('');
+
+  // Documentation reference
+  console.log(chalk.dim('Documentation: https://github.com/eltmon/panopticon#what-your-project-needs-to-provide'));
 }
 
 interface ListOptions {

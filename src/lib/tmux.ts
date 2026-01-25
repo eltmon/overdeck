@@ -68,7 +68,8 @@ export function createSession(
     chmodSync(tmpFile, '755');
 
     // Execute the script
-    execSync(`tmux send-keys -t ${name} "bash ${tmpFile}" Enter`);
+    execSync(`tmux send-keys -t ${name} "bash ${tmpFile}"`);
+    execSync(`tmux send-keys -t ${name} C-m`);
   } else if (initialCommand) {
     // Simple command - use inline
     const cmd = `tmux new-session -d -s ${name} -c "${escapedCwd}"${envFlags} "${initialCommand.replace(/"/g, '\\"')}"`;
@@ -87,7 +88,7 @@ export function sendKeys(sessionName: string, keys: string): void {
   // This is the correct way - combining them doesn't work
   const escapedKeys = keys.replace(/"/g, '\\"');
   execSync(`tmux send-keys -t ${sessionName} "${escapedKeys}"`);
-  execSync(`tmux send-keys -t ${sessionName} Enter`);
+  execSync(`tmux send-keys -t ${sessionName} C-m`);
 }
 
 export function capturePane(sessionName: string, lines: number = 50): string {

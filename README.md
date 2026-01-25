@@ -389,6 +389,90 @@ The merge-agent uses a specialized prompt template that instructs it to:
 - Document conflict resolution decisions
 - Provide detailed feedback on what was merged
 
+#### Review Pipeline Flow
+
+The review pipeline is a sequential handoff between specialists:
+
+```
+Human clicks "Review"
+        │
+        ▼
+┌───────────────────┐
+│   review-agent    │ Reviews code, checks for issues
+└─────────┬─────────┘
+          │ If PASSED: queues test-agent
+          │ If BLOCKED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│    test-agent     │ Runs test suite, analyzes failures
+└─────────┬─────────┘
+          │ If PASSED: marks ready for merge
+          │ If FAILED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│  (Human clicks    │ Human approval required
+│  "Approve & Merge"│ before merge
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│   merge-agent     │ Performs merge, resolves conflicts
+└───────────────────┘
+```
+
+**Key Points:**
+- **Human-initiated start** - A human must click "Review" to start the pipeline
+- **Automatic handoffs** - review-agent → test-agent happens automatically
+- **Human approval for merge** - Merge is NOT automatic; human clicks "Approve & Merge"
+- **Feedback loops** - Failed reviews/tests send feedback back to the work-agent
+
+#### Queue Processing
+
+Each specialist has a task queue (`~/.panopticon/specialists/{name}/hook.json`) managed via the FPP (Fixed Point Principle):
+
+```
+1. Task arrives (via API or handoff)
+        │
+        ▼
+2. wakeSpecialistOrQueue() checks if specialist is busy
+        │
+        ├── If IDLE: Wake specialist immediately with task
+        │
+        └── If BUSY: Add task to queue (hook.json)
+                │
+                ▼
+3. When specialist completes current task:
+        │
+        ├── Updates status via API (passed/failed/skipped)
+        │
+        └── Dashboard automatically wakes specialist for next queued task
+```
+
+**Queue priority order:** `urgent` > `high` > `normal` > `low`
+
+**Completion triggers:** When a specialist reports status (`passed`, `failed`, or `skipped`), the dashboard:
+1. Sets the specialist state to `idle`
+2. Checks the specialist's queue for pending work
+3. If work exists, immediately wakes the specialist with the next task
+
+#### Agent Self-Requeue (Circuit Breaker)
+
+After a human initiates the first review, work-agents can request re-review up to 3 times automatically:
+
+```bash
+# Work-agent requests re-review after fixing issues
+pan work request-review MIN-123 -m "Fixed: added tests for edge cases"
+```
+
+**Circuit breaker behavior:**
+- First human click resets the counter to 0
+- Each `pan work request-review` increments the counter
+- After 3 automatic re-requests, returns HTTP 429
+- Human must click "Review" in dashboard to continue
+
+This prevents infinite loops where an agent repeatedly fails review.
+
+**API endpoint:** `POST /api/workspaces/:issueId/request-review`
+
 #### Specialist Auto-Initialization
 
 When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures the test-agent, review-agent, and merge-agent are ready to receive wake signals without manual setup.
@@ -642,6 +726,360 @@ Issues are routed to different subdirectories based on their labels:
 
 Example: An issue with label "splash" in the MIN team would create its workspace at `/home/user/projects/myn/splash/workspaces/feature-min-xxx/`.
 
+### Custom Workspace Commands (Legacy)
+
+> **Note:** For most polyrepo projects, use the built-in `workspace` configuration (see below) instead of custom scripts. Custom commands are only needed for highly specialized setups.
+
+For projects that need logic beyond what the configuration supports, you can specify custom workspace scripts:
+
+```yaml
+projects:
+  myn:
+    name: "Mind Your Now"
+    path: /home/user/projects/myn
+    linear_team: MIN
+    # Custom scripts handle complex workspace setup
+    workspace_command: /home/user/projects/myn/infra/new-feature
+    workspace_remove_command: /home/user/projects/myn/infra/remove-feature
+```
+
+When `workspace_command` is specified, Panopticon calls your script instead of creating a standard git worktree. The script receives the normalized issue ID (e.g., `min-123`) as an argument.
+
+When `workspace_remove_command` is specified, Panopticon calls your script when deleting workspaces (e.g., aborting planning with "delete workspace" enabled). This is important for complex setups that need to:
+- Stop Docker containers and remove volumes
+- Clean up root-owned files created by containers
+- Remove git worktrees from multiple repositories
+- Release port assignments
+- Remove DNS entries
+
+**What your custom script should handle:**
+- Creating git worktrees for multiple repositories (polyrepo structure)
+- Setting up Docker Compose files and dev containers
+- Configuring environment variables and `.env` files
+- Setting up DNS entries for workspace-specific URLs (e.g., Traefik routing)
+- Creating a `./dev` script for container management
+- Copying agent configuration templates (CLAUDE.md, .mcp.json, etc.)
+
+**Example script flow:**
+```bash
+#!/bin/bash
+# new-feature script for a polyrepo project
+ISSUE_ID=$1  # e.g., "min-123"
+
+# Create worktrees for frontend and api repos
+git -C /path/to/frontend worktree add ../workspaces/feature-$ISSUE_ID/fe feature/$ISSUE_ID
+git -C /path/to/api worktree add ../workspaces/feature-$ISSUE_ID/api feature/$ISSUE_ID
+
+# Generate docker-compose from templates
+sed "s/{{FEATURE_FOLDER}}/feature-$ISSUE_ID/g" template.yml > workspace/docker-compose.yml
+
+# Set up DNS and Traefik routing
+# ... additional setup
+```
+
+The standard `pan workspace create` command will automatically detect and use your custom script.
+
+#### Container Configuration Tips
+
+When setting up Docker containers for workspaces, avoid these common pitfalls:
+
+**Maven projects:**
+- DO NOT set `MAVEN_CONFIG=/some/path` as an environment variable
+- Maven interprets `MAVEN_CONFIG` as additional CLI arguments, not a directory path
+- This causes "Unknown lifecycle phase" errors (e.g., "Unknown lifecycle phase /maven-cache")
+- Instead, use `-Dmaven.repo.local=/path/to/cache` in the Maven command
+
+```yaml
+# WRONG - causes Maven startup failure
+environment:
+  - MAVEN_CONFIG=/maven-cache
+
+# CORRECT - use command line argument
+command: ./mvnw spring-boot:run -Dmaven.repo.local=/maven-cache/repository
+volumes:
+  - ~/.m2:/maven-cache:cached
+```
+
+**pnpm projects:**
+- Set `PNPM_HOME=/path` to configure the pnpm store location
+- Mount a named volume for the store to share across containers
+
+### What Your Project Needs to Provide
+
+Panopticon is an orchestration layer - it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**.
+
+Projects can be as simple as just a git repo (for worktree-only workspaces) or as complex as a full polyrepo with Docker, Traefik, and database seeding. Here's what you need for each level:
+
+### Required: Workspace Templates
+
+Your project needs a `.devcontainer/` or template directory with:
+
+```
+your-project/
+├── infra/
+│   └── .devcontainer-template/      # Template for workspace containers
+│       ├── docker-compose.devcontainer.yml.template
+│       ├── compose.infra.yml.template   # Optional: separate infra services
+│       ├── Dockerfile
+│       └── devcontainer.json.template
+└── ...
+```
+
+**Docker Compose templates** should use placeholders that Panopticon will replace:
+
+```yaml
+# docker-compose.devcontainer.yml.template
+services:
+  api:
+    build: ./api
+    labels:
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-api.rule=Host(`api-{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
+    environment:
+      - DATABASE_URL=postgres://app:app@postgres:5432/mydb
+
+  frontend:
+    build: ./fe
+    labels:
+      - "traefik.http.routers.{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
+```
+
+### Required for HTTPS: Traefik Configuration
+
+If you want local HTTPS (recommended), provide a Traefik compose file:
+
+```
+your-project/
+├── infra/
+│   └── docker-compose.traefik.yml   # Traefik reverse proxy
+└── ...
+```
+
+Example Traefik config:
+```yaml
+# infra/docker-compose.traefik.yml
+services:
+  traefik:
+    image: traefik:v2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ~/.panopticon/traefik/certs:/certs:ro
+    command:
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+```
+
+### Required for Database Seeding: Seed Directory
+
+For projects with databases:
+
+```
+your-project/
+├── infra/
+│   └── seed/
+│       └── seed.sql              # Sanitized production data
+└── ...
+```
+
+Your compose template should mount this:
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    volumes:
+      - /path/to/project/infra/seed:/docker-entrypoint-initdb.d:ro
+```
+
+### Optional: Agent Templates
+
+For customizing how agents work in your project:
+
+```
+your-project/
+├── infra/
+│   └── .agent-template/
+│       ├── CLAUDE.md.template    # Project-specific AI instructions
+│       └── .mcp.json.template    # MCP server configuration
+└── .claude/
+    └── skills/                   # Project-specific skills
+        └── my-project-standards/
+            └── SKILL.md
+```
+
+### Configuration in projects.yaml
+
+Point Panopticon to your templates:
+
+```yaml
+# ~/.panopticon/projects.yaml
+projects:
+  myproject:
+    name: "My Project"
+    path: /home/user/projects/myproject
+    linear_team: PRJ
+
+    workspace:
+      type: polyrepo  # or monorepo
+      workspaces_dir: workspaces
+
+      docker:
+        traefik: infra/docker-compose.traefik.yml
+        compose_template: infra/.devcontainer-template
+
+      database:
+        seed_file: /home/user/projects/myproject/infra/seed/seed.sql
+        container_name: "{{PROJECT}}-postgres-1"
+
+      agent:
+        template_dir: infra/.agent-template
+        templates:
+          - source: CLAUDE.md.template
+            target: CLAUDE.md
+```
+
+### Quick Checklist
+
+| Component | Required? | Location | Purpose |
+|-----------|-----------|----------|---------|
+| Docker Compose template | Yes (for Docker workspaces) | `infra/.devcontainer-template/` | Container configuration |
+| Traefik config | Only for HTTPS | `infra/docker-compose.traefik.yml` | Reverse proxy |
+| Seed file | Only if database needed | `infra/seed/seed.sql` | Pre-populate database |
+| Agent template | Recommended | `infra/.agent-template/` | AI instructions |
+| Project skills | Optional | `.claude/skills/` | Project-specific workflows |
+
+### Example: Minimal Setup
+
+For a simple monorepo with no Docker:
+
+```yaml
+# ~/.panopticon/projects.yaml
+projects:
+  simple-app:
+    name: "Simple App"
+    path: /home/user/projects/simple-app
+    linear_team: APP
+    # No workspace config needed - uses git worktrees
+```
+
+Panopticon creates workspaces as git worktrees. Docker, HTTPS, and seeding are opt-in.
+
+---
+
+## Polyrepo Workspace Configuration
+
+For projects with multiple git repositories, configure workspace settings directly in `projects.yaml`:
+
+```yaml
+projects:
+  myapp:
+    name: "My App"
+    path: /home/user/projects/myapp
+    linear_team: APP
+
+    workspace:
+      type: polyrepo
+      workspaces_dir: workspaces
+
+      # Git repositories to include in each workspace
+      repos:
+        - name: fe
+          path: frontend
+          branch_prefix: "feature/"
+        - name: api
+          path: backend
+          branch_prefix: "feature/"
+
+      # DNS entries for local development
+      dns:
+        domain: myapp.test
+        entries:
+          - "{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          - "api-{{FEATURE_FOLDER}}.{{DOMAIN}}"
+        sync_method: wsl2hosts  # or: hosts_file, dnsmasq
+
+      # Port assignments for services
+      ports:
+        redis:
+          range: [6380, 6499]
+
+      # Service definitions - how to start each service
+      services:
+        - name: api
+          path: api
+          start_command: ./mvnw spring-boot:run
+          docker_command: ./mvnw spring-boot:run
+          health_url: "https://api-{{FEATURE_FOLDER}}.{{DOMAIN}}/actuator/health"
+          port: 8080
+        - name: frontend
+          path: fe
+          start_command: pnpm start
+          docker_command: pnpm start
+          health_url: "https://{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          port: 3000
+
+      # Docker configuration
+      docker:
+        traefik: infra/docker-compose.traefik.yml
+        compose_template: infra/.devcontainer-template
+
+      # Agent configuration templates
+      agent:
+        template_dir: infra/.agent-template
+        templates:
+          - source: CLAUDE.md.template
+            target: CLAUDE.md
+        symlinks:
+          - .claude/commands
+          - .claude/skills
+
+      # Environment template
+      env:
+        template: |
+          COMPOSE_PROJECT_NAME={{COMPOSE_PROJECT}}
+          FRONTEND_URL=https://{{FEATURE_FOLDER}}.{{DOMAIN}}
+```
+
+**Template Placeholders:**
+
+| Placeholder | Example | Description |
+|------------|---------|-------------|
+| `{{FEATURE_NAME}}` | `min-123` | Normalized issue ID |
+| `{{FEATURE_FOLDER}}` | `feature-min-123` | Workspace folder name |
+| `{{BRANCH_NAME}}` | `feature/min-123` | Git branch name |
+| `{{COMPOSE_PROJECT}}` | `myapp-feature-min-123` | Docker Compose project |
+| `{{DOMAIN}}` | `myapp.test` | DNS domain |
+
+**Service Templates:**
+
+Panopticon provides built-in templates for common frameworks. Use these to avoid boilerplate:
+
+| Template | Start Command | Port |
+|----------|--------------|------|
+| `react` | `npm start` | 3000 |
+| `react-vite` | `npm run dev` | 5173 |
+| `react-pnpm` | `pnpm start` | 3000 |
+| `nextjs` | `npm run dev` | 3000 |
+| `spring-boot-maven` | `./mvnw spring-boot:run` | 8080 |
+| `spring-boot-gradle` | `./gradlew bootRun` | 8080 |
+| `express` | `npm start` | 3000 |
+| `fastapi` | `uvicorn main:app --reload` | 8000 |
+| `django` | `python manage.py runserver` | 8000 |
+
+Use a template by referencing it in your service config:
+
+```yaml
+services:
+  - name: api
+    template: spring-boot-maven
+    path: api
+    health_url: "https://api-{{FEATURE_FOLDER}}.myapp.test/health"
+```
+
+See `/pan-workspace-config` skill for complete documentation.
+
 ### Managing Projects
 
 ```bash
@@ -653,6 +1091,134 @@ pan project add /path/to/project --name myproject --linear-team PRJ
 
 # Remove a project
 pan project remove myproject
+```
+
+### Database Seeding
+
+Many projects need a pre-populated database for development and testing. Panopticon provides database seeding commands that work with your existing infrastructure.
+
+**Problem:** Development databases often need:
+- Schema with 100+ migrations already applied
+- Seed data for testing (users, reference data)
+- External QA database connections
+- Database snapshots from staging/production (sanitized)
+
+**Solution:** Configure database seeding in `projects.yaml`:
+
+```yaml
+projects:
+  myapp:
+    workspace:
+      database:
+        # Path to seed file (loaded on first container start)
+        seed_file: /path/to/sanitized-seed.sql
+
+        # Command to create new snapshots from external source
+        snapshot_command: "kubectl exec -n prod pod/postgres -- pg_dump -U app mydb"
+
+        # Or connect to external database directly
+        external_db:
+          host: qa-db.example.com
+          database: myapp_qa
+          user: readonly
+          password_env: QA_DB_PASSWORD
+
+        # Container naming pattern
+        container_name: "{{PROJECT}}-postgres-1"
+
+        # Migration tool (for status checks)
+        migrations:
+          type: flyway  # flyway | liquibase | prisma | typeorm | custom
+          path: src/main/resources/db/migration
+```
+
+**Commands:**
+
+```bash
+# Create a snapshot from production/staging
+pan db snapshot --project myapp --output /path/to/seed.sql
+
+# Seed a workspace database
+pan db seed MIN-123
+
+# Check database status
+pan db status MIN-123
+
+# Clean kubectl noise from pg_dump files
+pan db clean /path/to/dump.sql
+
+# View database configuration
+pan db config myapp
+```
+
+**Workflow for capturing production data:**
+
+1. **Create snapshot** from production (via kubectl or direct connection):
+   ```bash
+   pan db snapshot --project myapp --sanitize
+   ```
+
+2. **Verify** the seed file:
+   ```bash
+   pan db clean /path/to/seed.sql --dry-run
+   ```
+
+3. **Update projects.yaml** with seed file path
+
+4. **Workspaces** automatically seed on first postgres container start
+
+**Container integration:**
+
+Your Docker Compose template should mount the seed directory:
+
+```yaml
+# compose.infra.yml
+services:
+  postgres:
+    image: postgres:16
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Seed database on first startup
+      - /path/to/project/infra/seed:/docker-entrypoint-initdb.d:ro
+```
+
+**Troubleshooting:**
+
+| Issue | Solution |
+|-------|----------|
+| "relation does not exist" | Seed file missing or incomplete - run `pan db snapshot` |
+| Slow database startup | Large seed file - consider pruning old data |
+| kubectl garbage in dump | Run `pan db clean <file>` to remove stderr noise |
+| Migrations fail after seed | Check Flyway version matches seed file's schema_history |
+
+### Agent Completion Notifications
+
+Panopticon includes a notification system that alerts you when agents complete their work.
+
+**Desktop Notifications:**
+
+The `notify-complete` script sends desktop notifications across platforms:
+
+| Platform | Notification Method |
+|----------|---------------------|
+| WSL2/Windows | PowerShell toast notifications |
+| macOS | osascript display notification |
+| Linux | notify-send |
+
+**Usage:**
+```bash
+# Send a completion notification
+~/.panopticon/bin/notify-complete MIN-123 "Fixed login button" "https://gitlab.com/mr/456"
+```
+
+**Completion log:** All notifications are logged to `~/.panopticon/agent-completed.log` with timestamps.
+
+**Integration with agent workflows:**
+
+Agents can call `notify-complete` at the end of their work:
+```bash
+# In agent completion script or /work-complete skill
+notify-complete "$ISSUE_ID" "$SUMMARY" "$MR_URL"
 ```
 
 ---
@@ -719,6 +1285,9 @@ pan work triage
 # Reopen a closed issue and re-run planning
 pan work reopen min-123
 
+# Request re-review after fixing feedback (for agents, max 3 auto-requeues)
+pan work request-review min-123 -m "Fixed: added tests and removed duplication"
+
 # Recover crashed agents
 pan work recover min-123
 pan work recover --all
@@ -736,6 +1305,63 @@ pan work health status
 # Start the health daemon (background monitoring)
 pan work health daemon --interval 30
 ```
+
+### Test Runner
+
+```bash
+# Run all tests for a workspace
+pan test run min-123
+
+# Run tests for main branch
+pan test run main
+
+# Run specific test suites only
+pan test run min-123 --tests backend,frontend_unit
+
+# List configured tests for a project
+pan test list
+
+# List tests for specific project
+pan test list myproject
+```
+
+**Test Configuration:**
+
+Configure test suites in `projects.yaml`:
+
+```yaml
+projects:
+  myapp:
+    tests:
+      backend:
+        type: maven           # maven, vitest, jest, playwright, pytest, cargo
+        path: api             # Path relative to workspace
+        command: ./mvnw test  # Command to run
+
+      frontend_unit:
+        type: vitest
+        path: fe
+        command: pnpm test:unit --run
+        container: true       # Run inside Docker container
+        container_name: "{{COMPOSE_PROJECT}}-fe-1"
+
+      frontend_e2e:
+        type: playwright
+        path: fe
+        command: pnpm test:e2e
+        env:
+          BASE_URL: "https://{{FEATURE_FOLDER}}.myapp.test"
+```
+
+**Reports:**
+
+Test results are saved to `{project}/reports/test-run-{target}-{timestamp}.md` with detailed logs for each suite.
+
+**Notifications:**
+
+Desktop notifications are sent when tests complete (disable with `--no-notify`).
+
+See `/pan-test-config` skill for complete documentation.
 
 ### FPP Hooks (Fixed Point Principle)
 
@@ -827,6 +1453,9 @@ pan work plan MIN-123 --continue
 # Create a workspace (git worktree) without starting an agent
 pan workspace create MIN-123
 
+# Create workspace and start Docker containers
+pan workspace create MIN-123 --docker
+
 # List all workspaces
 pan workspace list
 
@@ -835,6 +1464,69 @@ pan workspace destroy MIN-123
 
 # Force destroy (even with uncommitted changes)
 pan workspace destroy MIN-123 --force
+```
+
+#### Docker Integration
+
+The `--docker` flag automatically starts containers after workspace creation:
+
+```bash
+pan workspace create MIN-123 --docker
+```
+
+**What it does:**
+1. Creates the workspace (git worktree or custom command)
+2. Looks for docker-compose files in:
+   - `{workspace}/docker-compose.yml`
+   - `{workspace}/docker-compose.yaml`
+   - `{workspace}/.devcontainer/docker-compose.yml`
+   - `{workspace}/.devcontainer/docker-compose.devcontainer.yml`
+   - `{workspace}/.devcontainer/compose.yml`
+3. Runs `docker compose -p "{project}-feature-{issue}" -f {file} up -d --build`
+
+**Docker Project Naming:**
+
+Each workspace gets a unique Docker Compose project name to avoid container conflicts:
+- Format: `{project-name}-feature-{issue-id}` (e.g., `mind-your-now-feature-min-123`)
+- The project name comes from `name` in your `~/.panopticon/projects.yaml`
+- Container names follow: `{project}-{service}-1` (e.g., `mind-your-now-feature-min-123-api-1`)
+
+This allows multiple workspaces to run simultaneously without port or name conflicts.
+
+**Why this matters:**
+- Containers start warming up while you review the issue
+- Environment is ready when the planning agent starts asking questions
+- You can test assumptions during planning without waiting for builds
+
+**Dashboard integration:**
+
+The planning dialog includes a "Start Docker containers" checkbox:
+- **Default:** Enabled (containers start automatically)
+- **Preference saved:** Your choice is remembered in browser localStorage
+- **Key:** `panopticon.planning.startDocker`
+
+To change the default via browser console:
+```javascript
+// Disable Docker by default
+localStorage.setItem('panopticon.planning.startDocker', 'false');
+
+// Enable Docker by default (this is the out-of-box default)
+localStorage.setItem('panopticon.planning.startDocker', 'true');
+```
+
+**Example workflow:**
+```bash
+# From dashboard: click "Start Planning" (Docker enabled by default)
+# Or from CLI:
+pan workspace create MIN-123 --docker
+
+# While containers build in background:
+# - Review the Linear issue
+# - Check related PRs
+# - Think about approach
+
+# By the time you're ready to engage with the planning agent,
+# the dev environment is warm and ready for testing
 ```
 
 ### Project Management
@@ -1072,6 +1764,8 @@ Panopticon ships with 25+ skills organized into categories:
 | `pan-convoy-synthesis` | Synthesize convoy coordination |
 | `pan-subagent-creator` | Create specialized subagents |
 | `pan-skill-creator` | Create new skills (guided) |
+| `pan-workspace-config` | Configure polyrepo workspaces, DNS, ports |
+| `pan-test-config` | Configure project test suites |
 
 ### Utilities
 

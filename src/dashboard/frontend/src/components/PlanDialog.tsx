@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, Minus, FileText, ExternalLink } from 'lucide-react';
+import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
@@ -41,6 +41,12 @@ interface PlanningStatus {
 
 type Step = 'checking' | 'ready' | 'starting' | 'planning' | 'complete' | 'error';
 
+// Default for startDocker - can be overridden by localStorage
+const getDefaultStartDocker = (): boolean => {
+  const stored = localStorage.getItem('panopticon.planning.startDocker');
+  return stored !== null ? stored === 'true' : true; // Default to true
+};
+
 export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogProps) {
   const [step, setStep] = useState<Step>('checking');
   const [result, setResult] = useState<StartPlanningResult | null>(null);
@@ -48,6 +54,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [minimized, setMinimized] = useState(false);
   const [position, setPosition] = useState({ x: -1, y: -1 }); // -1 means centered
   const [size, setSize] = useState({ width: 900, height: 600 });
+  const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   
   // Track if we've actually connected to a planning session in THIS dialog instance
   // This prevents stale cache from incorrectly triggering 'complete' state
@@ -60,7 +67,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ startDocker }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -104,6 +111,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         method: 'DELETE',
       });
       if (!stopRes.ok) throw new Error('Failed to stop planning');
+      const stopData = await stopRes.json();
 
       // Then mark planning as complete (changes label from "Planning" to "Planned")
       const completeRes = await fetch(`/api/issues/${issue.identifier}/complete-planning`, {
@@ -113,11 +121,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         console.warn('Failed to mark planning complete, continuing anyway');
       }
 
-      return stopRes.json();
+      return stopData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
       setStep('complete');
+    },
+    onError: (err: Error) => {
+      console.error('Stop planning failed:', err);
+      setError(err.message);
+      setStep('error');
     },
   });
 
@@ -169,14 +182,28 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     },
   });
 
-  // Reset state when dialog closes/opens
+  // Track previous issue to detect switches
+  const prevIssueRef = useRef<string | null>(null);
+
+  // Reset state when dialog closes/opens OR when switching to a different issue
   useEffect(() => {
+    const issueChanged = prevIssueRef.current !== null && prevIssueRef.current !== issue.identifier;
+    prevIssueRef.current = issue.identifier;
+
     if (!isOpen) {
       setStep('checking'); // Start with checking on reopen
       setResult(null);
       setError(null);
       setMinimized(false);
       hasConnectedToSession.current = false;
+    } else if (issueChanged) {
+      // Switching to a different issue - reset state and unminimize
+      setStep('checking');
+      setResult(null);
+      setError(null);
+      setMinimized(false);
+      hasConnectedToSession.current = false;
+      queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
     } else {
       // Dialog is opening - invalidate stale cache to prevent false 'complete' transitions
       queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
@@ -260,31 +287,32 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     return `${workspacePath}/docs/${issue.identifier}-plan.md`;
   };
 
+  // When minimized, only render the floating bar (no full-screen wrapper)
+  if (minimized) {
+    return (
+      <div
+        className="fixed bottom-4 right-4 z-50 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-gray-700 transition-colors"
+        onClick={() => setMinimized(false)}
+      >
+        <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+          <Sparkles className="w-3 h-3 text-white" />
+        </div>
+        <span className="text-sm text-white font-medium">Plan: {issue.identifier}</span>
+        {step === 'planning' && (
+          <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50">
-      {/* Backdrop - only show when not minimized */}
-      {!minimized && (
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      )}
+      {/* Backdrop - clicking minimizes instead of closing */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMinimized(true)} />
 
-      {/* Minimized state - small floating bar */}
-      {minimized ? (
-        <div
-          className="fixed bottom-4 right-4 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-gray-700 transition-colors"
-          onClick={() => setMinimized(false)}
-        >
-          <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-            <Sparkles className="w-3 h-3 text-white" />
-          </div>
-          <span className="text-sm text-white font-medium">Plan: {issue.identifier}</span>
-          {step === 'planning' && (
-            <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
-          )}
-        </div>
-      ) : (
-        /* Dialog with Rnd for drag/resize */
-        <Rnd
-          position={{ x: centeredX, y: centeredY }}
+      {/* Dialog with Rnd for drag/resize */}
+      <Rnd
+        position={{ x: centeredX, y: centeredY }}
           size={size}
           onDragStop={(_e, d) => setPosition({ x: d.x, y: d.y })}
           onResizeStop={(_e, _direction, ref, _delta, pos) => {
@@ -339,14 +367,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                 <button
                   onClick={() => setMinimized(true)}
                   className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                  title="Minimize"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={onClose}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                  title="Close"
+                  title="Hide (planning continues in background)"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -435,6 +456,23 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                           </li>
                         </ul>
                       </div>
+
+                      {/* Docker option */}
+                      <label className="flex items-center gap-3 mb-6 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={startDocker}
+                          onChange={(e) => {
+                            setStartDocker(e.target.checked);
+                            localStorage.setItem('panopticon.planning.startDocker', String(e.target.checked));
+                          }}
+                          className="w-4 h-4 rounded border-gray-500 bg-gray-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                        />
+                        <span className="text-sm text-gray-300">
+                          Start Docker containers
+                          <span className="text-gray-500 ml-1">(dev environment ready for testing)</span>
+                        </span>
+                      </label>
 
                       <button
                         onClick={handleStartPlanning}
@@ -637,7 +675,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
             </div>
           </div>
         </Rnd>
-      )}
     </div>
   );
 }

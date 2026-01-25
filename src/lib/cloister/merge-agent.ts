@@ -21,6 +21,7 @@ import {
   wakeSpecialist,
   isRunning,
 } from './specialists.js';
+import { runMergeValidation, autoRevertMerge } from './validation.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -46,6 +47,7 @@ export interface MergeResult {
   resolvedFiles?: string[];
   failedFiles?: string[];
   testsStatus?: 'PASS' | 'FAIL' | 'SKIP';
+  validationStatus?: 'PASS' | 'FAIL' | 'NOT_RUN';
   reason?: string;
   notes?: string;
   output?: string;
@@ -133,6 +135,68 @@ function detectTestCommand(projectPath: string): string {
 }
 
 /**
+ * Post-merge cleanup: move PRD to completed, update issue status
+ */
+async function postMergeCleanup(issueId: string, projectPath: string): Promise<void> {
+  console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
+
+  // 1. Move PRD from active to completed
+  try {
+    const activePrdPath = join(projectPath, 'docs/prds/active', `${issueId.toLowerCase()}-plan.md`);
+    const completedPrdPath = join(projectPath, 'docs/prds/completed', `${issueId.toLowerCase()}-plan.md`);
+
+    if (existsSync(activePrdPath)) {
+      // Ensure completed directory exists
+      const completedDir = dirname(completedPrdPath);
+      if (!existsSync(completedDir)) {
+        mkdirSync(completedDir, { recursive: true });
+      }
+
+      // Move the file using git mv for proper tracking
+      await execAsync(`git mv "${activePrdPath}" "${completedPrdPath}"`, { cwd: projectPath, encoding: 'utf-8' });
+      await execAsync(`git commit -m "Move ${issueId} PRD to completed"`, { cwd: projectPath, encoding: 'utf-8' });
+      await execAsync(`git push`, { cwd: projectPath, encoding: 'utf-8' });
+      console.log(`[merge-agent] ✓ Moved PRD to completed and pushed: ${completedPrdPath}`);
+      logActivity('prd_moved', `Moved ${issueId} PRD to completed directory`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not move PRD: ${err}`);
+    // Non-fatal, continue with cleanup
+  }
+
+  // 2. Update issue status (GitHub or Linear)
+  const isGitHub = issueId.toUpperCase().startsWith('PAN-');
+
+  if (isGitHub) {
+    // GitHub: remove in-progress label, add done label, close issue
+    try {
+      const issueNum = issueId.replace(/^PAN-/i, '');
+      await execAsync(`gh issue edit ${issueNum} --remove-label "in-progress" --add-label "done" 2>/dev/null || true`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+      console.log(`[merge-agent] ✓ Updated GitHub issue ${issueId} labels`);
+      logActivity('issue_updated', `Updated ${issueId} labels: removed in-progress, added done`);
+    } catch (err) {
+      console.warn(`[merge-agent] Could not update GitHub issue labels: ${err}`);
+    }
+  } else {
+    // Linear: use pan CLI to mark as done (if available)
+    try {
+      await execAsync(`pan work done ${issueId} -c "Merged to main" 2>/dev/null || true`, {
+        encoding: 'utf-8',
+      });
+      console.log(`[merge-agent] ✓ Updated Linear issue ${issueId} to Done`);
+      logActivity('issue_updated', `Updated ${issueId} to Done in Linear`);
+    } catch (err) {
+      console.warn(`[merge-agent] Could not update Linear issue: ${err}`);
+    }
+  }
+
+  console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}`);
+}
+
+/**
  * Parse result markers from agent output
  */
 function parseAgentOutput(output: string): MergeResult {
@@ -142,6 +206,7 @@ function parseAgentOutput(output: string): MergeResult {
   let resolvedFiles: string[] = [];
   let failedFiles: string[] = [];
   let testsStatus: 'PASS' | 'FAIL' | 'SKIP' | null = null;
+  let validationStatus: 'PASS' | 'FAIL' | null = null;
   let reason = '';
   let notes = '';
 
@@ -182,6 +247,14 @@ function parseAgentOutput(output: string): MergeResult {
       }
     }
 
+    // Match VALIDATION
+    if (trimmed.startsWith('VALIDATION:')) {
+      const value = trimmed.substring('VALIDATION:'.length).trim();
+      if (value === 'PASS' || value === 'FAIL') {
+        validationStatus = value;
+      }
+    }
+
     // Match REASON
     if (trimmed.startsWith('REASON:')) {
       reason = trimmed.substring('REASON:'.length).trim();
@@ -199,6 +272,7 @@ function parseAgentOutput(output: string): MergeResult {
       success: true,
       resolvedFiles,
       testsStatus: testsStatus || 'SKIP',
+      validationStatus: validationStatus || 'NOT_RUN',
       notes,
       output,
     };
@@ -206,6 +280,7 @@ function parseAgentOutput(output: string): MergeResult {
     return {
       success: false,
       failedFiles,
+      validationStatus: validationStatus || 'NOT_RUN',
       reason,
       notes,
       output,
@@ -214,6 +289,7 @@ function parseAgentOutput(output: string): MergeResult {
     // No result markers found - assume failure
     return {
       success: false,
+      validationStatus: 'NOT_RUN',
       reason: 'Agent did not report result in expected format',
       output,
     };
@@ -400,15 +476,64 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
           console.log(`[merge-agent] Found result markers in output`);
 
           const result = parseAgentOutput(output);
-          logMergeHistory(context, result);
 
+          // If agent reports success, run post-merge validation
           if (result.success) {
-            logActivity('merge_success', `Merge completed for ${context.issueId}`);
-          } else {
-            logActivity('merge_failure', `Merge failed for ${context.issueId}: ${result.reason}`);
-          }
+            console.log(`[merge-agent] Agent reported success, running post-merge validation...`);
+            logActivity('merge_validation_start', `Running validation for ${context.issueId}`);
 
-          return result;
+            const validationResult = await runMergeValidation({
+              projectPath: context.projectPath,
+              issueId: context.issueId,
+            });
+
+            if (validationResult.valid) {
+              // Validation passed
+              console.log(`[merge-agent] ✓ Validation passed`);
+              logActivity('merge_success', `Merge and validation completed for ${context.issueId}`);
+
+              // Update result with validation status
+              result.validationStatus = 'PASS';
+              logMergeHistory(context, result);
+
+              // Run post-merge cleanup (move PRD, update issue status)
+              await postMergeCleanup(context.issueId, context.projectPath);
+
+              return result;
+            } else {
+              // Validation failed - auto-revert
+              console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
+              logActivity('merge_validation_fail', `Validation failed for ${context.issueId}: ${validationResult.failures.map(f => f.type).join(', ')}`);
+
+              // Attempt auto-revert
+              const revertSuccess = await autoRevertMerge(context.projectPath);
+
+              const failureReason = validationResult.failures.map(f => `${f.type}: ${f.message}`).join('; ');
+              const revertNote = revertSuccess
+                ? 'Merge auto-reverted to clean state'
+                : 'WARNING: Auto-revert failed - manual cleanup required';
+
+              console.log(`[merge-agent] ${revertNote}`);
+              logActivity('merge_auto_revert', revertNote);
+
+              // Return failure with validation details
+              const failedResult: MergeResult = {
+                success: false,
+                validationStatus: 'FAIL',
+                reason: `Validation failed: ${failureReason}. ${revertNote}`,
+                notes: result.notes,
+                output,
+              };
+
+              logMergeHistory(context, failedResult);
+              return failedResult;
+            }
+          } else {
+            // Agent reported failure
+            logActivity('merge_failure', `Merge failed for ${context.issueId}: ${result.reason}`);
+            logMergeHistory(context, result);
+            return result;
+          }
         }
       }
 
@@ -599,13 +724,64 @@ Report any issues or conflicts you encountered.`;
             const remoteHead = remoteHeadRaw.trim();
 
             if (remoteHead === currentHead) {
-              console.log(`[merge-agent] Merge completed and pushed successfully`);
-              logActivity('merge_complete', `Merge completed by specialist`);
-              return {
-                success: true,
-                testsStatus: 'SKIP', // Specialist ran tests, we trust the result
-                notes: 'Merge completed by merge-agent specialist',
-              };
+              console.log(`[merge-agent] Merge completed and pushed, running validation...`);
+              logActivity('merge_validation_start', `Running post-merge validation for ${issueId}`);
+
+              // Run validation
+              const validationResult = await runMergeValidation({
+                projectPath,
+                issueId,
+              });
+
+              if (validationResult.valid) {
+                // Validation passed
+                console.log(`[merge-agent] ✓ Merge validation passed`);
+                logActivity('merge_complete', `Merge and validation completed by specialist`);
+
+                // Run post-merge cleanup (move PRD, update issue status)
+                await postMergeCleanup(issueId, projectPath);
+
+                return {
+                  success: true,
+                  validationStatus: 'PASS',
+                  testsStatus: 'SKIP', // Specialist ran tests, we trust the result
+                  notes: 'Merge completed by merge-agent specialist and validation passed',
+                };
+              } else {
+                // Validation failed - auto-revert
+                console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
+                logActivity('merge_validation_fail', `Validation failed: ${validationResult.failures.map(f => f.type).join(', ')}`);
+
+                // Attempt auto-revert
+                const revertSuccess = await autoRevertMerge(projectPath);
+
+                // Force push to revert the remote as well
+                if (revertSuccess) {
+                  try {
+                    await execAsync(`git push --force-with-lease origin ${targetBranch}`, {
+                      cwd: projectPath,
+                      encoding: 'utf-8',
+                    });
+                    console.log(`[merge-agent] ✓ Auto-revert pushed to remote`);
+                    logActivity('merge_auto_revert', 'Merge auto-reverted and pushed to remote');
+                  } catch (pushError: any) {
+                    console.error(`[merge-agent] ✗ Failed to push revert: ${pushError.message}`);
+                    logActivity('merge_revert_push_fail', 'Auto-revert successful but push failed');
+                  }
+                }
+
+                const failureReason = validationResult.failures.map(f => `${f.type}: ${f.message}`).join('; ');
+                const revertNote = revertSuccess
+                  ? 'Merge auto-reverted and force-pushed to remote'
+                  : 'WARNING: Auto-revert failed - manual cleanup required';
+
+                return {
+                  success: false,
+                  validationStatus: 'FAIL',
+                  reason: `Validation failed: ${failureReason}. ${revertNote}`,
+                  notes: 'Merge completed but validation failed, auto-reverted',
+                };
+              }
             }
           } catch {
             // Remote check failed, but local merge is done

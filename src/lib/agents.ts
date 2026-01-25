@@ -71,6 +71,7 @@ export interface AgentState {
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
   lastActivity?: string;
+  branch?: string; // Git branch name for this agent
 
   // Model routing & handoffs (Phase 4)
   complexity?: ComplexityLevel;
@@ -252,6 +253,7 @@ export interface SpawnOptions {
   runtime?: string;
   model?: string;
   prompt?: string;
+  difficulty?: ComplexityLevel;
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
@@ -275,6 +277,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     status: 'starting',
     startedAt: new Date().toISOString(),
     // Initialize Phase 4 fields
+    complexity: options.difficulty,
     handoffCount: 0,
     costSoFar: 0,
   };
@@ -329,7 +332,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       await execAsync(`tmux paste-buffer -t ${agentId}`);
       // Small delay to let paste complete, then send Enter
       await new Promise(resolve => setTimeout(resolve, 500));
-      await execAsync(`tmux send-keys -t ${agentId} Enter`);
+      await execAsync(`tmux send-keys -t "${agentId}" C-m`, { encoding: 'utf-8' });
     } else {
       console.error('Claude SessionStart hook did not fire in time, prompt not sent. Check ~/.claude/settings.json has SessionStart hook configured.');
     }
@@ -664,7 +667,7 @@ function checkAndSetupHooks(): void {
     console.log('Configuring Panopticon heartbeat hooks...');
     // Note: This runs during spawn which is now async, so we can use execAsync
     // But this is called from a sync context in checkAndSetupHooks, so we use fire-and-forget
-    exec('pan setup hooks', { stdio: 'pipe' }, (error) => {
+    exec('pan setup hooks', (error: Error | null) => {
       if (error) {
         console.warn('⚠ Failed to auto-configure hooks. Run `pan setup hooks` manually.');
       } else {
