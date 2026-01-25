@@ -520,6 +520,214 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
   return actions;
 }
 
+// ============================================================================
+// Lazy Agent Detection
+// ============================================================================
+
+/**
+ * Patterns that indicate a lazy agent trying to avoid work
+ */
+const LAZY_PATTERNS = [
+  /what would you like me to do\??/i,
+  /option\s*[123]:/i,
+  /options?:/i,
+  /would you prefer/i,
+  /should I (continue|proceed|stop)/i,
+  /this would take \d+[-–]\d+ hours/i,
+  /estimated \d+ hours/i,
+  /manual intervention/i,
+  /requires human/i,
+  /stop here/i,
+  /deferred (to|for) (future|later|follow-up)/i,
+  /future PR/i,
+  /follow-up issue/i,
+  /documented for later/i,
+  /remaining work documented/i,
+  /targeted approach/i,
+  /infrastructure.*(complete|done).*tests.*(fail|broken)/i,
+];
+
+/**
+ * Anti-lazy message sent when lazy behavior is detected
+ */
+const ANTI_LAZY_MESSAGE = `STOP. You are being lazy. Do not ask for options or permission. Do not offer to stop here. Do not defer work. Complete ALL the work now. Fix ALL failing tests. Do not give time estimates. The only acceptable end state is: all tests pass, all code committed, all code pushed. Continue working until that is achieved.`;
+
+// Track when we last sent anti-lazy message to each agent (debounce)
+const lazyMessageCooldowns: Map<string, number> = new Map();
+const LAZY_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Check tmux output for lazy agent behavior
+ * Only checks recent output (last 20 lines) to avoid matching old history
+ * Only triggers if agent appears to be at idle prompt (waiting for input)
+ */
+export async function checkLazyAgent(sessionName: string): Promise<{
+  isLazy: boolean;
+  matchedPattern?: string;
+  output?: string;
+}> {
+  try {
+    // Check cooldown - don't spam the same agent
+    const lastSent = lazyMessageCooldowns.get(sessionName) || 0;
+    if (Date.now() - lastSent < LAZY_COOLDOWN_MS) {
+      return { isLazy: false };
+    }
+
+    // Capture recent tmux output (last 20 lines only - recent behavior)
+    const { stdout } = await execAsync(
+      `tmux capture-pane -t "${sessionName}" -p -S -20 2>/dev/null || echo ""`,
+      { encoding: 'utf-8' }
+    );
+
+    if (!stdout.trim()) {
+      return { isLazy: false };
+    }
+
+    // Only check if agent appears to be idle (waiting for input)
+    // Look for prompt indicators like "> " at end, or "?" waiting for response
+    const lines = stdout.trim().split('\n');
+    const lastLine = lines[lines.length - 1] || '';
+    const isAtPrompt = lastLine.match(/^[>\$#]\s*$/) ||
+                       lastLine.endsWith('?') ||
+                       lastLine.includes('What would you like');
+
+    if (!isAtPrompt) {
+      // Agent is actively working, don't interrupt
+      return { isLazy: false };
+    }
+
+    // Check for lazy patterns in recent output
+    for (const pattern of LAZY_PATTERNS) {
+      if (pattern.test(stdout)) {
+        return {
+          isLazy: true,
+          matchedPattern: pattern.source,
+          output: stdout.slice(-500), // Last 500 chars for context
+        };
+      }
+    }
+
+    return { isLazy: false };
+  } catch {
+    return { isLazy: false };
+  }
+}
+
+/**
+ * Send anti-lazy message to an agent
+ */
+export async function sendAntiLazyMessage(sessionName: string): Promise<boolean> {
+  try {
+    // Send the anti-lazy message
+    await execAsync(
+      `tmux send-keys -t "${sessionName}" "${ANTI_LAZY_MESSAGE.replace(/"/g, '\\"')}"`,
+      { encoding: 'utf-8' }
+    );
+    // Send Enter
+    await execAsync(`tmux send-keys -t "${sessionName}" Enter`, { encoding: 'utf-8' });
+
+    // Record cooldown to prevent spam
+    lazyMessageCooldowns.set(sessionName, Date.now());
+
+    console.log(`[deacon] Sent anti-lazy message to ${sessionName}`);
+    return true;
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[deacon] Failed to send anti-lazy message to ${sessionName}:`, msg);
+    return false;
+  }
+}
+
+/**
+ * Check if an issue has completed or is in the review pipeline (agent has handed off)
+ *
+ * Returns true if:
+ * - Issue has been merged (status cleared)
+ * - Issue is in review pipeline (reviewing, testing, passed, readyForMerge)
+ *
+ * In these cases, the agent has done its job and shouldn't get anti-lazy messages.
+ */
+function isIssueCompletedOrInReview(agentId: string): boolean {
+  try {
+    // Extract issue ID from agent ID (e.g., "agent-pan-97" -> "PAN-97")
+    const match = agentId.match(/agent-([a-z]+-\d+)/i);
+    if (!match) return false;
+
+    const issueId = match[1].toUpperCase();
+
+    if (!existsSync(REVIEW_STATUS_FILE)) {
+      // No review status file at all - assume agent hasn't started review yet
+      return false;
+    }
+
+    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
+    const statuses = JSON.parse(content);
+    const status = statuses[issueId];
+
+    // If status was cleared (after merge), agent has completed
+    if (!status) {
+      // Check if issue appears to have been processed before
+      // No status = either never started review, or was cleared after merge
+      // We'll be conservative: if the agent is idle and no status exists,
+      // check if Linear/GitHub issue is closed
+      return false; // Will need to check issue tracker status separately
+    }
+
+    // If issue is in review pipeline (reviewing, testing, or passed), agent has handed off
+    const hasCompletedReview =
+      status.reviewStatus === 'reviewing' ||
+      status.reviewStatus === 'passed' ||
+      status.testStatus === 'testing' ||
+      status.testStatus === 'passed' ||
+      status.readyForMerge === true ||
+      status.mergeStatus === 'merging' ||
+      status.mergeStatus === 'merged';
+
+    return hasCompletedReview;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check all active agents for lazy behavior and auto-correct
+ */
+export async function checkAndCorrectLazyAgents(): Promise<string[]> {
+  const actions: string[] = [];
+
+  // Get all running agents
+  const agents = listRunningAgents();
+
+  for (const agent of agents) {
+    if (!agent.tmuxActive) continue;
+
+    // Skip agents whose issues are already in the review pipeline or completed
+    // They've done their work and handed off - not lazy
+    if (isIssueCompletedOrInReview(agent.id)) {
+      continue;
+    }
+
+    // Check for lazy behavior
+    const lazyCheck = await checkLazyAgent(agent.id);
+
+    if (lazyCheck.isLazy) {
+      console.log(`[deacon] Lazy agent detected: ${agent.id} (pattern: ${lazyCheck.matchedPattern})`);
+
+      // Send correction message
+      const sent = await sendAntiLazyMessage(agent.id);
+      if (sent) {
+        actions.push(`Corrected lazy agent ${agent.id} (matched: ${lazyCheck.matchedPattern})`);
+      }
+    }
+  }
+
+  return actions;
+}
+
+// ============================================================================
+// Orphaned Review Status Detection
+// ============================================================================
+
 /**
  * Check for orphaned review/test statuses (PAN-88 follow-up)
  *
@@ -695,6 +903,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
+
+  // Check for lazy agent behavior and auto-correct
+  const lazyActions = await checkAndCorrectLazyAgents();
+  actions.push(...lazyActions);
 
   saveState(state);
 

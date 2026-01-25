@@ -65,11 +65,16 @@ function validateFeatureName(name: string): boolean {
 
 /**
  * Create a git worktree
+ * @param repoPath Path to the source git repository
+ * @param targetPath Where to create the worktree
+ * @param branchName Name of the feature branch to create/checkout
+ * @param defaultBranch Base branch to create new branches from (default: 'main')
  */
 async function createWorktree(
   repoPath: string,
   targetPath: string,
-  branchName: string
+  branchName: string,
+  defaultBranch: string = 'main'
 ): Promise<{ success: boolean; message: string }> {
   try {
     // Fetch latest from origin
@@ -89,7 +94,8 @@ async function createWorktree(
     if (branchExists) {
       await execAsync(`git worktree add "${targetPath}" "${branchName}"`, { cwd: repoPath });
     } else {
-      await execAsync(`git worktree add "${targetPath}" -b "${branchName}" main`, { cwd: repoPath });
+      // Create new branch from the configured default branch
+      await execAsync(`git worktree add "${targetPath}" -b "${branchName}" "${defaultBranch}"`, { cwd: repoPath });
     }
 
     return { success: true, message: `Created worktree at ${targetPath}` };
@@ -358,10 +364,12 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       const targetPath = join(workspacePath, repo.name);
       const branchPrefix = repo.branch_prefix || 'feature/';
       const branchName = `${branchPrefix}${featureName}`;
+      // Per-repo default_branch overrides workspace-level, falls back to 'main'
+      const defaultBranch = repo.default_branch || workspaceConfig.default_branch || 'main';
 
-      const worktreeResult = await createWorktree(repoPath, targetPath, branchName);
+      const worktreeResult = await createWorktree(repoPath, targetPath, branchName, defaultBranch);
       if (worktreeResult.success) {
-        result.steps.push(`Created worktree for ${repo.name}: ${branchName}`);
+        result.steps.push(`Created worktree for ${repo.name}: ${branchName} (from ${defaultBranch})`);
       } else {
         result.errors.push(worktreeResult.message);
       }
@@ -369,9 +377,10 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   } else {
     // Monorepo: create single worktree
     const branchName = `feature/${featureName}`;
-    const worktreeResult = await createWorktree(projectConfig.path, workspacePath, branchName);
+    const defaultBranch = workspaceConfig.default_branch || 'main';
+    const worktreeResult = await createWorktree(projectConfig.path, workspacePath, branchName, defaultBranch);
     if (worktreeResult.success) {
-      result.steps.push(`Created worktree: ${branchName}`);
+      result.steps.push(`Created worktree: ${branchName} (from ${defaultBranch})`);
     } else {
       result.errors.push(worktreeResult.message);
     }
@@ -458,6 +467,20 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
           const targetPath = join(devcontainerDir, file);
           copyFileSync(sourcePath, targetPath);
         }
+      }
+    }
+
+    // Create ./dev symlink at workspace root pointing to .devcontainer/dev
+    // Symlink keeps changes in sync - editing ./dev updates .devcontainer/dev
+    const devScriptInContainer = join(devcontainerDir, 'dev');
+    const devScriptAtRoot = join(workspacePath, 'dev');
+    if (existsSync(devScriptInContainer) && !existsSync(devScriptAtRoot)) {
+      try {
+        symlinkSync('.devcontainer/dev', devScriptAtRoot);
+        chmodSync(devScriptInContainer, 0o755); // Make executable
+        result.steps.push('Created ./dev symlink');
+      } catch (error) {
+        result.errors.push(`Failed to create ./dev symlink: ${error}`);
       }
     }
   }

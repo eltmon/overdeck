@@ -415,6 +415,39 @@ WebFetch({
 })
 ```
 
+### UI Design with Google Stitch (Optional)
+
+If the issue involves UI work and the Stitch MCP is available, you can use it to:
+
+1. **Generate UI designs** from requirements
+2. **Create DESIGN.md** files for consistent styling
+3. **Document designs in STATE.md** for worker agents
+
+**Check if Stitch is available:**
+```bash
+claude mcp list | grep stitch
+```
+
+**If available, for UI issues:**
+- Use Stitch tools to generate screen designs
+- Create a DESIGN.md using `/stitch-design-md` skill
+- Document Stitch project/screen IDs in STATE.md
+
+**Example STATE.md section for UI work:**
+```markdown
+## UI Designs
+
+### Stitch Assets
+- **Project ID:** 12345678
+- **Screen:** "Dashboard" (screen ID: 87654321)
+- **Design Notes:** Dark mode, glassmorphism cards, gradient accents
+- **DESIGN.md:** `src/components/DESIGN.md`
+
+Worker: Use `/stitch-react-components` to convert to React components.
+```
+
+If Stitch is NOT available, document UI requirements in prose and let the worker implement from description.
+
 ## When Complete
 
 Your plan should be:

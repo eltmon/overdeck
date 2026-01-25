@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2 } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 
@@ -345,14 +345,20 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             </div>
             <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
               {grouped[status].map((issue) => {
-                const agent = agents.find(
-                  (a) => a.issueId?.toLowerCase() === issue.identifier.toLowerCase()
+                const issueIdLower = issue.identifier.toLowerCase();
+                // Find both planning and work agents separately
+                const planningAgent = agents.find(
+                  (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'planning'
+                );
+                const workAgent = agents.find(
+                  (a) => a.issueId?.toLowerCase() === issueIdLower && a.type !== 'planning'
                 );
                 return (
                   <IssueCard
                     key={issue.id}
                     issue={issue}
-                    agent={agent}
+                    planningAgent={planningAgent}
+                    workAgent={workAgent}
                     cost={issueCosts[issue.identifier.toLowerCase()]}
                     isSelected={selectedIssue === issue.identifier}
                     onSelect={() => onSelectIssue(
@@ -495,7 +501,8 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
 
 interface IssueCardProps {
   issue: Issue;
-  agent?: Agent;
+  planningAgent?: Agent;
+  workAgent?: Agent;
   cost?: IssueCost;
   isSelected: boolean;
   onSelect: () => void;
@@ -503,9 +510,17 @@ interface IssueCardProps {
   onViewBeads?: (issue: Issue) => void;
 }
 
-function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
+function IssueCard({ issue, planningAgent, workAgent, cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
   const queryClient = useQueryClient();
-  const isRunning = agent && agent.status !== 'dead';
+
+  // Determine which agent is relevant based on issue status
+  const isPlanning = STATUS_LABELS[issue.status] === 'planning';
+  const activeAgent = isPlanning ? planningAgent : workAgent;
+  const isRunning = activeAgent && activeAgent.status !== 'dead';
+
+  // For display in terminal viewer, use the active agent
+  const agent = activeAgent;
+
   const [showAbortConfirm, setShowAbortConfirm] = useState(false);
   const [deleteWorkspace, setDeleteWorkspace] = useState(false);
 
@@ -631,6 +646,30 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
       setShowAbortConfirm(false);
       setDeleteWorkspace(false);
       queryClient.invalidateQueries({ queryKey: ['issues'] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    },
+  });
+
+  // Deep wipe mutation - completely resets issue state
+  const deepWipeMutation = useMutation({
+    mutationFn: async (options: { deleteWorkspace: boolean }) => {
+      const res = await fetch(`/api/issues/${issue.identifier}/deep-wipe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteWorkspace: options.deleteWorkspace }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Deep wipe failed');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setShowAbortConfirm(false);
+      setDeleteWorkspace(false);
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      console.log('Deep wipe completed:', data.cleanupLog);
     },
   });
 
@@ -820,7 +859,7 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
 
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-600">
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-600 flex-wrap">
           <button
             onClick={handlePlan}
             className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
@@ -836,6 +875,20 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
           >
             {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
             {startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm(`Deep wipe ${issue.identifier}? This will clean up any stale state:\n• Kill agents\n• Delete agent state\n• Delete workspace & branches`)) {
+                deepWipeMutation.mutate({ deleteWorkspace: true });
+              }
+            }}
+            disabled={deepWipeMutation.isPending}
+            className="flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors disabled:opacity-50"
+            title="Clean up stale workspace, branches, and state"
+          >
+            {deepWipeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            {deepWipeMutation.isPending ? 'Wiping...' : 'Reset'}
           </button>
         </div>
       )}
@@ -880,7 +933,7 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
       {/* Abort confirmation panel */}
       {showAbortConfirm && (
         <div className="mt-3 pt-3 border-t border-orange-600/50 bg-orange-950/30 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
-          <p className="text-xs text-orange-300 mb-2">Abort planning and return to Todo?</p>
+          <p className="text-xs text-orange-300 mb-2">Abort planning and return to Backlog?</p>
           <label className="flex items-center gap-2 text-xs text-gray-400 mb-3 cursor-pointer">
             <input
               type="checkbox"
@@ -891,7 +944,7 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
             />
             Also delete workspace (git worktree)
           </label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={handleAbortCancel}
               className="px-2 py-1 text-xs text-gray-400 hover:text-white transition-colors"
@@ -900,10 +953,23 @@ function IssueCard({ issue, agent, cost, isSelected, onSelect, onPlan, onViewBea
             </button>
             <button
               onClick={handleAbortConfirm}
-              disabled={abortPlanningMutation.isPending}
+              disabled={abortPlanningMutation.isPending || deepWipeMutation.isPending}
               className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-500 text-white rounded transition-colors disabled:opacity-50"
             >
-              {abortPlanningMutation.isPending ? 'Aborting...' : 'Confirm Abort'}
+              {abortPlanningMutation.isPending ? 'Aborting...' : 'Abort'}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Deep wipe ${issue.identifier}? This will:\n• Kill all agents\n• Delete all state\n• Reset to Backlog\n• Remove labels${deleteWorkspace ? '\n• Delete workspace' : ''}`)) {
+                  deepWipeMutation.mutate({ deleteWorkspace });
+                }
+              }}
+              disabled={abortPlanningMutation.isPending || deepWipeMutation.isPending}
+              className="px-2 py-1 text-xs bg-red-700 hover:bg-red-600 text-white rounded transition-colors disabled:opacity-50"
+              title="Complete reset - kills agents, deletes state, resets Linear"
+            >
+              {deepWipeMutation.isPending ? 'Wiping...' : '🔥 Deep Wipe'}
             </button>
           </div>
         </div>

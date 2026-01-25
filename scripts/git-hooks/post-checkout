@@ -1,0 +1,109 @@
+#!/bin/bash
+#
+# Git post-checkout hook to guard main project directories
+# Prevents accidental checkouts away from main in the primary project directory
+#
+# Install: ln -sf /path/to/panopticon/scripts/git-hooks/post-checkout .git/hooks/post-checkout
+# Or: pan projects add /path/to/project (auto-installs hooks)
+#
+# This hook only activates in the MAIN project directory (not worktrees).
+# Worktrees can freely checkout any branch - that's their purpose.
+#
+# Auto-revert behavior:
+# - Agents (PANOPTICON_AGENT=1): Always auto-revert (agents should never checkout in main)
+# - Manual (PANOPTICON_AUTO_REVERT_CHECKOUT=1): Opt-in auto-revert for humans
+# - Default: Warn only, don't revert
+
+# Get the previous and new HEAD refs
+PREV_HEAD=$1
+NEW_HEAD=$2
+IS_BRANCH_CHECKOUT=$3  # 1 if branch checkout, 0 if file checkout
+
+# Only care about branch checkouts
+if [ "$IS_BRANCH_CHECKOUT" != "1" ]; then
+    exit 0
+fi
+
+# Check if we're in a worktree (worktrees have .git as a file, not directory)
+if [ -f ".git" ]; then
+    # This is a worktree - allow any checkout
+    exit 0
+fi
+
+# Check if .git is a directory (main repo)
+if [ ! -d ".git" ]; then
+    # Not a git repo at all
+    exit 0
+fi
+
+# Get current branch name
+CURRENT_BRANCH=$(git branch --show-current 2>/dev/null)
+
+# If we're on main or master, all good
+if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
+    exit 0
+fi
+
+# We're in the main project directory and NOT on main - this is bad!
+echo ""
+echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+echo "║  ⚠️  WARNING: Main project directory is not on 'main' branch!               ║"
+echo "╠══════════════════════════════════════════════════════════════════════════════╣"
+echo "║                                                                              ║"
+echo "║  Current branch: $CURRENT_BRANCH"
+echo "║  Location: $(pwd)"
+echo "║                                                                              ║"
+echo "║  The main project directory should ALWAYS stay on 'main'.                   ║"
+echo "║  All feature work should happen in workspaces (git worktrees).              ║"
+echo "║                                                                              ║"
+echo "║  To fix this:                                                               ║"
+echo "║    git checkout main                                                        ║"
+echo "║                                                                              ║"
+echo "║  To work on a feature:                                                      ║"
+echo "║    pan workspace create ISSUE-ID                                            ║"
+echo "║                                                                              ║"
+echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Auto-revert for agents and planning sessions
+# They should NEVER be checking out in main project
+IS_PANOPTICON_SESSION=0
+
+# Check explicit environment variables
+if [ "$PANOPTICON_AGENT" = "1" ] || [ -n "$PANOPTICON_AGENT_ID" ]; then
+    IS_PANOPTICON_SESSION=1
+fi
+
+# Check for planning session
+if [ "$PANOPTICON_PLANNING" = "1" ] || [ -n "$PANOPTICON_PLANNING_ISSUE" ]; then
+    IS_PANOPTICON_SESSION=1
+fi
+
+# Check tmux session name pattern (agent-* or planning-* or specialist-*)
+if [ -n "$TMUX" ]; then
+    TMUX_SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null || true)
+    case "$TMUX_SESSION" in
+        agent-*|planning-*|specialist-*)
+            IS_PANOPTICON_SESSION=1
+            ;;
+    esac
+fi
+
+if [ "$IS_PANOPTICON_SESSION" = "1" ]; then
+    echo "🤖 Panopticon session detected - auto-reverting to main branch..."
+    git checkout main --quiet
+    echo "✓ Reverted to main branch. Agents/planning must use workspaces for feature branches."
+    exit 0
+fi
+
+# Check for manual auto-revert environment variable
+if [ "$PANOPTICON_AUTO_REVERT_CHECKOUT" = "1" ]; then
+    echo "Auto-reverting to main branch (PANOPTICON_AUTO_REVERT_CHECKOUT=1)..."
+    git checkout main --quiet
+    echo "Reverted to main branch."
+    exit 0
+fi
+
+# Return success but with warning - don't block the checkout
+# The warning is enough for humans to notice
+exit 0

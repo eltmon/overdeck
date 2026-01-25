@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync, rmSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -122,6 +122,7 @@ interface ReviewStatus {
   issueId: string;
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
+  mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
   reviewNotes?: string;
   testNotes?: string;
   updatedAt: string;
@@ -4664,11 +4665,30 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
     });
   }
 
+  // Check if already merging
+  if (reviewStatus?.mergeStatus === 'merging') {
+    return res.status(400).json({
+      error: 'Merge already in progress',
+      mergeStatus: 'merging',
+    });
+  }
+
+  // Check if already merged
+  if (reviewStatus?.mergeStatus === 'merged') {
+    return res.status(400).json({
+      error: 'Already merged',
+      mergeStatus: 'merged',
+    });
+  }
+
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   const branchName = `feature/${issueLower}`;
+
+  // Mark merge as in progress
+  setReviewStatus(issueId, { mergeStatus: 'merging' });
 
   // Mark operation as pending
   setPendingOperation(issueId, 'merge');
@@ -4729,12 +4749,14 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       });
     } else {
       const error = mergeResult.notes || 'Merge failed';
+      setReviewStatus(issueId, { mergeStatus: 'failed' });
       completePendingOperation(issueId, error);
       return res.status(500).json({ error, mergeResult });
     }
 
   } catch (error: any) {
     console.error(`[merge] Error:`, error);
+    setReviewStatus(issueId, { mergeStatus: 'failed' });
     completePendingOperation(issueId, error.message);
     return res.status(500).json({ error: error.message });
   }
@@ -5296,11 +5318,30 @@ app.post('/api/agents', async (req, res) => {
     return res.status(400).json({ error: 'issueId required' });
   }
 
+  const issueLower = issueId.toLowerCase();
+
+  // SAFEGUARD: Check if planning agent is still running
+  // Never start work agent while planning agent is active - they'll conflict
+  const planningSession = `planning-${issueLower}`;
+  try {
+    const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
+    if (sessions.split('\n').includes(planningSession)) {
+      console.warn(`[start-agent] BLOCKED: Planning agent still running for ${issueId}`);
+      return res.status(409).json({
+        error: `Planning agent is still running for ${issueId}. Kill the planning session first or wait for it to complete.`,
+        planningSession,
+        hint: 'Use "Complete Planning" or "Abort Planning" to end the planning session before starting work.',
+      });
+    }
+  } catch (tmuxErr) {
+    // If tmux check fails, log but continue (fail-open)
+    console.warn(`[start-agent] Could not check for planning session: ${tmuxErr}`);
+  }
+
   try {
     // Extract prefix from issue ID (e.g., "MIN" from "MIN-645")
     const issuePrefix = issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
-    const issueLower = issueId.toLowerCase();
 
     // Before starting agent, commit and push any planning artifacts
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -6002,16 +6043,26 @@ Start by exploring the codebase to understand the context, then begin the discov
       const agentCwd = workspaceCreated ? workspacePath : projectPath;
 
       // Start tmux session with Claude Code for planning (interactive TUI mode)
-      // Just start Claude interactively - the prompt file is in the workspace for reference
-      const claudeCommand = `cd "${agentCwd}" && claude --dangerously-skip-permissions`;
+      // Use a launcher script to safely pass the prompt (avoids shell escaping issues)
+      const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
+      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+      await execAsync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
+
+      // Write a launcher script that safely passes the prompt
+      const launcherScript = join(agentStateDir, 'launcher.sh');
+      const promptFile = join(agentStateDir, 'init-prompt.txt');
+      writeFileSync(promptFile, initMessage);
+      writeFileSync(launcherScript, `#!/bin/bash
+cd "${agentCwd}"
+prompt=$(cat "${promptFile}")
+exec claude --dangerously-skip-permissions "$prompt"
+`, { mode: 0o755 });
 
       // Ensure tmux is running before starting session
       await ensureTmuxRunning();
-      await execAsync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
+      await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
 
-      // Create agent state file so QuestionDialog can find the JSONL path
-      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-      await execAsync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
+      // Write agent state file so QuestionDialog can find the JSONL path
       writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
         id: sessionName,
         issueId: issue.identifier,
@@ -6030,24 +6081,7 @@ Start by exploring the codebase to understand the context, then begin the discov
         // Ignore resize errors
       }
 
-      // Wait for Claude to initialize, then send the planning prompt
-      setTimeout(async () => {
-        try {
-          // Send a short message that tells Claude to read the prompt file
-          const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
-          // Escape special characters for tmux send-keys
-          const escapedMessage = initMessage.replace(/'/g, "'\\''");
-          // Send text first, then Enter SEPARATELY with a delay
-          // This prevents Enter being interpreted as a newline in the text
-          await execAsync(`tmux send-keys -t ${sessionName} '${escapedMessage}'`, { encoding: 'utf-8' });
-          // Wait 500ms for text to be fully received before sending Enter
-          await new Promise(resolve => setTimeout(resolve, 500));
-          await execAsync(`tmux send-keys -t ${sessionName} C-m`, { encoding: 'utf-8' });
-          console.log(`Sent planning prompt to ${sessionName}`);
-        } catch (err) {
-          console.error('Failed to send planning prompt:', err);
-        }
-      }, 6000); // Wait 6 seconds for Claude to fully initialize (TUI takes time)
+      console.log(`Started planning agent ${sessionName} with initial prompt`);
 
       planningAgentStarted = true;
     } catch (err: any) {
@@ -6456,17 +6490,60 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
     await execAsync(`tmux kill-session -t planning-${id.toLowerCase()} 2>/dev/null || true`, { encoding: 'utf-8' });
 
     // Clean up agent state files to prevent stale "running" status
+    // Note: issueIdentifier is the human-readable ID (e.g., "MIN-665"), not the Linear UUID
     const agentStateDir = sessionName ? join(homedir(), '.panopticon', 'agents', sessionName) : null;
-    const workAgentStateDir = join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
+    const workAgentStateDir = issueIdentifier
+      ? join(homedir(), '.panopticon', 'agents', `agent-${issueIdentifier.toLowerCase()}`)
+      : join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
+
+    console.log(`[abort-planning] Cleanup paths: sessionName=${sessionName}, issueIdentifier=${issueIdentifier}`);
+    console.log(`[abort-planning] agentStateDir=${agentStateDir}, exists=${agentStateDir ? existsSync(agentStateDir) : 'null'}`);
+    console.log(`[abort-planning] workAgentStateDir=${workAgentStateDir}, exists=${existsSync(workAgentStateDir)}`);
+
     try {
       if (agentStateDir && existsSync(agentStateDir)) {
         rmSync(agentStateDir, { recursive: true, force: true });
+        console.log(`[abort-planning] ✓ Cleaned up planning agent state: ${agentStateDir}`);
       }
       if (existsSync(workAgentStateDir)) {
         rmSync(workAgentStateDir, { recursive: true, force: true });
+        console.log(`[abort-planning] ✓ Cleaned up work agent state: ${workAgentStateDir}`);
       }
     } catch (cleanupErr) {
-      console.log('Warning: Could not clean up agent state:', cleanupErr);
+      console.log('[abort-planning] Warning: Could not clean up agent state:', cleanupErr);
+    }
+
+    // Clean up legacy planning directory (outside workspace, in project root)
+    // This exists when planning started before workspace creation or workspace was skipped
+    if (issueIdentifier) {
+      try {
+        // Find project path to locate legacy planning dir
+        let projectPath: string | undefined;
+        const prefix = issueIdentifier.split('-')[0].toUpperCase();
+
+        const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+        if (existsSync(projectsYamlPath)) {
+          const yaml = await import('js-yaml');
+          const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
+          for (const [, config] of Object.entries(projectsConfig.projects || {})) {
+            const projConfig = config as any;
+            if (projConfig.linear_team?.toUpperCase() === prefix) {
+              projectPath = projConfig.path;
+              break;
+            }
+          }
+        }
+
+        if (projectPath) {
+          const legacyPlanningDir = join(projectPath, '.planning', issueIdentifier.toLowerCase());
+          if (existsSync(legacyPlanningDir)) {
+            rmSync(legacyPlanningDir, { recursive: true, force: true });
+            console.log(`Cleaned up legacy planning dir: ${legacyPlanningDir}`);
+          }
+        }
+      } catch (planningCleanupErr) {
+        console.log('Warning: Could not clean up legacy planning dir:', planningCleanupErr);
+      }
     }
 
     // Optionally delete the workspace
@@ -6795,9 +6872,9 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey: linearKey });
 
-    // Find the issue
-    const issueResult = await client.issueSearch(id, { first: 1 });
-    const issue = issueResult.nodes[0];
+    // Find the issue by identifier (e.g., "MIN-665")
+    // Linear SDK accepts both UUIDs and identifiers
+    const issue = await client.issue(id);
 
     if (!issue) {
       return res.status(404).json({ error: `Issue ${id} not found` });
@@ -6836,6 +6913,171 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
   } catch (error: any) {
     console.error('Error reopening issue:', error);
     res.status(500).json({ error: 'Failed to reopen issue: ' + error.message });
+  }
+});
+
+// Deep wipe - completely clean up all state for an issue
+app.post('/api/issues/:id/deep-wipe', async (req, res) => {
+  const { id } = req.params;
+  const { deleteWorkspace = false } = req.body || {};
+  const cleanupLog: string[] = [];
+
+  try {
+    const issueLower = id.toLowerCase();
+    const githubCheck = isGitHubIssue(id);
+
+    // 1. Kill all tmux sessions for this issue
+    const sessionPatterns = [
+      `planning-${issueLower}`,
+      `agent-${issueLower}`,
+    ];
+    for (const session of sessionPatterns) {
+      try {
+        await execAsync(`tmux kill-session -t ${session} 2>/dev/null || true`, { encoding: 'utf-8' });
+        cleanupLog.push(`Killed tmux session: ${session}`);
+      } catch (e) {
+        // Session might not exist
+      }
+    }
+
+    // 2. Clean up agent state directories
+    const agentDirs = [
+      join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`),
+      join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`),
+    ];
+    for (const dir of agentDirs) {
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true });
+        cleanupLog.push(`Deleted agent state: ${dir}`);
+      }
+    }
+
+    // 3. Find project path for workspace and planning dir cleanup
+    let projectPath: string | undefined;
+    if (!githubCheck.isGitHub) {
+      const prefix = id.split('-')[0].toUpperCase();
+      const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+      if (existsSync(projectsYamlPath)) {
+        const yaml = await import('js-yaml');
+        const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
+        for (const [, config] of Object.entries(projectsConfig.projects || {})) {
+          const projConfig = config as any;
+          if (projConfig.linear_team?.toUpperCase() === prefix) {
+            projectPath = projConfig.path;
+            break;
+          }
+        }
+      }
+    } else {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
+    }
+
+    // 4. Clean up legacy planning directory
+    if (projectPath) {
+      const legacyPlanningDir = join(projectPath, '.planning', issueLower);
+      if (existsSync(legacyPlanningDir)) {
+        rmSync(legacyPlanningDir, { recursive: true, force: true });
+        cleanupLog.push(`Deleted legacy planning dir: ${legacyPlanningDir}`);
+      }
+    }
+
+    // 5. Optionally delete workspace
+    if (deleteWorkspace && projectPath) {
+      const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+      const branchName = `feature/${issueLower}`;
+      const gitDirs = ['api', 'frontend', 'fe', '.'];
+
+      // Helper to run git commands with timeout (5 seconds for local, 10 for remote)
+      const gitExec = async (cmd: string, timeoutMs = 5000) => {
+        try {
+          await execAsync(cmd, { encoding: 'utf-8', timeout: timeoutMs });
+        } catch (e) {
+          // Command failed or timed out - continue anyway
+        }
+      };
+
+      // Remove git worktrees first
+      for (const gitDir of gitDirs) {
+        const gitPath = join(projectPath, gitDir);
+        if (existsSync(join(gitPath, '.git'))) {
+          // Remove worktree - use prune instead of remove to avoid hangs
+          await gitExec(`cd "${gitPath}" && git worktree prune 2>/dev/null || true`);
+
+          // Also try explicit remove for subdirs
+          const subDirs = ['fe', 'api', 'frontend'];
+          for (const subDir of subDirs) {
+            const subPath = join(workspacePath, subDir);
+            await gitExec(`cd "${gitPath}" && git worktree remove "${subPath}" --force 2>/dev/null || true`);
+          }
+
+          // Delete local branch
+          await gitExec(`cd "${gitPath}" && git branch -D "${branchName}" 2>/dev/null || true`);
+
+          // Delete remote branch (longer timeout for network)
+          await gitExec(`cd "${gitPath}" && git push origin --delete "${branchName}" 2>/dev/null || true`, 10000);
+        }
+      }
+
+      // Delete workspace directory if it still exists
+      if (existsSync(workspacePath)) {
+        rmSync(workspacePath, { recursive: true, force: true });
+      }
+      cleanupLog.push(`Deleted workspace and branches: ${branchName}`);
+    }
+
+    // 6. Reset Linear issue state and remove labels
+    if (!githubCheck.isGitHub) {
+      const linearKey = process.env.LINEAR_API_KEY || '';
+      if (linearKey) {
+        try {
+          const { LinearClient } = await import('@linear/sdk');
+          const client = new LinearClient({ apiKey: linearKey });
+          const issue = await client.issue(id);
+
+          if (issue) {
+            // Get team and backlog state
+            const team = await issue.team;
+            if (team) {
+              const states = await team.states();
+              const backlogState = states.nodes.find(s => s.type === 'backlog');
+
+              if (backlogState) {
+                await issue.update({ stateId: backlogState.id });
+                cleanupLog.push(`Reset Linear status to Backlog`);
+              }
+
+              // Remove labels
+              const labels = await issue.labels();
+              const labelsToRemove = labels.nodes.filter(l =>
+                l.name.toLowerCase() === 'review ready' ||
+                l.name.toLowerCase() === 'planning'
+              );
+              if (labelsToRemove.length > 0) {
+                const currentLabelIds = labels.nodes.map(l => l.id);
+                const newLabelIds = currentLabelIds.filter(
+                  lid => !labelsToRemove.some(lr => lr.id === lid)
+                );
+                await issue.update({ labelIds: newLabelIds });
+                cleanupLog.push(`Removed labels: ${labelsToRemove.map(l => l.name).join(', ')}`);
+              }
+            }
+          }
+        } catch (linearErr) {
+          cleanupLog.push(`Linear cleanup warning: ${(linearErr as Error).message}`);
+        }
+      }
+    }
+
+    console.log(`[deep-wipe] Completed for ${id}:`, cleanupLog);
+    res.json({
+      success: true,
+      message: `Deep wipe completed for ${id}`,
+      cleanupLog,
+    });
+  } catch (error: any) {
+    console.error('Error in deep wipe:', error);
+    res.status(500).json({ error: 'Deep wipe failed: ' + error.message, partialLog: cleanupLog });
   }
 });
 

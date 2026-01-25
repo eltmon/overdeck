@@ -7,6 +7,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, appendFileSync } from 'fs';
 import { join, basename } from 'path';
+import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { PANOPTICON_HOME } from '../paths.js';
@@ -595,20 +596,25 @@ You will be woken up when your services are needed. For now, acknowledge your in
 Say: "I am the ${name} specialist, ready and waiting for tasks."`;
 
   try {
-    // Spawn Claude Code fresh in tmux
+    // Write identity prompt and launcher script to avoid shell escaping issues
+    const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
+    await execAsync(`mkdir -p "${agentDir}"`, { encoding: 'utf-8' });
+
+    const promptFile = join(agentDir, 'identity-prompt.md');
+    const launcherScript = join(agentDir, 'launcher.sh');
+
+    writeFileSync(promptFile, identityPrompt);
+    writeFileSync(launcherScript, `#!/bin/bash
+cd "${cwd}"
+prompt=$(cat "${promptFile}")
+exec claude --dangerously-skip-permissions "$prompt"
+`, { mode: 0o755 });
+
+    // Spawn Claude Code via launcher script (safely passes prompt with any characters)
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude --dangerously-skip-permissions"`,
+      `tmux new-session -d -s "${tmuxSession}" "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
     );
-
-    // Wait for Claude to start, then send identity prompt
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    const escapedPrompt = identityPrompt.replace(/'/g, "'\\''");
-    // Send text and Enter SEPARATELY to avoid Enter being interpreted as newline
-    await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
 
     // Record wake event
     recordWake(name);

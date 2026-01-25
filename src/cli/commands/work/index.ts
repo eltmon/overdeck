@@ -16,6 +16,7 @@ import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
 import { reopenCommand } from './reopen.js';
 import { requestReviewCommand } from './request-review.js';
+import { wipeCommand } from './wipe.js';
 
 export function registerWorkCommands(program: Command): void {
   const work = program
@@ -147,6 +148,13 @@ export function registerWorkCommands(program: Command): void {
     .description('Request re-review after fixing feedback (max 3 auto-requeues)')
     .option('-m, --message <text>', 'Message for reviewers describing fixes')
     .action(requestReviewCommand);
+
+  work
+    .command('wipe <id>')
+    .description('Deep wipe: completely reset all state for an issue')
+    .option('-w, --workspace', 'Also delete the workspace')
+    .option('-y, --yes', 'Skip confirmation')
+    .action(wipeCommand);
 }
 
 // Re-export individual commands for direct use

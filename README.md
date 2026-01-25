@@ -1578,6 +1578,50 @@ This allows multiple agents to work on different features simultaneously without
 >
 > If you see a warning like "Main project is on branch 'feature/xxx' instead of 'main'", something has incorrectly checked out a feature branch in the main project. Fix it with `git checkout main`.
 
+#### Git Hooks for Branch Protection
+
+Panopticon provides git hooks to enforce the main branch convention. These hooks are automatically installed:
+
+- **On `pan project add`** - Hooks are installed when registering a new project
+- **On `pan sync`** - Hooks are updated in all registered projects
+
+The hooks are polyrepo-aware and will install in all git repositories within your project.
+
+**Auto-revert behavior:**
+- **Agents & planning sessions**: Automatically revert to `main` if they accidentally checkout a feature branch
+- **Human users**: Display a prominent warning (no auto-revert by default)
+
+To enable auto-revert for humans:
+```bash
+export PANOPTICON_AUTO_REVERT_CHECKOUT=1  # Add to .bashrc/.zshrc
+```
+
+Manual hook installation (for projects not in registry):
+```bash
+./scripts/install-git-hooks.sh /path/to/your/project
+```
+
+#### Planning vs Work Agent Safeguard
+
+The dashboard prevents starting a work agent (`agent-<issue>`) while a planning agent (`planning-<issue>`) is still running for the same issue. This prevents conflicts where both agents try to modify the same workspace.
+
+If you see "Planning agent is still running" when trying to start work:
+1. **Complete the planning session** - Use "Complete Planning" button
+2. **Or abort planning** - Use "Abort Planning" if you want to discard
+3. **Or kill the session manually** - `tmux kill-session -t planning-<issue>`
+
+#### Specialist Agent Safeguards
+
+All specialist agents (review-agent, test-agent, merge-agent) are configured to:
+1. **Run in workspaces only** - Never in the main project directory
+2. **Never checkout branches** - They work with the branch already in the workspace
+3. **Create workspaces if needed** - Use `pan workspace create <ISSUE-ID>` instead of `git checkout`
+
+These safeguards are enforced through:
+- **Prompt instructions** - Clear warnings in all specialist prompts
+- **Code enforcement** - Specialists spawn with workspace as cwd
+- **Git hooks** - Auto-revert if checkout detected in tmux sessions
+
 #### Git-Backed Collaborative Planning
 
 | Start Planning | Codebase Exploration | Discovery Questions |

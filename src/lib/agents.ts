@@ -312,31 +312,26 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   clearReadySignal(agentId);
 
   // Create tmux session and start claude
-  const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`;
+  // For prompts with special shell characters, use a launcher script to safely pass the prompt
+  // The script reads the file into a variable, which bash then safely expands
+  let claudeCmd: string;
+  if (prompt) {
+    const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
+    const launcherContent = `#!/bin/bash
+prompt=$(cat "${promptFile}")
+exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
+`;
+    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    claudeCmd = `bash "${launcherScript}"`;
+  } else {
+    claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`;
+  }
+
   createSession(agentId, options.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: agentId
     }
   });
-
-  // If there's a prompt, load it via tmux buffer after claude starts
-  if (prompt) {
-    // Wait for SessionStart hook to signal ready (PAN-87: reliable prompt delivery)
-    // The hook writes ready.json when Claude's session starts
-    const ready = await waitForReadySignal(agentId, 30);
-
-    if (ready) {
-      // Use tmux load-buffer and paste-buffer to send the prompt
-      // This avoids all shell escaping issues (using execAsync to not block event loop)
-      await execAsync(`tmux load-buffer "${promptFile}"`);
-      await execAsync(`tmux paste-buffer -t ${agentId}`);
-      // Small delay to let paste complete, then send Enter
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await execAsync(`tmux send-keys -t "${agentId}" C-m`, { encoding: 'utf-8' });
-    } else {
-      console.error('Claude SessionStart hook did not fire in time, prompt not sent. Check ~/.claude/settings.json has SessionStart hook configured.');
-    }
-  }
 
   // Update status
   state.status = 'running';

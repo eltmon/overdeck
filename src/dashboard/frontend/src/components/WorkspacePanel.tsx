@@ -39,6 +39,7 @@ interface ReviewStatus {
   issueId: string;
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
+  mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
   reviewNotes?: string;
   testNotes?: string;
   updatedAt: string;
@@ -806,20 +807,27 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
           )}
 
           <div className="flex flex-wrap gap-1.5">
-            {/* MERGE button - only shows when review+test passed */}
-            {reviewStatus?.readyForMerge && (
+            {/* MERGE button - only shows when review+test passed AND not already merged */}
+            {reviewStatus?.readyForMerge && reviewStatus?.mergeStatus !== 'merged' && (
               <button
                 onClick={handleMerge}
-                disabled={mergeMutation.isPending}
+                disabled={mergeMutation.isPending || reviewStatus?.mergeStatus === 'merging'}
                 className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-500 disabled:opacity-50 font-medium"
               >
-                {mergeMutation.isPending ? (
+                {(mergeMutation.isPending || reviewStatus?.mergeStatus === 'merging') ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
                   <CheckCircle className="w-3 h-3" />
                 )}
-                MERGE
+                {reviewStatus?.mergeStatus === 'merging' ? 'MERGING...' : 'MERGE'}
               </button>
+            )}
+            {/* Show merged badge when already merged */}
+            {reviewStatus?.mergeStatus === 'merged' && (
+              <span className="flex items-center gap-1 px-2 py-1 text-xs bg-green-900/30 text-green-400 rounded font-medium">
+                <CheckCircle className="w-3 h-3" />
+                MERGED
+              </span>
             )}
 
             {/* Review & Test button - available anytime to (re-)run the cycle */}

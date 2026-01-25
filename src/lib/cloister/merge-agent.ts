@@ -355,7 +355,60 @@ function parseAgentOutput(output: string): MergeResult {
       output,
     };
   } else {
-    // No result markers found - assume failure
+    // No structured result markers found - try to detect human-readable format
+    // Agents sometimes output "MERGE TASK COMPLETE" instead of "MERGE_RESULT: SUCCESS"
+    const lowerOutput = output.toLowerCase();
+
+    // Check for success indicators
+    const successIndicators = [
+      'merge task complete',
+      'successfully merged',
+      'merge complete',
+      'pushed merge commit',
+      'successfully merged and pushed',
+    ];
+
+    const failureIndicators = [
+      'merge failed',
+      'merge task failed',
+      'could not merge',
+      'conflict not resolved',
+    ];
+
+    const hasSuccessIndicator = successIndicators.some(i => lowerOutput.includes(i));
+    const hasFailureIndicator = failureIndicators.some(i => lowerOutput.includes(i));
+
+    if (hasSuccessIndicator && !hasFailureIndicator) {
+      // Extract test status from output if mentioned
+      let detectedTestStatus: 'PASS' | 'FAIL' | 'SKIP' = 'SKIP';
+      if (lowerOutput.includes('tests: pass') || lowerOutput.includes('tests passed') ||
+          output.match(/\d+ passed/)) {
+        detectedTestStatus = 'PASS';
+      } else if (lowerOutput.includes('tests: fail') || lowerOutput.includes('tests failed')) {
+        detectedTestStatus = 'FAIL';
+      }
+
+      console.log('[merge-agent] Detected success from human-readable output');
+      return {
+        success: true,
+        testsStatus: detectedTestStatus,
+        validationStatus: 'PASS',
+        notes: 'Detected from human-readable output (agent did not use structured format)',
+        output,
+      };
+    }
+
+    if (hasFailureIndicator) {
+      console.log('[merge-agent] Detected failure from human-readable output');
+      return {
+        success: false,
+        validationStatus: 'NOT_RUN',
+        reason: 'Detected merge failure from agent output',
+        output,
+      };
+    }
+
+    // Truly unrecognized output
     return {
       success: false,
       validationStatus: 'NOT_RUN',
@@ -539,10 +592,19 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
       // Check if we have new output with result markers
       if (output !== lastOutput) {
         lastOutput = output;
+        const lowerOutput = output.toLowerCase();
 
-        // Look for result markers in the output
-        if (output.includes('MERGE_RESULT:')) {
-          console.log(`[merge-agent] Found result markers in output`);
+        // Look for result markers in the output (structured or human-readable)
+        const hasStructuredResult = output.includes('MERGE_RESULT:');
+        const hasHumanReadableResult =
+          lowerOutput.includes('merge task complete') ||
+          lowerOutput.includes('successfully merged') ||
+          lowerOutput.includes('merge complete') ||
+          lowerOutput.includes('merge failed') ||
+          lowerOutput.includes('merge task failed');
+
+        if (hasStructuredResult || hasHumanReadableResult) {
+          console.log(`[merge-agent] Found result markers in output (structured: ${hasStructuredResult}, human-readable: ${hasHumanReadableResult})`);
 
           const result = parseAgentOutput(output);
 

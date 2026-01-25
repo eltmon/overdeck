@@ -1,9 +1,18 @@
 import chalk from 'chalk';
 import ora from 'ora';
+import { existsSync, readdirSync, statSync, symlinkSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
 import { planSync, executeSync, planHooksSync, syncHooks } from '../../lib/sync.js';
 import { SYNC_TARGETS, Runtime, isDevMode } from '../../lib/paths.js';
+import { listProjects } from '../../lib/projects.js';
+
+// Get path to bundled git hooks
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const BUNDLED_GIT_HOOKS_DIR = join(__dirname, '..', '..', 'scripts', 'git-hooks');
 
 interface SyncOptions {
   dryRun?: boolean;
@@ -156,5 +165,83 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.succeed(`Synced ${hooksResult.synced.length} hooks to ~/.panopticon/bin/`);
   } else {
     hooksSpinner.info('No hooks to sync');
+  }
+
+  // Sync git hooks to all registered projects (branch protection)
+  const projects = listProjects();
+  if (projects.length > 0 && existsSync(BUNDLED_GIT_HOOKS_DIR)) {
+    const gitHooksSpinner = ora('Installing git hooks in registered projects...').start();
+    let totalInstalled = 0;
+    let projectsUpdated = 0;
+
+    for (const { config } of projects) {
+      if (!existsSync(config.path)) continue;
+
+      // Find all .git directories (handles polyrepos)
+      const gitDirs: string[] = [];
+
+      // Check root
+      if (existsSync(join(config.path, '.git')) && statSync(join(config.path, '.git')).isDirectory()) {
+        gitDirs.push(join(config.path, '.git'));
+      } else {
+        // Scan for polyrepo
+        try {
+          const entries = readdirSync(config.path);
+          for (const entry of entries) {
+            const entryPath = join(config.path, entry);
+            const gitPath = join(entryPath, '.git');
+            if (existsSync(gitPath) && statSync(gitPath).isDirectory()) {
+              gitDirs.push(gitPath);
+            }
+          }
+        } catch {
+          // Skip unreadable directories
+        }
+      }
+
+      // Install hooks in each git dir
+      for (const gitDir of gitDirs) {
+        const hooksTarget = join(gitDir, 'hooks');
+        if (!existsSync(hooksTarget)) {
+          mkdirSync(hooksTarget, { recursive: true });
+        }
+
+        try {
+          const hooks = readdirSync(BUNDLED_GIT_HOOKS_DIR).filter(f =>
+            statSync(join(BUNDLED_GIT_HOOKS_DIR, f)).isFile()
+          );
+
+          for (const hook of hooks) {
+            const source = join(BUNDLED_GIT_HOOKS_DIR, hook);
+            const target = join(hooksTarget, hook);
+
+            // Skip if already a symlink to our hook
+            if (existsSync(target)) {
+              try {
+                const { readlinkSync } = await import('fs');
+                if (readlinkSync(target) === source) continue;
+              } catch {
+                // Not a symlink
+              }
+              // Backup existing
+              const { renameSync } = await import('fs');
+              try { renameSync(target, `${target}.backup`); } catch {}
+            }
+
+            try {
+              symlinkSync(source, target);
+              totalInstalled++;
+            } catch {}
+          }
+          projectsUpdated++;
+        } catch {}
+      }
+    }
+
+    if (totalInstalled > 0) {
+      gitHooksSpinner.succeed(`Installed git hooks in ${projectsUpdated} project(s)`);
+    } else {
+      gitHooksSpinner.info('Git hooks already up to date');
+    }
   }
 }

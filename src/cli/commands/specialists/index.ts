@@ -10,6 +10,7 @@ import { wakeCommand } from './wake.js';
 import { queueCommand } from './queue.js';
 import { resetCommand } from './reset.js';
 import { clearQueueCommand } from './clear-queue.js';
+import { doneCommand } from './done.js';
 
 export function registerSpecialistsCommands(program: Command): void {
   const specialists = program
@@ -52,4 +53,12 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--force', 'Skip confirmation prompt')
     .option('--reset-status', 'Reset review statuses to pending')
     .action(clearQueueCommand);
+
+  // pan specialists done <type> <issueId> --status <passed|failed> [--notes "..."]
+  specialists
+    .command('done <type> <issueId>')
+    .description('Signal specialist completion (deterministic status update)')
+    .requiredOption('--status <status>', 'Result status: passed or failed')
+    .option('--notes <notes>', 'Optional notes about the result')
+    .action(doneCommand);
 }

@@ -195,6 +195,7 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
   };
 
   const startAgentMutation = useMutation({
+    mutationKey: ['startAgent', issue.identifier], // Reset state when issue changes
     mutationFn: async () => {
       const res = await fetch('/api/agents', {
         method: 'POST',

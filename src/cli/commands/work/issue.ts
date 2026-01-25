@@ -158,6 +158,55 @@ function readPlanningContext(workspacePath: string): string | null {
 }
 
 /**
+ * Check if STATE.md contains Stitch design information
+ * Returns the Stitch section if found, null otherwise
+ */
+function extractStitchDesigns(stateContent: string | null): string | null {
+  if (!stateContent) return null;
+
+  // Look for Stitch-related sections in STATE.md
+  const stitchPatterns = [
+    /## UI Designs[\s\S]*?(?=\n## |$)/i,
+    /### Stitch Assets[\s\S]*?(?=\n### |\n## |$)/i,
+    /## Stitch[\s\S]*?(?=\n## |$)/i,
+  ];
+
+  for (const pattern of stitchPatterns) {
+    const match = stateContent.match(pattern);
+    if (match) {
+      return match[0].trim();
+    }
+  }
+
+  // Also check for Stitch project/screen IDs mentioned anywhere
+  if (stateContent.includes('Stitch') &&
+      (stateContent.includes('Project ID') || stateContent.includes('Screen ID'))) {
+    // Extract the relevant paragraph
+    const lines = stateContent.split('\n');
+    const stitchLines: string[] = [];
+    let inStitchSection = false;
+
+    for (const line of lines) {
+      if (line.toLowerCase().includes('stitch')) {
+        inStitchSection = true;
+      }
+      if (inStitchSection) {
+        stitchLines.push(line);
+        if (line.trim() === '' && stitchLines.length > 3) {
+          break;
+        }
+      }
+    }
+
+    if (stitchLines.length > 0) {
+      return stitchLines.join('\n').trim();
+    }
+  }
+
+  return null;
+}
+
+/**
  * Extract beads IDs from STATE.md content
  * Looks for patterns like `panopticon-1dg` in backticks or tables
  */
@@ -280,6 +329,22 @@ function buildAgentPrompt(issueId: string, workspacePath: string, projectRoot: s
     lines.push('');
   }
 
+  // Add Stitch design information if present in STATE.md
+  const planningContent = readPlanningContext(workspacePath);
+  const stitchDesigns = extractStitchDesigns(planningContent);
+  if (stitchDesigns) {
+    lines.push('## UI Designs (Stitch)');
+    lines.push('');
+    lines.push('The planning agent created UI designs using Google Stitch. Use these assets:');
+    lines.push('');
+    lines.push(stitchDesigns);
+    lines.push('');
+    lines.push('**To convert Stitch designs to React:**');
+    lines.push('- Use `/stitch-react-components` skill with the Project/Screen IDs above');
+    lines.push('- Or check if DESIGN.md already exists for styling guidelines');
+    lines.push('');
+  }
+
   lines.push('## Your Task');
   lines.push('');
   lines.push('1. Read the context files listed above');
@@ -300,6 +365,32 @@ function buildAgentPrompt(issueId: string, workspacePath: string, projectRoot: s
   lines.push('');
   lines.push('The next agent will read STATE.md to know exactly where to pick up. Beads tasks track individual items,');
   lines.push('but STATE.md provides the narrative context and current state that beads alone cannot capture.');
+  lines.push('');
+
+  // CRITICAL: No lazy agents - complete ALL work
+  lines.push('## CRITICAL: Complete ALL Work - No Excuses');
+  lines.push('');
+  lines.push('**You are an autonomous agent. You MUST complete the entire issue without stopping to ask for permission or options.**');
+  lines.push('');
+  lines.push('❌ **NEVER do any of these:**');
+  lines.push('- Stop and ask "What would you like me to do?"');
+  lines.push('- Offer options like "Option 1, Option 2, Option 3"');
+  lines.push('- Say work requires "manual intervention" or "human review"');
+  lines.push('- Give time estimates ("this would take 5-10 hours")');
+  lines.push('- Suggest "targeted approach" or "stop here"');
+  lines.push('- Defer work to "future PRs" or "follow-up issues"');
+  lines.push('- Say "remaining work documented for later"');
+  lines.push('- Declare infrastructure "complete" when tests still fail');
+  lines.push('');
+  lines.push('✅ **ALWAYS do this instead:**');
+  lines.push('- Complete ALL phases of the plan from start to finish');
+  lines.push('- Fix ALL failing tests, not just "high-impact" ones');
+  lines.push('- If something is broken, fix it - don\'t document it');
+  lines.push('- If tests fail, debug and fix them until they pass');
+  lines.push('- Work autonomously until the issue is FULLY resolved');
+  lines.push('- The only acceptable end state is: all tests pass, all code committed, pushed');
+  lines.push('');
+  lines.push('**You have unlimited time and context. Use it. Do not be lazy.**');
   lines.push('');
 
   // CRITICAL: Work completion requirements

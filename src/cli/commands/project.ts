@@ -1,6 +1,7 @@
 import chalk from 'chalk';
-import { existsSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { existsSync, readFileSync, symlinkSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { join, resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import {
   listProjects,
   registerProject,
@@ -11,6 +12,69 @@ import {
   ProjectConfig,
   IssueRoutingRule,
 } from '../../lib/projects.js';
+
+// Get path to bundled git hooks
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// After build: dist/cli/commands/project.js -> dist -> package root -> scripts/git-hooks
+const BUNDLED_HOOKS_DIR = join(__dirname, '..', '..', 'scripts', 'git-hooks');
+
+/**
+ * Install Panopticon git hooks in a directory
+ * Returns number of hooks installed
+ */
+function installGitHooks(gitDir: string): number {
+  const hooksTarget = join(gitDir, 'hooks');
+  let installed = 0;
+
+  // Create hooks directory if needed
+  if (!existsSync(hooksTarget)) {
+    mkdirSync(hooksTarget, { recursive: true });
+  }
+
+  // Check if bundled hooks exist
+  if (!existsSync(BUNDLED_HOOKS_DIR)) {
+    return 0;
+  }
+
+  try {
+    const hooks = readdirSync(BUNDLED_HOOKS_DIR).filter(f => {
+      const p = join(BUNDLED_HOOKS_DIR, f);
+      return existsSync(p) && statSync(p).isFile();
+    });
+
+    for (const hook of hooks) {
+      const source = join(BUNDLED_HOOKS_DIR, hook);
+      const target = join(hooksTarget, hook);
+
+      // Skip if already a symlink to our hook
+      if (existsSync(target)) {
+        try {
+          const { readlinkSync } = require('fs');
+          if (readlinkSync(target) === source) {
+            continue; // Already installed
+          }
+        } catch {
+          // Not a symlink, will be backed up
+        }
+      }
+
+      // Backup existing hook if present and not a symlink
+      if (existsSync(target)) {
+        const { renameSync } = require('fs');
+        renameSync(target, `${target}.backup`);
+      }
+
+      // Create symlink
+      symlinkSync(source, target);
+      installed++;
+    }
+  } catch (err) {
+    // Silent fail - hooks are optional
+  }
+
+  return installed;
+}
 
 interface AddOptions {
   name?: string;
@@ -79,10 +143,82 @@ export async function projectAddCommand(
     existsSync(join(fullPath, 'infra', '.devcontainer-template')) ||
     existsSync(join(fullPath, '.devcontainer-template'));
 
+  // Detect repo structure (monorepo vs polyrepo)
+  const hasRootGit = existsSync(join(fullPath, '.git'));
+  const subRepos: string[] = [];
+
+  if (!hasRootGit) {
+    // No root .git - scan for subdirectory git repos
+    const { readdirSync, statSync } = await import('fs');
+    try {
+      const entries = readdirSync(fullPath);
+      for (const entry of entries) {
+        const entryPath = join(fullPath, entry);
+        try {
+          if (statSync(entryPath).isDirectory() && existsSync(join(entryPath, '.git'))) {
+            subRepos.push(entry);
+          }
+        } catch {
+          // Skip inaccessible directories
+        }
+      }
+    } catch {
+      // Could not scan directory
+    }
+  }
+
+  const isPolyrepo = !hasRootGit && subRepos.length > 0;
+
+  // Install git hooks (branch protection)
+  let hooksInstalled = 0;
+  if (hasRootGit) {
+    // Single repo - install in root
+    hooksInstalled = installGitHooks(join(fullPath, '.git'));
+    if (hooksInstalled > 0) {
+      console.log(chalk.green(`✓ Installed ${hooksInstalled} git hook(s) for branch protection`));
+    }
+  } else if (isPolyrepo) {
+    // Polyrepo - install in each sub-repo
+    for (const repo of subRepos) {
+      const count = installGitHooks(join(fullPath, repo, '.git'));
+      hooksInstalled += count;
+    }
+    if (hooksInstalled > 0) {
+      console.log(chalk.green(`✓ Installed git hooks in ${subRepos.length} repositories`));
+    }
+  }
+  if (hooksInstalled > 0) {
+    console.log(chalk.dim('  (Prevents agents from checking out branches in main project)'));
+    console.log('');
+  }
+
   console.log(chalk.bold('Next Steps:\n'));
 
+  // Step 0: Polyrepo detected - highlight this
+  if (isPolyrepo) {
+    console.log(chalk.yellow.bold('⚠️  POLYREPO DETECTED'));
+    console.log(chalk.yellow(`   Found ${subRepos.length} git repositories: ${subRepos.join(', ')}`));
+    console.log('');
+    console.log(chalk.cyan('0. Configure as polyrepo'));
+    console.log(chalk.dim(`   Edit ${PROJECTS_CONFIG_FILE} and add:`));
+    console.log('');
+    console.log(chalk.dim('   workspace:'));
+    console.log(chalk.dim('     type: polyrepo'));
+    console.log(chalk.dim('     workspaces_dir: workspaces'));
+    console.log(chalk.dim('     default_branch: main'));
+    console.log(chalk.dim('     repos:'));
+    for (const repo of subRepos) {
+      console.log(chalk.dim(`       - name: ${repo}`));
+      console.log(chalk.dim(`         path: ${repo}`));
+      console.log(chalk.dim(`         branch_prefix: "feature/"`));
+    }
+    console.log('');
+    console.log(chalk.dim('   See README "Polyrepo Workspace Configuration" for full example.'));
+    console.log('');
+  }
+
   // Step 1: Configure workspace in projects.yaml
-  console.log(chalk.cyan('1. Configure workspace settings'));
+  console.log(chalk.cyan(`${isPolyrepo ? '1' : '1'}. Configure workspace settings`));
   console.log(chalk.dim(`   Edit ${PROJECTS_CONFIG_FILE}`));
   console.log(chalk.dim('   Add workspace, dns, docker, and service configuration'));
   console.log('');

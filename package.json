@@ -33,6 +33,7 @@
   "files": [
     "dist",
     "templates",
+    "scripts/git-hooks",
     "README.md",
     "LICENSE"
   ],

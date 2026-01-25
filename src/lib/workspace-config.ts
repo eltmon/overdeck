@@ -11,6 +11,8 @@ export interface RepoConfig {
   path: string;
   /** Branch prefix for feature branches (default: 'feature/') */
   branch_prefix?: string;
+  /** Default branch to create feature branches from (default: 'main') */
+  default_branch?: string;
 }
 
 export interface DnsConfig {
@@ -119,6 +121,8 @@ export interface WorkspaceConfig {
   type?: 'polyrepo' | 'monorepo';
   /** Where to create workspaces (relative to project path) */
   workspaces_dir?: string;
+  /** Default branch for all repos (default: 'main'). Can be overridden per-repo. */
+  default_branch?: string;
   /** Git repositories to include (for polyrepo) */
   repos?: RepoConfig[];
   /** DNS configuration */
