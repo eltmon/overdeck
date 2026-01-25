@@ -706,7 +706,12 @@ function mapGitHubStateToCanonical(state: string, labels: string[]): string {
   // Order matters: more progressed states take precedence
   const labelNames = labels.map(l => l.toLowerCase());
 
-  // Most progressed states first (in_review > in_progress)
+  // Most progressed states first
+  // "done" label on OPEN issues = work complete, pending merge/closure → in_review
+  // (actual "done" status only for CLOSED issues, handled above)
+  if (labelNames.some(l => l === 'done' || l.includes('completed'))) {
+    return 'in_review';
+  }
   if (labelNames.some(l => l.includes('in review') || l.includes('in-review') || l.includes('review') || l.includes('qa'))) {
     return 'in_review';
   }
@@ -5908,6 +5913,28 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
   const { skipWorkspace = false, startDocker = false } = req.body;
 
   try {
+    // Check if a work agent is already running for this issue
+    // Don't allow planning when execution is in progress
+    const issueLowerForCheck = id.toLowerCase();
+    try {
+      const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
+      const workAgentSession = sessions
+        .trim()
+        .split('\n')
+        .find(s => s === `agent-${issueLowerForCheck}`);
+
+      if (workAgentSession) {
+        return res.status(409).json({
+          error: `Cannot start planning: work agent already running for ${id.toUpperCase()}`,
+          hint: 'Stop the agent first or use the terminal view to interact with it',
+          existingSession: workAgentSession,
+        });
+      }
+    } catch (tmuxError) {
+      // tmux not running or error checking - continue with planning
+      console.log('[start-planning] Could not check existing agents:', tmuxError);
+    }
+
     // Check if this is a GitHub issue
     const githubCheck = isGitHubIssue(id);
 
