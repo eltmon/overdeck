@@ -1,235 +1,63 @@
-# PAN-93: Merge-agent should detect and resolve merge conflicts before completing
+# PAN-82: Cost Calculation Pricing and Calculation Fixes
 
-## Status: IMPLEMENTATION COMPLETE ✅
+## Current Status
 
-**Progress:**
-- ✅ Created scripts/validate-merge.sh
-- ✅ Created src/lib/cloister/validation.ts
-- ✅ Updated src/lib/cloister/prompts/merge-agent.md
-- ✅ Updated src/lib/cloister/merge-agent.ts
-  - Added post-merge validation in both code paths
-  - Auto-revert on validation failure
-  - Force-push revert to remote
-- ✅ Added unit tests (9 tests, all passing)
-- ✅ Added integration tests (6 tests, all passing)
+**✅ COMPLETE** - All implementation tasks finished and committed.
 
-## Problem Statement
+- All 8 beads tasks completed and closed
+- 43 new unit tests added, all passing
+- All existing tests passing (363 total)
+- Changes committed and pushed to remote
+- Ready for review
 
-When merging PAN-75, the merge-agent left unresolved merge conflicts in files, causing build failures:
-- `src/dashboard/frontend/src/components/KanbanBoard.tsx`
-- `.planning/STATE.md`
+## Summary
 
-The build failed with conflict markers (`<<<<<<< HEAD`) still in the code.
-
-**Root cause:** The polling loop in `spawnMergeAgentForBranches()` only checks:
-- Did HEAD change?
-- Is commit message merge-like?
-- Is it pushed?
-
-It does NOT validate:
-- Conflict markers removed
-- Build passes
-- Tests pass
-
-## Solution Architecture
-
-### Two-Layer Validation (Belt + Suspenders)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Merge Request                            │
-└─────────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 1: Pre-Merge Validation (Subagent - Haiku)          │
-│  • Check workspace has no existing conflict markers         │
-│  • Verify workspace builds/tests before attempting merge    │
-└─────────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Merge Execution (Merge-Agent Specialist - Opus)           │
-│  • git merge                                                │
-│  • Resolve conflicts if any                                 │
-│  • Call validation subagent                                 │
-│  • Push if valid                                            │
-└─────────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 2: Post-Merge Validation (Subagent - Haiku)         │
-│  • Run scripts/validate-merge.sh                            │
-│  • Check for conflict markers (all tracked files)           │
-│  • Run build                                                 │
-│  • Run tests                                                 │
-│  • Report pass/fail to merge-agent                          │
-└─────────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Layer 3: Polling Fallback (Pure Bash - No AI)             │
-│  • If specialist doesn't report, polling catches merge      │
-│  • Run same validation script                               │
-│  • Auto-revert if validation fails                          │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### On Validation Failure
-
-1. **Auto-revert**: `git reset --hard HEAD~1`
-2. **Report**: Return structured failure with:
-   - Which files have conflict markers
-   - Build errors (if applicable)
-   - Test failures (if applicable)
-3. **Leave clean state**: Repository is back to pre-merge state
+Fix incorrect pricing constants, add missing models, implement dual cache TTL pricing, and resolve calculation bugs in the cost tracking system.
 
 ## Decisions Made
 
-| Topic | Decision | Rationale |
-|-------|----------|-----------|
-| Validation level | Strict (conflicts + build + tests) | Prevent any broken code from reaching main |
-| Execution model | Subagent (Haiku) | Preserve Opus context for merge decisions |
-| Command format | Shell script `scripts/validate-merge.sh` | Per-project customizable, simple to maintain |
-| Validation layers | Both specialist + polling fallback | Redundancy catches edge cases |
-| Failure handling | Auto-revert + report | Clean state for retry |
-| Pre-merge check | Yes | Catch issues before merge complicates things |
-| File types | All tracked files | Conflict markers can appear anywhere |
-| Testing | Unit + integration tests | High-stakes feature needs thorough testing |
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Historical data compatibility | Fix forward only | PAN-81 will handle migration with corrected pricing |
+| Long-context pricing scope | Both Sonnet 4 and Sonnet 4.5 | Official docs confirm both models have 1M context with premium pricing |
+| Long-context output multiplier | 1.5x ($22.50 vs $15) | Official pricing, not 2x like input |
+| Cache TTL pricing | Full implementation (5m + 1h) | Add cacheWrite5mPer1k, cacheWrite1hPer1k, pass cacheTTL to calculateCost |
+| CostSummary.totalTokens type | Extend type + calculation | Add cacheRead/cacheWrite fields to interface and include in totals |
+| Haiku 3.5 removal | Remove ALL references | User wants it completely removed despite official support |
+| Opus 4.1 pricing | Add explicit entry | Ensure 100% precision in all pricing entries |
+| normalizeModelName() fix | Include in this issue | Required for 4.5 models to use correct pricing entries |
 
-## Implementation Details
+## Files Modified
 
-### New Files
+### 1. `src/lib/cost.ts` - Main pricing and calculation logic
+- Updated `ModelPricing` interface with dual cache TTL
+- Updated `DEFAULT_PRICING` array with corrected prices
+- Added long-context pricing for Sonnet 4/4.5
 
-1. **`scripts/validate-merge.sh`** - Main validation script
-   ```bash
-   #!/bin/bash
-   # Check for conflict markers in tracked files
-   # Run npm run build
-   # Run npm test
-   # Exit 0 on success, 1 on failure with details
-   ```
+### 2. `src/lib/cost-parsers/jsonl-parser.ts` - Model normalization
+- Fixed `normalizeModelName()` for 4.5 models
 
-2. **`src/lib/cloister/validation-subagent.ts`** - Subagent spawning logic
-   - Spawns Haiku subagent to run validation
-   - Parses results
-   - Returns structured pass/fail
-
-3. **`tests/unit/lib/merge-validation.test.ts`** - Unit tests
-   - Test conflict marker detection regex
-   - Test result parsing
-
-4. **`tests/integration/merge-validation.test.ts`** - Integration tests
-   - Mock merge with conflicts scenario
-   - Verify auto-revert works
-   - Verify clean merge passes
-
-### Modified Files
-
-1. **`src/lib/cloister/merge-agent.ts`**
-   - Add validation call after detecting merge completion
-   - Add auto-revert logic on validation failure
-   - Update `MergeResult` interface with validation details
-
-2. **`src/lib/cloister/prompts/merge-agent.md`**
-   - Add explicit instruction to run validation script
-   - Emphasize not committing with conflict markers
-   - Add validation result markers
-
-3. **`src/dashboard/server/index.ts`**
-   - Update merge endpoint to handle validation failures
-   - Return detailed error info to frontend
-
-### Validation Script Details
-
-```bash
-#!/bin/bash
-# scripts/validate-merge.sh
-
-set -e
-
-PROJECT_ROOT="${1:-.}"
-cd "$PROJECT_ROOT"
-
-echo "=== Merge Validation ==="
-
-# 1. Check for conflict markers
-echo "Checking for conflict markers..."
-if git grep -l '<<<<<<< ' 2>/dev/null; then
-    echo "ERROR: Conflict markers found in files:"
-    git grep -l '<<<<<<< '
-    exit 1
-fi
-
-# Also check for ======= and >>>>>>> patterns
-if git grep -l '^=======$' 2>/dev/null; then
-    echo "ERROR: Conflict separator markers found"
-    exit 1
-fi
-
-if git grep -l '>>>>>>> ' 2>/dev/null; then
-    echo "ERROR: Conflict end markers found"
-    exit 1
-fi
-
-echo "No conflict markers found."
-
-# 2. Run build
-echo "Running build..."
-if [ -f "package.json" ]; then
-    npm run build || { echo "ERROR: Build failed"; exit 1; }
-elif [ -f "pom.xml" ]; then
-    mvn compile || { echo "ERROR: Build failed"; exit 1; }
-fi
-echo "Build passed."
-
-# 3. Run tests
-echo "Running tests..."
-if [ -f "package.json" ]; then
-    npm test || { echo "ERROR: Tests failed"; exit 1; }
-elif [ -f "pom.xml" ]; then
-    mvn test || { echo "ERROR: Tests failed"; exit 1; }
-fi
-echo "Tests passed."
-
-echo "=== Validation PASSED ==="
-exit 0
-```
-
-## Out of Scope
-
-- Changing the merge strategy itself (squash vs regular)
-- Changing the specialist system architecture
-- Adding new specialist types
-- UI changes for validation status display
+### 3. `src/dashboard/server/index.ts` - Dashboard pricing
+- Updated `MODEL_PRICING` object
 
 ## Success Criteria
 
-1. Merge with unresolved conflicts is detected and rejected
-2. Failed build after merge is detected and rejected
-3. Failed tests after merge is detected and rejected
-4. Auto-revert leaves repository in clean state
-5. Detailed failure report helps debugging
-6. Tests cover conflict detection and revert logic
+- [x] All pricing values match official Anthropic rates
+- [x] 4.5 series models have pricing entries
+- [x] Opus 4 cache read fixed (0.0015, not 0.00175)
+- [x] claude-haiku-3.5 removed from ALL files
+- [x] Long-context pricing applies 2x input + 1.5x output for Sonnet 4/4.5 >200K tokens
+- [x] Dual cache TTL pricing (5m: 1.25x, 1h: 2x) implemented
+- [x] Cache tokens included in totalTokens.total
+- [x] CostSummary type includes cacheRead/cacheWrite
+- [x] normalizeModelName() correctly maps 4.5 models
+- [x] All existing tests pass
+- [x] New tests cover pricing accuracy and edge cases
 
-## Risk Assessment
+## Out of Scope
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Validation adds latency | Medium | Low | Subagent runs in parallel, validation script is fast |
-| False positives (e.g., doc with `<<<<` example) | Low | Medium | Use proper git grep, could add allowlist |
-| Revert leaves orphaned state | Low | High | Verify revert works in tests, add state cleanup |
-
-## Test Plan
-
-### Unit Tests
-- `parseConflictMarkers()` - detect markers in various formats
-- `validateMergeResult()` - parse validation script output
-- `shouldAutoRevert()` - decision logic
-
-### Integration Tests
-- Scenario: Clean merge, validation passes
-- Scenario: Merge with unresolved conflicts, auto-reverts
-- Scenario: Merge succeeds but build fails, auto-reverts
-- Scenario: Merge succeeds but tests fail, auto-reverts
-- Scenario: Validation script missing, graceful degradation
+- Historical data migration (handled by PAN-81)
+- Event-sourced cost tracking (handled by PAN-81)
+- Dashboard UI changes (except pricing constants)
+- OpenAI/Google pricing updates
+- Batch API pricing (separate feature)
