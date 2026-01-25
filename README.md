@@ -26,6 +26,7 @@ Panopticon is a unified orchestration layer for AI coding assistants. It works w
 - **Health Monitoring** - Deacon-style stuck detection with auto-recovery
 - **Context Engineering** - Structured state management (STATE.md, WORKSPACE.md)
 - **Agent CVs** - Work history tracking for capability-based routing
+- **Google Stitch Integration** - AI-powered UI design with automatic design-to-code workflows
 
 ---
 
@@ -222,6 +223,7 @@ See [docs/DNS_SETUP.md](docs/DNS_SETUP.md) for detailed DNS configuration (espec
 - **mkcert** - For HTTPS certificates (recommended)
 - **Linear API key** - For issue tracking integration
 - **Beads CLI (bd)** - For persistent task tracking across sessions. Auto-installed by `pan install`. Upgrade with `pan beads upgrade`.
+- **Google Stitch MCP** - For AI-powered UI design integration (see below)
 
 ### Platform Support
 
@@ -302,6 +304,80 @@ If you have multiple Linear projects, configure which local directory each maps 
 ```
 
 The dashboard uses this mapping to determine where to create workspaces when you click "Create Workspace" or "Start Agent" for an issue.
+
+## Google Stitch Integration
+
+Panopticon integrates with [Google Stitch](https://stitch.withgoogle.com), Google's AI-powered UI design tool, enabling design-to-code workflows.
+
+### What is Google Stitch?
+
+Google Stitch generates production-ready UI designs from natural language prompts or image inputs. It's free (350 standard + 50 experimental generations/month) and requires only a Google account.
+
+### Setup (Optional)
+
+Use the `/pan-stitch` skill to set up the integration:
+
+```bash
+# Run the setup skill
+/pan-stitch
+
+# Or manually:
+# 1. Install gcloud CLI
+curl -sSL https://sdk.cloud.google.com | bash
+
+# 2. Authenticate
+gcloud auth login
+gcloud auth application-default login
+
+# 3. Create project and enable API
+gcloud projects create stitch-tools-$(date +%s)
+gcloud config set project YOUR_PROJECT_ID
+gcloud billing projects link YOUR_PROJECT_ID --billing-account=YOUR_BILLING_ID
+gcloud beta services mcp enable stitch.googleapis.com  # MUST use beta!
+
+# 4. Register MCP (note "proxy" subcommand)
+claude mcp add -e GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID -s user stitch -- npx -y @_davideast/stitch-mcp proxy
+```
+
+### How It Works
+
+When Stitch is configured, the planning agent can:
+
+1. **Create UI designs** - Generate screens for UI-related issues
+2. **Document in STATE.md** - Record Stitch project/screen IDs for workers
+3. **Worker agents pick up designs** - Use the Stitch skills to convert to React
+
+### Stitch Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/pan-stitch` | Setup and configure Stitch MCP |
+| `/stitch-design-md` | Create DESIGN.md from Stitch projects |
+| `/stitch-react-components` | Convert Stitch HTML to React components |
+
+### STATE.md Integration
+
+When planning UI work, add a Stitch section to STATE.md:
+
+```markdown
+## UI Designs
+
+### Stitch Assets
+- **Project ID:** 12345678
+- **Screen:** "Dashboard" (screen ID: 87654321)
+- **Design Notes:** Dark mode, glassmorphism cards, gradient accents
+- **DESIGN.md:** Generated at `src/components/DESIGN.md`
+
+Worker: Use `/stitch-react-components` to convert the Dashboard screen to React.
+```
+
+### Manual Workflow (No MCP)
+
+If you prefer not to set up the MCP:
+
+1. Design at https://stitch.withgoogle.com
+2. Export HTML/CSS from the UI
+3. Use `/stitch-react-components` with the exported files
 
 ## Cloister: AI Lifecycle Manager
 
@@ -832,6 +908,7 @@ your-project/
 services:
   api:
     build: ./api
+    user: vscode  # Run as non-root to avoid permission issues
     labels:
       - "traefik.http.routers.{{FEATURE_FOLDER}}-api.rule=Host(`api-{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
     environment:
@@ -839,9 +916,16 @@ services:
 
   frontend:
     build: ./fe
+    user: vscode  # Run as non-root to avoid permission issues
     labels:
       - "traefik.http.routers.{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
 ```
+
+> **⚠️ Important: File Permissions**
+>
+> Always run containers as a non-root user (e.g., `user: vscode`) to avoid permission issues.
+> Files created by root-owned containers cannot be removed by `pan workspace destroy` without sudo.
+> The Microsoft devcontainers base image includes a `vscode` user (UID 1000) that matches most host users.
 
 ### Required for HTTPS: Traefik Configuration
 
@@ -970,7 +1054,7 @@ Panopticon creates workspaces as git worktrees. Docker, HTTPS, and seeding are o
 
 ## Polyrepo Workspace Configuration
 
-For projects with multiple git repositories, configure workspace settings directly in `projects.yaml`:
+For projects with multiple git repositories (like separate frontend/backend repos), configure workspace settings directly in `projects.yaml`:
 
 ```yaml
 projects:
@@ -982,15 +1066,20 @@ projects:
     workspace:
       type: polyrepo
       workspaces_dir: workspaces
+      # Default branch for all repos (optional, defaults to 'main')
+      default_branch: main
 
       # Git repositories to include in each workspace
+      # Each repo is a SEPARATE git repository with its own .git
       repos:
         - name: fe
-          path: frontend
+          path: frontend           # Relative to project root
           branch_prefix: "feature/"
+          # default_branch: main   # Can override workspace default per-repo
         - name: api
           path: backend
           branch_prefix: "feature/"
+          # default_branch: develop  # Example: API uses 'develop' as default
 
       # DNS entries for local development
       dns:
@@ -1079,6 +1168,28 @@ services:
 ```
 
 See `/pan-workspace-config` skill for complete documentation.
+
+### Polyrepo Merge Considerations
+
+> **⚠️ Important:** Polyrepo merging requires special handling. The current merge-agent is optimized for monorepos.
+
+For polyrepo projects:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Workspace creation | ✅ Supported | Creates worktrees in each repo |
+| Branch management | ✅ Supported | Each repo gets its own feature branch |
+| Agent work | ✅ Supported | Agents can work across repos |
+| Merge | ⚠️ Manual | Push each repo's branch, merge via GitLab/GitHub |
+
+**Current workflow for polyrepo merges:**
+
+1. Agent completes work and pushes branches to each repo
+2. Create merge requests for each repo manually (or via `gh pr create`)
+3. Review and merge each MR separately
+4. The "Approve & Merge" button is not yet polyrepo-aware
+
+**Future enhancement:** Polyrepo-aware merge-agent that handles multiple repos automatically.
 
 ### Managing Projects
 
@@ -1347,6 +1458,11 @@ pan work reopen min-123
 # Request re-review after fixing feedback (for agents, max 3 auto-requeues)
 pan work request-review min-123 -m "Fixed: added tests and removed duplication"
 
+# Deep wipe: completely reset all state for an issue
+pan work wipe min-123           # Cleans up agents, state, Linear status
+pan work wipe min-123 -w        # Also delete workspace
+pan work wipe min-123 -y -w     # Skip confirmation
+
 # Recover crashed agents
 pan work recover min-123
 pan work recover --all
@@ -1444,6 +1560,23 @@ pan work hook mail agent-min-123 "Review feedback received"
 - Is located at `{project}/workspaces/{issue-id}/`
 
 This allows multiple agents to work on different features simultaneously without conflicts.
+
+> **IMPORTANT: Main Project Branch Convention**
+>
+> The main project directory should **ALWAYS** stay on the `main` branch. All feature work happens in workspaces (git worktrees), never in the main project.
+>
+> - **Main project**: Always on `main` - serves as the stable reference point
+> - **Workspaces**: Each has its own feature branch checked out
+> - **Want to check something?** Create a worktree, don't checkout in main
+> - **Quick test?** Create a worktree
+> - **Emergency hotfix?** Create a worktree
+>
+> This convention ensures:
+> 1. Specialists (review-agent, test-agent) always find the correct code
+> 2. Merge operations have a clean target
+> 3. Multiple agents don't interfere with each other
+>
+> If you see a warning like "Main project is on branch 'feature/xxx' instead of 'main'", something has incorrectly checked out a feature branch in the main project. Fix it with `git checkout main`.
 
 #### Git-Backed Collaborative Planning
 
@@ -2099,6 +2232,26 @@ Each agent's state is tracked in `~/.panopticon/agents/{agent-id}/state.json`:
 
 **State Cleanup:** When an agent is killed or aborted (`pan work kill`), Panopticon automatically cleans up its state files to prevent stale data from affecting future runs.
 
+### Deep Wipe
+
+For issues that get into a stuck or inconsistent state, use `pan work wipe` to completely reset:
+
+```bash
+pan work wipe MIN-123           # Basic cleanup
+pan work wipe MIN-123 -w        # Also delete workspace
+pan work wipe MIN-123 -y -w     # Skip confirmation
+```
+
+**Deep wipe cleans up:**
+- Tmux sessions (`planning-min-123`, `agent-min-123`)
+- Agent state directories (`~/.panopticon/agents/planning-*`, `agent-*`)
+- Legacy planning directories (`project/.planning/min-123/`)
+- Workspace (if `-w` flag is used)
+- Linear issue status (reset to Backlog)
+- Linear labels (removes "Review Ready", "Planning")
+
+**Dashboard UI:** When aborting planning, click "🔥 Deep Wipe" for a complete reset.
+
 ## Health Monitoring (Deacon Pattern)
 
 Panopticon implements the Deacon pattern for stuck agent detection:
@@ -2255,6 +2408,101 @@ The skill guides you through:
 - As a smoke test before releases
 
 ## Troubleshooting
+
+### WSL2 Stability Issues (Windows Users)
+
+WSL2 can experience crashes and networking issues, especially under heavy AI agent workloads. Here are recommended `.wslconfig` settings to improve stability.
+
+**Create/edit `C:\Users\<username>\.wslconfig`:**
+
+```ini
+[wsl2]
+# Resource allocation (adjust based on your system)
+memory=40GB
+processors=18
+swap=8GB
+
+# Localhost forwarding between Windows and WSL
+localhostForwarding=true
+
+# Disable GPU/GUI passthrough - reduces dxg driver errors
+guiApplications=false
+
+# Route DNS through Windows - prevents getaddrinfo() failures
+dnsTunneling=true
+
+# Inherit Windows proxy settings
+autoProxy=true
+
+# Windows 11 22H2+ ONLY: Use mirrored networking
+# This bypasses the Hyper-V NAT layer that can cause "Object Name not found" errors
+# networkingMode=mirrored
+```
+
+**After changing `.wslconfig`:**
+```powershell
+wsl --shutdown
+# Then relaunch your WSL terminal
+```
+
+**Verify settings applied:**
+```bash
+# Check resources
+free -h          # Should show configured memory
+nproc            # Should show configured processors
+swapon --show    # Should show configured swap
+
+# Check networking mode (Windows 11 only)
+ip addr show eth0  # NAT mode shows 172.x.x.x IP
+                   # Mirrored mode shares Windows network directly
+```
+
+#### Windows 10 Limitations
+
+| Feature | Windows 10 | Windows 11 22H2+ |
+|---------|-----------|------------------|
+| `networkingMode=mirrored` | ❌ Not supported | ✅ Supported |
+| `dnsTunneling=true` | ✅ Works | ✅ Works |
+| `guiApplications=false` | ✅ Works | ✅ Works |
+
+**Windows 10 users:** The `networkingMode=mirrored` setting will be silently ignored. You'll stay on NAT mode, which can be less stable. The other settings (`dnsTunneling`, `guiApplications=false`) still help with stability.
+
+If you experience frequent WSL2 crashes on Windows 10, consider:
+- Upgrading to Windows 11 for mirrored networking support
+- Reducing `memory` allocation if system is under pressure
+- Checking Windows Event Viewer for specific crash causes
+
+#### Additional Windows 10 Workarounds
+
+If NAT networking is unstable on Windows 10:
+
+```powershell
+# 1. Update WSL to latest version
+wsl --update
+
+# 2. Check for VPN/firewall conflicts
+# Disable VPN temporarily to test if it's causing issues
+
+# 3. Reset Windows network stack (run as Admin)
+netsh winsock reset
+netsh int ip reset
+
+# 4. Restart after network reset
+Restart-Computer
+```
+
+**Common conflict sources:**
+- VPN clients (especially corporate VPNs)
+- Docker Desktop (can conflict with WSL networking)
+- Third-party firewalls
+- Hyper-V virtual switch issues
+
+**If NAT fails completely**, WSL 2.3.25+ automatically falls back to VirtioProxy mode. This is less performant but more stable. You'll see: `"Failed to configure network (networkingMode Nat), falling back to networkingMode VirtioProxy."`
+
+**References:**
+- [Microsoft WSL Networking Documentation](https://learn.microsoft.com/en-us/windows/wsl/networking)
+- [WSL GitHub Issues - Networking](https://github.com/microsoft/WSL/issues?q=networking+mirrored)
+- [WSL NAT Fallback Issue #12297](https://github.com/microsoft/WSL/issues/12297)
 
 ### Slow Vite/React Frontend with Multiple Workspaces
 
