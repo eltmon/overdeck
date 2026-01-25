@@ -38,19 +38,6 @@ function getOneDayAgo(): Date {
 
 import type { Issue } from '../frontend/src/types.js';
 
-import type { Issue } from '../frontend/src/types.js';
-
-/**
- * Get a Date object representing 24 hours ago from now.
- * Used for filtering recently completed issues.
- */
-function getOneDayAgo(): Date {
-  const date = new Date();
-  date.setDate(date.getDate() - 1);
-  return date;
-}
-
-
 // Ensure tmux server is running (starts one if not)
 async function ensureTmuxRunning(): Promise<void> {
   try {
