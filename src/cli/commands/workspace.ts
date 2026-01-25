@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join, basename } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
@@ -22,6 +22,42 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+
+/**
+ * Initialize fresh beads for a workspace, removing any inherited beads from main branch
+ */
+async function initializeWorkspaceBeads(workspacePath: string, issueId: string): Promise<{ success: boolean; beadId?: string; error?: string }> {
+  try {
+    // Remove inherited .beads directory if it exists (copied from main via worktree)
+    const beadsDir = join(workspacePath, '.beads');
+    if (existsSync(beadsDir)) {
+      rmSync(beadsDir, { recursive: true, force: true });
+    }
+
+    // Initialize fresh beads
+    const prefix = 'workspace';
+    await execAsync(`bd init --prefix ${prefix}`, { cwd: workspacePath, encoding: 'utf-8' });
+
+    // Create a bead for this specific issue
+    const title = `${issueId.toUpperCase()}: Implementation`;
+    const { stdout } = await execAsync(
+      `bd create --title "${title}" --priority 1 --type task --json`,
+      { cwd: workspacePath, encoding: 'utf-8' }
+    );
+
+    // Parse the created bead ID
+    try {
+      const result = JSON.parse(stdout);
+      return { success: true, beadId: result.id };
+    } catch {
+      // bd create might not output JSON, try to extract ID from output
+      const match = stdout.match(/([a-z]+-[a-z0-9]+)/);
+      return { success: true, beadId: match?.[1] };
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
 
 export function registerWorkspaceCommands(program: Command): void {
   const workspace = program.command('workspace').description('Workspace management');
@@ -233,6 +269,14 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     spinner.text = 'Creating git worktree...';
     createWorktree(projectRoot, workspacePath, branchName);
 
+    // Initialize fresh beads for this workspace (remove inherited beads from main)
+    spinner.text = 'Initializing workspace beads...';
+    const beadsResult = await initializeWorkspaceBeads(workspacePath, issueId);
+    let workspaceBeadId: string | undefined;
+    if (beadsResult.success) {
+      workspaceBeadId = beadsResult.beadId;
+    }
+
     // Generate CLAUDE.md
     spinner.text = 'Generating CLAUDE.md...';
     const variables: TemplateVariables = {
@@ -243,6 +287,7 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       FRONTEND_URL: `https://${folderName}.localhost:3000`,
       API_URL: `https://api-${folderName}.localhost:8080`,
       PROJECT_NAME: projectName,
+      BEAD_ID: workspaceBeadId,
     };
 
     const claudeMd = generateClaudeMd(projectRoot, variables);
@@ -313,6 +358,15 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       }
       console.log('');
     }
+
+    console.log(chalk.bold('Beads:'));
+    if (beadsResult.success && workspaceBeadId) {
+      console.log(`  Status:  ${chalk.green('Initialized fresh')}`);
+      console.log(`  Task:    ${chalk.cyan(workspaceBeadId)}`);
+    } else {
+      console.log(`  Status:  ${chalk.yellow('Not initialized')} - ${beadsResult.error || 'unknown error'}`);
+    }
+    console.log('');
 
     if (options.docker) {
       console.log(chalk.bold('Docker:'));

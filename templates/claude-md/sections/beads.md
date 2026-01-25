@@ -3,12 +3,11 @@
 Use beads for persistent task tracking that survives compaction.
 
 ```bash
-bd ready              # Find unblocked work
+bd list               # See all tasks
 bd show <id>          # Get full context
 bd update <id> --status in_progress  # Start work
 bd comments add <id> "note"  # Add progress (CRITICAL)
 bd close <id> --reason "..."  # Complete
-bd sync               # Persist to git
 ```
 
 **ALWAYS** add comments as you work - they survive context compaction.
