@@ -3454,11 +3454,13 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
   }
 
   // Run all docker checks in parallel
+  // Use 'docker ps' (not -a) to only show RUNNING containers
+  // This avoids matching stopped containers with old naming patterns
   const results = await Promise.all(
     checks.map(async ({ displayName, containerName }) => {
       try {
         const { stdout } = await execAsync(
-          `docker ps -a --filter "name=${containerName}" --format "{{.Status}}" 2>/dev/null || echo ""`
+          `docker ps --filter "name=${containerName}" --format "{{.Status}}" 2>/dev/null || echo ""`
         );
         return { displayName, containerName, output: stdout.trim() };
       } catch {
@@ -3472,9 +3474,9 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
   for (const displayName of Object.keys(containerMap)) {
     const match = results.find(r => r.displayName === displayName && r.output);
     if (match) {
-      const isRunning = match.output.startsWith('Up');
-      const uptime = isRunning ? match.output.replace(/^Up\s+/, '').split(/\s+/)[0] : null;
-      status[displayName] = { running: isRunning, uptime };
+      // Since we use 'docker ps' (running only), any match is running
+      const uptime = match.output.replace(/^Up\s+/, '').split(/\s+/)[0] || null;
+      status[displayName] = { running: true, uptime };
     } else {
       status[displayName] = { running: false, uptime: null };
     }
