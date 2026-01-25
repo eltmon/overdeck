@@ -124,7 +124,8 @@ export async function doneCommand(
       break;
 
     case 'merge':
-      status.mergeStatus = options.status;
+      // Map passed/failed to merged/failed for mergeStatus type
+      status.mergeStatus = options.status === 'passed' ? 'merged' : 'failed';
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Merge completed for ${normalizedIssueId}`));
         // Clear readyForMerge since it's done

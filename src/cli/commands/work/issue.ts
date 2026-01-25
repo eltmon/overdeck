@@ -52,8 +52,8 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
 
     if (!inProgressState) return false;
 
-    // Update the issue state
-    await issue.update({ stateId: inProgressState.id });
+    // Update the issue state using client.updateIssue
+    await client.updateIssue(issue.id, { stateId: inProgressState.id });
 
     return true;
   } catch (error) {

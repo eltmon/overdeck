@@ -2660,26 +2660,26 @@ localhostForwarding=true
 # Disable GPU/GUI passthrough - reduces dxg driver errors
 guiApplications=false
 
+# ============================================================
+# WINDOWS 11 ONLY - Comment these out on Windows 10!
+# These settings require Windows 11 22H2 or later.
+# On Windows 10 they are silently ignored or may cause issues.
+# ============================================================
+
 # Route DNS through Windows - prevents getaddrinfo() failures
-dnsTunneling=true
+# dnsTunneling=true          # Windows 11 only
 
 # Inherit Windows proxy settings
-autoProxy=true
+# autoProxy=true             # Windows 11 only
 
-# MEMORY FRAGMENTATION FIX (prevents "page allocation failure" crashes)
-# AI agent workloads with Docker constantly allocate/free memory, causing fragmentation.
-# The hv_balloon driver can't find contiguous pages → vmbus channel allocation fails → crash.
-# These settings help prevent this:
-
-# Aggressively reclaim cached memory (dropCache is more aggressive than gradual)
-autoMemoryReclaim=dropCache
+# Aggressively reclaim cached memory
+# autoMemoryReclaim=dropCache  # Windows 11 only
 
 # Use sparse VHD to allow better memory compaction
-sparseVhd=true
+# sparseVhd=true             # Windows 11 only
 
-# DISABLED: mirrored networking may conflict with Docker Desktop
-# If you're NOT using Docker Desktop, you can try enabling this:
-# networkingMode=mirrored
+# Mirrored networking (may conflict with Docker Desktop)
+# networkingMode=mirrored    # Windows 11 only
 ```
 
 **After changing `.wslconfig`:**
@@ -2704,15 +2704,21 @@ ip addr show eth0  # NAT mode shows 172.x.x.x IP
 
 | Feature | Windows 10 | Windows 11 22H2+ |
 |---------|-----------|------------------|
-| `networkingMode=mirrored` | ❌ Not supported | ✅ Supported |
-| `dnsTunneling=true` | ✅ Works | ✅ Works |
+| `memory`, `processors`, `swap` | ✅ Works | ✅ Works |
+| `localhostForwarding` | ✅ Works | ✅ Works |
 | `guiApplications=false` | ✅ Works | ✅ Works |
+| `networkingMode=mirrored` | ❌ Not supported | ✅ Supported |
+| `dnsTunneling=true` | ❌ Not supported | ✅ Supported |
+| `autoProxy=true` | ❌ Not supported | ✅ Supported |
+| `autoMemoryReclaim` | ❌ Not supported | ✅ Supported |
+| `sparseVhd=true` | ❌ Not supported | ✅ Supported |
 
-**Windows 10 users:** The `networkingMode=mirrored` setting will be silently ignored. You'll stay on NAT mode, which can be less stable. The other settings (`dnsTunneling`, `guiApplications=false`) still help with stability.
+**Windows 10 users:** Most advanced WSL2 features require Windows 11. On Windows 10, only the basic resource limits and `localhostForwarding`/`guiApplications` settings are supported. Other settings will be silently ignored or may cause instability.
 
 If you experience frequent WSL2 crashes on Windows 10, consider:
-- Upgrading to Windows 11 for mirrored networking support
+- Using only the basic settings shown above (memory, processors, swap, localhostForwarding, guiApplications)
 - Reducing `memory` allocation if system is under pressure
+- Upgrading to Windows 11 for full WSL2 feature support
 - Checking Windows Event Viewer for specific crash causes
 
 #### Additional Windows 10 Workarounds
