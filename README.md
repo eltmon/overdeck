@@ -221,7 +221,7 @@ See [docs/DNS_SETUP.md](docs/DNS_SETUP.md) for detailed DNS configuration (espec
 ### Optional
 - **mkcert** - For HTTPS certificates (recommended)
 - **Linear API key** - For issue tracking integration
-- **Beads CLI (bd)** - For persistent task tracking across sessions
+- **Beads CLI (bd)** - For persistent task tracking across sessions. Auto-installed by `pan install`. Upgrade with `pan beads upgrade`.
 
 ### Platform Support
 
@@ -1246,7 +1246,15 @@ pan setup hooks       # Install Claude Code hooks (heartbeat, etc.)
 
 Beads is an optional git-backed issue tracker for persistent task tracking. Panopticon includes commands to manage beads databases and automatic cleanup after merges.
 
+**Installation:** Beads is automatically installed during `pan install`. You can also install/upgrade manually:
+
 ```bash
+# Check beads version and available updates
+pan beads upgrade --check
+
+# Upgrade to latest version
+pan beads upgrade
+
 # Show beads statistics (total, open, closed, old)
 pan beads stats
 
@@ -1259,6 +1267,8 @@ pan beads compact --days 60
 # Preview what would be removed (dry run)
 pan beads compact --dry-run
 ```
+
+**Recommended version:** v0.47.1+ includes important fixes for git worktree isolation.
 
 **Automatic Compaction:**
 

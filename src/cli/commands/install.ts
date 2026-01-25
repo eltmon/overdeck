@@ -26,6 +26,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--minimal', 'Skip Traefik and mkcert (use port-based routing)')
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
     .option('--skip-docker', 'Skip Docker network setup')
+    .option('--skip-beads', 'Skip beads CLI installation')
     .action(installCommand);
 }
 
@@ -34,6 +35,7 @@ interface InstallOptions {
   minimal?: boolean;
   skipMkcert?: boolean;
   skipDocker?: boolean;
+  skipBeads?: boolean;
 }
 
 interface PrereqResult {
@@ -147,13 +149,21 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'brew install mkcert / apt install mkcert',
   });
 
-  // Beads CLI
+  // Beads CLI (optional - will be auto-installed)
   const hasBeads = checkCommand('bd');
+  let beadsVersion = '';
+  if (hasBeads) {
+    try {
+      const output = execSync('bd --version', { encoding: 'utf-8' }).trim();
+      const match = output.match(/(\d+\.\d+\.\d+)/);
+      beadsVersion = match ? match[1] : 'unknown';
+    } catch {}
+  }
   results.push({
     name: 'Beads CLI (bd)',
     passed: hasBeads,
-    message: hasBeads ? 'installed' : 'not found',
-    fix: 'cargo install beads-cli',
+    message: hasBeads ? `v${beadsVersion}` : 'not found (will auto-install)',
+    fix: 'curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash',
   });
 
   // ttyd (web terminal for planning sessions)
@@ -167,7 +177,8 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
 
   return {
     results,
-    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd').every((r) => r.passed),
+    // mkcert, ttyd, and beads are optional (will be auto-installed or skipped)
+    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)').every((r) => r.passed),
   };
 }
 
@@ -330,6 +341,70 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   } else {
     spinner.info('ttyd already installed');
+  }
+
+  // Step 5b: Install beads CLI (git-backed issue tracker)
+  if (options.skipBeads) {
+    spinner.info('Skipping beads installation (--skip-beads)');
+  } else {
+    const hasBeadsNow = checkCommand('bd');
+    if (!hasBeadsNow) {
+    spinner.start('Installing beads CLI (bd)...');
+    try {
+      const plat = detectPlatform();
+      if (plat === 'darwin') {
+        // macOS - try homebrew
+        try {
+          execSync('brew install steveyegge/beads/bd', { stdio: 'pipe', timeout: 120000 });
+          spinner.succeed('beads installed via Homebrew');
+        } catch {
+          // Fall back to curl script
+          try {
+            execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
+              stdio: 'pipe',
+              timeout: 120000,
+            });
+            spinner.succeed('beads installed via install script');
+          } catch {
+            spinner.warn('beads installation failed - install manually: brew install steveyegge/beads/bd');
+          }
+        }
+      } else {
+        // Linux/WSL - use install script
+        try {
+          execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
+            stdio: 'pipe',
+            timeout: 120000,
+          });
+          spinner.succeed('beads installed via install script');
+        } catch (error) {
+          spinner.warn('beads installation failed - install manually: curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash');
+        }
+      }
+    } catch (error) {
+      spinner.warn('beads installation failed (workspace beads tracking will not work)');
+    }
+  } else {
+    // Check if upgrade is needed
+    try {
+      const output = execSync('bd --version', { encoding: 'utf-8' }).trim();
+      const match = output.match(/(\d+)\.(\d+)\.(\d+)/);
+      if (match) {
+        const [, major, minor, patch] = match.map(Number);
+        const currentVersion = major * 10000 + minor * 100 + patch;
+        const recommendedVersion = 47 * 100 + 1; // v0.47.1 has worktree isolation fix
+        if (currentVersion < recommendedVersion) {
+          spinner.info(`beads v${major}.${minor}.${patch} installed (v0.47.1+ recommended for worktree isolation)`);
+        } else {
+          spinner.info(`beads v${major}.${minor}.${patch} installed`);
+        }
+      } else {
+        spinner.info('beads already installed');
+      }
+    } catch {
+      spinner.info('beads already installed');
+    }
+    }
   }
 
   // Step 6: Setup Traefik configuration
