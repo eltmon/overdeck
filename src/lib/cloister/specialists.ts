@@ -752,10 +752,15 @@ export async function wakeSpecialist(
       // Use Opus for merge-agent (complex conflict resolution), default for others
       const modelFlag = name === 'merge-agent' ? '--model opus' : '';
 
+      // merge-agent needs full bypass to handle git stash drop, reset, etc.
+      const permissionFlags = name === 'merge-agent'
+        ? '--dangerously-skip-permissions --permission-mode bypassPermissions'
+        : '--dangerously-skip-permissions';
+
       // Start with --resume if we have a session, otherwise fresh
       const claudeCmd = sessionId
-        ? `claude --resume "${sessionId}" ${modelFlag} --dangerously-skip-permissions`
-        : `claude ${modelFlag} --dangerously-skip-permissions`;
+        ? `claude --resume "${sessionId}" ${modelFlag} ${permissionFlags}`
+        : `claude ${modelFlag} ${permissionFlags}`;
 
       await execAsync(
         `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${claudeCmd}"`,

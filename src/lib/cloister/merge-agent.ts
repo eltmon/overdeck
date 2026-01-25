@@ -135,6 +135,68 @@ function detectTestCommand(projectPath: string): string {
 }
 
 /**
+ * Post-merge cleanup: move PRD to completed, update issue status
+ */
+async function postMergeCleanup(issueId: string, projectPath: string): Promise<void> {
+  console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
+
+  // 1. Move PRD from active to completed
+  try {
+    const activePrdPath = join(projectPath, 'docs/prds/active', `${issueId.toLowerCase()}-plan.md`);
+    const completedPrdPath = join(projectPath, 'docs/prds/completed', `${issueId.toLowerCase()}-plan.md`);
+
+    if (existsSync(activePrdPath)) {
+      // Ensure completed directory exists
+      const completedDir = dirname(completedPrdPath);
+      if (!existsSync(completedDir)) {
+        mkdirSync(completedDir, { recursive: true });
+      }
+
+      // Move the file using git mv for proper tracking
+      await execAsync(`git mv "${activePrdPath}" "${completedPrdPath}"`, { cwd: projectPath, encoding: 'utf-8' });
+      await execAsync(`git commit -m "Move ${issueId} PRD to completed"`, { cwd: projectPath, encoding: 'utf-8' });
+      await execAsync(`git push`, { cwd: projectPath, encoding: 'utf-8' });
+      console.log(`[merge-agent] ✓ Moved PRD to completed and pushed: ${completedPrdPath}`);
+      logActivity('prd_moved', `Moved ${issueId} PRD to completed directory`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not move PRD: ${err}`);
+    // Non-fatal, continue with cleanup
+  }
+
+  // 2. Update issue status (GitHub or Linear)
+  const isGitHub = issueId.toUpperCase().startsWith('PAN-');
+
+  if (isGitHub) {
+    // GitHub: remove in-progress label, add done label, close issue
+    try {
+      const issueNum = issueId.replace(/^PAN-/i, '');
+      await execAsync(`gh issue edit ${issueNum} --remove-label "in-progress" --add-label "done" 2>/dev/null || true`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+      console.log(`[merge-agent] ✓ Updated GitHub issue ${issueId} labels`);
+      logActivity('issue_updated', `Updated ${issueId} labels: removed in-progress, added done`);
+    } catch (err) {
+      console.warn(`[merge-agent] Could not update GitHub issue labels: ${err}`);
+    }
+  } else {
+    // Linear: use pan CLI to mark as done (if available)
+    try {
+      await execAsync(`pan work done ${issueId} -c "Merged to main" 2>/dev/null || true`, {
+        encoding: 'utf-8',
+      });
+      console.log(`[merge-agent] ✓ Updated Linear issue ${issueId} to Done`);
+      logActivity('issue_updated', `Updated ${issueId} to Done in Linear`);
+    } catch (err) {
+      console.warn(`[merge-agent] Could not update Linear issue: ${err}`);
+    }
+  }
+
+  console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}`);
+}
+
+/**
  * Parse result markers from agent output
  */
 function parseAgentOutput(output: string): MergeResult {
@@ -434,6 +496,9 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
               result.validationStatus = 'PASS';
               logMergeHistory(context, result);
 
+              // Run post-merge cleanup (move PRD, update issue status)
+              await postMergeCleanup(context.issueId, context.projectPath);
+
               return result;
             } else {
               // Validation failed - auto-revert
@@ -672,6 +737,10 @@ Report any issues or conflicts you encountered.`;
                 // Validation passed
                 console.log(`[merge-agent] ✓ Merge validation passed`);
                 logActivity('merge_complete', `Merge and validation completed by specialist`);
+
+                // Run post-merge cleanup (move PRD, update issue status)
+                await postMergeCleanup(issueId, projectPath);
+
                 return {
                   success: true,
                   validationStatus: 'PASS',

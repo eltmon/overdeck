@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   app:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -31,6 +32,7 @@ services:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME:-app}.loadbalancer.server.port=8080"
 
   postgres:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       - POSTGRES_DB=${DB_NAME:-appdb}
@@ -49,6 +51,7 @@ services:
       - app-network
 
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     ports:
       - "${REDIS_PORT:-6379}:6379"

@@ -111,6 +111,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         method: 'DELETE',
       });
       if (!stopRes.ok) throw new Error('Failed to stop planning');
+      const stopData = await stopRes.json();
 
       // Then mark planning as complete (changes label from "Planning" to "Planned")
       const completeRes = await fetch(`/api/issues/${issue.identifier}/complete-planning`, {
@@ -120,11 +121,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         console.warn('Failed to mark planning complete, continuing anyway');
       }
 
-      return stopRes.json();
+      return stopData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
       setStep('complete');
+    },
+    onError: (err: Error) => {
+      console.error('Stop planning failed:', err);
+      setError(err.message);
+      setStep('error');
     },
   });
 

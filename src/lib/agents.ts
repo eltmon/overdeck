@@ -332,7 +332,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       await execAsync(`tmux paste-buffer -t ${agentId}`);
       // Small delay to let paste complete, then send Enter
       await new Promise(resolve => setTimeout(resolve, 500));
-      await execAsync(`tmux send-keys -t ${agentId} Enter`);
+      await execAsync(`tmux send-keys -t "${agentId}" C-m`, { encoding: 'utf-8' });
     } else {
       console.error('Claude SessionStart hook did not fire in time, prompt not sent. Check ~/.claude/settings.json has SessionStart hook configured.');
     }

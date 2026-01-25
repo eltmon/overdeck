@@ -657,11 +657,11 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
                   </div>
                 )}
 
-                {/* Start containers button when not running */}
-                {workspace.hasDocker && (!workspace.containers || !Object.values(workspace.containers).some(c => c.running)) && (
+                {/* Start containers button when ANY container is stopped */}
+                {workspace.hasDocker && workspace.containers && Object.values(workspace.containers).some(c => !c.running) && (
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center gap-3">
-                      <span className="text-xs text-yellow-500">Containers not running.</span>
+                      <span className="text-xs text-yellow-500">Some containers stopped.</span>
                       <button
                         onClick={handleStartContainers}
                         disabled={startContainersMutation.isPending}

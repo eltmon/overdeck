@@ -1822,7 +1822,7 @@ app.post('/api/agents/:id/poke', async (req, res) => {
     // Send message via tmux (two separate commands: text then Enter)
     const escapedMsg = pokeMsg.replace(/"/g, '\\"').replace(/'/g, "\\'");
     await execAsync(`tmux send-keys -t "${id}" "${escapedMsg}"`);
-    await execAsync(`tmux send-keys -t "${id}" Enter`);
+    await execAsync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
 
     res.json({ success: true, message: 'Agent poked successfully' });
   } catch (error) {
@@ -4110,6 +4110,107 @@ app.post('/api/workspaces/:issueId/start', async (req, res) => {
   } catch (error: any) {
     console.error('Error starting containers:', error);
     res.status(500).json({ error: 'Failed to start containers: ' + error.message });
+  }
+});
+
+// Control individual container (start/stop/restart)
+app.post('/api/workspaces/:issueId/containers/:containerName/:action', async (req, res) => {
+  const { issueId, containerName, action } = req.params;
+
+  // Validate action
+  if (!['start', 'stop', 'restart'].includes(action)) {
+    return res.status(400).json({ error: 'Invalid action. Must be start, stop, or restart.' });
+  }
+
+  // Find workspace and compose file
+  const projectPaths = [
+    join(homedir(), 'projects/myn/workspaces', `feature-${issueId.toLowerCase()}`),
+    join(homedir(), 'projects/panopticon/workspaces', `feature-${issueId.toLowerCase()}`),
+  ];
+
+  let workspacePath: string | null = null;
+  let composeFile: string | null = null;
+
+  for (const path of projectPaths) {
+    if (existsSync(path)) {
+      workspacePath = path;
+      // Check for compose file in common locations
+      const composePaths = [
+        join(path, '.devcontainer/docker-compose.devcontainer.yml'),
+        join(path, 'docker-compose.yml'),
+        join(path, 'docker-compose.yaml'),
+      ];
+      for (const cp of composePaths) {
+        if (existsSync(cp)) {
+          composeFile = cp;
+          break;
+        }
+      }
+      break;
+    }
+  }
+
+  if (!workspacePath) {
+    return res.status(404).json({ error: `Workspace not found for ${issueId}` });
+  }
+
+  if (!composeFile) {
+    return res.status(404).json({ error: `No docker-compose file found in workspace` });
+  }
+
+  // Check Docker is running
+  try {
+    await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+  } catch {
+    return res.status(400).json({ error: 'Docker is not running. Start Docker Desktop first.' });
+  }
+
+  // Map display name to service name(s) - some services have aliases
+  const serviceMap: Record<string, string[]> = {
+    'frontend': ['fe', 'frontend'],
+    'api': ['api'],
+    'dev': ['dev'],
+    'postgres': ['postgres'],
+    'redis': ['redis'],
+    'fe': ['fe', 'frontend'],
+  };
+
+  const serviceNames = serviceMap[containerName.toLowerCase()] || [containerName.toLowerCase()];
+
+  try {
+    // Get the project name from compose
+    const { stdout: projectNameOut } = await execAsync(
+      `docker compose -f "${composeFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+      { encoding: 'utf-8' }
+    );
+    const projectName = projectNameOut.trim();
+
+    // Try each possible service name
+    let success = false;
+    let lastError = '';
+
+    for (const serviceName of serviceNames) {
+      try {
+        const cmd = `docker compose -f "${composeFile}" ${projectName ? `--project-name "${projectName}"` : ''} ${action} ${serviceName}`;
+        console.log(`[container-control] Running: ${cmd}`);
+        await execAsync(cmd, { encoding: 'utf-8', timeout: 30000 });
+        success = true;
+        console.log(`[container-control] Successfully ${action}ed ${serviceName} for ${issueId}`);
+        break;
+      } catch (err: any) {
+        lastError = err.message || String(err);
+        // Continue trying other service names
+      }
+    }
+
+    if (success) {
+      res.json({ success: true, message: `Container ${containerName} ${action}ed successfully` });
+    } else {
+      res.status(500).json({ error: `Failed to ${action} ${containerName}: ${lastError}` });
+    }
+  } catch (error: any) {
+    console.error(`Error ${action}ing container:`, error);
+    res.status(500).json({ error: `Failed to ${action} container: ${error.message}` });
   }
 });
 
