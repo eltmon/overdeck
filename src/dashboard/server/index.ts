@@ -5586,11 +5586,144 @@ app.post('/api/agents', async (req, res) => {
       }
     }
 
+    // First, start containers if workspace has ./dev script
+    // We must wait for containers to be ready BEFORE starting the agent
+    const devScript = join(workspacePath, 'dev');
+    let containerActivityId: string | null = null;
+    let containersReady = false;
+
+    if (existsSync(workspacePath) && existsSync(devScript)) {
+      // Check if Docker is running
+      let dockerRunning = false;
+      try {
+        await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+        dockerRunning = true;
+      } catch {
+        console.log('[start-agent] Docker not running, skipping container start');
+      }
+
+      if (dockerRunning) {
+        containerActivityId = `containers-${Date.now()}`;
+        const featureName = `myn-feature-${issueLower}`;
+
+        logActivity({
+          id: containerActivityId,
+          timestamp: new Date().toISOString(),
+          command: `./dev all (${issueId}) - waiting for containers`,
+          status: 'running',
+          output: [],
+        });
+
+        // Pass UID/GID for correct file ownership in containers
+        const containerUid = process.getuid?.() ?? 1000;
+        const containerGid = process.getgid?.() ?? 1000;
+
+        // Start containers (don't detach - we need to track completion)
+        const containerPromise = new Promise<boolean>((resolve) => {
+          const containerChild = spawn('./dev', ['all'], {
+            cwd: workspacePath,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` },
+          });
+
+          containerChild.stdout?.on('data', (data) => {
+            data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+              appendActivityOutput(containerActivityId!, line);
+            });
+          });
+          containerChild.stderr?.on('data', (data) => {
+            data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+              appendActivityOutput(containerActivityId!, `[stderr] ${line}`);
+            });
+          });
+
+          containerChild.on('close', (code) => {
+            appendActivityOutput(containerActivityId!, `[${new Date().toISOString()}] ./dev all exited with code ${code}`);
+            updateActivity(containerActivityId!, { status: code === 0 ? 'completed' : 'failed' });
+            resolve(code === 0);
+          });
+
+          containerChild.on('error', (err) => {
+            appendActivityOutput(containerActivityId!, `[error] ${err.message}`);
+            updateActivity(containerActivityId!, { status: 'failed' });
+            resolve(false);
+          });
+
+          // Timeout after 5 minutes
+          setTimeout(() => {
+            appendActivityOutput(containerActivityId!, '[timeout] Container startup exceeded 5 minutes');
+            containerChild.kill('SIGTERM');
+            resolve(false);
+          }, 5 * 60 * 1000);
+        });
+
+        console.log(`[start-agent] Starting containers for ${issueId}, waiting for ready...`);
+        appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Starting containers...`);
+
+        // Wait for ./dev all to complete
+        const devCompleted = await containerPromise;
+
+        if (devCompleted) {
+          // Now poll for container health (some containers have healthchecks)
+          const maxWaitMs = 60000; // 60 seconds
+          const pollIntervalMs = 2000;
+          const startTime = Date.now();
+
+          appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Checking container health...`);
+
+          while (Date.now() - startTime < maxWaitMs) {
+            try {
+              const { stdout } = await execAsync(
+                `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+                { encoding: 'utf-8' }
+              );
+
+              const containers = stdout.trim().split('\n').filter(Boolean);
+              const allHealthy = containers.length > 0 && containers.every(line => {
+                const status = line.split('|')[1] || '';
+                // Container is ready if it's "Up" and either has no healthcheck or is "(healthy)"
+                return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
+              });
+
+              if (allHealthy) {
+                containersReady = true;
+                appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] All ${containers.length} containers ready`);
+                console.log(`[start-agent] All ${containers.length} containers ready for ${issueId}`);
+                break;
+              }
+
+              await new Promise(r => setTimeout(r, pollIntervalMs));
+            } catch (healthErr) {
+              console.error('[start-agent] Error checking container health:', healthErr);
+              await new Promise(r => setTimeout(r, pollIntervalMs));
+            }
+          }
+
+          if (!containersReady) {
+            appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Warning: Container health check timed out, proceeding anyway`);
+            console.warn(`[start-agent] Container health check timed out for ${issueId}`);
+            containersReady = true; // Proceed anyway, agent can handle it
+          }
+        } else {
+          appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Container startup failed`);
+          console.error(`[start-agent] Container startup failed for ${issueId}`);
+          return res.status(500).json({
+            error: `Container startup failed for ${issueId}`,
+            hint: 'Check activity log for details',
+            activityId: containerActivityId,
+          });
+        }
+      }
+    }
+
+    // NOW spawn the agent (after containers are ready)
     const activityId = spawnPanCommand(
       ['work', 'issue', issueId],
       `Start agent for ${issueId}`,
       projectPath
     );
+
+    console.log(`[start-agent] Agent spawned for ${issueId} (containers ready: ${containersReady})`);
 
     // Update issue status to "In Progress"
     const apiKey = getLinearApiKey();
@@ -5693,66 +5826,6 @@ app.post('/api/agents', async (req, res) => {
       } catch (linearError) {
         console.error('Failed to update Linear status:', linearError);
         // Don't fail the request, agent was still started
-      }
-    }
-
-    // Also start containers if workspace has ./dev script
-    let containerActivityId: string | null = null;
-    const devScript = join(workspacePath, 'dev');
-
-    if (existsSync(workspacePath) && existsSync(devScript)) {
-      // Check if Docker is running
-      let dockerRunning = false;
-      try {
-        await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
-        dockerRunning = true;
-      } catch {
-        console.log('Docker not running, skipping container start');
-      }
-
-      if (dockerRunning) {
-        containerActivityId = `containers-${Date.now()}`;
-
-        logActivity({
-          id: containerActivityId,
-          timestamp: new Date().toISOString(),
-          command: `./dev all (${issueId})`,
-          status: 'running',
-          output: [],
-        });
-
-        // Pass UID/GID for correct file ownership in containers
-        const containerUid = process.getuid?.() ?? 1000;
-        const containerGid = process.getgid?.() ?? 1000;
-        const containerChild = spawn('./dev', ['all'], {
-          cwd: workspacePath,
-          detached: true,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          env: { ...process.env, UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` },
-        });
-
-        containerChild.stdout?.on('data', (data) => {
-          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
-            appendActivityOutput(containerActivityId!, line);
-          });
-        });
-        containerChild.stderr?.on('data', (data) => {
-          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
-            appendActivityOutput(containerActivityId!, `[stderr] ${line}`);
-          });
-        });
-
-        containerChild.on('close', (code) => {
-          appendActivityOutput(containerActivityId!, `[${new Date().toISOString()}] ./dev all exited with code ${code}`);
-          updateActivity(containerActivityId!, { status: code === 0 ? 'completed' : 'failed' });
-        });
-
-        containerChild.on('error', (err) => {
-          appendActivityOutput(containerActivityId!, `[error] ${err.message}`);
-          updateActivity(containerActivityId!, { status: 'failed' });
-        });
-
-        console.log(`Starting containers for ${issueId} in ${workspacePath}`);
       }
     }
 
@@ -6164,6 +6237,14 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         : join(projectPath, '.planning', issueLower);
       if (!existsSync(planningDir)) {
         await execAsync(`mkdir -p "${planningDir}"`, { encoding: 'utf-8' });
+      }
+
+      // Clear stale STATE.md from previous planning session (start fresh)
+      // This prevents new planning agents from seeing old state and thinking work is done
+      const staleStatePath = join(planningDir, 'STATE.md');
+      if (existsSync(staleStatePath)) {
+        console.log(`[start-planning] Clearing stale STATE.md from previous session`);
+        await execAsync(`rm -f "${staleStatePath}"`, { encoding: 'utf-8' });
       }
 
       const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
