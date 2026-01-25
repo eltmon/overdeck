@@ -31,9 +31,17 @@
   - Explains why convoys, how they work, synthesis process
   - Full command reference and custom template examples
 
-### Remaining (Deferred)
-- Phase 4: Dashboard integration (complex - deferred for separate PR)
-- Tests for convoy runtime (medium - deferred for separate PR)
+- ✅ Phase 4: Dashboard integration
+  - API endpoints for convoy management
+  - ConvoyPanel React component with expand/collapse
+  - useConvoys hook for data fetching
+  - Integrated into main App with Convoys tab
+
+- ✅ Phase 7: Tests for convoy runtime
+  - 17 comprehensive tests added
+  - Template parsing, state management, validation
+  - Execution order and dependency checking
+  - All 410 tests passing (no regressions)
 
 ---
 
@@ -58,23 +66,24 @@ The system automatically:
 ### Test Results
 
 All tests pass:
-- **Test Files:** 30 passed | 5 skipped (35)
-- **Tests:** 393 passed | 46 skipped (446)
-- **Duration:** 8.47s
+- **Test Files:** 31 passed | 5 skipped (36)
+- **Tests:** 410 passed | 46 skipped (463)
+- **Duration:** 8.03s
 
 No regressions introduced by convoy implementation.
+17 new tests added for convoy runtime.
 
 ### Files Changed
 
-- **New:** 7 files (convoy runtime, CLI commands, PRD)
-- **Modified:** 5 files (CLI index, review agent, prompts, README, STATE)
-- **Total:** 2,173 insertions, 362 deletions
+- **New:** 12 files (convoy runtime, CLI commands, tests, dashboard components, hooks, PRD)
+- **Modified:** 8 files (CLI index, review agent, prompts, README, STATE, dashboard server, App)
+- **Total:** ~3,000+ insertions, ~400 deletions
 
 ### Next Steps
 
-1. User testing of convoy commands
-2. Dashboard integration (separate PR)
-3. Unit tests for convoy-specific logic (separate PR)
+1. User testing of convoy CLI commands
+2. User testing of dashboard convoy tab
+3. (Optional) Add more convoy templates (planning, triage, health-monitor)
 
 ---
 
