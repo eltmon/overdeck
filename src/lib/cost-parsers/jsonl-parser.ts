@@ -293,6 +293,49 @@ export function getRecentSessions(days: number = 7): SessionUsage[] {
 }
 
 /**
+ * Get the active session model for a workspace
+ * Returns the full model ID (e.g., "claude-sonnet-4-5-20250929") from the most recent session file
+ */
+export function getActiveSessionModel(workspacePath: string): string | null {
+  try {
+    // Convert workspace path to Claude project dir name
+    // e.g., /home/user/projects/myn/workspaces/feature-min-664
+    //    -> -home-user-projects-myn-workspaces-feature-min-664
+    const projectDirName = workspacePath.replace(/\//g, '-').replace(/^-/, '');
+    const projectDir = join(CLAUDE_PROJECTS_DIR, projectDirName);
+
+    // Find most recently modified session file
+    const sessions = getSessionFiles(projectDir);
+    if (sessions.length === 0) {
+      return null;
+    }
+
+    // Parse the most recent session file to find model
+    const mostRecentSession = sessions[0]; // Already sorted by mtime
+    const content = readFileSync(mostRecentSession, 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim());
+
+    // Look for model in first few messages (usually in first message)
+    for (let i = 0; i < Math.min(lines.length, 10); i++) {
+      try {
+        const msg: ClaudeMessage = JSON.parse(lines[i]);
+        const model = msg.message?.model || msg.model;
+        if (model) {
+          return model; // Return full model ID
+        }
+      } catch {
+        // Skip invalid JSON lines
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('Failed to get active session model:', error);
+    return null;
+  }
+}
+
+/**
  * Import session usage to cost log
  */
 export function importSessionToCostLog(

@@ -1,22 +1,5 @@
 # PAN-91: Display Full Model Name in Card Detail Panel
 
-## Current Status
-
-✅ **COMPLETE** - All implementation finished, tested, committed, and pushed.
-
-**Completed:**
-- ✅ Added getActiveSessionModel() to jsonl-parser.ts
-- ✅ Updated workspace endpoint to return agentModelFull
-- ✅ Added agentModelFull to WorkspaceInfo interface
-- ✅ Created getFriendlyModelName() helper function
-- ✅ Added tooltip to agent badge showing full model ID
-- ✅ Updated cost breakdown "By Model" section with friendly names and tooltips
-- ✅ All tests passing (511 passed, 46 skipped)
-- ✅ Changes committed and pushed to feature/pan-91
-- ✅ All beads tasks closed
-
-**PR:** https://github.com/eltmon/panopticon-cli/pull/new/feature/pan-91
-
 ## Summary
 
 Display the full Claude model identifier (e.g., "claude-sonnet-4-5-20250929") instead of just the short name ("sonnet") in the issue detail panel.

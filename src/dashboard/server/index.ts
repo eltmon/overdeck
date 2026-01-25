@@ -25,7 +25,7 @@ import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig, findProjectByTeam, extractTeamPrefix } from '../../lib/projects.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
-import { normalizeModelName } from '../../lib/cost-parsers/jsonl-parser.js';
+import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import type { Issue } from '../frontend/src/types.js';
 
@@ -3689,6 +3689,7 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
   let hasAgent = false;
   let agentSessionId: string | null = null;
   let agentModel: string | undefined;
+  let agentModelFull: string | undefined;
 
   const sessions = sessionsResult.stdout;
   if (sessions.includes(agentSession)) {
@@ -3698,6 +3699,14 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     const paneOutput = paneResult.stdout;
     const modelMatch = paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
     agentModel = modelMatch ? modelMatch[1] : undefined;
+
+    // Get full model ID from session files
+    if (workspacePath) {
+      const fullModel = getActiveSessionModel(workspacePath);
+      if (fullModel) {
+        agentModelFull = fullModel;
+      }
+    }
   }
 
   // Get any pending operation for this issue
@@ -3713,6 +3722,7 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     hasAgent,
     agentSessionId,
     agentModel,
+    agentModelFull,
     git,
     repoGit,
     services,
