@@ -3432,9 +3432,9 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
   const containerMap: Record<string, string[]> = {
     'frontend': ['frontend', 'fe'],
     'api': ['api'],
-    'dev': ['dev'],
     'postgres': ['postgres'],
     'redis': ['redis'],
+    // Note: 'dev' is a script (./dev), not a container - don't check for it
   };
 
   // Build all possible container patterns
