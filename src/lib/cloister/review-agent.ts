@@ -7,6 +7,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
+import { startConvoy, waitForConvoy, type ConvoyContext } from '../convoy.js';
 
 const execAsync = promisify(exec);
 
@@ -288,185 +289,112 @@ function logReviewHistory(
 }
 
 /**
- * Validate that we have a workspace and main project is on main branch
- *
- * Specialists should ALWAYS run in workspaces, never in the main project.
- * The main project should ALWAYS be on main branch.
+ * Parse convoy synthesis output to ReviewResult
  */
-async function validateWorkspaceAndBranch(context: ReviewContext): Promise<{ valid: boolean; error?: string; workingDir: string }> {
-  // Workspace is required - specialists should never run without one
-  if (!context.workspace) {
+function parseConvoySynthesis(convoyOutputDir: string): ReviewResult {
+  const synthesisPath = join(convoyOutputDir, 'synthesis.md');
+
+  if (!existsSync(synthesisPath)) {
     return {
-      valid: false,
-      error: 'No workspace provided. Review agent requires a workspace to run in.',
-      workingDir: context.projectPath,
+      success: false,
+      reviewResult: 'COMMENTED',
+      notes: 'Convoy did not produce synthesis output',
     };
   }
 
-  // Check workspace exists
-  if (!existsSync(context.workspace)) {
-    return {
-      valid: false,
-      error: `Workspace does not exist: ${context.workspace}`,
-      workingDir: context.projectPath,
-    };
-  }
+  const synthesisContent = readFileSync(synthesisPath, 'utf-8');
 
-  // Safeguard: Check that main project is on main branch
-  // This catches when something has incorrectly checked out a feature branch in the main project
-  try {
-    const { stdout: currentBranch } = await execAsync('git branch --show-current', {
-      cwd: context.projectPath,
-      encoding: 'utf-8',
-    });
-    const branch = currentBranch.trim();
+  // Parse synthesis for review result markers
+  const result = parseAgentOutput(synthesisContent);
 
-    if (branch && branch !== 'main' && branch !== 'master') {
-      console.warn(`[review-agent] WARNING: Main project at ${context.projectPath} is on branch '${branch}' instead of 'main'`);
-      console.warn(`[review-agent] This indicates a bug - the main project should ALWAYS stay on main.`);
-      console.warn(`[review-agent] Proceeding with workspace anyway, but this should be investigated.`);
-      // Don't fail, just warn - we'll use the workspace which has the correct branch
+  // Also collect findings from individual review files
+  const correctnessPath = join(convoyOutputDir, 'correctness.md');
+  const securityPath = join(convoyOutputDir, 'security.md');
+  const performancePath = join(convoyOutputDir, 'performance.md');
+
+  const filesReviewed: string[] = [];
+
+  // Extract file names from each review
+  for (const path of [correctnessPath, securityPath, performancePath]) {
+    if (existsSync(path)) {
+      const content = readFileSync(path, 'utf-8');
+      // Look for file references (simplified)
+      const fileMatches = content.match(/\b[\w\/\-\.]+\.(ts|js|tsx|jsx|py|java|go|rs)\b/g);
+      if (fileMatches) {
+        filesReviewed.push(...fileMatches);
+      }
     }
-  } catch (err) {
-    // Non-fatal - just log and continue
-    console.warn(`[review-agent] Could not check main project branch: ${err}`);
   }
 
-  return {
-    valid: true,
-    workingDir: context.workspace,
-  };
+  result.filesReviewed = [...new Set(filesReviewed)]; // Deduplicate
+
+  return result;
 }
 
 /**
  * Spawn review-agent to review a pull request
  *
+ * Now uses convoy system with parallel specialized reviewers.
+ *
  * @param context - Review context
  * @returns Promise that resolves with review result
  */
 export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewResult> {
-  console.log(`[review-agent] Starting code review for ${context.issueId} (${context.prUrl})`);
+  console.log(`[review-agent] Starting convoy code review for ${context.issueId} (${context.prUrl})`);
 
-  // Validate workspace and branch state
-  const validation = await validateWorkspaceAndBranch(context);
-  if (!validation.valid) {
-    console.error(`[review-agent] ${validation.error}`);
-    return {
-      success: false,
-      reviewResult: 'COMMENTED',
-      notes: validation.error,
-    };
-  }
-
-  const workingDir = validation.workingDir;
-  console.log(`[review-agent] Working directory: ${workingDir}`);
-
-  // Get existing session ID
-  const sessionId = getSessionId('review-agent');
-
-  // Build prompt (non-blocking)
-  const prompt = await buildReviewPrompt(context);
-
-  // Build Claude command args
-  const args = ['--model', 'sonnet', '--print', '-p', prompt];
-
-  if (sessionId) {
-    args.push('--resume', sessionId);
-  }
-
-  console.log(`[review-agent] Session: ${sessionId || 'new session'}`);
-  console.log(`[review-agent] PR: ${context.prUrl}`);
-
-  // Spawn Claude process in the WORKSPACE (not projectPath!)
-  // Workspace has the feature branch checked out; projectPath should stay on main
-  const proc = spawn('claude', args, {
-    cwd: workingDir,
-    env: {
-      ...process.env,
-      PANOPTICON_AGENT_ID: 'review-agent',
-    },
-  });
-
-  // Capture output
-  let output = '';
-  let errorOutput = '';
-
-  proc.stdout?.on('data', (data) => {
-    const chunk = data.toString();
-    output += chunk;
-    // Also stream to console for visibility
-    process.stdout.write(chunk);
-  });
-
-  proc.stderr?.on('data', (data) => {
-    const chunk = data.toString();
-    errorOutput += chunk;
-    process.stderr.write(chunk);
-  });
-
-  // Create timeout promise
-  const timeoutPromise = new Promise<ReviewResult>((_, reject) => {
-    setTimeout(() => {
-      proc.kill('SIGTERM');
-      reject(new Error('review-agent timeout after 20 minutes'));
-    }, REVIEW_TIMEOUT_MS);
-  });
-
-  // Create completion promise
-  const completionPromise = new Promise<ReviewResult>((resolve, reject) => {
-    proc.on('close', (code) => {
-      console.log(`[review-agent] Process exited with code ${code}`);
-
-      // Try to extract session ID from output if this was a new session
-      if (!sessionId && output) {
-        // Look for session ID in output (Claude Code prints it)
-        const sessionMatch = output.match(/Session ID: ([a-f0-9-]+)/i);
-        if (sessionMatch) {
-          const newSessionId = sessionMatch[1];
-          setSessionId('review-agent', newSessionId);
-          recordWake('review-agent', newSessionId);
-          console.log(`[review-agent] Captured session ID: ${newSessionId}`);
-        }
-      } else if (sessionId) {
-        recordWake('review-agent');
-      }
-
-      // Parse output for results
-      const result = parseAgentOutput(output);
-
-      // Log to history
-      logReviewHistory(context, result, sessionId || undefined);
-
-      resolve(result);
-    });
-
-    proc.on('error', (error) => {
-      console.error(`[review-agent] Process error:`, error);
-      reject(error);
-    });
-  });
-
-  // Race between timeout and completion
   try {
-    const result = await Promise.race([completionPromise, timeoutPromise]);
+    // Get files changed from PR if not provided
+    let filesChanged = context.filesChanged || [];
+    if (filesChanged.length === 0) {
+      filesChanged = await getFilesChangedFromPR(context.prUrl, context.projectPath);
+    }
 
-    // Send feedback to the work agent so they know what to fix
+    // Build convoy context
+    const convoyContext: ConvoyContext = {
+      projectPath: context.projectPath,
+      prUrl: context.prUrl,
+      issueId: context.issueId,
+      files: filesChanged,
+    };
+
+    console.log(`[review-agent] Starting convoy with ${filesChanged.length} files`);
+
+    // Start convoy
+    const convoy = await startConvoy('code-review', convoyContext);
+
+    console.log(`[review-agent] Convoy started: ${convoy.id}`);
+    console.log(`[review-agent] Spawned agents: ${convoy.agents.map(a => a.role).join(', ')}`);
+
+    // Wait for convoy to complete (20 minute timeout)
+    const completedConvoy = await waitForConvoy(convoy.id, REVIEW_TIMEOUT_MS);
+
+    console.log(`[review-agent] Convoy completed with status: ${completedConvoy.status}`);
+
+    // Parse synthesis output
+    const result = parseConvoySynthesis(completedConvoy.outputDir);
+
+    // Add convoy metadata
+    result.output = `Convoy ${completedConvoy.id} - Status: ${completedConvoy.status}`;
+
+    // Log to history
+    logReviewHistory(context, result, convoy.id);
+
+    // Send feedback to work agent
     await sendFeedbackToWorkAgent(context, result);
 
     return result;
   } catch (error: any) {
-    console.error(`[review-agent] Failed:`, error);
+    console.error(`[review-agent] Convoy review failed:`, error);
 
     const result: ReviewResult = {
       success: false,
       reviewResult: 'COMMENTED',
-      notes: error.message || 'Unknown error',
-      output: output || errorOutput,
+      notes: error.message || 'Convoy review failed',
     };
 
-    logReviewHistory(context, result, sessionId || undefined);
+    logReviewHistory(context, result);
 
-    // Send feedback even on failure so agent knows something went wrong
+    // Send feedback even on failure
     await sendFeedbackToWorkAgent(context, result);
 
     return result;

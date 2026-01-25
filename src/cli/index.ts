@@ -13,6 +13,7 @@ import { registerInstallCommand } from './commands/install.js';
 import { registerCloisterCommands } from './commands/cloister/index.js';
 import { registerSetupCommands } from './commands/setup/index.js';
 import { registerSpecialistsCommands } from './commands/specialists/index.js';
+import { registerConvoyCommands } from './commands/convoy/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
@@ -79,6 +80,9 @@ registerCloisterCommands(program);
 
 // Register specialists commands (pan specialists list, wake, queue, reset)
 registerSpecialistsCommands(program);
+
+// Register convoy commands (pan convoy start, status, list, stop)
+registerConvoyCommands(program);
 
 // Register setup commands (pan setup hooks, etc.)
 registerSetupCommands(program);

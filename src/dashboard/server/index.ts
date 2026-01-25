@@ -26,6 +26,7 @@ import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } from '../../lib/projects.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName } from '../../lib/cost-parsers/jsonl-parser.js';
+import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import type { Issue } from '../frontend/src/types.js';
 
 /**
@@ -3043,6 +3044,94 @@ app.get('/api/activity/:id', (req, res) => {
     return res.status(404).json({ error: 'Activity not found' });
   }
   res.json(activity);
+});
+
+// ============================================================================
+// Convoy API Endpoints
+// ============================================================================
+
+// List all convoys
+app.get('/api/convoys', (_req, res) => {
+  try {
+    const convoys = listConvoys();
+    res.json({ convoys });
+  } catch (error: any) {
+    console.error('Error listing convoys:', error);
+    res.status(500).json({ error: 'Failed to list convoys: ' + error.message });
+  }
+});
+
+// Get convoy status
+app.get('/api/convoys/:id', (req, res) => {
+  try {
+    const convoy = getConvoyStatus(req.params.id);
+    if (!convoy) {
+      return res.status(404).json({ error: 'Convoy not found' });
+    }
+    res.json(convoy);
+  } catch (error: any) {
+    console.error('Error getting convoy status:', error);
+    res.status(500).json({ error: 'Failed to get convoy status: ' + error.message });
+  }
+});
+
+// Start a new convoy
+app.post('/api/convoys/start', async (req, res) => {
+  try {
+    const { template, context } = req.body;
+
+    if (!template) {
+      return res.status(400).json({ error: 'Template name is required' });
+    }
+
+    if (!context || !context.projectPath) {
+      return res.status(400).json({ error: 'Context with projectPath is required' });
+    }
+
+    const convoy = await startConvoy(template, context as ConvoyContext);
+    res.json(convoy);
+  } catch (error: any) {
+    console.error('Error starting convoy:', error);
+    res.status(500).json({ error: 'Failed to start convoy: ' + error.message });
+  }
+});
+
+// Stop a convoy
+app.post('/api/convoys/:id/stop', async (req, res) => {
+  try {
+    await stopConvoy(req.params.id);
+    res.json({ success: true, message: 'Convoy stopped' });
+  } catch (error: any) {
+    console.error('Error stopping convoy:', error);
+    res.status(500).json({ error: 'Failed to stop convoy: ' + error.message });
+  }
+});
+
+// Get convoy output (combined from all agents)
+app.get('/api/convoys/:id/output', (req, res) => {
+  try {
+    const convoy = getConvoyStatus(req.params.id);
+    if (!convoy) {
+      return res.status(404).json({ error: 'Convoy not found' });
+    }
+
+    const outputs: Record<string, string> = {};
+
+    for (const agent of convoy.agents) {
+      if (agent.outputFile && existsSync(agent.outputFile)) {
+        try {
+          outputs[agent.role] = readFileSync(agent.outputFile, 'utf-8');
+        } catch (err) {
+          outputs[agent.role] = `Error reading output: ${err}`;
+        }
+      }
+    }
+
+    res.json({ outputs });
+  } catch (error: any) {
+    console.error('Error getting convoy output:', error);
+    res.status(500).json({ error: 'Failed to get convoy output: ' + error.message });
+  }
 });
 
 // ============================================================================

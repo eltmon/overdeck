@@ -8,6 +8,7 @@ import { SkillsList } from './components/SkillsList';
 import { WorkspacePanel } from './components/WorkspacePanel';
 import { IssueDetailPanel } from './components/IssueDetailPanel';
 import { ActivityPanel } from './components/ActivityPanel';
+import { ConvoyPanel } from './components/ConvoyPanel';
 import { CloisterStatusBar } from './components/CloisterStatusBar';
 import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
@@ -17,7 +18,7 @@ import { SearchModal } from './components/search/SearchModal';
 import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft } from 'lucide-react';
 import { Agent, Issue } from './types';
 
-type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'metrics' | 'handoffs';
+type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'handoffs';
 
 const MIN_PANEL_WIDTH = 400;
 const MAX_PANEL_WIDTH = 1200;
@@ -195,6 +196,7 @@ export default function App() {
             {([
               { id: 'kanban', label: 'Board', icon: LayoutGrid },
               { id: 'agents', label: 'Agents', icon: Users },
+              { id: 'convoys', label: 'Convoys', icon: Users },
               { id: 'handoffs', label: 'Handoffs', icon: ArrowRightLeft },
               { id: 'activity', label: 'Activity', icon: Terminal },
               { id: 'metrics', label: 'Metrics', icon: BarChart3 },
@@ -289,6 +291,11 @@ export default function App() {
         {activeTab === 'activity' && (
           <div className="w-full h-full">
             <ActivityPanel onClose={() => setActiveTab('kanban')} />
+          </div>
+        )}
+        {activeTab === 'convoys' && (
+          <div className="w-full h-full">
+            <ConvoyPanel onClose={() => setActiveTab('kanban')} />
           </div>
         )}
         {activeTab === 'metrics' && (

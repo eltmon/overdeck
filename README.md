@@ -1468,6 +1468,165 @@ pan work recover min-123
 pan work recover --all
 ```
 
+### Convoys: Multi-Agent Orchestration
+
+Convoys enable Panopticon to run multiple AI agents in parallel for complex tasks like code review. Instead of a single agent doing everything, specialized agents focus on specific concerns and a synthesis agent combines their findings.
+
+**Why Convoys?**
+
+When reviewing code, a single AI agent must context-switch between:
+- Checking for logic errors
+- Looking for security vulnerabilities
+- Analyzing performance issues
+
+This leads to:
+- Shallow reviews (can't go deep on everything)
+- Missed issues (focus on one area, miss others)
+- Long sequential execution (can't parallelize)
+
+Convoys solve this by **specialization + parallelization**:
+- 3 focused agents review in parallel (10x faster)
+- Each agent goes deep in their domain
+- Synthesis agent combines findings with prioritization
+
+#### Built-in Convoy Templates
+
+| Template | Agents | Use Case |
+|----------|--------|----------|
+| `code-review` | correctness, security, performance, synthesis | Comprehensive code review |
+| `planning` | planner | Codebase exploration and planning |
+| `triage` | (dynamic) | Parallel issue triage |
+| `health-monitor` | monitor | Check health of running agents |
+
+#### Quick Start
+
+```bash
+# Run a parallel code review
+pan convoy start code-review --files "src/**/*.ts"
+
+# Check status
+pan convoy status
+
+# List all convoys (running and completed)
+pan convoy list
+
+# Stop a convoy
+pan convoy stop <convoy-id>
+```
+
+#### How Code Review Convoy Works
+
+```
+pan convoy start code-review --files "src/**/*.ts"
+    │
+    ├─→ Phase 1 (Parallel): 3 specialized reviewers run simultaneously
+    │     ├─→ Correctness (Haiku) → correctness.md
+    │     ├─→ Security (Sonnet)    → security.md
+    │     └─→ Performance (Haiku)  → performance.md
+    │
+    └─→ Phase 2 (Sequential): Synthesis agent runs after Phase 1 completes
+          └─→ Synthesis reads all 3 reviews → synthesis.md
+```
+
+**Phase 1 - Specialized Reviews (Parallel)**
+- **Correctness** (Haiku) - Logic errors, edge cases, type safety
+- **Security** (Sonnet) - OWASP Top 10, injection, XSS, auth issues
+- **Performance** (Haiku) - N+1 queries, blocking ops, memory leaks
+
+**Phase 2 - Synthesis (Sequential)**
+- Reads all three review files
+- Removes duplicates (same issue found by multiple reviewers)
+- Prioritizes findings (blocker → critical → high → medium → low)
+- Generates unified report with action items
+
+#### What is Synthesis?
+
+Synthesis is the process of combining findings from multiple parallel agents into a single, prioritized, actionable report.
+
+**Without synthesis**, after 3 parallel reviews you get:
+- 3 separate markdown files to read
+- Duplicate findings (same issue reported differently)
+- No prioritization (which to fix first?)
+- Mental overhead to merge them yourself
+
+**With synthesis**, you get:
+- Single unified report
+- Deduplicated findings
+- AI-prioritized by severity × impact
+- Clear action items
+
+**Example synthesis output:**
+
+```markdown
+# Code Review - Complete Analysis
+
+## Executive Summary
+- 2 blockers (MUST FIX)
+- 3 critical issues
+- 5 high-priority items
+
+## Top Priority
+1. SQL injection in auth.ts:42 (Security, Critical)
+2. execSync blocking event loop in sync.ts:89 (Performance, Blocker)
+3. Null pointer in user fetch in api.ts:156 (Correctness, High)
+
+## Blocker Issues
+[Detailed findings with code examples and fixes]
+
+## Critical Issues
+[...]
+
+## Review Statistics
+- Files reviewed: 12
+- Issues found: 10
+- Duplicates removed: 3
+```
+
+#### Convoy Commands
+
+```bash
+# Start a convoy
+pan convoy start <template> [options]
+  --files <pattern>       # File pattern (e.g., "src/**/*.ts")
+  --pr-url <url>          # Pull request URL
+  --issue-id <id>         # Issue ID
+  --project-path <path>   # Project path (defaults to cwd)
+
+# Check convoy status
+pan convoy status [convoy-id]  # Show status (defaults to most recent)
+
+# List convoys
+pan convoy list                # All convoys
+pan convoy list --status running  # Filter by status
+
+# Stop a convoy
+pan convoy stop <convoy-id>    # Kill all agents, mark failed
+```
+
+#### Custom Convoy Templates
+
+Create custom templates in `~/.panopticon/convoy-templates/`:
+
+```json
+{
+  "name": "lightweight-review",
+  "description": "Quick security-only review",
+  "agents": [
+    {
+      "role": "security",
+      "subagent": "code-review-security",
+      "parallel": false
+    }
+  ],
+  "config": {
+    "outputDir": ".claude/reviews",
+    "timeout": 600000
+  }
+}
+```
+
+Then use with: `pan convoy start lightweight-review --files "src/**/*.ts"`
+
 ### Health Monitoring
 
 ```bash
