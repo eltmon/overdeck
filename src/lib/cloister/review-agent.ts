@@ -288,6 +288,57 @@ function logReviewHistory(
 }
 
 /**
+ * Validate that we have a workspace and main project is on main branch
+ *
+ * Specialists should ALWAYS run in workspaces, never in the main project.
+ * The main project should ALWAYS be on main branch.
+ */
+async function validateWorkspaceAndBranch(context: ReviewContext): Promise<{ valid: boolean; error?: string; workingDir: string }> {
+  // Workspace is required - specialists should never run without one
+  if (!context.workspace) {
+    return {
+      valid: false,
+      error: 'No workspace provided. Review agent requires a workspace to run in.',
+      workingDir: context.projectPath,
+    };
+  }
+
+  // Check workspace exists
+  if (!existsSync(context.workspace)) {
+    return {
+      valid: false,
+      error: `Workspace does not exist: ${context.workspace}`,
+      workingDir: context.projectPath,
+    };
+  }
+
+  // Safeguard: Check that main project is on main branch
+  // This catches when something has incorrectly checked out a feature branch in the main project
+  try {
+    const { stdout: currentBranch } = await execAsync('git branch --show-current', {
+      cwd: context.projectPath,
+      encoding: 'utf-8',
+    });
+    const branch = currentBranch.trim();
+
+    if (branch && branch !== 'main' && branch !== 'master') {
+      console.warn(`[review-agent] WARNING: Main project at ${context.projectPath} is on branch '${branch}' instead of 'main'`);
+      console.warn(`[review-agent] This indicates a bug - the main project should ALWAYS stay on main.`);
+      console.warn(`[review-agent] Proceeding with workspace anyway, but this should be investigated.`);
+      // Don't fail, just warn - we'll use the workspace which has the correct branch
+    }
+  } catch (err) {
+    // Non-fatal - just log and continue
+    console.warn(`[review-agent] Could not check main project branch: ${err}`);
+  }
+
+  return {
+    valid: true,
+    workingDir: context.workspace,
+  };
+}
+
+/**
  * Spawn review-agent to review a pull request
  *
  * @param context - Review context
@@ -295,6 +346,20 @@ function logReviewHistory(
  */
 export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewResult> {
   console.log(`[review-agent] Starting code review for ${context.issueId} (${context.prUrl})`);
+
+  // Validate workspace and branch state
+  const validation = await validateWorkspaceAndBranch(context);
+  if (!validation.valid) {
+    console.error(`[review-agent] ${validation.error}`);
+    return {
+      success: false,
+      reviewResult: 'COMMENTED',
+      notes: validation.error,
+    };
+  }
+
+  const workingDir = validation.workingDir;
+  console.log(`[review-agent] Working directory: ${workingDir}`);
 
   // Get existing session ID
   const sessionId = getSessionId('review-agent');
@@ -312,9 +377,10 @@ export async function spawnReviewAgent(context: ReviewContext): Promise<ReviewRe
   console.log(`[review-agent] Session: ${sessionId || 'new session'}`);
   console.log(`[review-agent] PR: ${context.prUrl}`);
 
-  // Spawn Claude process
+  // Spawn Claude process in the WORKSPACE (not projectPath!)
+  // Workspace has the feature branch checked out; projectPath should stay on main
   const proc = spawn('claude', args, {
-    cwd: context.projectPath,
+    cwd: workingDir,
     env: {
       ...process.env,
       PANOPTICON_AGENT_ID: 'review-agent',

@@ -5,7 +5,10 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn, execSync } from 'child_process';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -342,6 +345,57 @@ function logTestHistory(
 }
 
 /**
+ * Validate that we have a workspace and main project is on main branch
+ *
+ * Specialists should ALWAYS run in workspaces, never in the main project.
+ * The main project should ALWAYS be on main branch.
+ */
+async function validateWorkspaceAndBranch(context: TestContext): Promise<{ valid: boolean; error?: string; workingDir: string }> {
+  // Workspace is required - specialists should never run without one
+  if (!context.workspace) {
+    return {
+      valid: false,
+      error: 'No workspace provided. Test agent requires a workspace to run in.',
+      workingDir: context.projectPath,
+    };
+  }
+
+  // Check workspace exists
+  if (!existsSync(context.workspace)) {
+    return {
+      valid: false,
+      error: `Workspace does not exist: ${context.workspace}`,
+      workingDir: context.projectPath,
+    };
+  }
+
+  // Safeguard: Check that main project is on main branch
+  // This catches when something has incorrectly checked out a feature branch in the main project
+  try {
+    const { stdout: currentBranch } = await execAsync('git branch --show-current', {
+      cwd: context.projectPath,
+      encoding: 'utf-8',
+    });
+    const branch = currentBranch.trim();
+
+    if (branch && branch !== 'main' && branch !== 'master') {
+      console.warn(`[test-agent] WARNING: Main project at ${context.projectPath} is on branch '${branch}' instead of 'main'`);
+      console.warn(`[test-agent] This indicates a bug - the main project should ALWAYS stay on main.`);
+      console.warn(`[test-agent] Proceeding with workspace anyway, but this should be investigated.`);
+      // Don't fail, just warn - we'll use the workspace which has the correct branch
+    }
+  } catch (err) {
+    // Non-fatal - just log and continue
+    console.warn(`[test-agent] Could not check main project branch: ${err}`);
+  }
+
+  return {
+    valid: true,
+    workingDir: context.workspace,
+  };
+}
+
+/**
  * Spawn test-agent to execute tests
  *
  * @param context - Test context
@@ -350,8 +404,27 @@ function logTestHistory(
 export async function spawnTestAgent(context: TestContext): Promise<TestResult> {
   console.log(`[test-agent] Starting test execution for ${context.issueId}`);
 
-  // Detect test command if not provided
-  const testCommand = context.testCommand || detectTestCommand(context.projectPath);
+  // Validate workspace and branch state
+  const validation = await validateWorkspaceAndBranch(context);
+  if (!validation.valid) {
+    console.error(`[test-agent] ${validation.error}`);
+    return {
+      success: false,
+      testResult: 'ERROR',
+      testsRun: 0,
+      testsPassed: 0,
+      testsFailed: 0,
+      fixAttempted: false,
+      fixResult: 'NOT_ATTEMPTED',
+      notes: validation.error,
+    };
+  }
+
+  const workingDir = validation.workingDir;
+  console.log(`[test-agent] Working directory: ${workingDir}`);
+
+  // Detect test command if not provided (use workspace for detection)
+  const testCommand = context.testCommand || detectTestCommand(workingDir);
 
   if (testCommand === 'auto') {
     const result: TestResult = {
@@ -386,9 +459,10 @@ export async function spawnTestAgent(context: TestContext): Promise<TestResult> 
 
   console.log(`[test-agent] Session: ${sessionId || 'new session'}`);
 
-  // Spawn Claude process
+  // Spawn Claude process in the WORKSPACE (not projectPath!)
+  // Workspace has the feature branch checked out; projectPath should stay on main
   const proc = spawn('claude', args, {
-    cwd: context.projectPath,
+    cwd: workingDir,
     env: {
       ...process.env,
       PANOPTICON_AGENT_ID: 'test-agent',
