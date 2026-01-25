@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync, rmSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync, rmSync, symlinkSync, chmodSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -23,7 +23,7 @@ import { checkAllTriggers } from '../../lib/cloister/triggers.js';
 import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent } from '../../lib/agents.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
-import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig } from '../../lib/projects.js';
+import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig, findProjectByTeam, extractTeamPrefix } from '../../lib/projects.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
@@ -4138,10 +4138,107 @@ app.post('/api/workspaces/:issueId/start', async (req, res) => {
     return res.status(400).json({ error: 'Workspace does not exist' });
   }
 
-  // Check for ./dev script
+  // Check for ./dev script - repair if needed (older workspaces may lack symlink)
   const devScript = join(workspacePath, 'dev');
+  const devScriptInContainer = join(workspacePath, '.devcontainer', 'dev');
+
   if (!existsSync(devScript)) {
-    return res.status(400).json({ error: 'Workspace has no ./dev script' });
+    // Try to repair: create symlink if .devcontainer/dev exists
+    if (existsSync(devScriptInContainer)) {
+      try {
+        symlinkSync('.devcontainer/dev', devScript);
+        chmodSync(devScriptInContainer, 0o755); // Ensure executable
+        console.log(`[workspace/start] Repaired: created ./dev symlink for ${issueId}`);
+      } catch (repairErr) {
+        return res.status(400).json({
+          error: `Workspace has no ./dev script and repair failed: ${repairErr}`
+        });
+      }
+    } else {
+      return res.status(400).json({ error: 'Workspace has no ./dev script (checked root and .devcontainer/)' });
+    }
+  }
+
+  // Repair workspace .env file if needed (older workspaces may lack port assignments)
+  // This prevents port conflicts between workspaces
+  const envFilePath = join(workspacePath, '.env');
+  const teamPrefix = extractTeamPrefix(issueId);
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+  if (projectConfig?.workspace?.ports && projectConfig?.workspace?.env?.template) {
+    const featureFolder = `feature-${issueLower}`;
+    let needsRepair = !existsSync(envFilePath);
+
+    // Check if env file is missing required port variables
+    if (!needsRepair && existsSync(envFilePath)) {
+      const existingEnv = readFileSync(envFilePath, 'utf-8');
+      for (const portName of Object.keys(projectConfig.workspace.ports)) {
+        const portVar = `${portName.toUpperCase()}_PORT`;
+        if (!existingEnv.includes(portVar)) {
+          needsRepair = true;
+          break;
+        }
+      }
+    }
+
+    if (needsRepair) {
+      try {
+        // Assign ports from configured ranges
+        const placeholders: Record<string, string> = {
+          FEATURE_FOLDER: featureFolder,
+        };
+
+        for (const [portName, portConfig] of Object.entries(projectConfig.workspace.ports)) {
+          const portFile = join(projectPath, `.${portName}-ports`);
+          const range = portConfig.range as [number, number];
+
+          // Read existing assignments
+          let content = '';
+          if (existsSync(portFile)) {
+            content = readFileSync(portFile, 'utf-8');
+          }
+
+          // Check if already assigned
+          const lines = content.split('\n').filter(Boolean);
+          let port: number | null = null;
+          for (const line of lines) {
+            const [folder, p] = line.split(':');
+            if (folder === featureFolder) {
+              port = parseInt(p, 10);
+              break;
+            }
+          }
+
+          // Find next available port if not assigned
+          if (!port) {
+            const usedPorts = new Set(lines.map(l => parseInt(l.split(':')[1], 10)));
+            for (let p = range[0]; p <= range[1]; p++) {
+              if (!usedPorts.has(p)) {
+                port = p;
+                writeFileSync(portFile, content + (content.endsWith('\n') || !content ? '' : '\n') + `${featureFolder}:${port}\n`);
+                break;
+              }
+            }
+          }
+
+          if (port) {
+            placeholders[`${portName.toUpperCase()}_PORT`] = String(port);
+          }
+        }
+
+        // Generate .env content from template
+        let envContent = projectConfig.workspace.env.template;
+        for (const [key, value] of Object.entries(placeholders)) {
+          envContent = envContent.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+        }
+
+        writeFileSync(envFilePath, envContent);
+        console.log(`[workspace/start] Repaired: created .env with port assignments for ${issueId}`);
+      } catch (envErr) {
+        console.warn(`[workspace/start] Could not repair .env for ${issueId}: ${envErr}`);
+        // Continue anyway - Docker might still work with defaults
+      }
+    }
   }
 
   // Check if Docker is running
@@ -6043,6 +6140,33 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       }
 
       const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
+
+      // Get project config for structure context
+      const teamPrefix = extractTeamPrefix(issue.identifier);
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+      // Generate project structure context for polyrepos
+      let projectStructureSection = '';
+      if (projectConfig?.workspace?.type === 'polyrepo' && projectConfig.workspace.repos) {
+        const repos = projectConfig.workspace.repos;
+        projectStructureSection = `
+## Project Structure (Polyrepo)
+
+**IMPORTANT:** This project uses a **polyrepo** structure. The workspace root is NOT a git repository.
+Each subdirectory is a separate git worktree:
+
+| Directory | Purpose |
+|-----------|---------|
+${repos.map(r => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join('\n')}
+
+**Git operations:**
+- Run \`git status\`, \`git log\`, etc. INSIDE the subdirectories (e.g., \`cd fe && git status\`)
+- The workspace root (\`${workspacePath}\`) has no \`.git\` directory
+- Each subdirectory has its own branch: \`${repos[0]?.branch_prefix || 'feature/'}${issue.identifier.toLowerCase()}\`
+
+`;
+      }
+
       const planningPrompt = `# Planning Session: ${issue.identifier}
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
@@ -6073,7 +6197,7 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 
 ## Description
 ${issue.description || 'No description provided'}
-
+${projectStructureSection}
 ---
 
 ## Your Mission

@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { spawnAgent } from '../../../lib/agents.js';
-import { resolveProjectFromIssue, hasProjects, listProjects } from '../../../lib/projects.js';
+import { resolveProjectFromIssue, hasProjects, listProjects, findProjectByTeam, extractTeamPrefix, ProjectConfig } from '../../../lib/projects.js';
 
 /**
  * Get Linear API key from environment or config file
@@ -281,6 +281,42 @@ function readBeadsTasks(workspacePath: string, projectRoot: string, issueId: str
 }
 
 /**
+ * Generate polyrepo context section if applicable
+ */
+function buildPolyrepoContext(issueId: string, workspacePath: string): string {
+  const teamPrefix = extractTeamPrefix(issueId);
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+  if (!projectConfig?.workspace?.type || projectConfig.workspace.type !== 'polyrepo' || !projectConfig.workspace.repos) {
+    return '';
+  }
+
+  const repos = projectConfig.workspace.repos;
+  const lines: string[] = [
+    '## Project Structure (Polyrepo)',
+    '',
+    '**IMPORTANT:** This project uses a **polyrepo** structure. The workspace root is NOT a git repository.',
+    'Each subdirectory is a separate git worktree:',
+    '',
+    '| Directory | Purpose |',
+    '|-----------|---------|',
+  ];
+
+  for (const repo of repos) {
+    lines.push(`| \`${repo.name}/\` | Git worktree for ${repo.path} |`);
+  }
+
+  lines.push('');
+  lines.push('**Git operations:**');
+  lines.push('- Run `git status`, `git log`, etc. INSIDE the subdirectories (e.g., `cd fe && git status`)');
+  lines.push(`- The workspace root (\`${workspacePath}\`) has no \`.git\` directory`);
+  lines.push(`- Each subdirectory has its own branch: \`${repos[0]?.branch_prefix || 'feature/'}${issueId.toLowerCase()}\``);
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+/**
  * Build a comprehensive prompt with planning context
  */
 function buildAgentPrompt(issueId: string, workspacePath: string, projectRoot: string): string {
@@ -290,6 +326,12 @@ function buildAgentPrompt(issueId: string, workspacePath: string, projectRoot: s
     `**Workspace:** ${workspacePath}`,
     '',
   ];
+
+  // Add polyrepo context if applicable
+  const polyrepoContext = buildPolyrepoContext(issueId, workspacePath);
+  if (polyrepoContext) {
+    lines.push(polyrepoContext);
+  }
 
   // Check what context files exist
   const hasStateFile = existsSync(join(workspacePath, '.planning', 'STATE.md'));

@@ -748,8 +748,17 @@ function IssueCard({ issue, planningAgent, workAgent, cost, isSelected, onSelect
             {/* Awaiting Input badge - agent is waiting for user response */}
             {agent?.hasPendingQuestion && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-white animate-pulse"
-                title={`Agent is waiting for user input (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Open planning dialog for planning agents, otherwise select for terminal view
+                  if (agent.type === 'planning') {
+                    onPlan();
+                  } else {
+                    onSelect();
+                  }
+                }}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-white animate-pulse cursor-pointer hover:bg-amber-500"
+                title={`Agent is waiting for user input - click to respond (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
               >
                 <HelpCircle className="w-3 h-3" />
                 Input
