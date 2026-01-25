@@ -1650,6 +1650,16 @@ Stop with `pan down`.
 | **Skills** | Available skills and their descriptions |
 | **Health** | System health checks and diagnostics |
 
+### Issue Filtering
+
+The dashboard automatically filters issues to reduce visual clutter:
+
+- **Linear issues** - Shows current cycle issues only
+- **Done column** - Shows items completed in the last 24 hours
+- **Canceled column** - Shows items canceled in the last 24 hours
+
+This filtering applies to both Linear and GitHub issues. Older completed items are excluded from the dashboard but remain in your issue tracker.
+
 ### Issue Cards
 
 Issue cards on the Kanban board display:

@@ -22,6 +22,7 @@ export interface Issue {
   url: string;
   createdAt: string;
   updatedAt: string;
+  completedAt?: string;  // ISO timestamp when issue was completed/canceled
   project?: LinearProject;
   source?: IssueSource;
   sourceRepo?: string;

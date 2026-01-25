@@ -38,6 +38,19 @@ function getOneDayAgo(): Date {
 
 import type { Issue } from '../frontend/src/types.js';
 
+import type { Issue } from '../frontend/src/types.js';
+
+/**
+ * Get a Date object representing 24 hours ago from now.
+ * Used for filtering recently completed issues.
+ */
+function getOneDayAgo(): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
+  return date;
+}
+
+
 // Ensure tmux server is running (starts one if not)
 async function ensureTmuxRunning(): Promise<void> {
   try {
@@ -766,19 +779,20 @@ async function fetchGitHubIssues(): Promise<any[]> {
       }
 
       try {
+        const dateFilter = getOneDayAgo().toISOString().split('T')[0]; // YYYY-MM-DD
+
         // Use async execAsync to avoid blocking event loop
         const { stdout: closedJson } = await execAsync(
-          `gh issue list --repo ${owner}/${repo} --state closed --limit 50 --json number,title,body,state,labels,assignees,createdAt,updatedAt,url`,
+          `gh issue list --repo ${owner}/${repo} --state closed --search "closed:>=${dateFilter}" --limit 50 --json number,title,body,state,labels,assignees,createdAt,updatedAt,closedAt,url`,
           { timeout: 30000 }
         );
         closedIssues = JSON.parse(closedJson);
       } catch (ghError: any) {
         console.error(`gh CLI failed for ${owner}/${repo} closed issues:`, ghError.message);
         // Fallback to API
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const oneDayAgo = getOneDayAgo();
         const closedResponse = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/issues?state=closed&since=${thirtyDaysAgo.toISOString()}&per_page=50`,
+          `https://api.github.com/repos/${owner}/${repo}/issues?state=closed&since=${oneDayAgo.toISOString()}&per_page=50`,
           {
             headers: {
               'Authorization': `token ${config.token}`,
@@ -835,6 +849,7 @@ async function fetchGitHubIssues(): Promise<any[]> {
           // gh CLI uses camelCase, API uses snake_case
           createdAt: issue.createdAt || issue.created_at,
           updatedAt: issue.updatedAt || issue.updated_at,
+          completedAt: issue.closedAt || issue.closed_at,
           // Use repo as project
           project: {
             id: `github-${owner}-${repo}`,
@@ -989,6 +1004,7 @@ app.get('/api/issues', async (req, res) => {
               url
               createdAt
               updatedAt
+              completedAt
               state {
                 name
                 type
@@ -1067,6 +1083,7 @@ app.get('/api/issues', async (req, res) => {
       url: issue.url,
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
+      completedAt: issue.completedAt,
       // Use project if available, otherwise fall back to team
       project: issue.project ? {
         id: issue.project.id,
@@ -1095,8 +1112,30 @@ app.get('/api/issues', async (req, res) => {
       fetchRallyIssues(),
     ]);
 
-    // Merge and sort by updatedAt
-    const allFormatted = [...linearFormatted, ...githubIssues, ...rallyIssues].sort((a, b) =>
+    // Merge all issues
+    let allFormatted = [...linearFormatted, ...githubIssues, ...rallyIssues];
+
+    const oneDayAgoTime = getOneDayAgo().getTime();
+
+    allFormatted = allFormatted.filter((issue: Issue) => {
+      const isDone = issue.status === 'Done' || issue.status === 'Completed' || issue.status === 'Closed';
+      const isCanceled = issue.status === 'Canceled' || issue.status === 'Cancelled';
+
+      // Keep all non-done/canceled issues
+      if (!isDone && !isCanceled) return true;
+
+      // For done/canceled issues, only keep if completed in last 24 hours
+      if (issue.completedAt) {
+        const completedTime = new Date(issue.completedAt).getTime();
+        return completedTime >= oneDayAgoTime;
+      }
+
+      // If no completedAt, exclude done/canceled items (shouldn't happen with new data)
+      return false;
+    });
+
+    // Sort by updatedAt
+    allFormatted.sort((a, b) =>
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
 
