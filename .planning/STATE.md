@@ -24,7 +24,11 @@ All planned components have been successfully implemented:
 ## Tests
 
 - Build: ✅ Success
-- Unit Tests: ✅ 28/28 passed
+- Frontend Unit Tests: ✅ 28/28 passed (useSearch hook)
+- Backend Unit Tests: ✅ 27/27 passed (specialist-handoff-logger)
+  - All 6 exported functions tested
+  - Coverage: writing/reading events, filtering, statistics, edge cases
+  - Edge cases: empty log, corrupted JSON, midnight boundary
 
 ---
 
