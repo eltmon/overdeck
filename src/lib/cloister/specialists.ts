@@ -11,6 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
+import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -1134,7 +1135,24 @@ export function submitToSpecialistQueue(
     },
   };
 
-  return pushToHook(specialistName, item);
+  const queueItem = pushToHook(specialistName, item);
+
+  // Log specialist handoff event
+  const handoffEvent = createSpecialistHandoff(
+    task.source, // From (e.g., 'review-agent' or 'issue-agent')
+    specialistName, // To specialist
+    task.issueId,
+    task.priority,
+    {
+      workspace: task.workspace,
+      branch: task.branch,
+      prUrl: task.prUrl,
+      source: task.source,
+    }
+  );
+  logSpecialistHandoff(handoffEvent);
+
+  return queueItem;
 }
 
 /**
