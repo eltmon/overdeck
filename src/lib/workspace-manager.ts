@@ -462,13 +462,9 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
-  // Initialize beads if available
-  try {
-    await execAsync('bd init', { cwd: workspacePath });
-    result.steps.push('Initialized beads');
-  } catch {
-    // Beads not available, skip
-  }
+  // Note: Beads initialization is handled by the calling command (workspace.ts)
+  // With beads v0.47.1+, worktrees use shared database with labels for isolation
+  // The workspace.ts command creates a bead with workspace:issue-id label
 
   // Start Docker containers if requested
   if (startDocker) {

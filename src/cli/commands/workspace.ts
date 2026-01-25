@@ -24,35 +24,69 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 /**
- * Initialize fresh beads for a workspace, removing any inherited beads from main branch
+ * Check beads version to determine which approach to use
+ * Returns version as a number (e.g., 47.1 for v0.47.1) or 0 if not installed
+ */
+async function getBeadsVersion(): Promise<number> {
+  try {
+    const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
+    const match = stdout.match(/(\d+)\.(\d+)\.(\d+)/);
+    if (match) {
+      const [, , minor, patch] = match.map(Number);
+      return minor * 100 + patch; // e.g., 47.1 = 4701
+    }
+  } catch {}
+  return 0;
+}
+
+/**
+ * Initialize beads for a workspace
+ *
+ * Beads v0.47.1+ uses shared database with labels for isolation (recommended)
+ * Older versions use separate .beads directories (legacy workaround)
  */
 async function initializeWorkspaceBeads(workspacePath: string, issueId: string): Promise<{ success: boolean; beadId?: string; error?: string }> {
   try {
-    // Remove inherited .beads directory if it exists (copied from main via worktree)
-    const beadsDir = join(workspacePath, '.beads');
-    if (existsSync(beadsDir)) {
-      rmSync(beadsDir, { recursive: true, force: true });
-    }
+    const beadsVersion = await getBeadsVersion();
 
-    // Initialize fresh beads
-    const prefix = 'workspace';
-    await execAsync(`bd init --prefix ${prefix}`, { cwd: workspacePath, encoding: 'utf-8' });
+    if (beadsVersion >= 4701) {
+      // v0.47.1+ - Use shared database with workspace label
+      // The worktree inherits .beads/redirect from main repo, which points to shared database
+      const workspaceLabel = `workspace:${issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
+      const title = `${issueId.toUpperCase()}: Implementation`;
 
-    // Create a bead for this specific issue
-    const title = `${issueId.toUpperCase()}: Implementation`;
-    const { stdout } = await execAsync(
-      `bd create --title "${title}" --priority 1 --type task --json`,
-      { cwd: workspacePath, encoding: 'utf-8' }
-    );
+      const { stdout } = await execAsync(
+        `bd create --title "${title}" --priority 1 --type task --labels "${workspaceLabel}" 2>&1`,
+        { cwd: workspacePath, encoding: 'utf-8' }
+      );
 
-    // Parse the created bead ID
-    try {
-      const result = JSON.parse(stdout);
-      return { success: true, beadId: result.id };
-    } catch {
-      // bd create might not output JSON, try to extract ID from output
+      // Parse the created bead ID
       const match = stdout.match(/([a-z]+-[a-z0-9]+)/);
       return { success: true, beadId: match?.[1] };
+    } else {
+      // Legacy approach for older beads versions (< 0.47.1)
+      // Remove inherited .beads directory and initialize fresh
+      const beadsDir = join(workspacePath, '.beads');
+      if (existsSync(beadsDir)) {
+        rmSync(beadsDir, { recursive: true, force: true });
+      }
+
+      const prefix = 'workspace';
+      await execAsync(`bd init --prefix ${prefix}`, { cwd: workspacePath, encoding: 'utf-8' });
+
+      const title = `${issueId.toUpperCase()}: Implementation`;
+      const { stdout } = await execAsync(
+        `bd create --title "${title}" --priority 1 --type task --json`,
+        { cwd: workspacePath, encoding: 'utf-8' }
+      );
+
+      try {
+        const result = JSON.parse(stdout);
+        return { success: true, beadId: result.id };
+      } catch {
+        const match = stdout.match(/([a-z]+-[a-z0-9]+)/);
+        return { success: true, beadId: match?.[1] };
+      }
     }
   } catch (error: any) {
     return { success: false, error: error.message };

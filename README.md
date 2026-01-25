@@ -1270,6 +1270,20 @@ pan beads compact --dry-run
 
 **Recommended version:** v0.47.1+ includes important fixes for git worktree isolation.
 
+**Workspace Isolation:**
+
+With beads v0.47.1+, workspaces share the same database but use labels for isolation:
+
+```bash
+# In workspace for PAN-83, list only that workspace's tasks
+bd list --label workspace:pan-83
+
+# Or use bd ready with label filter
+bd ready --label workspace:pan-83
+```
+
+Panopticon automatically creates beads with `workspace:<issue-id>` labels when you create a workspace. Agents can filter to see only their workspace's tasks.
+
 **Automatic Compaction:**
 
 After every successful merge, the merge-agent automatically:
