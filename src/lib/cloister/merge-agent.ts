@@ -645,17 +645,33 @@ INSTRUCTIONS:
 4. git merge ${sourceBranch}
 5. If conflicts: resolve them intelligently, then git add and git commit
 6. If clean merge: the merge commit is auto-created
-7. Run tests: npm test (or appropriate test command)
-8. If tests pass: git push origin ${targetBranch}
-9. If tests fail: git reset --hard HEAD~1 and report failure
+7. Build the project to verify no compile errors:
+   - Use the Task tool with subagent_type="Bash" to run the build command
+   - For Node.js: npm run build
+   - For Java/Maven: mvn compile
+   - For Rust: cargo build
+   - Check package.json, pom.xml, or Cargo.toml to determine the right command
+8. Run tests using the Task tool with subagent_type="Bash":
+   - For Node.js: npm test
+   - For Java/Maven: mvn test
+   - For Rust: cargo test
+   - Use the appropriate command based on project type
+9. If build AND tests pass: git push origin ${targetBranch}
+10. If build OR tests fail: git reset --hard HEAD~1 and report failure with details
 
 CRITICAL: You MUST complete this merge. The approve operation is waiting.
 When done, the merge commit should be pushed to origin/${targetBranch}.
 
+WHY USE SUBAGENTS FOR BUILD/TEST:
+- Subagents have isolated context and won't pollute your working memory
+- Build and test output can be verbose - subagents handle this cleanly
+- If tests fail, the subagent returns a clear summary
+
 DO NOT:
 - Delete the feature branch (locally or remotely)
 - Clean up workspaces
-- Do anything beyond the merge, test, and push steps above
+- Skip the build step - compile errors after merge are common
+- Do anything beyond the merge, build, test, and push steps above
 
 Report any issues or conflicts you encountered.`;
 

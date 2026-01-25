@@ -38,25 +38,47 @@ For each conflict:
 
 **CRITICAL:** Before committing, you MUST verify the merge is complete and valid.
 
-Run the validation script to check for:
-- Conflict markers that weren't resolved
-- Build errors
-- Test failures
+#### Step 3a: Check for Conflict Markers
 
+Search all files for remaining conflict markers:
 ```bash
-bash scripts/validate-merge.sh
+git diff --check
 ```
+Or search manually for `<<<<<<<`, `=======`, or `>>>>>>>` markers.
 
-The validation script will check:
-1. **Conflict Markers:** No `<<<<<<<`, `=======`, or `>>>>>>>` markers remain in any tracked file
-2. **Build:** Project builds without errors
-3. **Tests:** All tests pass
+**If markers found:** Go back and resolve them before proceeding.
 
-**If validation fails:**
-- Review the error output
-- Fix the issues
-- Re-run validation
-- **DO NOT commit until validation passes**
+#### Step 3b: Build the Project (REQUIRED)
+
+**Use the Task tool with subagent_type="Bash"** to run the build in an isolated context:
+
+Detect the project type and run the appropriate build command:
+- **Node.js** (package.json exists): `npm run build`
+- **Java/Maven** (pom.xml exists): `mvn compile`
+- **Rust** (Cargo.toml exists): `cargo build`
+- **Python** (setup.py/pyproject.toml): `pip install -e .` or `python -m build`
+
+**Why use a subagent?** Build output can be verbose. A subagent isolates the output and returns a clean summary.
+
+**If build fails:** Fix the compile errors before proceeding. Common post-merge issues:
+- Missing imports from deleted files
+- Type conflicts from incompatible changes
+- Duplicate declarations
+
+#### Step 3c: Run Tests (REQUIRED)
+
+**Use the Task tool with subagent_type="Bash"** to run tests:
+
+- **Node.js**: `npm test`
+- **Java/Maven**: `mvn test`
+- **Rust**: `cargo test`
+- **Python**: `pytest` or `python -m pytest`
+
+**If tests fail:**
+- Review the failure output from the subagent
+- Fix the failing tests
+- Re-run tests
+- **DO NOT commit until tests pass**
 
 ### 4. Stage and Commit
 
@@ -78,6 +100,8 @@ When you're done (or if you encounter an error), report your results in this EXA
 ```
 MERGE_RESULT: SUCCESS
 RESOLVED_FILES: path/to/file1.ts, path/to/file2.ts
+BUILD: PASS
+TESTS: PASS
 VALIDATION: PASS
 NOTES: Brief description of what was resolved
 ```
@@ -87,6 +111,8 @@ Or if you failed:
 ```
 MERGE_RESULT: FAILURE
 FAILED_FILES: path/to/file1.ts, path/to/file2.ts
+BUILD: FAIL
+TESTS: SKIP
 VALIDATION: FAIL
 REASON: Why the resolution failed
 NOTES: Additional context
@@ -97,7 +123,9 @@ NOTES: Additional context
 - **MERGE_RESULT:** Either `SUCCESS` or `FAILURE`
 - **RESOLVED_FILES:** Comma-separated list of files you successfully resolved (only if SUCCESS)
 - **FAILED_FILES:** Comma-separated list of files you couldn't resolve (only if FAILURE)
-- **VALIDATION:** Either `PASS` or `FAIL` - Result of running validation script (required)
+- **BUILD:** Either `PASS`, `FAIL`, or `SKIP` - Result of running build command
+- **TESTS:** Either `PASS`, `FAIL`, or `SKIP` - Result of running test command
+- **VALIDATION:** Either `PASS` or `FAIL` - Overall validation (PASS only if BUILD and TESTS both PASS)
 - **REASON:** Brief explanation of why resolution failed (only if FAILURE)
 - **NOTES:** Any important observations or context
 
@@ -111,10 +139,11 @@ NOTES: Additional context
 ## What Success Looks Like
 
 1. All conflict files are resolved (no conflict markers remain)
-2. Validation script passes (no conflicts, build succeeds, tests pass)
-3. Merge commit is completed
-4. Result is reported in the structured format with VALIDATION: PASS
+2. Build passes (ran via Task tool with subagent_type="Bash")
+3. Tests pass (ran via Task tool with subagent_type="Bash")
+4. Merge commit is completed
+5. Result is reported in the structured format with BUILD: PASS, TESTS: PASS, VALIDATION: PASS
 
-**Remember:** The validation script is your final gate before committing. If it fails, the merge is NOT complete.
+**Remember:** Both build AND tests must pass before committing. If either fails, the merge is NOT complete. Use subagents to run these commands to keep your context clean.
 
 Begin analyzing the conflicts now.
