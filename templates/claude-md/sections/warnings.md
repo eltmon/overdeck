@@ -4,6 +4,25 @@
 - **DO NOT** push to main/master branch directly
 - **ALWAYS** check for existing patterns before introducing new ones
 
+## NEVER Defer Work (CRITICAL)
+
+**You MUST complete ALL work in the issue scope. NEVER defer tasks to "future PRs".**
+
+❌ **NEVER say things like:**
+- "Deferred for future PR"
+- "Left as TODO for follow-up"
+- "Out of scope, will address later"
+- "Dashboard integration deferred"
+- "Tests deferred for future work"
+
+✅ **Instead:**
+- Complete the full scope of the issue
+- If scope is too large, ask the user to split the issue BEFORE starting
+- If blocked, report the blocker and wait for guidance
+- If you run out of context, use `/work-tell` to hand off with full notes
+
+**The issue is NOT complete until ALL requirements are implemented, tested, and working.**
+
 ## Completion Requirements (CRITICAL)
 
 **You are NOT done until ALL of these are true:**
