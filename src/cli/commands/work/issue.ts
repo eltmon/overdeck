@@ -2,8 +2,65 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
+import { homedir } from 'os';
 import { spawnAgent } from '../../../lib/agents.js';
 import { resolveProjectFromIssue, hasProjects, listProjects } from '../../../lib/projects.js';
+
+/**
+ * Get Linear API key from environment or config file
+ */
+function getLinearApiKey(): string | null {
+  const envFile = join(homedir(), '.panopticon.env');
+  if (existsSync(envFile)) {
+    const content = readFileSync(envFile, 'utf-8');
+    const match = content.match(/LINEAR_API_KEY=(.+)/);
+    if (match) return match[1].trim();
+  }
+  return process.env.LINEAR_API_KEY || null;
+}
+
+/**
+ * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
+ */
+function isLinearIssue(issueId: string): boolean {
+  return /^[A-Z]+-\d+$/i.test(issueId);
+}
+
+/**
+ * Update Linear issue status to "In Progress" when agent starts
+ */
+async function updateLinearToInProgress(apiKey: string, issueIdentifier: string): Promise<boolean> {
+  try {
+    const { LinearClient } = await import('@linear/sdk');
+    const client = new LinearClient({ apiKey });
+
+    // Search for the issue by identifier
+    const results = await client.searchIssues(issueIdentifier, { first: 1 });
+    const issue = results.nodes[0];
+
+    if (!issue) return false;
+
+    // Get the team to find workflow states
+    const team = await issue.team;
+    if (!team) return false;
+
+    // Find the "In Progress" state
+    const states = await team.states();
+    const inProgressState = states.nodes.find((s) =>
+      s.name === 'In Progress' || s.type === 'started'
+    );
+
+    if (!inProgressState) return false;
+
+    // Update the issue state
+    await issue.update({ stateId: inProgressState.id });
+
+    return true;
+  } catch (error) {
+    // Silently fail - don't block agent spawn for Linear API issues
+    return false;
+  }
+}
 
 interface IssueOptions {
   model: string;
@@ -328,6 +385,17 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     });
 
     spinner.succeed(`Agent spawned: ${agent.id}`);
+
+    // Update Linear issue to "In Progress" if applicable
+    if (isLinearIssue(id)) {
+      const apiKey = getLinearApiKey();
+      if (apiKey) {
+        const updated = await updateLinearToInProgress(apiKey, id);
+        if (updated) {
+          console.log(chalk.green(`  ✓ Updated ${id.toUpperCase()} to In Progress`));
+        }
+      }
+    }
 
     console.log('');
     console.log(chalk.bold('Agent Details:'));
