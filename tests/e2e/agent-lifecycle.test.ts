@@ -16,6 +16,13 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import type { ExecaReturnValue } from 'execa';
 
+// Mock tmux module at the top level (hoisted before imports)
+vi.mock('../../src/lib/tmux.js', () => ({
+  sessionExists: vi.fn(),
+  createSession: vi.fn(),
+  sendKeys: vi.fn(),
+}));
+
 describe('Agent Lifecycle Integration (PAN-80)', () => {
   let tempDir: string;
   let originalHome: string | undefined;
@@ -41,6 +48,9 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
     // Mock execa
     const { execa } = await import('execa');
     execaMock = vi.mocked(execa);
+
+    // Reset tmux mocks between tests
+    vi.clearAllMocks();
   });
 
   afterEach(async () => {
@@ -247,11 +257,11 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       };
       writeFileSync(stateFile, JSON.stringify(combinedState, null, 2));
 
-      // Mock tmux functions
+      // Configure tmux mocks
       const tmuxMock = await import('../../src/lib/tmux.js');
-      vi.spyOn(tmuxMock, 'sessionExists').mockReturnValue(false);
-      vi.spyOn(tmuxMock, 'createSession').mockImplementation(() => {});
-      vi.spyOn(tmuxMock, 'sendKeys').mockImplementation(() => {});
+      vi.mocked(tmuxMock.sessionExists).mockReturnValue(false);
+      vi.mocked(tmuxMock.createSession).mockImplementation(() => {});
+      vi.mocked(tmuxMock.sendKeys).mockImplementation(() => {});
 
       // Resume agent
       const result = await resumeAgent(agentId);
@@ -272,7 +282,7 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
     });
 
     it('should handle resume with optional message', async () => {
-      const { saveAgentRuntimeState, saveSessionId, saveAgentState, resumeAgent } =
+      const { saveAgentRuntimeState, saveSessionId, saveAgentState, resumeAgent, getAgentDir } =
         await import('../../src/lib/agents.js');
 
       const agentId = getUniqueAgentId('resume-msg');
@@ -295,7 +305,6 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       });
 
       // Then manually merge runtime state
-      const { getAgentDir } = await import('../../src/lib/agents.js');
       const agentDir = getAgentDir(agentId);
       const stateFile = join(agentDir, 'state.json');
       const existingState = JSON.parse(readFileSync(stateFile, 'utf8'));
@@ -308,16 +317,20 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       };
       writeFileSync(stateFile, JSON.stringify(combinedState, null, 2));
 
-      // Mock tmux functions
+      // Configure tmux mocks
       const tmuxMock = await import('../../src/lib/tmux.js');
-      vi.spyOn(tmuxMock, 'sessionExists').mockReturnValue(false);
-      vi.spyOn(tmuxMock, 'createSession').mockImplementation(() => {});
-      const sendKeysSpy = vi.spyOn(tmuxMock, 'sendKeys').mockImplementation(() => {});
+      vi.mocked(tmuxMock.sessionExists).mockReturnValue(false);
+      vi.mocked(tmuxMock.createSession).mockImplementation(() => {
+        // Simulate SessionStart hook creating ready signal
+        const readyPath = join(agentDir, 'ready.json');
+        writeFileSync(readyPath, JSON.stringify({ ready: true }));
+      });
+      vi.mocked(tmuxMock.sendKeys).mockImplementation(() => {});
 
       await resumeAgent(agentId, message);
 
       // Verify sendKeys was called with the message
-      expect(sendKeysSpy).toHaveBeenCalledWith(agentId, message);
+      expect(tmuxMock.sendKeys).toHaveBeenCalledWith(agentId, message);
     });
   });
 
