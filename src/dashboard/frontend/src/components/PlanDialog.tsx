@@ -217,13 +217,17 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       // Check planning status
       fetch(`/api/planning/${issue.identifier}/status`)
         .then(res => res.json())
-        .then((data: PlanningStatus) => {
+        .then((data: PlanningStatus & { planningCompleted?: boolean }) => {
           if (data.active) {
             // Session is running - connect to it directly (skip ready step)
             hasConnectedToSession.current = true;
             setStep('planning');
+          } else if (data.planningCompleted) {
+            // Planning was done but not marked complete - go directly to complete step
+            // This allows user to click "Done Planning" without restarting
+            setStep('complete');
           } else {
-            // No active session - show ready step
+            // No active session and no completed planning - show ready step
             setStep('ready');
           }
         })

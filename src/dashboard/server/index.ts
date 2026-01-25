@@ -6454,16 +6454,30 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
 
     const sessionExists = sessions.includes(sessionName);
 
+    // Check if planning artifacts exist (indicates planning was done but not marked complete)
+    const planningDirInWorkspace = join(workspacePath, '.planning');
+    const legacyPlanningDir = join(projectPath, '.planning', issueLower);
+    const planningDir = existsSync(planningDirInWorkspace) ? planningDirInWorkspace :
+                        existsSync(legacyPlanningDir) ? legacyPlanningDir : null;
+
+    const hasStateFile = planningDir ? existsSync(join(planningDir, 'STATE.md')) : false;
+    const hasPromptFile = planningDir ? existsSync(join(planningDir, 'PLANNING_PROMPT.md')) : false;
+
     res.json({
       active: sessionExists,
       sessionName,
       workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
+      // If session is NOT active but STATE.md exists, planning was completed but not marked done
+      planningCompleted: !sessionExists && hasStateFile,
+      hasStateFile,
+      hasPromptFile,
     });
   } catch (error: any) {
     res.json({
       active: false,
       sessionName,
       workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
+      planningCompleted: false,
       error: error.message,
     });
   }
