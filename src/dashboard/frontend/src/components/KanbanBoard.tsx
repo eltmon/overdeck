@@ -4,6 +4,7 @@ import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../typ
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2 } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
+import { SpecialistAgent } from './SpecialistAgentCard';
 
 // Difficulty badge colors
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
@@ -20,6 +21,36 @@ function DifficultyBadge({ level }: { level: ComplexityLevel }) {
   return (
     <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${color}`}>
       {level}
+    </span>
+  );
+}
+
+// Agent type icons for badges
+const AGENT_ICONS: Record<string, string> = {
+  work: '🤖',
+  planning: '📋',
+  review: '👁️',
+  test: '🧪',
+  merge: '🔀'
+};
+
+// Agent attribution badge component
+function AgentBadge({
+  type,
+  name,
+  isConflict
+}: {
+  type: 'work' | 'planning' | 'review' | 'test' | 'merge';
+  name: string;
+  isConflict: boolean;
+}) {
+  const icon = AGENT_ICONS[type];
+  const conflictClass = isConflict ? 'animate-[pulse_2s_ease-in-out_infinite]' : '';
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs text-blue-400 ${conflictClass}`}>
+      <span>{icon}</span>
+      <span>{name}</span>
     </span>
   );
 }
@@ -84,6 +115,12 @@ async function fetchIssues(cycle: string = 'current', includeCompleted: boolean 
 async function fetchAgents(): Promise<Agent[]> {
   const res = await fetch('/api/agents');
   if (!res.ok) throw new Error('Failed to fetch agents');
+  return res.json();
+}
+
+async function fetchSpecialists(): Promise<SpecialistAgent[]> {
+  const res = await fetch('/api/specialists');
+  if (!res.ok) throw new Error('Failed to fetch specialists');
   return res.json();
 }
 
@@ -158,6 +195,12 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const { data: agents = [] } = useQuery({
     queryKey: ['agents'],
     queryFn: fetchAgents,
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+
+  const { data: specialists = [] } = useQuery({
+    queryKey: ['specialists'],
+    queryFn: fetchSpecialists,
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
@@ -353,12 +396,17 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                 const workAgent = agents.find(
                   (a) => a.issueId?.toLowerCase() === issueIdLower && a.type !== 'planning'
                 );
+                // Find specialists working on this issue
+                const issueSpecialists = specialists.filter(
+                  (s) => s.currentIssue?.toLowerCase() === issueIdLower
+                );
                 return (
                   <IssueCard
                     key={issue.id}
                     issue={issue}
                     planningAgent={planningAgent}
                     workAgent={workAgent}
+                    specialists={issueSpecialists}
                     cost={issueCosts[issue.identifier.toLowerCase()]}
                     isSelected={selectedIssue === issue.identifier}
                     onSelect={() => onSelectIssue(
@@ -503,6 +551,7 @@ interface IssueCardProps {
   issue: Issue;
   planningAgent?: Agent;
   workAgent?: Agent;
+  specialists?: SpecialistAgent[];
   cost?: IssueCost;
   isSelected: boolean;
   onSelect: () => void;
@@ -510,7 +559,7 @@ interface IssueCardProps {
   onViewBeads?: (issue: Issue) => void;
 }
 
-function IssueCard({ issue, planningAgent, workAgent, cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
+function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
   const queryClient = useQueryClient();
 
   // Determine which agent is relevant based on issue status
@@ -732,9 +781,35 @@ function IssueCard({ issue, planningAgent, workAgent, cost, isSelected, onSelect
               <span className="text-gray-400">{issue.identifier}</span>
               <ExternalLink className="w-3 h-3 opacity-50" />
             </a>
-            {agent && (
-              <span className="text-xs text-blue-400">{agent.model}</span>
-            )}
+            {/* Agent attribution badges */}
+            {(() => {
+              const badges = [];
+              // Conflict detection: multiple agents working on same issue
+              const hasConflict = ((!!workAgent || !!planningAgent) && specialists.length > 0) ||
+                                  (!!workAgent && !!planningAgent) ||
+                                  specialists.length > 1;
+
+              if (workAgent) {
+                badges.push({
+                  type: 'work' as const,
+                  name: workAgent.issueId || workAgent.id.split('-').pop() || workAgent.id
+                });
+              }
+              if (planningAgent) {
+                badges.push({
+                  type: 'planning' as const,
+                  name: planningAgent.issueId || planningAgent.id.split('-').pop() || planningAgent.id
+                });
+              }
+              for (const spec of specialists) {
+                const specType = spec.name.replace('-agent', '') as 'review' | 'test' | 'merge';
+                badges.push({ type: specType, name: specType });
+              }
+
+              return badges.map((b, i) => (
+                <AgentBadge key={i} type={b.type} name={b.name} isConflict={hasConflict} />
+              ));
+            })()}
             {/* Review Ready badge - prominent indicator that agent completed work */}
             {isReviewReady && (
               <span
