@@ -1,30 +1,10 @@
 # PAN-83: Update Handoffs Tab and Metrics for Queue System
 
-## Status: ✅ IMPLEMENTATION COMPLETE
+## Status: READY FOR IMPLEMENTATION
 
 ## Summary
 
 Update the dashboard's Handoffs tab and metrics to reflect the new queue-based specialist system while preserving existing model handoff tracking.
-
-## Implementation Completed
-
-All planned components have been successfully implemented:
-
-1. ✅ **specialist-handoff-logger.ts** - Core logging infrastructure created
-2. ✅ **API endpoints** - Added `/api/specialist-handoffs` and `/api/specialist-handoffs/stats`
-3. ✅ **MetricsSummary.tsx** - Updated with three new metrics:
-   - Specialist Handoffs (today's count)
-   - Cost Escalations (model handoff count)
-   - Queue Depth (pending items)
-4. ✅ **HandoffsPage.tsx** - Added new "Specialist Handoffs" section with:
-   - Stats cards (Today's Handoffs, Queue Depth, Success Rate, Most Active)
-   - Table showing recent handoffs with issue, transition, priority, status
-5. ✅ **Integration** - Hooked logging into `submitToSpecialistQueue()` in specialists.ts
-
-## Tests
-
-- Build: ✅ Success
-- Unit Tests: ✅ 28/28 passed
 
 ---
 

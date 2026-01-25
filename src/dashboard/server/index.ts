@@ -17,6 +17,7 @@ import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../l
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
+import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../lib/cloister/specialist-handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
 import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent } from '../../lib/agents.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
@@ -3168,6 +3169,32 @@ app.get('/api/handoffs/stats', (req, res) => {
   } catch (error: any) {
     console.error('Error getting handoff stats:', error);
     res.status(500).json({ error: 'Failed to get handoff stats: ' + error.message });
+  }
+});
+
+// Get all specialist handoff events
+app.get('/api/specialist-handoffs', (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+    const handoffs = readSpecialistHandoffs(limit);
+    res.json({
+      handoffs,
+      total: handoffs.length,
+    });
+  } catch (error: any) {
+    console.error('Error getting specialist handoffs:', error);
+    res.status(500).json({ error: 'Failed to get specialist handoffs: ' + error.message });
+  }
+});
+
+// Get specialist handoff statistics
+app.get('/api/specialist-handoffs/stats', (req, res) => {
+  try {
+    const stats = getSpecialistHandoffStats();
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Error getting specialist handoff stats:', error);
+    res.status(500).json({ error: 'Failed to get specialist handoff stats: ' + error.message });
   }
 });
 
