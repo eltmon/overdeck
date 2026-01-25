@@ -347,6 +347,35 @@ When Stitch is configured, the planning agent can:
 2. **Document in STATE.md** - Record Stitch project/screen IDs for workers
 3. **Worker agents pick up designs** - Use the Stitch skills to convert to React
 
+### Bidirectional Sync
+
+Designs are stored in your Google account and sync bidirectionally:
+
+```
+Planning Agent creates design via MCP
+    ↓
+Stored in Google Cloud (your account)
+    ↓
+Visible on stitch.withgoogle.com
+    ↓
+Worker agent retrieves via MCP → converts to React
+```
+
+- **MCP → Web UI:** Designs created by agents appear in Stitch web UI
+- **Web UI → MCP:** Designs created in web UI are accessible to agents
+- **Edit anywhere:** Refine AI-generated designs in the web UI before workers convert them
+
+### Available MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `create_project` | Create a new Stitch project |
+| `list_projects` | List all your projects (owned/shared) |
+| `get_project` | Get project details |
+| `list_screens` | List screens in a project |
+| `get_screen` | Get screen details + HTML/CSS download URLs |
+| `generate_screen_from_text` | Generate a screen from a text prompt |
+
 ### Stitch Skills
 
 | Skill | Purpose |
@@ -2642,14 +2671,14 @@ autoProxy=true
 # The hv_balloon driver can't find contiguous pages → vmbus channel allocation fails → crash.
 # These settings help prevent this:
 
-# Automatically reclaim cached memory to reduce fragmentation
-autoMemoryReclaim=gradual
+# Aggressively reclaim cached memory (dropCache is more aggressive than gradual)
+autoMemoryReclaim=dropCache
 
 # Use sparse VHD to allow better memory compaction
 sparseVhd=true
 
-# Windows 11 22H2+ ONLY: Use mirrored networking
-# This bypasses the Hyper-V NAT layer that can cause "Object Name not found" errors
+# DISABLED: mirrored networking may conflict with Docker Desktop
+# If you're NOT using Docker Desktop, you can try enabling this:
 # networkingMode=mirrored
 ```
 
