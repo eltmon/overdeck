@@ -29,6 +29,8 @@ All planned components have been successfully implemented:
   - All 6 exported functions tested
   - Coverage: writing/reading events, filtering, statistics, edge cases
   - Edge cases: empty log, corrupted JSON, midnight boundary
+- E2E Tests: ✅ 22/22 passed (agent-lifecycle, 1 skipped)
+  - Fixed pre-existing test timeout bug in resumeAgent test
 
 ---
 
