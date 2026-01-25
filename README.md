@@ -2637,6 +2637,17 @@ dnsTunneling=true
 # Inherit Windows proxy settings
 autoProxy=true
 
+# MEMORY FRAGMENTATION FIX (prevents "page allocation failure" crashes)
+# AI agent workloads with Docker constantly allocate/free memory, causing fragmentation.
+# The hv_balloon driver can't find contiguous pages → vmbus channel allocation fails → crash.
+# These settings help prevent this:
+
+# Automatically reclaim cached memory to reduce fragmentation
+autoMemoryReclaim=gradual
+
+# Use sparse VHD to allow better memory compaction
+sparseVhd=true
+
 # Windows 11 22H2+ ONLY: Use mirrored networking
 # This bypasses the Hyper-V NAT layer that can cause "Object Name not found" errors
 # networkingMode=mirrored
