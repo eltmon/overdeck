@@ -1,0 +1,295 @@
+---
+title: Architecture
+description: Technical architecture and design decisions
+---
+
+# Architecture
+
+Deep dive into Panopticon's technical architecture and design decisions.
+
+## System Overview
+
+Panopticon consists of three main components:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         DASHBOARD                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │   React     │  │   Next.js   │  │   API       │            │
+│  │   Frontend  │──│   SSR       │──│   Server    │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                           CLI                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │   Commands  │  │   Skills    │  │   Hooks     │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        CLOISTER                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │  Heartbeat  │  │  Handoff    │  │ Specialists │            │
+│  │  Monitor    │  │  Manager    │  │  (review,   │            │
+│  └─────────────┘  └─────────────┘  │  test, merge)│            │
+│                                    └─────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Directory Structure
+
+Panopticon stores all runtime state in `~/.panopticon/`:
+
+```
+~/.panopticon/
+  config.toml           # Main configuration
+  projects.yaml         # Multi-project registry with issue routing
+  project-mappings.json # Linear project → local path mappings (legacy)
+  session-map.json      # Claude sessions → issue linking
+  runtime-metrics.json  # Runtime performance metrics
+
+  skills/               # Shared skills (SKILL.md format)
+  commands/             # Slash commands
+  agents/               # Subagent templates (.md files)
+  bin/                  # Hook scripts (synced via pan sync)
+    heartbeat-hook      # Real-time activity monitoring hook
+
+  agents/               # Per-agent runtime state
+    agent-min-123/
+      state.json        # Agent state (model, phase, complexity)
+      health.json       # Health status
+      hook.json         # FPP work queue
+      cv.json           # Work history
+      mail/             # Incoming messages
+      handoffs/         # Handoff prompts (for debugging)
+
+  cloister/             # Cloister AI lifecycle manager
+    config.json         # Cloister settings
+    state.json          # Running state
+    events.jsonl        # Handoff event log
+
+  heartbeats/           # Real-time agent activity
+    agent-min-123.json  # Last heartbeat from agent
+
+  logs/                 # Log files
+    handoffs.jsonl      # All handoff events (for analytics)
+
+  costs/                # Raw cost logs (JSONL)
+  backups/              # Sync backups
+  traefik/              # Traefik reverse proxy config
+    dynamic/            # Dynamic route configs
+    certs/              # TLS certificates
+```
+
+## Agent State Management
+
+Each agent's state is tracked in `~/.panopticon/agents/{agent-id}/state.json`:
+
+```json
+{
+  "id": "agent-min-123",
+  "issueId": "MIN-123",
+  "workspace": "/home/user/projects/myapp/workspaces/feature-min-123",
+  "branch": "feature/min-123",
+  "phase": "implementation",
+  "model": "sonnet",
+  "complexity": "medium",
+  "handoffCount": 0,
+  "sessionId": "abc123",
+  "createdAt": "2024-01-22T10:00:00-08:00",
+  "updatedAt": "2024-01-22T10:30:00-08:00"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `phase` | Current work phase: `planning`, `implementation`, `testing`, `review`, `merging` |
+| `model` | Current model: `haiku`, `sonnet`, `opus` |
+| `complexity` | Detected complexity: `trivial`, `simple`, `medium`, `complex`, `expert` |
+| `handoffCount` | Number of times the agent has been handed off to a different model |
+| `sessionId` | Claude Code session ID (for resuming after handoff) |
+
+**State Cleanup:** When an agent is killed or aborted (`pan work kill`), Panopticon automatically cleans up its state files to prevent stale data from affecting future runs.
+
+## Deep Wipe
+
+For issues that get into a stuck or inconsistent state, use `pan work wipe` to completely reset:
+
+```bash
+pan work wipe MIN-123           # Basic cleanup
+pan work wipe MIN-123 -w        # Also delete workspace
+pan work wipe MIN-123 -y -w     # Skip confirmation
+```
+
+**Deep wipe cleans up:**
+- Tmux sessions (`planning-min-123`, `agent-min-123`)
+- Agent state directories (`~/.panopticon/agents/planning-*`, `agent-*`)
+- Legacy planning directories (`project/.planning/min-123/`)
+- Workspace (if `-w` flag is used)
+- Linear issue status (reset to Backlog)
+- Linear labels (removes "Review Ready", "Planning")
+
+**Dashboard UI:** When aborting planning, click "🔥 Deep Wipe" for a complete reset.
+
+## Health Monitoring (Deacon Pattern)
+
+Panopticon implements the Deacon pattern for stuck agent detection:
+
+- **Ping timeout**: 30 seconds
+- **Consecutive failures**: 3 before recovery
+- **Cooldown**: 5 minutes between force-kills
+
+When an agent is stuck (no activity for 30+ minutes), Panopticon will:
+1. Force kill the tmux session
+2. Record the kill in health.json
+3. Respawn with crash recovery context
+
+## FPP (Fixed Point Principle)
+
+> "Any runnable action is a fixed point and must resolve before the system can rest."
+
+*Inspired by Doctor Who: a fixed point in time must occur — it cannot be avoided.*
+
+**Fixed Point Principle (FPP):** Any runnable bead, hook, or agent action represents a fixed point in execution and must be resolved immediately. Panopticon continues executing until no fixed points remain.
+
+FPP ensures agents are self-propelling:
+1. Work items are pushed to the agent's hook
+2. On spawn/recovery, the hook is checked
+3. Pending work is injected into the agent's prompt
+4. Completed work is popped from the hook
+
+## Development
+
+### Dev vs Production Strategy
+
+Panopticon uses a **shared config, switchable CLI** approach:
+
+```
+~/.panopticon/           # Shared by both dev and prod
+├── config.toml          # Settings
+├── projects.json        # Registered projects
+├── project-mappings.json # Linear → local path mappings
+├── agents/              # Agent state
+└── skills/              # Shared skills
+```
+
+Both dev and production versions read/write the same config, so you can switch between them freely.
+
+### Running in Development Mode
+
+```bash
+# Clone and setup
+git clone https://github.com/eltmon/panopticon.git
+cd panopticon
+npm install
+
+# Link dev version globally (makes 'pan' use your local code)
+npm link
+
+# Start the dashboard (with hot reload)
+cd src/dashboard
+npm run install:all
+npm run dev
+# → Frontend: http://localhost:3010
+# → API: http://localhost:3011
+```
+
+### Switching Between Dev and Prod
+
+```bash
+# Use dev version (from your local repo)
+cd /path/to/panopticon && npm link
+
+# Switch back to stable release
+npm unlink panopticon-cli
+npm install -g panopticon-cli
+```
+
+### Dashboard Modes
+
+| Mode | Command | Use Case |
+|------|---------|----------|
+| **Production** | `pan up` | Daily usage, containerized, HTTPS at https://pan.localhost |
+| **Dev** | `cd src/dashboard && npm run dev` | Only for active development on Panopticon itself |
+
+**Note:** Use `pan up` for normal usage - it runs in Docker and won't conflict with your project's ports. Only use dev mode when actively working on Panopticon's codebase.
+
+### Working on Panopticon While Using It
+
+If you're both developing Panopticon AND using it for your own projects:
+
+1. **Use `npm link`** so CLI changes take effect immediately
+2. **Run dashboard from source** for hot reload on UI changes
+3. **Config is shared** - workspaces/agents work the same either way
+4. **Test in a real project** - your own usage is the best test
+
+## PRD Architecture
+
+### PRD Types
+
+```
+myproject/
+├── docs/
+│   └── PRD.md                   # Canonical PRD (always on main)
+└── workspaces/
+    └── feature-min-123/
+        └── docs/
+            └── MIN-123-plan.md   # Feature PRD (lives in feature branch)
+```
+
+| PRD Type | Location | Purpose |
+|----------|----------|---------|
+| **Canonical PRD** | `docs/PRD.md` | Core product definition, always on main |
+| **Feature PRD** | `workspaces/feature-{issue}/docs/{ISSUE}-plan.md` | Feature spec, lives in feature branch, merged with PR |
+
+### Feature PRDs Live in Workspaces
+
+When you start planning an issue, Panopticon creates:
+1. A git worktree (workspace) for the feature branch
+2. A planning session that generates a feature PRD
+
+The feature PRD **lives in the workspace** (feature branch) because:
+- It gets merged with the PR (documentation travels with code)
+- If you abort planning and delete the workspace, you don't want orphaned PRDs
+- Clean separation - each feature is self-contained
+
+### PRD Naming Convention
+
+| Document | Naming | Example |
+|----------|--------|---------|
+| Canonical PRD | `PRD.md` | `docs/PRD.md` |
+| Feature PRD | `{ISSUE}-plan.md` | `MIN-123-plan.md`, `PAN-4-plan.md` |
+| Planning artifacts | In `.planning/{issue}/` | `.planning/min-123/STATE.md` |
+
+## Developer Skills
+
+Panopticon has two types of skills:
+
+| Directory | Purpose | Synced When |
+|-----------|---------|-------------|
+| `skills/` | User-facing skills for all Panopticon users | Always via `pan sync` |
+| `dev-skills/` | Developer-only skills for Panopticon contributors | Only in dev mode |
+
+**Dev mode is automatically detected** when running from the Panopticon source repo (npm link). Skills in `dev-skills/` are:
+- Checked into the repo and version-controlled
+- Only synced to developers' machines, not end users
+- Shown with `[dev]` label in `pan sync --dry-run`
+
+```bash
+# Check what will be synced (including dev-skills)
+pan sync --dry-run
+
+# Output shows:
+# Developer mode detected - dev-skills will be synced
+# ...
+#   + skill/test-specialist-workflow [dev]
+```
+
+## Related Guides
+
+- [Cloister](/features/cloister) - AI lifecycle management
+- [Core Commands](/cli/core-commands) - CLI reference
+- [Troubleshooting](/reference/troubleshooting) - Common issues

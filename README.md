@@ -1,32 +1,71 @@
+<div align="center">
+
 # Panopticon CLI
 
-Multi-agent orchestration for AI coding assistants.
+**Multi-agent orchestration for AI coding assistants**
+
+[![npm version](https://img.shields.io/npm/v/panopticon-cli.svg)](https://www.npmjs.com/package/panopticon-cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/panopticon/pulls)
 
 > *"The Panopticon had six sides, one for each of the Founders of Gallifrey..."*
 
-## Overview
+<img src="docs/dashboard-overview.png" alt="Panopticon Dashboard" width="800" />
 
-Panopticon is a unified orchestration layer for AI coding assistants. It works with:
+</div>
+
+---
+
+## What is Panopticon?
+
+| Without Panopticon | With Panopticon |
+|:------------------|:----------------|
+| Manually juggle multiple AI agents | **Automatic orchestration** - spawn, monitor, and coordinate agents from a dashboard |
+| Agents start fresh every session | **Persistent context** - skills, state files, and beads track work across sessions |
+| Simple tasks eat Opus credits | **Smart model routing** - Haiku for simple, Sonnet for medium, Opus for complex |
+| Stuck agents waste your time | **Automatic recovery** - detect stuck agents and hand off to specialists |
+| AI tools have separate configs | **Universal skills** - one SKILL.md works across Claude, Codex, Cursor, Gemini |
+
+## Screenshots
+
+<div align="center">
+<table>
+<tr>
+<td><img src="docs/planning-session-dialog.png" alt="Planning Dialog" width="300" /></td>
+<td><img src="docs/planning-session-discovery.png" alt="Discovery Phase" width="300" /></td>
+<td><img src="docs/planning-session-active.png" alt="Active Session" width="300" /></td>
+</tr>
+<tr>
+<td align="center"><em>Start planning</em></td>
+<td align="center"><em>Discovery phase</em></td>
+<td align="center"><em>Active session</em></td>
+</tr>
+</table>
+</div>
+
+## Key Features
+
+| Feature | Description |
+|:--------|:------------|
+| **Multi-Agent Orchestration** | Spawn and manage AI agents in tmux sessions via dashboard or CLI |
+| **Cloister Lifecycle Manager** | Automatic model routing, stuck detection, and specialist handoffs |
+| **Universal Skills** | One SKILL.md format works across all supported AI tools |
+| **Workspaces** | Git worktree-based feature branches with Docker isolation |
+| **Convoys** | Run parallel agents on related issues with auto-synthesis |
+| **Specialists** | Dedicated review, test, and merge agents for quality control |
+| **Heartbeat Monitoring** | Real-time agent activity tracking via Claude Code hooks |
+| **Legacy Codebase Support** | AI self-monitoring skills that learn from your codebase |
+
+## Supported Tools
 
 | Tool | Support |
-|------|---------|
+|:-----|:--------|
 | **Claude Code** | Full support |
 | **Codex** | Skills sync |
 | **Cursor** | Skills sync |
 | **Gemini CLI** | Skills sync |
 | **Google Antigravity** | Skills sync |
-
-### Features
-
-- **Multi-agent orchestration** - Spawn and manage multiple AI agents in tmux sessions
-- **Cloister AI Lifecycle Manager** - Automatic model routing, stuck detection, and specialist handoffs
-- **Universal skills** - One SKILL.md format works across all supported tools
-- **Heartbeat Hooks** - Real-time agent activity monitoring via Claude Code hooks
-- **Multi-project support** - YAML-based project registry with label-based issue routing
-- **Health Monitoring** - Deacon-style stuck detection with auto-recovery
-- **Context Engineering** - Structured state management (STATE.md, WORKSPACE.md)
-- **Agent CVs** - Work history tracking for capability-based routing
-- **Google Stitch Integration** - AI-powered UI design with automatic design-to-code workflows
 
 ---
 
@@ -159,54 +198,12 @@ The AI adapts to your org structure, not the other way around.
 ## Quick Start
 
 ```bash
-# Install Panopticon
-npm install -g panopticon-cli
-
-# Install prerequisites and setup (includes optional HTTPS/Traefik)
-pan install
-
-# Sync skills to all AI tools
-pan sync
-
-# Check system health
-pan doctor
+npm install -g panopticon-cli && pan install && pan sync && pan up
 ```
 
-### HTTPS Setup (Optional)
+**That's it!** Dashboard runs at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
 
-Panopticon supports local HTTPS via Traefik reverse proxy:
-
-```bash
-# Full install (includes Traefik + mkcert for HTTPS)
-pan install
-
-# Add to /etc/hosts (macOS/Linux)
-echo "127.0.0.1 pan.localhost" | sudo tee -a /etc/hosts
-
-# Start with HTTPS
-pan up
-# → Dashboard: https://pan.localhost
-# → Traefik UI: https://traefik.pan.localhost:8080
-```
-
-**Minimal install** (skip Traefik, use ports):
-```bash
-pan install --minimal
-pan up
-# → Dashboard: http://localhost:3010
-```
-
-See [docs/DNS_SETUP.md](docs/DNS_SETUP.md) for detailed DNS configuration (especially for WSL2).
-
-## Supported Platforms
-
-| Platform | Support |
-|----------|---------|
-| **Linux** | Full support |
-| **macOS** | Full support |
-| **Windows** | WSL2 required |
-
-> **Windows users:** Panopticon requires WSL2 (Windows Subsystem for Linux 2). Native Windows is not supported. [Install WSL2](https://docs.microsoft.com/en-us/windows/wsl/install)
+📖 **[Full installation guide, requirements, and platform support →](https://panopticon-cli.com/quickstart)**
 
 ## Requirements
 

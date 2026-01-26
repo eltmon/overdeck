@@ -1,0 +1,264 @@
+---
+title: Skills System
+description: Universal reusable workflows and best practices
+---
+
+# Skills System
+
+Panopticon's skills system provides reusable workflows and best practices for AI agents.
+
+## What Are Skills
+
+Skills are reusable, shareable workflows that encode best practices for common development tasks. They are:
+
+- **Universal** - Work across all AI coding tools (Claude Code, Cursor, Windsurf, etc.)
+- **Shareable** - Distribute via `pan sync` to sync to all connected AI tools
+- **Contextual** - Invoked with `/skill-name` in AI tool prompts
+- **Best-practice-driven** - Encode proven workflows and checklists
+
+Skills eliminate the need to repeatedly explain how to do common tasks. Instead of telling an agent "please review this code for security issues", you invoke `/code-review-security` and the agent follows the established workflow.
+
+## Built-In Skills
+
+Panopticon includes dozens of built-in skills organized by category:
+
+### Development Workflows
+
+| Skill | Description |
+|-------|-------------|
+| `feature-work` | Standard feature implementation workflow |
+| `bug-fix` | Systematic bug investigation and fixing |
+| `refactor` | Safe refactoring with tests first |
+| `code-review` | Comprehensive code review checklist |
+| `code-review-security` | OWASP Top 10 security analysis |
+| `code-review-performance` | Algorithm and resource optimization |
+| `release` | Step-by-step release process |
+| `dependency-update` | Safe dependency updates |
+| `incident-response` | Production incident handling |
+| `onboard-codebase` | Understanding new codebases |
+| `work-complete` | Checklist for completing agent work |
+
+### AI Self-Monitoring
+
+| Skill | Description |
+|-------|-------------|
+| `knowledge-capture` | Captures learnings when AI gets confused or corrected |
+| `refactor-radar` | Detects systemic issues causing AI confusion |
+| `session-health` | Detect and clean up stuck sessions |
+
+### Panopticon Operations (pan-*)
+
+| Skill | Description |
+|-------|-------------|
+| `pan-help` | Show all Panopticon commands |
+| `pan-up` | Start dashboard and services |
+| `pan-down` | Stop dashboard and services |
+| `pan-status` | Show running agents |
+| `pan-issue` | Spawn agent for an issue |
+| `pan-plan` | Create execution plan for issue |
+| `pan-tell` | Send message to running agent |
+| `pan-kill` | Kill a running agent |
+| `pan-approve` | Approve agent work and merge |
+| `pan-health` | Check system health |
+| `pan-sync` | Sync skills to AI tools |
+| `pan-install` | Install prerequisites |
+| `pan-setup` | Initial setup wizard |
+| `pan-quickstart` | Quick start guide |
+| `pan-projects` | Manage registered projects |
+| `pan-tracker` | Issue tracker operations |
+| `pan-logs` | View agent logs |
+| `pan-rescue` | Recover crashed agents |
+| `pan-diagnose` | Diagnose agent issues |
+| `pan-docker` | Docker operations |
+| `pan-network` | Network diagnostics |
+| `pan-config` | Configuration management |
+| `pan-restart` | Safely restart Panopticon dashboard and services |
+| `pan-code-review` | Orchestrate parallel code review (3 reviewers + synthesis) |
+| `pan-convoy-synthesis` | Synthesize convoy coordination |
+| `pan-subagent-creator` | Create specialized subagents |
+| `pan-skill-creator` | Create new skills (guided) |
+| `pan-workspace-config` | Configure polyrepo workspaces, DNS, ports |
+| `pan-test-config` | Configure project test suites |
+
+### Utilities
+
+| Skill | Description |
+|-------|-------------|
+| `beads` | Git-backed issue tracking with dependencies |
+| `skill-creator` | Guide for creating new skills |
+| `web-design-guidelines` | UI/UX review checklist |
+
+## Using Skills
+
+Skills are invoked via slash commands in any AI coding tool:
+
+```
+# In Claude Code, Cursor, Windsurf, etc:
+/feature-work
+/code-review-security
+/bug-fix
+/pan-help
+```
+
+When you invoke a skill, the AI tool injects the skill's prompt into the conversation, giving the agent detailed instructions on how to proceed.
+
+## Creating Custom Skills
+
+Skills are markdown files stored in `~/.panopticon/skills/`. Create your own with:
+
+```bash
+# Use the guided skill creator
+/pan-skill-creator
+
+# Or manually create a skill
+mkdir -p ~/.panopticon/skills/my-custom-skill
+cat > ~/.panopticon/skills/my-custom-skill/skill.md <<'EOF'
+# My Custom Skill
+
+Brief description of what this skill does.
+
+## When to Use
+
+Describe when this skill should be invoked.
+
+## Steps
+
+1. Step 1 description
+2. Step 2 description
+3. Step 3 description
+
+## Best Practices
+
+- Tip 1
+- Tip 2
+EOF
+
+# Sync to all AI tools
+pan sync
+```
+
+**Skill anatomy:**
+
+```markdown
+# Skill Title
+
+One-line description.
+
+## When to Use
+
+When to invoke this skill (triggers).
+
+## Steps
+
+1. Detailed step-by-step instructions
+2. With specific commands or patterns
+3. And expected outcomes
+
+## Checklist
+
+- [ ] Item 1
+- [ ] Item 2
+- [ ] Item 3
+
+## Examples
+
+\`\`\`bash
+# Example command
+\`\`\`
+
+## Related Skills
+
+- /other-skill - When to use instead
+- /complementary-skill - Use together with this
+```
+
+See the [skill-creator skill](/cli/core-commands) or use `/pan-skill-creator` for guided creation.
+
+## Skill Distribution
+
+Skills can be distributed via:
+
+1. **Project-specific** - Store in `.panopticon/skills/` in your repo
+2. **User-specific** - Store in `~/.panopticon/skills/` (synced to AI tools)
+3. **Team-shared** - Commit to version control and share via git
+4. **Public packages** - Distribute via npm or GitHub
+
+### Syncing Skills
+
+```bash
+# Sync all skills to AI tools (Claude Code, Cursor, etc.)
+pan sync
+
+# Only sync skills (skip agents, hooks)
+pan sync --skills-only
+
+# Verify sync status
+pan sync --dry-run
+```
+
+The `pan sync` command:
+- Copies skills from `~/.panopticon/skills/` to each AI tool's config directory
+- Updates existing skills if versions differ
+- Preserves local customizations (doesn't overwrite modified files)
+
+## Subagents
+
+Panopticon includes specialized subagent templates for common development tasks. Subagents are invoked via the Task tool or convoy orchestration for parallel execution.
+
+### Code Review Subagents
+
+| Subagent | Model | Focus | Output |
+|----------|-------|-------|--------|
+| `code-review-correctness` | haiku | Logic errors, edge cases, type safety | `.claude/reviews/<timestamp>-correctness.md` |
+| `code-review-security` | sonnet | OWASP Top 10, vulnerabilities | `.claude/reviews/<timestamp>-security.md` |
+| `code-review-performance` | haiku | Algorithms, N+1 queries, memory | `.claude/reviews/<timestamp>-performance.md` |
+| `code-review-synthesis` | sonnet | Combines all findings into unified report | `.claude/reviews/<timestamp>-synthesis.md` |
+
+**Usage Example:**
+```bash
+/pan-code-review --files "src/auth/*.ts"
+```
+
+This spawns all three reviewers in parallel, then synthesizes their findings into a prioritized report.
+
+### Planning & Exploration Subagents
+
+| Subagent | Model | Focus | Permission Mode |
+|----------|-------|-------|-----------------|
+| `planning-agent` | sonnet | Codebase research, execution planning | `plan` (read-only) |
+| `codebase-explorer` | haiku | Fast architecture discovery, pattern finding | `plan` (read-only) |
+| `triage-agent` | haiku | Issue categorization, complexity estimation | default |
+| `health-monitor` | haiku | Agent stuck detection, log analysis | default |
+
+**Usage Examples:**
+```bash
+# Explore codebase architecture
+Task(subagent_type='codebase-explorer', prompt='Map out the authentication system')
+
+# Triage an issue
+Task(subagent_type='triage-agent', prompt='Categorize and estimate ISSUE-123')
+
+# Check agent health
+Task(subagent_type='health-monitor', prompt='Check status of all running agents')
+```
+
+## Best Practices
+
+**When creating skills:**
+- **Be specific** - Include exact commands, not just concepts
+- **Include examples** - Show concrete usage patterns
+- **Add checklists** - Help agents verify completion
+- **Cross-reference** - Link to related skills and guides
+- **Test thoroughly** - Verify skills work end-to-end
+
+**When using skills:**
+- **Invoke early** - Start with a skill, don't switch mid-task
+- **Follow fully** - Don't skip steps or customize on-the-fly
+- **Report issues** - If a skill doesn't work, improve it
+- **Combine wisely** - Some skills complement each other, others conflict
+
+## Related Guides
+
+- [Creating Skills](/cli/core-commands#pan-skill-creator) - Detailed skill creation guide
+- [Convoys](/features/convoys) - Parallel subagent execution
+- [Subagents](/cli/core-commands#pan-subagent-creator) - Custom subagent templates

@@ -1,0 +1,106 @@
+---
+title: Quick Start
+description: Get up and running with Panopticon in minutes
+---
+
+# Quick Start
+
+Get Panopticon set up and create your first autonomous agent workspace.
+
+## Installation
+
+```bash
+# Install Panopticon
+npm install -g panopticon-cli
+
+# Install prerequisites and setup (includes optional HTTPS/Traefik)
+pan install
+
+# Sync skills to all AI tools
+pan sync
+
+# Check system health
+pan doctor
+```
+
+## HTTPS Setup (Optional)
+
+Panopticon supports local HTTPS via Traefik reverse proxy:
+
+```bash
+# Full install (includes Traefik + mkcert for HTTPS)
+pan install
+
+# Add to /etc/hosts (macOS/Linux)
+echo "127.0.0.1 pan.localhost" | sudo tee -a /etc/hosts
+
+# Start with HTTPS
+pan up
+# → Dashboard: https://pan.localhost
+# → Traefik UI: https://traefik.pan.localhost:8080
+```
+
+**Minimal install** (skip Traefik, use ports):
+```bash
+pan install --minimal
+pan up
+# → Dashboard: http://localhost:3010
+```
+
+See [Docker & HTTPS Setup](/guides/docker-setup) for detailed DNS configuration (especially for WSL2).
+
+## Supported Platforms
+
+| Platform | Support |
+|----------|---------|
+| **Linux** | Full support |
+| **macOS** | Full support |
+| **Windows** | WSL2 required |
+
+> **Windows users:** Panopticon requires WSL2 (Windows Subsystem for Linux 2). Native Windows is not supported. [Install WSL2](https://docs.microsoft.com/en-us/windows/wsl/install)
+
+## Requirements
+
+### Required
+- Node.js 18+
+- Git (for worktree-based workspaces)
+- Docker (for Traefik and workspace containers)
+- tmux (for agent sessions)
+- **ttyd** - Web terminal for interactive planning sessions. Auto-installed by `pan install`.
+- **GitHub CLI (`gh`)** - For GitHub integration (issues, PRs, merges). [Install](https://cli.github.com/)
+- **GitLab CLI (`glab`)** - For GitLab integration (if using GitLab). [Install](https://gitlab.com/gitlab-org/cli)
+
+### Optional
+- **mkcert** - For HTTPS certificates (recommended)
+- **Linear API key** - For issue tracking integration
+- **Beads CLI (bd)** - For persistent task tracking across sessions. Auto-installed by `pan install`. Upgrade with `pan beads upgrade`.
+- **Google Stitch MCP** - For AI-powered UI design integration
+
+### Platform Support
+
+The Panopticon dashboard includes terminal streaming, which requires a native binary (`node-pty`). Prebuilt binaries are available for:
+
+| Platform | Architecture | Support |
+|----------|-------------|---------|
+| macOS | Intel (x64) | ✅ Prebuilt |
+| macOS | Apple Silicon (arm64) | ✅ Prebuilt |
+| Linux | x64 (glibc) | ✅ Prebuilt |
+| Linux | arm64 (glibc) | ✅ Prebuilt |
+| Linux | musl (Alpine) | ✅ Prebuilt |
+| Windows | x64 | ✅ Prebuilt |
+
+If a prebuilt binary is not available for your platform, node-gyp will automatically compile from source during installation (requires Python and build tools).
+
+### Why CLI tools instead of API tokens?
+
+Panopticon uses `gh` and `glab` CLIs instead of raw API tokens because:
+- **Better auth**: OAuth tokens that auto-refresh (no expiring PATs)
+- **Simpler setup**: `gh auth login` handles everything
+- **Agent-friendly**: Agents can use them for PRs, merges, reviews
+
+## Next Steps
+
+- [Configure projects](/configuration/projects) - Set up your projects
+- [Configure issue trackers](/configuration/issue-trackers) - Connect Linear, GitHub, GitLab, or Rally
+- [Spawn your first agent](/cli/agent-commands) - Create an agent for an issue
+- [Explore the dashboard](/) - Learn about the dashboard features

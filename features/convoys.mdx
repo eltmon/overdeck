@@ -1,0 +1,364 @@
+---
+title: Convoys
+description: Multi-agent parallel orchestration system
+---
+
+# Convoys: Multi-Agent Orchestration
+
+Convoys enable Panopticon to run multiple AI agents in parallel for complex tasks like code review. Instead of a single agent doing everything, specialized agents focus on specific concerns and a synthesis agent combines their findings.
+
+## Why Convoys?
+
+When reviewing code, a single AI agent must context-switch between:
+- Checking for logic errors
+- Looking for security vulnerabilities
+- Analyzing performance issues
+
+This leads to:
+- **Shallow reviews** - Can't go deep on everything
+- **Missed issues** - Focus on one area, miss others
+- **Long sequential execution** - Can't parallelize
+
+Convoys solve this by **specialization + parallelization**:
+- 3 focused agents review in parallel (10x faster)
+- Each agent goes deep in their domain
+- Synthesis agent combines findings with prioritization
+
+## Quick Start
+
+```bash
+# Run a parallel code review
+pan convoy start code-review --files "src/**/*.ts"
+
+# Check status
+pan convoy status
+
+# List all convoys (running and completed)
+pan convoy list
+
+# Stop a convoy
+pan convoy stop <convoy-id>
+```
+
+## How Code Review Convoy Works
+
+```
+pan convoy start code-review --files "src/**/*.ts"
+    │
+    ├─→ Phase 1 (Parallel): 3 specialized reviewers run simultaneously
+    │     ├─→ Correctness (Haiku) → correctness.md
+    │     ├─→ Security (Sonnet)    → security.md
+    │     └─→ Performance (Haiku)  → performance.md
+    │
+    └─→ Phase 2 (Sequential): Synthesis agent runs after Phase 1 completes
+          └─→ Synthesis reads all 3 reviews → synthesis.md
+```
+
+### Phase 1: Specialized Reviews (Parallel)
+
+Three specialized agents run simultaneously, each focusing on a specific concern:
+
+| Agent | Model | Focus Areas |
+|-------|-------|-------------|
+| **Correctness** | Haiku | Logic errors, edge cases, type safety, null handling |
+| **Security** | Sonnet | OWASP Top 10, injection vulnerabilities, XSS, auth issues |
+| **Performance** | Haiku | N+1 queries, blocking operations, memory leaks, algorithm complexity |
+
+Each agent:
+- Reviews the specified files independently
+- Writes findings to `.claude/reviews/<timestamp>-<domain>.md`
+- Can go deep without worrying about other concerns
+- Runs in parallel (total time = slowest agent, not sum of all)
+
+### Phase 2: Synthesis (Sequential)
+
+After all specialized reviews complete, a synthesis agent:
+1. **Reads all review files** - Ingests findings from all three agents
+2. **Removes duplicates** - Same issue found by multiple reviewers
+3. **Prioritizes findings** - Orders by severity × impact
+4. **Generates unified report** - Single actionable document
+
+**Output:** `.claude/reviews/<timestamp>-synthesis.md`
+
+## What is Synthesis?
+
+Synthesis is the process of combining findings from multiple parallel agents into a single, prioritized, actionable report.
+
+**Without synthesis**, after 3 parallel reviews you get:
+- 3 separate markdown files to read
+- Duplicate findings (same issue reported differently)
+- No prioritization (which to fix first?)
+- Mental overhead to merge them yourself
+
+**With synthesis**, you get:
+- Single unified report
+- Deduplicated findings
+- AI-prioritized by severity × impact
+- Clear action items
+
+**Example synthesis output:**
+
+```markdown
+# Code Review - Complete Analysis
+
+## Executive Summary
+- 2 blockers (MUST FIX)
+- 3 critical issues
+- 5 high-priority items
+
+## Top Priority
+1. SQL injection in auth.ts:42 (Security, Critical)
+2. execSync blocking event loop in sync.ts:89 (Performance, Blocker)
+3. Null pointer in user fetch in api.ts:156 (Correctness, High)
+
+## Blocker Issues
+[Detailed findings with code examples and fixes]
+
+## Critical Issues
+[...]
+
+## Review Statistics
+- Files reviewed: 12
+- Issues found: 10
+- Duplicates removed: 3
+```
+
+## Built-in Convoy Templates
+
+| Template | Agents | Use Case |
+|----------|--------|----------|
+| `code-review` | correctness, security, performance, synthesis | Comprehensive code review |
+| `planning` | planner | Codebase exploration and planning |
+| `triage` | (dynamic) | Parallel issue triage |
+| `health-monitor` | monitor | Check health of running agents |
+
+### code-review Template
+
+The most commonly used convoy. Runs three specialized code reviewers in parallel, then synthesizes results.
+
+```bash
+# Review TypeScript files
+pan convoy start code-review --files "src/**/*.ts"
+
+# Review specific pull request
+pan convoy start code-review --pr-url https://github.com/org/repo/pull/123
+
+# Target specific issue
+pan convoy start code-review --issue-id MIN-123 --files "src/auth/*.ts"
+```
+
+**Output files:**
+- `.claude/reviews/<timestamp>-correctness.md`
+- `.claude/reviews/<timestamp>-security.md`
+- `.claude/reviews/<timestamp>-performance.md`
+- `.claude/reviews/<timestamp>-synthesis.md` (prioritized combined report)
+
+## Convoy Commands
+
+```bash
+# Start a convoy
+pan convoy start <template> [options]
+  --files <pattern>       # File pattern (e.g., "src/**/*.ts")
+  --pr-url <url>          # Pull request URL
+  --issue-id <id>         # Issue ID
+  --project-path <path>   # Project path (defaults to cwd)
+
+# Check convoy status
+pan convoy status [convoy-id]  # Show status (defaults to most recent)
+
+# List convoys
+pan convoy list                # All convoys
+pan convoy list --status running  # Filter by status
+
+# Stop a convoy
+pan convoy stop <convoy-id>    # Kill all agents, mark failed
+```
+
+## Custom Convoy Templates
+
+Create custom templates in `~/.panopticon/convoy-templates/`:
+
+```json
+{
+  "name": "lightweight-review",
+  "description": "Quick security-only review",
+  "agents": [
+    {
+      "role": "security",
+      "subagent": "code-review-security",
+      "parallel": false
+    }
+  ],
+  "config": {
+    "outputDir": ".claude/reviews",
+    "timeout": 600000
+  }
+}
+```
+
+Then use with:
+```bash
+pan convoy start lightweight-review --files "src/**/*.ts"
+```
+
+### Template Structure
+
+**agents** - Array of agent configurations:
+```json
+{
+  "role": "security",           // Agent identifier
+  "subagent": "code-review-security",  // Subagent type from Task tool
+  "parallel": true,             // Run in parallel with other parallel agents
+  "model": "sonnet",            // Override default model
+  "config": {                   // Agent-specific config
+    "focus": "OWASP Top 10"
+  }
+}
+```
+
+**config** - Convoy-level configuration:
+```json
+{
+  "outputDir": ".claude/reviews",   // Where to write results
+  "timeout": 600000,                // Max time per agent (ms)
+  "synthesize": true,               // Run synthesis after parallel phase
+  "synthesiAgent": "synthesis"      // Subagent to use for synthesis
+}
+```
+
+## Convoy Lifecycle
+
+```
+1. Start command received
+        │
+        ▼
+2. Create convoy directory: ~/.panopticon/convoys/<convoy-id>/
+        │
+        ▼
+3. Spawn parallel agents (Phase 1)
+        │
+        ├─→ Agent 1 (tmux session)
+        ├─→ Agent 2 (tmux session)
+        └─→ Agent 3 (tmux session)
+        │
+        ▼
+4. Wait for all parallel agents to complete
+        │
+        ▼
+5. Spawn synthesis agent (Phase 2)
+        │
+        └─→ Synthesis agent (reads all outputs)
+        │
+        ▼
+6. Convoy marked as completed
+```
+
+## Monitoring Convoys
+
+**Dashboard integration:**
+
+The Panopticon dashboard shows:
+- Active convoys with progress
+- Phase completion (parallel vs synthesis)
+- Individual agent status
+- Output file links
+
+**CLI monitoring:**
+
+```bash
+# Watch convoy progress
+pan convoy status <convoy-id>
+
+# Tail logs from specific agent
+tmux attach -t convoy-<convoy-id>-security
+
+# View all output files
+ls -lh ~/.panopticon/convoys/<convoy-id>/output/
+```
+
+## Performance Benefits
+
+**Sequential review (single agent):**
+- 10 minutes for correctness
+- 10 minutes for security
+- 10 minutes for performance
+- **Total: 30 minutes**
+
+**Convoy review (parallel):**
+- Phase 1: 10 minutes (all three run simultaneously)
+- Phase 2: 3 minutes (synthesis)
+- **Total: 13 minutes (2.3x faster)**
+
+With more agents, the speedup is even more dramatic.
+
+## Use Cases
+
+**Code Review:**
+- Pre-merge quality checks
+- Security audits
+- Performance optimization reviews
+
+**Planning:**
+- Explore multiple architectural approaches simultaneously
+- Research competing libraries in parallel
+- Evaluate different implementation strategies
+
+**Issue Triage:**
+- Categorize backlog items in parallel
+- Estimate complexity across multiple issues
+- Prioritize work queue
+
+**Health Monitoring:**
+- Check status of all running agents
+- Detect stuck or crashed agents
+- Analyze system health across projects
+
+## Best Practices
+
+**When to use convoys:**
+- Task can be split into independent concerns (security, performance, etc.)
+- You need comprehensive coverage (not just surface-level review)
+- Speed matters (parallel execution valuable)
+- Results need synthesis (combining findings)
+
+**When NOT to use convoys:**
+- Task is inherently sequential (one step depends on another)
+- Simple, focused review (single-agent is faster to set up)
+- Findings don't benefit from synthesis (independent results)
+
+**Convoy design tips:**
+- **Keep agents focused** - Each should have a clear, narrow responsibility
+- **Balance workload** - Aim for similar execution times across parallel agents
+- **Design for synthesis** - Structure output so synthesis can combine effectively
+- **Monitor costs** - Multiple agents = multiple API calls
+
+## Troubleshooting
+
+**Convoy stuck in "running" state:**
+```bash
+# Check individual agent status
+tmux list-sessions | grep convoy-<convoy-id>
+
+# View agent output
+tmux attach -t convoy-<convoy-id>-<role>
+
+# Force stop if needed
+pan convoy stop <convoy-id>
+```
+
+**Synthesis agent fails:**
+- Check that all parallel agents completed successfully
+- Verify output files exist in expected location
+- Review synthesis agent logs in tmux session
+
+**Agents completing too quickly:**
+- Check for permission issues (can they access files?)
+- Verify file patterns match actual files
+- Review agent prompts for clarity
+
+## Related Guides
+
+- [Convoy Commands](/cli/convoy-commands) - CLI reference
+- [Skills](/features/skills) - Subagents and skill system
+- [Specialists](/features/specialists) - Long-running specialist agents
+- [Cloister](/features/cloister) - AI lifecycle management

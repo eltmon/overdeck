@@ -1,0 +1,185 @@
+---
+title: Issue Tracker Integration
+description: Connect Linear, GitHub, GitLab, and Rally
+---
+
+# Issue Tracker Integration
+
+Panopticon integrates with popular issue tracking systems to provide unified project management.
+
+## Supported Trackers
+
+| Tracker | Role | Configuration |
+|---------|------|---------------|
+| **Linear** | Primary tracker | `LINEAR_API_KEY` in `.panopticon.env` |
+| **GitHub Issues** | Secondary tracker | `GITHUB_TOKEN` or `gh auth login` |
+| **GitLab Issues** | Secondary tracker | `glab auth login` |
+| **Rally** | Secondary tracker | `RALLY_API_KEY` in `.panopticon.env` |
+
+Secondary trackers sync issues to the dashboard alongside Linear issues, allowing unified project management.
+
+## Configuration
+
+Create `~/.panopticon.env`:
+
+```bash
+LINEAR_API_KEY=lin_api_xxxxx
+GITHUB_TOKEN=ghp_xxxxx  # Optional: for GitHub-tracked projects
+RALLY_API_KEY=_xxxxx    # Optional: for Rally as secondary tracker
+```
+
+## Linear Integration
+
+Linear is Panopticon's primary issue tracker. Most features are designed around Linear's workflow.
+
+### Setup
+
+1. Generate an API key at https://linear.app/settings/api
+2. Add to `~/.panopticon.env`:
+   ```bash
+   LINEAR_API_KEY=lin_api_xxxxx
+   ```
+
+### Team Mapping
+
+Map Linear teams to local projects in `~/.panopticon/projects.yaml`:
+
+```yaml
+projects:
+  myapp:
+    name: "My Application"
+    path: /home/user/projects/myapp
+    linear_team: APP  # Linear team prefix
+```
+
+### Issue States
+
+Panopticon tracks and updates Linear issue states:
+
+| State | Description |
+|-------|-------------|
+| **Backlog** | Not started |
+| **Planning** | Planning session active |
+| **In Progress** | Agent working on issue |
+| **In Review** | Awaiting code review |
+| **Done** | Work completed |
+
+## GitHub Issues
+
+GitHub Issues work as a secondary tracker, syncing to the dashboard alongside Linear.
+
+### Setup
+
+```bash
+# Authenticate with GitHub CLI
+gh auth login
+
+# Or set a token in .panopticon.env
+GITHUB_TOKEN=ghp_xxxxx
+```
+
+### Issue Prefix
+
+GitHub Issues are prefixed with the repository name:
+
+```
+myn-123      # Linear issue (MIN team)
+panopticon#45  # GitHub issue (panopticon repo)
+```
+
+### Creating Issues
+
+```bash
+# Via CLI
+gh issue create --title "New feature" --body "Description"
+
+# Or via dashboard - select GitHub project
+```
+
+## GitLab Issues
+
+GitLab Issues integrate similarly to GitHub Issues.
+
+### Setup
+
+```bash
+# Authenticate with GitLab CLI
+glab auth login
+```
+
+### Issue Prefix
+
+```
+myproject!23  # GitLab issue/MR
+```
+
+## Rally Integration
+
+Rally (CA Agile Central) is supported for enterprises using Rally for project management.
+
+### Setup
+
+1. Generate a Rally API key from your Rally workspace settings
+2. Add to `~/.panopticon.env`:
+   ```bash
+   RALLY_API_KEY=_xxxxx
+   ```
+
+### Configuration
+
+Configure Rally workspace mapping:
+
+```yaml
+# ~/.panopticon/projects.yaml
+projects:
+  enterprise-app:
+    name: "Enterprise Application"
+    path: /home/user/projects/enterprise
+    rally_workspace: YOUR_WORKSPACE_OID
+    rally_project: YOUR_PROJECT_OID
+```
+
+## Unified Dashboard
+
+The dashboard shows issues from all configured trackers:
+
+- **Kanban board** displays issues by status
+- **Filter by tracker** to focus on specific systems
+- **Create workspaces** from any tracker
+- **Spawn agents** regardless of tracker source
+
+## Multi-Tracker Workflows
+
+### Primary + Secondary Pattern
+
+A common pattern is using Linear as primary with GitHub for open-source components:
+
+```yaml
+projects:
+  myapp:
+    name: "My Application"
+    linear_team: APP
+    # ... standard config
+
+  myapp-oss:
+    name: "My App OSS Components"
+    github_repo: myorg/myapp-oss
+    # GitHub Issues as primary for this project
+```
+
+### Syncing Between Trackers
+
+Panopticon doesn't sync issues between trackers - each issue lives in its source system. However, agents can reference issues from multiple trackers:
+
+```markdown
+<!-- In an agent's STATE.md -->
+Related issues:
+- MIN-123 (Linear) - Parent feature
+- panopticon#45 (GitHub) - Dependency fix needed
+```
+
+## Related Guides
+
+- [Project Registry](/configuration/projects) - Managing multiple projects
+- [Quickstart](/quickstart) - Initial setup
+- [Core Commands](/cli/core-commands) - CLI reference

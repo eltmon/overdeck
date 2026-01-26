@@ -1,0 +1,127 @@
+---
+title: CLI Overview
+description: Introduction to Panopticon's command-line interface
+---
+
+# CLI Overview
+
+The Panopticon CLI (`pan`) provides a comprehensive set of commands for managing agents, workspaces, and multi-project orchestration.
+
+## Philosophy
+
+The Panopticon CLI is designed around a few key principles:
+
+1. **Agent-centric** - Commands focus on spawning, monitoring, and controlling AI agents
+2. **Workspace isolation** - Each issue gets its own git worktree workspace
+3. **Multi-project support** - Manage multiple projects from a single installation
+4. **Integration-first** - Works seamlessly with Linear, GitHub, GitLab, and Rally
+
+## Command Structure
+
+Panopticon commands are organized into logical groups:
+
+| Group | Purpose | Examples |
+|-------|---------|----------|
+| **Core** | System management | `pan up`, `pan down`, `pan sync`, `pan doctor` |
+| **Work** | Agent management | `pan work issue`, `pan work status`, `pan work tell` |
+| **Workspace** | Workspace lifecycle | `pan workspace create`, `pan workspace destroy` |
+| **Convoy** | Multi-agent orchestration | `pan convoy start`, `pan convoy status` |
+| **Project** | Project registry | `pan project add`, `pan project list` |
+| **Cloister** | AI lifecycle manager | `pan cloister start`, `pan cloister status` |
+
+## Installation & Setup
+
+```bash
+# Install Panopticon globally
+npm install -g panopticon-cli
+
+# Run first-time setup
+pan install
+
+# Sync skills to AI tools
+pan sync
+
+# Check system health
+pan doctor
+```
+
+## Common Patterns
+
+### Issue-based workflows
+
+Most commands accept an issue identifier (e.g., `MIN-123`, `42`):
+
+```bash
+pan work issue MIN-123      # Spawn agent
+pan work tell MIN-123 "msg" # Send message
+pan work status             # List all agents
+pan work kill MIN-123       # Stop agent
+```
+
+### Workspace management
+
+Workspaces are git worktrees created automatically or on-demand:
+
+```bash
+pan workspace create MIN-123         # Create workspace
+pan workspace create MIN-123 --docker # With Docker containers
+pan workspace destroy MIN-123        # Clean up workspace
+```
+
+### Dashboard integration
+
+Many operations can be performed either via CLI or dashboard:
+
+```bash
+pan up    # Start dashboard at localhost:3010
+```
+
+The dashboard provides a visual interface for all CLI operations.
+
+## Getting Help
+
+```bash
+# General help
+pan --help
+
+# Command-specific help
+pan work --help
+pan workspace --help
+
+# Command documentation
+man pan              # If installed via package manager
+```
+
+## Common Options
+
+### Global flags
+
+| Flag | Description |
+|------|-------------|
+| `--help` | Show help for any command |
+| `--version` | Show Panopticon version |
+| `--verbose` | Enable verbose output |
+
+### Issue identifiers
+
+Commands accept various issue identifier formats:
+
+- **Linear**: `MIN-123`, `min-123` (case-insensitive)
+- **GitHub**: `#42`, `42` (numeric)
+- **GitLab**: `!42`, `42` (numeric)
+
+## Configuration
+
+Panopticon stores configuration in:
+
+- `~/.panopticon.env` - API keys and tokens
+- `~/.panopticon/projects.yaml` - Registered projects
+- `~/.panopticon/project-mappings.json` - Linear project mappings
+- Project-level: `.panopticon.json` - Project-specific settings
+
+## Next Steps
+
+- [Core Commands](/cli/core-commands) - System management commands
+- [Agent Commands](/cli/agent-commands) - Manage AI agents
+- [Workspace Commands](/cli/workspace-commands) - Workspace management
+- [Convoy Commands](/cli/convoy-commands) - Multi-agent orchestration

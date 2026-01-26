@@ -1,0 +1,190 @@
+---
+title: Google Stitch Integration
+description: AI-powered UI design to code workflow
+---
+
+# Google Stitch Integration
+
+Panopticon integrates with [Google Stitch](https://stitch.withgoogle.com), Google's AI-powered UI design tool, enabling design-to-code workflows.
+
+## What is Google Stitch?
+
+Google Stitch generates production-ready UI designs from natural language prompts or image inputs. It's free (350 standard + 50 experimental generations/month) and requires only a Google account.
+
+## Setup (Optional)
+
+Use the `/pan-stitch` skill to set up the integration:
+
+```bash
+# Run the setup skill
+/pan-stitch
+
+# Or manually:
+# 1. Install gcloud CLI
+curl -sSL https://sdk.cloud.google.com | bash
+
+# 2. Authenticate
+gcloud auth login
+gcloud auth application-default login
+
+# 3. Create project and enable API
+gcloud projects create stitch-tools-$(date +%s)
+gcloud config set project YOUR_PROJECT_ID
+gcloud billing projects link YOUR_PROJECT_ID --billing-account=YOUR_BILLING_ID
+gcloud beta services mcp enable stitch.googleapis.com  # MUST use beta!
+
+# 4. Register MCP (note "proxy" subcommand)
+claude mcp add -e GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID -s user stitch -- npx -y @_davideast/stitch-mcp proxy
+```
+
+## How It Works
+
+When Stitch is configured, the planning agent can:
+
+1. **Create UI designs** - Generate screens for UI-related issues
+2. **Document in STATE.md** - Record Stitch project/screen IDs for workers
+3. **Worker agents pick up designs** - Use the Stitch skills to convert to React
+
+## Bidirectional Sync
+
+Designs are stored in your Google account and sync bidirectionally:
+
+```
+Planning Agent creates design via MCP
+    ↓
+Stored in Google Cloud (your account)
+    ↓
+Visible on stitch.withgoogle.com
+    ↓
+Worker agent retrieves via MCP → converts to React
+```
+
+- **MCP → Web UI:** Designs created by agents appear in Stitch web UI
+- **Web UI → MCP:** Designs created in web UI are accessible to agents
+- **Edit anywhere:** Refine AI-generated designs in the web UI before workers convert them
+
+## Available MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `create_project` | Create a new Stitch project |
+| `list_projects` | List all your projects (owned/shared) |
+| `get_project` | Get project details |
+| `list_screens` | List screens in a project |
+| `get_screen` | Get screen details + HTML/CSS download URLs |
+| `generate_screen_from_text` | Generate a screen from a text prompt |
+
+## Stitch Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/pan-stitch` | Setup and configure Stitch MCP |
+| `/stitch-design-md` | Create DESIGN.md from Stitch projects |
+| `/stitch-react-components` | Convert Stitch HTML to React components |
+
+## STATE.md Integration
+
+When planning UI work, add a Stitch section to STATE.md:
+
+```markdown
+## UI Designs
+
+### Stitch Assets
+- **Project ID:** 12345678
+- **Screen:** "Dashboard" (screen ID: 87654321)
+- **Design Notes:** Dark mode, glassmorphism cards, gradient accents
+- **DESIGN.md:** Generated at `src/components/DESIGN.md`
+
+Worker: Use `/stitch-react-components` to convert the Dashboard screen to React.
+```
+
+## Workflow: From Design to Code
+
+### 1. Planning Phase
+
+During issue planning, the planning agent can create designs:
+
+```
+Agent: "This issue requires a new dashboard UI. Let me create a Stitch design."
+       → Calls `generate_screen_from_text` with the design requirements
+       → Records project/screen IDs in STATE.md
+```
+
+### 2. Implementation Phase
+
+The implementation agent picks up the design:
+
+```
+Agent: "I see there's a Stitch design in STATE.md. Let me convert it."
+       → Runs `/stitch-react-components`
+       → Retrieves HTML/CSS from Stitch
+       → Generates React components with Tailwind
+```
+
+### 3. Iteration
+
+If the design needs changes:
+
+1. Open https://stitch.withgoogle.com
+2. Find your project and screen
+3. Edit using the visual tools
+4. Re-run `/stitch-react-components` to get updated code
+
+## Manual Workflow (No MCP)
+
+If you prefer not to set up the MCP:
+
+1. Design at https://stitch.withgoogle.com
+2. Export HTML/CSS from the UI
+3. Use `/stitch-react-components` with the exported files
+
+## Best Practices
+
+### Design Quality
+
+- **Be specific in prompts** - Include details about colors, spacing, and layout
+- **Use device types** - Specify MOBILE or DESKTOP for appropriate layouts
+- **Iterate in the web UI** - Fine-tune designs visually before converting
+
+### Code Quality
+
+- **Review generated code** - AI-generated components may need cleanup
+- **Extract common components** - Don't duplicate similar UI elements
+- **Follow project conventions** - Adapt generated code to match your style guide
+
+### Team Collaboration
+
+- **Share Stitch projects** - Multiple team members can access the same designs
+- **Document decisions** - Note why specific design choices were made in STATE.md
+- **Version control DESIGN.md** - Track design evolution alongside code changes
+
+## Troubleshooting
+
+### "Permission denied" errors
+
+Make sure you've authenticated with gcloud:
+```bash
+gcloud auth application-default login
+```
+
+### "API not enabled" errors
+
+Enable the Stitch API:
+```bash
+gcloud beta services mcp enable stitch.googleapis.com
+```
+
+### MCP not connecting
+
+Verify the MCP is registered:
+```bash
+claude mcp list
+```
+
+Should show `stitch` in the list.
+
+## Related Guides
+
+- [Skills](/features/skills) - Understanding Panopticon skills
+- [Quickstart](/quickstart) - Initial setup
+- [Concepts](/concepts) - Core Panopticon concepts

@@ -1,0 +1,170 @@
+---
+title: Project Registry
+description: Managing multiple projects with Panopticon
+---
+
+# Project Registry
+
+Panopticon's project registry enables multi-project management with intelligent issue routing and label-based workspace creation.
+
+## Overview
+
+Projects are registered in `~/.panopticon/projects.yaml`. Each project can have:
+
+- **Issue routing rules** - Route issues to different subdirectories based on labels
+- **Custom workspace commands** - For complex polyrepo setups
+- **Linear team mapping** - Connect projects to Linear teams
+
+## Registering Projects
+
+```bash
+# Register a project
+pan project add /path/to/your/project --name myproject --linear-team PRJ
+
+# List registered projects
+pan project list
+
+# Remove a project
+pan project remove myproject
+```
+
+## Project Configuration
+
+Projects are defined in `~/.panopticon/projects.yaml`:
+
+```yaml
+projects:
+  myn:
+    name: "Mind Your Now"
+    path: /home/user/projects/myn
+    linear_team: MIN
+    issue_routing:
+      - labels: [splash, landing-pages, seo]
+        path: /home/user/projects/myn/splash
+      - labels: [docs, marketing]
+        path: /home/user/projects/myn/docs
+      - default: true
+        path: /home/user/projects/myn
+
+  panopticon:
+    name: "Panopticon"
+    path: /home/user/projects/panopticon
+    linear_team: PAN
+```
+
+### Configuration Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Human-readable project name |
+| `path` | Yes | Absolute path to project root |
+| `linear_team` | Yes | Linear team prefix (e.g., "MIN", "PAN") |
+| `issue_routing` | No | Label-based routing rules |
+| `workspace_command` | No | Custom workspace creation script |
+| `workspace_remove_command` | No | Custom workspace cleanup script |
+| `workspace` | No | Polyrepo configuration (see [Polyrepo Configuration](/configuration/polyrepo)) |
+
+## Label-Based Routing
+
+Issues are routed to different subdirectories based on their labels:
+
+1. **Labeled issues** - Matched against `issue_routing` rules in order
+2. **Default route** - Issues without matching labels use the `default: true` path
+3. **Fallback** - If no default, uses the project root path
+
+**Example:** An issue with label "splash" in the MIN team would create its workspace at `/home/user/projects/myn/splash/workspaces/feature-min-xxx/`.
+
+## Linear Project Mapping
+
+If you have multiple Linear projects, configure which local directory each maps to. Create/edit `~/.panopticon/project-mappings.json`:
+
+```json
+[
+  {
+    "linearProjectId": "abc123",
+    "linearProjectName": "Mind Your Now",
+    "linearPrefix": "MIN",
+    "localPath": "/home/user/projects/myn"
+  },
+  {
+    "linearProjectId": "def456",
+    "linearProjectName": "Househunt",
+    "linearPrefix": "HH",
+    "localPath": "/home/user/projects/househunt"
+  }
+]
+```
+
+The dashboard uses this mapping to determine where to create workspaces when you click "Create Workspace" or "Start Agent" for an issue.
+
+## Custom Workspace Commands (Legacy)
+
+> **Note:** For most polyrepo projects, use the built-in `workspace` configuration (see [Polyrepo Configuration](/configuration/polyrepo)) instead of custom scripts. Custom commands are only needed for highly specialized setups.
+
+For projects that need logic beyond what the configuration supports, you can specify custom workspace scripts:
+
+```yaml
+projects:
+  myn:
+    name: "Mind Your Now"
+    path: /home/user/projects/myn
+    linear_team: MIN
+    # Custom scripts handle complex workspace setup
+    workspace_command: /home/user/projects/myn/infra/new-feature
+    workspace_remove_command: /home/user/projects/myn/infra/remove-feature
+```
+
+When `workspace_command` is specified, Panopticon calls your script instead of creating a standard git worktree. The script receives the normalized issue ID (e.g., `min-123`) as an argument.
+
+When `workspace_remove_command` is specified, Panopticon calls your script when deleting workspaces (e.g., aborting planning with "delete workspace" enabled). This is important for complex setups that need to:
+- Stop Docker containers and remove volumes
+- Clean up root-owned files created by containers
+- Remove git worktrees from multiple repositories
+- Release port assignments
+- Remove DNS entries
+
+**What your custom script should handle:**
+- Creating git worktrees for multiple repositories (polyrepo structure)
+- Setting up Docker Compose files and dev containers
+- Configuring environment variables and `.env` files
+- Setting up DNS entries for workspace-specific URLs (e.g., Traefik routing)
+- Creating a `./dev` script for container management
+- Copying agent configuration templates (CLAUDE.md, .mcp.json, etc.)
+
+**Example script flow:**
+```bash
+#!/bin/bash
+# new-feature script for a polyrepo project
+ISSUE_ID=$1  # e.g., "min-123"
+
+# Create worktrees for frontend and api repos
+git -C /path/to/frontend worktree add ../workspaces/feature-$ISSUE_ID/fe feature/$ISSUE_ID
+git -C /path/to/api worktree add ../workspaces/feature-$ISSUE_ID/api feature/$ISSUE_ID
+
+# Generate docker-compose from templates
+sed "s/{{FEATURE_FOLDER}}/feature-$ISSUE_ID/g" template.yml > workspace/docker-compose.yml
+
+# Set up DNS and Traefik routing
+# ... additional setup
+```
+
+The standard `pan workspace create` command will automatically detect and use your custom script.
+
+## Project Initialization
+
+When registering a new project with Panopticon (`pan project add`), the system will:
+
+1. **Check for existing PRD** - Look for `docs/PRD.md`, `PRD.md`, `README.md`, or similar
+2. **If found**: Use it to create/update the canonical PRD format, prompting for any missing crucial information
+3. **If not found**: Generate one by:
+   - Analyzing the codebase structure
+   - Identifying key technologies and patterns
+   - Asking discovery questions about the product
+
+This ensures every Panopticon-managed project has a well-defined canonical PRD that agents can reference.
+
+## Related Guides
+
+- [Polyrepo Configuration](/configuration/polyrepo) - Multi-repository workspace setup
+- [Issue Tracker Integration](/configuration/issue-trackers) - Connecting to Linear, GitHub, etc.
+- [Workspaces](/features/workspaces) - Workspace management

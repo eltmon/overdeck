@@ -1,0 +1,162 @@
+---
+title: Core Concepts
+description: Understanding the key concepts behind Panopticon's architecture
+---
+
+# Core Concepts
+
+Learn the fundamental concepts that power Panopticon's multi-agent orchestration.
+
+## Agents
+
+Agents are autonomous AI coding assistants that work independently on tasks. Panopticon spawns agents in tmux sessions, allowing you to:
+
+- **Monitor them in real-time** - See what they're working on via the dashboard
+- **Send messages** - Provide feedback or guidance as they work
+- **Manage multiple agents** - Run several agents simultaneously on different issues
+- **Track their work** - See costs, runtime, and outcomes
+
+Agents can be:
+- **Implementation agents** - Work on features, bugs, refactoring
+- **Planning agents** - Explore codebases and create implementation plans
+- **Specialist agents** - Focus on specific tasks (review, testing, merging)
+
+## Workspaces
+
+**Workspaces are git worktrees** - isolated working directories for each issue/feature. Each workspace:
+
+- Has its own feature branch (e.g., `feature/min-123-add-login`)
+- Shares git history with the main repo (no separate clone)
+- Can run independently (separate node_modules, builds, etc.)
+- Is located at `{project}/workspaces/{issue-id}/`
+
+This allows multiple agents to work on different features simultaneously without conflicts.
+
+### Main Project Branch Convention
+
+The main project directory should **ALWAYS** stay on the `main` branch. All feature work happens in workspaces (git worktrees), never in the main project.
+
+- **Main project**: Always on `main` - serves as the stable reference point
+- **Workspaces**: Each has its own feature branch checked out
+- **Want to check something?** Create a worktree, don't checkout in main
+- **Quick test?** Create a worktree
+- **Emergency hotfix?** Create a worktree
+
+This convention ensures:
+1. Specialists (review-agent, test-agent) always find the correct code
+2. Merge operations have a clean target
+3. Multiple agents don't interfere with each other
+
+### Docker Integration
+
+Workspaces can include Docker containers for full development environments. The `--docker` flag automatically:
+
+1. Creates the workspace (git worktree)
+2. Looks for docker-compose files
+3. Starts containers with unique project names to avoid conflicts
+
+Each workspace gets a unique Docker Compose project name:
+- Format: `{project-name}-feature-{issue-id}` (e.g., `mind-your-now-feature-min-123`)
+- Allows multiple workspaces to run simultaneously without port conflicts
+
+## Skills
+
+Skills are reusable workflows and best practices that work across all AI tools. They're written once in a standard format and synced to:
+
+- Claude Code
+- Codex
+- Cursor
+- Gemini CLI
+- Google Antigravity
+
+Skills provide:
+- **Standard workflows** - Feature development, bug fixing, code review
+- **Best practices** - Security checks, performance optimization
+- **Project-specific knowledge** - Your codebase conventions and patterns
+
+Panopticon ships with 25+ built-in skills and supports custom skills in `.claude/skills/`.
+
+## Specialists
+
+Specialist agents are AI agents with focused expertise:
+
+- **Review Agent** - Performs comprehensive code reviews
+- **Test Agent** - Runs tests and validates functionality
+- **Merge Agent** - Handles pull request merging
+
+Specialists work in **convoys** - parallel groups that combine their findings through a synthesis agent.
+
+### Why Specialists?
+
+When a single agent does everything, it must context-switch between:
+- Checking for logic errors
+- Looking for security vulnerabilities
+- Analyzing performance issues
+
+This leads to:
+- Shallow reviews (can't go deep on everything)
+- Missed issues (focus on one area, miss others)
+- Long sequential execution (can't parallelize)
+
+Specialists solve this through **specialization + parallelization**.
+
+## Convoys
+
+Convoys enable multiple AI agents to work in parallel on complex tasks. Instead of a single agent doing everything, specialized agents focus on specific concerns and a synthesis agent combines their findings.
+
+### How Convoys Work
+
+```
+pan convoy start code-review --files "src/**/*.ts"
+    │
+    ├─→ Phase 1 (Parallel): 3 specialized reviewers run simultaneously
+    │     ├─→ Correctness (Haiku) → correctness.md
+    │     ├─→ Security (Sonnet)    → security.md
+    │     └─→ Performance (Haiku)  → performance.md
+    │
+    └─→ Phase 2 (Sequential): Synthesis agent runs after Phase 1 completes
+          → Combines findings, prioritizes issues → REVIEW.md
+```
+
+Benefits:
+- **10x faster** - Parallel execution instead of sequential
+- **Deeper analysis** - Each agent focuses on their domain
+- **Better coverage** - No missed issues from context-switching
+
+### Built-in Convoy Templates
+
+| Template | Agents | Use Case |
+|----------|--------|----------|
+| `code-review` | correctness, security, performance, synthesis | Comprehensive code review |
+| `planning` | planner | Codebase exploration and planning |
+| `triage` | (dynamic) | Parallel issue triage |
+| `health-monitor` | monitor | Check health of running agents |
+
+## Issue Tracker Integration
+
+Panopticon integrates with popular issue trackers:
+
+- **Linear** - Full integration with cycles, labels, and status updates
+- **GitHub Issues** - Issue tracking and PR management
+- **GitLab Issues** - Issue tracking and MR management
+- **Rally (CA Agile Central)** - Enterprise issue tracking
+
+The dashboard displays issues in a Kanban board with:
+- Drag-and-drop status changes
+- Cost badges (color-coded by amount)
+- Workspace and agent status indicators
+- Container status (running/stopped)
+
+### Issue Filtering
+
+The dashboard automatically filters issues to reduce clutter:
+- **Linear issues** - Shows current cycle issues only
+- **Done column** - Shows items completed in the last 24 hours
+- **Canceled column** - Shows items canceled in the last 24 hours
+
+## Next Steps
+
+- [CLI Commands](/cli/overview) - Learn about available commands
+- [Workspaces](/features/workspaces) - Deep dive into workspace management
+- [Cloister](/features/cloister) - Understand the AI lifecycle manager
+- [Specialists](/features/specialists) - Learn about specialist agents

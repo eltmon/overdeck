@@ -1,0 +1,346 @@
+---
+title: Workspaces
+description: Git worktree-based isolated development environments
+---
+
+# Workspaces
+
+Workspaces provide isolated development environments for each issue, enabling multiple agents to work on different features simultaneously without conflicts.
+
+## What Are Workspaces?
+
+**Workspaces are git worktrees** - isolated working directories for each issue/feature. Each workspace:
+
+- Has its own feature branch (e.g., `feature/min-123-add-login`)
+- Shares git history with the main repo (no separate clone)
+- Can run independently (separate node_modules, builds, containers)
+- Is located at `{project}/workspaces/{issue-id}/`
+
+This architecture allows multiple agents to work simultaneously without stepping on each other's toes.
+
+## Why Workspaces?
+
+**Without workspaces:**
+- Only one agent can work at a time (shared working directory)
+- Branch switching disrupts running agents
+- Can't test multiple features simultaneously
+- Risk of cross-contamination between issues
+
+**With workspaces:**
+- Multiple agents work in parallel on different issues
+- Each has its own branch, dependencies, and containers
+- Complete isolation - no shared state
+- Clean, predictable environment per issue
+
+## Architecture
+
+```
+project/
+├── .git/                  # Shared git repository
+├── src/                   # Main project (always on 'main' branch)
+├── package.json
+└── workspaces/
+    ├── feature-min-123/   # Workspace for MIN-123
+    │   ├── .git           # Symlink to ../.git
+    │   ├── .planning/     # Planning artifacts (ephemeral)
+    │   ├── src/           # Feature branch code
+    │   ├── node_modules/  # Independent dependencies
+    │   └── docker-compose.yml
+    └── feature-min-456/   # Workspace for MIN-456
+        ├── .git
+        ├── .planning/
+        └── src/
+```
+
+## Git Worktrees
+
+Git worktrees allow multiple working directories to share a single git repository. Benefits:
+
+**Efficiency:**
+- No need to clone the repo multiple times
+- Shared git history and objects (saves disk space)
+- Fast branch switching (just create a new worktree)
+
+**Isolation:**
+- Each worktree has its own checked-out branch
+- Changes in one worktree don't affect others
+- Can build/test multiple branches simultaneously
+
+**Safety:**
+- Can't accidentally checkout the same branch twice
+- Main project stays on `main` branch (protected)
+- Feature work isolated to dedicated worktrees
+
+## Workspace Structure
+
+```
+workspaces/feature-min-123/
+├── .planning/                 # Planning artifacts (ephemeral)
+│   ├── STATE.md               # Current planning state
+│   ├── output.jsonl           # Full conversation history
+│   ├── PLANNING_PROMPT.md     # Initial planning prompt
+│   ├── CONTINUATION_PROMPT.md # Context for continued sessions
+│   └── output-*.jsonl         # Backup of previous rounds
+├── src/                       # Feature branch code
+├── node_modules/              # Independent dependencies
+├── package.json
+└── docker-compose.yml         # Workspace-specific containers
+```
+
+### Planning Artifacts
+
+> ⚠️ **Note: `.planning/` is currently ephemeral (not tracked in git)**
+>
+> The `.planning/` directory is listed in `.gitignore` to prevent cross-contamination between issues. When branches merge, planning state from issue A could contaminate issue B's workspace, causing agents to work on the wrong tasks.
+>
+> **Current behavior:** Planning state is local to your machine only. If you switch machines, you'll need to re-run the planning session.
+
+When planning completes, the AI generates:
+- **STATE.md** - Current understanding, decisions made, and implementation plan
+- **Beads tasks** - Trackable sub-tasks with dependencies
+- **Feature PRD** - Copied to `docs/prds/active/{issue}-plan.md` for documentation
+
+**What persists:**
+1. **Context recovery** - STATE.md and beads preserve planning decisions
+2. **Audit trail** - See decisions made in STATE.md
+3. **Beads tasks** - Sub-tasks ARE persisted (beads uses label-based isolation)
+
+## Docker Integration
+
+Workspaces can have independent Docker environments, allowing:
+- Isolated databases per feature
+- Independent service configurations
+- No port conflicts (unique project names)
+
+### Starting Containers with Workspaces
+
+```bash
+# Create workspace and start Docker containers
+pan workspace create MIN-123 --docker
+```
+
+**What happens:**
+1. Creates the workspace (git worktree)
+2. Looks for docker-compose files in workspace
+3. Runs `docker compose -p "{project}-feature-{issue}" up -d --build`
+
+**Docker Project Naming:**
+
+Each workspace gets a unique Docker Compose project name:
+- Format: `{project-name}-feature-{issue-id}`
+- Example: `mind-your-now-feature-min-123`
+- Container names: `{project}-{service}-1`
+
+This prevents conflicts when running multiple workspaces simultaneously.
+
+### Dashboard Integration
+
+The planning dialog includes a "Start Docker containers" checkbox:
+- **Default:** Enabled (containers start automatically)
+- **Preference saved:** Your choice is remembered in browser localStorage
+
+**Why this helps:**
+- Containers start warming up while you review the issue
+- Environment ready when planning agent starts
+- Can test assumptions during planning without waiting
+
+## Workspace Lifecycle
+
+### 1. Creation
+
+```bash
+# Create workspace without Docker
+pan workspace create MIN-123
+
+# Create workspace with Docker containers
+pan workspace create MIN-123 --docker
+```
+
+**What happens:**
+1. Creates git worktree at `{project}/workspaces/feature-min-123/`
+2. Checks out feature branch `feature/min-123-*`
+3. Optionally starts Docker containers
+4. Registers workspace in Panopticon registry
+
+### 2. Usage
+
+Agents work inside the workspace:
+- **Planning agents** - Explore codebase, create STATE.md and beads tasks
+- **Work agents** - Implement features, run tests, commit changes
+- **Specialists** - Review code, run tests, merge changes
+
+All activity isolated to the workspace directory.
+
+### 3. Cleanup
+
+```bash
+# Destroy workspace (safe - checks for uncommitted changes)
+pan workspace destroy MIN-123
+
+# Force destroy (even with uncommitted changes)
+pan workspace destroy MIN-123 --force
+```
+
+**What happens:**
+1. Stops and removes Docker containers (if any)
+2. Checks for uncommitted changes (unless --force)
+3. Removes git worktree
+4. Cleans up planning artifacts
+5. Unregisters from Panopticon
+
+## Main Project Branch Convention
+
+> **CRITICAL:** The main project directory must **ALWAYS** stay on the `main` branch. All feature work happens in workspaces.
+
+**Why this matters:**
+- **Specialists** (review-agent, test-agent) need a stable reference point
+- **Merge operations** require a clean target
+- **Multiple agents** won't interfere with each other
+
+**Wrong:**
+```bash
+# In main project directory
+git checkout feature/min-123  # ❌ BAD!
+```
+
+**Right:**
+```bash
+# Create a workspace instead
+pan workspace create MIN-123  # ✅ GOOD!
+cd workspaces/feature-min-123
+```
+
+### Git Hooks for Branch Protection
+
+Panopticon provides git hooks to enforce the main branch convention. These hooks are automatically installed:
+
+- **On `pan project add`** - Hooks installed when registering project
+- **On `pan sync`** - Hooks updated in all registered projects
+
+**Auto-revert behavior:**
+- **Agents & planning sessions**: Automatically revert to `main` if they accidentally checkout a feature branch
+- **Human users**: Display prominent warning (no auto-revert by default)
+
+To enable auto-revert for humans:
+```bash
+export PANOPTICON_AUTO_REVERT_CHECKOUT=1  # Add to .bashrc/.zshrc
+```
+
+## Safeguards
+
+### Planning vs Work Agent Safeguard
+
+The dashboard prevents starting a work agent (`agent-<issue>`) while a planning agent (`planning-<issue>`) is still running. This prevents conflicts where both agents try to modify the same workspace.
+
+If you see "Planning agent is still running":
+1. **Complete planning** - Use "Complete Planning" button
+2. **Or abort** - Use "Abort Planning" to discard
+3. **Or kill manually** - `tmux kill-session -t planning-<issue>`
+
+### Specialist Agent Safeguards
+
+All specialist agents (review-agent, test-agent, merge-agent) are configured to:
+1. **Run in workspaces only** - Never in main project directory
+2. **Never checkout branches** - Work with branch already in workspace
+3. **Create workspaces if needed** - Use `pan workspace create` instead of `git checkout`
+
+These safeguards are enforced through:
+- **Prompt instructions** - Clear warnings in all specialist prompts
+- **Code enforcement** - Specialists spawn with workspace as cwd
+- **Git hooks** - Auto-revert if checkout detected in tmux sessions
+
+## Use Cases
+
+**Feature Development:**
+```bash
+pan workspace create MIN-123
+cd workspaces/feature-min-123
+# Agent implements feature in isolation
+```
+
+**Parallel Development:**
+```bash
+pan workspace create MIN-123
+pan workspace create MIN-456
+pan workspace create MIN-789
+# Three agents work simultaneously without conflicts
+```
+
+**Testing Multiple Approaches:**
+```bash
+pan workspace create MIN-123 --docker
+pan workspace create MIN-123-alternative --docker
+# Compare two implementation approaches side-by-side
+```
+
+**Emergency Hotfix:**
+```bash
+pan workspace create MIN-999-hotfix
+# Fix doesn't interfere with ongoing feature work
+```
+
+## Best Practices
+
+**Workspace Management:**
+- Create workspace before starting work (don't checkout in main project)
+- One workspace per issue (don't reuse for multiple issues)
+- Clean up completed workspaces to free disk space
+- Use `--docker` flag to warm up containers early
+
+**Branch Naming:**
+- Follow convention: `feature/{issue-id}-{description}`
+- Example: `feature/min-123-add-login`
+- Panopticon auto-generates appropriate names
+
+**Docker Usage:**
+- Use unique container names via project naming
+- Clean up containers when destroying workspace
+- Keep docker-compose.yml in workspace (not main project)
+
+**Planning Artifacts:**
+- `.planning/` is ephemeral - don't rely on it for cross-machine work
+- STATE.md and beads persist the important context
+- Feature PRD goes to `docs/prds/active/` for permanent storage
+
+## Troubleshooting
+
+**Workspace creation fails:**
+```bash
+# Check if worktree already exists
+git worktree list
+
+# Remove stale worktree
+git worktree remove workspaces/feature-min-123
+```
+
+**Docker containers conflict:**
+```bash
+# Check running containers
+docker ps | grep feature-min-123
+
+# Stop conflicting containers
+docker compose -p mind-your-now-feature-min-123 down
+```
+
+**Main project on wrong branch:**
+```bash
+# Go back to main
+cd /path/to/project
+git checkout main
+```
+
+**Disk space issues:**
+```bash
+# List all workspaces
+pan workspace list
+
+# Destroy completed workspaces
+pan workspace destroy MIN-123
+pan workspace destroy MIN-456
+```
+
+## Related Guides
+
+- [Workspace Commands](/cli/workspace-commands) - CLI reference
+- [Specialists](/features/specialists) - Specialist agent workspace usage
+- [Planning Session](/quickstart#planning-session) - Using workspaces for planning

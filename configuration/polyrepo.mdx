@@ -1,0 +1,360 @@
+---
+title: Polyrepo Configuration
+description: Multi-repository workspace management
+---
+
+# Polyrepo Configuration
+
+Panopticon supports projects with multiple git repositories (like separate frontend/backend repos). Configure workspace settings directly in `projects.yaml` to manage polyrepo workspaces.
+
+## Overview
+
+Polyrepo workspaces create git worktrees in each repository, allowing agents to work across multiple codebases simultaneously while maintaining proper git isolation.
+
+## Recommended: Separate Infra Repository
+
+For polyrepo projects, we strongly recommend maintaining a **dedicated infrastructure repository** alongside your code repos:
+
+```
+myproject/
+├── infra/                    # Infrastructure repo (git)
+│   ├── .devcontainer-template/   # Templates for workspace creation
+│   │   ├── dev.template          # Dev script template
+│   │   ├── compose.infra.yml.template
+│   │   └── docker-compose.devcontainer.yml.template
+│   ├── new-feature              # Script to create workspaces
+│   ├── remove-feature           # Script to clean up workspaces
+│   ├── certs/                   # SSL certificates
+│   └── traefik/                 # Traefik config
+├── frontend/                 # Frontend repo (git)
+├── backend/                  # Backend repo (git)
+└── workspaces/               # Feature workspaces (git worktrees)
+    └── feature-xxx/
+        ├── fe/               # Worktree of frontend
+        ├── api/              # Worktree of backend
+        └── .devcontainer/    # Generated from templates
+```
+
+**Benefits of a separate infra repo:**
+
+1. **Version-controlled templates** - Dev script changes are tracked and shared
+2. **Centralized configuration** - DNS, ports, Traefik rules in one place
+3. **Workspace consistency** - All workspaces use the same templates
+4. **Team collaboration** - Infra changes go through normal PR review
+5. **Easy updates** - Fix a template once, regenerate affected workspaces
+
+**Key files in the infra repo:**
+
+| File | Purpose |
+|------|---------|
+| `dev.template` | Template for `./dev` script (container management) |
+| `new-feature` | Creates workspace with git worktrees + devcontainer |
+| `remove-feature` | Cleans up workspace and worktrees |
+| `.devcontainer-template/` | Docker Compose and devcontainer templates |
+
+## Configuration in projects.yaml
+
+```yaml
+projects:
+  myapp:
+    name: "My App"
+    path: /home/user/projects/myapp
+    linear_team: APP
+
+    workspace:
+      type: polyrepo
+      workspaces_dir: workspaces
+      # Default branch for all repos (optional, defaults to 'main')
+      default_branch: main
+
+      # Git repositories to include in each workspace
+      # Each repo is a SEPARATE git repository with its own .git
+      repos:
+        - name: fe
+          path: frontend           # Relative to project root
+          branch_prefix: "feature/"
+          # default_branch: main   # Can override workspace default per-repo
+        - name: api
+          path: backend
+          branch_prefix: "feature/"
+          # default_branch: develop  # Example: API uses 'develop' as default
+
+      # DNS entries for local development
+      dns:
+        domain: myapp.test
+        entries:
+          - "{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          - "api-{{FEATURE_FOLDER}}.{{DOMAIN}}"
+        sync_method: wsl2hosts  # or: hosts_file, dnsmasq
+
+      # Port assignments for services
+      ports:
+        redis:
+          range: [6380, 6499]
+
+      # Service definitions - how to start each service
+      services:
+        - name: api
+          path: api
+          start_command: ./mvnw spring-boot:run
+          docker_command: ./mvnw spring-boot:run
+          health_url: "https://api-{{FEATURE_FOLDER}}.{{DOMAIN}}/actuator/health"
+          port: 8080
+        - name: frontend
+          path: fe
+          start_command: pnpm start
+          docker_command: pnpm start
+          health_url: "https://{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          port: 3000
+
+      # Docker configuration
+      docker:
+        traefik: infra/docker-compose.traefik.yml
+        compose_template: infra/.devcontainer-template
+
+      # Agent configuration templates
+      agent:
+        template_dir: infra/.agent-template
+        templates:
+          - source: CLAUDE.md.template
+            target: CLAUDE.md
+        symlinks:
+          - .claude/commands
+          - .claude/skills
+
+      # Environment template
+      env:
+        template: |
+          COMPOSE_PROJECT_NAME={{COMPOSE_PROJECT}}
+          FRONTEND_URL=https://{{FEATURE_FOLDER}}.{{DOMAIN}}
+```
+
+## Template Placeholders
+
+| Placeholder | Example | Description |
+|------------|---------|-------------|
+| `{{FEATURE_NAME}}` | `min-123` | Normalized issue ID |
+| `{{FEATURE_FOLDER}}` | `feature-min-123` | Workspace folder name |
+| `{{BRANCH_NAME}}` | `feature/min-123` | Git branch name |
+| `{{COMPOSE_PROJECT}}` | `myapp-feature-min-123` | Docker Compose project |
+| `{{DOMAIN}}` | `myapp.test` | DNS domain |
+
+## Service Templates
+
+Panopticon provides built-in templates for common frameworks. Use these to avoid boilerplate:
+
+| Template | Start Command | Port |
+|----------|--------------|------|
+| `react` | `npm start` | 3000 |
+| `react-vite` | `npm run dev` | 5173 |
+| `react-pnpm` | `pnpm start` | 3000 |
+| `nextjs` | `npm run dev` | 3000 |
+| `spring-boot-maven` | `./mvnw spring-boot:run` | 8080 |
+| `spring-boot-gradle` | `./gradlew bootRun` | 8080 |
+| `express` | `npm start` | 3000 |
+| `fastapi` | `uvicorn main:app --reload` | 8000 |
+| `django` | `python manage.py runserver` | 8000 |
+
+Use a template by referencing it in your service config:
+
+```yaml
+services:
+  - name: api
+    template: spring-boot-maven
+    path: api
+    health_url: "https://api-{{FEATURE_FOLDER}}.myapp.test/health"
+```
+
+See `/pan-workspace-config` skill for complete documentation.
+
+## What Your Project Needs to Provide
+
+Panopticon is an orchestration layer - it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**.
+
+Projects can be as simple as just a git repo (for worktree-only workspaces) or as complex as a full polyrepo with Docker, Traefik, and database seeding.
+
+### Required: Workspace Templates
+
+Your project needs a `.devcontainer/` or template directory with:
+
+```
+your-project/
+├── infra/
+│   └── .devcontainer-template/      # Template for workspace containers
+│       ├── docker-compose.devcontainer.yml.template
+│       ├── compose.infra.yml.template   # Optional: separate infra services
+│       ├── Dockerfile
+│       └── devcontainer.json.template
+└── ...
+```
+
+**Docker Compose templates** should use placeholders that Panopticon will replace:
+
+```yaml
+# docker-compose.devcontainer.yml.template
+services:
+  api:
+    build: ./api
+    user: vscode  # Run as non-root to avoid permission issues
+    labels:
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-api.rule=Host(`api-{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
+    environment:
+      - DATABASE_URL=postgres://app:app@postgres:5432/mydb
+
+  frontend:
+    build: ./fe
+    user: vscode  # Run as non-root to avoid permission issues
+    labels:
+      - "traefik.http.routers.{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.{{DOMAIN}}`)"
+```
+
+> **⚠️ Important: File Permissions**
+>
+> Always run containers as a non-root user (e.g., `user: vscode`) to avoid permission issues.
+> Files created by root-owned containers cannot be removed by `pan workspace destroy` without sudo.
+> The Microsoft devcontainers base image includes a `vscode` user (UID 1000) that matches most host users.
+
+### Required for HTTPS: Traefik Configuration
+
+If you want local HTTPS (recommended), provide a Traefik compose file:
+
+```
+your-project/
+├── infra/
+│   └── docker-compose.traefik.yml   # Traefik reverse proxy
+└── ...
+```
+
+Example Traefik config:
+```yaml
+# infra/docker-compose.traefik.yml
+services:
+  traefik:
+    image: traefik:v2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ~/.panopticon/traefik/certs:/certs:ro
+    command:
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+```
+
+### Required for Database Seeding: Seed Directory
+
+For projects with databases:
+
+```
+your-project/
+├── infra/
+│   └── seed/
+│       └── seed.sql              # Sanitized production data
+└── ...
+```
+
+Your compose template should mount this:
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    volumes:
+      - /path/to/project/infra/seed:/docker-entrypoint-initdb.d:ro
+```
+
+### Optional: Agent Templates
+
+For customizing how agents work in your project:
+
+```
+your-project/
+├── infra/
+│   └── .agent-template/
+│       ├── CLAUDE.md.template    # Project-specific AI instructions
+│       └── .mcp.json.template    # MCP server configuration
+└── .claude/
+    └── skills/                   # Project-specific skills
+        └── my-project-standards/
+            └── SKILL.md
+```
+
+## Quick Checklist
+
+| Component | Required? | Location | Purpose |
+|-----------|-----------|----------|---------|
+| Docker Compose template | Yes (for Docker workspaces) | `infra/.devcontainer-template/` | Container configuration |
+| Traefik config | Only for HTTPS | `infra/docker-compose.traefik.yml` | Reverse proxy |
+| Seed file | Only if database needed | `infra/seed/seed.sql` | Pre-populate database |
+| Agent template | Recommended | `infra/.agent-template/` | AI instructions |
+| Project skills | Optional | `.claude/skills/` | Project-specific workflows |
+
+## Example: Minimal Setup
+
+For a simple monorepo with no Docker:
+
+```yaml
+# ~/.panopticon/projects.yaml
+projects:
+  simple-app:
+    name: "Simple App"
+    path: /home/user/projects/simple-app
+    linear_team: APP
+    # No workspace config needed - uses git worktrees
+```
+
+Panopticon creates workspaces as git worktrees. Docker, HTTPS, and seeding are opt-in.
+
+## Container Configuration Tips
+
+When setting up Docker containers for workspaces, avoid these common pitfalls:
+
+**Maven projects:**
+- DO NOT set `MAVEN_CONFIG=/some/path` as an environment variable
+- Maven interprets `MAVEN_CONFIG` as additional CLI arguments, not a directory path
+- This causes "Unknown lifecycle phase" errors (e.g., "Unknown lifecycle phase /maven-cache")
+- Instead, use `-Dmaven.repo.local=/path/to/cache` in the Maven command
+
+```yaml
+# WRONG - causes Maven startup failure
+environment:
+  - MAVEN_CONFIG=/maven-cache
+
+# CORRECT - use command line argument
+command: ./mvnw spring-boot:run -Dmaven.repo.local=/maven-cache/repository
+volumes:
+  - ~/.m2:/maven-cache:cached
+```
+
+**pnpm projects:**
+- Set `PNPM_HOME=/path` to configure the pnpm store location
+- Mount a named volume for the store to share across containers
+
+## Polyrepo Merge Considerations
+
+> **⚠️ Important:** Polyrepo merging requires special handling. The current merge-agent is optimized for monorepos.
+
+For polyrepo projects:
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Workspace creation | ✅ Supported | Creates worktrees in each repo |
+| Branch management | ✅ Supported | Each repo gets its own feature branch |
+| Agent work | ✅ Supported | Agents can work across repos |
+| Merge | ⚠️ Manual | Push each repo's branch, merge via GitLab/GitHub |
+
+**Current workflow for polyrepo merges:**
+
+1. Agent completes work and pushes branches to each repo
+2. Create merge requests for each repo manually (or via `gh pr create`)
+3. Review and merge each MR separately
+4. The "Approve & Merge" button is not yet polyrepo-aware
+
+**Future enhancement:** Polyrepo-aware merge-agent that handles multiple repos automatically.
+
+## Related Guides
+
+- [Project Registry](/configuration/projects) - Project configuration
+- [Workspaces](/features/workspaces) - Workspace management
+- [Docker & HTTPS Setup](/guides/docker-setup) - Docker and networking
