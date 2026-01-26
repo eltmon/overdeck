@@ -17,7 +17,7 @@ allowed-tools:
   - Grep
   - Glob
   - ToolSearch
-version: "1.0.0"
+version: "1.2.0"
 author: "Ed Becker"
 license: "MIT"
 ---
@@ -26,232 +26,365 @@ license: "MIT"
 
 **Trigger:** `/opus-plan <issue-id>`
 
-Use this skill when you need high-quality planning for an issue before handing off to Sonnet agents for implementation. This ensures strategic decisions are made by Opus, not cheaper models.
+**CRITICAL:** This skill MUST be run by Opus. The entire point is that Opus does ALL the thinking so Sonnet just executes. If you are Sonnet or Haiku, STOP and tell the user to switch to Opus.
 
-## Purpose
+## Core Principle
 
-This skill performs comprehensive planning work:
-1. Creates workspace and `.planning/` directory
-2. Gathers requirements through discovery
-3. Creates detailed PRD.md
-4. Creates STATE.md with implementation approach
-5. Creates beads for all tasks with dependencies
-6. Auto-detects UI work and uses Stitch MCP for designs
-7. **Updates issue tracker with planning status and labels**
+**Opus plans EVERYTHING. Sonnet executes.**
 
-## When to Use
+Do NOT leave any decisions for the implementation agent. Every architectural choice, every file path, every function name, every edge case - all decided here. The implementation agent should be able to work through beads mechanically without making any design decisions.
 
-- Before spawning a `/work-issue` agent for any significant feature
-- When planning quality matters (architectural decisions, UX design)
-- When an issue was poorly planned and needs a do-over
+---
 
-## Instructions
+## EXECUTION STEPS
 
-When the user invokes `/opus-plan <issue-id>`:
-
-### Step 1: Setup Workspace
+### Step 1: Parse Issue ID and Setup
 
 ```bash
-# Determine project path from issue prefix
-# PAN-* -> /home/eltmon/projects/panopticon
-# MIN-* -> /home/eltmon/projects/myn
-# HH-*  -> /home/eltmon/projects/househunt
-# JH-*  -> /home/eltmon/projects/jobhunt
+# PAN-XXX -> /home/eltmon/projects/panopticon (GitHub)
+# MIN-XXX -> /home/eltmon/projects/myn (Linear)
+# HH-XXX  -> /home/eltmon/projects/househunt (Linear)
+# JH-XXX  -> /home/eltmon/projects/jobhunt (Linear)
 
-mkdir -p /path/to/project/workspaces/feature-<issue-id>/.planning
+mkdir -p <project>/workspaces/feature-<issue-id-lowercase>/.planning
 ```
 
 ### Step 2: Fetch Issue Details
 
-Use the appropriate tool based on issue tracker:
-- GitHub (PAN-*): `gh issue view <number>`
-- Linear (MIN-*, HH-*, JH-*): `mcp__linear__get_issue`
+**GitHub (PAN-*):** `gh issue view <number>`
+**Linear:** Use `mcp__linear__get_issue` tool
 
-### Step 3: Discovery Phase
+Read the FULL issue. Understand what's being asked.
 
-Explore the codebase to understand:
-- Current architecture and patterns
-- Relevant files that will be modified
-- Existing implementations to follow
-- Technology constraints
+### Step 3: Deep Discovery
 
-Use:
-- `Task` tool with `subagent_type=Explore`
-- `Grep` for finding patterns
-- `Read` for understanding key files
+**YOU MUST** thoroughly explore the codebase. Use `Task` tool with `subagent_type=Explore` or manually:
 
-### Step 4: Create PRD.md
+1. Find ALL related files:
+   - Where does the feature touch?
+   - What patterns exist?
+   - What tests exist?
 
-Write a comprehensive PRD covering:
-- Executive Summary
-- Problem Statement
-- User Personas (who will use this)
-- User Stories (at least 5-10)
-- Functional Requirements (numbered, specific)
-- Non-Functional Requirements
-- Technical Design (architecture, API changes, component structure)
-- Acceptance Criteria (checkboxes, testable)
-- Dependencies
-- Risks and Mitigations
+2. Read key files completely:
+   - Don't skim - read line by line
+   - Understand the data flow
+   - Note function signatures
 
-### Step 5: Create STATE.md
+3. Identify:
+   - Files to create (new)
+   - Files to modify (existing)
+   - Files to delete (cleanup)
+   - Tests to write/update
 
-Write implementation guidance:
-- Discovery Summary (what you learned)
-- Key Architectural Decisions (with rationale)
-- Implementation Plan (phased, with clear tasks)
-- Task Dependencies (what blocks what)
-- Definition of Done
-- Notes for Implementation Agent
+### Step 4: Write PRD.md
 
-### Step 6: Create Beads
+Create `.planning/PRD.md` with ALL sections filled in completely:
 
-For each task identified in STATE.md:
+```markdown
+# PRD: <Title>
 
-```bash
-bd create --title "<issue-id>: <task name>" \
-  --priority <1-4> \
-  --labels "<issue-id>,difficulty:<trivial|simple|medium|complex>,phase-<n>" \
-  --description "<detailed task description>"
+**Issue:** <issue-id>
+**Author:** Ed Becker (with Claude Opus 4.5)
+**Created:** <date>
+**Status:** Ready for Implementation
+
+## Executive Summary
+<2-3 sentences describing what we're building and why>
+
+## Problem Statement
+<Detailed description of the problem. Include:
+- Current behavior
+- Desired behavior
+- Impact of not fixing>
+
+## User Personas
+<At least 3 personas with specific needs>
+
+## User Stories
+<10+ user stories covering all use cases>
+
+## Functional Requirements
+
+### FR1: <Category>
+- FR1.1: <Specific, testable requirement>
+- FR1.2: <Specific, testable requirement>
+
+### FR2: <Category>
+...
+
+## Non-Functional Requirements
+<Performance, accessibility, security, etc.>
+
+## Technical Design
+
+### Architecture Overview
+<High-level description with diagram if helpful>
+
+### Data Flow
+<How data moves through the system>
+
+### API Changes
+<New endpoints, modified endpoints, with full signatures>
+
+### Component Structure
+<File tree of new/modified components>
+
+### Database Changes
+<Schema changes if any>
+
+## Acceptance Criteria
+<Numbered checkboxes - these become the final verification>
+
+## Dependencies
+<External dependencies, internal dependencies>
+
+## Risks and Mitigations
+<What could go wrong, prevention strategies>
 ```
 
-Then set up dependencies:
+### Step 5: Write STATE.md
+
+Create `.planning/STATE.md` with COMPLETE task breakdown:
+
+```markdown
+# <issue-id>: <Title>
+
+**Status:** Ready for Implementation
+**Planned by:** Claude Opus 4.5
+**Date:** <date>
+
+---
+
+## Discovery Summary
+<What you learned - specific file paths, patterns, gotchas>
+
+## Key Architectural Decisions
+
+### Decision 1: <Topic>
+**Choice:** <What we're doing>
+**Rationale:** <Why this choice, not alternatives>
+**Implications:** <What this means for implementation>
+
+### Decision 2: ...
+
+## Implementation Plan
+
+### Phase 1: <Name> (Priority: P1)
+
+#### Task 1.1: <Specific task name>
+**File:** `src/path/to/file.ts`
+**Action:** Create new file / Modify existing
+**Details:**
+- Create function `functionName(param: Type): ReturnType`
+- Handle edge case X
+- Integrate with Y
+**Tests:** `tests/path/to/test.ts`
+
+#### Task 1.2: ...
+
+### Phase 2: <Name> (Priority: P2)
+...
+
+## Task Dependencies
+
+```
+Task 1.1 ──┬── Task 2.1 ── Task 3.1
+           │
+Task 1.2 ──┴── Task 2.2 ── Task 3.2
+```
+
+<Explicit list: "Task X blocks Task Y because...">
+
+## Definition of Done
+- [ ] All beads completed
+- [ ] All tests passing
+- [ ] No TypeScript errors
+- [ ] Manual testing complete
+- [ ] PR created and reviewed
+
+## Notes for Implementation Agent
+- Start with Phase 1 tasks (they unblock everything)
+- Run tests after each task
+- Don't refactor code outside the scope
+- Ask for help if blocked
+```
+
+### Step 6: CREATE ALL BEADS
+
+**This is the critical step.** Create 30-60+ beads for a typical feature. Each bead must be:
+- Completable in 1 focused session
+- Specific enough that no decisions are needed
+- Include exact file paths and function names
+
+**For each task in STATE.md, create a bead:**
+
+```bash
+bd create --title "<ISSUE-ID>: <exact task name>" \
+  --priority <1-4> \
+  --labels "<ISSUE-ID>,difficulty:<level>,phase-<n>,<optional-tags>" \
+  --description "<VERY detailed description:
+File: src/exact/path/file.ts
+
+What to do:
+1. Create/modify function X
+2. Add parameter Y
+3. Handle edge case Z
+
+Expected behavior:
+- When A happens, B should occur
+- If C fails, show error D
+
+Tests:
+- Add test in tests/path/test.ts
+- Cover cases: E, F, G>"
+```
+
+**Label format:**
+- `<ISSUE-ID>` - always include
+- `difficulty:trivial|simple|medium|complex`
+- `phase-1|phase-2|etc`
+- `api` - backend work
+- `frontend` - React components
+- `stitch` - design work
+- `test` - test-only tasks
+
+**After creating beads, set dependencies:**
 ```bash
 bd dep add <blocked-id> <blocker-id>
 ```
 
+**VERIFY:** `bd search "<ISSUE-ID>"` and count. Should be 30-60+ for a real feature.
+
 ### Step 7: Stitch Integration (UI Work)
 
-If the issue involves UI changes, detect from:
-- Keywords: "dashboard", "frontend", "settings", "modal", "component"
-- File paths mentioned: `src/dashboard/*`, `*.tsx`
+If issue involves UI, YOU MUST use Stitch:
 
-If UI work detected:
-1. Create Stitch project
-2. Design all new screens/components
-3. Document designs in `.planning/STITCH_DESIGNS.md`
-4. Reference designs in STATE.md
+```bash
+# Load Stitch tools
+ToolSearch query: "+stitch"
+
+# Create project
+mcp__stitch__create_project name="<issue-id>-design"
+
+# Design each screen
+mcp__stitch__generate_screen_from_text ...
+```
+
+Document all designs in `.planning/STITCH_DESIGNS.md`.
 
 ### Step 8: Update Issue Tracker
 
-**For GitHub Issues (PAN-*):**
-
+**GitHub (PAN-*):**
 ```bash
-# Add labels
-gh issue edit <number> --add-label "planned,ready-for-implementation"
+gh label create "planned" --color "0E8A16" 2>/dev/null || true
+gh label create "ready-for-implementation" --color "1D76DB" 2>/dev/null || true
+gh label create "opus-planned" --color "7057FF" 2>/dev/null || true
 
-# Add comment with planning summary
-gh issue comment <number> --body "$(cat <<'EOF'
-## Planning Complete
+gh issue edit <number> --add-label "planned,ready-for-implementation,opus-planned"
 
+gh issue comment <number> --body "## Planning Complete
 **Planned by:** Claude Opus 4.5
-**Workspace:** `workspaces/feature-pan-<number>/`
+**Workspace:** workspaces/feature-<issue-id>/
 
-### Artifacts Created
-- `.planning/PRD.md` - Product requirements
-- `.planning/STATE.md` - Implementation approach
-
-### Beads Created
-<count> tasks with dependencies configured
-
-### Ready Work (unblocked)
-<list of ready beads>
-
-### Next Steps
-Run `/work-issue PAN-<number>` to spawn implementation agent
-EOF
-)"
+### Beads Created: <N> tasks
+### Ready Work: <list unblocked beads>
+### Next: /work-issue <ISSUE-ID>"
 ```
 
-**For Linear Issues (MIN-*, HH-*, JH-*):**
-
-```typescript
-// Use Linear MCP to update
-mcp__linear__update_issue({
-  issueId: "<issue-uuid>",
-  labelIds: ["<planned-label-id>", "<ready-for-impl-label-id>"],
-  // Optionally move to "Planned" state if workflow supports it
-})
-
-// Add comment
-mcp__linear__create_comment({
-  issueId: "<issue-uuid>",
-  body: "<planning summary markdown>"
-})
-```
-
-### Step 9: Final Summary
-
-Output:
-- Workspace path
-- PRD summary
-- Number of beads created
-- Ready tasks (unblocked work that can start immediately)
-- Issue tracker updates made
-- Any open questions that need user input
-
-## Example Output
+### Step 9: Output Summary
 
 ```
-## Opus Planning Complete for PAN-121
+## Opus Planning Complete for <ISSUE-ID>
 
-**Workspace:** /home/eltmon/projects/panopticon/workspaces/feature-pan-121
+**Workspace:** <path>
+**PRD:** <title> - <N> requirements
+**STATE.md:** <N> phases, <M> tasks
 
-**PRD:** Settings Page Redesign with CCR Integration
-- 6 user personas identified
-- 10 user stories documented
-- 6 functional requirement groups
-
-**STATE.md:** 5-phase implementation plan
-- Phase 1: CCR Integration (Critical)
-- Phase 2: Stitch Designs
-- Phase 3: Backend API
-- Phase 4: Frontend Components
-- Phase 5: Testing
-
-**Beads Created:** 14 tasks
-- 4 ready to start (unblocked)
-- 10 blocked by dependencies
-
-**Issue Tracker Updated:**
-- Added labels: `planned`, `ready-for-implementation`
-- Added planning summary comment
+**Beads Created:** <total>
+- Ready (unblocked): <N>
+- Blocked: <M>
 
 **Ready Work:**
-1. panopticon-97u: Add CCR detection utility (P1)
-2. panopticon-xqa: Update agent spawning (P1)
-3. panopticon-y0y: Add CCR integration tests (P1)
-4. panopticon-pkl: Create Stitch designs (P2)
+1. <bead-id>: <title> [P<n>]
+...
 
-**Next:** Run `/work-issue PAN-121` to spawn agent, or manually work on ready tasks
+**Next:** /work-issue <ISSUE-ID>
 ```
 
-## Labels to Add
+---
 
-| Tracker | Labels |
-|---------|--------|
-| GitHub | `planned`, `ready-for-implementation`, `opus-planned` |
-| Linear | `Planned`, `Ready for Implementation` |
+## Task Breakdown Templates
 
-If labels don't exist, create them:
-```bash
-# GitHub
-gh label create "planned" --color "0E8A16" --description "Planning phase complete"
-gh label create "ready-for-implementation" --color "1D76DB" --description "Ready for agent to implement"
-gh label create "opus-planned" --color "7057FF" --description "Planned by Claude Opus"
+### For Backend API Work:
+
+```
+Phase: API Implementation
+Tasks:
+- Define types/interfaces in types.ts
+- Create endpoint handler function
+- Add route registration
+- Add request validation
+- Add error handling
+- Write unit tests for handler
+- Write integration tests for endpoint
+- Update API documentation
 ```
 
-## Status Transitions
+### For React Component Work:
 
-| Tracker | From | To |
-|---------|------|-----|
-| GitHub | Any | (labels only, no status) |
-| Linear | Backlog/Todo | In Progress (or custom "Planned" state) |
+```
+Phase: Component Implementation
+Tasks:
+- Create component file with shell
+- Add props interface
+- Implement render logic
+- Add state management (if needed)
+- Add event handlers
+- Style with Tailwind/CSS
+- Add loading states
+- Add error states
+- Write unit tests
+- Wire into parent component
+- Add to Storybook (if applicable)
+```
 
-## Notes
+### For Bug Fixes:
 
-- This skill should ONLY be run by Opus (check your model ID)
-- If invoked by Sonnet, warn user and suggest using Opus
-- All architectural decisions should be FINAL - no "we could do X or Y"
-- Issues must be ready for a junior dev to execute
-- Always update the issue tracker so the planning is visible in the UI
+```
+Phase: Bug Fix
+Tasks:
+- Write failing test that reproduces bug
+- Identify root cause (document in bead)
+- Implement fix
+- Verify test passes
+- Add regression tests
+- Check for similar issues elsewhere
+```
+
+### For Refactoring:
+
+```
+Phase: Refactoring
+Tasks:
+- Write tests for current behavior (if missing)
+- Extract function/module
+- Update all call sites
+- Run tests, fix failures
+- Update documentation
+- Remove old code
+```
+
+---
+
+## Quality Checklist
+
+Before completing /opus-plan, verify:
+
+- [ ] PRD.md has ALL sections filled
+- [ ] STATE.md has EVERY task detailed
+- [ ] Each bead has exact file paths
+- [ ] Each bead has expected behavior
+- [ ] Dependencies are set correctly
+- [ ] Ready tasks identified
+- [ ] Issue tracker updated
+- [ ] No decisions left for implementation agent
