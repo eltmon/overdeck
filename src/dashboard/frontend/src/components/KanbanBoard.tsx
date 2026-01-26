@@ -895,6 +895,14 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
             {agent?.type === 'planning' ? 'Continue Planning' : 'Watch'}
           </button>
           <button
+            onClick={() => onViewBeads && onViewBeads(issue)}
+            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+            title="View tasks for this issue"
+          >
+            <List className="w-3.5 h-3.5" />
+            Tasks
+          </button>
+          <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
               showMessageInput ? 'text-blue-400' : 'text-gray-400 hover:text-white'
@@ -1061,13 +1069,21 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
 
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-600">
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-600 flex-wrap">
           <button
             onClick={handlePlan}
             className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
           >
             <FileText className="w-3.5 h-3.5" />
             Re-plan
+          </button>
+          <button
+            onClick={() => onViewBeads && onViewBeads(issue)}
+            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+            title="View tasks for this issue"
+          >
+            <List className="w-3.5 h-3.5" />
+            Tasks
           </button>
           <button
             onClick={handleStartAgent}

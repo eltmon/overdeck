@@ -1,0 +1,88 @@
+# Panopticon Dashboard Dev Container
+# Feature workspace: {{FEATURE_FOLDER}}
+# URLs:
+#   Frontend: https://{{FEATURE_FOLDER}}.pan.localhost
+#   API: https://api-{{FEATURE_FOLDER}}.pan.localhost
+
+services:
+  # Combined dev container for VS Code attach
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    volumes:
+      - ../:/workspaces/panopticon:cached
+      - npm-cache:/home/node/.npm
+    command: sleep infinity
+    networks:
+      - devnet
+      - panopticon
+
+  # Frontend (Vite dev server with HMR)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    working_dir: /workspaces/panopticon/src/dashboard/frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ../src/dashboard/frontend:/workspaces/panopticon/src/dashboard/frontend:cached
+      - npm-cache:/home/node/.npm
+      # Named volume to shadow host's node_modules (avoids permission conflicts)
+      - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
+    environment:
+      - CI=true
+      - VITE_API_URL=https://api-{{FEATURE_FOLDER}}.pan.localhost
+    networks:
+      - devnet
+      - panopticon
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.pan.localhost`)"
+      - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.entrypoints=websecure"
+      - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.tls=true"
+      - "traefik.http.services.pan-fe-{{FEATURE_FOLDER}}.loadbalancer.server.port=5173"
+
+  # Backend API server (with watch mode)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    working_dir: /workspaces/panopticon/src/dashboard/server
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - ../src/dashboard/server:/workspaces/panopticon/src/dashboard/server:cached
+      - npm-cache:/home/node/.npm
+      # Named volume to shadow host's node_modules (avoids permission conflicts)
+      - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
+      # Mount required host paths for workspace/agent management
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${HOME}/.panopticon:/home/node/.panopticon:ro
+      - ${HOME}/projects:/home/node/projects:ro
+    environment:
+      - NODE_ENV=development
+      - PORT=3011
+      - LINEAR_API_KEY=${LINEAR_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    networks:
+      - devnet
+      - panopticon
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.rule=Host(`api-{{FEATURE_FOLDER}}.pan.localhost`)"
+      - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.entrypoints=websecure"
+      - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.tls=true"
+      - "traefik.http.services.pan-api-{{FEATURE_FOLDER}}.loadbalancer.server.port=3011"
+
+volumes:
+  npm-cache:
+  frontend-node-modules:
+  server-node-modules:
+
+networks:
+  devnet:
+  panopticon:
+    external: true

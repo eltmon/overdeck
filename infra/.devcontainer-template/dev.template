@@ -1,0 +1,146 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Load and export all .env variables so Docker Compose can use them
+if [ -f .env ]; then set -a; source .env; set +a; fi
+
+FEATURE_FOLDER="{{FEATURE_FOLDER}}"
+
+# Use workspace-specific project name to avoid container conflicts
+export COMPOSE_PROJECT_NAME="panopticon-${FEATURE_FOLDER}"
+
+case "${1:-help}" in
+  up|all)
+    echo "Starting Panopticon Dashboard containers..."
+    docker compose -f .devcontainer/docker-compose.devcontainer.yml up -d frontend server
+
+    # Wait for services to be ready
+    "$0" wait-ready
+
+    echo ""
+    echo "All services ready!"
+    echo ""
+    echo "URLs:"
+    echo "  Frontend: https://${FEATURE_FOLDER}.pan.localhost"
+    echo "  API:      https://api-${FEATURE_FOLDER}.pan.localhost"
+    echo ""
+    echo "Logs: ./dev logs"
+    ;;
+  wait-ready)
+    MAX_WAIT=120  # 2 minutes max (no database to wait for)
+    INTERVAL=3
+    ELAPSED=0
+
+    echo "Waiting for services to be ready (timeout: ${MAX_WAIT}s)..."
+
+    # Wait for containers to exist first
+    echo "  Waiting for containers to start..."
+    while [ $ELAPSED -lt $MAX_WAIT ]; do
+      FE_EXISTS=$(docker ps --filter "name=${COMPOSE_PROJECT_NAME}-frontend" --format '{{.Names}}' 2>/dev/null | head -1)
+      SERVER_EXISTS=$(docker ps --filter "name=${COMPOSE_PROJECT_NAME}-server" --format '{{.Names}}' 2>/dev/null | head -1)
+
+      if [ -n "$FE_EXISTS" ] && [ -n "$SERVER_EXISTS" ]; then
+        echo "  Containers running: $FE_EXISTS, $SERVER_EXISTS"
+        break
+      fi
+
+      sleep $INTERVAL
+      ELAPSED=$((ELAPSED + INTERVAL))
+      echo "  Still waiting for containers... (${ELAPSED}s)"
+    done
+
+    if [ $ELAPSED -ge $MAX_WAIT ]; then
+      echo "ERROR: Containers did not start within ${MAX_WAIT}s"
+      exit 1
+    fi
+
+    # Wait for health checks
+    echo "  Waiting for services to be healthy..."
+    FE_READY=false
+    SERVER_READY=false
+
+    while [ $ELAPSED -lt $MAX_WAIT ]; do
+      # Check Frontend (Vite dev server)
+      if [ "$FE_READY" = false ]; then
+        if docker exec ${COMPOSE_PROJECT_NAME}-frontend-1 curl -sf -o /dev/null "http://localhost:5173" 2>/dev/null; then
+          echo "  Frontend: ready"
+          FE_READY=true
+        fi
+      fi
+
+      # Check Server (Express API)
+      if [ "$SERVER_READY" = false ]; then
+        if docker exec ${COMPOSE_PROJECT_NAME}-server-1 curl -sf -o /dev/null "http://localhost:3011/api/health" 2>/dev/null; then
+          echo "  Server: ready"
+          SERVER_READY=true
+        fi
+      fi
+
+      # Both ready?
+      if [ "$FE_READY" = true ] && [ "$SERVER_READY" = true ]; then
+        echo "All services healthy!"
+        exit 0
+      fi
+
+      sleep $INTERVAL
+      ELAPSED=$((ELAPSED + INTERVAL))
+
+      if [ "$FE_READY" = false ] || [ "$SERVER_READY" = false ]; then
+        echo "  Still waiting... (${ELAPSED}s) Frontend:$FE_READY Server:$SERVER_READY"
+      fi
+    done
+
+    echo "ERROR: Services did not become healthy within ${MAX_WAIT}s"
+    echo "  Frontend: $FE_READY"
+    echo "  Server: $SERVER_READY"
+    echo ""
+    echo "Check logs: ./dev logs"
+    exit 1
+    ;;
+  down)
+    if [ "${2:-}" = "--volumes" ]; then
+      docker compose -f .devcontainer/docker-compose.devcontainer.yml down -v
+    else
+      docker compose -f .devcontainer/docker-compose.devcontainer.yml down
+    fi
+    ;;
+  frontend|fe)
+    docker compose -f .devcontainer/docker-compose.devcontainer.yml up frontend
+    ;;
+  server|api)
+    docker compose -f .devcontainer/docker-compose.devcontainer.yml up server
+    ;;
+  status)
+    docker compose -f .devcontainer/docker-compose.devcontainer.yml ps
+    echo ""
+    echo "URLs:"
+    echo "  Frontend: https://${FEATURE_FOLDER}.pan.localhost"
+    echo "  API:      https://api-${FEATURE_FOLDER}.pan.localhost"
+    ;;
+  logs)
+    docker compose -f .devcontainer/docker-compose.devcontainer.yml logs -f "${2:-}"
+    ;;
+  rebuild)
+    echo "Rebuilding containers..."
+    docker compose -f .devcontainer/docker-compose.devcontainer.yml build --no-cache
+    "$0" up
+    ;;
+  *)
+    echo "Usage: ./dev {up|down|frontend|server|status|logs|rebuild}"
+    echo ""
+    echo "  up|all           Start all services + wait until healthy"
+    echo "  down [--volumes] Stop all services (--volumes removes npm cache)"
+    echo "  frontend|fe      Start Vite frontend (foreground)"
+    echo "  server|api       Start Express backend (foreground)"
+    echo "  status           Show running services and URLs"
+    echo "  logs [service]   Tail service logs"
+    echo "  rebuild          Rebuild containers from scratch"
+    echo ""
+    echo "URLs for this workspace:"
+    echo "  Frontend: https://${FEATURE_FOLDER}.pan.localhost"
+    echo "  API:      https://api-${FEATURE_FOLDER}.pan.localhost"
+    ;;
+esac

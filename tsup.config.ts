@@ -11,4 +11,6 @@ export default defineConfig({
   sourcemap: true,
   target: 'node18',
   shims: true,
+  noExternal: ['@panopticon/shared'],
+  tsconfig: './tsconfig.json',
 });

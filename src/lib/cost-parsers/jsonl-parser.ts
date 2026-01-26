@@ -304,7 +304,8 @@ export function getActiveSessionModel(workspacePath: string): string | null {
     // Convert workspace path to Claude project dir name
     // e.g., /home/user/projects/myn/workspaces/feature-min-664
     //    -> -home-user-projects-myn-workspaces-feature-min-664
-    const projectDirName = workspacePath.replace(/\//g, '-').replace(/^-/, '');
+    // NOTE: The directory name KEEPS the leading dash
+    const projectDirName = workspacePath.replace(/\//g, '-');
     const projectDir = join(CLAUDE_PROJECTS_DIR, projectDirName);
 
     // Find most recently modified session file

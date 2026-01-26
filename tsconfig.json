@@ -9,12 +9,14 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "@panopticon/shared/*": ["./packages/shared/src/*"]
+    }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "packages/shared/src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "src/dashboard/**/*"]
 }

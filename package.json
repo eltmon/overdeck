@@ -24,6 +24,11 @@
     "url": "https://github.com/eltmon/panopticon-cli/issues"
   },
   "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "src/dashboard/server",
+    "src/dashboard/frontend"
+  ],
   "bin": {
     "pan": "./dist/cli/index.js",
     "panopticon": "./dist/cli/index.js"
