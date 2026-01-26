@@ -7682,12 +7682,12 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
 });
 
 // Get beads tasks for an issue
-app.get('/api/issues/:id/beads', (req, res) => {
+app.get('/api/issues/:id/beads', async (req, res) => {
   const { id } = req.params;
   const issueLower = id.toLowerCase();
 
   try {
-    // Find project path
+    // Find project path for workspace info
     const githubCheck = isGitHubIssue(id);
     let projectPath = '';
 
@@ -7707,80 +7707,50 @@ app.get('/api/issues/:id/beads', (req, res) => {
       }
     }
 
-    if (!projectPath) {
-      return res.json({ tasks: [], message: 'No project found' });
+    const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
+
+    // Use bd search CLI to get beads - this queries the SQLite database directly
+    // which is always up to date (unlike the JSONL export file)
+    try {
+      const { stdout } = await execAsync(`bd search "${id}" --json`, {
+        cwd: projectPath || homedir(),
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+
+      const beads = JSON.parse(stdout || '[]');
+      const tasks = beads.map((bead: any) => ({
+        id: bead.id,
+        title: bead.title,
+        status: bead.status,
+        type: bead.issue_type || bead.type || 'task',
+        blockedBy: bead.blocked_by || [],
+        createdAt: bead.created_at,
+        labels: bead.labels || [],
+        priority: bead.priority,
+      }));
+
+      // Sort by priority (P1 first) then by creation date
+      tasks.sort((a: any, b: any) => {
+        if (a.priority !== b.priority) return (a.priority || 4) - (b.priority || 4);
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+
+      res.json({
+        tasks,
+        workspacePath,
+        count: tasks.length,
+      });
+    } catch (bdError: any) {
+      // bd command not found or failed - return empty
+      console.error('bd search failed:', bdError.message);
+      res.json({
+        tasks: [],
+        workspacePath,
+        count: 0,
+        message: 'bd (beads) CLI not available or search failed',
+      });
     }
-
-    // Read STATE.md to get beads IDs created during planning
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const statePath = join(workspacePath, '.planning', 'STATE.md');
-    const beadsIds: string[] = [];
-
-    if (existsSync(statePath)) {
-      const stateContent = readFileSync(statePath, 'utf-8');
-      // Extract beads IDs from STATE.md (format: `panopticon-xxx` or similar)
-      const idMatches = stateContent.match(/`([a-z]+-[a-z0-9]+)`/g) || [];
-      for (const match of idMatches) {
-        const beadsId = match.replace(/`/g, '');
-        if (beadsId.includes('-') && !beadsId.includes('/')) {
-          beadsIds.push(beadsId);
-        }
-      }
-    }
-
-    // Check both workspace beads and main project beads
-    const beadsPaths = [
-      join(workspacePath, '.beads', 'issues.jsonl'),
-      join(projectPath, '.beads', 'issues.jsonl'),
-    ];
-
-    const tasks: any[] = [];
-    const seenIds = new Set<string>();
-
-    for (const issuesFile of beadsPaths) {
-      if (!existsSync(issuesFile)) continue;
-
-      const content = readFileSync(issuesFile, 'utf-8');
-      const lines = content.split('\n').filter(line => line.trim());
-
-      for (const line of lines) {
-        try {
-          const issue = JSON.parse(line);
-          // Skip if already seen
-          if (seenIds.has(issue.id)) continue;
-
-          // Include if: ID is in our beadsIds list, OR tagged with issue identifier
-          const tags = issue.tags || [];
-          const matchesTag = tags.some((t: string) =>
-            t.toLowerCase() === issueLower || t.toLowerCase() === id.toLowerCase()
-          );
-          const matchesBeadsId = beadsIds.includes(issue.id);
-
-          if (matchesTag || matchesBeadsId) {
-            seenIds.add(issue.id);
-            tasks.push({
-              id: issue.id,
-              title: issue.title,
-              status: issue.status,
-              type: issue.issue_type || issue.type,
-              blockedBy: issue.blocked_by || [],
-              createdAt: issue.created_at,
-            });
-          }
-        } catch (e) {
-          // Skip malformed lines
-        }
-      }
-    }
-
-    // Sort by creation date
-    tasks.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-    res.json({
-      tasks,
-      workspacePath,
-      count: tasks.length,
-    });
   } catch (error: any) {
     console.error('Error fetching beads:', error);
     res.status(500).json({ error: 'Failed to fetch beads: ' + error.message });
