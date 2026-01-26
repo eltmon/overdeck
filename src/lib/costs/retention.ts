@@ -19,6 +19,13 @@ const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 // Event log file path
 const EVENTS_FILE = join(COSTS_DIR, 'events.jsonl');
 const LOCK_FILE = join(COSTS_DIR, 'events.lock');
+
+/**
+ * Sleep for a specified number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 const RETENTION_MARKER_FILE = join(COSTS_DIR, 'last-retention-cleanup.txt');
 
 /**
@@ -69,14 +76,14 @@ export function isRetentionCleanupNeeded(): boolean {
  *
  * @returns Object with cleanup statistics
  */
-export function cleanOldEvents(): {
+export async function cleanOldEvents(): Promise<{
   totalEventsBefore: number;
   totalEventsAfter: number;
   eventsRemoved: number;
   oldestEventBefore?: string;
   oldestEventAfter?: string;
   bytesFreed: number;
-} {
+}> {
   console.log('[retention] Starting event log cleanup (90-day retention)...');
 
   // Get initial stats
@@ -141,11 +148,8 @@ export function cleanOldEvents(): {
       console.warn('[retention] Lock timeout, forcing cleanup');
       break;
     }
-    // Wait for lock
-    const waitUntil = Date.now() + 100;
-    while (Date.now() < waitUntil) {
-      // Spin
-    }
+    // Wait for 100ms before checking again
+    await sleep(100);
   }
 
   try {
@@ -195,14 +199,14 @@ export function cleanOldEvents(): {
  *
  * Safe to call on every dashboard startup - checks if cleanup is needed first.
  */
-export function runRetentionCleanupIfNeeded(): void {
+export async function runRetentionCleanupIfNeeded(): Promise<void> {
   if (!isRetentionCleanupNeeded()) {
     console.log('[retention] Skipping cleanup - last run was within 24 hours');
     return;
   }
 
   try {
-    cleanOldEvents();
+    await cleanOldEvents();
   } catch (error: any) {
     console.error('[retention] Failed to run cleanup:', error.message);
     // Don't throw - retention is a background task that shouldn't block startup

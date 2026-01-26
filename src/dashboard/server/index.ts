@@ -8043,7 +8043,9 @@ if (!isMigrationComplete()) {
 }
 
 // Run retention cleanup (90-day rolling window) if needed
-runRetentionCleanupIfNeeded();
+runRetentionCleanupIfNeeded().catch(err => {
+  console.error('[retention] Startup cleanup failed:', err);
+});
 
 // In production, serve the frontend static files
 if (process.env.NODE_ENV === 'production') {

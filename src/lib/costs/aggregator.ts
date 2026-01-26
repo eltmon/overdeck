@@ -92,6 +92,7 @@ export function updateCacheFromEvent(cache: CostCache, event: CostEvent): void {
   issueCost.outputTokens += event.output;
   issueCost.cacheReadTokens += event.cache_read;
   issueCost.cacheWriteTokens += event.cache_write;
+  issueCost.eventCount += 1;
 
   // Update model breakdown
   issueCost.models[event.model] = (issueCost.models[event.model] || 0) + eventCost;
@@ -245,6 +246,7 @@ function createEmptyIssueCostData(): IssueCostData {
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
     models: {},
+    eventCount: 0,
     lastUpdated: new Date().toISOString(),
   };
 }

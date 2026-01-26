@@ -15,11 +15,18 @@ const EVENTS_FILE = join(COSTS_DIR, 'events.jsonl');
 const LOCK_FILE = join(COSTS_DIR, 'events.lock');
 
 /**
+ * Sleep for a specified number of milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Append a cost event to the event log
  *
  * Uses simple file locking to prevent concurrent write corruption.
  */
-export function appendEvent(event: CostEvent): void {
+export async function appendEvent(event: CostEvent): Promise<void> {
   // Ensure costs directory exists
   mkdirSync(COSTS_DIR, { recursive: true });
 
@@ -31,11 +38,8 @@ export function appendEvent(event: CostEvent): void {
       console.warn('Cost event lock timeout, forcing write');
       break;
     }
-    // Busy wait for 10ms
-    const waitUntil = Date.now() + 10;
-    while (Date.now() < waitUntil) {
-      // Spin
-    }
+    // Wait for 10ms before checking again
+    await sleep(10);
   }
 
   try {

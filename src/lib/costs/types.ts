@@ -55,6 +55,9 @@ export interface IssueCostData {
   /** Cost breakdown by model */
   models: Record<string, number>;
 
+  /** Number of cost events recorded for this issue */
+  eventCount: number;
+
   /** Last time this issue's costs were updated */
   lastUpdated: string;
 }

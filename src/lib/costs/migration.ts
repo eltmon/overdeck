@@ -255,7 +255,7 @@ export async function runMigration(): Promise<MigrationState> {
 
         // Append events to log
         for (const event of events) {
-          appendEvent(event);
+          await appendEvent(event);
           totalEvents++;
         }
 

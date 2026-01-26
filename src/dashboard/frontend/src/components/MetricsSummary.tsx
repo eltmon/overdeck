@@ -122,6 +122,31 @@ export function MetricsSummary() {
     ? Object.values(handoffStats.byTrigger).reduce((sum, count) => sum + count, 0)
     : 0;
 
+  // Determine cost tracking status
+  const getCostTrackingStatus = () => {
+    if (!costStatus) return { label: 'Unknown', color: 'gray' };
+
+    // Check if migration is in progress
+    if (!costStatus.migration.completed) {
+      return { label: 'Migrating', color: 'yellow' };
+    }
+
+    // Check if events are stale (no events in 24h)
+    if (costStatus.events.newestEvent) {
+      const newestEventTime = new Date(costStatus.events.newestEvent).getTime();
+      const now = Date.now();
+      const hoursSinceLastEvent = (now - newestEventTime) / (1000 * 60 * 60);
+
+      if (hoursSinceLastEvent > 24) {
+        return { label: 'Stale', color: 'red' };
+      }
+    }
+
+    return { label: 'Live', color: 'green' };
+  };
+
+  const costStatus_ = getCostTrackingStatus();
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       {/* Cost Today */}
@@ -131,6 +156,19 @@ export function MetricsSummary() {
             <DollarSign className="w-5 h-5 text-green-400" />
             <span className="text-sm text-gray-400">Cost Today</span>
           </div>
+          <span
+            className={`px-2 py-1 text-xs font-medium rounded ${
+              costStatus_.color === 'green'
+                ? 'bg-green-900/30 text-green-400 border border-green-700'
+                : costStatus_.color === 'yellow'
+                ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-700'
+                : costStatus_.color === 'red'
+                ? 'bg-red-900/30 text-red-400 border border-red-700'
+                : 'bg-gray-900/30 text-gray-400 border border-gray-700'
+            }`}
+          >
+            {costStatus_.label}
+          </span>
         </div>
         <div className="text-2xl font-bold text-white">
           ${metrics.today.totalCost.toFixed(2)}
