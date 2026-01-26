@@ -8,6 +8,7 @@ import { createSession, killSession, sendKeys, sessionExists, getAgentSessions }
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
+import { loadSettings, type ModelId } from './settings.js';
 
 const execAsync = promisify(exec);
 
@@ -254,6 +255,46 @@ export interface SpawnOptions {
   model?: string;
   prompt?: string;
   difficulty?: ComplexityLevel;
+  agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'planning-agent' | 'work-agent';
+}
+
+/**
+ * Determine which model to use for an agent based on configuration
+ * Priority:
+ * 1. Explicitly provided model (options.model)
+ * 2. Specialist model (if agentType is a specialist)
+ * 3. Complexity-based model (if difficulty is provided)
+ * 4. Default fallback (sonnet)
+ */
+function determineModel(options: SpawnOptions): string {
+  // Explicit model always wins
+  if (options.model) {
+    return options.model;
+  }
+
+  try {
+    const settings = loadSettings();
+
+    // Check if this is a specialist agent
+    if (options.agentType && options.agentType !== 'work-agent') {
+      const specialistKey = options.agentType.replace('-agent', '_agent') as keyof typeof settings.models.specialists;
+      if (settings.models.specialists[specialistKey]) {
+        return settings.models.specialists[specialistKey];
+      }
+    }
+
+    // Check for complexity-based model
+    if (options.difficulty && settings.models.complexity[options.difficulty]) {
+      return settings.models.complexity[options.difficulty];
+    }
+
+    // Fall back to default model
+    return 'sonnet';
+  } catch (error) {
+    // If settings can't be loaded, fall back to default
+    console.warn('Warning: Could not load settings for model selection, using default');
+    return options.model || 'sonnet';
+  }
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
@@ -267,13 +308,16 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Initialize hook for this agent (FPP support)
   initHook(agentId);
 
+  // Determine model based on configuration
+  const selectedModel = determineModel(options);
+
   // Create state
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
     workspace: options.workspace,
     runtime: options.runtime || 'claude',
-    model: options.model || 'sonnet',
+    model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
     // Initialize Phase 4 fields

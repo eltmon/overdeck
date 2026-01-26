@@ -13,6 +13,7 @@ import { promisify } from 'util';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
+import { loadSettings } from '../settings.js';
 
 const execAsync = promisify(exec);
 
@@ -586,6 +587,18 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   const tmuxSession = getTmuxSessionName(name);
   const cwd = process.env.HOME || '/home/eltmon';
 
+  // Determine model for this specialist from settings
+  let model = 'sonnet'; // default fallback
+  try {
+    const settings = loadSettings();
+    const specialistKey = name.replace('-agent', '_agent') as keyof typeof settings.models.specialists;
+    if (settings.models.specialists[specialistKey]) {
+      model = settings.models.specialists[specialistKey];
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not load settings for ${name}, using default model`);
+  }
+
   // Create identity prompt for the specialist
   const identityPrompt = `You are the ${name} specialist agent for Panopticon.
 Your role: ${name === 'merge-agent' ? 'Resolve merge conflicts and ensure clean integrations' :
@@ -607,7 +620,7 @@ Say: "I am the ${name} specialist, ready and waiting for tasks."`;
     writeFileSync(launcherScript, `#!/bin/bash
 cd "${cwd}"
 prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions "$prompt"
+exec claude --dangerously-skip-permissions --model ${model} "$prompt"
 `, { mode: 0o755 });
 
     // Spawn Claude Code via launcher script (safely passes prompt with any characters)
