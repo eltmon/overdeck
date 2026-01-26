@@ -9,6 +9,7 @@ import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadSettings, type ModelId } from './settings.js';
+import { getModelId, WorkTypeId } from './work-type-router.js';
 
 const execAsync = promisify(exec);
 
@@ -79,6 +80,10 @@ export interface AgentState {
   handoffCount?: number;
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
+
+  // Work type system (PAN-118)
+  phase?: 'exploration' | 'planning' | 'implementation' | 'testing' | 'documentation' | 'review-response';
+  workType?: WorkTypeId; // Current work type ID
 }
 
 export function getAgentDir(agentId: string): string {
@@ -256,15 +261,22 @@ export interface SpawnOptions {
   prompt?: string;
   difficulty?: ComplexityLevel;
   agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'planning-agent' | 'work-agent';
+
+  // Work type system (PAN-118)
+  phase?: 'exploration' | 'planning' | 'implementation' | 'testing' | 'documentation' | 'review-response';
+  workType?: WorkTypeId; // Explicit work type ID (overrides phase-based detection)
 }
 
 /**
  * Determine which model to use for an agent based on configuration
- * Priority:
+ *
+ * New Priority (PAN-118):
  * 1. Explicitly provided model (options.model)
- * 2. Specialist model (if agentType is a specialist)
- * 3. Complexity-based model (if difficulty is provided)
- * 4. Default fallback (sonnet)
+ * 2. Explicit work type ID (options.workType)
+ * 3. Work type from phase (options.phase → issue-agent:{phase})
+ * 4. Specialist work type (options.agentType → specialist-{type})
+ * 5. Complexity-based routing (LEGACY - deprecated)
+ * 6. Default fallback (claude-sonnet-4-5)
  */
 function determineModel(options: SpawnOptions): string {
   // Explicit model always wins
@@ -273,27 +285,42 @@ function determineModel(options: SpawnOptions): string {
   }
 
   try {
-    const settings = loadSettings();
+    // Use work type router if work type or phase specified
+    if (options.workType) {
+      return getModelId(options.workType);
+    }
 
-    // Check if this is a specialist agent
+    // Map phase to work type ID
+    if (options.phase) {
+      const workType: WorkTypeId = `issue-agent:${options.phase}` as WorkTypeId;
+      return getModelId(workType);
+    }
+
+    // Map specialist agent type to work type ID
     if (options.agentType && options.agentType !== 'work-agent') {
-      const specialistKey = options.agentType.replace('-agent', '_agent') as keyof typeof settings.models.specialists;
-      if (settings.models.specialists[specialistKey]) {
-        return settings.models.specialists[specialistKey];
+      if (options.agentType === 'planning-agent') {
+        return getModelId('planning-agent');
+      }
+      // Specialists: review-agent, test-agent, merge-agent
+      const workType: WorkTypeId = `specialist-${options.agentType}` as WorkTypeId;
+      return getModelId(workType);
+    }
+
+    // LEGACY: Complexity-based routing (deprecated but kept for backward compat)
+    if (options.difficulty) {
+      const settings = loadSettings();
+      if (settings.models.complexity[options.difficulty]) {
+        console.warn(`Using legacy complexity-based routing for ${options.difficulty}. Consider migrating to work types.`);
+        return settings.models.complexity[options.difficulty];
       }
     }
 
-    // Check for complexity-based model
-    if (options.difficulty && settings.models.complexity[options.difficulty]) {
-      return settings.models.complexity[options.difficulty];
-    }
-
     // Fall back to default model
-    return 'sonnet';
+    return 'claude-sonnet-4-5';
   } catch (error) {
-    // If settings can't be loaded, fall back to default
-    console.warn('Warning: Could not load settings for model selection, using default');
-    return options.model || 'sonnet';
+    // If work type router fails, fall back to default
+    console.warn('Warning: Could not resolve model using work type router, using default');
+    return options.model || 'claude-sonnet-4-5';
   }
 }
 
@@ -320,10 +347,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
-    // Initialize Phase 4 fields
+    // Initialize Phase 4 fields (legacy)
     complexity: options.difficulty,
     handoffCount: 0,
     costSoFar: 0,
+    // Work type system (PAN-118)
+    phase: options.phase,
+    workType: options.workType,
   };
 
   saveAgentState(state);
