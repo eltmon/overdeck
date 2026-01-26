@@ -27,6 +27,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-beads', 'Skip beads CLI installation')
+    .option('--skip-router', 'Skip claude-code-router installation')
     .action(installCommand);
 }
 
@@ -36,6 +37,7 @@ interface InstallOptions {
   skipMkcert?: boolean;
   skipDocker?: boolean;
   skipBeads?: boolean;
+  skipRouter?: boolean;
 }
 
 interface PrereqResult {
@@ -166,6 +168,15 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash',
   });
 
+  // claude-code-router (optional - will be auto-installed)
+  const hasRouter = checkCommand('claude-code-router');
+  results.push({
+    name: 'claude-code-router',
+    passed: hasRouter,
+    message: hasRouter ? 'installed' : 'not found (will auto-install)',
+    fix: 'npm install -g @musistudio/claude-code-router',
+  });
+
   // ttyd (web terminal for planning sessions)
   const hasTtyd = checkCommand('ttyd') || existsSync(join(homedir(), 'bin', 'ttyd'));
   results.push({
@@ -177,8 +188,8 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
 
   return {
     results,
-    // mkcert, ttyd, and beads are optional (will be auto-installed or skipped)
-    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)').every((r) => r.passed),
+    // mkcert, ttyd, beads, and claude-code-router are optional (will be auto-installed or skipped)
+    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)' && r.name !== 'claude-code-router').every((r) => r.passed),
   };
 }
 
@@ -404,6 +415,28 @@ async function installCommand(options: InstallOptions): Promise<void> {
     } catch {
       spinner.info('beads already installed');
     }
+    }
+  }
+
+  // Step 5c: Install claude-code-router (multi-model routing)
+  if (options.skipRouter) {
+    spinner.info('Skipping claude-code-router installation (--skip-router)');
+  } else {
+    const hasRouterNow = checkCommand('claude-code-router');
+    if (!hasRouterNow) {
+      spinner.start('Installing claude-code-router...');
+      try {
+        // Install from npm globally
+        execSync('npm install -g @musistudio/claude-code-router', {
+          stdio: 'pipe',
+          timeout: 120000
+        });
+        spinner.succeed('claude-code-router installed via npm');
+      } catch (error) {
+        spinner.warn('claude-code-router installation failed - install manually: npm install -g @musistudio/claude-code-router');
+      }
+    } else {
+      spinner.info('claude-code-router already installed');
     }
   }
 
