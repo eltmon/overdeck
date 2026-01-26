@@ -28,6 +28,20 @@ import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import type { Issue } from '../frontend/src/types.js';
+// Event-sourced cost tracking
+import {
+  getAllIssueCosts,
+  updateCacheIncremental,
+  rebuildFromEvents,
+  getCacheStats
+} from '../../lib/costs/aggregator.js';
+import {
+  getMigrationState,
+  isMigrationComplete,
+  runMigration
+} from '../../lib/costs/migration.js';
+import { getEventLogStats } from '../../lib/costs/events.js';
+import { runRetentionCleanupIfNeeded } from '../../lib/costs/retention.js';
 
 /**
  * Get a Date object representing 24 hours ago from now.
@@ -7878,106 +7892,35 @@ app.get('/api/costs/summary', (_req, res) => {
   }
 });
 
-// GET /api/costs/by-issue - Costs grouped by issue (calculated from actual session files)
+// GET /api/costs/by-issue - Costs grouped by issue (read from pre-computed cache)
 app.get('/api/costs/by-issue', async (_req, res) => {
   try {
-    const issueMap: Record<string, { totalCost: number; tokenCount: number; sessionCount: number; model?: string; durationMinutes?: number }> = {};
+    // Read from pre-computed cache (O(1) lookup, no session parsing!)
+    const issueCosts = getAllIssueCosts();
 
-    // Read all agent state files and calculate costs from actual session data
-    // Include both regular agents (agent-*) and planning agents (planning-*)
-    const agentsDir = join(homedir(), '.panopticon', 'agents');
-    if (existsSync(agentsDir)) {
-      const agentDirs = readdirSync(agentsDir).filter(name => name.startsWith('agent-') || name.startsWith('planning-'));
+    // Convert to array format expected by frontend
+    const issues = Object.entries(issueCosts).map(([issueId, data]) => {
+      const totalTokens = data.inputTokens + data.outputTokens + data.cacheReadTokens + data.cacheWriteTokens;
 
-      // Process agents in parallel batches to avoid blocking (ASYNC)
-      const BATCH_SIZE = 5;
-      for (let i = 0; i < agentDirs.length; i += BATCH_SIZE) {
-        const batch = agentDirs.slice(i, i + BATCH_SIZE);
-        const results = await Promise.all(
-          batch.map(async (agentDir) => {
-            try {
-              const stateFile = join(agentsDir, agentDir, 'state.json');
-              if (!existsSync(stateFile)) return null;
-
-              const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-              if (!state.issueId || !state.workspace) return null;
-
-              const sessionData = await parseWorkspaceSessionUsageAsync(state.workspace);
-              return { issueId: state.issueId, sessionData };
-            } catch {
-              return null;
-            }
-          })
-        );
-
-        // Aggregate results
-        for (const result of results) {
-          if (!result) continue;
-          const key = result.issueId.toLowerCase();
-          const sessionData = result.sessionData;
-
-          if (!issueMap[key]) {
-            issueMap[key] = { totalCost: 0, tokenCount: 0, sessionCount: 0 };
-          }
-
-          issueMap[key].totalCost += sessionData.cost;
-          issueMap[key].tokenCount += sessionData.tokenCount;
-          issueMap[key].sessionCount += 1;
-          issueMap[key].model = sessionData.model;
-
-          if (sessionData.startTime && sessionData.endTime) {
-            const start = new Date(sessionData.startTime).getTime();
-            const end = new Date(sessionData.endTime).getTime();
-            const minutes = (end - start) / (1000 * 60);
-            issueMap[key].durationMinutes = (issueMap[key].durationMinutes || 0) + minutes;
-          }
+      // Get primary model (the one with highest cost)
+      let primaryModel = 'claude-sonnet-4';
+      let maxModelCost = 0;
+      for (const [model, cost] of Object.entries(data.models)) {
+        if (cost > maxModelCost) {
+          maxModelCost = cost;
+          primaryModel = model;
         }
       }
-    }
 
-    // Also check legacy tracking files for any historical data
-    const sessionMap = loadSessionMap();
-    const runtimeMetrics = loadRuntimeMetrics();
-
-    // Add from session-map (legacy format) if not already present
-    for (const [issueId, issueData] of Object.entries(sessionMap.issues || {})) {
-      const data = issueData as any;
-      const key = issueId.toLowerCase();
-      if (!issueMap[key] && (data.totalCost || 0) > 0) {
-        issueMap[key] = {
-          totalCost: data.totalCost || 0,
-          tokenCount: data.totalTokens || 0,
-          sessionCount: data.sessions?.length || 0,
-        };
-      }
-    }
-
-    // Add from runtime-metrics if it has higher values (legacy)
-    for (const task of runtimeMetrics.tasks || []) {
-      if (task.issueId) {
-        const key = task.issueId.toLowerCase();
-        if (!issueMap[key]) {
-          issueMap[key] = { totalCost: 0, tokenCount: 0, sessionCount: 0 };
-        }
-        // Only use if higher than what we calculated from sessions
-        if (task.cost > issueMap[key].totalCost) {
-          issueMap[key].totalCost = task.cost;
-          issueMap[key].tokenCount = task.tokenCount;
-          issueMap[key].model = task.model;
-          issueMap[key].durationMinutes = task.durationMinutes;
-        }
-      }
-    }
-
-    // Convert to array
-    const issues = Object.entries(issueMap).map(([issueId, data]) => ({
-      issueId: issueId.toUpperCase(),
-      totalCost: data.totalCost,
-      tokenCount: data.tokenCount,
-      sessionCount: data.sessionCount,
-      model: data.model,
-      durationMinutes: data.durationMinutes,
-    }));
+      return {
+        issueId: issueId.toUpperCase(),
+        totalCost: data.totalCost,
+        tokenCount: totalTokens,
+        sessionCount: 1, // We don't track session count in new system
+        model: primaryModel,
+        lastUpdated: data.lastUpdated,
+      };
+    });
 
     // Sort by cost descending
     issues.sort((a, b) => b.totalCost - a.totalCost);
@@ -8031,6 +7974,84 @@ app.get('/api/issues/:id/costs', (req, res) => {
   } catch (error: any) {
     console.error('Error getting issue costs:', error);
     res.status(500).json({ error: 'Failed to get issue costs: ' + error.message });
+  }
+});
+
+// POST /api/costs/update-cache - Incrementally update cost cache with new events
+app.post('/api/costs/update-cache', async (_req, res) => {
+  try {
+    const eventsProcessed = updateCacheIncremental();
+    res.json({
+      success: true,
+      eventsProcessed,
+      message: eventsProcessed > 0 ? `Processed ${eventsProcessed} new events` : 'No new events to process'
+    });
+  } catch (error: any) {
+    console.error('Error updating cost cache:', error);
+    res.status(500).json({ error: 'Failed to update cost cache: ' + error.message });
+  }
+});
+
+// POST /api/costs/rebuild - Rebuild entire cost cache from event log
+app.post('/api/costs/rebuild', async (_req, res) => {
+  try {
+    const cache = rebuildFromEvents();
+    res.json({
+      success: true,
+      issueCount: Object.keys(cache.issues).length,
+      lastEventLine: cache.lastEventLine,
+      message: 'Cost cache rebuilt successfully'
+    });
+  } catch (error: any) {
+    console.error('Error rebuilding cost cache:', error);
+    res.status(500).json({ error: 'Failed to rebuild cost cache: ' + error.message });
+  }
+});
+
+// GET /api/costs/status - Get cost tracking system status
+app.get('/api/costs/status', async (_req, res) => {
+  try {
+    const migrationState = getMigrationState();
+    const migrationComplete = isMigrationComplete();
+    const cacheStats = getCacheStats();
+    const eventStats = getEventLogStats();
+
+    res.json({
+      migration: {
+        completed: migrationComplete,
+        state: migrationState,
+      },
+      cache: cacheStats,
+      events: eventStats,
+    });
+  } catch (error: any) {
+    console.error('Error getting cost status:', error);
+    res.status(500).json({ error: 'Failed to get cost status: ' + error.message });
+  }
+});
+
+// POST /api/costs/migrate - Run historical cost migration
+app.post('/api/costs/migrate', async (_req, res) => {
+  try {
+    if (isMigrationComplete()) {
+      res.json({
+        success: true,
+        alreadyCompleted: true,
+        state: getMigrationState(),
+        message: 'Migration already completed'
+      });
+      return;
+    }
+
+    const state = await runMigration();
+    res.json({
+      success: state.completed,
+      state,
+      message: state.completed ? 'Migration completed successfully' : 'Migration failed'
+    });
+  } catch (error: any) {
+    console.error('Error running migration:', error);
+    res.status(500).json({ error: 'Failed to run migration: ' + error.message });
   }
 });
 
@@ -8104,6 +8125,34 @@ if (shouldAutoStart()) {
   console.log('🔔 Auto-starting Cloister...');
   getCloisterService().start();
 }
+
+// Run cost migration on first startup (non-blocking)
+if (!isMigrationComplete()) {
+  console.log('📊 Running historical cost migration...');
+  runMigration()
+    .then((state) => {
+      if (state.completed) {
+        console.log(`✓ Migration complete: ${state.workspaceCount} workspaces, ${state.eventCount} events`);
+      } else {
+        console.error('✗ Migration failed:', state.errors?.join(', '));
+      }
+    })
+    .catch((err) => {
+      console.error('Failed to run migration:', err);
+    });
+} else {
+  console.log('✓ Cost migration already completed');
+  // Update cache incrementally with any new events
+  const eventsProcessed = updateCacheIncremental();
+  if (eventsProcessed > 0) {
+    console.log(`✓ Processed ${eventsProcessed} new cost events`);
+  }
+}
+
+// Run retention cleanup (90-day rolling window) if needed
+runRetentionCleanupIfNeeded().catch(err => {
+  console.error('[retention] Startup cleanup failed:', err);
+});
 
 // In production, serve the frontend static files
 if (process.env.NODE_ENV === 'production') {
