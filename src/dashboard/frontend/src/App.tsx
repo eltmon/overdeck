@@ -14,11 +14,12 @@ import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { MetricsSummary } from './components/MetricsSummary';
 import { MetricsPage } from './components/MetricsPage';
+import { SettingsPage } from './components/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
-import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft } from 'lucide-react';
+import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft, Settings } from 'lucide-react';
 import { Agent, Issue } from './types';
 
-type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'handoffs';
+type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'handoffs' | 'settings';
 
 const MIN_PANEL_WIDTH = 400;
 const MAX_PANEL_WIDTH = 1200;
@@ -202,6 +203,7 @@ export default function App() {
               { id: 'metrics', label: 'Metrics', icon: BarChart3 },
               { id: 'skills', label: 'Skills', icon: BookOpen },
               { id: 'health', label: 'Health', icon: Activity },
+              { id: 'settings', label: 'Settings', icon: Settings },
             ] as const).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -306,6 +308,11 @@ export default function App() {
         {activeTab === 'handoffs' && (
           <div className="w-full overflow-auto">
             <HandoffsPage />
+          </div>
+        )}
+        {activeTab === 'settings' && (
+          <div className="p-6 w-full overflow-auto">
+            <SettingsPage />
           </div>
         )}
       </main>
