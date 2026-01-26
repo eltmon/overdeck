@@ -270,6 +270,92 @@ Panopticon supports multiple issue trackers:
 
 Secondary trackers sync issues to the dashboard alongside Linear issues, allowing unified project management.
 
+### Multi-Model Support
+
+Panopticon integrates with [claude-code-router](https://github.com/musistudio/claude-code-router) to enable using multiple AI model providers alongside Anthropic models. Configure which models to use for different agent types and task complexities.
+
+#### Supported Providers and Models
+
+**Anthropic** (via Claude Code / Claude API)
+- `claude-opus-4-5` - Most capable, best for planning and complex tasks
+- `claude-sonnet-4-5` - Balanced performance and cost
+- `claude-haiku-4-5` - Fast and cost-effective for simple tasks
+
+**OpenAI**
+- `gpt-5.2-codex` - Agentic coding and research
+- `o3-deep-research` - Deep research capabilities
+- `gpt-4o` - General-purpose model
+- `gpt-4o-mini` - Faster, more cost-effective variant
+
+**Google (Gemini)**
+- `gemini-3-pro-preview` - Supports `thinking_level: high|low`
+- `gemini-3-flash-preview` - Supports `thinking_level: minimal|low|medium|high`
+
+**Z.AI**
+- `glm-4.7` - General-purpose model
+- `glm-4.7-flash` - Faster variant
+
+#### Configuration via Dashboard
+
+1. Open the Panopticon dashboard and navigate to **Settings**
+2. Configure **API keys** for external providers:
+   - OpenAI API Key
+   - Google AI API Key
+   - Z.AI API Key
+3. Configure **models per agent type**:
+   - Review Agent - Model for code review
+   - Test Agent - Model for running tests
+   - Merge Agent - Model for handling merges
+   - Planning Agent - Model for autonomous planning
+4. Configure **models by task complexity** (for PAN-75):
+   - Trivial tasks → Cost-effective models (e.g., `claude-haiku-4-5`)
+   - Expert tasks → Most capable models (e.g., `claude-opus-4-5`)
+
+**Security:** Settings are stored in `~/.panopticon/settings.json`. For added security:
+```bash
+chmod 600 ~/.panopticon/settings.json
+```
+
+**Environment Variables:** Instead of storing keys in settings.json, you can use environment variables:
+```bash
+# In your shell profile (~/.bashrc, ~/.zshrc)
+export OPENAI_API_KEY="sk-..."
+export GOOGLE_AI_API_KEY="AIza..."
+export ZAI_API_KEY="..."
+```
+
+Then in the dashboard, use variable syntax in the API key fields:
+- `$OPENAI_API_KEY`
+- `$GOOGLE_AI_API_KEY`
+- `$ZAI_API_KEY`
+
+#### Router Configuration
+
+**Panopticon owns the router configuration.** When you save settings in the dashboard, Panopticon automatically generates `~/.claude-code-router/config.json` with the appropriate provider and routing configuration. Manual edits to this file will be overwritten on the next settings change.
+
+#### Example Use Cases
+
+**Cost optimization:**
+```
+Specialist agents → claude-sonnet-4-5 (balanced)
+Planning agent → claude-opus-4-5 (most capable)
+Simple tasks → claude-haiku-4-5 (cost-effective)
+```
+
+**Multi-provider setup:**
+```
+Code review → gpt-4o (OpenAI's code understanding)
+Testing → claude-sonnet-4-5 (Anthropic's reliability)
+Planning → claude-opus-4-5 (Anthropic's reasoning)
+```
+
+**Research-heavy workflows:**
+```
+Research tasks → o3-deep-research (OpenAI)
+Implementation → claude-sonnet-4-5 (Anthropic)
+Code review → gemini-3-pro-preview (Google)
+```
+
 ### Register Projects
 
 Register your local project directories so Panopticon knows where to create workspaces:
