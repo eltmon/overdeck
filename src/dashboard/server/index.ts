@@ -14,6 +14,8 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 
 const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
+import { loadSettings, saveSettings, validateSettings, getAvailableModels } from '../../lib/settings.js';
+import { generateRouterConfig, writeRouterConfig } from '../../lib/router-config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../lib/health-filtering.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
@@ -2206,6 +2208,55 @@ app.get('/api/cloister/spawn-status', (_req, res) => {
   } catch (error: any) {
     console.error('Error checking spawn status:', error);
     res.status(500).json({ error: 'Failed to check spawn status: ' + error.message });
+  }
+});
+
+// Get settings (PAN-78)
+app.get('/api/settings', (_req, res) => {
+  try {
+    const settings = loadSettings();
+    res.json(settings);
+  } catch (error: any) {
+    console.error('Error loading settings:', error);
+    res.status(500).json({ error: 'Failed to load settings: ' + error.message });
+  }
+});
+
+// Get available models (filtered by configured API keys) (PAN-78)
+app.get('/api/settings/available-models', (_req, res) => {
+  try {
+    const settings = loadSettings();
+    const availableModels = getAvailableModels(settings);
+    res.json(availableModels);
+  } catch (error: any) {
+    console.error('Error loading available models:', error);
+    res.status(500).json({ error: 'Failed to load available models: ' + error.message });
+  }
+});
+
+// Update settings (PAN-78)
+app.put('/api/settings', (req, res) => {
+  try {
+    const newSettings = req.body;
+
+    // Validate settings
+    const validationError = validateSettings(newSettings);
+    if (validationError) {
+      res.status(400).json({ error: validationError });
+      return;
+    }
+
+    // Save settings
+    saveSettings(newSettings);
+
+    // Regenerate router config
+    const routerConfig = generateRouterConfig(newSettings);
+    writeRouterConfig(routerConfig);
+
+    res.json({ success: true, message: 'Settings saved and router config updated' });
+  } catch (error: any) {
+    console.error('Error saving settings:', error);
+    res.status(500).json({ error: 'Failed to save settings: ' + error.message });
   }
 });
 
