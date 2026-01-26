@@ -1057,6 +1057,7 @@ export async function wakeSpecialistOrQueue(
   saveAgentRuntimeState(tmuxSession, {
     state: 'active',
     lastActivity: new Date().toISOString(),
+    currentIssue: task.issueId,
   });
   console.log(`[specialist] ${name} marked active (preventing concurrent wakes)`);
 
@@ -1064,10 +1065,11 @@ export async function wakeSpecialistOrQueue(
     const wakeResult = await wakeSpecialistWithTask(name, task);
 
     if (!wakeResult.success) {
-      // Wake failed - revert state to idle
+      // Wake failed - revert state to idle and clear currentIssue
       saveAgentRuntimeState(tmuxSession, {
         state: 'idle',
         lastActivity: new Date().toISOString(),
+        currentIssue: undefined,
       });
     }
 
@@ -1078,10 +1080,11 @@ export async function wakeSpecialistOrQueue(
       error: wakeResult.error,
     };
   } catch (error: unknown) {
-    // Exception - revert state to idle
+    // Exception - revert state to idle and clear currentIssue
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
       lastActivity: new Date().toISOString(),
+      currentIssue: undefined,
     });
 
     const msg = error instanceof Error ? error.message : String(error);

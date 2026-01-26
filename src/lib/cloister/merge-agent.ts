@@ -22,6 +22,7 @@ import {
   isRunning,
 } from './specialists.js';
 import { runMergeValidation, autoRevertMerge } from './validation.js';
+import { cleanupStaleLocks } from '../git-utils.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -724,7 +725,31 @@ export async function spawnMergeAgentForBranches(
 
   // Pre-flight checks (quick validation before waking specialist)
   try {
-    // Check that source branch is pushed to remote
+    // 1. Check for and clean up stale git lock files
+    console.log(`[merge-agent] Checking for stale git lock files...`);
+    const lockCleanup = await cleanupStaleLocks(projectPath);
+
+    if (lockCleanup.found.length > 0) {
+      console.log(`[merge-agent] Found ${lockCleanup.found.length} lock file(s)`);
+
+      if (lockCleanup.removed.length > 0) {
+        console.log(`[merge-agent] ✓ Cleaned up ${lockCleanup.removed.length} stale lock file(s):`);
+        lockCleanup.removed.forEach(f => console.log(`  - ${f}`));
+        logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
+      }
+
+      if (lockCleanup.errors.length > 0) {
+        console.warn(`[merge-agent] ⚠️ Failed to clean up some locks:`, lockCleanup.errors);
+        if (lockCleanup.errors.some(e => e.error.includes('Git processes are running'))) {
+          const message = 'Git processes are still running - cannot safely start merge';
+          console.error(`[merge-agent] ${message}`);
+          logActivity('merge_blocked', message);
+          return { success: false, reason: message };
+        }
+      }
+    }
+
+    // 2. Check that source branch is pushed to remote
     try {
       const { stdout: remoteBranches } = await execAsync(`git ls-remote --heads origin ${sourceBranch}`, {
         cwd: projectPath,
