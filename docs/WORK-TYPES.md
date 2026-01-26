@@ -6,7 +6,9 @@ A comprehensive breakdown of all controllable work types for model routing.
 
 Panopticon supports fine-grained model routing across 20+ work types. Each work type can be assigned a different model, allowing you to optimize for cost, speed, or quality based on the task.
 
-**Total controllable work types: 20**
+**Total controllable work types: 23**
+
+*Note: Originally spec'd at 20 types, but CLI contexts (2) and one additional agent type (1) were added during implementation.*
 
 ---
 

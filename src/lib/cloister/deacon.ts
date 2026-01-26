@@ -33,7 +33,7 @@ import {
   wakeSpecialistWithTask,
   completeSpecialistTask,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState } from '../agents.js';
 import { sessionExists } from '../tmux.js';
 
 // ============================================================================
@@ -471,6 +471,22 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
 
     // Get runtime state (from hooks)
     const runtimeState = getAgentRuntimeState(agent.id);
+
+    // P0 FIX: Sync state.json lastActivity with runtime heartbeat
+    // This keeps the dashboard accurate and prevents stale state display
+    if (runtimeState && runtimeState.lastActivity) {
+      const state = getAgentState(agent.id);
+      if (state) {
+        const runtimeLastActivity = runtimeState.lastActivity;
+        const stateLastActivity = state.lastActivity;
+
+        // Update state.json if runtime is more recent (or state has no timestamp)
+        if (!stateLastActivity || new Date(runtimeLastActivity) > new Date(stateLastActivity)) {
+          state.lastActivity = runtimeLastActivity;
+          saveAgentState(state);
+        }
+      }
+    }
 
     // Only suspend idle agents
     if (!runtimeState || runtimeState.state !== 'idle') {
