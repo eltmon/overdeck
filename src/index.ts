@@ -1,7 +1,7 @@
 // Panopticon CLI - Main exports for library usage
-export * from '@panopticon/shared/paths.js';
-export * from '@panopticon/shared/config.js';
-export * from '@panopticon/shared/shell.js';
-export * from '@panopticon/shared/backup.js';
-export * from '@panopticon/shared/sync.js';
-export * from '@panopticon/shared/tracker/index.js';
+export * from './lib/paths.js';
+export * from './lib/config.js';
+export * from './lib/shell.js';
+export * from './lib/backup.js';
+export * from './lib/sync.js';
+export * from './lib/tracker/index.js';
