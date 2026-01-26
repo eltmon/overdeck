@@ -19,6 +19,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
 import { registerDbCommands } from './commands/db.js';
 import { registerBeadsCommands } from './commands/beads.js';
+import { migrateConfigCommand } from './commands/migrate-config.js';
 
 const program = new Command();
 
@@ -95,6 +96,16 @@ registerDbCommands(program);
 
 // Register beads commands (pan beads compact, pan beads stats)
 registerBeadsCommands(program);
+
+// Config migration
+program
+  .command('migrate-config')
+  .description('Migrate from settings.json to config.yaml')
+  .option('--force', 'Force migration even if config.yaml exists')
+  .option('--preview', 'Preview migration without applying changes')
+  .option('--no-backup', 'Do not back up settings.json')
+  .option('--delete-legacy', 'Delete settings.json after migration')
+  .action(migrateConfigCommand);
 
 // Shorthand: pan status = pan work status
 program

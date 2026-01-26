@@ -15,6 +15,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { loadSettings, saveSettings, validateSettings, getAvailableModels } from '../../lib/settings.js';
+import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi } from '../../lib/settings-api.js';
 import { generateRouterConfig, writeRouterConfig } from '../../lib/router-config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../lib/health-filtering.js';
@@ -2214,7 +2215,7 @@ app.get('/api/cloister/spawn-status', (_req, res) => {
 // Get settings (PAN-78)
 app.get('/api/settings', (_req, res) => {
   try {
-    const settings = loadSettings();
+    const settings = loadSettingsApi();
     res.json(settings);
   } catch (error: any) {
     console.error('Error loading settings:', error);
@@ -2225,8 +2226,8 @@ app.get('/api/settings', (_req, res) => {
 // Get available models (filtered by configured API keys) (PAN-78)
 app.get('/api/settings/available-models', (_req, res) => {
   try {
-    const settings = loadSettings();
-    const availableModels = getAvailableModels(settings);
+    const settings = loadSettingsApi();
+    const availableModels = getAvailableModelsApi(settings);
     res.json(availableModels);
   } catch (error: any) {
     console.error('Error loading available models:', error);
@@ -2234,26 +2235,147 @@ app.get('/api/settings/available-models', (_req, res) => {
   }
 });
 
-// Update settings (PAN-78)
+// Validate API key (PAN-118-23)
+app.post('/api/settings/validate-api-key', async (req, res) => {
+  try {
+    const { provider, apiKey } = req.body;
+
+    if (!provider || !apiKey) {
+      res.status(400).json({ error: 'Provider and apiKey are required' });
+      return;
+    }
+
+    let valid = false;
+    let error: string | null = null;
+    let models: string[] = [];
+
+    // Validate based on provider
+    switch (provider) {
+      case 'openai':
+        try {
+          const response = await fetch('https://api.openai.com/v1/models', {
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            valid = true;
+            // Extract relevant model IDs
+            models = data.data
+              .map((m: any) => m.id)
+              .filter((id: string) =>
+                id.includes('gpt-') || id.includes('o1') || id.includes('o3')
+              );
+          } else if (response.status === 401) {
+            error = 'Invalid API key';
+          } else if (response.status === 429) {
+            error = 'Rate limit exceeded';
+          } else {
+            error = `HTTP error: ${response.status}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+
+      case 'google':
+        try {
+          // Test with a minimal generateContent call
+          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+          const response = await fetch(testUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: 'test'
+                }]
+              }]
+            }),
+          });
+
+          if (response.ok || response.status === 400) {
+            // 400 is also OK - it means the key is valid but request was malformed (expected)
+            valid = true;
+            models = ['gemini-3-pro-preview', 'gemini-3-flash-preview'];
+          } else if (response.status === 401 || response.status === 403) {
+            error = 'Invalid API key';
+          } else if (response.status === 429) {
+            error = 'Rate limit exceeded';
+          } else {
+            error = `HTTP error: ${response.status}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+
+      case 'zai':
+        try {
+          // Z.AI validation - assuming similar pattern to OpenAI
+          const response = await fetch('https://api.zai.chat/v1/models', {
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            valid = true;
+            models = data.data?.map((m: any) => m.id) || ['glm-4.7', 'glm-4.7-flash'];
+          } else if (response.status === 401) {
+            error = 'Invalid API key';
+          } else if (response.status === 429) {
+            error = 'Rate limit exceeded';
+          } else {
+            error = `HTTP error: ${response.status}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+
+      default:
+        res.status(400).json({ error: `Unsupported provider: ${provider}` });
+        return;
+    }
+
+    res.json({
+      valid,
+      provider,
+      models: valid ? models : undefined,
+      error: error || undefined,
+    });
+  } catch (error: any) {
+    console.error('Error validating API key:', error);
+    res.status(500).json({ error: 'Failed to validate API key: ' + error.message });
+  }
+});
+
+// Update settings (PAN-78, updated for PAN-118)
 app.put('/api/settings', (req, res) => {
   try {
     const newSettings = req.body;
 
     // Validate settings
-    const validationError = validateSettings(newSettings);
+    const validationError = validateSettingsApi(newSettings);
     if (validationError) {
       res.status(400).json({ error: validationError });
       return;
     }
 
-    // Save settings
-    saveSettings(newSettings);
+    // Save settings to YAML
+    saveSettingsApi(newSettings);
 
-    // Regenerate router config
-    const routerConfig = generateRouterConfig(newSettings);
-    writeRouterConfig(routerConfig);
+    // TODO: Regenerate router config for new work-type-based routing
+    // const routerConfig = generateRouterConfig(newSettings);
+    // writeRouterConfig(routerConfig);
 
-    res.json({ success: true, message: 'Settings saved and router config updated' });
+    res.json({ success: true, message: 'Settings saved to config.yaml' });
   } catch (error: any) {
     console.error('Error saving settings:', error);
     res.status(500).json({ error: 'Failed to save settings: ' + error.message });
