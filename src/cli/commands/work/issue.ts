@@ -158,6 +158,50 @@ function readPlanningContext(workspacePath: string): string | null {
 }
 
 /**
+ * Validate that STATE.md belongs to the current issue.
+ * If the STATE.md is for a different issue (cross-contamination from git merge),
+ * remove it to prevent the agent from working on the wrong issue.
+ *
+ * Returns true if STATE.md is valid (matches issue or doesn't exist).
+ */
+function validateAndCleanStateFile(workspacePath: string, issueId: string): { valid: boolean; removed: boolean; wrongIssue?: string } {
+  const statePath = join(workspacePath, '.planning', 'STATE.md');
+
+  if (!existsSync(statePath)) {
+    return { valid: true, removed: false };
+  }
+
+  try {
+    const content = readFileSync(statePath, 'utf-8');
+    const firstLine = content.split('\n')[0] || '';
+
+    // Extract issue ID from first line (format: "# ISSUE-ID: Title" or "# ISSUE-ID - Title")
+    const issueMatch = firstLine.match(/^#\s*([A-Z]+-\d+)/i);
+
+    if (issueMatch) {
+      const stateIssueId = issueMatch[1].toUpperCase();
+      const currentIssueId = issueId.toUpperCase();
+
+      if (stateIssueId !== currentIssueId) {
+        // Cross-contamination detected! Remove the stale STATE.md
+        const { unlinkSync } = require('fs');
+        unlinkSync(statePath);
+
+        console.warn(chalk.yellow(`⚠️  Removed stale STATE.md (was for ${stateIssueId}, not ${currentIssueId})`));
+        console.warn(chalk.dim('   This can happen when branches are merged. The agent will start fresh.'));
+
+        return { valid: false, removed: true, wrongIssue: stateIssueId };
+      }
+    }
+
+    return { valid: true, removed: false };
+  } catch (error) {
+    // If we can't read/parse the file, leave it alone
+    return { valid: true, removed: false };
+  }
+}
+
+/**
  * Check if STATE.md contains Stitch design information
  * Returns the Stitch section if found, null otherwise
  */
@@ -502,6 +546,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.log(`  Planning:   ${planningContext ? 'Found (.planning/STATE.md)' : 'None'}`);
       console.log(`  Beads:      ${beadsTasks.length} tasks`);
       return;
+    }
+
+    // Validate STATE.md belongs to this issue (prevent cross-contamination from git merges)
+    spinner.text = 'Validating workspace state...';
+    const stateValidation = validateAndCleanStateFile(workspace, id);
+    if (stateValidation.removed) {
+      spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
     }
 
     spinner.text = 'Building agent prompt with planning context...';

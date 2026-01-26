@@ -4,6 +4,22 @@
 - **DO NOT** push to main/master branch directly
 - **ALWAYS** check for existing patterns before introducing new ones
 
+## CRITICAL: Workspace Isolation
+
+**You are working in an ISOLATED WORKSPACE. Your working directory MUST be:**
+
+```
+{{WORKSPACE_PATH}}
+```
+
+**Before making ANY file changes:**
+1. Run `pwd` to verify you're in the workspace
+2. All file paths should be relative to the workspace OR absolute paths within the workspace
+3. NEVER use paths like `/home/.../projects/panopticon/src/...` (main project)
+4. ALWAYS use paths like `./src/...` or `{{WORKSPACE_PATH}}/src/...` (workspace)
+
+**If you see yourself working in the main project directory instead of the workspace, STOP and correct your working directory.**
+
 ## NEVER Defer Work (CRITICAL)
 
 **You MUST complete ALL work in the issue scope. NEVER defer tasks to "future PRs".**
