@@ -9,24 +9,161 @@ Spawn, monitor, and control autonomous AI coding agents.
 
 ## pan work issue
 
-Create workspace and spawn agent for an issue.
+Spawn an agent for a Linear or GitHub issue.
+
+```bash
+# Spawn an agent for a Linear issue
+pan work issue MIN-123
+
+# Spawn an agent for a GitHub issue
+pan work issue 42
+```
+
+This command:
+1. Creates a workspace (git worktree) if it doesn't exist
+2. Spawns an autonomous agent in a tmux session
+3. The agent reads the issue, explores the codebase, and implements the solution
 
 ## pan work status
 
-Show all running agents and their status.
+List all running agents and their status.
+
+```bash
+pan work status
+```
+
+Shows:
+- Agent session ID
+- Issue number and title
+- Current status
+- Runtime duration
+- Workspace location
 
 ## pan work tell
 
 Send a message to a running agent.
 
+```bash
+# Send a message to an agent (handles Enter key automatically)
+pan work tell min-123 "Please also add tests"
+```
+
+This command:
+- Sends your message to the agent's tmux session
+- The agent receives it and responds accordingly
+- Useful for providing feedback, clarification, or guidance
+
 ## pan work kill
 
 Stop a running agent.
 
+```bash
+pan work kill min-123
+```
+
+Terminates the agent's tmux session. The workspace and any uncommitted work remain intact.
+
+## pan work pending
+
+Show work completed and awaiting review.
+
+```bash
+pan work pending
+```
+
+Lists issues where agents have finished work but haven't been approved yet.
+
 ## pan work approve
 
-Approve agent work and merge changes.
+Approve agent work, merge MR, and update issue tracker.
 
-## pan work done
+```bash
+pan work approve min-123
+```
 
-Mark work as complete and update issue status.
+This command:
+1. Spawns a merge-agent specialist
+2. Reviews the changes
+3. Merges the pull/merge request
+4. Updates the issue status
+
+## pan work list
+
+List issues from configured trackers.
+
+```bash
+pan work list
+```
+
+Shows issues from Linear, GitHub, or GitLab based on your configuration.
+
+## pan work triage
+
+Triage issues from secondary tracker.
+
+```bash
+pan work triage
+```
+
+Process issues from a secondary tracker (e.g., Rally) and create equivalent issues in your primary tracker.
+
+## pan work reopen
+
+Reopen a closed issue and re-run planning.
+
+```bash
+pan work reopen min-123
+```
+
+Reopens the issue in your tracker and restarts the planning session.
+
+## pan work request-review
+
+Request re-review after fixing feedback.
+
+```bash
+pan work request-review min-123 -m "Fixed: added tests and removed duplication"
+```
+
+For agents, this command has a maximum of 3 auto-requeues to prevent infinite loops.
+
+## pan work wipe
+
+Deep wipe: completely reset all state for an issue.
+
+```bash
+# Clean up agents, state, Linear status
+pan work wipe min-123
+
+# Also delete workspace
+pan work wipe min-123 -w
+
+# Skip confirmation
+pan work wipe min-123 -y -w
+```
+
+This is a nuclear option that:
+- Kills any running agents
+- Cleans up state files
+- Updates issue tracker status
+- Optionally removes the workspace
+
+## pan work recover
+
+Recover crashed agents.
+
+```bash
+# Recover a specific agent
+pan work recover min-123
+
+# Recover all crashed agents
+pan work recover --all
+```
+
+Attempts to resume agents that crashed or were interrupted.
+
+## Next Steps
+
+- [Workspace Commands](/cli/workspace-commands) - Manage workspaces
+- [Convoy Commands](/cli/convoy-commands) - Multi-agent orchestration
+- [Core Concepts](/concepts) - Understand agents and workspaces

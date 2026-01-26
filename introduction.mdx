@@ -3,30 +3,141 @@ title: Introduction
 description: 'Multi-agent orchestration for AI coding assistants'
 ---
 
-# Welcome to Panopticon
+# Panopticon CLI
 
-Panopticon is an open-source framework for orchestrating multiple AI coding assistants. It provides a dashboard for monitoring agents, managing workspaces, and coordinating specialist agents for code review, testing, and merging.
+Multi-agent orchestration for AI coding assistants.
 
-## Features
+> *"The Panopticon had six sides, one for each of the Founders of Gallifrey..."*
 
-- **Multi-Agent Dashboard** - Monitor all your AI agents in real-time
-- **Workspace Management** - Create isolated workspaces for each issue
-- **Specialist Agents** - Dedicated agents for review, testing, and merging
-- **Skills System** - Reusable workflows and best practices
-- **Issue Tracker Integration** - Works with Linear and GitHub Issues
+## Overview
+
+Panopticon is a unified orchestration layer for AI coding assistants. It works with:
+
+| Tool | Support |
+|------|---------|
+| **Claude Code** | Full support |
+| **Codex** | Skills sync |
+| **Cursor** | Skills sync |
+| **Gemini CLI** | Skills sync |
+| **Google Antigravity** | Skills sync |
+
+### Features
+
+- **Multi-agent orchestration** - Spawn and manage multiple AI agents in tmux sessions
+- **Cloister AI Lifecycle Manager** - Automatic model routing, stuck detection, and specialist handoffs
+- **Universal skills** - One SKILL.md format works across all supported tools
+- **Heartbeat Hooks** - Real-time agent activity monitoring via Claude Code hooks
+- **Multi-project support** - YAML-based project registry with label-based issue routing
+- **Health Monitoring** - Deacon-style stuck detection with auto-recovery
+- **Context Engineering** - Structured state management (STATE.md, WORKSPACE.md)
+- **Agent CVs** - Work history tracking for capability-based routing
+- **Google Stitch Integration** - AI-powered UI design with automatic design-to-code workflows
 
 ## Quick Start
 
 ```bash
+# Install Panopticon
 npm install -g panopticon-cli
-pan setup
+
+# Install prerequisites and setup
+pan install
+
+# Start the dashboard
 pan up
 ```
 
 Visit [localhost:3010](http://localhost:3010) to see your dashboard.
 
+## Dashboard
+
+Start the dashboard with:
+
+```bash
+pan up
+```
+
+The dashboard provides a comprehensive interface for managing AI agents and workspaces.
+
+### Dashboard Tabs
+
+| Tab | Purpose |
+|-----|---------|
+| **Board** | Kanban view of Linear issues with drag-and-drop status changes |
+| **Agents** | Running agent sessions with terminal output |
+| **Activity** | Real-time `pan` command output log |
+| **Metrics** | Runtime comparison and cost tracking |
+| **Skills** | Available skills and their descriptions |
+| **Health** | System health checks and diagnostics |
+
+### Issue Filtering
+
+The dashboard automatically filters issues to reduce visual clutter:
+
+- **Linear issues** - Shows current cycle issues only
+- **Done column** - Shows items completed in the last 24 hours
+- **Canceled column** - Shows items canceled in the last 24 hours
+
+This filtering applies to both Linear and GitHub issues. Older completed items are excluded from the dashboard but remain in your issue tracker.
+
+### Issue Cards
+
+Issue cards on the Kanban board display:
+
+- **Cost badges** - Color-coded by amount ($0-5 green, $5-20 yellow, $20+ red)
+- **Container status** - Shows if workspace has Docker containers (running/stopped)
+- **Agent status** - Indicates if an agent is currently working on the issue
+- **Workspace status** - Shows if workspace exists, is corrupted, or needs creation
+
+### Workspace Actions
+
+Click an issue card to open the workspace detail panel:
+
+| Button | Action |
+|--------|--------|
+| **Create Workspace** | Creates git worktree for the issue |
+| **Containerize** | Adds Docker containers to an existing workspace |
+| **Start Containers** | Starts stopped Docker containers |
+| **Start Planning** | Opens interactive planning session with AI |
+| **Start Agent** | Spawns autonomous agent in tmux |
+| **Approve & Merge** | Triggers merge-agent to handle PR merge |
+
+### Interactive Planning
+
+The planning dialog provides a real-time terminal for collaborative planning:
+
+- **Discovery questions** - AI asks clarifying questions before implementation
+- **Codebase exploration** - AI reads files and understands patterns
+- **Pull/Push buttons** - Git operations to share planning context with teammates
+- **AskUserQuestion rendering** - Questions from the AI appear as interactive prompts
+
+### Metrics & Cost Tracking
+
+The **Metrics** tab provides insights into AI agent performance and costs:
+
+- **Per-issue cost badges** - See costs directly on Kanban cards (color-coded by amount)
+- **Issue cost breakdown** - Click an issue to see detailed costs by model and session
+- **Runtime comparison** - Compare success rates, duration, and costs across runtimes (Claude, Codex, etc.)
+- **Capability analysis** - See how different task types (feature, bugfix, refactor) perform
+
+Cost data is stored in `~/.panopticon/`:
+- `session-map.json` - Links Claude Code sessions to issues
+- `runtime-metrics.json` - Aggregated runtime performance data
+- `costs/` - Raw cost logs
+
+**API Endpoints:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/costs/summary` | Overall cost summary (today/week/month) |
+| `GET /api/costs/by-issue` | Costs grouped by issue |
+| `GET /api/issues/:id/costs` | Cost details for a specific issue |
+| `GET /api/metrics/runtimes` | Runtime comparison metrics |
+| `GET /api/metrics/tasks` | Recent task history |
+
 ## Learn More
 
-- [Installation Guide](/quickstart) - Get up and running
-- [CLI Reference](/cli) - All available commands
-- [Specialist Agents](/specialists) - Code review and testing automation
+- [Quick Start Guide](/quickstart) - Installation and setup
+- [Core Concepts](/concepts) - Understanding Panopticon's architecture
+- [CLI Commands](/cli/overview) - All available commands
+- [Features](/features/cloister) - Deep dive into key features
+- [Guides](/guides/legacy-codebases) - Step-by-step guides
