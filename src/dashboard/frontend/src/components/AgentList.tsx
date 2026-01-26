@@ -28,6 +28,7 @@ interface ActivityEntry {
   timestamp: string;
   type: string;
   source: string;
+  command?: string;
   issueId?: string;
   output?: string;
 }
@@ -312,13 +313,14 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                   entry.type === 'spawn' ? 'bg-green-900/50 text-green-400' :
                   entry.type === 'complete' ? 'bg-blue-900/50 text-blue-400' :
                   entry.type === 'error' ? 'bg-red-900/50 text-red-400' :
+                  entry.type === 'deacon' ? 'bg-purple-900/50 text-purple-400' :
                   'bg-gray-700 text-gray-300'
                 }`}>
                   {entry.type}
                 </span>
                 <span className="text-gray-300 truncate flex-1">
-                  {entry.source}
-                  {entry.issueId && (
+                  {entry.type === 'deacon' ? entry.command : entry.source}
+                  {entry.issueId && entry.type !== 'deacon' && (
                     <span className="text-cyan-400 ml-1">({entry.issueId})</span>
                   )}
                 </span>
