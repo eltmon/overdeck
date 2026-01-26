@@ -25,6 +25,7 @@ export const CERTS_DIR = join(PANOPTICON_HOME, 'certs');
 
 // Config files
 export const CONFIG_FILE = join(CONFIG_DIR, 'config.toml');
+export const SETTINGS_FILE = join(CONFIG_DIR, 'settings.json');
 
 // AI tool directories
 export const CLAUDE_DIR = join(homedir(), '.claude');
