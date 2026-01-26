@@ -2143,86 +2143,27 @@ The planning dialog provides a real-time terminal for collaborative planning:
 
 ### Metrics & Cost Tracking
 
-Panopticon uses **event-sourced cost tracking** for real-time visibility into AI usage and costs.
+The **Metrics** tab provides insights into AI agent performance and costs:
 
-#### How It Works
+- **Per-issue cost badges** - See costs directly on Kanban cards (color-coded by amount)
+- **Issue cost breakdown** - Click an issue to see detailed costs by model and session
+- **Runtime comparison** - Compare success rates, duration, and costs across runtimes (Claude, Codex, etc.)
+- **Capability analysis** - See how different task types (feature, bugfix, refactor) perform
 
-1. **Hooks capture usage** - Claude Code `Stop` and `SubagentStop` hooks fire after each API call
-2. **Events logged** - Token usage and model info appended to `~/.panopticon/costs/events.jsonl`
-3. **Cache updated** - Pre-computed aggregations in `~/.panopticon/costs/by-issue.json` (O(1) reads)
-4. **Dashboard displays** - Cost badges on Kanban cards, status indicator in metrics panel
+Cost data is stored in `~/.panopticon/`:
+- `session-map.json` - Links Claude Code sessions to issues
+- `runtime-metrics.json` - Aggregated runtime performance data
+- `costs/` - Raw cost logs
 
-**Key Features:**
-
-- **Real-time tracking** - Costs appear immediately after each Claude API call
-- **Subagent costs included** - Tracks both main agents and task-delegated subagents
-- **Historical migration** - On first run, migrates existing workspace session files
-- **90-day retention** - Old events automatically cleaned up
-- **Fast queries** - Pre-computed cache enables <100ms cost lookups
-
-#### Data Files
-
-All cost data is stored in `~/.panopticon/costs/`:
-
-| File | Purpose |
-|------|---------|
-| `events.jsonl` | Append-only event log (JSONL format) |
-| `by-issue.json` | Pre-computed cost aggregations by issue |
-| `migration-state.json` | Historical migration status |
-| `.events.lock` | File lock for concurrent writes |
-
-#### Dashboard UI
-
-- **Cost badges** - Color-coded by amount on issue cards ($0-5 green, $5-20 yellow, $20+ red)
-- **Status indicator** - Shows "Live" (green), "Migrating" (yellow), or "Stale" (red) in Metrics panel
-- **Event count** - Number of API calls tracked per issue
-
-#### API Endpoints
+**API Endpoints:**
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/costs/by-issue` | Pre-computed costs grouped by issue (fast) |
-| `GET /api/costs/status` | System status (migration, cache, events) |
-| `GET /api/costs/rebuild` | Manually rebuild cache from event log |
-| `POST /api/costs/migrate` | Trigger historical migration (idempotent) |
-
-#### Troubleshooting
-
-**Costs not appearing?**
-
-1. **Check hooks are registered:**
-   ```bash
-   cat ~/.config/claude-code/hooks.json
-   # Should include:
-   # "Stop": "~/.panopticon/hooks/cost-hook"
-   # "SubagentStop": "~/.panopticon/hooks/cost-hook"
-   ```
-
-2. **Verify events are being logged:**
-   ```bash
-   tail -f ~/.panopticon/costs/events.jsonl
-   # Should see new lines after each Claude response
-   ```
-
-3. **Check migration status:**
-   ```bash
-   curl http://localhost:3011/api/costs/status | jq
-   # Should show migration.completed: true
-   ```
-
-4. **Manually rebuild cache:**
-   ```bash
-   curl http://localhost:3011/api/costs/rebuild
-   # Recreates by-issue.json from events.jsonl
-   ```
-
-5. **Re-run migration:**
-   ```bash
-   curl -X POST http://localhost:3011/api/costs/migrate
-   # Imports historical workspace session files
-   ```
-
-**Note:** If hooks aren't registered, run `pan setup hooks` to configure them automatically.
+| `GET /api/costs/summary` | Overall cost summary (today/week/month) |
+| `GET /api/costs/by-issue` | Costs grouped by issue |
+| `GET /api/issues/:id/costs` | Cost details for a specific issue |
+| `GET /api/metrics/runtimes` | Runtime comparison metrics |
+| `GET /api/metrics/tasks` | Recent task history |
 
 ## Skills
 

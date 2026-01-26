@@ -141,7 +141,7 @@ export async function setupHooksCommand(): Promise<void> {
   }
 
   // 3. Copy hook scripts to ~/.panopticon/bin/
-  const hookScripts = ['pre-tool-hook', 'heartbeat-hook', 'stop-hook', 'specialist-stop-hook', 'cost-hook'];
+  const hookScripts = ['pre-tool-hook', 'heartbeat-hook', 'stop-hook', 'specialist-stop-hook'];
   const { fileURLToPath } = await import('url');
   const { dirname } = await import('path');
   const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -171,7 +171,7 @@ export async function setupHooksCommand(): Promise<void> {
     chmodSync(scriptDest, 0o755); // Make executable
   }
 
-  console.log(chalk.green('✓ Installed hook scripts (pre-tool, post-tool, stop, specialist-stop, cost)'));
+  console.log(chalk.green('✓ Installed hook scripts (pre-tool, post-tool, stop, specialist-stop)'));
 
   // 4. Read or create Claude Code settings.json
   const claudeDir = join(homedir(), '.claude');
@@ -235,7 +235,7 @@ export async function setupHooksCommand(): Promise<void> {
     ]
   });
 
-  // Configure Stop hook (sets state to "idle" + logs cost events)
+  // Configure Stop hook (sets state to "idle")
   if (!settings.hooks.Stop) {
     settings.hooks.Stop = [];
   }
@@ -245,10 +245,6 @@ export async function setupHooksCommand(): Promise<void> {
       {
         type: 'command',
         command: join(binDir, 'stop-hook')
-      },
-      {
-        type: 'command',
-        command: join(binDir, 'cost-hook')
       }
     ]
   });
@@ -262,7 +258,7 @@ export async function setupHooksCommand(): Promise<void> {
   console.log(chalk.dim('Claude Code hooks are now configured:'));
   console.log(chalk.dim('  • PreToolUse  - Sets agent state to "active"'));
   console.log(chalk.dim('  • PostToolUse - Logs activity to activity.jsonl'));
-  console.log(chalk.dim('  • Stop       - Sets agent state to "idle" + logs cost events\n'));
+  console.log(chalk.dim('  • Stop       - Sets agent state to "idle"\n'));
   console.log(chalk.dim('When you run agents via `pan work issue`, they will report'));
-  console.log(chalk.dim('their status and costs in real-time to the Panopticon dashboard.\n'));
+  console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));
 }
