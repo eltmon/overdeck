@@ -1787,11 +1787,8 @@ app.post('/api/agents/:id/message', async (req, res) => {
   }
 
   try {
-    // Send message to tmux session (async)
-    await execAsync(`tmux send-keys -t "${id}" "${message.replace(/"/g, '\\"')}"`);
-    // Press Enter (C-m is more reliable than literal 'Enter')
-    await execAsync(`tmux send-keys -t "${id}" C-m`);
-
+    const { messageAgent } = await import('../lib/agents.js');
+    await messageAgent(id, message);
     res.json({ success: true });
   } catch (error) {
     console.error('Error sending message:', error);
@@ -1864,11 +1861,8 @@ app.post('/api/agents/:id/poke', async (req, res) => {
   const pokeMsg = message || defaultPokeMessage;
 
   try {
-    // Send message via tmux (two separate commands: text then Enter)
-    const escapedMsg = pokeMsg.replace(/"/g, '\\"').replace(/'/g, "\\'");
-    await execAsync(`tmux send-keys -t "${id}" "${escapedMsg}"`);
-    await execAsync(`tmux send-keys -t "${id}" C-m`, { encoding: 'utf-8' });
-
+    const { messageAgent } = await import('../lib/agents.js');
+    await messageAgent(id, pokeMsg);
     res.json({ success: true, message: 'Agent poked successfully' });
   } catch (error) {
     console.error('Error poking agent:', error);
@@ -4658,15 +4652,12 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
       try {
-        const { sessionExists, sendToTmux } = await import('../../lib/tmux.js');
-        if (sessionExists(agentId)) {
-          const feedback = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nPlease address these issues and re-request review.`;
-          sendToTmux(agentId, feedback);
-          console.log(`[review-status] Auto-sent feedback to ${agentId}`);
-        } else {
-          console.log(`[review-status] Work agent ${agentId} not running, feedback saved to review-status only`);
-        }
+        const { messageAgent } = await import('../../lib/agents.js');
+        const feedback = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nPlease address these issues and re-request review.`;
+        await messageAgent(agentId, feedback);
+        console.log(`[review-status] Auto-sent feedback to ${agentId}`);
       } catch (err) {
+        console.log(`[review-status] Work agent ${agentId} not running or suspended, feedback saved to mail queue`);
         console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
       }
     }
@@ -4715,13 +4706,12 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     if (testStatus === 'failed' && testNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
       try {
-        const { sessionExists, sendToTmux } = await import('../../lib/tmux.js');
-        if (sessionExists(agentId)) {
-          const feedback = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nPlease fix the failing tests and re-request review.`;
-          sendToTmux(agentId, feedback);
-          console.log(`[review-status] Auto-sent test failure to ${agentId}`);
-        }
+        const { messageAgent } = await import('../../lib/agents.js');
+        const feedback = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nPlease fix the failing tests and re-request review.`;
+        await messageAgent(agentId, feedback);
+        console.log(`[review-status] Auto-sent test failure to ${agentId}`);
       } catch (err) {
+        console.log(`[review-status] Work agent ${agentId} not running or suspended, feedback saved to mail queue`);
         console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
       }
     }

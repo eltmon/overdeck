@@ -1278,25 +1278,23 @@ export async function sendFeedbackToAgent(
     console.error(`[specialist] Failed to log feedback:`, error);
   }
 
-  // Try to send feedback to the issue agent's tmux session
+  // Try to send feedback to the issue agent
   const agentSession = `agent-${toIssueId.toLowerCase()}`;
 
   try {
-    await execAsync(`tmux has-session -t "${agentSession}" 2>/dev/null`, { encoding: 'utf-8' });
+    const { messageAgent } = await import('../agents.js');
 
     // Format feedback message for the agent
     const feedbackMessage = formatFeedbackForAgent(fullFeedback);
-    const escapedMessage = feedbackMessage.replace(/'/g, "'\\''");
 
-    // Send to agent
-    await execAsync(`tmux send-keys -t "${agentSession}" '${escapedMessage}'`, { encoding: 'utf-8' });
-    await execAsync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
+    // Send to agent (handles suspended agents, mail queue, etc.)
+    await messageAgent(agentSession, feedbackMessage);
 
     console.log(`[specialist] Sent feedback from ${fromSpecialist} to ${agentSession}`);
     return true;
-  } catch {
+  } catch (err) {
     // Agent session doesn't exist or send failed
-    console.log(`[specialist] Could not send feedback to ${agentSession} (session may not exist)`);
+    console.log(`[specialist] Could not send feedback to ${agentSession}:`, err);
     // Feedback is still logged, can be retrieved later
     return false;
   }
