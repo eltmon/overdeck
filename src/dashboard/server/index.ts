@@ -5215,9 +5215,9 @@ PROJECT: ${projectPath}
 
 === DECISION ===
 **IF ANY ISSUES FOUND:**
-- DO NOT hand off to test-agent
+- Update status: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[detailed list of all issues found]"}'
 - Use /send-feedback-to-agent to send detailed feedback to agent-${issueId.toLowerCase()}
-- Report: "REVIEW BLOCKED: [list of issues that must be fixed]"
+- DO NOT hand off to test-agent
 
 **ONLY IF CODE IS PERFECT (rare):**
 - Update status: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'

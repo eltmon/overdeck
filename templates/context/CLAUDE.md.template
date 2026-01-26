@@ -67,6 +67,28 @@ Before marking this issue complete:
 - [ ] No console errors or warnings
 - [ ] Documentation updated if needed
 
+## Responding to Review Feedback
+
+If you receive feedback from review-agent indicating issues to fix:
+
+1. **Read the feedback carefully** - Understand each issue raised
+2. **Fix all issues** - Address every item in the feedback
+3. **Test your fixes** - Ensure tests still pass
+4. **Commit and push** - Push your fixes to the remote branch
+5. **Request re-review** - Run this command:
+   ```bash
+   pan work request-review {{ISSUE_ID}} -m "Fixed: [brief summary of what you fixed]"
+   ```
+
+**Circuit breaker**: You can auto-request re-review up to 3 times. After that, a human must click "Review" in the dashboard.
+
+**Example**:
+```bash
+pan work request-review PAN-123 -m "Fixed: added real tests instead of placeholders"
+```
+
+This will queue the review-agent to re-review your changes.
+
 ## Emergency Recovery
 
 If you're resuming after a crash:
