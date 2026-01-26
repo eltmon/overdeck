@@ -33,7 +33,7 @@ import {
   wakeSpecialistWithTask,
   completeSpecialistTask,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir } from '../agents.js';
 import { sessionExists } from '../tmux.js';
 
 // ============================================================================
@@ -454,7 +454,7 @@ export interface PatrolResult {
  * Check and auto-suspend idle agents (PAN-80)
  *
  * Specialists: 5 minute idle timeout
- * Work agents: 10 minute idle timeout
+ * Work agents: NEVER auto-suspend after completion (stay available for merge)
  */
 export async function checkAndSuspendIdleAgents(): Promise<string[]> {
   const actions: string[] = [];
@@ -485,6 +485,18 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
     // Determine timeout based on agent type
     const isSpecialist = specialistNames.has(agent.id);
     const timeoutMinutes = isSpecialist ? 5 : 10;
+
+    // Check if this is a completed work agent
+    // Work agents that have finished their work should remain available for merge
+    const isWorkAgent = agent.id.startsWith('agent-') && !isSpecialist;
+    if (isWorkAgent) {
+      const completedFile = join(getAgentDir(agent.id), 'completed');
+
+      if (existsSync(completedFile)) {
+        // Skip suspension - work agent completed and should stay available
+        continue;
+      }
+    }
 
     // Check if idle timeout exceeded
     if (idleMinutes > timeoutMinutes) {

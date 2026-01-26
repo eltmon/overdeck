@@ -160,6 +160,71 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
     console.log(chalk.dim('Ready for review. When approved, run:'));
     console.log(chalk.dim(`  pan work approve ${issueId}`));
+    console.log('');
+
+    // Auto-trigger review & test (respecting circuit breaker)
+    try {
+      const dashboardUrl = 'http://localhost:3011';
+
+      // Check if dashboard is running
+      const http = await import('http');
+      const checkDashboard = () => new Promise<boolean>((resolve) => {
+        const req = http.request(`${dashboardUrl}/health`, { method: 'GET', timeout: 1000 }, (res) => {
+          resolve(res.statusCode === 200);
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => { req.destroy(); resolve(false); });
+        req.end();
+      });
+
+      const dashboardRunning = await checkDashboard();
+
+      if (dashboardRunning) {
+        console.log(chalk.dim('Auto-triggering review & test...'));
+
+        // Trigger review endpoint
+        const reviewReq = () => new Promise<any>((resolve, reject) => {
+          const postData = JSON.stringify({});
+          const req = http.request(
+            `${dashboardUrl}/api/workspaces/${issueId}/review`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
+            (res) => {
+              let data = '';
+              res.on('data', (chunk) => data += chunk);
+              res.on('end', () => {
+                try {
+                  resolve(JSON.parse(data));
+                } catch {
+                  resolve({ success: false, error: 'Invalid response' });
+                }
+              });
+            }
+          );
+          req.on('error', reject);
+          req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+          req.write(postData);
+          req.end();
+        });
+
+        const result = await reviewReq();
+
+        if (result.success) {
+          console.log(chalk.green(`  ✓ Review & test ${result.queued ? 'queued' : 'started'} automatically`));
+        } else {
+          // Don't fail the command if review trigger fails - just inform
+          console.log(chalk.yellow(`  ⚠ Auto-review not triggered: ${result.error || result.message || 'Unknown error'}`));
+          if (result.alreadyReviewed) {
+            console.log(chalk.dim(`    Manual review needed - click "Review and Test" in dashboard`));
+          }
+        }
+      } else {
+        console.log(chalk.dim('  Dashboard not running - skipping auto-review'));
+        console.log(chalk.dim('  Start dashboard with: pan up'));
+      }
+    } catch (error: any) {
+      // Don't fail the done command if auto-review fails
+      console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
+    }
 
   } catch (error: any) {
     spinner.fail(error.message);
