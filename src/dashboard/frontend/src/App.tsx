@@ -14,7 +14,7 @@ import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { MetricsSummary } from './components/MetricsSummary';
 import { MetricsPage } from './components/MetricsPage';
-import { SettingsPage } from './components/SettingsPage';
+import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
 import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft, Settings } from 'lucide-react';
 import { Agent, Issue } from './types';
