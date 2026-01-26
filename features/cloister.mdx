@@ -199,8 +199,8 @@ Cloister supports two handoff methods, automatically selected based on agent typ
 
 | Method | When Used | How It Works |
 |--------|-----------|--------------|
-| **Kill & Spawn** | General agents (agent-min-123, etc.) | 1. Captures full context (STATE.md, beads, git state)<br>2. Kills tmux session<br>3. Spawns new agent with handoff prompt<br>4. New agent continues work with preserved context |
-| **Specialist Wake** | Permanent specialists (merge-agent, test-agent) | 1. Captures handoff context<br>2. Sends wake message to existing session<br>3. Specialist resumes with context injection |
+| **Kill & Spawn** | General agents (agent-min-123, etc.) | 1. Captures full context (STATE.md, beads, git state)<br />2. Kills tmux session<br />3. Spawns new agent with handoff prompt<br />4. New agent continues work with preserved context |
+| **Specialist Wake** | Permanent specialists (merge-agent, test-agent) | 1. Captures handoff context<br />2. Sends wake message to existing session<br />3. Specialist resumes with context injection |
 
 **Kill & Spawn** is used for temporary agents that work on specific issues. It creates a clean handoff by:
 - Capturing the agent's current understanding (from STATE.md)
