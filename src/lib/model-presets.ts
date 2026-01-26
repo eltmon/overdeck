@@ -2,7 +2,7 @@
  * Model Presets
  *
  * Defines three preset configurations (Premium, Balanced, Budget) with
- * model assignments for all 20 work types. Users can select a preset
+ * model assignments for all 23 work types. Users can select a preset
  * and optionally override specific work types.
  */
 

@@ -136,7 +136,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
  * Generate claude-code-router config from work types
  *
  * This is the new work-type-based router configuration.
- * It generates routing rules for all 20 work types using the
+ * It generates routing rules for all 23 work types using the
  * WorkTypeRouter to resolve models.
  */
 export function generateRouterConfigFromWorkTypes(): RouterConfig {
@@ -185,7 +185,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
     });
   }
 
-  // Generate router rules for all 20 work types
+  // Generate router rules for all 23 work types
   const allWorkTypes = getAllWorkTypes();
   for (const workType of allWorkTypes) {
     const resolution = workTypeRouter.getModel(workType);

@@ -192,7 +192,7 @@ Override specific work types while keeping preset defaults for others.
 
 ### Available Work Types
 
-See [WORK-TYPES.md](./WORK-TYPES.md) for the complete list of 20 work types.
+See [WORK-TYPES.md](./WORK-TYPES.md) for the complete list of 23 work types.
 
 **Categories**:
 - `issue-agent:*` - Main work agent phases (6 types)

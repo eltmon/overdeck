@@ -19,7 +19,7 @@ export interface WorkTypeMetadata {
 }
 
 /**
- * Complete registry of all 20 work types with metadata
+ * Complete registry of all 23 work types with metadata
  */
 export const WORK_TYPES = {
   // Issue agent phases (6)
