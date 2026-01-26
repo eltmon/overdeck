@@ -221,12 +221,12 @@ export function SettingsPage() {
 
       {/* Save status */}
       {saveMutation.isSuccess && (
-        <div className="bg-green-900/30 border border-green-700 rounded-md p-4 text-green-400">
+        <div className="bg-green-900/30 border border-green-700 rounded-md p-4 text-green-400 animate-fade-in">
           Settings saved successfully! Changes will apply to newly spawned agents.
         </div>
       )}
       {saveMutation.isError && (
-        <div className="bg-red-900/30 border border-red-700 rounded-md p-4 text-red-400">
+        <div className="bg-red-900/30 border border-red-700 rounded-md p-4 text-red-400 animate-fade-in">
           Error: {(saveMutation.error as Error).message}
         </div>
       )}

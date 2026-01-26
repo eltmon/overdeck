@@ -30,8 +30,12 @@ export function WorkTypeOverrides({ overrides, presetModels, onConfigureOverride
       </button>
 
       {/* Expanded Content */}
-      {expanded && (
-        <div className="mt-4 bg-[#24283b] rounded-lg border border-slate-700/50 overflow-hidden">
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          expanded ? 'max-h-[2000px] mt-4 opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="bg-[#24283b] rounded-lg border border-slate-700/50">
           <WorkTypeTable
             overrides={overrides}
             presetModels={presetModels}
@@ -39,7 +43,7 @@ export function WorkTypeOverrides({ overrides, presetModels, onConfigureOverride
             onRemoveOverride={onRemoveOverride}
           />
         </div>
-      )}
+      </div>
     </section>
   );
 }
