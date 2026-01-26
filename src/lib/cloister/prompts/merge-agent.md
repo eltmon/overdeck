@@ -52,6 +52,26 @@ For each conflict:
 - **Maintain code style consistency** - Follow existing patterns in the project
 - **Do NOT modify files that don't have conflicts** - Only touch the files listed above
 
+### Special Rules for PRDs and Planning Files
+
+**`.planning/` directory:**
+- Should be gitignored. If it appears in a merge, remove it with `git rm --cached`
+- This is workspace-specific state, not meant for version control
+
+**PRD files (`docs/prds/`):**
+- `docs/prds/completed/*` → **Always keep target branch version** (completed PRDs are final)
+- `docs/prds/active/*` → If conflict, **keep target (main) version** since active PRDs may have moved
+- New PRD files from feature branch → **Accept without conflict**
+
+**False rename detection:**
+If Git incorrectly detects a rename between unrelated files (e.g., STATE.md ↔ some-prd.md):
+1. Check if files are actually unrelated (different purposes)
+2. If unrelated, restore BOTH files to their correct content:
+   ```bash
+   git show {{targetBranch}}:path/to/file > path/to/file  # Restore target version
+   git add path/to/file
+   ```
+
 ### 3. Validate Resolution
 
 **CRITICAL:** Before committing, you MUST verify the merge is complete and valid.
