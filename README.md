@@ -1860,15 +1860,24 @@ These safeguards are enforced through:
 | ![Start](docs/planning-session-dialog.png) | ![Exploring](docs/planning-session-active.png) | ![Discovery](docs/planning-session-discovery.png) |
 | Click to create workspace and start AI planning | Claude explores the codebase, reads docs, understands patterns | Interactive questions to clarify requirements and approach |
 
-Planning artifacts are stored **inside the workspace**, making them part of the feature branch:
+Planning artifacts are stored **inside the workspace**:
+
+> ⚠️ **Note: `.planning/` is currently ephemeral (not tracked in git)**
+>
+> The `.planning/` directory is listed in `.gitignore` to prevent cross-contamination between issues. When branches merge, planning state from issue A could contaminate issue B's workspace, causing agents to work on the wrong tasks.
+>
+> **Current behavior:** Planning state is local to your machine only. If you switch machines, you'll need to re-run the planning session.
+>
+> See [#111](https://github.com/eltmon/panopticon-cli/issues/111) for the future enhancement to support cross-machine planning sync safely.
 
 ```
 workspaces/feature-min-123/
-├── .planning/
-│   ├── output.jsonl          # Full conversation history (tool uses + results)
-│   ├── PLANNING_PROMPT.md    # Initial planning prompt
+├── .planning/                 # ⚠️ NOT tracked in git (ephemeral)
+│   ├── STATE.md               # Current planning state
+│   ├── output.jsonl           # Full conversation history
+│   ├── PLANNING_PROMPT.md     # Initial planning prompt
 │   ├── CONTINUATION_PROMPT.md # Context for continued sessions
-│   └── output-*.jsonl        # Backup of previous rounds
+│   └── output-*.jsonl         # Backup of previous rounds
 └── ... (code)
 ```
 
@@ -1879,42 +1888,16 @@ When the planning session completes, the AI generates:
 - **Beads tasks** - Trackable sub-tasks with dependencies for the implementation
 - **Feature PRD** - Copied to `docs/prds/active/{issue}-plan.md` for documentation
 
-**This enables:**
+**Future capabilities (currently disabled - see note above):**
 
-1. **Collaborative async planning** - Push your branch, someone else pulls and continues the planning session with full context
-2. **Context recovery** - If Claude's context compacts, the full conversation is preserved in the branch
-3. **Audit trail** - See how planning decisions were made, what files were explored, what questions were asked
-4. **Branch portability** - The planning state travels with the feature branch
+1. ~~**Collaborative async planning** - Push your branch, someone else pulls and continues the planning session with full context~~
+2. ~~**Branch portability** - The planning state travels with the feature branch~~
 
-**Dashboard workflow (recommended):**
+**What still works:**
 
-The planning dialog has **Pull** and **Push** buttons that handle git operations automatically:
-
-| Button | What it does |
-|--------|--------------|
-| **Pull** | Fetches from origin, creates workspace from remote branch if needed, pulls latest changes |
-| **Push** | Commits `.planning/` artifacts and pushes to origin |
-
-1. Person A starts planning in dashboard, clicks **Push** when interrupted
-2. Person B opens same issue in dashboard, clicks **Pull** → gets Person A's full context
-3. Person B continues the planning session and clicks **Push** when done
-
-**CLI workflow:**
-```bash
-# Person A starts planning
-pan work plan MIN-123
-# ... answers discovery questions, gets interrupted ...
-
-# Push the branch (includes planning context)
-cd workspaces/feature-min-123
-git add .planning && git commit -m "WIP: planning session"
-git push origin feature/min-123
-
-# Person B continues
-git pull origin feature/min-123
-pan work plan MIN-123 --continue
-# Claude has full context from Person A's session
-```
+1. **Context recovery** - If Claude's context compacts, STATE.md and beads preserve the planning decisions
+2. **Audit trail** - See decisions made in STATE.md
+3. **Beads tasks** - Sub-tasks created during planning ARE persisted (beads uses label-based isolation)
 
 ```bash
 # Create a workspace (git worktree) without starting an agent
