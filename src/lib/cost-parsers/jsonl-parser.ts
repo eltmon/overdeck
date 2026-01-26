@@ -295,6 +295,9 @@ export function getRecentSessions(days: number = 7): SessionUsage[] {
 /**
  * Get the active session model for a workspace
  * Returns the full model ID (e.g., "claude-sonnet-4-5-20250929") from the most recent session file
+ *
+ * NOTE: Claude Max can auto-upgrade models mid-session (e.g., Sonnet → Opus).
+ * We read from the END of the file to get the CURRENT model, not the initial one.
  */
 export function getActiveSessionModel(workspacePath: string): string | null {
   try {
@@ -315,13 +318,29 @@ export function getActiveSessionModel(workspacePath: string): string | null {
     const content = readFileSync(mostRecentSession, 'utf-8');
     const lines = content.split('\n').filter(line => line.trim());
 
-    // Look for model in first few messages (usually in first message)
+    // Read from END of file to get CURRENT model (may have been auto-upgraded by Claude Max)
+    // Look at last 100 lines to find the most recent model entry
+    const searchLines = lines.slice(-100);
+    for (let i = searchLines.length - 1; i >= 0; i--) {
+      try {
+        const msg: ClaudeMessage = JSON.parse(searchLines[i]);
+        const model = msg.message?.model || msg.model;
+        // Skip synthetic/placeholder model values
+        if (model && model !== '<synthetic>') {
+          return model; // Return full model ID
+        }
+      } catch {
+        // Skip invalid JSON lines
+      }
+    }
+
+    // Fallback: check first few lines if nothing found at end
     for (let i = 0; i < Math.min(lines.length, 10); i++) {
       try {
         const msg: ClaudeMessage = JSON.parse(lines[i]);
         const model = msg.message?.model || msg.model;
-        if (model) {
-          return model; // Return full model ID
+        if (model && model !== '<synthetic>') {
+          return model;
         }
       } catch {
         // Skip invalid JSON lines
