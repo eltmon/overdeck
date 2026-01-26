@@ -25,6 +25,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Debug - Check if tsup is installed
+        run: |
+          ls -la node_modules/.bin/tsup || echo "tsup bin not found"
+          npm list tsup || echo "tsup not in npm list"
+
       - name: Install dashboard frontend dependencies
         run: cd src/dashboard/frontend && npm ci
 
