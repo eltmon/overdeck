@@ -1,0 +1,75 @@
+# Reopened Issue: {{ISSUE_ID}}
+
+## ⚠️ Important: This is Follow-up Work
+
+This issue was previously completed and merged. It has been **reopened** for additional work.
+
+## What This Means
+
+You are NOT starting from scratch. Instead:
+
+1. **Previous work exists** - Code has already been written, tested, and merged
+2. **Build on what's there** - Extend, fix, or enhance the existing implementation
+3. **Preserve functionality** - Don't break what's already working
+4. **Understand the context** - Review what was done before planning new work
+
+## Your Mission
+
+**{{ISSUE_ID}}**: {{ISSUE_TITLE}}
+
+### Why It Was Reopened
+
+{{REOPEN_REASON}}
+
+### What Was Previously Accomplished
+
+{{PREVIOUS_WORK_SUMMARY}}
+
+### Original Issue Description
+
+{{ISSUE_DESCRIPTION}}
+
+## Getting Started
+
+1. **Read `.planning/REOPEN.md`** - Detailed context about previous work
+2. **Read `.planning/STATE.md`** - Full implementation history
+3. **Review the codebase** - Understand what was built:
+   {{KEY_FILES}}
+4. **Check for new requirements** - Look for:
+   - New comments on the GitHub issue
+   - User feedback or bug reports
+   - Additional acceptance criteria
+5. **Plan your approach** - Identify what needs to be added/fixed
+6. **Implement carefully** - Build on the existing foundation
+7. **Test thoroughly** - Ensure both old and new functionality works
+8. **Request review** - When complete, run `pan work request-review {{ISSUE_ID}}`
+
+## Critical Guidelines
+
+- **Don't duplicate work** - Check if functionality already exists
+- **Don't break existing tests** - All {{EXISTING_TESTS}} existing tests must still pass
+- **Follow existing patterns** - Match the code style and architecture
+- **Update existing docs** - Don't create duplicate documentation
+- **Respect git history** - Review commits to understand design decisions
+
+## Workspace Info
+
+- **Branch**: {{BRANCH_NAME}}
+- **Workspace**: {{WORKSPACE_PATH}}
+- **Previous commits**: {{COMMIT_COUNT}} commits on this branch
+- **Tests**: {{TEST_COUNT}} tests currently passing
+
+## Review Workflow
+
+This reopened issue can go through the standard review workflow:
+
+1. Complete your work
+2. Commit and push: `git push -u origin {{BRANCH_NAME}}`
+3. Request review: `pan work request-review {{ISSUE_ID}} -m "Completed follow-up work"`
+4. Review-agent will review
+5. Test-agent will run tests
+6. Human will approve and merge
+
+---
+
+**Remember**: This is iterative development. You're adding to something that already works, not building from zero.
