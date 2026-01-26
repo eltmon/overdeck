@@ -5,9 +5,27 @@
   "colors": {
     "primary": "#D4A27F",
     "light": "#E5C4A8",
-    "dark": "#B8886A"
+    "dark": "#B8886A",
+    "background": {
+      "light": "#FDFDF7",
+      "dark": "#09090B"
+    }
   },
   "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/logo/panopticon-light.svg",
+    "dark": "/logo/panopticon-dark.svg"
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/eltmon/panopticon"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Install",
+    "url": "https://www.npmjs.com/package/panopticon-cli"
+  },
   "navigation": {
     "tabs": [
       {
@@ -15,10 +33,69 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction"]
+            "pages": [
+              "introduction",
+              "quickstart",
+              "concepts"
+            ]
+          },
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/overview",
+              "cli/core-commands",
+              "cli/agent-commands",
+              "cli/workspace-commands",
+              "cli/convoy-commands"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/cloister",
+              "features/specialists",
+              "features/skills",
+              "features/workspaces",
+              "features/convoys"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/projects",
+              "configuration/issue-trackers",
+              "configuration/polyrepo"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/legacy-codebases",
+              "guides/stitch-integration",
+              "guides/docker-setup"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/architecture",
+              "reference/troubleshooting"
+            ]
           }
         ]
       }
     ]
+  },
+  "footerSocials": {
+    "github": "https://github.com/eltmon/panopticon"
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true
+  },
+  "analytics": {
+    "posthog": {
+      "apiKey": ""
+    }
   }
 }
