@@ -1,14 +1,16 @@
 /**
- * Tests for jsonl-parser.ts - getActiveSessionModel()
+ * Tests for jsonl-parser.ts
  *
- * Tests the function that extracts the full model ID from Claude Code session files.
+ * Tests for:
+ * - getActiveSessionModel() - Extracts full model ID from session files
+ * - parseClaudeSession() - Parses session usage with multi-model cost calculation
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir, homedir } from 'os';
-import { getActiveSessionModel } from '../../../src/lib/cost-parsers/jsonl-parser.js';
+import { getActiveSessionModel, parseClaudeSession } from '../../../src/lib/cost-parsers/jsonl-parser.js';
 
 describe('getActiveSessionModel', () => {
   let tempHome: string;
@@ -241,5 +243,288 @@ describe('getActiveSessionModel', () => {
     } finally {
       rmSync(claudeProjectDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('parseClaudeSession', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'pan-parse-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  /**
+   * Helper to create a test session file with synthetic messages
+   */
+  function createTestSession(messages: Array<{
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    timestamp?: string;
+  }>): string {
+    const sessionFile = join(tempDir, 'test-session.jsonl');
+    const sessionId = 'test-session-123';
+
+    const lines = messages.map((msg, i) => JSON.stringify({
+      sessionId,
+      timestamp: msg.timestamp || new Date(Date.now() + i * 1000).toISOString(),
+      message: {
+        id: `msg-${i}`,
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        model: msg.model,
+        usage: {
+          input_tokens: msg.inputTokens,
+          output_tokens: msg.outputTokens,
+        },
+      },
+    }));
+
+    writeFileSync(sessionFile, lines.join('\n') + '\n');
+    return sessionFile;
+  }
+
+  it('should return null for non-existent file', () => {
+    const result = parseClaudeSession('/tmp/nonexistent-file.jsonl');
+    expect(result).toBeNull();
+  });
+
+  it('should return null for session with no usage', () => {
+    const sessionFile = join(tempDir, 'no-usage.jsonl');
+    const content = JSON.stringify({
+      sessionId: 'test',
+      message: { role: 'user' }
+    });
+    writeFileSync(sessionFile, content + '\n');
+
+    const result = parseClaudeSession(sessionFile);
+    expect(result).toBeNull();
+  });
+
+  it('should parse single-model session correctly', () => {
+    const sessionFile = createTestSession([
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 2000, outputTokens: 1000 },
+    ]);
+
+    const result = parseClaudeSession(sessionFile);
+
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe('claude-sonnet-4.5');  // Normalized
+    expect(result!.usage.inputTokens).toBe(3000);
+    expect(result!.usage.outputTokens).toBe(1500);
+    expect(result!.messageCount).toBe(2);
+
+    // For single-model sessions, cost and cost_v2 should be equal
+    expect(result!.cost_v2).toBeDefined();
+    expect(result!.cost_v2).toBeCloseTo(result!.cost, 5);
+
+    // Should have model breakdown
+    expect(result!.modelBreakdown).toBeDefined();
+    expect(result!.modelBreakdown!['claude-sonnet-4-5-20250929']).toBeDefined();
+    expect(result!.modelBreakdown!['claude-sonnet-4-5-20250929'].messageCount).toBe(2);
+    expect(result!.modelBreakdown!['claude-sonnet-4-5-20250929'].inputTokens).toBe(3000);
+    expect(result!.modelBreakdown!['claude-sonnet-4-5-20250929'].outputTokens).toBe(1500);
+  });
+
+  it('should calculate costs correctly for multi-model session (Sonnet → Opus)', () => {
+    // Simulate auto-upgrade: 5 Sonnet messages, then 2 Opus messages
+    const sessionFile = createTestSession([
+      // Sonnet messages (cheaper)
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
+      // Opus messages (more expensive)
+      { model: 'claude-opus-4-5-20251101', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-opus-4-5-20251101', inputTokens: 1000, outputTokens: 500 },
+    ]);
+
+    const result = parseClaudeSession(sessionFile);
+
+    expect(result).not.toBeNull();
+
+    // Model display should show progression
+    expect(result!.model).toBe('claude-sonnet-4.5 → claude-opus-4.5');
+
+    // Should have breakdown for both models
+    expect(result!.modelBreakdown).toBeDefined();
+    expect(Object.keys(result!.modelBreakdown!).length).toBe(2);
+    expect(result!.modelBreakdown!['claude-sonnet-4-5-20250929']).toBeDefined();
+    expect(result!.modelBreakdown!['claude-opus-4-5-20251101']).toBeDefined();
+
+    // Verify Sonnet breakdown
+    const sonnetBreakdown = result!.modelBreakdown!['claude-sonnet-4-5-20250929'];
+    expect(sonnetBreakdown.messageCount).toBe(5);
+    expect(sonnetBreakdown.inputTokens).toBe(5000);
+    expect(sonnetBreakdown.outputTokens).toBe(2500);
+
+    // Verify Opus breakdown
+    const opusBreakdown = result!.modelBreakdown!['claude-opus-4-5-20251101'];
+    expect(opusBreakdown.messageCount).toBe(2);
+    expect(opusBreakdown.inputTokens).toBe(2000);
+    expect(opusBreakdown.outputTokens).toBe(1000);
+
+    // Calculate expected costs manually
+    // Sonnet: input=$0.003/1k, output=$0.015/1k
+    const expectedSonnetCost = (5000 * 0.003 / 1000) + (2500 * 0.015 / 1000);
+    expect(sonnetBreakdown.cost).toBeCloseTo(expectedSonnetCost, 5);
+
+    // Opus: input=$0.005/1k, output=$0.025/1k
+    const expectedOpusCost = (2000 * 0.005 / 1000) + (1000 * 0.025 / 1000);
+    expect(opusBreakdown.cost).toBeCloseTo(expectedOpusCost, 5);
+
+    // cost_v2 should be sum of both
+    expect(result!.cost_v2).toBeCloseTo(expectedSonnetCost + expectedOpusCost, 5);
+
+    // CRITICAL: cost_v2 should be GREATER than cost
+    // (cost uses first model = Sonnet for all messages, which underestimates)
+    expect(result!.cost_v2!).toBeGreaterThan(result!.cost);
+
+    // Verify the underestimation: cost assumes all 7 messages use Sonnet pricing
+    const expectedOldCost = (7000 * 0.003 / 1000) + (3500 * 0.015 / 1000);
+    expect(result!.cost).toBeCloseTo(expectedOldCost, 5);
+  });
+
+  it('should handle multiple model switches', () => {
+    // Sonnet → Opus → Sonnet
+    const sessionFile = createTestSession([
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-opus-4-5-20251101', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
+    ]);
+
+    const result = parseClaudeSession(sessionFile);
+
+    expect(result).not.toBeNull();
+    expect(result!.modelBreakdown).toBeDefined();
+    expect(Object.keys(result!.modelBreakdown!).length).toBe(2);
+
+    // Verify Sonnet aggregated correctly (messages 1 + 3)
+    const sonnetBreakdown = result!.modelBreakdown!['claude-sonnet-4-5-20250929'];
+    expect(sonnetBreakdown.messageCount).toBe(2);
+    expect(sonnetBreakdown.inputTokens).toBe(2000);
+
+    // Opus should have 1 message
+    const opusBreakdown = result!.modelBreakdown!['claude-opus-4-5-20251101'];
+    expect(opusBreakdown.messageCount).toBe(1);
+  });
+
+  it('should handle sessions with cache tokens', () => {
+    const sessionFile = join(tempDir, 'cache-test.jsonl');
+    const content = JSON.stringify({
+      sessionId: 'cache-test',
+      timestamp: new Date().toISOString(),
+      message: {
+        model: 'claude-sonnet-4-5-20250929',
+        usage: {
+          input_tokens: 1000,
+          output_tokens: 500,
+          cache_read_input_tokens: 5000,
+          cache_creation_input_tokens: 2000,
+        },
+      },
+    });
+    writeFileSync(sessionFile, content + '\n');
+
+    const result = parseClaudeSession(sessionFile);
+
+    expect(result).not.toBeNull();
+    expect(result!.usage.cacheReadTokens).toBe(5000);
+    expect(result!.usage.cacheWriteTokens).toBe(2000);
+
+    // Cost should include cache pricing
+    expect(result!.cost_v2).toBeDefined();
+    expect(result!.cost_v2!).toBeGreaterThan(0);
+  });
+
+  it('should handle top-level usage field', () => {
+    const sessionFile = join(tempDir, 'top-level-usage.jsonl');
+    const content = JSON.stringify({
+      sessionId: 'top-level-test',
+      timestamp: new Date().toISOString(),
+      model: 'claude-opus-4-5-20251101',
+      usage: {
+        input_tokens: 1000,
+        output_tokens: 500,
+      },
+    });
+    writeFileSync(sessionFile, content + '\n');
+
+    const result = parseClaudeSession(sessionFile);
+
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe('claude-opus-4.5');
+    expect(result!.usage.inputTokens).toBe(1000);
+    expect(result!.usage.outputTokens).toBe(500);
+    expect(result!.cost_v2).toBeDefined();
+    expect(result!.modelBreakdown).toBeDefined();
+  });
+
+  it('should skip messages with invalid JSON', () => {
+    const sessionFile = join(tempDir, 'invalid-json.jsonl');
+    const lines = [
+      JSON.stringify({
+        sessionId: 'test',
+        message: {
+          model: 'claude-sonnet-4-5-20250929',
+          usage: { input_tokens: 1000, output_tokens: 500 }
+        }
+      }),
+      'invalid json line here',
+      JSON.stringify({
+        sessionId: 'test',
+        message: {
+          model: 'claude-sonnet-4-5-20250929',
+          usage: { input_tokens: 2000, output_tokens: 1000 }
+        }
+      }),
+    ];
+    writeFileSync(sessionFile, lines.join('\n') + '\n');
+
+    const result = parseClaudeSession(sessionFile);
+
+    expect(result).not.toBeNull();
+    expect(result!.messageCount).toBe(2);  // Should skip invalid line
+    expect(result!.usage.inputTokens).toBe(3000);
+  });
+
+  it('should use session ID from filename if not in messages', () => {
+    const sessionFile = join(tempDir, 'my-session-id.jsonl');
+    const content = JSON.stringify({
+      message: {
+        model: 'claude-sonnet-4-5-20250929',
+        usage: { input_tokens: 1000, output_tokens: 500 }
+      }
+    });
+    writeFileSync(sessionFile, content + '\n');
+
+    const result = parseClaudeSession(sessionFile);
+
+    expect(result).not.toBeNull();
+    expect(result!.sessionId).toBe('my-session-id');
+  });
+
+  it('should default to claude-sonnet-4 if no model found', () => {
+    const sessionFile = join(tempDir, 'no-model.jsonl');
+    const content = JSON.stringify({
+      sessionId: 'test',
+      message: {
+        usage: { input_tokens: 1000, output_tokens: 500 }
+        // No model field
+      }
+    });
+    writeFileSync(sessionFile, content + '\n');
+
+    const result = parseClaudeSession(sessionFile);
+
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe('claude-sonnet-4');
+    // Should not have modelBreakdown since no model IDs found
+    expect(result!.modelBreakdown).toBeUndefined();
   });
 });
