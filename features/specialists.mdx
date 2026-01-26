@@ -9,24 +9,275 @@ Specialized AI agents that perform focused tasks in the development workflow.
 
 ## Overview
 
-What specialist agents are and how they work.
+Specialist agents are **permanent, long-lived agents** that handle specific phases of the development lifecycle. Unlike work agents (which are temporary and tied to a single issue), specialists persist across multiple issues and build context over time.
+
+**Key characteristics:**
+- **Persistent** - Run continuously in tmux sessions
+- **Cross-issue** - Work on multiple issues, building codebase knowledge
+- **Specialized** - Each has a narrow, focused responsibility
+- **Coordinated** - Managed by [Cloister](/features/cloister) for handoffs
+
+## Types of Specialists
+
+Panopticon includes three built-in specialists:
+
+| Specialist | Purpose | Trigger |
+|------------|---------|---------|
+| **review-agent** | Code review before merge | Human clicks "Review" in dashboard |
+| **test-agent** | Runs test suite after implementation | Automatically after review passes |
+| **merge-agent** | Handles git merge and conflict resolution | Human clicks "Approve & Merge" |
 
 ## Review Agent
 
-Automated code review and feedback.
+The review-agent performs comprehensive code review, checking for:
+- Logic errors and edge cases
+- Security vulnerabilities
+- Performance issues
+- Code quality and best practices
+
+**Triggering review-agent:**
+
+```bash
+# Via dashboard - click "Review" button on issue card
+# Or via CLI:
+pan specialists wake review-agent --issue MIN-123
+```
+
+**Review outcomes:**
+- **PASSED** - Code looks good, automatically queues test-agent
+- **BLOCKED** - Issues found, sends feedback to work-agent with required fixes
+- **SKIPPED** - Review not applicable or already completed
+
+The review-agent can run in convoy mode for parallel specialized reviews. See the [code-review convoy](/cli/convoy-commands#code-review-template) for details.
 
 ## Test Agent
 
-Test execution and validation.
+The test-agent runs the full test suite and analyzes failures. It's automatically invoked after the review-agent passes.
+
+**What it does:**
+1. Runs all configured test suites (backend, frontend, integration, e2e)
+2. Analyzes test failures to understand root causes
+3. Reports results with actionable feedback
+4. If tests pass, marks issue ready for merge
+
+**Test outcomes:**
+- **PASSED** - All tests pass, ready for human to approve merge
+- **FAILED** - Tests failing, sends detailed feedback to work-agent
+- **SKIPPED** - Tests not applicable or already run
+
+**Test configuration:**
+
+Configure test suites in `~/.panopticon/projects.yaml`:
+
+```yaml
+projects:
+  myproject:
+    name: "My Project"
+    path: /home/user/projects/myproject
+    tests:
+      backend:
+        command: "npm test"
+        timeout: 300000
+      frontend_unit:
+        command: "cd frontend && npm run test:unit"
+        timeout: 180000
+      e2e:
+        command: "npm run test:e2e"
+        timeout: 600000
+```
 
 ## Merge Agent
 
-Automated merging and deployment.
+The merge-agent handles **ALL** merges, not just conflicts. This ensures:
+- It sees all code changes coming through the pipeline
+- It builds context about the codebase over time
+- When conflicts DO occur, it has better understanding for intelligent resolution
+- Tests are always run before completing the merge
 
-## Specialist Workflow
+**Workflow:**
 
-How specialists coordinate with implementation agents.
+1. **Pull latest main** - Ensures local main is up-to-date
+2. **Analyze incoming changes** - Reviews what the feature branch contains
+3. **Perform merge** - Merges feature branch into main
+4. **Resolve conflicts** - If conflicts exist, uses AI to resolve them intelligently
+5. **Run tests** - Verifies the merge didn't break anything
+6. **Commit merge** - Commits the merge with descriptive message
+7. **Report results** - Returns success/failure with details
+
+**Triggering merge-agent:**
+
+```bash
+# Via dashboard - click "Approve & Merge" on an issue card
+# merge-agent is ALWAYS invoked, regardless of whether conflicts exist
+
+# Via CLI
+pan specialists wake merge-agent --issue MIN-123
+```
+
+The merge-agent uses a specialized prompt template that instructs it to:
+- Never force-push
+- Always run tests before completing
+- Document conflict resolution decisions
+- Provide detailed feedback on what was merged
+
+## Review Pipeline Flow
+
+The complete review pipeline is a sequential handoff between specialists:
+
+```
+Human clicks "Review"
+        │
+        ▼
+┌───────────────────┐
+│   review-agent    │ Reviews code, checks for issues
+└─────────┬─────────┘
+          │ If PASSED: queues test-agent
+          │ If BLOCKED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│    test-agent     │ Runs test suite, analyzes failures
+└─────────┬─────────┘
+          │ If PASSED: marks ready for merge
+          │ If FAILED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│  (Human clicks    │ Human approval required
+│  "Approve & Merge"│ before merge
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│   merge-agent     │ Performs merge, resolves conflicts
+└───────────────────┘
+```
+
+**Key Points:**
+- **Human-initiated start** - A human must click "Review" to start the pipeline
+- **Automatic handoffs** - review-agent → test-agent happens automatically
+- **Human approval for merge** - Merge is NOT automatic; human clicks "Approve & Merge"
+- **Feedback loops** - Failed reviews/tests send feedback back to the work-agent
+
+## Queue Processing
+
+Each specialist has a task queue (`~/.panopticon/specialists/{name}/hook.json`) managed via the FPP (Fixed Point Principle):
+
+```
+1. Task arrives (via API or handoff)
+        │
+        ▼
+2. wakeSpecialistOrQueue() checks if specialist is busy
+        │
+        ├── If IDLE: Wake specialist immediately with task
+        │
+        └── If BUSY: Add task to queue (hook.json)
+                │
+                ▼
+3. When specialist completes current task:
+        │
+        ├── Updates status via API (passed/failed/skipped)
+        │
+        └── Dashboard automatically wakes specialist for next queued task
+```
+
+**Queue priority order:** `urgent` > `high` > `normal` > `low`
+
+**Completion triggers:** When a specialist reports status (`passed`, `failed`, or `skipped`), the dashboard:
+1. Sets the specialist state to `idle`
+2. Checks the specialist's queue for pending work
+3. If work exists, immediately wakes the specialist with the next task
+
+## Agent Self-Requeue (Circuit Breaker)
+
+After a human initiates the first review, work-agents can request re-review up to 3 times automatically:
+
+```bash
+# Work-agent requests re-review after fixing issues
+pan work request-review MIN-123 -m "Fixed: added tests for edge cases"
+```
+
+**Circuit breaker behavior:**
+- First human click resets the counter to 0
+- Each `pan work request-review` increments the counter
+- After 3 automatic re-requests, returns HTTP 429
+- Human must click "Review" in dashboard to continue
+
+This prevents infinite loops where an agent repeatedly fails review.
+
+**API endpoint:** `POST /api/workspaces/:issueId/request-review`
+
+## Specialist Auto-Initialization
+
+When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures the test-agent, review-agent, and merge-agent are ready to receive wake signals without manual setup.
+
+**Manual initialization:**
+
+```bash
+# Initialize all specialists
+pan specialists init
+
+# Initialize specific specialist
+pan specialists init review-agent
+```
+
+## Specialist Safeguards
+
+All specialist agents are configured to:
+1. **Run in workspaces only** - Never in the main project directory
+2. **Never checkout branches** - They work with the branch already in the workspace
+3. **Create workspaces if needed** - Use `pan workspace create <ISSUE-ID>` instead of `git checkout`
+
+These safeguards are enforced through:
+- **Prompt instructions** - Clear warnings in all specialist prompts
+- **Code enforcement** - Specialists spawn with workspace as cwd
+- **Git hooks** - Auto-revert if checkout detected in tmux sessions
+
+See [Workspace Commands](/cli/workspace-commands#main-project-branch-convention) for more on branch protection.
 
 ## Configuration
 
-Setting up and configuring specialists.
+Specialist configuration lives in `~/.panopticon/cloister/config.json`:
+
+```json
+{
+  "specialists": {
+    "test_agent": {
+      "enabled": true,
+      "auto_wake": true,
+      "model": "sonnet"
+    },
+    "review_agent": {
+      "enabled": true,
+      "auto_wake": false,
+      "model": "sonnet"
+    },
+    "merge_agent": {
+      "enabled": true,
+      "auto_wake": false,
+      "model": "sonnet"
+    }
+  }
+}
+```
+
+**Configuration options:**
+- `enabled` - Whether the specialist is active
+- `auto_wake` - Whether to automatically wake on trigger (vs manual)
+- `model` - Which AI model to use (haiku, sonnet, opus)
+
+## Viewing Specialist Status
+
+```bash
+# Check status of all specialists
+pan specialists status
+
+# View specific specialist
+pan specialists status review-agent
+
+# See specialist queue
+pan specialists queue review-agent
+```
+
+## Related Guides
+
+- [Cloister](/features/cloister) - AI lifecycle manager that coordinates specialists
+- [Convoys](/features/convoys) - Parallel specialist execution for code review
+- [Agent Commands](/cli/agent-commands) - CLI commands for working with agents

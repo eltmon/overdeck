@@ -7,22 +7,151 @@ description: Multi-agent parallel orchestration commands
 
 Orchestrate multiple agents working in parallel on related tasks.
 
+## Overview
+
+Convoys enable running multiple AI agents in parallel, combining their specialized expertise to tackle complex tasks more effectively. See the [Convoys feature guide](/features/convoys) for conceptual overview.
+
 ## pan convoy start
 
-Start a convoy of parallel agents.
+Start a new convoy with a specific template:
+
+```bash
+# Run a parallel code review
+pan convoy start code-review --files "src/**/*.ts"
+
+# Use with pull request
+pan convoy start code-review --pr-url https://github.com/org/repo/pull/123
+
+# Target specific issue
+pan convoy start code-review --issue-id MIN-123
+
+# Specify project path
+pan convoy start code-review --files "src/**/*.ts" --project-path /path/to/project
+```
+
+**Options:**
+- `--files <pattern>` - File pattern to analyze (e.g., "src/**/*.ts")
+- `--pr-url <url>` - Pull request URL to review
+- `--issue-id <id>` - Issue ID to associate with convoy
+- `--project-path <path>` - Project path (defaults to current directory)
 
 ## pan convoy status
 
-Check status of all agents in a convoy.
+Check the status of a running convoy:
 
-## pan convoy synthesize
+```bash
+# Show most recent convoy status
+pan convoy status
 
-Synthesize results from convoy agents.
+# Check specific convoy
+pan convoy status <convoy-id>
+```
 
-## Convoy Patterns
+The status command shows:
+- Overall convoy state (running, completed, failed)
+- Individual agent progress
+- Phase completion (e.g., parallel review phase vs synthesis phase)
+- Output files generated
 
-Common convoy usage patterns.
+## pan convoy list
 
-## Best Practices
+List all convoys (running and completed):
 
-Tips for effective convoy orchestration.
+```bash
+# List all convoys
+pan convoy list
+
+# Filter by status
+pan convoy list --status running
+pan convoy list --status completed
+pan convoy list --status failed
+```
+
+## pan convoy stop
+
+Stop a running convoy:
+
+```bash
+pan convoy stop <convoy-id>
+```
+
+This will:
+1. Kill all running agents in the convoy
+2. Mark the convoy as failed
+3. Preserve any output generated so far
+
+## Built-in Convoy Templates
+
+| Template | Agents | Use Case |
+|----------|--------|----------|
+| `code-review` | correctness, security, performance, synthesis | Comprehensive code review |
+| `planning` | planner | Codebase exploration and planning |
+| `triage` | (dynamic) | Parallel issue triage |
+| `health-monitor` | monitor | Check health of running agents |
+
+### code-review Template
+
+The code-review convoy uses specialized agents for parallel review:
+
+**Phase 1 - Specialized Reviews (Parallel)**
+- **Correctness** (Haiku) - Logic errors, edge cases, type safety
+- **Security** (Sonnet) - OWASP Top 10, injection, XSS, auth issues
+- **Performance** (Haiku) - N+1 queries, blocking ops, memory leaks
+
+**Phase 2 - Synthesis (Sequential)**
+- Reads all three review files
+- Removes duplicates (same issue found by multiple reviewers)
+- Prioritizes findings (blocker → critical → high → medium → low)
+- Generates unified report with action items
+
+**Output files:**
+- `.claude/reviews/<timestamp>-correctness.md`
+- `.claude/reviews/<timestamp>-security.md`
+- `.claude/reviews/<timestamp>-performance.md`
+- `.claude/reviews/<timestamp>-synthesis.md`
+
+## Custom Convoy Templates
+
+Create custom templates in `~/.panopticon/convoy-templates/`:
+
+```json
+{
+  "name": "lightweight-review",
+  "description": "Quick security-only review",
+  "agents": [
+    {
+      "role": "security",
+      "subagent": "code-review-security",
+      "parallel": false
+    }
+  ],
+  "config": {
+    "outputDir": ".claude/reviews",
+    "timeout": 600000
+  }
+}
+```
+
+Then use with:
+```bash
+pan convoy start lightweight-review --files "src/**/*.ts"
+```
+
+## Convoy Execution Flow
+
+```
+pan convoy start code-review --files "src/**/*.ts"
+    │
+    ├─→ Phase 1 (Parallel): 3 specialized reviewers run simultaneously
+    │     ├─→ Correctness (Haiku) → correctness.md
+    │     ├─→ Security (Sonnet)    → security.md
+    │     └─→ Performance (Haiku)  → performance.md
+    │
+    └─→ Phase 2 (Sequential): Synthesis agent runs after Phase 1 completes
+          └─→ Synthesis reads all 3 reviews → synthesis.md
+```
+
+## Related Commands
+
+- [pan work issue](/cli/agent-commands#pan-work-issue) - Spawn single work agent
+- [pan cloister start](/cli/core-commands#pan-cloister-start) - Start AI lifecycle manager

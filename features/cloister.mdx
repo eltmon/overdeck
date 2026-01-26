@@ -3,30 +3,391 @@ title: Cloister
 description: AI lifecycle manager with intelligent model routing
 ---
 
-# Cloister
+# Cloister: AI Lifecycle Manager
 
-Cloister is Panopticon's AI lifecycle manager, providing intelligent model selection, cost tracking, and graceful degradation.
+Cloister is Panopticon's intelligent agent lifecycle manager. It monitors all running agents and automatically handles:
 
-## Overview
+- **Model Routing** - Routes tasks to appropriate models based on complexity
+- **Stuck Detection** - Identifies agents that have stopped making progress
+- **Automatic Handoffs** - Escalates to specialists when needed
+- **Specialist Coordination** - Manages test-agent, review-agent, and merge-agent
 
-What Cloister does and why it matters.
+## How Cloister Works
 
-## Model Routing
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     CLOISTER SERVICE                         │
+│                                                              │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │  Heartbeat  │───▶│   Trigger   │───▶│   Handoff   │     │
+│  │   Monitor   │    │   Detector  │    │   Manager   │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+│         │                  │                  │             │
+│         ▼                  ▼                  ▼             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │   Agent     │    │  Complexity │    │ Specialists │     │
+│  │   Health    │    │   Analysis  │    │             │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
 
-How Cloister selects the right model for each task.
+## Starting Cloister
 
-## Cost Tracking
+```bash
+# Via dashboard - click "Start" in the Cloister status bar
+# Or via CLI:
+pan cloister start
 
-Real-time cost monitoring and budgets.
+# Check status
+pan cloister status
 
-## Graceful Degradation
+# Stop monitoring
+pan cloister stop
+```
 
-Automatic fallback when models are unavailable.
+## Specialists
+
+Cloister manages specialized agents that handle specific phases of the development lifecycle:
+
+| Specialist | Purpose | Trigger |
+|------------|---------|---------|
+| **test-agent** | Runs test suite after implementation | `implementation_complete` signal |
+| **review-agent** | Code review before merge | After tests pass (manual trigger) |
+| **merge-agent** | Handles git merge and conflict resolution | "Approve & Merge" button |
+
+See the [Specialists feature guide](/features/specialists) for detailed information on specialist agents.
+
+### Merge Agent Workflow
+
+The merge-agent is a specialist that handles **ALL** merges, not just conflicts. This ensures:
+- It sees all code changes coming through the pipeline
+- It builds context about the codebase over time
+- When conflicts DO occur, it has better understanding for intelligent resolution
+- Tests are always run before completing the merge
+
+**Workflow:**
+
+1. **Pull latest main** - Ensures local main is up-to-date
+2. **Analyze incoming changes** - Reviews what the feature branch contains
+3. **Perform merge** - Merges feature branch into main
+4. **Resolve conflicts** - If conflicts exist, uses AI to resolve them intelligently
+5. **Run tests** - Verifies the merge didn't break anything
+6. **Commit merge** - Commits the merge with descriptive message
+7. **Report results** - Returns success/failure with details
+
+**Triggering merge-agent:**
+
+```bash
+# Via dashboard - click "Approve & Merge" on an issue card
+# merge-agent is ALWAYS invoked, regardless of whether conflicts exist
+
+# Via CLI
+pan specialists wake merge-agent --issue MIN-123
+```
+
+The merge-agent uses a specialized prompt template that instructs it to:
+- Never force-push
+- Always run tests before completing
+- Document conflict resolution decisions
+- Provide detailed feedback on what was merged
+
+### Review Pipeline Flow
+
+The review pipeline is a sequential handoff between specialists:
+
+```
+Human clicks "Review"
+        │
+        ▼
+┌───────────────────┐
+│   review-agent    │ Reviews code, checks for issues
+└─────────┬─────────┘
+          │ If PASSED: queues test-agent
+          │ If BLOCKED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│    test-agent     │ Runs test suite, analyzes failures
+└─────────┬─────────┘
+          │ If PASSED: marks ready for merge
+          │ If FAILED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│  (Human clicks    │ Human approval required
+│  "Approve & Merge"│ before merge
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│   merge-agent     │ Performs merge, resolves conflicts
+└───────────────────┘
+```
+
+**Key Points:**
+- **Human-initiated start** - A human must click "Review" to start the pipeline
+- **Automatic handoffs** - review-agent → test-agent happens automatically
+- **Human approval for merge** - Merge is NOT automatic; human clicks "Approve & Merge"
+- **Feedback loops** - Failed reviews/tests send feedback back to the work-agent
+
+### Queue Processing
+
+Each specialist has a task queue (`~/.panopticon/specialists/{name}/hook.json`) managed via the FPP (Fixed Point Principle):
+
+```
+1. Task arrives (via API or handoff)
+        │
+        ▼
+2. wakeSpecialistOrQueue() checks if specialist is busy
+        │
+        ├── If IDLE: Wake specialist immediately with task
+        │
+        └── If BUSY: Add task to queue (hook.json)
+                │
+                ▼
+3. When specialist completes current task:
+        │
+        ├── Updates status via API (passed/failed/skipped)
+        │
+        └── Dashboard automatically wakes specialist for next queued task
+```
+
+**Queue priority order:** `urgent` > `high` > `normal` > `low`
+
+**Completion triggers:** When a specialist reports status (`passed`, `failed`, or `skipped`), the dashboard:
+1. Sets the specialist state to `idle`
+2. Checks the specialist's queue for pending work
+3. If work exists, immediately wakes the specialist with the next task
+
+### Agent Self-Requeue (Circuit Breaker)
+
+After a human initiates the first review, work-agents can request re-review up to 3 times automatically:
+
+```bash
+# Work-agent requests re-review after fixing issues
+pan work request-review MIN-123 -m "Fixed: added tests for edge cases"
+```
+
+**Circuit breaker behavior:**
+- First human click resets the counter to 0
+- Each `pan work request-review` increments the counter
+- After 3 automatic re-requests, returns HTTP 429
+- Human must click "Review" in dashboard to continue
+
+This prevents infinite loops where an agent repeatedly fails review.
+
+**API endpoint:** `POST /api/workspaces/:issueId/request-review`
+
+### Specialist Auto-Initialization
+
+When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures the test-agent, review-agent, and merge-agent are ready to receive wake signals without manual setup.
+
+## Automatic Handoffs
+
+Cloister detects situations that require intervention:
+
+| Trigger | Condition | Action |
+|---------|-----------|--------|
+| **stuck_escalation** | No activity for 30+ minutes | Escalate to more capable model |
+| **complexity_upgrade** | Task complexity exceeds model capability | Route to Opus |
+| **implementation_complete** | Agent signals work is done | Wake test-agent |
+| **test_failure** | Tests fail repeatedly | Escalate model or request help |
+| **planning_complete** | Planning session finishes | Transition to implementation |
+| **merge_requested** | User clicks "Approve & Merge" | Wake merge-agent |
+
+### Handoff Methods
+
+Cloister supports two handoff methods, automatically selected based on agent type:
+
+| Method | When Used | How It Works |
+|--------|-----------|--------------|
+| **Kill & Spawn** | General agents (agent-min-123, etc.) | 1. Captures full context (STATE.md, beads, git state)<br>2. Kills tmux session<br>3. Spawns new agent with handoff prompt<br>4. New agent continues work with preserved context |
+| **Specialist Wake** | Permanent specialists (merge-agent, test-agent) | 1. Captures handoff context<br>2. Sends wake message to existing session<br>3. Specialist resumes with context injection |
+
+**Kill & Spawn** is used for temporary agents that work on specific issues. It creates a clean handoff by:
+- Capturing the agent's current understanding (from STATE.md)
+- Preserving beads task progress and open items
+- Including relevant git diff and file context
+- Building a comprehensive handoff prompt for the new model
+
+**Specialist Wake** is used for permanent specialists that persist across multiple issues. It avoids the overhead of killing/respawning by injecting context into the existing session.
+
+### Handoff Context Capture
+
+When a handoff occurs, Cloister captures:
+
+```json
+{
+  "agentId": "agent-min-123",
+  "issueId": "MIN-123",
+  "currentModel": "sonnet",
+  "targetModel": "opus",
+  "reason": "stuck_escalation",
+  "handoffCount": 1,
+  "state": {
+    "phase": "implementation",
+    "complexity": "complex",
+    "lastActivity": "2024-01-22T10:30:00-08:00"
+  },
+  "beadsTasks": [...],
+  "gitContext": {
+    "branch": "feature/min-123",
+    "uncommittedChanges": ["src/auth.ts", "src/tests/auth.test.ts"],
+    "recentCommits": [...]
+  }
+}
+```
+
+Handoff prompts are saved to `~/.panopticon/agents/{agent-id}/handoffs/` for debugging.
+
+## Heartbeat Monitoring
+
+Agents send heartbeats via Claude Code hooks. Cloister tracks:
+
+- Last tool use and timestamp
+- Current task being worked on
+- Git branch and workspace
+- Process health
+
+Heartbeat files are stored in `~/.panopticon/heartbeats/`:
+
+```json
+{
+  "timestamp": "2024-01-22T10:30:00-08:00",
+  "agent_id": "agent-min-123",
+  "tool_name": "Edit",
+  "last_action": "{\"file_path\":\"/path/to/file.ts\"...}",
+  "git_branch": "feature/min-123",
+  "workspace": "/home/user/projects/myapp/workspaces/feature-min-123"
+}
+```
+
+### Heartbeat Hook Installation
+
+The heartbeat hook is automatically synced to `~/.panopticon/bin/heartbeat-hook` via `pan sync`. It's also installed automatically when you install or upgrade Panopticon via npm.
+
+**Manual installation:**
+```bash
+pan sync  # Syncs all skills, agents, AND hooks
+```
+
+**Hook configuration in `~/.claude/settings.json`:**
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.panopticon/bin/heartbeat-hook"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Hook resilience:** The heartbeat hook is designed to fail silently if:
+- The heartbeats directory doesn't exist
+- Write permissions are missing
+- The hook script has errors
+
+This prevents hook failures from interrupting agent work.
 
 ## Configuration
 
-How to configure Cloister for your needs.
+Cloister configuration lives in `~/.panopticon/cloister/config.json`:
 
-## Best Practices
+```json
+{
+  "monitoring": {
+    "heartbeat_interval_ms": 5000,
+    "stuck_threshold_minutes": 30,
+    "health_check_interval_ms": 30000
+  },
+  "specialists": {
+    "test_agent": { "enabled": true, "auto_wake": true },
+    "review_agent": { "enabled": true, "auto_wake": false },
+    "merge_agent": { "enabled": true, "auto_wake": false }
+  },
+  "triggers": {
+    "stuck_escalation": { "enabled": true },
+    "complexity_upgrade": { "enabled": true }
+  }
+}
+```
 
-Tips for optimal model usage.
+## Model Routing & Complexity Detection
+
+Cloister automatically routes tasks to the appropriate model based on detected complexity, optimizing for cost while ensuring quality.
+
+### Complexity Levels
+
+| Level | Model | Use Case |
+|-------|-------|----------|
+| **trivial** | Haiku | Typos, comments, documentation updates |
+| **simple** | Haiku | Small fixes, test additions, minor changes |
+| **medium** | Sonnet | Features, components, integrations |
+| **complex** | Sonnet/Opus | Refactors, migrations, redesigns |
+| **expert** | Opus | Architecture, security, performance optimization |
+
+### Complexity Detection Signals
+
+Complexity is detected from multiple signals (in priority order):
+
+1. **Explicit field** - Task has a `complexity` field set (e.g., in beads)
+2. **Labels/tags** - Issue labels like `architecture`, `security`, `refactor`
+3. **Keywords** - Title/description contains keywords like "migration", "overhaul"
+4. **File count** - Number of files changed (>20 files = complex)
+5. **Time estimate** - If estimate exceeds thresholds
+
+**Keyword patterns:**
+```javascript
+{
+  trivial: ['typo', 'rename', 'comment', 'documentation', 'readme'],
+  simple: ['add comment', 'update docs', 'fix typo', 'small fix'],
+  medium: ['feature', 'endpoint', 'component', 'service'],
+  complex: ['refactor', 'migration', 'redesign', 'overhaul'],
+  expert: ['architecture', 'security', 'performance optimization']
+}
+```
+
+### Configuring Model Routing
+
+Edit `~/.panopticon/cloister/config.json`:
+
+```json
+{
+  "model_selection": {
+    "default_model": "sonnet",
+    "complexity_routing": {
+      "trivial": "haiku",
+      "simple": "haiku",
+      "medium": "sonnet",
+      "complex": "sonnet",
+      "expert": "opus"
+    }
+  }
+}
+```
+
+### Cost Optimization
+
+Model routing helps optimize costs:
+
+| Model | Relative Cost | Best For |
+|-------|---------------|----------|
+| Haiku | 1x (cheapest) | Simple tasks, bulk operations |
+| Sonnet | 3x | Most development work |
+| Opus | 15x | Complex architecture, critical fixes |
+
+A typical agent run might:
+1. Start on Haiku for initial exploration
+2. Escalate to Sonnet for implementation
+3. Escalate to Opus only if stuck or complexity detected
+
+## Related Guides
+
+- [Specialists](/features/specialists) - Detailed specialist agent documentation
+- [Convoys](/features/convoys) - Multi-agent orchestration
+- [Core Commands](/cli/core-commands) - Cloister CLI commands

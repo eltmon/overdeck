@@ -7,22 +7,201 @@ description: Managing isolated development workspaces
 
 Create and manage isolated workspaces for agent work.
 
+## Overview
+
+**Workspaces are git worktrees** - isolated working directories for each issue/feature. Each workspace:
+- Has its own feature branch (e.g., `feature/min-123-add-login`)
+- Shares git history with the main repo (no separate clone)
+- Can run independently (separate node_modules, builds, etc.)
+- Is located at `{project}/workspaces/{issue-id}/`
+
+This allows multiple agents to work on different features simultaneously without conflicts.
+
 ## pan workspace create
 
-Create a new workspace for an issue.
+Create a new workspace (git worktree) without starting an agent:
 
-## pan workspace destroy
+```bash
+pan workspace create MIN-123
 
-Clean up and remove a workspace.
+# Create workspace and start Docker containers
+pan workspace create MIN-123 --docker
+```
+
+### Docker Integration
+
+The `--docker` flag automatically starts containers after workspace creation:
+
+```bash
+pan workspace create MIN-123 --docker
+```
+
+**What it does:**
+1. Creates the workspace (git worktree or custom command)
+2. Looks for docker-compose files in:
+   - `{workspace}/docker-compose.yml`
+   - `{workspace}/docker-compose.yaml`
+   - `{workspace}/.devcontainer/docker-compose.yml`
+   - `{workspace}/.devcontainer/docker-compose.devcontainer.yml`
+   - `{workspace}/.devcontainer/compose.yml`
+3. Runs `docker compose -p "{project}-feature-{issue}" -f {file} up -d --build`
+
+**Docker Project Naming:**
+
+Each workspace gets a unique Docker Compose project name to avoid container conflicts:
+- Format: `{project-name}-feature-{issue-id}` (e.g., `mind-your-now-feature-min-123`)
+- The project name comes from `name` in your `~/.panopticon/projects.yaml`
+- Container names follow: `{project}-{service}-1` (e.g., `mind-your-now-feature-min-123-api-1`)
+
+This allows multiple workspaces to run simultaneously without port or name conflicts.
+
+**Why this matters:**
+- Containers start warming up while you review the issue
+- Environment is ready when the planning agent starts asking questions
+- You can test assumptions during planning without waiting for builds
+
+**Dashboard integration:**
+
+The planning dialog includes a "Start Docker containers" checkbox:
+- **Default:** Enabled (containers start automatically)
+- **Preference saved:** Your choice is remembered in browser localStorage
+- **Key:** `panopticon.planning.startDocker`
+
+To change the default via browser console:
+```javascript
+// Disable Docker by default
+localStorage.setItem('panopticon.planning.startDocker', 'false');
+
+// Enable Docker by default (this is the out-of-box default)
+localStorage.setItem('panopticon.planning.startDocker', 'true');
+```
+
+**Example workflow:**
+```bash
+# From dashboard: click "Start Planning" (Docker enabled by default)
+# Or from CLI:
+pan workspace create MIN-123 --docker
+
+# While containers build in background:
+# - Review the Linear issue
+# - Check related PRs
+# - Think about approach
+
+# By the time you're ready to engage with the planning agent,
+# the dev environment is warm and ready for testing
+```
 
 ## pan workspace list
 
-List all workspaces and their status.
+List all workspaces and their status:
+
+```bash
+pan workspace list
+```
+
+## pan workspace destroy
+
+Clean up and remove a workspace:
+
+```bash
+pan workspace destroy MIN-123
+
+# Force destroy (even with uncommitted changes)
+pan workspace destroy MIN-123 --force
+```
+
+## Main Project Branch Convention
+
+> **IMPORTANT:** The main project directory should **ALWAYS** stay on the `main` branch. All feature work happens in workspaces (git worktrees), never in the main project.
+>
+> - **Main project**: Always on `main` - serves as the stable reference point
+> - **Workspaces**: Each has its own feature branch checked out
+> - **Want to check something?** Create a worktree, don't checkout in main
+> - **Quick test?** Create a worktree
+> - **Emergency hotfix?** Create a worktree
+>
+> This convention ensures:
+> 1. Specialists (review-agent, test-agent) always find the correct code
+> 2. Merge operations have a clean target
+> 3. Multiple agents don't interfere with each other
+>
+> If you see a warning like "Main project is on branch 'feature/xxx' instead of 'main'", something has incorrectly checked out a feature branch in the main project. Fix it with `git checkout main`.
+
+### Git Hooks for Branch Protection
+
+Panopticon provides git hooks to enforce the main branch convention. These hooks are automatically installed:
+
+- **On `pan project add`** - Hooks are installed when registering a new project
+- **On `pan sync`** - Hooks are updated in all registered projects
+
+The hooks are polyrepo-aware and will install in all git repositories within your project.
+
+**Auto-revert behavior:**
+- **Agents & planning sessions**: Automatically revert to `main` if they accidentally checkout a feature branch
+- **Human users**: Display a prominent warning (no auto-revert by default)
+
+To enable auto-revert for humans:
+```bash
+export PANOPTICON_AUTO_REVERT_CHECKOUT=1  # Add to .bashrc/.zshrc
+```
+
+Manual hook installation (for projects not in registry):
+```bash
+./scripts/install-git-hooks.sh /path/to/your/project
+```
 
 ## Workspace Structure
 
-How workspaces are organized.
+Workspaces include planning artifacts stored inside the workspace directory:
 
-## Workspace Lifecycle
+```
+workspaces/feature-min-123/
+├── .planning/                 # ⚠️ NOT tracked in git (ephemeral)
+│   ├── STATE.md               # Current planning state
+│   ├── output.jsonl           # Full conversation history
+│   ├── PLANNING_PROMPT.md     # Initial planning prompt
+│   ├── CONTINUATION_PROMPT.md # Context for continued sessions
+│   └── output-*.jsonl         # Backup of previous rounds
+└── ... (code)
+```
 
-Creation, usage, and cleanup flow.
+> ⚠️ **Note: `.planning/` is currently ephemeral (not tracked in git)**
+>
+> The `.planning/` directory is listed in `.gitignore` to prevent cross-contamination between issues. When branches merge, planning state from issue A could contaminate issue B's workspace, causing agents to work on the wrong tasks.
+>
+> **Current behavior:** Planning state is local to your machine only. If you switch machines, you'll need to re-run the planning session.
+>
+> See [#111](https://github.com/eltmon/panopticon-cli/issues/111) for the future enhancement to support cross-machine planning sync safely.
+
+When the planning session completes, the AI generates:
+- **STATE.md** - Current understanding, decisions made, and implementation plan
+- **Beads tasks** - Trackable sub-tasks with dependencies for the implementation
+- **Feature PRD** - Copied to `docs/prds/active/{issue}-plan.md` for documentation
+
+**What works:**
+1. **Context recovery** - If Claude's context compacts, STATE.md and beads preserve the planning decisions
+2. **Audit trail** - See decisions made in STATE.md
+3. **Beads tasks** - Sub-tasks created during planning ARE persisted (beads uses label-based isolation)
+
+## Safeguards
+
+### Planning vs Work Agent Safeguard
+
+The dashboard prevents starting a work agent (`agent-<issue>`) while a planning agent (`planning-<issue>`) is still running for the same issue. This prevents conflicts where both agents try to modify the same workspace.
+
+If you see "Planning agent is still running" when trying to start work:
+1. **Complete the planning session** - Use "Complete Planning" button
+2. **Or abort planning** - Use "Abort Planning" if you want to discard
+3. **Or kill the session manually** - `tmux kill-session -t planning-<issue>`
+
+### Specialist Agent Safeguards
+
+All specialist agents (review-agent, test-agent, merge-agent) are configured to:
+1. **Run in workspaces only** - Never in the main project directory
+2. **Never checkout branches** - They work with the branch already in the workspace
+3. **Create workspaces if needed** - Use `pan workspace create <ISSUE-ID>` instead of `git checkout`
+
+These safeguards are enforced through:
+- **Prompt instructions** - Clear warnings in all specialist prompts
+- **Code enforcement** - Specialists spawn with workspace as cwd
+- **Git hooks** - Auto-revert if checkout detected in tmux sessions
