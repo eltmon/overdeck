@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import ora from 'ora';
+import { execSync } from 'child_process';
 import { existsSync, readdirSync, statSync, symlinkSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -13,6 +14,16 @@ import { listProjects } from '../../lib/projects.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const BUNDLED_GIT_HOOKS_DIR = join(__dirname, '..', '..', 'scripts', 'git-hooks');
+
+// Helper to check if a command exists
+function checkCommand(cmd: string): boolean {
+  try {
+    execSync(`which ${cmd}`, { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface SyncOptions {
   dryRun?: boolean;
@@ -165,6 +176,21 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.succeed(`Synced ${hooksResult.synced.length} hooks to ~/.panopticon/bin/`);
   } else {
     hooksSpinner.info('No hooks to sync');
+  }
+
+  // Check and install claude-code-router if missing
+  const hasRouter = checkCommand('claude-code-router');
+  if (!hasRouter) {
+    const routerSpinner = ora('Installing claude-code-router...').start();
+    try {
+      execSync('npm install -g @musistudio/claude-code-router', {
+        stdio: 'pipe',
+        timeout: 120000
+      });
+      routerSpinner.succeed('claude-code-router installed');
+    } catch (error) {
+      routerSpinner.warn('Failed to install claude-code-router - run: npm install -g @musistudio/claude-code-router');
+    }
   }
 
   // Sync git hooks to all registered projects (branch protection)
