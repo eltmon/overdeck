@@ -83,7 +83,11 @@ export function ProviderCard({
       </div>
 
       {/* API Key Input */}
-      {enabled && (
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          enabled ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
         <div className="space-y-2">
           <label className="text-xs font-semibold text-[#a390cb] uppercase tracking-wider flex items-center gap-2">
             API Key
@@ -141,7 +145,7 @@ export function ProviderCard({
             )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
