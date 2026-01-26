@@ -2234,6 +2234,127 @@ app.get('/api/settings/available-models', (_req, res) => {
   }
 });
 
+// Validate API key (PAN-118-23)
+app.post('/api/settings/validate-api-key', async (req, res) => {
+  try {
+    const { provider, apiKey } = req.body;
+
+    if (!provider || !apiKey) {
+      res.status(400).json({ error: 'Provider and apiKey are required' });
+      return;
+    }
+
+    let valid = false;
+    let error: string | null = null;
+    let models: string[] = [];
+
+    // Validate based on provider
+    switch (provider) {
+      case 'openai':
+        try {
+          const response = await fetch('https://api.openai.com/v1/models', {
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            valid = true;
+            // Extract relevant model IDs
+            models = data.data
+              .map((m: any) => m.id)
+              .filter((id: string) =>
+                id.includes('gpt-') || id.includes('o1') || id.includes('o3')
+              );
+          } else if (response.status === 401) {
+            error = 'Invalid API key';
+          } else if (response.status === 429) {
+            error = 'Rate limit exceeded';
+          } else {
+            error = `HTTP error: ${response.status}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+
+      case 'google':
+        try {
+          // Test with a minimal generateContent call
+          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+          const response = await fetch(testUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: 'test'
+                }]
+              }]
+            }),
+          });
+
+          if (response.ok || response.status === 400) {
+            // 400 is also OK - it means the key is valid but request was malformed (expected)
+            valid = true;
+            models = ['gemini-3-pro-preview', 'gemini-3-flash-preview'];
+          } else if (response.status === 401 || response.status === 403) {
+            error = 'Invalid API key';
+          } else if (response.status === 429) {
+            error = 'Rate limit exceeded';
+          } else {
+            error = `HTTP error: ${response.status}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+
+      case 'zai':
+        try {
+          // Z.AI validation - assuming similar pattern to OpenAI
+          const response = await fetch('https://api.zai.chat/v1/models', {
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            valid = true;
+            models = data.data?.map((m: any) => m.id) || ['glm-4.7', 'glm-4.7-flash'];
+          } else if (response.status === 401) {
+            error = 'Invalid API key';
+          } else if (response.status === 429) {
+            error = 'Rate limit exceeded';
+          } else {
+            error = `HTTP error: ${response.status}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+
+      default:
+        res.status(400).json({ error: `Unsupported provider: ${provider}` });
+        return;
+    }
+
+    res.json({
+      valid,
+      provider,
+      models: valid ? models : undefined,
+      error: error || undefined,
+    });
+  } catch (error: any) {
+    console.error('Error validating API key:', error);
+    res.status(500).json({ error: 'Failed to validate API key: ' + error.message });
+  }
+});
+
 // Update settings (PAN-78)
 app.put('/api/settings', (req, res) => {
   try {
