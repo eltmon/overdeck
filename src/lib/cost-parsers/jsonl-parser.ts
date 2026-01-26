@@ -42,10 +42,17 @@ export interface SessionUsage {
   sessionFile: string;
   startTime: string;
   endTime: string;
-  model: string;
-  usage: TokenUsage;
-  cost: number;
+  model: string;  // Display name (normalized). Shows "sonnet-4.5 → opus-4.5" for upgrades
+  usage: TokenUsage;  // Total tokens across all models
+  cost: number;  // DEPRECATED: Uses first-model pricing (kept for backward compatibility)
+  cost_v2?: number;  // NEW: Accurate per-message pricing
   messageCount: number;
+  modelBreakdown?: Record<string, {  // NEW: Cost/token breakdown by exact model ID
+    cost: number;
+    inputTokens: number;
+    outputTokens: number;
+    messageCount: number;
+  }>;
 }
 
 // Claude projects directory
@@ -163,7 +170,25 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
 }
 
 /**
- * Parse a Claude Code session JSONL file and extract usage
+ * Parse a Claude Code session JSONL file and extract usage with per-message cost calculation
+ *
+ * This function calculates costs accurately for sessions that span multiple models
+ * (e.g., when Claude Max auto-upgrades from Sonnet to Opus mid-conversation).
+ *
+ * Cost Calculation:
+ * - `cost_v2`: Accurate per-message pricing. Each message is costed using its own model's pricing.
+ * - `cost`: DEPRECATED. Uses first model's pricing for all messages (kept for backward compatibility).
+ *
+ * Model Display:
+ * - Single model: "claude-sonnet-4.5" (normalized name)
+ * - Multiple models: "claude-sonnet-4.5 → claude-opus-4.5" (progression of normalized names)
+ *
+ * Model Breakdown:
+ * - Keys are exact model IDs (e.g., "claude-sonnet-4-5-20250929")
+ * - Values contain per-model cost, token counts, and message count
+ *
+ * @param sessionFile - Path to the .jsonl session file
+ * @returns Session usage summary with accurate multi-model costing, or null if no usage found
  */
 export function parseClaudeSession(sessionFile: string): SessionUsage | null {
   if (!existsSync(sessionFile)) {
@@ -186,6 +211,15 @@ export function parseClaudeSession(sessionFile: string): SessionUsage | null {
     cacheWriteTokens: 0,
   };
 
+  // NEW: Per-message cost tracking
+  const modelBreakdown: Record<string, {
+    cost: number;
+    inputTokens: number;
+    outputTokens: number;
+    messageCount: number;
+  }> = {};
+  let totalCostV2 = 0;
+
   for (const line of lines) {
     try {
       const msg: ClaudeMessage = JSON.parse(line);
@@ -207,19 +241,55 @@ export function parseClaudeSession(sessionFile: string): SessionUsage | null {
 
       // Extract usage - can be in message.usage or top-level usage
       const usage = msg.message?.usage || msg.usage;
-      const model = msg.message?.model || msg.model;
+      const modelId = msg.message?.model || msg.model;  // Exact model ID
 
       if (usage) {
+        // Accumulate total tokens (existing behavior)
         totalUsage.inputTokens += usage.input_tokens || 0;
         totalUsage.outputTokens += usage.output_tokens || 0;
         totalUsage.cacheReadTokens = (totalUsage.cacheReadTokens || 0) + (usage.cache_read_input_tokens || 0);
         totalUsage.cacheWriteTokens = (totalUsage.cacheWriteTokens || 0) + (usage.cache_creation_input_tokens || 0);
         messageCount++;
+
+        // NEW: Calculate cost for THIS message using THIS message's model
+        if (modelId) {
+          // Normalize model name for pricing lookup
+          const { provider, model: normalizedModel } = normalizeModelName(modelId);
+          const pricing = getPricing(provider, normalizedModel);
+
+          if (pricing) {
+            // Create message-specific usage object
+            const msgUsage: TokenUsage = {
+              inputTokens: usage.input_tokens || 0,
+              outputTokens: usage.output_tokens || 0,
+              cacheReadTokens: usage.cache_read_input_tokens || 0,
+              cacheWriteTokens: usage.cache_creation_input_tokens || 0,
+            };
+
+            // Calculate cost for this message
+            const msgCost = calculateCost(msgUsage, pricing);
+            totalCostV2 += msgCost;
+
+            // Track breakdown by exact model ID
+            if (!modelBreakdown[modelId]) {
+              modelBreakdown[modelId] = {
+                cost: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                messageCount: 0,
+              };
+            }
+            modelBreakdown[modelId].cost += msgCost;
+            modelBreakdown[modelId].inputTokens += msgUsage.inputTokens;
+            modelBreakdown[modelId].outputTokens += msgUsage.outputTokens;
+            modelBreakdown[modelId].messageCount++;
+          }
+        }
       }
 
-      // Track primary model (most frequently used)
-      if (model && !primaryModel) {
-        primaryModel = model;
+      // Track primary model (first model found - for backward compatibility)
+      if (modelId && !primaryModel) {
+        primaryModel = modelId;
       }
     } catch {
       // Skip invalid JSON lines
@@ -241,7 +311,18 @@ export function parseClaudeSession(sessionFile: string): SessionUsage | null {
     primaryModel = 'claude-sonnet-4';
   }
 
-  // Calculate cost
+  // Generate model display string (normalized names)
+  // For multi-model sessions: "claude-sonnet-4.5 → claude-opus-4.5"
+  // For single-model sessions: "claude-sonnet-4.5"
+  const normalizedModels = Object.keys(modelBreakdown)
+    .map(id => normalizeModelName(id).model);
+  const modelDisplay = normalizedModels.length > 0
+    ? (normalizedModels.length > 1
+        ? normalizedModels.join(' → ')
+        : normalizedModels[0])
+    : normalizeModelName(primaryModel).model;
+
+  // DEPRECATED: Calculate cost using first model (for backward compatibility)
   const { provider, model } = normalizeModelName(primaryModel);
   const pricing = getPricing(provider, model);
   const cost = pricing ? calculateCost(totalUsage, pricing) : 0;
@@ -251,10 +332,12 @@ export function parseClaudeSession(sessionFile: string): SessionUsage | null {
     sessionFile,
     startTime: startTime || new Date().toISOString(),
     endTime: endTime || new Date().toISOString(),
-    model: primaryModel,
+    model: modelDisplay,
     usage: totalUsage,
-    cost,
+    cost,  // DEPRECATED: First-model pricing
+    cost_v2: totalCostV2 > 0 ? totalCostV2 : undefined,  // NEW: Accurate per-message pricing
     messageCount,
+    modelBreakdown: Object.keys(modelBreakdown).length > 0 ? modelBreakdown : undefined,  // NEW: Cost breakdown by model
   };
 }
 
