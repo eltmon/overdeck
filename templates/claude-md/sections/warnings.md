@@ -53,9 +53,18 @@
 # 1. Run tests
 npm test  # or: mvn test, cargo test, etc.
 
-# 2. Stage and commit ALL changes
+# 2. Stage and commit ALL changes with Co-Authored-By line
+# CRITICAL: Use YOUR EXACT MODEL ID in the Co-Authored-By line
+# You have access to your model ID - it's shown in your system context
 git add -A
-git commit -m "feat: description (ISSUE-XXX)"
+git commit -m "feat: description (ISSUE-XXX)
+
+Co-Authored-By: Claude <your-exact-model-id-here> <noreply@anthropic.com>"
+
+# Example for claude-sonnet-4-5-20250929:
+# git commit -m "feat: add specialist completion API
+#
+# Co-Authored-By: Claude claude-sonnet-4-5-20250929 <noreply@anthropic.com>"
 
 # 3. Push to remote
 git push -u origin $(git branch --show-current)
