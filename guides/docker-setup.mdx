@@ -9,24 +9,333 @@ Configure Docker, Traefik, and local HTTPS for Panopticon workspaces.
 
 ## Overview
 
-Why Docker and HTTPS matter for development.
+Panopticon uses Docker for isolated development environments and Traefik as a reverse proxy for local HTTPS. This enables:
 
-## Docker Setup
+- **Isolated workspaces** - Each feature branch runs in its own containers
+- **Local HTTPS** - Trusted certificates for `.localhost` or custom domains
+- **Automatic routing** - Traefik routes traffic based on container labels
 
-Installing and configuring Docker.
+## Prerequisites
+
+- Docker Desktop (macOS/Windows) or Docker Engine (Linux)
+- Docker Compose v2.x
+- `mkcert` for local certificate generation
+
+## Quick Setup
+
+```bash
+# Install mkcert
+brew install mkcert  # macOS
+# or: sudo apt install mkcert  # Ubuntu/Debian
+
+# Install the local CA
+mkcert -install
+
+# Run Panopticon's setup
+pan install
+pan doctor  # Verify setup
+```
 
 ## Traefik Configuration
 
-Setting up Traefik as a reverse proxy.
+Panopticon manages Traefik configuration in `~/.panopticon/traefik/`:
 
-## Local HTTPS
+```
+~/.panopticon/traefik/
+├── traefik.yml           # Static configuration
+├── dynamic/              # Dynamic route configs (per-workspace)
+│   └── feature-min-123.yml
+└── certs/                # TLS certificates
+    ├── localhost.pem
+    └── localhost-key.pem
+```
 
-Generating and trusting local SSL certificates.
+### Static Configuration
 
-## Workspace Networking
+The main Traefik config (`~/.panopticon/traefik/traefik.yml`):
 
-How workspaces connect through Traefik.
+```yaml
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    watch: true
+    exposedByDefault: false
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/localhost.pem
+        keyFile: /certs/localhost-key.pem
+```
+
+### Dynamic Configuration
+
+Each workspace gets a dynamic config file. Example for `feature-min-123`:
+
+```yaml
+http:
+  routers:
+    feature-min-123-frontend:
+      rule: "Host(`feature-min-123.localhost`)"
+      service: feature-min-123-frontend
+      entryPoints:
+        - websecure
+      tls: {}
+
+    feature-min-123-api:
+      rule: "Host(`api-feature-min-123.localhost`)"
+      service: feature-min-123-api
+      entryPoints:
+        - websecure
+      tls: {}
+
+  services:
+    feature-min-123-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://feature-min-123-frontend:3000"
+
+    feature-min-123-api:
+      loadBalancer:
+        servers:
+          - url: "http://feature-min-123-api:8080"
+```
+
+## Certificate Generation
+
+### Using mkcert
+
+```bash
+# Generate certificates for localhost domains
+cd ~/.panopticon/traefik/certs
+mkcert localhost "*.localhost" 127.0.0.1 ::1
+
+# Rename to expected names
+mv localhost+3.pem localhost.pem
+mv localhost+3-key.pem localhost-key.pem
+```
+
+### For Custom Domains
+
+If using custom domains like `myapp.test`:
+
+```bash
+# Generate certificates for custom domain
+mkcert myapp.test "*.myapp.test"
+```
+
+## DNS Configuration
+
+### Option 1: .localhost (Recommended)
+
+Modern browsers resolve `*.localhost` to `127.0.0.1` automatically. No DNS config needed.
+
+```yaml
+# In projects.yaml
+dns:
+  domain: localhost
+  entries:
+    - "{{FEATURE_FOLDER}}.localhost"
+    - "api-{{FEATURE_FOLDER}}.localhost"
+```
+
+### Option 2: /etc/hosts
+
+For custom domains, add entries to `/etc/hosts`:
+
+```bash
+# Add manually or let Panopticon manage it
+127.0.0.1 feature-min-123.myapp.test
+127.0.0.1 api-feature-min-123.myapp.test
+```
+
+### Option 3: WSL2 Hosts Sync (Windows)
+
+For WSL2, use the `wsl2hosts` sync method:
+
+```yaml
+dns:
+  sync_method: wsl2hosts
+```
+
+This syncs entries between WSL2's `/etc/hosts` and Windows' hosts file.
+
+## Starting Traefik
+
+### Via Dashboard
+
+The dashboard starts Traefik automatically when you run `pan up`:
+
+```bash
+pan up
+# Traefik available at http://localhost:8080 (dashboard)
+# HTTPS routing at https://*.localhost
+```
+
+### Manually
+
+```bash
+# Start Traefik container
+docker run -d \
+  --name panopticon-traefik \
+  --network panopticon \
+  -p 80:80 -p 443:443 -p 8080:8080 \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v ~/.panopticon/traefik:/etc/traefik:ro \
+  -v ~/.panopticon/traefik/certs:/certs:ro \
+  traefik:v2.10
+```
+
+## Workspace Container Setup
+
+### Docker Compose Template
+
+```yaml
+# infra/.devcontainer-template/docker-compose.yml.template
+services:
+  frontend:
+    build:
+      context: ./fe
+      dockerfile: Dockerfile
+    volumes:
+      - ./fe:/app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-fe.rule=Host(`{{FEATURE_FOLDER}}.localhost`)"
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-fe.entrypoints=websecure"
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-fe.tls=true"
+      - "traefik.http.services.{{FEATURE_FOLDER}}-fe.loadbalancer.server.port=3000"
+    networks:
+      - panopticon
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    volumes:
+      - ./api:/app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-api.rule=Host(`api-{{FEATURE_FOLDER}}.localhost`)"
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-api.entrypoints=websecure"
+      - "traefik.http.routers.{{FEATURE_FOLDER}}-api.tls=true"
+      - "traefik.http.services.{{FEATURE_FOLDER}}-api.loadbalancer.server.port=8080"
+    networks:
+      - panopticon
+
+networks:
+  panopticon:
+    external: true
+```
+
+### Network Setup
+
+Create the shared Panopticon network:
+
+```bash
+docker network create panopticon
+```
+
+All workspaces and Traefik connect to this network for routing.
 
 ## Troubleshooting
 
-Common Docker and HTTPS issues.
+### "Connection refused" on HTTPS
+
+1. Check Traefik is running:
+   ```bash
+   docker ps | grep traefik
+   ```
+
+2. Check Traefik logs:
+   ```bash
+   docker logs panopticon-traefik
+   ```
+
+3. Verify certificates exist:
+   ```bash
+   ls ~/.panopticon/traefik/certs/
+   ```
+
+### "Certificate not trusted" warnings
+
+1. Install mkcert's CA:
+   ```bash
+   mkcert -install
+   ```
+
+2. Restart your browser
+
+### Workspace containers not routable
+
+1. Verify containers are on the panopticon network:
+   ```bash
+   docker network inspect panopticon
+   ```
+
+2. Check container labels:
+   ```bash
+   docker inspect <container> | grep -A 20 Labels
+   ```
+
+3. Check Traefik dashboard at http://localhost:8080
+
+### Port conflicts
+
+If ports 80/443 are in use:
+
+```bash
+# Find what's using the ports
+lsof -i :80
+lsof -i :443
+
+# Common culprits: Apache, nginx, other dev servers
+```
+
+### WSL2-specific issues
+
+See [Troubleshooting](/reference/troubleshooting#wsl2-stability-issues-windows-users) for WSL2-specific networking and performance issues.
+
+## Best Practices
+
+### Resource Management
+
+- **Limit concurrent workspaces** - Each workspace uses memory
+- **Use shared volumes** - Cache npm/maven dependencies across workspaces
+- **Clean up old containers** - Run `docker system prune` periodically
+
+### Security
+
+- **Don't expose Traefik externally** - Keep it bound to localhost
+- **Use unique certificates per environment** - Don't share between machines
+- **Regenerate certificates periodically** - mkcert certs expire after ~1 year
+
+### Performance
+
+- **Use Docker volumes for node_modules** - Avoid mounting from host
+- **Adjust Vite polling interval** - See [Troubleshooting](/reference/troubleshooting#slow-vitereact-frontend-with-multiple-workspaces)
+- **Monitor container resources** - Use `docker stats`
+
+## Related Guides
+
+- [Polyrepo Configuration](/configuration/polyrepo) - Multi-repository workspaces
+- [Workspaces](/features/workspaces) - Workspace management
+- [Troubleshooting](/reference/troubleshooting) - Common issues

@@ -5,32 +5,379 @@ description: Common issues and solutions
 
 # Troubleshooting
 
-Solutions to common problems and issues.
+Solutions to common problems and issues with Panopticon.
 
-## Installation Issues
+## WSL2 Stability Issues (Windows Users)
 
-Problems during installation and setup.
+WSL2 can experience crashes and networking issues, especially under heavy AI agent workloads. Here are recommended `.wslconfig` settings to improve stability.
+
+### Recommended Configuration
+
+**Create/edit `C:\Users\<username>\.wslconfig`:**
+
+```ini
+[wsl2]
+# Resource allocation (adjust based on your system)
+memory=40GB
+processors=18
+swap=8GB
+
+# Localhost forwarding between Windows and WSL
+localhostForwarding=true
+
+# Disable GPU/GUI passthrough - reduces dxg driver errors
+guiApplications=false
+
+# ============================================================
+# WINDOWS 11 ONLY - Comment these out on Windows 10!
+# These settings require Windows 11 22H2 or later.
+# On Windows 10 they are silently ignored or may cause issues.
+# ============================================================
+
+# Route DNS through Windows - prevents getaddrinfo() failures
+# dnsTunneling=true          # Windows 11 only
+
+# Inherit Windows proxy settings
+# autoProxy=true             # Windows 11 only
+
+# Aggressively reclaim cached memory
+# autoMemoryReclaim=dropCache  # Windows 11 only
+
+# Use sparse VHD to allow better memory compaction
+# sparseVhd=true             # Windows 11 only
+
+# Mirrored networking (may conflict with Docker Desktop)
+# networkingMode=mirrored    # Windows 11 only
+```
+
+**After changing `.wslconfig`:**
+```powershell
+wsl --shutdown
+# Then relaunch your WSL terminal
+```
+
+**Verify settings applied:**
+```bash
+# Check resources
+free -h          # Should show configured memory
+nproc            # Should show configured processors
+swapon --show    # Should show configured swap
+
+# Check networking mode (Windows 11 only)
+ip addr show eth0  # NAT mode shows 172.x.x.x IP
+                   # Mirrored mode shares Windows network directly
+```
+
+### Windows 10 Limitations
+
+| Feature | Windows 10 | Windows 11 22H2+ |
+|---------|-----------|------------------|
+| `memory`, `processors`, `swap` | ✅ Works | ✅ Works |
+| `localhostForwarding` | ✅ Works | ✅ Works |
+| `guiApplications=false` | ✅ Works | ✅ Works |
+| `networkingMode=mirrored` | ❌ Not supported | ✅ Supported |
+| `dnsTunneling=true` | ❌ Not supported | ✅ Supported |
+| `autoProxy=true` | ❌ Not supported | ✅ Supported |
+| `autoMemoryReclaim` | ❌ Not supported | ✅ Supported |
+| `sparseVhd=true` | ❌ Not supported | ✅ Supported |
+
+**Windows 10 users:** Most advanced WSL2 features require Windows 11. On Windows 10, only the basic resource limits and `localhostForwarding`/`guiApplications` settings are supported. Other settings will be silently ignored or may cause instability.
+
+If you experience frequent WSL2 crashes on Windows 10, consider:
+- Using only the basic settings shown above (memory, processors, swap, localhostForwarding, guiApplications)
+- Reducing `memory` allocation if system is under pressure
+- Upgrading to Windows 11 for full WSL2 feature support
+- Checking Windows Event Viewer for specific crash causes
+
+### Additional Windows 10 Workarounds
+
+If NAT networking is unstable on Windows 10:
+
+```powershell
+# 1. Update WSL to latest version
+wsl --update
+
+# 2. Check for VPN/firewall conflicts
+# Disable VPN temporarily to test if it's causing issues
+
+# 3. Reset Windows network stack (run as Admin)
+netsh winsock reset
+netsh int ip reset
+
+# 4. Restart after network reset
+Restart-Computer
+```
+
+**Common conflict sources:**
+- VPN clients (especially corporate VPNs)
+- Docker Desktop (can conflict with WSL networking)
+- Third-party firewalls
+- Hyper-V virtual switch issues
+
+**If NAT fails completely**, WSL 2.3.25+ automatically falls back to VirtioProxy mode. This is less performant but more stable. You'll see: `"Failed to configure network (networkingMode Nat), falling back to networkingMode VirtioProxy."`
+
+**References:**
+- [Microsoft WSL Networking Documentation](https://learn.microsoft.com/en-us/windows/wsl/networking)
+- [WSL GitHub Issues - Networking](https://github.com/microsoft/WSL/issues?q=networking+mirrored)
+- [WSL NAT Fallback Issue #12297](https://github.com/microsoft/WSL/issues/12297)
+
+## Slow Vite/React Frontend with Multiple Workspaces
+
+If running multiple containerized workspaces with Vite/React frontends, you may notice CPU spikes and slow HMR. This is because Vite's default file watching polls every 100ms, which compounds with multiple instances.
+
+**Fix:** Increase the polling interval in your `vite.config.mjs`:
+
+```javascript
+server: {
+    watch: {
+        usePolling: true,
+        interval: 3000,  // Poll every 3s instead of 100ms default
+    },
+}
+```
+
+A 3000ms interval supports 4-5 concurrent workspaces comfortably while maintaining acceptable HMR responsiveness.
+
+## Corrupted Workspaces
+
+A workspace can become "corrupted" when it exists as a directory but is no longer a valid git worktree. The dashboard will show a yellow "Workspace Corrupted" warning with an option to clean and recreate.
+
+### Symptoms
+
+- Dashboard shows "Workspace Corrupted" warning
+- `git status` in the workspace fails with "not a git repository"
+- The `.git` file is missing from the workspace directory
+
+### Common Causes
+
+| Cause | Description |
+|-------|-------------|
+| **Interrupted creation** | `pan workspace create` was killed mid-execution (Ctrl+C, system crash) |
+| **Manual .git deletion** | Someone accidentally deleted the `.git` file in the workspace |
+| **Disk space issues** | Ran out of disk space during workspace creation |
+| **Git worktree pruning** | Running `git worktree prune` in the main repo removed the worktree link |
+| **Force-deleted main repo** | The main repository was moved or deleted while workspaces existed |
+
+### Resolution
+
+**Via Dashboard (recommended):**
+
+1. Click on the issue to open the detail panel
+2. Click "Clean & Recreate" button
+3. Review the files that will be deleted
+4. Check "Create backup" to preserve your work (recommended)
+5. Click "Backup & Recreate"
+
+**Via CLI:**
+
+```bash
+# Option 1: Manual cleanup
+rm -rf /path/to/project/workspaces/feature-issue-123
+pan workspace create ISSUE-123
+
+# Option 2: Backup first
+cp -r /path/to/project/workspaces/feature-issue-123 /tmp/backup-issue-123
+rm -rf /path/to/project/workspaces/feature-issue-123
+pan workspace create ISSUE-123
+# Then manually restore files from backup
+```
+
+### Prevention
+
+- Don't interrupt `pan workspace create` commands
+- Don't run `git worktree prune` in the main repo without checking for active workspaces
+- Ensure adequate disk space before creating workspaces
 
 ## Docker Issues
 
-Docker and container-related problems.
+### Container won't start
+
+```bash
+# Check container logs
+docker logs <container-name>
+
+# Common issues:
+# - Port already in use
+# - Volume mount permissions
+# - Missing environment variables
+```
+
+### "No such network: panopticon"
+
+```bash
+# Create the network
+docker network create panopticon
+```
+
+### Permission denied on mounted volumes
+
+If containers run as root and create files, you won't be able to delete them:
+
+```bash
+# Use sudo to remove
+sudo rm -rf /path/to/workspace
+
+# Or run container as your user
+# In docker-compose.yml:
+services:
+  app:
+    user: "${UID}:${GID}"
+```
 
 ## Network Issues
 
-HTTPS, Traefik, and networking problems.
+### HTTPS not working
+
+1. Check certificates exist:
+   ```bash
+   ls ~/.panopticon/traefik/certs/
+   ```
+
+2. Regenerate if missing:
+   ```bash
+   cd ~/.panopticon/traefik/certs
+   mkcert localhost "*.localhost" 127.0.0.1 ::1
+   ```
+
+3. Install the CA:
+   ```bash
+   mkcert -install
+   ```
+
+### Can't reach workspace URLs
+
+1. Check Traefik is running:
+   ```bash
+   docker ps | grep traefik
+   ```
+
+2. Check DNS resolution:
+   ```bash
+   ping feature-min-123.localhost
+   ```
+
+3. Check Traefik dashboard (http://localhost:8080) for routing rules
 
 ## Agent Issues
 
-Problems with agent spawning and communication.
+### Agent stuck / not responding
+
+```bash
+# Check tmux session
+tmux capture-pane -t agent-min-123 -p
+
+# Kill and restart
+pan work kill MIN-123
+pan work issue MIN-123
+```
+
+### Agent keeps failing
+
+Check the handoff count in state.json. If it's high, the task may be too complex:
+
+```bash
+cat ~/.panopticon/agents/agent-min-123/state.json | jq .handoffCount
+```
+
+Consider:
+- Breaking the issue into smaller tasks
+- Adding more context to the issue description
+- Manually handling complex parts
+
+### Messages not reaching agent
+
+Use the proper messaging API:
+
+```bash
+# Correct
+pan work tell MIN-123 "Your message"
+
+# NOT this (won't send without Enter)
+tmux send-keys -t agent-min-123 "Your message"
+```
 
 ## Workspace Issues
 
-Workspace creation and cleanup problems.
+### Workspace creation fails
+
+```bash
+# Check for existing workspace
+ls /path/to/project/workspaces/feature-min-123
+
+# Check git worktree status
+cd /path/to/project
+git worktree list
+
+# Clean up orphaned worktrees
+git worktree prune
+```
+
+### Can't delete workspace
+
+If containers created root-owned files:
+
+```bash
+# Via Panopticon (handles Docker cleanup)
+pan workspace destroy MIN-123
+
+# Manual with sudo
+sudo rm -rf /path/to/workspace
+```
 
 ## Performance Issues
 
-Diagnosing and fixing performance problems.
+### Dashboard slow to load
+
+```bash
+# Restart the dashboard
+pan restart
+
+# Or kill and restart
+pan down
+pan up
+```
+
+### High CPU usage
+
+- Check number of concurrent workspaces
+- Increase Vite polling interval (see above)
+- Run `docker stats` to identify resource-heavy containers
+
+### High memory usage
+
+```bash
+# Check Docker memory
+docker stats
+
+# Prune unused containers/images
+docker system prune -a
+```
 
 ## Getting Help
 
-Where to get additional support.
+### Diagnostic Information
+
+When reporting issues, include:
+
+```bash
+# System info
+pan doctor
+
+# Current state
+pan status
+
+# Recent logs
+tail -50 ~/.panopticon/logs/*.log
+```
+
+### Resources
+
+- **GitHub Issues:** https://github.com/eltmon/panopticon/issues
+- **Documentation:** https://www.panopticon-cli.com
+- **CLI Help:** `pan --help` or `pan <command> --help`
+
+## Related Guides
+
+- [Docker & HTTPS Setup](/guides/docker-setup) - Network configuration
+- [Architecture](/reference/architecture) - System internals
+- [Core Commands](/cli/core-commands) - CLI reference
