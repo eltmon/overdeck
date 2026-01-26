@@ -41,6 +41,7 @@ import {
   runMigration
 } from '../../lib/costs/migration.js';
 import { getEventLogStats } from '../../lib/costs/events.js';
+import { runRetentionCleanupIfNeeded } from '../../lib/costs/retention.js';
 
 /**
  * Get a Date object representing 24 hours ago from now.
@@ -8040,6 +8041,9 @@ if (!isMigrationComplete()) {
     console.log(`✓ Processed ${eventsProcessed} new cost events`);
   }
 }
+
+// Run retention cleanup (90-day rolling window) if needed
+runRetentionCleanupIfNeeded();
 
 // In production, serve the frontend static files
 if (process.env.NODE_ENV === 'production') {

@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Users, AlertTriangle, TrendingUp, GitBranch, Layers } from 'lucide-react';
+import { DollarSign, Users, AlertTriangle, TrendingUp, GitBranch, Layers, Activity } from 'lucide-react';
 
 interface MetricsSummary {
   today: {
@@ -40,6 +40,30 @@ interface SpecialistHandoffStats {
   queueDepth: number;
 }
 
+interface CostStatus {
+  migration: {
+    completed: boolean;
+    state: {
+      completed: boolean;
+      completedAt: string;
+      workspaceCount: number;
+      eventCount: number;
+    } | null;
+  };
+  cache: {
+    issueCount: number;
+    lastEventLine: number;
+    lastEventTs: string;
+  };
+  events: {
+    exists: boolean;
+    totalEvents: number;
+    fileSize: number;
+    oldestEvent?: string;
+    newestEvent?: string;
+  };
+}
+
 async function fetchMetricsSummary(): Promise<MetricsSummary> {
   const res = await fetch('/api/metrics/summary');
   if (!res.ok) throw new Error('Failed to fetch metrics summary');
@@ -55,6 +79,12 @@ async function fetchHandoffStats(): Promise<HandoffStats> {
 async function fetchSpecialistHandoffStats(): Promise<SpecialistHandoffStats> {
   const res = await fetch('/api/specialist-handoffs/stats');
   if (!res.ok) throw new Error('Failed to fetch specialist handoff stats');
+  return res.json();
+}
+
+async function fetchCostStatus(): Promise<CostStatus> {
+  const res = await fetch('/api/costs/status');
+  if (!res.ok) throw new Error('Failed to fetch cost status');
   return res.json();
 }
 
@@ -74,6 +104,12 @@ export function MetricsSummary() {
   const { data: specialistStats } = useQuery({
     queryKey: ['specialist-handoff-stats'],
     queryFn: fetchSpecialistHandoffStats,
+    refetchInterval: 30000,
+  });
+
+  const { data: costStatus } = useQuery({
+    queryKey: ['cost-status'],
+    queryFn: fetchCostStatus,
     refetchInterval: 30000,
   });
 
