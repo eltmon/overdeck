@@ -7,26 +7,158 @@ description: Essential Panopticon commands for system management
 
 Core system management commands for Panopticon.
 
+## pan install
+
+Install prerequisites and perform first-time setup.
+
+```bash
+# Full install (includes Traefik + mkcert for HTTPS)
+pan install
+
+# Minimal install (skip Traefik, use ports)
+pan install --minimal
+```
+
+This command:
+- Installs ttyd (web terminal)
+- Installs beads CLI (task tracking)
+- Optionally sets up Traefik and mkcert for HTTPS
+- Creates necessary configuration directories
+- Sets up git hooks for registered projects
+
 ## pan sync
 
-Sync skills and configuration to AI tools.
+Sync skills and configuration to all AI tools.
+
+```bash
+pan sync
+```
+
+This command:
+- Copies skills from `~/.panopticon/skills/` to AI tool directories
+- Updates Claude Code skills in `~/.claude/skills/`
+- Syncs to Codex, Cursor, Gemini CLI, and Google Antigravity
+- Installs/updates git hooks in all registered projects
+
+Run this after:
+- Installing Panopticon
+- Updating skills
+- Adding new projects
+- Upgrading Panopticon
 
 ## pan doctor
 
 Check system health and configuration.
 
+```bash
+pan doctor
+```
+
+Checks:
+- Node.js version (18+ required)
+- Git installation
+- Docker installation and status
+- tmux installation
+- Required CLI tools (gh, glab)
+- Configuration files
+- API key validity
+- Workspace health
+- Traefik status (if installed)
+
+Returns a health report with recommendations for any issues found.
+
 ## pan up
 
 Start the Panopticon dashboard and services.
+
+```bash
+# Start with default settings
+pan up
+
+# Minimal mode (without Traefik)
+pan up --minimal
+```
+
+Starts:
+- **Frontend** - React dashboard (default: http://localhost:3010)
+- **API Server** - Backend API (default: http://localhost:3011)
+- **Traefik** - Reverse proxy (if installed)
+
+With HTTPS enabled:
+- Dashboard: https://pan.localhost
+- Traefik UI: https://traefik.pan.localhost:8080
+
+The dashboard provides:
+- Kanban board of issues
+- Agent monitoring
+- Real-time activity logs
+- Cost tracking
+- Skills browser
+- Health checks
 
 ## pan down
 
 Stop the dashboard and services gracefully.
 
+```bash
+pan down
+```
+
+This command:
+- Stops the frontend and API server
+- Optionally stops Traefik
+- Does NOT stop running agents (use `pan work kill` for that)
+- Does NOT affect workspaces or containers
+
+Agents continue running independently in tmux sessions.
+
 ## pan restart
 
-Restart the dashboard (frontend and API).
+Restart the dashboard (frontend and API server).
+
+```bash
+pan restart
+```
+
+This is a clean restart that:
+- Kills old processes
+- Frees ports (3010, 3011)
+- Waits for API health check
+- Starts fresh instances
+
+Use this when:
+- Dashboard becomes unresponsive
+- API is not responding
+- After upgrading Panopticon
+- To clear any stuck state
 
 ## pan health
 
-Check the health of all services.
+Check the health of all Panopticon services.
+
+```bash
+pan health
+```
+
+Shows status of:
+- Dashboard (frontend) - Running/stopped
+- API server - Running/stopped + health endpoint check
+- Traefik - Running/stopped (if installed)
+- Running agents - Count and session IDs
+- Workspaces - Count and disk usage
+- Docker containers - Count and status
+
+Returns:
+- Exit code 0 if all services healthy
+- Exit code 1 if any service is down
+
+Useful for:
+- Pre-flight checks before spawning agents
+- Monitoring in automation scripts
+- Troubleshooting issues
+
+## Next Steps
+
+- [Agent Commands](/cli/agent-commands) - Spawn and manage agents
+- [Workspace Commands](/cli/workspace-commands) - Manage workspaces
+- [CLI Overview](/cli/overview) - Learn more about the CLI
