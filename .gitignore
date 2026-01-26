@@ -36,6 +36,8 @@ workspaces/
 # Compiled TypeScript (build artifacts)
 src/lib/**/*.js
 src/dashboard/frontend/test-results/
+src/dashboard/frontend/playwright-report/
+test-results/
 src/dashboard/restart.sh
 
 # Workspace-specific generated files
