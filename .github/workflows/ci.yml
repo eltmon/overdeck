@@ -36,6 +36,12 @@ jobs:
       - name: Install dashboard server dependencies
         run: cd src/dashboard/server && npm ci
 
+      - name: Debug - Check working directory before build
+        run: |
+          pwd
+          ls -la node_modules/.bin/tsup
+          which npm
+
       - name: Build
         run: npm run build
 

@@ -48,7 +48,7 @@
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
     "build": "npm run build:cli && npm run build:dashboard",
-    "build:cli": "tsup",
+    "build:cli": "npx tsup",
     "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
     "build:dashboard:frontend": "cd src/dashboard/frontend && npm run build",
     "build:dashboard:server": "cd src/dashboard/server && npm run build",
