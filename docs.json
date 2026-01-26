@@ -48,8 +48,8 @@
           {
             "group": "Features",
             "pages": [
-              "features/cloister",
               "features/specialists",
+              "features/cloister",
               "features/skills",
               "features/workspaces",
               "features/convoys"
