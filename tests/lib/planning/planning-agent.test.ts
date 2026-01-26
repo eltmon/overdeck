@@ -1,77 +1,264 @@
-import { describe, it, expect, vi } from 'vitest';
-
-// Mock dependencies
-vi.mock('../../../src/lib/agents.js', () => ({
-  spawnAgent: vi.fn(() => Promise.resolve({ agentId: 'test-planning-agent', sessionId: 'test-session' })),
-}));
+import { describe, it, expect } from 'vitest';
+import { validatePlanningDocument } from '../../../src/lib/planning/planning-agent.js';
 
 describe('planning-agent', () => {
-  describe('generatePlanningDocument', () => {
-    it('should generate structured planning document', async () => {
-      // Placeholder: Would test actual planning doc generation
-      const issueDescription = 'Add user authentication system';
-
-      const planningDoc = {
-        approach: 'JWT-based authentication with refresh tokens',
-        architecture: {
-          components: ['Login endpoint', 'Token service', 'Auth middleware'],
-          database: ['users table', 'refresh_tokens table'],
-        },
-        phases: ['Setup database schema', 'Implement auth endpoints', 'Add middleware', 'Write tests'],
-        risks: ['Token expiration handling', 'Secure password storage'],
-      };
-
-      expect(planningDoc.approach).toBeDefined();
-      expect(planningDoc.phases).toHaveLength(4);
-      expect(planningDoc.risks).toBeDefined();
-    });
-  });
-
-  describe('createPlanningDocument', () => {
-    it('should create STATE.md file with planning content', () => {
-      const content = {
-        title: 'Authentication System Plan',
-        approach: 'Use JWT tokens',
-        phases: ['Phase 1', 'Phase 2'],
-      };
-
-      // Mock file creation
-      expect(content.title).toBe('Authentication System Plan');
-      expect(content.phases).toHaveLength(2);
-    });
-  });
-
-  describe('spawnPlanningAgent', () => {
-    it('should spawn agent with planning work type', async () => {
-      // Placeholder: Would test spawning with correct work type ID
-      const workType = 'planning-agent';
-      expect(workType).toBe('planning-agent');
-    });
-  });
-
   describe('validatePlanningDocument', () => {
-    it('should validate required sections exist', () => {
-      const validDoc = {
-        approach: 'Technical approach here',
-        phases: ['Phase 1', 'Phase 2'],
-        architecture: {},
-      };
+    it('should accept complete planning document', () => {
+      const content = `
+# Planning: PAN-123
 
-      const isValid =
-        typeof validDoc.approach === 'string' && validDoc.approach.length > 0 && Array.isArray(validDoc.phases) && validDoc.phases.length > 0;
+## Approach
 
-      expect(isValid).toBe(true);
+We will build this using a three-tier architecture.
+
+### High-Level Strategy
+
+Use React for frontend and Node.js for backend.
+
+## Architecture
+
+### System Components
+
+- Frontend (React)
+- Backend (Express)
+- Database (PostgreSQL)
+
+## Technology Decisions
+
+### Languages & Frameworks
+
+TypeScript, React, Express
+
+## Key Design Decisions
+
+### Decision 1: Use REST API
+
+We chose REST over GraphQL for simplicity.
+`;
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.complete).toBe(true);
+      expect(result.missingSections).toHaveLength(0);
     });
 
-    it('should reject empty planning documents', () => {
-      const invalidDoc = {
-        approach: '',
-        phases: [],
-      };
+    it('should detect missing Approach section', () => {
+      const content = `
+# Planning: PAN-123
 
-      const isValid = invalidDoc.approach.length > 0 && invalidDoc.phases.length > 0;
+## Architecture
 
-      expect(isValid).toBe(false);
+Some architecture details
+
+## Technology Decisions
+
+Some tech decisions
+
+## Key Design Decisions
+
+Some decisions
+`;
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.complete).toBe(false);
+      expect(result.missingSections).toContain('Approach');
+    });
+
+    it('should detect missing Architecture section', () => {
+      const content = `
+# Planning: PAN-123
+
+## Approach
+
+Some approach
+
+## Technology Decisions
+
+Some tech decisions
+
+## Key Design Decisions
+
+Some decisions
+`;
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.complete).toBe(false);
+      expect(result.missingSections).toContain('Architecture');
+    });
+
+    it('should detect missing Technology Decisions section', () => {
+      const content = `
+# Planning: PAN-123
+
+## Approach
+
+Some approach
+
+## Architecture
+
+Some architecture
+
+## Key Design Decisions
+
+Some decisions
+`;
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.complete).toBe(false);
+      expect(result.missingSections).toContain('Technology Decisions');
+    });
+
+    it('should detect missing Key Design Decisions section', () => {
+      const content = `
+# Planning: PAN-123
+
+## Approach
+
+Some approach
+
+## Architecture
+
+Some architecture
+
+## Technology Decisions
+
+Some tech decisions
+`;
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.complete).toBe(false);
+      expect(result.missingSections).toContain('Key Design Decisions');
+    });
+
+    it('should count open questions', () => {
+      const content = `
+# Planning: PAN-123
+
+## Approach
+
+Some approach
+
+## Architecture
+
+Some architecture
+
+## Technology Decisions
+
+Some tech decisions
+
+## Key Design Decisions
+
+Some decisions
+
+## Open Questions
+
+- What database should we use?
+- Should we use GraphQL or REST?
+- How should we handle authentication?
+`;
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.openQuestions).toBe(3);
+      expect(result.complete).toBe(false); // Not complete if there are open questions
+    });
+
+    it('should flag many unfilled sections as incomplete', () => {
+      const content = `
+# Planning: PAN-123
+
+## Approach
+
+_To be filled in_
+
+## Architecture
+
+_To be filled in_
+
+## Technology Decisions
+
+_To be filled in_
+
+## Key Design Decisions
+
+_To be filled in_
+`;
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.complete).toBe(false);
+      expect(result.missingSections.some(s => s.includes('unfilled'))).toBe(true);
+    });
+
+    it('should accept document with few unfilled placeholders', () => {
+      const content = `
+# Planning: PAN-123
+
+## Approach
+
+We will use a microservices architecture.
+
+_To be filled in_
+
+## Architecture
+
+Service-oriented design
+
+## Technology Decisions
+
+TypeScript, React, Node.js
+
+## Key Design Decisions
+
+Use REST API
+`;
+
+      const result = validatePlanningDocument(content);
+
+      // Should be complete - only 2 "To be filled in" placeholders (threshold is 2)
+      expect(result.complete).toBe(true);
+    });
+
+    it('should handle empty document', () => {
+      const content = '';
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.complete).toBe(false);
+      expect(result.missingSections.length).toBeGreaterThan(0);
+    });
+
+    it('should report zero open questions when section is empty', () => {
+      const content = `
+# Planning: PAN-123
+
+## Approach
+
+Some approach
+
+## Architecture
+
+Some architecture
+
+## Technology Decisions
+
+Some tech decisions
+
+## Key Design Decisions
+
+Some decisions
+
+## Open Questions
+
+`;
+
+      const result = validatePlanningDocument(content);
+
+      expect(result.openQuestions).toBe(0);
     });
   });
 });
