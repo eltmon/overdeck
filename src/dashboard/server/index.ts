@@ -169,12 +169,19 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
   // Merge existing with update
   const merged = { ...existing, ...update };
 
+  // readyForMerge logic:
+  // - True if review passed AND test passed AND not yet merged
+  // - False if explicitly set in update (e.g., after merge completion)
+  // - False if merge is complete
+  const readyForMerge = update.readyForMerge !== undefined
+    ? update.readyForMerge
+    : (merged.reviewStatus === 'passed' && merged.testStatus === 'passed' && merged.mergeStatus !== 'merged');
+
   const updated: ReviewStatus = {
     ...merged,
     issueId,
     updatedAt: new Date().toISOString(),
-    // Calculate readyForMerge from merged state (not just the update)
-    readyForMerge: merged.reviewStatus === 'passed' && merged.testStatus === 'passed',
+    readyForMerge,
   };
 
   statuses[issueId] = updated;
@@ -4570,6 +4577,89 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
   }
 
   res.json(status);
+});
+
+// Specialist completion endpoint
+// Allows specialists to signal completion via curl without needing `pan` CLI in PATH
+// Usage: curl -X POST http://localhost:3011/api/specialists/done \
+//   -H "Content-Type: application/json" \
+//   -d '{"specialist":"merge","issueId":"PAN-81","status":"passed","notes":"..."}'
+app.post('/api/specialists/done', async (req, res) => {
+  const { specialist, issueId, status, notes } = req.body;
+
+  // Validate specialist type
+  const validSpecialists = ['review', 'test', 'merge'];
+  if (!validSpecialists.includes(specialist)) {
+    return res.status(400).json({
+      error: `Invalid specialist: ${specialist}. Valid: ${validSpecialists.join(', ')}`,
+    });
+  }
+
+  // Validate status
+  if (!status || !['passed', 'failed'].includes(status)) {
+    return res.status(400).json({
+      error: `Invalid status: ${status}. Must be 'passed' or 'failed'`,
+    });
+  }
+
+  // Validate issueId
+  if (!issueId) {
+    return res.status(400).json({ error: 'issueId is required' });
+  }
+
+  const normalizedIssueId = issueId.toUpperCase();
+  console.log(`[specialists/done] ${specialist} signaling ${status} for ${normalizedIssueId}`);
+
+  // Build the update based on specialist type
+  const update: Partial<ReviewStatus> = {};
+
+  switch (specialist) {
+    case 'review':
+      update.reviewStatus = status === 'passed' ? 'passed' : 'blocked';
+      if (notes) update.reviewNotes = notes;
+      break;
+
+    case 'test':
+      update.testStatus = status;
+      if (notes) update.testNotes = notes;
+      break;
+
+    case 'merge':
+      update.mergeStatus = status === 'passed' ? 'merged' : 'failed';
+      break;
+  }
+
+  // Apply the update (this triggers all the side effects like idle state, queue processing)
+  const updatedStatus = setReviewStatus(normalizedIssueId, update);
+
+  // Set specialist state to idle
+  const { getTmuxSessionName, checkSpecialistQueue, completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
+  const tmuxSession = getTmuxSessionName(`${specialist}-agent` as any);
+  saveAgentRuntimeState(tmuxSession, {
+    state: 'idle',
+    lastActivity: new Date().toISOString(),
+  });
+  console.log(`[specialists/done] Set ${specialist}-agent to idle`);
+
+  // Clear this issue from the specialist's queue
+  const queue = checkSpecialistQueue(`${specialist}-agent` as any);
+  for (const item of queue.items) {
+    if (item.payload?.issueId?.toLowerCase() === normalizedIssueId.toLowerCase()) {
+      completeSpecialistTask(`${specialist}-agent` as any, item.id);
+      console.log(`[specialists/done] Cleared ${normalizedIssueId} from ${specialist}-agent queue`);
+    }
+  }
+
+  // Note: readyForMerge is automatically set to false when mergeStatus='merged' in setReviewStatus()
+
+  res.json({
+    success: true,
+    specialist,
+    issueId: normalizedIssueId,
+    status,
+    notes,
+    currentStatus: updatedStatus,
+  });
 });
 
 // Start review pipeline: triggers review-agent → test-agent

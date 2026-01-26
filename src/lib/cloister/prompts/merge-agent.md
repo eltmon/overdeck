@@ -133,23 +133,27 @@ Detect the project type and run the appropriate build command:
 
 ## Signal Completion (CRITICAL)
 
-When you're done, you MUST run this command to update the status:
+When you're done, you MUST call the API to update status:
 
 **If merge succeeded:**
 ```bash
-pan specialists done merge {{issueId}} --status passed --notes "All conflicts resolved, build and tests pass"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"merge","issueId":"{{issueId}}","status":"passed","notes":"All conflicts resolved, build and tests pass"}'
 ```
 
 **If merge failed:**
 ```bash
-pan specialists done merge {{issueId}} --status failed --notes "Brief description of what failed"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"merge","issueId":"{{issueId}}","status":"failed","notes":"Brief description of what failed"}'
 ```
 
 **IMPORTANT:**
-- You MUST run the `pan specialists done` command - this is how the system knows you're finished
-- Do NOT just print results to the screen - run the command
-- The command updates the dashboard and triggers the next step in the pipeline
-- If you don't run this command, the dashboard will show you as still "merging"
+- You MUST call the API - this is how the system knows you're finished
+- Do NOT just print results to the screen - call the API
+- The API updates the dashboard and triggers the next step in the pipeline
+- If you don't call the API, the dashboard will show you as still "merging"
 
 ### Example Complete Workflow
 
@@ -167,13 +171,17 @@ npm run build
 npm test
 
 # 5. Signal completion (REQUIRED)
-pan specialists done merge MIN-665 --status passed --notes "Conflicts resolved, all tests passing"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"merge","issueId":"MIN-665","status":"passed","notes":"Conflicts resolved, all tests passing"}'
 ```
 
 Or if merge failed:
 ```bash
 # Could not resolve - signal failure
-pan specialists done merge MIN-665 --status failed --notes "Incompatible type changes in core module, needs manual review"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"merge","issueId":"MIN-665","status":"failed","notes":"Incompatible type changes in core module, needs manual review"}'
 ```
 
 ## Important Constraints
@@ -189,7 +197,7 @@ pan specialists done merge MIN-665 --status failed --notes "Incompatible type ch
 2. Build passes (ran via Task tool with subagent_type="Bash")
 3. Tests pass (ran via Task tool with subagent_type="Bash")
 4. Merge commit is completed
-5. Completion signaled with `pan specialists done merge {{issueId}} --status passed`
+5. Completion signaled via API: `curl -X POST http://localhost:3011/api/specialists/done ...`
 
 **Remember:** Both build AND tests must pass before committing. If either fails, the merge is NOT complete. Use subagents to run these commands to keep your context clean.
 

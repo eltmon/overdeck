@@ -242,23 +242,27 @@ gh pr review {{prUrl}} --comment --body "Your questions/suggestions"
 
 ## Signal Completion (CRITICAL)
 
-After completing your review and sending feedback to the issue agent, you MUST run this command to update the status:
+After completing your review and sending feedback to the issue agent, you MUST call the API to update status:
 
 **If issues found (request changes):**
 ```bash
-pan specialists done review {{issueId}} --status failed --notes "Brief summary of issues"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"review","issueId":"{{issueId}}","status":"failed","notes":"Brief summary of issues"}'
 ```
 
 **If approved (rare - only for excellent code):**
 ```bash
-pan specialists done review {{issueId}} --status passed --notes "Clean code, full test coverage"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"review","issueId":"{{issueId}}","status":"passed","notes":"Clean code, full test coverage"}'
 ```
 
 **IMPORTANT:**
-- You MUST run the `pan specialists done` command - this is how the system knows you're finished
-- Do NOT just print results to the screen - run the command
-- The command updates the dashboard and triggers the next step in the pipeline
-- If you don't run this command, the dashboard will show you as still "reviewing"
+- You MUST call the API - this is how the system knows you're finished
+- Do NOT just print results to the screen - call the API
+- The API updates the dashboard and triggers the next step in the pipeline
+- If you don't call the API, the dashboard will show you as still "reviewing"
 
 ### Example Complete Workflow
 
@@ -270,7 +274,9 @@ gh pr review https://github.com/org/repo/pull/123 --request-changes --body "Your
 pan work tell min-665 "CODE REVIEW BLOCKED: Missing tests for new functions. Fix and reply when done."
 
 # 3. Signal completion (REQUIRED)
-pan specialists done review MIN-665 --status failed --notes "Missing tests, type safety issues"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"review","issueId":"MIN-665","status":"failed","notes":"Missing tests, type safety issues"}'
 ```
 
 Or for approval:
@@ -279,7 +285,9 @@ Or for approval:
 gh pr review https://github.com/org/repo/pull/123 --approve --body "Excellent work"
 
 # 2. Signal completion - test agent can now proceed
-pan specialists done review MIN-665 --status passed --notes "Clean code, full test coverage"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"review","issueId":"MIN-665","status":"passed","notes":"Clean code, full test coverage"}'
 ```
 
 ## Important Constraints
@@ -337,16 +345,20 @@ Fix these issues and reply when done."
 - Properly escapes special characters
 - Saves message to mail queue as backup
 
-### Step 2: Signal completion with CLI
+### Step 2: Signal completion with API
 
 Only AFTER sending feedback to the agent, signal completion:
 
 ```bash
 # If issues found:
-pan specialists done review {{issueId}} --status failed --notes "brief summary of issues"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"review","issueId":"{{issueId}}","status":"failed","notes":"brief summary of issues"}'
 
 # If approved:
-pan specialists done review {{issueId}} --status passed --notes "Clean code, ready for testing"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"review","issueId":"{{issueId}}","status":"passed","notes":"Clean code, ready for testing"}'
 ```
 
 ### Why This Matters

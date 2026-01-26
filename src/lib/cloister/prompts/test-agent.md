@@ -139,23 +139,27 @@ If you attempt a fix:
 
 ### 5. Signal Completion (CRITICAL)
 
-When you're done, you MUST run this command to update the status:
+When you're done, you MUST call the API to update status:
 
 **If tests passed:**
 ```bash
-pan specialists done test {{issueId}} --status passed --notes "All X tests passed"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"test","issueId":"{{issueId}}","status":"passed","notes":"All X tests passed"}'
 ```
 
 **If tests failed:**
 ```bash
-pan specialists done test {{issueId}} --status failed --notes "X tests failing: brief description"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"test","issueId":"{{issueId}}","status":"failed","notes":"X tests failing: brief description"}'
 ```
 
 **IMPORTANT:**
-- You MUST run the `pan specialists done` command - this is how the system knows you're finished
-- Do NOT just print results to the screen - run the command
-- The command updates the dashboard and triggers the next step in the pipeline
-- If you don't run this command, the dashboard will show you as still "testing"
+- You MUST call the API - this is how the system knows you're finished
+- Do NOT just print results to the screen - call the API
+- The API updates the dashboard and triggers the next step in the pipeline
+- If you don't call the API, the dashboard will show you as still "testing"
 
 ### Example Complete Workflow
 
@@ -164,10 +168,14 @@ pan specialists done test {{issueId}} --status failed --notes "X tests failing: 
 npm test
 
 # 2. If all pass:
-pan specialists done test MIN-665 --status passed --notes "42 tests passed, 0 failed"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"test","issueId":"MIN-665","status":"passed","notes":"42 tests passed, 0 failed"}'
 
 # 2. If some fail:
-pan specialists done test MIN-665 --status failed --notes "40 passed, 2 failed: auth.test.ts timeout, user.test.ts assertion"
+curl -X POST http://localhost:3011/api/specialists/done \
+  -H "Content-Type: application/json" \
+  -d '{"specialist":"test","issueId":"MIN-665","status":"failed","notes":"40 passed, 2 failed: auth.test.ts timeout, user.test.ts assertion"}'
 ```
 
 ## Important Constraints
