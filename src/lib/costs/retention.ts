@@ -38,7 +38,14 @@ export function getLastRetentionCleanup(): Date | null {
 
   try {
     const content = readFileSync(RETENTION_MARKER_FILE, 'utf-8').trim();
-    return new Date(content);
+    const date = new Date(content);
+
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+
+    return date;
   } catch {
     return null;
   }
@@ -115,6 +122,13 @@ export async function cleanOldEvents(): Promise<{
   for (const event of allEvents) {
     try {
       const eventDate = new Date(event.ts);
+
+      // Check if date is valid - if not, keep the event (assume it's recent)
+      if (isNaN(eventDate.getTime())) {
+        recentEvents.push(event);
+        continue;
+      }
+
       if (eventDate >= cutoffDate) {
         recentEvents.push(event);
       }
