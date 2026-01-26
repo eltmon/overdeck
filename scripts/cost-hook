@@ -1,0 +1,122 @@
+#!/bin/bash
+# ~/.panopticon/bin/cost-hook
+# Called by Claude Code after each API response with usage data on stdin
+#
+# This hook receives API usage data and writes cost events to enable
+# real-time cost tracking without session file parsing.
+#
+# CRITICAL: This hook runs for BOTH main agents AND subagents, capturing
+# all token usage uniformly.
+
+# Don't use set -e - we want the hook to be resilient to failures
+# and never break Claude Code execution
+
+# Parse usage info from stdin
+USAGE=$(cat 2>/dev/null || echo '{}')
+
+# Check if jq is available
+if ! command -v jq &> /dev/null; then
+  # Log error but don't break Claude Code
+  echo "[cost-hook] Warning: jq not found. Cost tracking requires jq." >&2
+  exit 0  # Silent failure
+fi
+
+# Extract usage data
+INPUT_TOKENS=$(echo "$USAGE" | jq -r '.usage.input_tokens // 0' 2>/dev/null || echo "0")
+OUTPUT_TOKENS=$(echo "$USAGE" | jq -r '.usage.output_tokens // 0' 2>/dev/null || echo "0")
+CACHE_READ=$(echo "$USAGE" | jq -r '.usage.cache_read_input_tokens // 0' 2>/dev/null || echo "0")
+CACHE_WRITE=$(echo "$USAGE" | jq -r '.usage.cache_creation_input_tokens // 0' 2>/dev/null || echo "0")
+MODEL=$(echo "$USAGE" | jq -r '.model // "claude-sonnet-4"' 2>/dev/null || echo "claude-sonnet-4")
+
+# Skip if no usage data (empty response or invalid format)
+if [ "$INPUT_TOKENS" = "0" ] && [ "$OUTPUT_TOKENS" = "0" ]; then
+  exit 0
+fi
+
+# Get agent ID from env (set by pan work issue) or tmux session name
+if [ -n "$PANOPTICON_AGENT_ID" ]; then
+  AGENT_ID="$PANOPTICON_AGENT_ID"
+elif [ -n "$TMUX" ]; then
+  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
+else
+  AGENT_ID="main-cli"
+fi
+AGENT_ID="${AGENT_ID:-unknown}"
+
+# Extract issue ID from agent name
+# Format: "agent-pan-74" -> "pan-74"
+# Format: "agent-pan-74-subagent-aa82e20" -> "pan-74"
+ISSUE_ID=""
+if [[ "$AGENT_ID" =~ (agent|planning)-([a-z]+-[0-9]+) ]]; then
+  ISSUE_ID="${BASH_REMATCH[2]}"
+fi
+
+# Ensure costs directory exists
+COSTS_DIR="$HOME/.panopticon/costs"
+mkdir -p "$COSTS_DIR"
+
+# Ensure errors log exists
+ERRORS_LOG="$COSTS_DIR/errors.log"
+touch "$ERRORS_LOG" 2>/dev/null || true
+
+# Create cost event in JSONL format
+TIMESTAMP=$(date -Iseconds)
+EVENT=$(jq -n \
+  --arg ts "$TIMESTAMP" \
+  --arg agent "$AGENT_ID" \
+  --argjson input "$INPUT_TOKENS" \
+  --argjson output "$OUTPUT_TOKENS" \
+  --argjson cache_read "$CACHE_READ" \
+  --argjson cache_write "$CACHE_WRITE" \
+  --arg model "$MODEL" \
+  --arg issueId "$ISSUE_ID" \
+  '{
+    ts: $ts,
+    agent: $agent,
+    input: $input,
+    output: $output,
+    cache_read: $cache_read,
+    cache_write: $cache_write,
+    model: $model
+  } + (if $issueId != "" then {issueId: $issueId} else {} end)' 2>/dev/null)
+
+# If event creation failed, log error and exit
+if [ -z "$EVENT" ]; then
+  echo "[$(date -Iseconds)] Failed to create cost event JSON" >> "$ERRORS_LOG" 2>/dev/null || true
+  exit 0
+fi
+
+# Append to events log with simple file locking
+EVENTS_FILE="$COSTS_DIR/events.jsonl"
+LOCK_FILE="$COSTS_DIR/events.lock"
+
+# Try to acquire lock (max 1 second wait)
+LOCK_WAIT=0
+while [ -f "$LOCK_FILE" ] && [ $LOCK_WAIT -lt 100 ]; do
+  sleep 0.01
+  LOCK_WAIT=$((LOCK_WAIT + 1))
+done
+
+# Create lock
+echo $$ > "$LOCK_FILE" 2>/dev/null || true
+
+# Append event (use >> for append)
+echo "$EVENT" >> "$EVENTS_FILE" 2>/dev/null || {
+  echo "[$(date -Iseconds)] Failed to write cost event to $EVENTS_FILE" >> "$ERRORS_LOG" 2>/dev/null || true
+}
+
+# Release lock
+rm -f "$LOCK_FILE" 2>/dev/null || true
+
+# Optionally trigger incremental cache update (non-blocking)
+# Only if dashboard is running and this is a significant event (>10k tokens)
+TOTAL_TOKENS=$((INPUT_TOKENS + OUTPUT_TOKENS))
+if [ $TOTAL_TOKENS -gt 10000 ]; then
+  if curl -s -f --max-time 0.5 "http://localhost:3011/health" > /dev/null 2>&1; then
+    curl -s -X POST "http://localhost:3011/api/costs/update-cache" \
+      > /dev/null 2>&1 &
+  fi
+fi
+
+# Always exit successfully - never break Claude Code execution
+exit 0
