@@ -15,6 +15,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { loadSettings, saveSettings, validateSettings, getAvailableModels } from '../../lib/settings.js';
+import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi } from '../../lib/settings-api.js';
 import { generateRouterConfig, writeRouterConfig } from '../../lib/router-config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../lib/health-filtering.js';
@@ -2214,7 +2215,7 @@ app.get('/api/cloister/spawn-status', (_req, res) => {
 // Get settings (PAN-78)
 app.get('/api/settings', (_req, res) => {
   try {
-    const settings = loadSettings();
+    const settings = loadSettingsApi();
     res.json(settings);
   } catch (error: any) {
     console.error('Error loading settings:', error);
@@ -2225,8 +2226,8 @@ app.get('/api/settings', (_req, res) => {
 // Get available models (filtered by configured API keys) (PAN-78)
 app.get('/api/settings/available-models', (_req, res) => {
   try {
-    const settings = loadSettings();
-    const availableModels = getAvailableModels(settings);
+    const settings = loadSettingsApi();
+    const availableModels = getAvailableModelsApi(settings);
     res.json(availableModels);
   } catch (error: any) {
     console.error('Error loading available models:', error);
@@ -2355,26 +2356,26 @@ app.post('/api/settings/validate-api-key', async (req, res) => {
   }
 });
 
-// Update settings (PAN-78)
+// Update settings (PAN-78, updated for PAN-118)
 app.put('/api/settings', (req, res) => {
   try {
     const newSettings = req.body;
 
     // Validate settings
-    const validationError = validateSettings(newSettings);
+    const validationError = validateSettingsApi(newSettings);
     if (validationError) {
       res.status(400).json({ error: validationError });
       return;
     }
 
-    // Save settings
-    saveSettings(newSettings);
+    // Save settings to YAML
+    saveSettingsApi(newSettings);
 
-    // Regenerate router config
-    const routerConfig = generateRouterConfig(newSettings);
-    writeRouterConfig(routerConfig);
+    // TODO: Regenerate router config for new work-type-based routing
+    // const routerConfig = generateRouterConfig(newSettings);
+    // writeRouterConfig(routerConfig);
 
-    res.json({ success: true, message: 'Settings saved and router config updated' });
+    res.json({ success: true, message: 'Settings saved to config.yaml' });
   } catch (error: any) {
     console.error('Error saving settings:', error);
     res.status(500).json({ error: 'Failed to save settings: ' + error.message });
