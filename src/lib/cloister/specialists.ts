@@ -14,6 +14,7 @@ import { PANOPTICON_HOME } from '../paths.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import { loadSettings } from '../settings.js';
+import { getModelId, WorkTypeId } from '../work-type-router.js';
 
 const execAsync = promisify(exec);
 
@@ -587,16 +588,14 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   const tmuxSession = getTmuxSessionName(name);
   const cwd = process.env.HOME || '/home/eltmon';
 
-  // Determine model for this specialist from settings
-  let model = 'sonnet'; // default fallback
+  // Determine model for this specialist using work type router
+  let model = 'claude-sonnet-4-5'; // default fallback
   try {
-    const settings = loadSettings();
-    const specialistKey = name.replace('-agent', '_agent') as keyof typeof settings.models.specialists;
-    if (settings.models.specialists[specialistKey]) {
-      model = settings.models.specialists[specialistKey];
-    }
+    // Map specialist name to work type ID
+    const workTypeId: WorkTypeId = `specialist-${name}` as WorkTypeId;
+    model = getModelId(workTypeId);
   } catch (error) {
-    console.warn(`Warning: Could not load settings for ${name}, using default model`);
+    console.warn(`Warning: Could not resolve model for ${name}, using default model`);
   }
 
   // Create identity prompt for the specialist

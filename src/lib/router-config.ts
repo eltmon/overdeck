@@ -2,6 +2,8 @@ import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { SettingsConfig, ModelId } from './settings.js';
+import { getAllWorkTypes, WorkTypeId } from './work-types.js';
+import { WorkTypeRouter } from './work-type-router.js';
 
 // claude-code-router config directory
 const ROUTER_CONFIG_DIR = join(homedir(), '.claude-code-router');
@@ -39,7 +41,9 @@ function getModelProvider(modelId: ModelId): 'anthropic' | 'openai' | 'google' |
 }
 
 /**
- * Generate claude-code-router config from Panopticon settings
+ * Generate claude-code-router config from Panopticon settings (LEGACY)
+ *
+ * @deprecated Use generateRouterConfigFromWorkTypes instead
  */
 export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
   const providers: Provider[] = [];
@@ -108,7 +112,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
     model: settings.models.planning_agent,
   };
 
-  // Complexity-based routing (for future use with PAN-75)
+  // Complexity-based routing (for backward compatibility)
   router['complexity-trivial'] = {
     model: settings.models.complexity.trivial,
   };
@@ -124,6 +128,71 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
   router['complexity-expert'] = {
     model: settings.models.complexity.expert,
   };
+
+  return { providers, router };
+}
+
+/**
+ * Generate claude-code-router config from work types
+ *
+ * This is the new work-type-based router configuration.
+ * It generates routing rules for all 20 work types using the
+ * WorkTypeRouter to resolve models.
+ */
+export function generateRouterConfigFromWorkTypes(): RouterConfig {
+  const workTypeRouter = new WorkTypeRouter();
+  const apiKeys = workTypeRouter.getApiKeys();
+  const enabledProviders = workTypeRouter.getEnabledProviders();
+
+  const providers: Provider[] = [];
+  const router: Record<string, RouterRule> = {};
+
+  // Anthropic provider (always included - uses $ANTHROPIC_API_KEY env var)
+  providers.push({
+    name: 'anthropic',
+    baseURL: 'https://api.anthropic.com/v1',
+    apiKey: '$ANTHROPIC_API_KEY',
+    models: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+  });
+
+  // OpenAI provider (only if enabled)
+  if (enabledProviders.has('openai') && apiKeys.openai) {
+    providers.push({
+      name: 'openai',
+      baseURL: 'https://api.openai.com/v1',
+      apiKey: apiKeys.openai.startsWith('$') ? apiKeys.openai : apiKeys.openai,
+      models: ['gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'],
+    });
+  }
+
+  // Google provider (only if enabled)
+  if (enabledProviders.has('google') && apiKeys.google) {
+    providers.push({
+      name: 'google',
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta',
+      apiKey: apiKeys.google.startsWith('$') ? apiKeys.google : apiKeys.google,
+      models: ['gemini-3-pro-preview', 'gemini-3-flash-preview'],
+    });
+  }
+
+  // Z.AI provider (only if enabled)
+  if (enabledProviders.has('zai') && apiKeys.zai) {
+    providers.push({
+      name: 'zai',
+      baseURL: 'https://open.bigmodel.cn/api/paas/v4',
+      apiKey: apiKeys.zai.startsWith('$') ? apiKeys.zai : apiKeys.zai,
+      models: ['glm-4.7', 'glm-4.7-flash'],
+    });
+  }
+
+  // Generate router rules for all 20 work types
+  const allWorkTypes = getAllWorkTypes();
+  for (const workType of allWorkTypes) {
+    const resolution = workTypeRouter.getModel(workType);
+    router[workType] = {
+      model: resolution.model,
+    };
+  }
 
   return { providers, router };
 }

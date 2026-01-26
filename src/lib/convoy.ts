@@ -14,6 +14,7 @@ import { parse as parseYaml } from 'yaml';
 import { createSession, killSession, sessionExists } from './tmux.js';
 import { getConvoyTemplate, getExecutionOrder, type ConvoyTemplate, type ConvoyAgent } from './convoy-templates.js';
 import { AGENTS_DIR } from './paths.js';
+import { getModelId, WorkTypeId } from './work-type-router.js';
 
 const execAsync = promisify(exec);
 
@@ -160,6 +161,25 @@ export function parseAgentTemplate(templatePath: string): AgentTemplate {
 // Agent Spawning
 // ============================================================================
 
+/**
+ * Map convoy role to work type ID
+ *
+ * Maps the role string from convoy templates to the corresponding work type ID.
+ *
+ * @param role Convoy role (e.g., 'security', 'performance', 'synthesis')
+ * @returns Work type ID or null if no mapping
+ */
+function mapConvoyRoleToWorkType(role: string): WorkTypeId | null {
+  const roleMap: Record<string, WorkTypeId> = {
+    'security': 'convoy:security-reviewer',
+    'performance': 'convoy:performance-reviewer',
+    'correctness': 'convoy:correctness-reviewer',
+    'synthesis': 'convoy:synthesis-agent',
+  };
+
+  return roleMap[role] || null;
+}
+
 export async function spawnConvoyAgent(
   convoy: ConvoyState,
   agent: ConvoyAgent,
@@ -171,6 +191,18 @@ export async function spawnConvoyAgent(
   // Find agent template
   const templatePath = join(AGENTS_DIR, `${subagent}.md`);
   const template = parseAgentTemplate(templatePath);
+
+  // Determine model using work type router
+  let model = template.model; // fallback to template default
+  try {
+    // Map convoy role to work type ID
+    const workTypeId = mapConvoyRoleToWorkType(role);
+    if (workTypeId) {
+      model = getModelId(workTypeId);
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not resolve model for convoy role ${role}, using template default`);
+  }
 
   // Build context for agent prompt
   const agentContext = {
@@ -213,8 +245,8 @@ ${context.issueId ? `**Issue ID**: ${context.issueId}` : ''}
   const promptFile = join(convoy.outputDir, `${role}-prompt.md`);
   writeFileSync(promptFile, prompt);
 
-  // Build claude command with model from template
-  const claudeCmd = `claude --dangerously-skip-permissions --model ${template.model}`;
+  // Build claude command with resolved model
+  const claudeCmd = `claude --dangerously-skip-permissions --model ${model}`;
 
   // Create tmux session
   createSession(agentState.tmuxSession, convoy.context.projectPath, claudeCmd, {
