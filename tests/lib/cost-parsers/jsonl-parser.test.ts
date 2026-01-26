@@ -46,9 +46,9 @@ describe('getActiveSessionModel', () => {
     // Create a unique test workspace path
     const testWorkspacePath = join(tempHome, 'test-workspace');
 
-    // Convert to Claude project dir name format
+    // Convert to Claude project dir name format (keeps leading dash)
     // e.g., /tmp/pan-test/test-workspace -> -tmp-pan-test-test-workspace
-    const projectDirName = testWorkspacePath.replace(/\//g, '-').replace(/^-/, '');
+    const projectDirName = testWorkspacePath.replace(/\//g, '-');
     const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
 
     // Create the directory
@@ -83,7 +83,7 @@ describe('getActiveSessionModel', () => {
   it('should return model ID from top-level model field', () => {
     // Test case where model is at top level, not in message object
     const testWorkspacePath = join(tempHome, 'test-workspace-2');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-').replace(/^-/, '');
+    const projectDirName = testWorkspacePath.replace(/\//g, '-');
     const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
 
     mkdirSync(claudeProjectDir, { recursive: true });
@@ -110,7 +110,7 @@ describe('getActiveSessionModel', () => {
 
   it('should return null when session file has no model field', () => {
     const testWorkspacePath = join(tempHome, 'test-workspace-3');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-').replace(/^-/, '');
+    const projectDirName = testWorkspacePath.replace(/\//g, '-');
     const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
 
     mkdirSync(claudeProjectDir, { recursive: true });
@@ -137,7 +137,7 @@ describe('getActiveSessionModel', () => {
 
   it('should handle invalid JSON in session file gracefully', () => {
     const testWorkspacePath = join(tempHome, 'test-workspace-4');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-').replace(/^-/, '');
+    const projectDirName = testWorkspacePath.replace(/\//g, '-');
     const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
 
     mkdirSync(claudeProjectDir, { recursive: true });
@@ -156,7 +156,7 @@ describe('getActiveSessionModel', () => {
 
   it('should use most recently modified session file', () => {
     const testWorkspacePath = join(tempHome, 'test-workspace-5');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-').replace(/^-/, '');
+    const projectDirName = testWorkspacePath.replace(/\//g, '-');
     const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
 
     mkdirSync(claudeProjectDir, { recursive: true });
@@ -193,7 +193,7 @@ describe('getActiveSessionModel', () => {
 
   it('should search first 10 lines for model field', () => {
     const testWorkspacePath = join(tempHome, 'test-workspace-6');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-').replace(/^-/, '');
+    const projectDirName = testWorkspacePath.replace(/\//g, '-');
     const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
 
     mkdirSync(claudeProjectDir, { recursive: true });
@@ -224,7 +224,7 @@ describe('getActiveSessionModel', () => {
   it('should handle special characters in workspace path', () => {
     // Test with path containing special characters that need escaping
     const testWorkspacePath = join(tempHome, 'test-workspace-special');
-    const projectDirName = testWorkspacePath.replace(/\//g, '-').replace(/^-/, '');
+    const projectDirName = testWorkspacePath.replace(/\//g, '-');
     const claudeProjectDir = join(homedir(), '.claude', 'projects', projectDirName);
 
     mkdirSync(claudeProjectDir, { recursive: true });
