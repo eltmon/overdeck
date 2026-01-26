@@ -206,12 +206,14 @@ This separation allows:
 
 ## Implementation Status
 
-- [ ] Standardize all agents to use work type IDs
-- [ ] Implement preset configuration system
-- [ ] Add fallback strategy for missing API keys
-- [ ] Update settings UI for work type management
-- [ ] Decouple planning from decomposition
-- [ ] Add thinking level support for Gemini models
+- [x] Standardize all agents to use work type IDs
+- [x] Implement preset configuration system
+- [x] Add fallback strategy for missing API keys
+- [ ] Update settings UI for work type management (blocked by PAN-118-6 migration task)
+- [x] Decouple planning from decomposition
+- [x] Add thinking level support for Gemini models (via claude-code-router)
 - [x] Document model selection rationale
+
+**Status**: Core functionality complete. Settings UI redesign pending Stitch integration.
 
 **Tracking issue**: [PAN-118](https://github.com/eltmon/panopticon-cli/issues/118)

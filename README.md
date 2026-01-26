@@ -271,6 +271,9 @@ Secondary trackers sync issues to the dashboard alongside Linear issues, allowin
 
 Panopticon integrates with [claude-code-router](https://github.com/musistudio/claude-code-router) to enable using multiple AI model providers alongside Anthropic models. Configure which models to use for different agent types and task complexities.
 
+📖 **[Complete work types guide and configuration examples →](docs/WORK-TYPES.md)**
+📋 **[Configuration file reference and presets →](docs/CONFIGURATION.md)**
+
 #### Supported Providers and Models
 
 **Anthropic** (via Claude Code / Claude API)
