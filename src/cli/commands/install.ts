@@ -512,7 +512,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
     console.log(`  4. Access dashboard at ${chalk.cyan('https://pan.localhost')}`);
   } else {
     console.log(`  2. Run ${chalk.cyan('pan up')} to start the dashboard`);
-    console.log(`  3. Access dashboard at ${chalk.cyan('http://localhost:3001')}`);
+    console.log(`  3. Access dashboard at ${chalk.cyan('http://localhost:3011')}`);
   }
 
   console.log(`  ${!options.minimal ? '5' : '4'}. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
