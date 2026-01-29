@@ -436,7 +436,8 @@ function spawnPanCommand(args: string[], description: string, cwd?: string): str
 }
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3011', 10);
+// Support both DASHBOARD_PORT (preferred) and PORT for backward compatibility
+const PORT = parseInt(process.env.DASHBOARD_PORT || process.env.PORT || '3010', 10);
 
 app.use(cors());
 app.use(express.json());

@@ -218,6 +218,7 @@ program
         ? spawn('node', [bundledServer], {
             detached: true,
             stdio: 'ignore',
+            env: { ...process.env, DASHBOARD_PORT: '3010' },
           })
         : spawn('npm', ['run', 'dev'], {
             cwd: srcDashboard,
@@ -245,7 +246,7 @@ program
         console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
         console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
       } else if (isProduction) {
-        console.log(`  URL: ${chalk.cyan('http://localhost:3011')}`);
+        console.log(`  URL: ${chalk.cyan('http://localhost:3010')}`);
       } else {
         console.log(`  Frontend: ${chalk.cyan('http://localhost:3001')}`);
         console.log(`  API:      ${chalk.cyan('http://localhost:3002')}`);
@@ -256,7 +257,7 @@ program
         console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
         console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
       } else if (isProduction) {
-        console.log(`  URL: ${chalk.cyan('http://localhost:3011')}`);
+        console.log(`  URL: ${chalk.cyan('http://localhost:3010')}`);
       } else {
         console.log(`  Frontend: ${chalk.cyan('http://localhost:3001')}`);
         console.log(`  API:      ${chalk.cyan('http://localhost:3002')}`);
@@ -266,6 +267,7 @@ program
       const child = isProduction
         ? spawn('node', [bundledServer], {
             stdio: 'inherit',
+            env: { ...process.env, DASHBOARD_PORT: '3010' },
           })
         : spawn('npm', ['run', 'dev'], {
             cwd: srcDashboard,
@@ -295,10 +297,10 @@ program
     // Stop dashboard
     console.log(chalk.dim('Stopping dashboard...'));
     try {
-      // Kill processes on dashboard ports (development: 3001/3002, bundled: 3011)
+      // Kill processes on dashboard ports (development: 3001/3002, bundled: 3010)
       execSync('lsof -ti:3001 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
       execSync('lsof -ti:3002 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
-      execSync('lsof -ti:3011 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
+      execSync('lsof -ti:3010 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
       console.log(chalk.green('✓ Dashboard stopped'));
     } catch {
       console.log(chalk.dim('  No dashboard processes found'));
