@@ -112,18 +112,23 @@ Sensitive API keys stored separately from configuration.
 # Anthropic (required)
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
-# OpenAI (optional)
+# OpenAI (optional - requires router)
 OPENAI_API_KEY=sk-...
 
-# Google (optional)
+# Google (optional - requires router)
 GOOGLE_API_KEY=...
 
-# Z.AI (optional)
-ZAI_API_KEY=...
+# Z.AI / GLM (optional - direct API, no router)
+ZAI_API_KEY=your-zai-key
+
+# Kimi / Moonshot (optional - direct API, no router)
+KIMI_API_KEY=sk-kimi-...
 
 # Linear (for issue tracking)
 LINEAR_API_KEY=lin_api_...
 ```
+
+**Note**: Direct-compatible providers (Kimi, GLM) don't need claude-code-router. Only OpenAI and Gemini require the router.
 
 ---
 

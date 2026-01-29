@@ -82,17 +82,9 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
     });
   }
 
-  // Z.AI provider (only if API key configured)
-  if (settings.api_keys.zai) {
-    providers.push({
-      name: 'zai',
-      baseURL: 'https://open.bigmodel.cn/api/paas/v4',
-      apiKey: settings.api_keys.zai.startsWith('$')
-        ? settings.api_keys.zai
-        : settings.api_keys.zai,
-      models: ['glm-4.7', 'glm-4.7-flash'],
-    });
-  }
+  // Z.AI provider - REMOVED (uses direct API, not router)
+  // GLM models are Anthropic-compatible and don't need translation
+  // See src/lib/providers.ts for direct API configuration
 
   // Router rules: Map agent types to configured models
 
@@ -175,15 +167,10 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
     });
   }
 
-  // Z.AI provider (only if enabled)
-  if (enabledProviders.has('zai') && apiKeys.zai) {
-    providers.push({
-      name: 'zai',
-      baseURL: 'https://open.bigmodel.cn/api/paas/v4',
-      apiKey: apiKeys.zai.startsWith('$') ? apiKeys.zai : apiKeys.zai,
-      models: ['glm-4.7', 'glm-4.7-flash'],
-    });
-  }
+  // Z.AI provider - REMOVED (uses direct API, not router)
+  // GLM models are Anthropic-compatible and don't need translation
+  // Kimi provider - also REMOVED (uses direct API, not router)
+  // See src/lib/providers.ts for direct API configuration
 
   // Generate router rules for all 23 work types
   const allWorkTypes = getAllWorkTypes();
