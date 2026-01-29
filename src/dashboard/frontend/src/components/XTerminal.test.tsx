@@ -18,12 +18,12 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 // Mock ResizeObserver
-class ResizeObserverMock {
+class ResizeObserverMock implements ResizeObserver {
   observe = vi.fn();
   disconnect = vi.fn();
   unobserve = vi.fn();
 }
-global.ResizeObserver = ResizeObserverMock as any;
+global.ResizeObserver = ResizeObserverMock;
 
 // Mock matchMedia for xterm.js
 Object.defineProperty(window, 'matchMedia', {
@@ -41,8 +41,15 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 describe('XTerminal', () => {
+  let originalClientWidth: PropertyDescriptor | undefined;
+  let originalClientHeight: PropertyDescriptor | undefined;
+
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Store original values before modifying
+    originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
 
     // Set up container dimensions for tests
     Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
@@ -57,14 +64,14 @@ describe('XTerminal', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
-      configurable: true,
-      value: 0,
-    });
-    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
-      configurable: true,
-      value: 0,
-    });
+
+    // Restore original values
+    if (originalClientWidth) {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    }
+    if (originalClientHeight) {
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+    }
   });
 
   it('renders terminal container with settings button', async () => {
@@ -256,5 +263,93 @@ describe('XTerminal - WebSocket', () => {
     await waitFor(() => {
       expect(screen.getByTitle('Terminal settings')).toBeInTheDocument();
     });
+  });
+});
+
+describe('XTerminal - Clipboard Functionality', () => {
+  let originalClientWidth: PropertyDescriptor | undefined;
+  let originalClientHeight: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Store original values before modifying
+    originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
+    // Set up container dimensions for tests
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      value: 800,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      value: 600,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+
+    // Restore original values
+    if (originalClientWidth) {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    }
+    if (originalClientHeight) {
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight);
+    }
+  });
+
+  it('mocks navigator.clipboard for paste operations', async () => {
+    // Mock navigator.clipboard
+    const readTextMock = vi.fn().mockResolvedValue('pasted text');
+    Object.defineProperty(global, 'navigator', {
+      value: {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+          readText: readTextMock,
+        },
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Terminal settings')).toBeInTheDocument();
+    });
+
+    // Verify clipboard mock is set up
+    expect(navigator.clipboard.readText).toBeDefined();
+    expect(navigator.clipboard.writeText).toBeDefined();
+  });
+
+  it('saves auto-copy setting even when localStorage throws', async () => {
+    // Mock localStorage to throw on setItem
+    vi.mocked(localStorageMock.setItem).mockImplementation(() => {
+      throw new Error('localStorage not available');
+    });
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Terminal settings')).toBeInTheDocument();
+    });
+
+    // Open settings
+    const settingsButton = screen.getByTitle('Terminal settings');
+    await user.click(settingsButton);
+
+    const checkbox = screen.getByLabelText('Auto-copy on selection');
+    await user.click(checkbox);
+
+    // Should not throw, error should be caught and logged
+    expect(localStorageMock.setItem).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
   });
 });

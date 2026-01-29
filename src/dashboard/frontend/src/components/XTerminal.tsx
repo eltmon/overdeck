@@ -1,11 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { ClipboardAddon } from '@xterm/addon-clipboard';
 import '@xterm/xterm/css/xterm.css';
 
 // Debounce utility to prevent resize spam
-function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): (...args: Parameters<T>) => void {
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (...args: Parameters<T>) => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   return (...args: Parameters<T>) => {
     if (timer) clearTimeout(timer);
@@ -37,7 +36,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
-  const clipboardAddon = useRef<ClipboardAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,7 +66,11 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
   // Persist auto-copy setting to localStorage
   useEffect(() => {
-    localStorage.setItem(AUTOCOPY_STORAGE_KEY, String(autoCopyOnSelect));
+    try {
+      localStorage.setItem(AUTOCOPY_STORAGE_KEY, String(autoCopyOnSelect));
+    } catch (err) {
+      console.error('Failed to save auto-copy setting:', err);
+    }
   }, [autoCopyOnSelect]);
 
   // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, max 30s
@@ -206,7 +208,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     // Create terminal instance if it doesn't exist, otherwise reuse
     let term = terminalInstance.current;
     let fit = fitAddon.current;
-    let clipboard = clipboardAddon.current;
 
     if (!term) {
       term = new Terminal({
@@ -246,16 +247,13 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       });
 
       fit = new FitAddon();
-      clipboard = new ClipboardAddon();
 
       term.loadAddon(fit);
-      term.loadAddon(clipboard);
       term.open(terminalRef.current);
       fit.fit();
 
       terminalInstance.current = term;
       fitAddon.current = fit;
-      clipboardAddon.current = clipboard;
 
       // Add selection change handler for auto-copy
       let selectionTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -376,7 +374,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       term?.dispose();
       terminalInstance.current = null;
       fitAddon.current = null;
-      clipboardAddon.current = null;
     };
   }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu]);
 
