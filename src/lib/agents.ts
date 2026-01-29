@@ -10,6 +10,7 @@ import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadSettings, type ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
+import { getProviderForModel, getProviderEnv, requiresRouter } from './providers.js';
 
 const execAsync = promisify(exec);
 
@@ -385,6 +386,22 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Clear ready signal before spawning (clean slate for PAN-87 fix)
   clearReadySignal(agentId);
 
+  // Get provider configuration for this model
+  const provider = getProviderForModel(selectedModel);
+  const settings = loadSettings();
+
+  // Get provider-specific environment variables
+  let providerEnv: Record<string, string> = {};
+  if (provider.name !== 'anthropic') {
+    // Get API key for this provider
+    const apiKey = settings.api_keys[provider.name as keyof typeof settings.api_keys];
+    if (apiKey) {
+      providerEnv = getProviderEnv(provider, apiKey);
+    } else {
+      console.warn(`Warning: No API key configured for ${provider.displayName}, falling back to Anthropic`);
+    }
+  }
+
   // Create tmux session and start claude
   // For prompts with special shell characters, use a launcher script to safely pass the prompt
   // The script reads the file into a variable, which bash then safely expands
@@ -403,7 +420,8 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
 
   createSession(agentId, options.workspace, claudeCmd, {
     env: {
-      PANOPTICON_AGENT_ID: agentId
+      PANOPTICON_AGENT_ID: agentId,
+      ...providerEnv // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   });
 

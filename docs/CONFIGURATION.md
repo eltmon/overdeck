@@ -12,6 +12,9 @@ Complete guide to configuring Panopticon's multi-model routing system.
 - [Fallback Strategy](#fallback-strategy)
 - [Examples](#examples)
 - [Precedence Rules](#precedence-rules)
+- [Advanced Configuration](#advanced-configuration)
+- [Using Alternative LLM APIs with Claude Code](#using-alternative-llm-apis-with-claude-code)
+- [Getting Help](#getting-help)
 
 ---
 
@@ -535,6 +538,122 @@ pan migrate-config
 # Manual migration: convert complexity levels to work types
 # Old: complexity.medium → New: issue-agent:* work types
 ```
+
+---
+
+## Using Alternative LLM APIs with Claude Code
+
+When working on Panopticon, you can configure Claude Code itself to use third-party LLM APIs like Kimi instead of Anthropic's API. This is separate from Panopticon's multi-model routing and affects the Claude Code CLI tool you use to interact with Panopticon.
+
+### API Compatibility Levels
+
+Different LLM providers have different compatibility with Claude Code's API format:
+
+**✅ Direct API Compatible** (No router needed):
+- **Kimi/Moonshot** - Implements Anthropic-compatible API ✅ Tested
+- **GLM (Z.AI)** - Implements Anthropic-compatible API ✅ Tested
+
+**🔄 Requires Router** (API format translation needed):
+- **OpenAI** - Different API structure, requires claude-code-router
+- **Google Gemini** - Different API structure, requires claude-code-router
+
+### Why Use Alternative APIs?
+
+- **Cost savings**: Kimi and other providers may offer lower API costs
+- **API limits**: Continue working when Anthropic credits are exhausted
+- **Model access**: Use alternative models like Kimi K2, GLM, Gemini, GPT
+
+### Configuring Direct-Compatible APIs (Kimi, GLM)
+
+**CRITICAL**: Use `ANTHROPIC_AUTH_TOKEN` (not `ANTHROPIC_API_KEY`):
+
+**Kimi API:**
+```bash
+# Option 1: Kimi coding endpoint
+export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+export ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
+claude
+
+# Option 2: Moonshot/Kimi K2 endpoint
+export ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic
+export ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
+claude
+```
+
+**GLM (Z.AI) API:**
+```bash
+# GLM/Z.AI endpoint (Anthropic-compatible)
+export ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
+export ANTHROPIC_AUTH_TOKEN=your-zai-api-key
+export API_TIMEOUT_MS=300000  # Optional: increase timeout
+claude
+```
+
+**Alternative (China mainland):**
+```bash
+export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic
+```
+
+### Getting a Kimi API Key
+
+1. **Register**: Sign up at [platform.moonshot.ai](https://platform.moonshot.ai/) (Google account recommended)
+2. **Create key**: Console → API Keys → "Create New Key"
+3. **Copy immediately**: Key is shown only once for security
+4. **Add credits**: Navigate to Billing tab and purchase credits for API access
+
+### Persistent Configuration
+
+Add to your shell profile (`~/.bashrc` or `~/.zshrc`):
+
+```bash
+# Kimi API configuration for Claude Code
+export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+export ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
+```
+
+Then reload your shell:
+```bash
+source ~/.bashrc  # or source ~/.zshrc
+```
+
+### Verification
+
+Check your Claude Code configuration:
+```bash
+claude /status
+```
+
+You should see the custom API endpoint listed in the status output.
+
+### When to Use claude-code-router
+
+For providers that require API format translation (OpenAI, Gemini), use claude-code-router:
+
+```bash
+# Install router
+npm install -g @musistudio/claude-code-router
+
+# Configure via router config
+# See PAN-78 for dashboard UI configuration
+```
+
+**Architecture Decision**:
+- **Direct APIs** (Kimi, GLM): Use `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` ← Simpler, less overhead
+- **Incompatible APIs** (OpenAI, Gemini): Use claude-code-router ← Required for API translation
+
+### Important Notes
+
+- This configures **Claude Code** (the CLI tool), not Panopticon's agent routing
+- Panopticon agents spawned via `pan work issue` will inherit this configuration
+- All Claude Code sessions in the terminal will use the configured endpoint
+- To switch back to Anthropic, unset the environment variables
+- For Panopticon multi-model routing (mixing providers in one workflow), see PAN-78
+
+### Resources
+
+- [Kimi Third-Party Agents Documentation](https://www.kimi.com/code/docs/en/more/third-party-agents.html)
+- [Setup Guide (Medium)](https://guozheng-ge.medium.com/set-up-claude-code-using-third-party-coding-models-glm-4-7-minimax-2-1-kimi-k2-5a3cdf38c261)
+- [Kimi API Documentation](https://platform.moonshot.ai/docs)
 
 ---
 

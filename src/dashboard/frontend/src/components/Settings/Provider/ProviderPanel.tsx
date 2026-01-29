@@ -11,11 +11,14 @@ export interface ProviderPanelProps {
   onTestConnection: (provider: Provider) => Promise<void>;
 }
 
-const PROVIDER_INFO: Record<Provider, { displayName: string; icon: string; iconColor: string }> = {
-  anthropic: { displayName: 'Anthropic', icon: 'auto_awesome', iconColor: '#D97757' },
-  openai: { displayName: 'OpenAI', icon: 'bolt', iconColor: '#10a37f' },
-  google: { displayName: 'Google Vertex AI', icon: 'google', iconColor: '#4285F4' },
-  zai: { displayName: 'Z.AI', icon: 'api', iconColor: '#94a3b8' },
+const PROVIDER_INFO: Record<
+  Provider,
+  { displayName: string; icon: string; iconColor: string; compatibility: 'direct' | 'router' }
+> = {
+  anthropic: { displayName: 'Anthropic', icon: 'auto_awesome', iconColor: '#D97757', compatibility: 'direct' },
+  openai: { displayName: 'OpenAI', icon: 'bolt', iconColor: '#10a37f', compatibility: 'router' },
+  google: { displayName: 'Google Vertex AI', icon: 'google', iconColor: '#4285F4', compatibility: 'router' },
+  zai: { displayName: 'Z.AI (GLM)', icon: 'api', iconColor: '#94a3b8', compatibility: 'direct' },
 };
 
 export function ProviderPanel({
@@ -55,6 +58,7 @@ export function ProviderPanel({
               displayName={info.displayName}
               icon={info.icon}
               iconColor={info.iconColor}
+              compatibility={info.compatibility}
               enabled={providers[provider]}
               connected={isConnected(provider)}
               apiKey={getApiKey(provider)}

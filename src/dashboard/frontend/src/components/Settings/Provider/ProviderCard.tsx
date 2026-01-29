@@ -17,6 +17,7 @@ export interface ProviderCardProps {
   locked?: boolean;
   showThinkingLevel?: boolean;
   thinkingLevel?: number;
+  compatibility?: 'direct' | 'router'; // NEW: Provider compatibility type
   onToggle: () => void;
   onApiKeyChange: (key: string) => void;
   onThinkingLevelChange?: (level: number) => void;
@@ -34,6 +35,7 @@ export function ProviderCard({
   locked = false,
   showThinkingLevel = false,
   thinkingLevel = 3,
+  compatibility = 'direct', // Default to direct
   onToggle,
   onApiKeyChange,
   onThinkingLevelChange,
@@ -66,7 +68,25 @@ export function ProviderCard({
             </span>
           </div>
           <div>
-            <h3 className="font-bold text-lg leading-tight">{displayName}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-lg leading-tight">{displayName}</h3>
+              {/* Compatibility Badge */}
+              <span
+                className={cn(
+                  'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+                  compatibility === 'direct'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                )}
+                title={
+                  compatibility === 'direct'
+                    ? 'Anthropic-compatible API (no router needed)'
+                    : 'Requires claude-code-router for API translation'
+                }
+              >
+                {compatibility === 'direct' ? '⚡ Direct' : '🔄 Router'}
+              </span>
+            </div>
             <span className="text-xs font-medium flex items-center gap-1">
               <StatusDot status={status} />
               {testing ? (

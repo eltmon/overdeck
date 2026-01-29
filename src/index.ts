@@ -5,3 +5,5 @@ export * from './lib/shell.js';
 export * from './lib/backup.js';
 export * from './lib/sync.js';
 export * from './lib/tracker/index.js';
+export * from './lib/providers.js';
+export * from './lib/settings.js';
