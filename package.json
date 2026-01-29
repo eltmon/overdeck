@@ -54,7 +54,7 @@
     "build:dashboard:server": "cd src/dashboard/server && npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "test": "vitest --run --no-file-parallelism",
+    "test": "vitest --run --no-file-parallelism && cd src/dashboard/frontend && npm test",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "vitest run tests/e2e",

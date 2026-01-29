@@ -17,8 +17,9 @@ Enable full copy/paste support in the XTerminal component, including keyboard sh
 - Currently frustrating UX: selection works but copy/paste doesn't
 
 ### Dependencies
-- Need to add: `@xterm/addon-clipboard` (official xterm.js clipboard addon)
+- ~~Need to add: `@xterm/addon-clipboard`~~ (NOT USED - removed during implementation)
 - Already have: `@xterm/xterm@6.0.0`, `@xterm/addon-fit@0.11.0`
+- Implementation uses browser's native `navigator.clipboard` API directly
 
 ## Requirements (from discovery)
 
@@ -49,12 +50,7 @@ Enable full copy/paste support in the XTerminal component, including keyboard sh
 
 ## Technical Approach
 
-### 1. Add Clipboard Addon Dependency
-```bash
-npm install --save @xterm/addon-clipboard
-```
-
-### 2. Extend XTerminal Component
+### 1. Extend XTerminal Component
 
 **Props to add:**
 ```typescript
@@ -66,12 +62,11 @@ interface XTerminalProps {
 ```
 
 **Features to implement:**
-- Load ClipboardAddon from `@xterm/addon-clipboard`
 - Add keyboard event handler for smart Ctrl+C/V behavior
 - Add right-click event handler for custom context menu
 - Add selection event handler for auto-copy (when enabled)
 - Store auto-copy preference in localStorage
-- Create context menu component/UI
+- Create context menu UI (embedded in XTerminal, not separate component)
 
 ### 3. Smart Ctrl+C Logic
 ```typescript
@@ -89,12 +84,13 @@ onKeyDown((event) => {
 })
 ```
 
-### 4. Context Menu
-- Custom React component (floating div)
+### 4. Context Menu (Embedded in XTerminal)
+- Custom context menu UI embedded directly in XTerminal component
 - Position at mouse coordinates on right-click
 - Options: "Copy" (if selection), "Paste"
 - Close on click outside or on action
 - Prevent browser's default context menu
+- Note: Originally planned as separate TerminalContextMenu.tsx, but implemented inline to reduce complexity
 
 ### 5. Auto-Copy on Selection
 ```typescript
@@ -115,19 +111,17 @@ Add toggle in PlanDialog or XTerminal component:
 ## Files to Modify
 
 1. **`src/dashboard/frontend/package.json`**
-   - Add `@xterm/addon-clipboard` dependency
+   - ~~Add `@xterm/addon-clipboard` dependency~~ (REMOVED - using native clipboard API)
 
 2. **`src/dashboard/frontend/src/components/XTerminal.tsx`**
-   - Import and load ClipboardAddon
    - Add keyboard event handlers (Ctrl+C/V)
    - Add selection change handler (auto-copy)
-   - Add right-click handler (context menu)
+   - Add right-click handler (context menu) - embedded UI
    - Add autoCopyOnSelect prop with localStorage persistence
 
-3. **`src/dashboard/frontend/src/components/TerminalContextMenu.tsx`** (NEW)
-   - Custom context menu component
-   - Copy/Paste actions
-   - Positioning logic
+3. **`src/dashboard/frontend/src/components/TerminalContextMenu.tsx`** (NOT CREATED)
+   - ~~Custom context menu component~~
+   - Implemented inline in XTerminal.tsx instead
 
 4. **Test files** (NEW):
    - `src/dashboard/frontend/src/components/XTerminal.test.tsx`
@@ -160,19 +154,14 @@ Add toggle in PlanDialog or XTerminal component:
 
 ## Breakdown into Sub-Tasks
 
-### Task 1: Add clipboard addon dependency
-**Difficulty:** `trivial`
-**Files:** `package.json`
-**Work:** Install `@xterm/addon-clipboard`
+### Task 1: ~~Add clipboard addon dependency~~
+**Status:** REMOVED - Using native `navigator.clipboard` API instead
+**Rationale:** The `@xterm/addon-clipboard` addon was found to be unnecessary; browser native API provides all needed functionality.
 
-### Task 2: Load clipboard addon in XTerminal
-**Difficulty:** `simple`
-**Files:** `XTerminal.tsx`
-**Work:** Import ClipboardAddon, instantiate, load into terminal
-
-### Task 3: Implement smart keyboard shortcuts (Ctrl+C/V)
+### Task 2: Implement smart keyboard shortcuts (Ctrl+C/V)
 **Difficulty:** `medium`
 **Files:** `XTerminal.tsx`
+**Status:** ✅ COMPLETE
 **Work:**
 - Add keyboard event listeners
 - Detect platform (Mac vs Windows/Linux)
@@ -180,9 +169,10 @@ Add toggle in PlanDialog or XTerminal component:
 - Implement Ctrl+V paste logic
 - Handle clipboard API permissions
 
-### Task 4: Implement auto-copy on selection
+### Task 3: Implement auto-copy on selection
 **Difficulty:** `medium`
 **Files:** `XTerminal.tsx`
+**Status:** ✅ COMPLETE
 **Work:**
 - Add `autoCopyOnSelect` prop with default `true`
 - Add selection change handler
@@ -190,28 +180,31 @@ Add toggle in PlanDialog or XTerminal component:
 - Store preference in localStorage
 - Only copy when selection is finalized
 
-### Task 5: Create context menu component
+### Task 4: Create context menu (embedded)
 **Difficulty:** `medium`
-**Files:** `TerminalContextMenu.tsx` (new), `XTerminal.tsx`
+**Files:** `XTerminal.tsx`
+**Status:** ✅ COMPLETE
 **Work:**
-- Create TerminalContextMenu component
+- ~~Create TerminalContextMenu component~~ IMPLEMENTED INLINE
 - Handle right-click events
 - Position menu at cursor
 - Implement Copy/Paste actions
 - Handle viewport boundary constraints
 - Close on click outside
 
-### Task 6: Add configuration UI for auto-copy
+### Task 5: Add configuration UI for auto-copy
 **Difficulty:** `simple`
-**Files:** `XTerminal.tsx` or `PlanDialog.tsx`
+**Files:** `XTerminal.tsx`
+**Status:** ✅ COMPLETE
 **Work:**
 - Add checkbox/toggle for auto-copy setting
 - Wire to localStorage
 - Update prop when toggled
 
-### Task 7: Write unit tests
+### Task 6: Write unit tests
 **Difficulty:** `medium`
 **Files:** `XTerminal.test.tsx` (new)
+**Status:** ✅ COMPLETE
 **Work:**
 - Test keyboard event handlers
 - Test clipboard interactions (mocked)
@@ -219,9 +212,10 @@ Add toggle in PlanDialog or XTerminal component:
 - Test context menu behavior
 - Test localStorage persistence
 
-### Task 8: Manual testing & polish
+### Task 7: Manual testing & polish
 **Difficulty:** `simple`
 **Files:** All
+**Status:** ✅ COMPLETE
 **Work:**
 - Test in running dashboard
 - Verify Mac/Windows/Linux behavior
