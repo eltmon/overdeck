@@ -1860,6 +1860,50 @@ auto_sync = false       # Manual triage
 | `pan doctor` | Check system health, dependencies |
 | `pan convoy start <type>` | Start parallel agent convoy |
 | `pan help` | Show all commands |
+| `ccr` | Run claude-code-router with permissions bypass |
+
+### `ccr` Utility Script
+
+Panopticon provides a `ccr` script for convenient Claude Code access through the router with permissions bypass.
+
+**Location:** `~/projects/ccr`
+
+**Usage:**
+```bash
+# Direct execution (recommended)
+ccr
+
+# With arguments
+ccr --model claude-sonnet-4-5
+ccr "your prompt here"
+
+# With resume
+ccr --resume <session-id>
+
+# Add as alias for convenience
+source ~/projects/ccr
+```
+
+**What it does:**
+- Runs `claude-code-router` with `CCR_DANGEROUSLY_SKIP=true` environment variable
+- Forwards all arguments to the router
+- Provides interactive terminal access with stdin/stdout/stderr inherited
+- Works from any directory
+
+**Installation:**
+The script is placed in `~/projects/` during Panopticon setup. To use it directly:
+
+```bash
+# Make executable (if needed)
+chmod +x ~/projects/ccr
+
+# Add to PATH or source directly
+export PATH="$PATH:$HOME/projects"
+# Or add to .bashrc/.zshrc:
+echo 'alias ccr="source ~/projects/ccr"' >> ~/.bashrc
+```
+
+
 
 ### `work` Commands (Agent/work management)
 

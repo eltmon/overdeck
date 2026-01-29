@@ -2609,10 +2609,10 @@ app.post('/api/specialists/:name/wake', async (req, res) => {
 
     const useSessionId = sessionId || existingSessionId;
 
-    // Spawn Claude Code with resume flag in tmux
+    // Spawn Claude via router with resume flag in tmux
     const cwd = homedir();
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude --resume ${useSessionId}"`,
+      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude-code-router --resume ${useSessionId}"`,
       { encoding: 'utf-8' }
     );
 
@@ -3804,9 +3804,26 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     });
   }
 
-  // Construct service URLs based on workspace naming convention
-  const frontendUrl = `https://feature-${issueLower}.myn.test`;
-  const apiUrl = `https://api-feature-${issueLower}.myn.test`;
+  // Construct service URLs based on project DNS configuration
+  const projectConfig = findProjectByTeam(issuePrefix);
+  const dnsDomain = projectConfig?.workspace?.dns?.domain || 'localhost';
+  const featureFolder = `feature-${issueLower}`;
+
+  // Use DNS entries from config if available, otherwise construct defaults
+  let frontendUrl = `https://${featureFolder}.${dnsDomain}`;
+  let apiUrl = `https://api-${featureFolder}.${dnsDomain}`;
+
+  // If project has explicit DNS entries pattern, use those
+  if (projectConfig?.workspace?.dns?.entries) {
+    const entries = projectConfig.workspace.dns.entries;
+    // First entry is typically frontend, second is API
+    if (entries[0]) {
+      frontendUrl = `https://${entries[0].replace('{{FEATURE_FOLDER}}', featureFolder)}`;
+    }
+    if (entries[1]) {
+      apiUrl = `https://${entries[1].replace('{{FEATURE_FOLDER}}', featureFolder)}`;
+    }
+  }
 
   // Check for WORKSPACE.md to get custom service URLs
   let services: { name: string; url?: string }[] = [];
@@ -6641,7 +6658,7 @@ Start by exploring the codebase to understand the context, then begin the discov
       writeFileSync(launcherScript, `#!/bin/bash
 cd "${agentCwd}"
 prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions "$prompt"
+exec claude-code-router "$prompt"
 `, { mode: 0o755 });
 
       // Ensure tmux is running before starting session
@@ -6921,7 +6938,7 @@ Continue the PLANNING session. Do NOT implement anything.
       renameSync(outputFile, backupPath);
     }
 
-    const claudeCommand = `cd "${agentCwd}" && claude --dangerously-skip-permissions --print --verbose --output-format stream-json -p "${continuationPromptPath}" 2>&1 | tee "${outputFile}"`;
+    const claudeCommand = `cd "${agentCwd}" && claude-code-router --print --verbose --output-format stream-json -p "${continuationPromptPath}" 2>&1 | tee "${outputFile}"`;
 
     await ensureTmuxRunning();
     await execAsync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });

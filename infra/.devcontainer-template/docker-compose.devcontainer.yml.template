@@ -19,19 +19,48 @@ services:
       - devnet
       - panopticon
 
+  # Init service: runs npm install once for all workspaces
+  # Frontend and server depend on this completing successfully
+  init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    working_dir: /workspaces/panopticon
+    command: sh -c "npm install && echo 'npm install complete'"
+    volumes:
+      - ../:/workspaces/panopticon:cached
+      - npm-cache:/home/node/.npm
+      # Shadow ALL node_modules to avoid host permission conflicts
+      - root-node-modules:/workspaces/panopticon/node_modules
+      - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
+      - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
+      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
+    networks:
+      - devnet
+
   # Frontend (Vite dev server with HMR)
+  # NOTE: Vite config uses port 3010, not default 5173
+  # Mounts entire project because npm workspaces hoists binaries to root node_modules
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
     user: node
     working_dir: /workspaces/panopticon/src/dashboard/frontend
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm run dev -- --host 0.0.0.0"
+    depends_on:
+      init:
+        condition: service_completed_successfully
     volumes:
-      - ../src/dashboard/frontend:/workspaces/panopticon/src/dashboard/frontend:cached
+      # Mount entire project so npm workspaces can find hoisted binaries
+      - ../:/workspaces/panopticon:cached
       - npm-cache:/home/node/.npm
-      # Named volume to shadow host's node_modules (avoids permission conflicts)
+      # Shadow ALL node_modules to avoid host permission conflicts
+      - root-node-modules:/workspaces/panopticon/node_modules
       - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
+      - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
+      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
     environment:
       - CI=true
       - VITE_API_URL=https://api-{{FEATURE_FOLDER}}.pan.localhost
@@ -43,24 +72,34 @@ services:
       - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.pan.localhost`)"
       - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.entrypoints=websecure"
       - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.tls=true"
-      - "traefik.http.services.pan-fe-{{FEATURE_FOLDER}}.loadbalancer.server.port=5173"
+      - "traefik.http.services.pan-fe-{{FEATURE_FOLDER}}.loadbalancer.server.port=3010"
 
   # Backend API server (with watch mode)
+  # NOTE: Server imports from ../../lib/ which needs root node_modules
+  # We mount the entire project and shadow only dashboard node_modules
   server:
     build:
       context: .
       dockerfile: Dockerfile
     user: node
     working_dir: /workspaces/panopticon/src/dashboard/server
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npm run dev"
+    depends_on:
+      init:
+        condition: service_completed_successfully
     volumes:
-      - ../src/dashboard/server:/workspaces/panopticon/src/dashboard/server:cached
+      # Mount entire project so ../../lib/ imports work
+      - ../:/workspaces/panopticon:cached
       - npm-cache:/home/node/.npm
-      # Named volume to shadow host's node_modules (avoids permission conflicts)
+      # Shadow ALL node_modules to avoid host permission conflicts
+      # (npm workspaces will try to hoist/install to all workspace node_modules)
+      - root-node-modules:/workspaces/panopticon/node_modules
       - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
+      - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
+      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
       # Mount required host paths for workspace/agent management
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${HOME}/.panopticon:/home/node/.panopticon:ro
+      - ${HOME}/.panopticon:/home/node/.panopticon
       - ${HOME}/projects:/home/node/projects:ro
     environment:
       - NODE_ENV=development
@@ -79,8 +118,10 @@ services:
 
 volumes:
   npm-cache:
+  root-node-modules:
   frontend-node-modules:
   server-node-modules:
+  packages-shared-node-modules:
 
 networks:
   devnet:

@@ -47,7 +47,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'kimi',
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
-    baseUrl: 'https://api.moonshot.ai/anthropic',
+    baseUrl: 'https://api.kimi.com/coding/',
     models: [], // Kimi uses same model names as Anthropic
     tested: true,
     description: 'Anthropic-compatible API, tested 2026-01-28',
@@ -104,6 +104,11 @@ export function getProviderForModel(modelId: ModelId): ProviderConfig {
   // Check Z.AI models
   if (['glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
     return PROVIDERS.zai;
+  }
+
+  // Check Kimi models
+  if (['kimi-k2', 'kimi-k2.5'].includes(modelId)) {
+    return PROVIDERS.kimi;
   }
 
   // Default to Anthropic if unknown
@@ -168,7 +173,7 @@ export function getProviderEnv(
   } else {
     // Router providers use local router proxy
     return {
-      ANTHROPIC_BASE_URL: 'http://localhost:8000',
+      ANTHROPIC_BASE_URL: 'http://localhost:3456',
       ANTHROPIC_AUTH_TOKEN: 'router-managed',
     };
   }

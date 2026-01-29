@@ -11,7 +11,7 @@ import { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './s
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi';
 
 /**
  * Map of model ID to provider
@@ -35,6 +35,10 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Z.AI models
   'glm-4.7': 'zai',
   'glm-4.7-flash': 'zai',
+
+  // Kimi models
+  'kimi-k2': 'kimi',
+  'kimi-k2.5': 'kimi',
 };
 
 /**
@@ -63,6 +67,10 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // Z.AI → Anthropic
   'glm-4.7': 'claude-haiku-4-5', // Standard model → Haiku
   'glm-4.7-flash': 'claude-haiku-4-5', // Fast model → Haiku
+
+  // Kimi → Anthropic
+  'kimi-k2': 'claude-sonnet-4-5', // Good balance model → Sonnet
+  'kimi-k2.5': 'claude-sonnet-4-5', // Premium model → Sonnet
 };
 
 /**
@@ -167,6 +175,7 @@ export function detectEnabledProviders(apiKeys: {
   openai?: string;
   google?: string;
   zai?: string;
+  kimi?: string;
 }): Set<ModelProvider> {
   const enabled = new Set<ModelProvider>(['anthropic']); // Always enabled
 
@@ -179,6 +188,9 @@ export function detectEnabledProviders(apiKeys: {
   }
   if (apiKeys.zai && apiKeys.zai.trim()) {
     enabled.add('zai');
+  }
+  if (apiKeys.kimi && apiKeys.kimi.trim()) {
+    enabled.add('kimi');
   }
 
   return enabled;

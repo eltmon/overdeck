@@ -31,9 +31,9 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
   };
 
   return (
-    <div className="space-y-1">
-      {/* Table Header */}
-      <div className="grid grid-cols-[40%_35%_25%] gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[#a390cb] border-b border-slate-700">
+    <div className="space-y-1 overflow-x-auto">
+      {/* Table Header - using fr units instead of % to properly account for gaps */}
+      <div className="grid grid-cols-[2fr_minmax(200px,1.5fr)_120px] gap-4 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[#a390cb] border-b border-slate-700 min-w-[600px]">
         <div>Work Type</div>
         <div>Current Model</div>
         <div>Override</div>
@@ -41,7 +41,7 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
 
       {/* Table Body */}
       {categories.map((category) => (
-        <div key={category}>
+        <div key={category} className="min-w-[600px]">
           {/* Category Header */}
           <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 bg-slate-800/50">
             {categoryLabels[category]}
@@ -56,17 +56,17 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
               <div
                 key={workType.id}
                 className={cn(
-                  'grid grid-cols-[40%_35%_25%] gap-4 px-4 py-3 text-sm hover:bg-slate-800/30 transition-colors',
+                  'grid grid-cols-[2fr_minmax(200px,1.5fr)_120px] gap-4 px-4 py-3 text-sm hover:bg-slate-800/30 transition-colors',
                   idx % 2 === 0 ? 'bg-slate-800/10' : 'bg-transparent'
                 )}
               >
                 {/* Work Type Name */}
-                <div className="text-white font-medium">{workType.displayName}</div>
+                <div className="text-white font-medium truncate">{workType.displayName}</div>
 
                 {/* Current Model with Badge */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[#a390cb] truncate">{model}</span>
-                  <Badge variant={isOverridden ? 'override' : 'preset'}>{isOverridden ? 'override' : 'preset'}</Badge>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[#a390cb] truncate flex-1">{model}</span>
+                  <Badge variant={isOverridden ? 'override' : 'preset'} className="flex-shrink-0">{isOverridden ? 'override' : 'preset'}</Badge>
                 </div>
 
                 {/* Override Actions */}
@@ -96,7 +96,7 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
       ))}
 
       {/* Table Footer */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700 text-sm">
+      <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700 text-sm min-w-[600px]">
         <button className="text-slate-400 hover:text-white transition-colors">Reset all overrides to preset</button>
         <span className="text-slate-500">
           {Object.keys(overrides).length} override{Object.keys(overrides).length !== 1 ? 's' : ''} active

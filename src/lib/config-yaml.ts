@@ -42,6 +42,7 @@ export interface YamlConfig {
       openai?: ProviderConfig | boolean;
       google?: ProviderConfig | boolean;
       zai?: ProviderConfig | boolean;
+      kimi?: ProviderConfig | boolean;
     };
 
     /** Per-work-type overrides */
@@ -56,6 +57,7 @@ export interface YamlConfig {
     openai?: string;
     google?: string;
     zai?: string;
+    kimi?: string;
   };
 }
 
@@ -74,6 +76,7 @@ export interface NormalizedConfig {
     openai?: string;
     google?: string;
     zai?: string;
+    kimi?: string;
   };
 
   /** Per-work-type overrides */
@@ -251,6 +254,15 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
           result.apiKeys.zai = resolveEnvVar(zai.api_key);
         }
       }
+
+      // Kimi
+      const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
+      if (kimi.enabled) {
+        result.enabledProviders.add('kimi');
+        if (kimi.api_key) {
+          result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
+        }
+      }
     }
 
     // Merge legacy API keys (for backward compatibility)
@@ -266,6 +278,10 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
       if (config.api_keys.zai) {
         result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
         result.enabledProviders.add('zai');
+      }
+      if (config.api_keys.kimi) {
+        result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
+        result.enabledProviders.add('kimi');
       }
     }
 

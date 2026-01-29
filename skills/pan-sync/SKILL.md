@@ -16,24 +16,34 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through syncing Panopticon skills to AI coding assistants. The sync process creates symlinks from `~/.panopticon/skills/` to each tool's skill directory.
+This skill guides you through syncing Panopticon skills to AI coding assistants. The sync process creates symlinks from `~/.panopticon/skills/` to each tool's skill directory and copies workspace CLAUDE.md files to `~/.opencode/cl-aude-md/`.
 
 ## When to Use
 
 - After installing or updating Panopticon
 - After adding new skills to `~/.panopticon/skills/`
 - When skills aren't appearing in your AI tool
+- When workspace CLAUDE.md files aren't available in opencode
 - To check what would be synced (dry run)
 
 ## How Sync Works
 
 ```
 ~/.panopticon/skills/          (Panopticon skills - source)
-       ↓ pan sync (creates symlinks)
+        ↓ pan sync (creates symlinks)
 ~/.claude/skills/              (Claude Code)
 ~/.codex/skills/               (Codex)
 ~/.cursor/skills/              (Cursor)
 ~/.gemini/skills/              (Gemini CLI)
+~/.opencode/skills/            (OpenCode)
+
+~/.panopticon/workspaces/       (Workspace directories)
+        ↓ pan sync (copies CLAUDE.md)
+~/.opencode/cl-aude-md/        (CLAUDE.md files)
+        ↓
+        feature-pan-73.md
+        feature-pan-101.md
+        ...
 ```
 
 **Key points:**
@@ -41,6 +51,7 @@ This skill guides you through syncing Panopticon skills to AI coding assistants.
 - Changes to source immediately reflect in all tools
 - Project-specific skills in `{project}/.claude/skills/` are NOT touched
 - Conflicts are detected and reported
+- CLAUDE.md files are copied from `~/.panopticon/workspaces/` to `~/.opencode/cl-aude-md/`
 
 ## Commands
 
@@ -108,6 +119,7 @@ backup_before_sync = true
 | `codex` | `~/.codex/skills/` | OpenAI Codex |
 | `cursor` | `~/.cursor/skills/` | Cursor (alternative) |
 | `gemini` | `~/.gemini/skills/` | Google Gemini CLI |
+| `opencode` | `~/.opencode/skills/` | OpenCode |
 
 ## Conflict Handling
 
@@ -223,6 +235,12 @@ backup_before_sync = false
 1. Run `pan sync` (not just `pan init`)
 2. Check target is in config: `cat ~/.panopticon/config.toml`
 3. Verify symlinks exist: `ls -la ~/.claude/skills/`
+
+**Problem:** CLAUDE.md files not available in opencode
+**Solution:**
+1. Run `pan sync` to copy workspace CLAUDE.md files
+2. Check files exist: `ls -la ~/.opencode/cl-aude-md/`
+3. Create a new workspace: `pan workspace create PAN-XXX`
 
 **Problem:** Sync reports conflicts
 **Solution:**
