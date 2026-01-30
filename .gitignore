@@ -46,3 +46,6 @@ CLAUDE.md
 
 # Beads daemon files
 .beads/
+
+# Stitch temp files
+temp/
