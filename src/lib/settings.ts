@@ -4,7 +4,7 @@ import { SETTINGS_FILE } from './paths.js';
 // Model identifiers
 export type AnthropicModel = 'claude-opus-4-5' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel = 'gpt-5.2-codex' | 'o3-deep-research' | 'gpt-4o' | 'gpt-4o-mini';
-export type GoogleModel = 'gemini-3-pro-preview' | 'gemini-3-flash-preview';
+export type GoogleModel = 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
 export type ZAIModel = 'glm-4.7' | 'glm-4.7-flash';
 export type KimiModel = 'kimi-k2' | 'kimi-k2.5';
 export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | ZAIModel | KimiModel;
