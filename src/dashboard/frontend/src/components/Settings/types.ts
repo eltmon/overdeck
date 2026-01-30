@@ -1,8 +1,7 @@
 // Settings data types matching the new config.yaml structure
+// Now uses smart (capability-based) model selection instead of static presets
 
-export type ModelPreset = 'premium' | 'balanced' | 'budget';
-
-export type Provider = 'anthropic' | 'openai' | 'google' | 'zai';
+export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi';
 
 export type WorkTypeId =
   // Issue agent phases
@@ -42,10 +41,10 @@ export interface ProvidersConfig {
   openai: boolean;
   google: boolean;
   zai: boolean;
+  kimi: boolean;
 }
 
 export interface ModelsConfig {
-  preset: ModelPreset;
   providers: ProvidersConfig;
   overrides: Partial<Record<WorkTypeId, ModelId>>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
@@ -55,6 +54,7 @@ export interface ApiKeysConfig {
   openai?: string;
   google?: string;
   zai?: string;
+  kimi?: string;
 }
 
 export interface SettingsConfig {
@@ -67,6 +67,7 @@ export interface AvailableModels {
   openai: string[];
   google: string[];
   zai: string[];
+  kimi: string[];
 }
 
 export interface WorkTypeInfo {
@@ -122,26 +123,3 @@ export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
   ],
 };
 
-export const PRESET_CONFIGS: Record<ModelPreset, { displayName: string; subtitle: string; icon: string; costLevel: number; bulletPoints: string[] }> = {
-  premium: {
-    displayName: 'Premium',
-    subtitle: 'Highest accuracy, maximum latency',
-    icon: 'workspace_premium',
-    costLevel: 5,
-    bulletPoints: ['GPT-4o / Claude 3.5 Sonnet', 'Complex reasoning focus'],
-  },
-  balanced: {
-    displayName: 'Balanced',
-    subtitle: 'Optimal speed and cost efficiency',
-    icon: 'balance',
-    costLevel: 3,
-    bulletPoints: ['Mixed provider routing', 'Sub-second initial response'],
-  },
-  budget: {
-    displayName: 'Budget',
-    subtitle: 'Efficiency focused, lowest cost',
-    icon: 'savings',
-    costLevel: 1,
-    bulletPoints: ['Small language models', 'High-throughput tasks'],
-  },
-};

@@ -143,14 +143,14 @@ When you're done, you MUST call the API to update status:
 
 **If tests passed:**
 ```bash
-curl -X POST http://localhost:3011/api/specialists/done \
+curl -X POST http://localhost:3010/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"{{issueId}}","status":"passed","notes":"All X tests passed"}'
 ```
 
 **If tests failed:**
 ```bash
-curl -X POST http://localhost:3011/api/specialists/done \
+curl -X POST http://localhost:3010/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"{{issueId}}","status":"failed","notes":"X tests failing: brief description"}'
 ```
@@ -161,6 +161,18 @@ curl -X POST http://localhost:3011/api/specialists/done \
 - The API updates the dashboard and triggers the next step in the pipeline
 - If you don't call the API, the dashboard will show you as still "testing"
 
+## ⛔ NEVER CLOSE GITHUB ISSUES (CRITICAL)
+
+**You are a specialist agent, NOT the work agent. You do NOT have permission to close issues.**
+
+- ❌ **NEVER run `gh issue close`** - This is ONLY for the human or merge-agent
+- ❌ **NEVER say "Merged to main"** - Merging is done by humans clicking the Merge button
+- ❌ **NEVER move issue to "Done"** - The dashboard handles status transitions
+- ✅ **ONLY call the `/api/specialists/done` endpoint** - This signals completion to the pipeline
+- ✅ **The human clicks "Merge" in the dashboard** when ready
+
+**Your job ends when you call the API. The pipeline handles everything else.**
+
 ### Example Complete Workflow
 
 ```bash
@@ -168,12 +180,12 @@ curl -X POST http://localhost:3011/api/specialists/done \
 npm test
 
 # 2. If all pass:
-curl -X POST http://localhost:3011/api/specialists/done \
+curl -X POST http://localhost:3010/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"MIN-665","status":"passed","notes":"42 tests passed, 0 failed"}'
 
 # 2. If some fail:
-curl -X POST http://localhost:3011/api/specialists/done \
+curl -X POST http://localhost:3010/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"MIN-665","status":"failed","notes":"40 passed, 2 failed: auth.test.ts timeout, user.test.ts assertion"}'
 ```

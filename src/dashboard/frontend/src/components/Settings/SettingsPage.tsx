@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelPreset, WorkTypeId, ModelId } from './types';
-import { PresetSelector } from './Preset/PresetSelector';
+import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
+import { SmartSelectionExplainer } from './SmartSelection/SmartSelectionExplainer';
 import { ProviderPanel } from './Provider/ProviderPanel';
 import { WorkTypeOverrides } from './Override/WorkTypeOverrides';
 import { Button } from './Shared/Button';
@@ -89,16 +89,6 @@ export function SettingsPage() {
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings);
 
   // Handlers
-  const handlePresetChange = (preset: ModelPreset) => {
-    setFormData({
-      ...formData,
-      models: {
-        ...formData.models,
-        preset,
-      },
-    });
-  };
-
   const handleProviderToggle = (provider: Provider) => {
     if (provider === 'anthropic') return; // Anthropic is always enabled
 
@@ -172,8 +162,7 @@ export function SettingsPage() {
     setFormData(settings || null);
   };
 
-  // Get preset models for comparison in overrides table
-  // TODO: This should come from the backend API or preset definitions
+  // Smart model selection info - no preset comparison needed
   const presetModels: Partial<Record<WorkTypeId, ModelId>> = {};
 
   return (
@@ -184,11 +173,14 @@ export function SettingsPage() {
           <span className="material-symbols-outlined text-4xl text-[#a078f7]">settings</span>
           <h1 className="text-4xl font-black tracking-tight">System Settings</h1>
         </div>
-        <p className="text-[#a390cb] text-lg max-w-2xl">Configure global AI model orchestration, provider credentials, and optimization presets.</p>
+        <p className="text-[#a390cb] text-lg max-w-2xl">
+          Configure AI model orchestration with smart capability-based selection.
+          The system automatically picks the best model for each task.
+        </p>
       </div>
 
-      {/* Preset Selector */}
-      <PresetSelector selected={formData.models.preset} onChange={handlePresetChange} />
+      {/* Smart Model Selection Explainer */}
+      <SmartSelectionExplainer />
 
       {/* Provider Panel */}
       <ProviderPanel

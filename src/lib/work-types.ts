@@ -176,7 +176,7 @@ export function getWorkTypeMetadata(id: WorkTypeId): WorkTypeMetadata {
  */
 export function getWorkTypeName(id: WorkTypeId): string {
   const metadata = WORK_TYPES[id];
-  if (metadata.phase) {
+  if ('phase' in metadata && metadata.phase) {
     return `${metadata.category} (${metadata.phase})`;
   }
   return id;

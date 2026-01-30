@@ -2,6 +2,7 @@
  * CLI Command: pan migrate-config
  *
  * Migrates from legacy settings.json to new config.yaml format
+ * Now uses smart (capability-based) model selection - no presets
  */
 
 import chalk from 'chalk';
@@ -11,7 +12,6 @@ import {
   needsMigration,
   hasLegacySettings,
   migrateConfig,
-  previewMigration,
   type MigrationOptions,
 } from '../../lib/config-migration.js';
 
@@ -45,13 +45,14 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
     return;
   }
 
-  // Preview mode
+  // Preview mode - dry run
   if (options.preview) {
     const spinner = ora('Generating migration preview...').start();
-    const preview = previewMigration();
+    const preview = migrateConfig({ dryRun: true });
 
-    if (!preview) {
-      spinner.fail('No settings.json found to preview');
+    if (!preview.success) {
+      spinner.fail('Preview failed');
+      console.error(chalk.red(`Error: ${preview.error || preview.message}`));
       return;
     }
 
@@ -59,15 +60,13 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
     console.log('');
 
     console.log(chalk.bold('Migration Summary:'));
-    console.log(`  Preset: ${chalk.cyan(preview.result.preset)}`);
-    console.log(`  Overrides: ${chalk.cyan(preview.result.overridesCount)} work types`);
-    console.log(`  Providers: ${chalk.cyan(preview.result.providersEnabled.join(', '))}`);
+    console.log(`  Selection: ${chalk.cyan('Smart (capability-based)')}`);
+    console.log(`  Overrides: ${chalk.cyan(preview.overridesCount)} work types`);
+    console.log(`  Providers: ${chalk.cyan(preview.providersEnabled.join(', '))}`);
     console.log('');
 
-    console.log(chalk.bold('New config.yaml content:'));
-    console.log(chalk.dim('─'.repeat(60)));
-    console.log(preview.yaml);
-    console.log(chalk.dim('─'.repeat(60)));
+    console.log(chalk.dim('Note: Legacy presets have been replaced with smart selection.'));
+    console.log(chalk.dim('The system now automatically picks the best model for each task.'));
     console.log('');
 
     return;
@@ -75,18 +74,23 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
 
   // Confirm migration
   if (!options.force) {
-    const preview = previewMigration();
-    if (preview) {
+    // Do a dry run to show what will happen
+    const preview = migrateConfig({ dryRun: true });
+
+    if (preview.success) {
       console.log(chalk.bold('Migration will:'));
-      console.log(`  • Create config.yaml with ${chalk.cyan(preview.result.preset)} preset`);
-      console.log(`  • Apply ${chalk.cyan(preview.result.overridesCount)} work type overrides`);
-      console.log(`  • Enable providers: ${chalk.cyan(preview.result.providersEnabled.join(', '))}`);
+      console.log(`  • Create config.yaml with ${chalk.cyan('smart (capability-based)')} selection`);
+      console.log(`  • Apply ${chalk.cyan(preview.overridesCount)} work type overrides`);
+      console.log(`  • Enable providers: ${chalk.cyan(preview.providersEnabled.join(', '))}`);
       if (options.backup !== false) {
         console.log('  • Back up settings.json to settings.json.backup');
       }
       if (options.deleteLegacy) {
         console.log('  • Rename settings.json to settings.json.migrated');
       }
+      console.log('');
+      console.log(chalk.yellow('Note: Legacy presets (Premium/Balanced/Budget) have been removed.'));
+      console.log(chalk.yellow('The new system automatically selects the best model for each task.'));
       console.log('');
     }
 
@@ -128,7 +132,7 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
   console.log(chalk.bold.green('✓ Configuration migrated successfully'));
   console.log('');
   console.log(chalk.bold('Details:'));
-  console.log(`  ${chalk.dim('Preset:')} ${chalk.cyan(result.preset)}`);
+  console.log(`  ${chalk.dim('Selection:')} ${chalk.cyan('Smart (capability-based)')}`);
   console.log(`  ${chalk.dim('Work type overrides:')} ${chalk.cyan(result.overridesCount)}`);
   console.log(`  ${chalk.dim('Enabled providers:')} ${chalk.cyan(result.providersEnabled.join(', '))}`);
   console.log('');
@@ -143,7 +147,8 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
 
   console.log(chalk.bold('Next steps:'));
   console.log('  1. Review your new config: ' + chalk.cyan('~/.panopticon/config.yaml'));
-  console.log('  2. Documentation: ' + chalk.cyan('docs/CONFIGURATION.md'));
-  console.log('  3. Start using Panopticon with the new config');
+  console.log('  2. Enable additional providers for more model options');
+  console.log('  3. Add work type overrides if you prefer specific models for tasks');
+  console.log('  4. Documentation: ' + chalk.cyan('docs/CONFIGURATION.md'));
   console.log('');
 }

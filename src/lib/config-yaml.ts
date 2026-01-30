@@ -5,7 +5,7 @@
  * 1. Global config: ~/.panopticon/config.yaml
  * 2. Per-project config: .panopticon.yaml (project root)
  *
- * Precedence: project > global > preset defaults
+ * Uses smart (capability-based) model selection - no legacy presets.
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -14,7 +14,6 @@ import { homedir } from 'os';
 import yaml from 'js-yaml';
 import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
-import { PresetName, DEFAULT_PRESET } from './model-presets.js';
 import { ModelProvider } from './model-fallback.js';
 
 /**
@@ -33,26 +32,23 @@ export interface ProviderConfig {
 export interface YamlConfig {
   /** Model configuration */
   models?: {
-    /** Selected preset (premium, balanced, budget) */
-    preset?: PresetName;
-
     /** Provider enable/disable and API keys */
     providers?: {
-      anthropic?: ProviderConfig | boolean; // Can be just boolean for backward compat
+      anthropic?: ProviderConfig | boolean;
       openai?: ProviderConfig | boolean;
       google?: ProviderConfig | boolean;
       zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
     };
 
-    /** Per-work-type overrides */
+    /** Per-work-type overrides (explicit model for specific tasks) */
     overrides?: Partial<Record<WorkTypeId, ModelId>>;
 
     /** Gemini thinking level (1-4) */
     gemini_thinking_level?: 1 | 2 | 3 | 4;
   };
 
-  /** Legacy API keys (for backward compatibility with settings.json) */
+  /** Legacy API keys (for backward compatibility) */
   api_keys?: {
     openai?: string;
     google?: string;
@@ -65,9 +61,6 @@ export interface YamlConfig {
  * Normalized configuration (after loading and merging)
  */
 export interface NormalizedConfig {
-  /** Selected preset */
-  preset: PresetName;
-
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;
 
@@ -90,11 +83,10 @@ export interface NormalizedConfig {
  * Default configuration (used when no config files exist)
  */
 const DEFAULT_CONFIG: NormalizedConfig = {
-  preset: DEFAULT_PRESET,
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   apiKeys: {},
   overrides: {},
-  geminiThinkingLevel: 3, // Medium by default
+  geminiThinkingLevel: 3,
 };
 
 /**
@@ -137,9 +129,6 @@ function resolveEnvVar(value: string | undefined): string | undefined {
 
 /**
  * Load and parse a YAML config file
- *
- * @param filePath Path to YAML file
- * @returns Parsed config or null if file doesn't exist
  */
 function loadYamlFile(filePath: string): YamlConfig | null {
   if (!existsSync(filePath)) {
@@ -158,9 +147,6 @@ function loadYamlFile(filePath: string): YamlConfig | null {
 
 /**
  * Find project root by looking for .git directory
- *
- * @param startDir Directory to start searching from
- * @returns Project root path or null if not in a git repo
  */
 function findProjectRoot(startDir: string = process.cwd()): string | null {
   let currentDir = startDir;
@@ -177,8 +163,6 @@ function findProjectRoot(startDir: string = process.cwd()): string | null {
 
 /**
  * Load per-project config (.panopticon.yaml in project root)
- *
- * @returns Parsed config or null if not in a project or no config exists
  */
 function loadProjectConfig(): YamlConfig | null {
   const projectRoot = findProjectRoot();
@@ -192,8 +176,6 @@ function loadProjectConfig(): YamlConfig | null {
 
 /**
  * Load global config (~/.panopticon/config.yaml)
- *
- * @returns Parsed config or null if file doesn't exist
  */
 function loadGlobalConfig(): YamlConfig | null {
   return loadYamlFile(GLOBAL_CONFIG_PATH);
@@ -201,28 +183,21 @@ function loadGlobalConfig(): YamlConfig | null {
 
 /**
  * Merge multiple configs with precedence: project > global > defaults
- *
- * @param configs Configs to merge (in order of precedence, highest first)
- * @returns Merged and normalized config
  */
 function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
-  const result: NormalizedConfig = { ...DEFAULT_CONFIG };
+  const result: NormalizedConfig = {
+    ...DEFAULT_CONFIG,
+    enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+  };
 
   // Filter out null configs
   const validConfigs = configs.filter((c): c is YamlConfig => c !== null);
 
   // Merge in reverse order (lowest precedence first)
   for (const config of validConfigs.reverse()) {
-    // Merge preset
-    if (config.models?.preset) {
-      result.preset = config.models.preset;
-    }
-
     // Merge providers
     if (config.models?.providers) {
       const providers = config.models.providers;
-
-      // Legacy API keys as fallback
       const legacyKeys = config.api_keys || {};
 
       // Anthropic (always enabled)
@@ -304,16 +279,10 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
 
 /**
  * Load complete configuration (global + project + defaults)
- *
- * This is the main entry point for loading configuration.
- *
- * @returns Merged and normalized configuration
  */
 export function loadConfig(): NormalizedConfig {
   const globalConfig = loadGlobalConfig();
   const projectConfig = loadProjectConfig();
-
-  // Merge with precedence: project > global > defaults
   return mergeConfigs(projectConfig, globalConfig);
 }
 
@@ -323,9 +292,7 @@ export function loadConfig(): NormalizedConfig {
 export function hasProjectConfig(): boolean {
   const projectRoot = findProjectRoot();
   if (!projectRoot) return false;
-
-  const projectConfigPath = join(projectRoot, '.panopticon.yaml');
-  return existsSync(projectConfigPath);
+  return existsSync(join(projectRoot, '.panopticon.yaml'));
 }
 
 /**
@@ -336,19 +303,17 @@ export function hasGlobalConfig(): boolean {
 }
 
 /**
- * Get path to global config file (for editing/display)
+ * Get path to global config file
  */
 export function getGlobalConfigPath(): string {
   return GLOBAL_CONFIG_PATH;
 }
 
 /**
- * Get path to project config file (for editing/display)
- * Returns null if not in a project
+ * Get path to project config file (null if not in a project)
  */
 export function getProjectConfigPath(): string | null {
   const projectRoot = findProjectRoot();
   if (!projectRoot) return null;
-
   return join(projectRoot, '.panopticon.yaml');
 }

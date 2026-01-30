@@ -387,7 +387,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   clearReadySignal(agentId);
 
   // Get provider configuration for this model
-  const provider = getProviderForModel(selectedModel);
+  // Note: selectedModel is string for flexibility, but we trust it's a valid ModelId
+  const provider = getProviderForModel(selectedModel as ModelId);
   const settings = loadSettings();
 
   // Get provider-specific environment variables

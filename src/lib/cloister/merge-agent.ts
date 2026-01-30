@@ -836,6 +836,7 @@ Report any issues or conflicts you encountered.`;
   const wakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
     waitForReady: true,
     startIfNotRunning: true,
+    issueId: issueId,
   });
 
   if (!wakeResult.success) {
