@@ -1,34 +1,24 @@
 import { useState, useMemo } from 'react';
-import { X, Check, ChevronDown, Info, AlertTriangle } from 'lucide-react';
 import { WorkTypeId, ModelId } from '../types';
 
-// Model definitions grouped by provider
+// Model definitions grouped by provider - matching Stitch design
 const MODELS_BY_PROVIDER = {
   anthropic: {
     name: 'Anthropic',
-    icon: 'auto_awesome',
-    color: 'text-orange-400',
-    bgColor: 'bg-orange-900/30',
     models: [
       { id: 'claude-opus-4-5' as ModelId, name: 'Claude Opus 4.5', tier: 'premium' },
-      { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', tier: 'standard' },
-      { id: 'claude-haiku-3-5' as ModelId, name: 'Claude Haiku 3.5', tier: 'fast' },
+      { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', tier: 'standard', isNew: true },
+      { id: 'claude-haiku-3-5' as ModelId, name: 'Claude Haiku', tier: 'fast' },
     ],
   },
   kimi: {
     name: 'Kimi',
-    icon: 'rocket_launch',
-    color: 'text-emerald-400',
-    bgColor: 'bg-emerald-900/30',
     models: [
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', tier: 'standard' },
     ],
   },
   openai: {
     name: 'OpenAI',
-    icon: 'bolt',
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-900/30',
     models: [
       { id: 'gpt-4o' as ModelId, name: 'GPT-4o', tier: 'standard' },
       { id: 'o1' as ModelId, name: 'o1', tier: 'premium' },
@@ -37,9 +27,6 @@ const MODELS_BY_PROVIDER = {
   },
   google: {
     name: 'Google',
-    icon: 'google',
-    color: 'text-purple-400',
-    bgColor: 'bg-purple-900/30',
     models: [
       { id: 'gemini-2.5-pro' as ModelId, name: 'Gemini 2.5 Pro', tier: 'premium' },
       { id: 'gemini-2.5-flash' as ModelId, name: 'Gemini 2.5 Flash', tier: 'fast' },
@@ -47,9 +34,6 @@ const MODELS_BY_PROVIDER = {
   },
   zai: {
     name: 'Z.AI',
-    icon: 'api',
-    color: 'text-red-400',
-    bgColor: 'bg-red-900/30',
     models: [
       { id: 'glm-4-plus' as ModelId, name: 'GLM-4 Plus', tier: 'standard' },
     ],
@@ -127,12 +111,12 @@ export function ModelOverrideModal({
   }, [enabledProviders]);
 
   // Get current model info
-  const currentModelInfo = useMemo(() => {
+  const selectedModelInfo = useMemo(() => {
     for (const provider of Object.values(MODELS_BY_PROVIDER)) {
       const model = provider.models.find(m => m.id === selectedModel);
-      if (model) return { ...model, provider: provider.name, color: provider.color };
+      if (model) return { ...model, provider: provider.name };
     }
-    return { id: selectedModel, name: selectedModel, tier: 'standard', provider: 'Unknown', color: 'text-gray-400' };
+    return { id: selectedModel, name: selectedModel, tier: 'standard', provider: 'Unknown' };
   }, [selectedModel]);
 
   const handleApply = () => {
@@ -147,131 +131,155 @@ export function ModelOverrideModal({
 
   const hasChanges = selectedModel !== currentModel;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+  // Calculate a mock capability match percentage based on model tier
+  const capabilityMatch = useMemo(() => {
+    const tierScores: Record<string, number> = { premium: 98, standard: 92, fast: 85 };
+    return tierScores[selectedModelInfo.tier as string] || 90;
+  }, [selectedModelInfo.tier]);
 
-      {/* Modal */}
-      <div className="relative bg-[#24283b] border border-[#414868] rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[#414868]">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Configure Model Override</h2>
-            <p className="text-sm text-[#8b7aa0] mt-1">{agentName}: {workTypeName}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-[#8b7aa0] hover:text-white hover:bg-[#414868] rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      {/* Modal Container */}
+      <div className="w-full max-w-[500px] bg-[#24283b] border border-[#414868] rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Modal Header */}
+        <div className="px-6 pt-6 pb-4">
+          <h2 className="text-white text-2xl font-bold leading-tight">Configure Model Override</h2>
+          <p className="text-[#a390cb] text-sm font-medium mt-1">{agentName}: {workTypeName}</p>
         </div>
 
-        {/* Content */}
-        <div className="p-5 space-y-5">
-          {/* Current Model */}
-          <div>
-            <label className="block text-sm font-medium text-[#c4b5d4] mb-2">Current Model</label>
-            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${currentModelInfo.color} bg-[#2d2640]`}>
-              <span className="font-medium">{currentModelInfo.name}</span>
-              {isOverride && (
-                <span className="text-xs bg-[#a078f7]/20 text-[#a078f7] px-2 py-0.5 rounded-full">override</span>
+        {/* Content Area */}
+        <div className="px-6 py-2 flex flex-col gap-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
+          {/* Current Model Section */}
+          <div className="flex flex-col gap-2">
+            <h3 className="text-white text-sm font-bold tracking-tight">Current Model</h3>
+            <div className="flex">
+              <div className="flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-4">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                <p className="text-emerald-400 text-xs font-bold leading-normal">{selectedModelInfo.name}</p>
+                {isOverride && (
+                  <span className="text-[10px] bg-[#a078f7]/20 text-[#a078f7] px-1.5 rounded">override</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Select Model Dropdown */}
+          <div className="flex flex-col gap-2">
+            <h3 className="text-white text-sm font-bold tracking-tight">Select Model</h3>
+            <div className="relative">
+              {/* Dropdown Trigger */}
+              <div
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex w-full items-center justify-between rounded-lg bg-[#1a1c2c] border border-[#414868] px-4 py-3 cursor-pointer hover:border-[#a078f7] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-[#a078f7] text-xl">psychology</span>
+                  <span className="text-white text-sm">{selectedModelInfo.name}</span>
+                </div>
+                <span className={`material-symbols-outlined text-[#a390cb] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}>
+                  expand_more
+                </span>
+              </div>
+
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 w-full bg-[#1a1c2c] border border-[#414868] rounded-lg shadow-xl overflow-hidden z-10">
+                  <div className="max-h-64 overflow-y-auto custom-scrollbar py-2">
+                    {availableProviders.map(([key, provider]) => (
+                      <div key={key}>
+                        {/* Provider Header */}
+                        <div className="px-4 py-2 text-[10px] font-bold text-[#a390cb] uppercase tracking-widest">
+                          {provider.name}
+                        </div>
+                        {/* Models */}
+                        {provider.models.map((model) => {
+                          const isSelected = selectedModel === model.id;
+                          return (
+                            <div
+                              key={model.id}
+                              onClick={() => {
+                                setSelectedModel(model.id);
+                                setIsDropdownOpen(false);
+                              }}
+                              className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center ${
+                                isSelected
+                                  ? 'text-[#a078f7] bg-[#a078f7]/10 border-l-2 border-[#a078f7]'
+                                  : 'text-gray-300 hover:bg-[#a078f7]/20 hover:text-white'
+                              }`}
+                            >
+                              <span>{model.name}</span>
+                              <div className="flex items-center gap-2">
+                                {'isNew' in model && model.isNew && (
+                                  <span className="text-[10px] bg-[#a078f7]/20 text-[#a078f7] px-1.5 rounded">New</span>
+                                )}
+                                {isSelected && (
+                                  <span className="material-symbols-outlined text-sm">check</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Model Selector */}
-          <div className="relative">
-            <label className="block text-sm font-medium text-[#c4b5d4] mb-2">Select Model</label>
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-[#1a1625] border border-[#414868] rounded-lg text-white hover:border-[#a078f7] transition-colors"
-            >
-              <span>{currentModelInfo.name}</span>
-              <ChevronDown className={`w-5 h-5 text-[#8b7aa0] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Dropdown */}
-            {isDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1625] border border-[#414868] rounded-lg shadow-xl max-h-64 overflow-y-auto custom-scrollbar z-10">
-                {availableProviders.map(([key, provider]) => (
-                  <div key={key}>
-                    {/* Provider Header */}
-                    <div className={`flex items-center gap-2 px-4 py-2 ${provider.bgColor} border-b border-[#2d2640]`}>
-                      <span className={`material-symbols-outlined text-base ${provider.color}`}>{provider.icon}</span>
-                      <span className={`text-xs font-semibold uppercase tracking-wider ${provider.color}`}>
-                        {provider.name}
-                      </span>
-                    </div>
-                    {/* Models */}
-                    {provider.models.map((model) => (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          setSelectedModel(model.id);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#2d2640] transition-colors ${
-                          selectedModel === model.id ? 'bg-[#a078f7]/10' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-white">{model.name}</span>
-                          {model.tier === 'premium' && (
-                            <span className="text-xs bg-amber-900/30 text-amber-400 px-1.5 py-0.5 rounded">premium</span>
-                          )}
-                          {model.tier === 'fast' && (
-                            <span className="text-xs bg-cyan-900/30 text-cyan-400 px-1.5 py-0.5 rounded">fast</span>
-                          )}
-                        </div>
-                        {selectedModel === model.id && (
-                          <Check className="w-4 h-4 text-[#a078f7]" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
+          {/* Capability Match */}
+          <div className="flex flex-col gap-3 p-4 rounded-lg bg-[#2e2249]/30 border border-[#a078f7]/10">
+            <div className="flex justify-between items-center">
+              <h3 className="text-white text-sm font-bold">Capability Match</h3>
+              <span className="text-[#a078f7] text-sm font-bold">{capabilityMatch}%</span>
+            </div>
+            <div className="w-full bg-[#1a1c2c] h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-[#a078f7] h-full rounded-full transition-all duration-300"
+                style={{ width: `${capabilityMatch}%` }}
+              />
+            </div>
+            <p className="text-[#a390cb] text-xs">
+              {capabilityMatch >= 95
+                ? 'Excellent match for this work type.'
+                : capabilityMatch >= 90
+                  ? 'High match for exploration and reasoning tasks.'
+                  : 'Good match with some capability trade-offs.'}
+            </p>
           </div>
 
-          {/* Info */}
-          <div className="flex items-start gap-2 p-3 bg-[#1a1625] rounded-lg">
-            <Info className="w-4 h-4 text-[#8b7aa0] mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-[#8b7aa0]">
-              This override will be used instead of smart selection for this work type.
+          {/* Info Note */}
+          <div className="flex items-start gap-3 bg-blue-500/10 p-3 rounded-lg">
+            <span className="material-symbols-outlined text-blue-400 text-lg mt-0.5">info</span>
+            <p className="text-[#a390cb] text-xs leading-relaxed">
+              This override will be used instead of smart selection for this work type. It may impact performance or cost efficiency.
             </p>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between p-5 border-t border-[#414868] bg-[#1a1625]">
-          <div>
-            {isOverride && (
-              <button
-                onClick={handleRemove}
-                className="flex items-center gap-2 px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-colors"
-              >
-                <AlertTriangle className="w-4 h-4" />
-                Remove Override
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
+        {/* Modal Footer */}
+        <div className="px-6 py-6 mt-4 border-t border-[#414868] flex items-center justify-between">
+          {isOverride ? (
+            <button
+              onClick={handleRemove}
+              className="text-rose-400 hover:text-rose-300 text-sm font-bold transition-colors"
+            >
+              Remove Override
+            </button>
+          ) : (
+            <div />
+          )}
+          <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-[#c4b5d4] hover:text-white hover:bg-[#414868] rounded-lg transition-colors"
+              className="px-4 py-2.5 rounded-lg text-white text-sm font-bold hover:bg-white/5 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleApply}
               disabled={!hasChanges && isOverride}
-              className="px-5 py-2 bg-[#a078f7] hover:bg-[#b088ff] text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 rounded-lg bg-[#a078f7] text-white text-sm font-bold hover:bg-[#b18df9] transition-all shadow-lg shadow-[#a078f7]/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Apply Override
             </button>
