@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
+import { SettingsConfig, Provider, WorkTypeId } from './types';
 import { SmartSelectionExplainer } from './SmartSelection/SmartSelectionExplainer';
 import { ProviderPanel } from './Provider/ProviderPanel';
-import { WorkTypeOverrides } from './Override/WorkTypeOverrides';
+import { AgentCardsPanel } from './AgentCards';
 import { Button } from './Shared/Button';
 
 // API Functions
@@ -162,9 +162,6 @@ export function SettingsPage() {
     setFormData(settings || null);
   };
 
-  // Smart model selection info - no preset comparison needed
-  const presetModels: Partial<Record<WorkTypeId, ModelId>> = {};
-
   return (
     <div className="space-y-6 pb-8">
       {/* Header */}
@@ -193,10 +190,9 @@ export function SettingsPage() {
         onTestConnection={handleTestConnection}
       />
 
-      {/* Work Type Overrides */}
-      <WorkTypeOverrides
+      {/* Agent Cards - shows which models power which agents */}
+      <AgentCardsPanel
         overrides={formData.models.overrides}
-        presetModels={presetModels}
         onConfigureOverride={handleConfigureOverride}
         onRemoveOverride={handleRemoveOverride}
       />
