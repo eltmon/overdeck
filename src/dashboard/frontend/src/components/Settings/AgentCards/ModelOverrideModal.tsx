@@ -1,43 +1,86 @@
 import { useState, useMemo } from 'react';
 import { WorkTypeId, ModelId } from '../types';
 
-// Model definitions grouped by provider - matching Stitch design
-const MODELS_BY_PROVIDER = {
+// Model capabilities that can be matched to work types
+type Capability = 'reasoning' | 'code' | 'vision' | 'fast' | 'cost-efficient' | 'large-context' | 'complex-math' | 'efficiency';
+
+interface ModelDef {
+  id: ModelId;
+  name: string;
+  icon: string;
+  tier?: 'premium' | 'balanced' | 'fast';
+  capabilities: Capability[];
+}
+
+interface ProviderDef {
+  name: string;
+  models: ModelDef[];
+}
+
+// Models grouped by provider
+const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
-      { id: 'claude-opus-4-5' as ModelId, name: 'Claude Opus 4.5', tier: 'premium' },
-      { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', tier: 'standard', isNew: true },
-      { id: 'claude-haiku-3-5' as ModelId, name: 'Claude Haiku', tier: 'fast' },
-    ],
-  },
-  kimi: {
-    name: 'Kimi',
-    models: [
-      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', tier: 'standard' },
+      { id: 'claude-opus-4-5' as ModelId, name: 'Claude Opus 4.5', icon: 'diamond', tier: 'premium', capabilities: ['reasoning', 'code', 'vision'] },
+      { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', icon: 'auto_awesome', tier: 'balanced', capabilities: ['reasoning', 'code', 'vision'] },
+      { id: 'claude-haiku-3-5' as ModelId, name: 'Claude Haiku', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient'] },
     ],
   },
   openai: {
     name: 'OpenAI',
     models: [
-      { id: 'gpt-4o' as ModelId, name: 'GPT-4o', tier: 'standard' },
-      { id: 'o1' as ModelId, name: 'o1', tier: 'premium' },
-      { id: 'o3-mini' as ModelId, name: 'o3-mini', tier: 'fast' },
+      { id: 'gpt-4o' as ModelId, name: 'GPT-4o', icon: 'science', capabilities: ['reasoning', 'code', 'vision'] },
+      { id: 'o1' as ModelId, name: 'o1', icon: 'psychology', tier: 'premium', capabilities: ['reasoning', 'complex-math'] },
+      { id: 'o3-mini' as ModelId, name: 'o3-mini', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'reasoning'] },
     ],
   },
   google: {
     name: 'Google',
     models: [
-      { id: 'gemini-2.5-pro' as ModelId, name: 'Gemini 2.5 Pro', tier: 'premium' },
-      { id: 'gemini-2.5-flash' as ModelId, name: 'Gemini 2.5 Flash', tier: 'fast' },
+      { id: 'gemini-2.5-pro' as ModelId, name: 'Gemini 2.5 Pro', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'] },
+      { id: 'gemini-2.5-flash' as ModelId, name: 'Gemini 2.5 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient'] },
+    ],
+  },
+  kimi: {
+    name: 'Kimi',
+    models: [
+      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: 'token', capabilities: ['efficiency', 'code', 'reasoning'] },
     ],
   },
   zai: {
     name: 'Z.AI',
     models: [
-      { id: 'glm-4-plus' as ModelId, name: 'GLM-4 Plus', tier: 'standard' },
+      { id: 'glm-4-plus' as ModelId, name: 'GLM-4 Plus', icon: 'hub', capabilities: ['reasoning', 'code'] },
     ],
   },
+};
+
+// Work type to required capabilities mapping
+const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
+  'issue-agent:exploration': ['reasoning', 'large-context'],
+  'issue-agent:planning': ['reasoning', 'code'],
+  'issue-agent:implementation': ['code', 'reasoning'],
+  'issue-agent:testing': ['code', 'reasoning'],
+  'issue-agent:documentation': ['reasoning'],
+  'issue-agent:review-response': ['reasoning', 'code'],
+  'specialist-review-agent': ['reasoning', 'code'],
+  'specialist-test-agent': ['code', 'reasoning'],
+  'specialist-merge-agent': ['code'],
+  'convoy:security-reviewer': ['reasoning', 'code'],
+  'convoy:performance-reviewer': ['reasoning', 'code'],
+  'convoy:correctness-reviewer': ['reasoning', 'code'],
+  'convoy:synthesis-agent': ['reasoning'],
+  'subagent:explore': ['fast', 'reasoning'],
+  'subagent:plan': ['reasoning'],
+  'subagent:bash': ['fast', 'code'],
+  'subagent:general-purpose': ['reasoning', 'code'],
+  'prd-agent': ['reasoning'],
+  'decomposition-agent': ['reasoning'],
+  'triage-agent': ['fast', 'reasoning'],
+  'planning-agent': ['reasoning', 'code'],
+  'cli:interactive': ['reasoning', 'code'],
+  'cli:quick-command': ['fast'],
 };
 
 // Work type display names
@@ -67,6 +110,18 @@ const WORK_TYPE_NAMES: Record<string, string> = {
   'cli:quick-command': 'CLI Quick Command',
 };
 
+// Capability display names
+const CAPABILITY_NAMES: Record<Capability, string> = {
+  'reasoning': 'Reasoning',
+  'code': 'Code',
+  'vision': 'Vision',
+  'fast': 'Fast',
+  'cost-efficient': 'Cost Efficient',
+  'large-context': 'Large Context',
+  'complex-math': 'Complex Math',
+  'efficiency': 'Efficiency',
+};
+
 interface ModelOverrideModalProps {
   workType: WorkTypeId;
   currentModel: ModelId;
@@ -87,201 +142,169 @@ export function ModelOverrideModal({
   onClose,
 }: ModelOverrideModalProps) {
   const [selectedModel, setSelectedModel] = useState<ModelId>(currentModel);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Get display name for work type
   const workTypeName = WORK_TYPE_NAMES[workType] || workType;
+  const requiredCapabilities = WORK_TYPE_CAPABILITIES[workType] || ['reasoning'];
 
-  // Get agent name from work type
-  const agentName = useMemo(() => {
-    if (workType.startsWith('issue-agent:')) return 'Issue Agent';
-    if (workType.startsWith('specialist-')) return workType.replace('specialist-', '').replace('-agent', ' Agent');
-    if (workType.startsWith('convoy:')) return 'Convoy';
-    if (workType.startsWith('subagent:')) return 'Subagent';
-    if (workType.endsWith('-agent')) return workType.replace('-agent', ' Agent');
-    if (workType.startsWith('cli:')) return 'CLI';
-    return 'Agent';
-  }, [workType]);
-
-  // Filter available models based on enabled providers
+  // Filter providers based on enabled list
   const availableProviders = useMemo(() => {
     return Object.entries(MODELS_BY_PROVIDER).filter(([key]) =>
       key === 'anthropic' || enabledProviders.includes(key)
     );
   }, [enabledProviders]);
 
-  // Get current model info
-  const selectedModelInfo = useMemo(() => {
-    for (const provider of Object.values(MODELS_BY_PROVIDER)) {
-      const model = provider.models.find(m => m.id === selectedModel);
-      if (model) return { ...model, provider: provider.name };
+  // Find recommended model (best capability match)
+  const recommendedModel = useMemo(() => {
+    let bestMatch: { id: ModelId; score: number } | null = null;
+
+    for (const [_providerKey, provider] of availableProviders) {
+      for (const model of provider.models) {
+        const matchingCaps = model.capabilities.filter(c => requiredCapabilities.includes(c));
+        const score = matchingCaps.length / requiredCapabilities.length;
+        // Prefer balanced tier for recommendations
+        const tierBonus = model.tier === 'balanced' ? 0.1 : 0;
+        const totalScore = score + tierBonus;
+
+        if (!bestMatch || totalScore > bestMatch.score) {
+          bestMatch = { id: model.id, score: totalScore };
+        }
+      }
     }
-    return { id: selectedModel, name: selectedModel, tier: 'standard', provider: 'Unknown' };
-  }, [selectedModel]);
+    return bestMatch?.id;
+  }, [availableProviders, requiredCapabilities]);
 
   const handleApply = () => {
     onApply(selectedModel);
     onClose();
   };
 
-  const handleRemove = () => {
-    onRemove();
-    onClose();
-  };
-
   const hasChanges = selectedModel !== currentModel;
 
-  // Calculate a mock capability match percentage based on model tier
-  const capabilityMatch = useMemo(() => {
-    const tierScores: Record<string, number> = { premium: 98, standard: 92, fast: 85 };
-    return tierScores[selectedModelInfo.tier as string] || 90;
-  }, [selectedModelInfo.tier]);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      {/* Modal Container */}
-      <div className="w-full max-w-[500px] bg-[#24283b] border border-[#414868] rounded-xl shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="w-full max-w-[640px] bg-[#0f172a] border border-slate-800 rounded-lg shadow-2xl flex flex-col overflow-hidden">
         {/* Modal Header */}
-        <div className="px-6 pt-6 pb-4">
-          <h2 className="text-white text-2xl font-bold leading-tight">Configure Model Override</h2>
-          <p className="text-[#a390cb] text-sm font-medium mt-1">{agentName}: {workTypeName}</p>
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex justify-between items-start gap-3">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-white tracking-tight text-2xl font-bold">Select Model</h1>
+              <p className="text-slate-400 text-sm">
+                Task: <span className="text-cyan-400/80">{workTypeName}</span>
+              </p>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
         </div>
 
-        {/* Content Area */}
-        <div className="px-6 py-2 flex flex-col gap-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
-          {/* Current Model Section */}
-          <div className="flex flex-col gap-2">
-            <h3 className="text-white text-sm font-bold tracking-tight">Current Model</h3>
-            <div className="flex">
-              <div className="flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-4">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                <p className="text-emerald-400 text-xs font-bold leading-normal">{selectedModelInfo.name}</p>
-                {isOverride && (
-                  <span className="text-[10px] bg-[#a078f7]/20 text-[#a078f7] px-1.5 rounded">override</span>
-                )}
-              </div>
-            </div>
-          </div>
+        {/* Model List */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar max-h-[500px]">
+          {availableProviders.map(([providerKey, provider], providerIndex) => (
+            <div key={providerKey} className="flex flex-col">
+              {providerIndex > 0 && <div className="h-px bg-slate-800 mx-6 my-2" />}
+              <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest px-6 pb-2 pt-6">
+                {provider.name}
+              </h3>
 
-          {/* Select Model Dropdown */}
-          <div className="flex flex-col gap-2">
-            <h3 className="text-white text-sm font-bold tracking-tight">Select Model</h3>
-            <div className="relative">
-              {/* Dropdown Trigger */}
-              <div
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex w-full items-center justify-between rounded-lg bg-[#1a1c2c] border border-[#414868] px-4 py-3 cursor-pointer hover:border-[#a078f7] transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[#a078f7] text-xl">psychology</span>
-                  <span className="text-white text-sm">{selectedModelInfo.name}</span>
-                </div>
-                <span className={`material-symbols-outlined text-[#a390cb] transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}>
-                  expand_more
-                </span>
-              </div>
+              {provider.models.map((model) => {
+                const isSelected = selectedModel === model.id;
+                const isRecommended = model.id === recommendedModel;
+                const matchingCaps = model.capabilities.filter(c => requiredCapabilities.includes(c));
 
-              {/* Dropdown Menu */}
-              {isDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 w-full bg-[#1a1c2c] border border-[#414868] rounded-lg shadow-xl overflow-hidden z-10">
-                  <div className="max-h-64 overflow-y-auto custom-scrollbar py-2">
-                    {availableProviders.map(([key, provider]) => (
-                      <div key={key}>
-                        {/* Provider Header */}
-                        <div className="px-4 py-2 text-[10px] font-bold text-[#a390cb] uppercase tracking-widest">
-                          {provider.name}
-                        </div>
-                        {/* Models */}
-                        {provider.models.map((model) => {
-                          const isSelected = selectedModel === model.id;
+                return (
+                  <div
+                    key={model.id}
+                    onClick={() => setSelectedModel(model.id)}
+                    className={`group flex items-center gap-4 px-6 py-4 cursor-pointer transition-all border-l-2 ${
+                      isSelected
+                        ? 'bg-cyan-500/10 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]'
+                        : isRecommended
+                          ? 'bg-cyan-500/5 border-cyan-400/50 hover:bg-cyan-500/10'
+                          : 'border-transparent hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <div className={`flex items-center justify-center rounded-lg shrink-0 size-10 transition-colors ${
+                      isSelected || isRecommended ? 'bg-cyan-500/20' : 'bg-slate-800 group-hover:bg-slate-700'
+                    }`}>
+                      <span className={`material-symbols-outlined ${isSelected || isRecommended ? 'text-cyan-400' : 'text-slate-400'}`}>
+                        {model.icon}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-1 flex-col justify-center">
+                      <div className="flex items-center gap-2">
+                        <p className={`text-white text-base ${isSelected ? 'font-bold' : 'font-medium'}`}>
+                          {model.name}
+                        </p>
+                        {isRecommended && (
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-400 text-[10px] text-slate-900 font-bold uppercase tracking-tight">
+                            Recommended
+                          </span>
+                        )}
+                        {model.tier === 'premium' && !isRecommended && (
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                            Premium
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 mt-1.5 flex-wrap">
+                        {model.capabilities.map((cap) => {
+                          const isMatching = matchingCaps.includes(cap);
                           return (
-                            <div
-                              key={model.id}
-                              onClick={() => {
-                                setSelectedModel(model.id);
-                                setIsDropdownOpen(false);
-                              }}
-                              className={`px-4 py-2 text-sm cursor-pointer flex justify-between items-center ${
-                                isSelected
-                                  ? 'text-[#a078f7] bg-[#a078f7]/10 border-l-2 border-[#a078f7]'
-                                  : 'text-gray-300 hover:bg-[#a078f7]/20 hover:text-white'
+                            <span
+                              key={cap}
+                              className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                                isMatching
+                                  ? isSelected
+                                    ? 'bg-cyan-500/20 text-white ring-1 ring-cyan-500/50'
+                                    : 'border border-cyan-500/40 text-cyan-400'
+                                  : 'border border-slate-700 text-slate-400'
                               }`}
                             >
-                              <span>{model.name}</span>
-                              <div className="flex items-center gap-2">
-                                {'isNew' in model && model.isNew && (
-                                  <span className="text-[10px] bg-[#a078f7]/20 text-[#a078f7] px-1.5 rounded">New</span>
-                                )}
-                                {isSelected && (
-                                  <span className="material-symbols-outlined text-sm">check</span>
-                                )}
-                              </div>
-                            </div>
+                              {CAPABILITY_NAMES[cap]}
+                            </span>
                           );
                         })}
                       </div>
-                    ))}
+                    </div>
+
+                    {isSelected && (
+                      <span className="material-symbols-outlined text-cyan-400">check_circle</span>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })}
             </div>
-          </div>
-
-          {/* Capability Match */}
-          <div className="flex flex-col gap-3 p-4 rounded-lg bg-[#2e2249]/30 border border-[#a078f7]/10">
-            <div className="flex justify-between items-center">
-              <h3 className="text-white text-sm font-bold">Capability Match</h3>
-              <span className="text-[#a078f7] text-sm font-bold">{capabilityMatch}%</span>
-            </div>
-            <div className="w-full bg-[#1a1c2c] h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-[#a078f7] h-full rounded-full transition-all duration-300"
-                style={{ width: `${capabilityMatch}%` }}
-              />
-            </div>
-            <p className="text-[#a390cb] text-xs">
-              {capabilityMatch >= 95
-                ? 'Excellent match for this work type.'
-                : capabilityMatch >= 90
-                  ? 'High match for exploration and reasoning tasks.'
-                  : 'Good match with some capability trade-offs.'}
-            </p>
-          </div>
-
-          {/* Info Note */}
-          <div className="flex items-start gap-3 bg-blue-500/10 p-3 rounded-lg">
-            <span className="material-symbols-outlined text-blue-400 text-lg mt-0.5">info</span>
-            <p className="text-[#a390cb] text-xs leading-relaxed">
-              This override will be used instead of smart selection for this work type. It may impact performance or cost efficiency.
-            </p>
-          </div>
+          ))}
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-6 mt-4 border-t border-[#414868] flex items-center justify-between">
-          {isOverride ? (
-            <button
-              onClick={handleRemove}
-              className="text-rose-400 hover:text-rose-300 text-sm font-bold transition-colors"
-            >
-              Remove Override
-            </button>
-          ) : (
-            <div />
-          )}
+        <div className="p-6 border-t border-slate-800 bg-slate-900/30 flex justify-between items-center">
+          <div>
+            {isOverride && (
+              <button
+                onClick={() => { onRemove(); onClose(); }}
+                className="text-rose-400 hover:text-rose-300 text-sm font-medium transition-colors"
+              >
+                Remove Override
+              </button>
+            )}
+          </div>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2.5 rounded-lg text-white text-sm font-bold hover:bg-white/5 transition-colors"
+              className="px-6 py-2.5 rounded-full text-slate-400 font-medium hover:text-white hover:bg-slate-800 transition-all"
             >
               Cancel
             </button>
             <button
               onClick={handleApply}
               disabled={!hasChanges && isOverride}
-              className="px-6 py-2.5 rounded-lg bg-[#a078f7] text-white text-sm font-bold hover:bg-[#b18df9] transition-all shadow-lg shadow-[#a078f7]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-8 py-2.5 rounded-full bg-cyan-400 text-slate-900 font-bold hover:bg-cyan-300 active:scale-95 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Apply Override
+              Apply Selection
             </button>
           </div>
         </div>
@@ -289,17 +312,17 @@ export function ModelOverrideModal({
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
+          width: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #2e2249;
+          background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #414868;
+          background: #1e293b;
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #a078f7;
+          background: #22d3ee;
         }
       `}</style>
     </div>

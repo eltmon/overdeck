@@ -1,0 +1,183 @@
+{
+  "research_date": "2026-01-29",
+  "sources_consulted": [
+    "https://www.vals.ai/benchmarks/swebench",
+    "https://livecodebench.github.io/",
+    "https://chat.lmsys.org/?leaderboard",
+    "https://artificialanalysis.ai/",
+    "https://www.anthropic.com/news/claude-opus-4-5",
+    "https://www.kimi.com/blog/kimi-k2-5.html",
+    "https://z.ai/blog/glm-4.7",
+    "https://pricepertoken.com/"
+  ],
+  "models": {
+    "claude-opus-4-5": {
+      "displayName": "Claude Opus 4.5",
+      "provider": "anthropic",
+      "costPer1MTokens": 45.0,
+      "contextWindow": 200000,
+      "skills": {
+        "code-generation": 96,
+        "code-review": 98,
+        "debugging": 97,
+        "planning": 99,
+        "documentation": 95,
+        "testing": 92,
+        "security": 98,
+        "performance": 90,
+        "synthesis": 98,
+        "speed": 40,
+        "context-length": 95
+      },
+      "evidence": {
+        "code-generation": "80.9% SWE-bench Verified (first >80%), 89.4% Aider Polyglot",
+        "planning": "User confirms best for planning, 59.3% Terminal-bench",
+        "security": "Best OWASP detection in community testing",
+        "synthesis": "76% more token efficient at same quality"
+      },
+      "notes": "First model to exceed 80% SWE-bench. Leads 7/8 languages on SWE-bench Multilingual."
+    },
+    "claude-sonnet-4-5": {
+      "displayName": "Claude Sonnet 4.5",
+      "provider": "anthropic",
+      "costPer1MTokens": 9.0,
+      "contextWindow": 200000,
+      "skills": {
+        "code-generation": 92,
+        "code-review": 92,
+        "debugging": 90,
+        "planning": 88,
+        "documentation": 90,
+        "testing": 90,
+        "security": 85,
+        "performance": 85,
+        "synthesis": 88,
+        "speed": 70,
+        "context-length": 95
+      },
+      "evidence": {
+        "code-generation": "77.2% SWE-bench (82% parallel), beats GPT-5 Codex (74.5%)",
+        "testing": "50% Terminal-Bench, 61.4% OSWorld",
+        "documentation": "100% AIME with Python tools"
+      },
+      "notes": "Best value in premium tier. 77.2% SWE-bench at 1/5th Opus cost."
+    },
+    "kimi-k2.5": {
+      "displayName": "Kimi K2.5",
+      "provider": "kimi",
+      "costPer1MTokens": 8.0,
+      "contextWindow": 256000,
+      "skills": {
+        "code-generation": 92,
+        "code-review": 90,
+        "debugging": 90,
+        "planning": 88,
+        "documentation": 88,
+        "testing": 88,
+        "security": 82,
+        "performance": 85,
+        "synthesis": 92,
+        "speed": 75,
+        "context-length": 98
+      },
+      "evidence": {
+        "code-generation": "76.8% SWE-bench, 85 LiveCodeBench v6",
+        "testing": "92% coding accuracy, 96.8% math accuracy",
+        "synthesis": "Can coordinate 100 sub-agents, 1500 parallel tool calls"
+      },
+      "notes": "Best open-source coding model. 5.1x cheaper than GPT-5.2. Excellent for frontend and multi-agent orchestration."
+    },
+    "glm-4.7": {
+      "displayName": "GLM 4.7",
+      "provider": "zai",
+      "costPer1MTokens": 5.0,
+      "contextWindow": 200000,
+      "skills": {
+        "code-generation": 88,
+        "code-review": 85,
+        "debugging": 85,
+        "planning": 82,
+        "documentation": 80,
+        "testing": 82,
+        "security": 72,
+        "performance": 78,
+        "synthesis": 85,
+        "speed": 80,
+        "context-length": 95
+      },
+      "evidence": {
+        "code-generation": "73.8% SWE-bench, 84.9 LiveCodeBench v6 (open-source SOTA)",
+        "testing": "87.4 τ²-Bench (SOTA for tool use)",
+        "planning": "95.7% AIME 2025 (beats Gemini 3 Pro and GPT-5.1)"
+      },
+      "notes": "Top open-source for agentic coding. 400B params with Interleaved/Preserved Thinking."
+    },
+    "gpt-5.2-codex": {
+      "displayName": "GPT-5.2 Codex",
+      "provider": "openai",
+      "costPer1MTokens": 75.0,
+      "contextWindow": 128000,
+      "skills": {
+        "code-generation": 95,
+        "code-review": 90,
+        "debugging": 92,
+        "planning": 88,
+        "documentation": 85,
+        "testing": 90,
+        "security": 85,
+        "performance": 88,
+        "synthesis": 88,
+        "speed": 55,
+        "context-length": 75
+      },
+      "evidence": {
+        "code-generation": "80% SWE-bench Verified, 55.6% SWE-bench Pro",
+        "debugging": "92.4% GPQA Diamond",
+        "performance": "52.9% ARC-AGI-2 (best abstract reasoning)",
+        "synthesis": "100% AIME 2025 without tools"
+      },
+      "notes": "Premium coding model. Best raw reasoning capabilities but expensive."
+    },
+    "gemini-3-pro-preview": {
+      "displayName": "Gemini 3 Pro",
+      "provider": "google",
+      "costPer1MTokens": 12.0,
+      "contextWindow": 1000000,
+      "skills": {
+        "code-generation": 90,
+        "code-review": 88,
+        "debugging": 85,
+        "planning": 85,
+        "documentation": 88,
+        "testing": 85,
+        "security": 78,
+        "performance": 85,
+        "synthesis": 90,
+        "speed": 80,
+        "context-length": 100
+      },
+      "evidence": {
+        "code-generation": "2439 Elo LiveCodeBench Pro, 1501 Elo LMArena (first >1500)",
+        "testing": "~95% AIME 2025",
+        "context-length": "1M token context window"
+      },
+      "notes": "First to exceed 1500 Elo on LMArena. Best for large codebase analysis with 1M context."
+    }
+  },
+  "methodology": "Scores based on: (1) Official benchmark results (SWE-bench, LiveCodeBench, AIME); (2) Community leaderboards (LMSYS, ArtificialAnalysis); (3) Pricing from provider APIs and aggregators; (4) User feedback on specific use cases. Scores normalized to 0-100 scale where 100 = best in class for that dimension.",
+  "confidence_levels": {
+    "high": ["claude-opus-4-5", "claude-sonnet-4-5", "gpt-5.2-codex", "gemini-3-pro-preview"],
+    "medium": ["kimi-k2.5", "glm-4.7"],
+    "low": ["claude-haiku-4-5", "gpt-4o-mini", "glm-4.7-flash", "gemini-3-flash-preview"]
+  },
+  "recommendations": {
+    "planning": "claude-opus-4-5 - User confirms 'Opus 4.5 planning for sure'. 99 score.",
+    "code-generation": "claude-opus-4-5 for quality (80.9% SWE-bench), kimi-k2.5 for value (76.8% at 5x lower cost)",
+    "debugging": "claude-opus-4-5 or o3-deep-research for complex issues, kimi-k2.5 for routine",
+    "security": "claude-opus-4-5 - Best security analysis, OWASP detection",
+    "large-codebase": "gemini-3-pro-preview - 1M context window",
+    "frontend-dev": "kimi-k2.5 - Specifically noted for excellent frontend capabilities",
+    "budget": "kimi-k2 ($1.4/M), glm-4.7-flash ($1.5/M), gemini-3-flash ($0.5/M)",
+    "multi-agent": "kimi-k2.5 - Can coordinate 100 sub-agents, 1500 parallel tool calls"
+  }
+}
