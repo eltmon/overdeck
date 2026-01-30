@@ -276,6 +276,50 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Extremely fast and cheap, huge context, great for exploration',
   },
 
+  'gemini-2.5-pro': {
+    model: 'gemini-2.5-pro',
+    provider: 'google',
+    displayName: 'Gemini 2.5 Pro',
+    costPer1MTokens: 12.0,
+    contextWindow: 1000000,
+    skills: {
+      'code-generation': 92,
+      'code-review': 90,
+      debugging: 88,
+      planning: 88,
+      documentation: 90,
+      testing: 87,
+      security: 82,
+      performance: 88,
+      synthesis: 92,
+      speed: 75,
+      'context-length': 100,
+    },
+    notes: 'Advanced reasoning and code capabilities with 1M context',
+  },
+
+  'gemini-2.5-flash': {
+    model: 'gemini-2.5-flash',
+    provider: 'google',
+    displayName: 'Gemini 2.5 Flash',
+    costPer1MTokens: 0.6,
+    contextWindow: 1000000,
+    skills: {
+      'code-generation': 78,
+      'code-review': 73,
+      debugging: 70,
+      planning: 65,
+      documentation: 75,
+      testing: 70,
+      security: 58,
+      performance: 68,
+      synthesis: 73,
+      speed: 95,
+      'context-length': 100,
+    },
+    notes: 'Fast and efficient with large context support',
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Z.AI MODELS
   // ═══════════════════════════════════════════════════════════════════════════
