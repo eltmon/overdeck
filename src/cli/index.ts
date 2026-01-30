@@ -1,4 +1,34 @@
 #!/usr/bin/env node
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+
+// Load ~/.panopticon.env before any other imports
+// This makes API keys and other env vars available to all commands
+const PANOPTICON_ENV_FILE = join(homedir(), '.panopticon.env');
+if (existsSync(PANOPTICON_ENV_FILE)) {
+  try {
+    const envContent = readFileSync(PANOPTICON_ENV_FILE, 'utf-8');
+    for (const line of envContent.split('\n')) {
+      const trimmed = line.trim();
+      // Skip comments and empty lines
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+      if (match) {
+        const [, key, value] = match;
+        // Only set if not already defined in process.env
+        if (process.env[key] === undefined) {
+          process.env[key] = value.trim();
+        }
+      }
+    }
+  } catch (error) {
+    // Non-fatal: warn but continue
+    console.warn('Warning: Failed to load ~/.panopticon.env:', (error as Error).message);
+  }
+}
+
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { initCommand } from './commands/init.js';

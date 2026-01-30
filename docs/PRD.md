@@ -8,6 +8,35 @@
 
 ---
 
+## ⚠️ DECOUPLING FROM MYN (CRITICAL)
+
+**Panopticon is being extracted from MYN into a standalone open-source project.**
+
+### DO NOT rely on MYN infrastructure:
+- ❌ `/home/eltmon/projects/myn/infra/` - MYN-specific, not portable
+- ❌ `myn-traefik` container - Should be `panopticon-traefik`
+- ❌ `*.localhost` domains - Project-specific, users will have their own
+
+### Panopticon MUST be self-contained:
+- ✅ All Traefik config in `~/.panopticon/traefik/`
+- ✅ All certs in `~/.panopticon/traefik/certs/`
+- ✅ Generic domain patterns (e.g., `*.pan.localhost` or configurable)
+- ✅ `pan install` sets up everything needed
+
+### Migration checklist (from MYN):
+- [ ] Traefik static config (`traefik.yml`) - DONE in `~/.panopticon/traefik/`
+- [ ] Traefik dynamic config templates - Need per-project generation
+- [ ] SSL cert generation (`mkcert`) - Need `pan doctor` to verify
+- [ ] `/etc/hosts` management - Need `pan workspace create` to handle
+- [ ] Docker network setup - Partially done
+
+### When working on infrastructure:
+1. **Always check:** Is this change in Panopticon or MYN?
+2. **If in MYN infra:** Port it to Panopticon first, then use Panopticon's version
+3. **Never add new MYN-specific infra** - Add to Panopticon instead
+
+---
+
 ## Executive Summary
 
 Panopticon is an **opinionated multi-agent orchestration system** for Claude Code. It manages projects, agents, and provides a unified set of skills, commands, and integrations that sync to your Claude Code environment.
@@ -1799,8 +1828,8 @@ description = "Mind Your Now - AI productivity app"
 [workspace]
 enabled = true
 docker_compose = ".devcontainer/docker-compose.devcontainer.yml"
-url_pattern = "https://feature-{issue}.myn.test"
-api_url_pattern = "https://api-feature-{issue}.myn.test"
+url_pattern = "https://feature-{issue}.localhost"
+api_url_pattern = "https://api-feature-{issue}.localhost"
 
 [agent]
 default_runtime = "claude"
@@ -2871,7 +2900,7 @@ MYN's workspace containers are **NOT** a single container. Each workspace runs *
 | `postgres` | Database (pgvector) | 5432 |
 | `redis` | Cache | 6379 |
 
-Plus **Traefik** runs as a shared global container routing all workspaces via friendly URLs (`https://feature-min-648.myn.test`).
+Plus **Traefik** runs as a shared global container routing all workspaces via friendly URLs (`https://feature-min-648.localhost`).
 
 ### CLI Distribution Strategy
 
@@ -3176,12 +3205,12 @@ sections = [
 
 [variables]
 # Project-specific variables for template substitution
-PROJECT_NAME = "Mind Your Now"
-PROJECT_DOMAIN = "myn.test"
-TEST_USER_EMAIL = "appletester@test.com"
+PROJECT_NAME = "My Project"
+PROJECT_DOMAIN = "myproject.localhost"
+TEST_USER_EMAIL = "tester@example.com"
 TEST_USER_PASSWORD = "your-test-password"
-LINEAR_TEAM_ID = "354c42bd-0631-42f1-9a0d-649326ce7506"
-LINEAR_TEAM_NAME = "Mind your now"
+LINEAR_TEAM_ID = "your-team-id"
+LINEAR_TEAM_NAME = "Your Team"
 ```
 
 #### Built-in Variables
@@ -3194,10 +3223,10 @@ Panopticon automatically provides these variables for substitution:
 | `{{BRANCH_NAME}}` | Git branch name | `feature/min-648` |
 | `{{ISSUE_ID}}` | Linear issue ID | `MIN-648` |
 | `{{WORKSPACE_PATH}}` | Full workspace path | `/home/.../workspaces/feature-min-648` |
-| `{{FRONTEND_URL}}` | Frontend URL | `https://feature-min-648.myn.test` |
-| `{{API_URL}}` | API URL | `https://api-feature-min-648.myn.test` |
-| `{{PROJECT_DOMAIN}}` | From project.toml | `myn.test` |
-| `{{PROJECT_NAME}}` | From project.toml | `Mind Your Now` |
+| `{{FRONTEND_URL}}` | Frontend URL | `https://feature-min-648.localhost` |
+| `{{API_URL}}` | API URL | `https://api-feature-min-648.localhost` |
+| `{{PROJECT_DOMAIN}}` | From project.toml | `myproject.localhost` |
+| `{{PROJECT_NAME}}` | From project.toml | `My Project` |
 
 #### Example: Panopticon-Provided Section
 
@@ -3448,7 +3477,7 @@ These existing scripts will be referenced when building Panopticon's installer:
 | `sync-hosts.ps1` | Windows hosts file sync from WSL2 | `/home/eltmon/projects/myn/infra/sync-hosts.ps1` |
 | `setup-hosts-automation.sh` | Passwordless hosts updates | `/home/eltmon/projects/myn/infra/setup-hosts-automation.sh` |
 
-**Note:** These scripts currently use `myn.test` as the domain. Panopticon will generalize to use `.localhost` domains with project-specific subdomains (e.g., `myn.localhost`, `myproject.localhost`).
+**Note:** Panopticon uses `.localhost` domains with project-specific subdomains (e.g., `myproject.localhost`). This avoids HSTS issues that affect `.test` domains in some browsers.
 
 ### V1 vs V2 Features
 

@@ -15,7 +15,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
 import { loadSettings, saveSettings, validateSettings, getAvailableModels } from '../../lib/settings.js';
-import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi } from '../../lib/settings-api.js';
+import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getOptimalDefaultsApi } from '../../lib/settings-api.js';
 import { generateRouterConfig, writeRouterConfig } from '../../lib/router-config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../lib/health-filtering.js';
@@ -30,7 +30,18 @@ import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig, find
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
+import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import type { Issue } from '../frontend/src/types.js';
+
+// Load environment variables from ~/.panopticon.env at startup
+// This makes API keys available to the settings system
+const envLoadResult = loadPanopticonEnv();
+if (envLoadResult.loaded.length > 0) {
+  console.log(`Loaded env vars from ~/.panopticon.env: ${envLoadResult.loaded.join(', ')}`);
+}
+if (envLoadResult.error) {
+  console.warn(`Note: ${envLoadResult.error}`);
+}
 
 /**
  * Get a Date object representing 24 hours ago from now.
@@ -41,8 +52,6 @@ function getOneDayAgo(): Date {
   date.setDate(date.getDate() - 1);
   return date;
 }
-
-import type { Issue } from '../frontend/src/types.js';
 
 // Ensure tmux server is running (starts one if not)
 async function ensureTmuxRunning(): Promise<void> {
@@ -2227,6 +2236,216 @@ app.get('/api/settings/available-models', (_req, res) => {
   } catch (error: any) {
     console.error('Error loading available models:', error);
     res.status(500).json({ error: 'Failed to load available models: ' + error.message });
+  }
+});
+
+// Get optimal defaults (research-based model assignments)
+app.get('/api/settings/optimal-defaults', (_req, res) => {
+  try {
+    const optimalDefaults = getOptimalDefaultsApi();
+    res.json(optimalDefaults);
+  } catch (error: any) {
+    console.error('Error getting optimal defaults:', error);
+    res.status(500).json({ error: 'Failed to get optimal defaults: ' + error.message });
+  }
+});
+
+// Model ID to API model ID mapping
+const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
+  // OpenAI models
+  'gpt-5.2-codex': { apiModel: 'gpt-4o' }, // Use gpt-4o for testing (codex may not be available)
+  'o3-deep-research': { apiModel: 'gpt-4o' }, // Use gpt-4o for testing
+  'gpt-4o': { apiModel: 'gpt-4o' },
+  'gpt-4o-mini': { apiModel: 'gpt-4o-mini' },
+  'o1': { apiModel: 'gpt-4o' }, // o1 may not be available, use gpt-4o for testing
+  'o3-mini': { apiModel: 'gpt-4o-mini' }, // Use mini for testing
+  // Google models
+  'gemini-3-pro-preview': { apiModel: 'gemini-1.5-pro' },
+  'gemini-3-flash-preview': { apiModel: 'gemini-1.5-flash' },
+  'gemini-2.5-pro': { apiModel: 'gemini-1.5-pro' },
+  'gemini-2.5-flash': { apiModel: 'gemini-1.5-flash' },
+  // Kimi models
+  'kimi-k2': { apiModel: 'moonshot-v1-8k' },
+  'kimi-k2.5': { apiModel: 'moonshot-v1-32k' },
+  'kimi-k2-turbo': { apiModel: 'moonshot-v1-8k' }, // Use 8k for turbo testing
+  // Z.AI models
+  'glm-4.7': { apiModel: 'glm-4' },
+  'glm-4.7-flash': { apiModel: 'glm-4-flash' },
+  'glm-4-plus': { apiModel: 'glm-4' },
+  'glm-4-air': { apiModel: 'glm-4-air' },
+  'glm-4-flash': { apiModel: 'glm-4-flash' },
+  'glm-4-long': { apiModel: 'glm-4-long' },
+};
+
+// Test API key with 2+3=5 calculation (supports specific model testing)
+app.post('/api/settings/test-api-key', async (req, res) => {
+  try {
+    const { provider, apiKey, model } = req.body;
+
+    if (!provider || !apiKey) {
+      res.status(400).json({ error: 'Provider and apiKey are required' });
+      return;
+    }
+
+    let success = false;
+    let error: string | null = null;
+    let response: string | null = null;
+    let latencyMs = 0;
+    const testPrompt = 'What is 2+3? Reply with just the number.';
+    const expectedAnswer = '5';
+
+    const startTime = Date.now();
+
+    switch (provider) {
+      case 'openai': {
+        const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gpt-4o-mini') : 'gpt-4o-mini';
+        try {
+          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: apiModel,
+              messages: [{ role: 'user', content: testPrompt }],
+              max_tokens: 10,
+            }),
+          });
+          latencyMs = Date.now() - startTime;
+
+          if (resp.ok) {
+            const data = await resp.json();
+            response = data.choices?.[0]?.message?.content?.trim() || '';
+            success = response.includes(expectedAnswer);
+            if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+          } else if (resp.status === 401) {
+            error = 'Invalid API key';
+          } else if (resp.status === 404) {
+            error = `Model not found: ${apiModel}`;
+          } else {
+            const errBody = await resp.text();
+            error = `HTTP ${resp.status}: ${errBody.slice(0, 100)}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+      }
+
+      case 'google': {
+        const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gemini-1.5-flash') : 'gemini-1.5-flash';
+        try {
+          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
+          const resp = await fetch(testUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: testPrompt }] }],
+              generationConfig: { maxOutputTokens: 10 },
+            }),
+          });
+          latencyMs = Date.now() - startTime;
+
+          if (resp.ok) {
+            const data = await resp.json();
+            response = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+            success = response.includes(expectedAnswer);
+            if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+          } else if (resp.status === 400 || resp.status === 403) {
+            error = 'Invalid API key';
+          } else if (resp.status === 404) {
+            error = `Model not found: ${apiModel}`;
+          } else {
+            const errBody = await resp.text();
+            error = `HTTP ${resp.status}: ${errBody.slice(0, 100)}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+      }
+
+      case 'kimi': {
+        const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'moonshot-v1-8k') : 'moonshot-v1-8k';
+        try {
+          const resp = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: apiModel,
+              messages: [{ role: 'user', content: testPrompt }],
+              max_tokens: 10,
+            }),
+          });
+          latencyMs = Date.now() - startTime;
+
+          if (resp.ok) {
+            const data = await resp.json();
+            response = data.choices?.[0]?.message?.content?.trim() || '';
+            success = response.includes(expectedAnswer);
+            if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+          } else if (resp.status === 401) {
+            error = 'Invalid API key';
+          } else if (resp.status === 404) {
+            error = `Model not found: ${apiModel}`;
+          } else {
+            const errBody = await resp.text();
+            error = `HTTP ${resp.status}: ${errBody.slice(0, 100)}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+      }
+
+      case 'zai': {
+        const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-4-flash') : 'glm-4-flash';
+        try {
+          const resp = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: apiModel,
+              messages: [{ role: 'user', content: testPrompt }],
+              max_tokens: 10,
+            }),
+          });
+          latencyMs = Date.now() - startTime;
+
+          if (resp.ok) {
+            const data = await resp.json();
+            response = data.choices?.[0]?.message?.content?.trim() || '';
+            success = response.includes(expectedAnswer);
+            if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+          } else if (resp.status === 401) {
+            error = 'Invalid API key';
+          } else if (resp.status === 404) {
+            error = `Model not found: ${apiModel}`;
+          } else {
+            const errBody = await resp.text();
+            error = `HTTP ${resp.status}: ${errBody.slice(0, 100)}`;
+          }
+        } catch (err: any) {
+          error = `Network error: ${err.message}`;
+        }
+        break;
+      }
+
+      default:
+        error = `Unknown provider: ${provider}`;
+    }
+
+    res.json({ success, error, response, latencyMs, model: model || 'default' });
+  } catch (error: any) {
+    console.error('Error testing API key:', error);
+    res.status(500).json({ error: 'Failed to test API key: ' + error.message });
   }
 });
 

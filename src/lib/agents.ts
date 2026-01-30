@@ -280,8 +280,11 @@ export interface SpawnOptions {
  * 6. Default fallback (claude-sonnet-4-5)
  */
 function determineModel(options: SpawnOptions): string {
+  console.log(`[DEBUG] determineModel called with:`, { model: options.model, workType: options.workType, phase: options.phase, agentType: options.agentType, difficulty: options.difficulty });
+
   // Explicit model always wins
   if (options.model) {
+    console.log(`[DEBUG] Using explicit model: ${options.model}`);
     return options.model;
   }
 
@@ -316,12 +319,13 @@ function determineModel(options: SpawnOptions): string {
       }
     }
 
-    // Fall back to default model
-    return 'claude-sonnet-4-5';
+    // Fall back to default model (use kimi-k2.5 if available)
+    return 'kimi-k2.5';
   } catch (error) {
     // If work type router fails, fall back to default
     console.warn('Warning: Could not resolve model using work type router, using default');
-    return options.model || 'claude-sonnet-4-5';
+    console.log(`[DEBUG] Catch block, options.model: ${options.model}, fallback: kimi-k2.5`);
+    return options.model || 'kimi-k2.5';
   }
 }
 
@@ -338,6 +342,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Determine model based on configuration
   const selectedModel = determineModel(options);
+  console.log(`[DEBUG] Selected model: ${selectedModel}`);
 
   // Create state
   const state: AgentState = {

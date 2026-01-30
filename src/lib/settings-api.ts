@@ -12,6 +12,53 @@ import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { MODEL_CAPABILITIES, getModelCapability } from './model-capabilities.js';
 
+/**
+ * Optimal model defaults based on research (see docs/MODEL_RECOMMENDATIONS.md)
+ * - Opus 4.5: Critical thinking tasks (exploration, planning, security review)
+ * - Sonnet 4.5: Quality implementation tasks (coding, testing, documentation)
+ * - Haiku 4.5: Speed-critical tasks (subagents, triage, quick CLI)
+ */
+export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
+  return {
+    // High-complexity phases - Opus 4.5 for deep analysis
+    'issue-agent:exploration': 'claude-opus-4-5',
+    'issue-agent:planning': 'claude-opus-4-5',
+
+    // Implementation phases - Sonnet 4.5 for best coding quality (82% SWE-bench)
+    'issue-agent:implementation': 'claude-sonnet-4-5',
+    'issue-agent:testing': 'claude-sonnet-4-5',
+    'issue-agent:documentation': 'claude-sonnet-4-5',
+    'issue-agent:review-response': 'claude-sonnet-4-5',
+
+    // Specialist agents - quality critical
+    'specialist-review-agent': 'claude-opus-4-5',
+    'specialist-test-agent': 'claude-sonnet-4-5',
+    'specialist-merge-agent': 'claude-sonnet-4-5',
+
+    // Convoy reviewers - mixed based on criticality
+    'convoy:security-reviewer': 'claude-opus-4-5',   // SAFETY CRITICAL
+    'convoy:performance-reviewer': 'claude-sonnet-4-5',
+    'convoy:correctness-reviewer': 'claude-sonnet-4-5',
+    'convoy:synthesis-agent': 'claude-sonnet-4-5',
+
+    // Subagents - speed-optimized (Haiku 2x faster, 1/3 cost)
+    'subagent:explore': 'claude-haiku-4-5',
+    'subagent:plan': 'claude-haiku-4-5',
+    'subagent:bash': 'claude-haiku-4-5',
+    'subagent:general-purpose': 'claude-sonnet-4-5',
+
+    // Workflow agents - balanced choices
+    'prd-agent': 'claude-sonnet-4-5',
+    'decomposition-agent': 'claude-haiku-4-5',
+    'triage-agent': 'claude-haiku-4-5',
+    'planning-agent': 'claude-sonnet-4-5',
+
+    // CLI modes - speed for quick, quality for interactive
+    'cli:interactive': 'claude-sonnet-4-5',
+    'cli:quick-command': 'claude-haiku-4-5',
+  };
+}
+
 // API format matches frontend SettingsConfig interface
 // Note: No cost_sensitivity - we're opinionated and always pick the best model
 // for each task. Users control cost by which providers they enable.
@@ -204,4 +251,24 @@ export function getAvailableModelsApi(): {
   }
 
   return result;
+}
+
+/**
+ * Get optimal default settings (for "Restore optimal defaults" feature)
+ */
+export function getOptimalDefaultsApi(): ApiSettingsConfig {
+  return {
+    models: {
+      providers: {
+        anthropic: true,
+        openai: false,
+        google: false,
+        zai: false,
+        kimi: false,
+      },
+      overrides: getOptimalModelDefaults(),
+      gemini_thinking_level: 3,
+    },
+    api_keys: {},
+  };
 }

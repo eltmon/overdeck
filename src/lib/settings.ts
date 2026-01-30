@@ -45,21 +45,21 @@ export interface SettingsConfig {
   api_keys: ApiKeysConfig;
 }
 
-// Default settings (Anthropic-only, no external API keys)
+// Default settings (Kimi K2.5 for all work types)
 const DEFAULT_SETTINGS: SettingsConfig = {
   models: {
     specialists: {
-      review_agent: 'claude-sonnet-4-5',
-      test_agent: 'claude-haiku-4-5',
-      merge_agent: 'claude-sonnet-4-5',
+      review_agent: 'kimi-k2.5',
+      test_agent: 'kimi-k2.5',
+      merge_agent: 'kimi-k2.5',
     },
-    planning_agent: 'claude-opus-4-5',
+    planning_agent: 'kimi-k2.5',
     complexity: {
-      trivial: 'claude-haiku-4-5',
-      simple: 'claude-haiku-4-5',
-      medium: 'claude-sonnet-4-5',
-      complex: 'claude-sonnet-4-5',
-      expert: 'claude-opus-4-5',
+      trivial: 'kimi-k2.5',
+      simple: 'kimi-k2.5',
+      medium: 'kimi-k2.5',
+      complex: 'kimi-k2.5',
+      expert: 'kimi-k2.5',
     },
   },
   api_keys: {},
@@ -102,20 +102,39 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
 /**
  * Load settings from ~/.panopticon/settings.json
  * Returns default settings if file doesn't exist or is invalid
+ * Also loads API keys from environment variables as fallback
  */
 export function loadSettings(): SettingsConfig {
+  let settings: SettingsConfig;
+
   if (!existsSync(SETTINGS_FILE)) {
-    return getDefaultSettings();
+    settings = getDefaultSettings();
+  } else {
+    try {
+      const content = readFileSync(SETTINGS_FILE, 'utf8');
+      const parsed = JSON.parse(content) as Partial<SettingsConfig>;
+      settings = deepMerge(DEFAULT_SETTINGS, parsed);
+    } catch (error) {
+      console.error('Warning: Failed to parse settings.json, using defaults');
+      settings = getDefaultSettings();
+    }
   }
 
-  try {
-    const content = readFileSync(SETTINGS_FILE, 'utf8');
-    const parsed = JSON.parse(content) as Partial<SettingsConfig>;
-    return deepMerge(DEFAULT_SETTINGS, parsed);
-  } catch (error) {
-    console.error('Warning: Failed to parse settings.json, using defaults');
-    return getDefaultSettings();
-  }
+  // Load API keys from environment variables as fallback
+  // This allows using ~/.panopticon.env for API keys
+  const envApiKeys: ApiKeysConfig = {};
+  if (process.env.OPENAI_API_KEY) envApiKeys.openai = process.env.OPENAI_API_KEY;
+  if (process.env.GOOGLE_API_KEY) envApiKeys.google = process.env.GOOGLE_API_KEY;
+  if (process.env.ZAI_API_KEY) envApiKeys.zai = process.env.ZAI_API_KEY;
+  if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
+
+  // Merge env vars as fallback (settings.json takes precedence)
+  settings.api_keys = {
+    ...envApiKeys,
+    ...settings.api_keys,
+  };
+
+  return settings;
 }
 
 /**

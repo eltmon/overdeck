@@ -116,14 +116,18 @@ function normalizeProviderConfig(
 }
 
 /**
- * Resolve environment variables in config values
+ * Resolve environment variables in config values.
+ * If the env var is not set, returns the original reference (e.g., "$OPENAI_API_KEY")
+ * so the UI can show that it's configured via env var but not resolved.
  */
 function resolveEnvVar(value: string | undefined): string | undefined {
   if (!value) return undefined;
 
   // Replace $VAR_NAME or ${VAR_NAME} with environment variable
-  return value.replace(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g, (_, varName) => {
-    return process.env[varName] || '';
+  // If env var is not set, keep the original reference
+  return value.replace(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g, (match, varName) => {
+    const envValue = process.env[varName];
+    return envValue !== undefined ? envValue : match; // Keep $VAR_NAME if not set
   });
 }
 
@@ -279,11 +283,33 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
 
 /**
  * Load complete configuration (global + project + defaults)
+ * Also loads API keys from environment variables as fallback
  */
 export function loadConfig(): NormalizedConfig {
   const globalConfig = loadGlobalConfig();
   const projectConfig = loadProjectConfig();
-  return mergeConfigs(projectConfig, globalConfig);
+  const config = mergeConfigs(projectConfig, globalConfig);
+
+  // Load API keys from environment variables as fallback
+  // This allows using ~/.panopticon.env for API keys
+  if (process.env.OPENAI_API_KEY && !config.apiKeys.openai) {
+    config.apiKeys.openai = process.env.OPENAI_API_KEY;
+    config.enabledProviders.add('openai');
+  }
+  if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
+    config.apiKeys.google = process.env.GOOGLE_API_KEY;
+    config.enabledProviders.add('google');
+  }
+  if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
+    config.apiKeys.zai = process.env.ZAI_API_KEY;
+    config.enabledProviders.add('zai');
+  }
+  if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
+    config.apiKeys.kimi = process.env.KIMI_API_KEY;
+    config.enabledProviders.add('kimi');
+  }
+
+  return config;
 }
 
 /**

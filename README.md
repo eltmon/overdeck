@@ -273,6 +273,7 @@ Panopticon integrates with [claude-code-router](https://github.com/musistudio/cl
 
 📖 **[Complete work types guide and configuration examples →](docs/WORK-TYPES.md)**
 📋 **[Configuration file reference and presets →](docs/CONFIGURATION.md)**
+🧠 **[Model recommendations for optimal cost/performance →](docs/MODEL_RECOMMENDATIONS.md)**
 
 #### Supported Providers and Models
 
@@ -311,23 +312,38 @@ Panopticon integrates with [claude-code-router](https://github.com/musistudio/cl
    - Trivial tasks → Cost-effective models (e.g., `claude-haiku-4-5`)
    - Expert tasks → Most capable models (e.g., `claude-opus-4-5`)
 
-**Security:** Settings are stored in `~/.panopticon/settings.json`. For added security:
+**Configuration Files:**
+
+Panopticon uses YAML-based configuration (new in v0.5+):
+
+| File | Purpose |
+|------|---------|
+| `~/.panopticon/config.yaml` | Global model settings, provider enable/disable, API key references |
+| `~/.panopticon.env` | API keys and sensitive credentials (auto-loaded) |
+| `.panopticon.yaml` | Per-project config (optional, overrides global) |
+
+**Security:** For added security, restrict file permissions:
 ```bash
-chmod 600 ~/.panopticon/settings.json
+chmod 600 ~/.panopticon/config.yaml ~/.panopticon.env
 ```
 
-**Environment Variables:** Instead of storing keys in settings.json, you can use environment variables:
+**Environment Variables:** API keys are loaded from `~/.panopticon.env` at startup:
 ```bash
-# In your shell profile (~/.bashrc, ~/.zshrc)
-export OPENAI_API_KEY="sk-..."
-export GOOGLE_AI_API_KEY="AIza..."
-export ZAI_API_KEY="..."
+# ~/.panopticon.env
+KIMI_API_KEY="sk-kimi-..."
+OPENAI_API_KEY="sk-..."
+GOOGLE_AI_KEY="AIza..."
+ZAI_API_KEY="..."
 ```
 
-Then in the dashboard, use variable syntax in the API key fields:
-- `$OPENAI_API_KEY`
-- `$GOOGLE_AI_API_KEY`
-- `$ZAI_API_KEY`
+In `config.yaml`, reference them with `$` syntax:
+```yaml
+models:
+  providers:
+    kimi:
+      enabled: true
+      api_key: $KIMI_API_KEY
+```
 
 #### Router Configuration
 
