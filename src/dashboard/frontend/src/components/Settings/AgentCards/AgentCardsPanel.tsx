@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { AgentCard, AgentPhase } from './AgentCard';
-import { WorkTypeId, ModelId } from '../types';
+import { ModelOverrideModal } from './ModelOverrideModal';
+import { WorkTypeId, ModelId, Provider } from '../types';
 
 // Agent definitions with their work types
 const AGENT_DEFINITIONS = {
@@ -137,15 +138,29 @@ const DEFAULT_MODEL = 'claude-sonnet-4-5' as ModelId;
 
 interface AgentCardsPanelProps {
   overrides: Partial<Record<WorkTypeId, ModelId>>;
-  onConfigureOverride?: (workType: WorkTypeId) => void;
-  onRemoveOverride?: (workType: WorkTypeId) => void;
+  enabledProviders: Record<Provider, boolean>;
+  onSetOverride: (workType: WorkTypeId, model: ModelId) => void;
+  onRemoveOverride: (workType: WorkTypeId) => void;
+  onResetAllOverrides: () => void;
 }
 
 export function AgentCardsPanel({
   overrides,
-  onConfigureOverride,
+  enabledProviders,
+  onSetOverride,
   onRemoveOverride,
+  onResetAllOverrides,
 }: AgentCardsPanelProps) {
+  // Modal state
+  const [modalWorkType, setModalWorkType] = useState<WorkTypeId | null>(null);
+
+  // Get list of enabled provider names for the modal
+  const enabledProviderList = useMemo(() => {
+    return Object.entries(enabledProviders)
+      .filter(([_, enabled]) => enabled)
+      .map(([provider]) => provider);
+  }, [enabledProviders]);
+
   // Helper to get model for a work type
   const getModel = (workType: WorkTypeId): { model: ModelId; isOverride: boolean } => {
     const override = overrides[workType];
@@ -173,6 +188,28 @@ export function AgentCardsPanel({
     return { model: primaryModel as ModelId, isOverride };
   }, [issueAgentPhases]);
 
+  // Handle opening modal
+  const handleConfigureOverride = (workType: WorkTypeId) => {
+    setModalWorkType(workType);
+  };
+
+  // Handle modal apply
+  const handleModalApply = (model: ModelId) => {
+    if (modalWorkType) {
+      onSetOverride(modalWorkType, model);
+    }
+  };
+
+  // Handle modal remove
+  const handleModalRemove = () => {
+    if (modalWorkType) {
+      onRemoveOverride(modalWorkType);
+    }
+  };
+
+  // Get current model info for modal
+  const modalModelInfo = modalWorkType ? getModel(modalWorkType) : null;
+
   return (
     <div className="space-y-8">
       {/* Section Header */}
@@ -198,7 +235,7 @@ export function AgentCardsPanel({
           primaryModel={issueAgentPrimary.model}
           isOverride={issueAgentPrimary.isOverride}
           phases={issueAgentPhases}
-          onConfigureOverride={onConfigureOverride}
+          onConfigureOverride={handleConfigureOverride}
           onRemoveOverride={onRemoveOverride}
         />
       </div>
@@ -213,15 +250,20 @@ export function AgentCardsPanel({
             const agent = AGENT_DEFINITIONS[key];
             const { model, isOverride } = getModel(agent.workType);
             return (
-              <AgentCard
+              <div
                 key={key}
-                name={agent.name}
-                icon={agent.icon}
-                description={agent.description}
-                primaryModel={model}
-                isOverride={isOverride}
-                variant="compact"
-              />
+                onClick={() => handleConfigureOverride(agent.workType)}
+                className="cursor-pointer"
+              >
+                <AgentCard
+                  name={agent.name}
+                  icon={agent.icon}
+                  description={agent.description}
+                  primaryModel={model}
+                  isOverride={isOverride}
+                  variant="compact"
+                />
+              </div>
             );
           })}
         </div>
@@ -243,7 +285,8 @@ export function AgentCardsPanel({
               return (
                 <div
                   key={key}
-                  className="flex flex-col items-center p-3 rounded-lg bg-[#150f1d] border border-[#2d2640]"
+                  onClick={() => handleConfigureOverride(agent.workType)}
+                  className="flex flex-col items-center p-3 rounded-lg bg-[#150f1d] border border-[#2d2640] cursor-pointer hover:border-[#a078f7] transition-colors"
                 >
                   <span className="material-symbols-outlined text-2xl text-[#a078f7] mb-2">
                     {agent.icon}
@@ -273,15 +316,20 @@ export function AgentCardsPanel({
             const agent = AGENT_DEFINITIONS[key];
             const { model, isOverride } = getModel(agent.workType);
             return (
-              <AgentCard
+              <div
                 key={key}
-                name={agent.name}
-                icon={agent.icon}
-                description={agent.description}
-                primaryModel={model}
-                isOverride={isOverride}
-                variant="compact"
-              />
+                onClick={() => handleConfigureOverride(agent.workType)}
+                className="cursor-pointer"
+              >
+                <AgentCard
+                  name={agent.name}
+                  icon={agent.icon}
+                  description={agent.description}
+                  primaryModel={model}
+                  isOverride={isOverride}
+                  variant="compact"
+                />
+              </div>
             );
           })}
         </div>
@@ -297,15 +345,20 @@ export function AgentCardsPanel({
             const agent = AGENT_DEFINITIONS[key];
             const { model, isOverride } = getModel(agent.workType);
             return (
-              <AgentCard
+              <div
                 key={key}
-                name={agent.name}
-                icon={agent.icon}
-                description={agent.description}
-                primaryModel={model}
-                isOverride={isOverride}
-                variant="compact"
-              />
+                onClick={() => handleConfigureOverride(agent.workType)}
+                className="cursor-pointer"
+              >
+                <AgentCard
+                  name={agent.name}
+                  icon={agent.icon}
+                  description={agent.description}
+                  primaryModel={model}
+                  isOverride={isOverride}
+                  variant="compact"
+                />
+              </div>
             );
           })}
         </div>
@@ -321,15 +374,20 @@ export function AgentCardsPanel({
             const agent = AGENT_DEFINITIONS[key];
             const { model, isOverride } = getModel(agent.workType);
             return (
-              <AgentCard
+              <div
                 key={key}
-                name={agent.name}
-                icon={agent.icon}
-                description={agent.description}
-                primaryModel={model}
-                isOverride={isOverride}
-                variant="compact"
-              />
+                onClick={() => handleConfigureOverride(agent.workType)}
+                className="cursor-pointer"
+              >
+                <AgentCard
+                  name={agent.name}
+                  icon={agent.icon}
+                  description={agent.description}
+                  primaryModel={model}
+                  isOverride={isOverride}
+                  variant="compact"
+                />
+              </div>
             );
           })}
         </div>
@@ -341,14 +399,26 @@ export function AgentCardsPanel({
           <span className="text-white font-medium">{Object.keys(overrides).length}</span> custom overrides active
         </div>
         <button
-          onClick={() => {
-            // Reset all overrides - handled by parent
-          }}
-          className="text-sm text-[#a078f7] hover:text-white transition-colors"
+          onClick={onResetAllOverrides}
+          disabled={Object.keys(overrides).length === 0}
+          className="text-sm text-[#a078f7] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Reset all to smart selection
         </button>
       </div>
+
+      {/* Model Override Modal */}
+      {modalWorkType && modalModelInfo && (
+        <ModelOverrideModal
+          workType={modalWorkType}
+          currentModel={modalModelInfo.model}
+          isOverride={modalModelInfo.isOverride}
+          enabledProviders={enabledProviderList}
+          onApply={handleModalApply}
+          onRemove={handleModalRemove}
+          onClose={() => setModalWorkType(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { SettingsConfig, Provider, WorkTypeId } from './types';
+import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
 import { SmartSelectionExplainer } from './SmartSelection/SmartSelectionExplainer';
 import { ProviderPanel } from './Provider/ProviderPanel';
 import { AgentCardsPanel } from './AgentCards';
@@ -136,18 +136,36 @@ export function SettingsPage() {
     }
   };
 
-  const handleConfigureOverride = (workType: WorkTypeId) => {
-    // TODO: Open modal to select model for this work type
-    console.log('Configure override for', workType);
+  const handleSetOverride = (workType: WorkTypeId, model: ModelId) => {
+    setFormData({
+      ...formData,
+      models: {
+        ...formData.models,
+        overrides: {
+          ...formData.models.overrides,
+          [workType]: model,
+        },
+      },
+    });
   };
 
   const handleRemoveOverride = (workType: WorkTypeId) => {
-    const { [workType]: removed, ...remainingOverrides } = formData.models.overrides;
+    const { [workType]: _removed, ...remainingOverrides } = formData.models.overrides;
     setFormData({
       ...formData,
       models: {
         ...formData.models,
         overrides: remainingOverrides,
+      },
+    });
+  };
+
+  const handleResetAllOverrides = () => {
+    setFormData({
+      ...formData,
+      models: {
+        ...formData.models,
+        overrides: {},
       },
     });
   };
@@ -193,8 +211,10 @@ export function SettingsPage() {
       {/* Agent Cards - shows which models power which agents */}
       <AgentCardsPanel
         overrides={formData.models.overrides}
-        onConfigureOverride={handleConfigureOverride}
+        enabledProviders={formData.models.providers}
+        onSetOverride={handleSetOverride}
         onRemoveOverride={handleRemoveOverride}
+        onResetAllOverrides={handleResetAllOverrides}
       />
 
       {/* Action Buttons */}
