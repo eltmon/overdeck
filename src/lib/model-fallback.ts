@@ -31,6 +31,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Google models
   'gemini-3-pro-preview': 'google',
   'gemini-3-flash-preview': 'google',
+  'gemini-2.5-pro': 'google',
+  'gemini-2.5-flash': 'google',
 
   // Z.AI models
   'glm-4.7': 'zai',
