@@ -238,13 +238,25 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     }
   }, [isOpen, issue.identifier, step]);
 
+  // Track when we entered planning step to avoid stale data race condition
+  const enteredPlanningAt = useRef<number>(0);
+
+  // Update timestamp when entering planning step
+  useEffect(() => {
+    if (step === 'planning') {
+      enteredPlanningAt.current = Date.now();
+    }
+  }, [step]);
+
   // Watch for session ending while in planning step
   useEffect(() => {
     // Only transition to 'complete' if:
     // 1. We're in the planning step
     // 2. We have fresh status data showing session is inactive
     // 3. We actually connected to a session in THIS dialog instance (not stale cache)
-    if (step === 'planning' && statusQuery.data && !statusQuery.data.active && hasConnectedToSession.current) {
+    // 4. We've been in planning step for at least 2 seconds (avoid stale data race)
+    const timeSinceEntered = Date.now() - enteredPlanningAt.current;
+    if (step === 'planning' && statusQuery.data && !statusQuery.data.active && hasConnectedToSession.current && timeSinceEntered > 2000) {
       // Session is no longer active - it ended or was stopped
       setStep('complete');
     }

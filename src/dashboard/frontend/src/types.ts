@@ -46,6 +46,7 @@ export interface Agent {
   consecutiveFailures: number;
   killCount: number;
   workspace?: string;
+  workspaceLocation?: 'local' | 'remote';
   git?: GitStatus;
   type?: 'agent' | 'planning';
   hasPendingQuestion?: boolean;

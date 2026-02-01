@@ -238,3 +238,42 @@ export function getAvailableModels(settings: SettingsConfig): {
     kimi: kimiModels,
   };
 }
+
+/**
+ * Check if a model ID is an Anthropic model
+ * Anthropic models can be run directly with `claude` CLI
+ */
+export function isAnthropicModel(modelId: ModelId | string): boolean {
+  return modelId.startsWith('claude-');
+}
+
+/**
+ * Get the Claude CLI model flag for an Anthropic model
+ * Maps our model IDs to Claude's expected format
+ */
+export function getClaudeModelFlag(modelId: ModelId | string): string {
+  const modelMap: Record<string, string> = {
+    'claude-opus-4-5': 'opus',
+    'claude-sonnet-4-5': 'sonnet',
+    'claude-haiku-4-5': 'haiku',
+  };
+  return modelMap[modelId] || 'sonnet';
+}
+
+/**
+ * Get the command to run an agent with a specific model
+ * Returns 'claude' for Anthropic models, 'claude-code-router' for others
+ */
+export function getAgentCommand(modelId: ModelId | string): { command: string; args: string[] } {
+  if (isAnthropicModel(modelId)) {
+    return {
+      command: 'claude',
+      args: ['--model', getClaudeModelFlag(modelId)],
+    };
+  }
+  // Non-Anthropic models require the router
+  return {
+    command: 'claude-code-router',
+    args: [],
+  };
+}

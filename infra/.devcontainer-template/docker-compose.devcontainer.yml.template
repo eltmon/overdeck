@@ -21,13 +21,27 @@ services:
 
   # Init service: runs npm install once for all workspaces
   # Frontend and server depend on this completing successfully
+  # Also verifies critical deps resolve to prevent Vite CPU runaway
   init:
     build:
       context: .
       dockerfile: Dockerfile
     user: node
     working_dir: /workspaces/panopticon
-    command: sh -c "npm install && echo 'npm install complete'"
+    command: >
+      sh -c "
+        echo '📦 Installing dependencies...' &&
+        npm install &&
+        echo '✅ npm install complete' &&
+        echo '🔍 Verifying critical dependencies resolve...' &&
+        node -e \"
+          const deps = ['react', 'react-dom', 'vite'];
+          const missing = deps.filter(d => { try { require.resolve(d); return false; } catch { return true; } });
+          if (missing.length) { console.error('❌ Missing deps:', missing.join(', ')); process.exit(1); }
+          console.log('✅ All critical deps resolve');
+        \" &&
+        echo '🎉 Init complete'
+      "
     volumes:
       - ../:/workspaces/panopticon:cached
       - npm-cache:/home/node/.npm
@@ -52,6 +66,10 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
     volumes:
       # Mount entire project so npm workspaces can find hoisted binaries
       - ../:/workspaces/panopticon:cached
@@ -87,6 +105,10 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
     volumes:
       # Mount entire project so ../../lib/ imports work
       - ../:/workspaces/panopticon:cached

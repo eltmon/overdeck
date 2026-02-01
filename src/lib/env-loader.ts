@@ -98,6 +98,16 @@ export function getApiKeysFromEnv(): {
 }
 
 /**
+ * Get shadow mode setting from environment (after loading ~/.panopticon.env)
+ * Returns true if SHADOW_MODE is set to 'true', '1', or 'yes' (case insensitive)
+ */
+export function getShadowModeFromEnv(): boolean {
+  const value = process.env.SHADOW_MODE;
+  if (!value) return false;
+  return ['true', '1', 'yes'].includes(value.toLowerCase());
+}
+
+/**
  * Check if ~/.panopticon.env file exists
  */
 export function hasEnvFile(): boolean {

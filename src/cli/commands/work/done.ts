@@ -5,10 +5,13 @@ import { existsSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../../lib/paths.js';
+import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
+import { updateShadowState } from '../../../lib/shadow-state.js';
 
 interface DoneOptions {
   comment?: string;
   noLinear?: boolean;
+  shadow?: boolean;
 }
 
 function getLinearApiKey(): string | null {
@@ -108,9 +111,17 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
   try {
     let linearUpdated = false;
+    let shadowModeActive = false;
 
-    // Step 1: Update Linear status to "In Review"
-    if (options.noLinear !== true) {
+    // Step 1: Update status (either tracker or shadow)
+    const skipTrackerUpdate = shouldSkipTrackerUpdate(issueId, options.shadow);
+
+    if (skipTrackerUpdate) {
+      shadowModeActive = true;
+      spinner.text = 'Updating shadow state...';
+      updateShadowState(issueId, 'closed', 'pan work done');
+      console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
+    } else if (options.noLinear !== true) {
       const apiKey = getLinearApiKey();
       if (apiKey) {
         spinner.text = 'Updating Linear to In Review...';
@@ -152,7 +163,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // Summary
     console.log(chalk.bold('Summary:'));
     console.log(`  Issue:   ${chalk.cyan(issueId)}`);
-    console.log(`  Linear:  ${linearUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
+    if (shadowModeActive) {
+      console.log(`  Status:  ${chalk.cyan('👻 Shadow mode - pending sync to tracker')}`);
+    } else {
+      console.log(`  Linear:  ${linearUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
+    }
     if (options.comment) {
       console.log(`  Comment: ${chalk.dim(options.comment.slice(0, 50))}${options.comment.length > 50 ? '...' : ''}`);
     }

@@ -17,6 +17,9 @@ import { healthCommand } from './health.js';
 import { reopenCommand } from './reopen.js';
 import { requestReviewCommand } from './request-review.js';
 import { wipeCommand } from './wipe.js';
+import { shadowCommand } from './shadow.js';
+import { syncCommand } from './sync.js';
+import { refreshCommand } from './refresh.js';
 
 export function registerWorkCommands(program: Command): void {
   const work = program
@@ -29,6 +32,8 @@ export function registerWorkCommands(program: Command): void {
     .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to settings.json or kimi-k2.5')
     .option('--runtime <runtime>', 'AI runtime (claude/codex)', 'claude')
     .option('--dry-run', 'Show what would be created')
+    .option('--shadow', 'Enable shadow mode (track status locally, don\'t update tracker)')
+    .option('--no-shadow', 'Disable shadow mode (override config/env settings)')
     .action(issueCommand);
 
   work
@@ -58,6 +63,8 @@ export function registerWorkCommands(program: Command): void {
     .description('Approve agent work, merge MR, update Linear')
     .option('--no-merge', 'Skip MR merge')
     .option('--no-linear', 'Skip Linear status update')
+    .option('--shadow', 'Enable shadow mode (track status locally, don\'t update tracker)')
+    .option('--no-shadow', 'Disable shadow mode (override config/env settings)')
     .action(approveCommand);
 
   work
@@ -65,6 +72,8 @@ export function registerWorkCommands(program: Command): void {
     .description('Mark work complete, update Linear to In Review')
     .option('-c, --comment <text>', 'Completion comment for Linear')
     .option('--no-linear', 'Skip Linear status update')
+    .option('--shadow', 'Enable shadow mode (track status locally, don\'t update tracker)')
+    .option('--no-shadow', 'Disable shadow mode (override config/env settings)')
     .action(doneCommand);
 
   work
@@ -74,6 +83,8 @@ export function registerWorkCommands(program: Command): void {
     .option('--json', 'Output as JSON')
     .option('--skip-discovery', 'Skip interactive discovery phase')
     .option('--force', 'Force planning even for simple issues')
+    .option('--shadow', 'Enable shadow mode (track status locally, don\'t update tracker)')
+    .option('--no-shadow', 'Disable shadow mode (override config/env settings)')
     .action(planCommand);
 
   work
@@ -84,6 +95,7 @@ export function registerWorkCommands(program: Command): void {
     .option('--json', 'Output as JSON')
     .option('--tracker <type>', 'Query specific tracker (linear/github/gitlab)')
     .option('--all-trackers', 'Query all configured trackers')
+    .option('--shadow-only', 'Show only shadowed issues')
     .action(listCommand);
 
   work
@@ -155,6 +167,25 @@ export function registerWorkCommands(program: Command): void {
     .option('-w, --workspace', 'Also delete the workspace')
     .option('-y, --yes', 'Skip confirmation')
     .action(wipeCommand);
+
+  // Shadow mode commands
+  work
+    .command('shadow <id>')
+    .description('Show shadow state details for an issue')
+    .action(shadowCommand);
+
+  work
+    .command('sync <id>')
+    .description('Sync shadow state to tracker')
+    .option('-f, --force', 'Skip confirmation prompt')
+    .option('--dry-run', 'Show what would be synced without making changes')
+    .action(syncCommand);
+
+  work
+    .command('refresh <id>')
+    .description('Refresh tracker status cache for a shadowed issue')
+    .option('--json', 'Output as JSON')
+    .action(refreshCommand);
 }
 
 // Re-export individual commands for direct use

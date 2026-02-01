@@ -407,6 +407,99 @@ If you have multiple Linear projects, configure which local directory each maps 
 
 The dashboard uses this mapping to determine where to create workspaces when you click "Create Workspace" or "Start Agent" for an issue.
 
+## Remote Workspaces (exe.dev)
+
+Offload Docker containers and Claude agents to [exe.dev](https://exe.dev) cloud VMs, freeing your local machine resources.
+
+### Why Remote Workspaces?
+
+- **Memory Freedom**: A single workspace with Docker + Claude agent uses ~1.5-2GB RAM
+- **Run 10+ Concurrent Workspaces**: Limited only by your exe.dev plan, not local RAM
+- **No Fan Noise**: Heavy workloads run in the cloud
+- **Battery Savings**: Your laptop stays cool and efficient
+
+### Pricing
+
+| Plan | RAM | VMs | Cost |
+|------|-----|-----|------|
+| Individual | 8GB | 25 | $20/month |
+| Enterprise | 16GB | 30 | $30/month |
+
+Enterprise plan supports ~10-14 concurrent workspaces.
+
+### Setup
+
+```bash
+# 1. Install exe CLI and authenticate
+curl -fsSL https://exe.dev/install.sh | sh
+exe auth login
+
+# 2. Configure Panopticon
+pan remote setup
+
+# 3. Initialize shared infrastructure (postgres, redis, traefik)
+pan remote init
+```
+
+### Usage
+
+```bash
+# Create remote workspace
+pan workspace create MIN-667 --remote
+
+# Create local workspace (explicit)
+pan workspace create MIN-668 --local
+
+# SSH into remote workspace
+pan workspace ssh MIN-667
+
+# Stop (hibernate) to save resources
+pan workspace stop MIN-667
+
+# Start hibernated workspace
+pan workspace start MIN-667
+
+# Check resource usage
+pan remote resources
+```
+
+### Configuration
+
+```toml
+# ~/.panopticon/config.toml
+[remote]
+enabled = true
+provider = "exe"
+default_location = "remote"   # or "local"
+auto_hibernate_minutes = 240  # 4 hours
+
+[remote.exe]
+infra_vm = "pan-infra"
+```
+
+### Architecture
+
+```
+Local Machine (Thin Client)        exe.dev Cloud ($30/month)
+┌─────────────────────────┐        ┌─────────────────────────────────┐
+│ Panopticon Dashboard    │        │ pan-infra VM (shared)           │
+│ ~100-200MB RAM          │───────▶│ ├─ PostgreSQL                   │
+│                         │        │ ├─ Redis                        │
+│ Orchestrates via SSH    │        │ └─ Traefik                      │
+└─────────────────────────┘        │                    ~500MB       │
+                                   ├─────────────────────────────────┤
+                                   │ min-667 VM (workspace)          │
+                                   │ ├─ Git repo                     │
+                                   │ ├─ Frontend (Vite)              │
+                                   │ ├─ API (Spring/Node)            │
+                                   │ └─ Claude Agent (tmux)          │
+                                   │                    ~1.1GB       │
+                                   ├─────────────────────────────────┤
+                                   │ min-668 VM (workspace)          │
+                                   │ └─ ...                ~1.1GB    │
+                                   └─────────────────────────────────┘
+```
+
 ## Google Stitch Integration
 
 Panopticon integrates with [Google Stitch](https://stitch.withgoogle.com), Google's AI-powered UI design tool, enabling design-to-code workflows.

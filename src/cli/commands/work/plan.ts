@@ -7,6 +7,8 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { ComplexityLevel } from '../../../lib/cloister/complexity.js';
+import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
+import { createShadowState } from '../../../lib/shadow-state.js';
 
 const execAsync = promisify(exec);
 
@@ -15,6 +17,7 @@ interface PlanOptions {
   json?: boolean;
   skipDiscovery?: boolean;
   force?: boolean;
+  shadow?: boolean;
 }
 
 interface LinearIssue {
@@ -801,6 +804,15 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
       for (const decision of decisions) {
         console.log(`  - ${decision.question}: ${chalk.dim(decision.answer.slice(0, 50))}${decision.answer.length > 50 ? '...' : ''}`);
       }
+      console.log('');
+    }
+
+    // Check shadow mode
+    const skipTrackerUpdate = shouldSkipTrackerUpdate(id, options.shadow);
+    if (skipTrackerUpdate) {
+      // Create shadow state for the issue
+      createShadowState(id, 'open', 'pan work plan');
+      console.log(chalk.cyan('👻 Shadow mode enabled: status will be tracked locally'));
       console.log('');
     }
 

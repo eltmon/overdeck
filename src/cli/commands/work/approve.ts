@@ -6,10 +6,13 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { execSync } from 'child_process';
 import { AGENTS_DIR } from '../../../lib/paths.js';
+import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
+import { markAsSynced } from '../../../lib/shadow-state.js';
 
 interface ApproveOptions {
   merge?: boolean;
   noLinear?: boolean;
+  shadow?: boolean;
 }
 
 function getLinearApiKey(): string | null {
@@ -148,8 +151,18 @@ export async function approveCommand(id: string, options: ApproveOptions = {}): 
       }
     }
 
-    // Step 2: Update Linear status
-    if (options.noLinear !== true) {
+    // Step 2: Update status (either tracker or shadow)
+    const skipTrackerUpdate = shouldSkipTrackerUpdate(state.issueId, options.shadow);
+
+    if (skipTrackerUpdate) {
+      spinner.text = 'Marking shadow state as synced...';
+      const syncResult = markAsSynced(state.issueId, 'closed');
+      if (syncResult.success) {
+        console.log(chalk.cyan(`  👻 Shadow mode: marked as synced`));
+      } else {
+        console.log(chalk.yellow(`  ⚠ Failed to update shadow state: ${syncResult.error}`));
+      }
+    } else if (options.noLinear !== true) {
       const apiKey = getLinearApiKey();
       if (apiKey) {
         spinner.text = 'Updating Linear status...';
@@ -184,7 +197,11 @@ export async function approveCommand(id: string, options: ApproveOptions = {}): 
     console.log(chalk.bold('Summary:'));
     console.log(`  Issue:   ${chalk.cyan(state.issueId)}`);
     console.log(`  PR:      ${prMerged ? chalk.green('Merged') : chalk.dim('Not merged')}`);
-    console.log(`  Linear:  ${linearUpdated ? chalk.green('Updated to Done') : chalk.dim('Not updated')}`);
+    if (skipTrackerUpdate) {
+      console.log(`  Status:  ${chalk.cyan('👻 Shadow mode - marked as synced')}`);
+    } else {
+      console.log(`  Linear:  ${linearUpdated ? chalk.green('Updated to Done') : chalk.dim('Not updated')}`);
+    }
     console.log('');
 
     console.log(chalk.dim('Workspace can be cleaned up with:'));

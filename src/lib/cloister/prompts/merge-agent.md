@@ -55,8 +55,10 @@ For each conflict:
 ### Special Rules for PRDs and Planning Files
 
 **`.planning/` directory:**
-- Should be gitignored. If it appears in a merge, remove it with `git rm --cached`
-- This is workspace-specific state, not meant for version control
+- Tracked on feature branches (NOT gitignored) to preserve planning state across sessions
+- **When merging to main:** Remove with `git rm --cached .planning/` before committing
+- **When merging between feature branches:** Keep the source branch's `.planning/`
+- This directory contains ephemeral planning state (STATE.md) that is branch-specific
 
 **PRD files (`docs/prds/`):**
 - `docs/prds/completed/*` → **Always keep target branch version** (completed PRDs are final)

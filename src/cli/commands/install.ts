@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
+import inquirer from 'inquirer';
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
@@ -16,7 +17,7 @@ import {
   SOURCE_TRAEFIK_TEMPLATES,
   SOURCE_SKILLS_DIR
 } from '../../lib/paths.js';
-import { getDefaultConfig, saveConfig } from '../../lib/config.js';
+import { getDefaultConfig, saveConfig, loadConfig } from '../../lib/config.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -474,30 +475,89 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   }
 
-  // Step 6: Create config file if doesn't exist
+  // Step 7: Create or update config file
   const configFile = join(PANOPTICON_HOME, 'config.toml');
-  if (!existsSync(configFile)) {
+  const configExists = existsSync(configFile);
+
+  if (!configExists) {
     spinner.start('Creating default config...');
+  } else {
+    spinner.start('Updating config with new settings...');
+  }
 
-    // Get default config and customize based on install options
-    const config = getDefaultConfig();
+  // Load existing config (or defaults if none exists)
+  const config = configExists ? loadConfig() : getDefaultConfig();
 
-    // Configure Traefik based on minimal flag
-    if (options.minimal) {
-      config.traefik = {
-        enabled: false,
-      };
-    } else {
+  // Configure Traefik based on minimal flag (always update this section)
+  if (options.minimal) {
+    config.traefik = {
+      enabled: false,
+    };
+  } else {
+    // Only set traefik config if not already configured, or if it was disabled
+    if (!config.traefik || !config.traefik.enabled) {
       config.traefik = {
         enabled: true,
         dashboard_port: 8080,
         domain: 'pan.localhost',
       };
     }
-
-    saveConfig(config);
-    spinner.succeed('Config created');
   }
+
+  // Step 7b: Shadow mode configuration
+  spinner.stop();
+  console.log('');
+  console.log(chalk.bold('Shadow Mode Configuration'));
+  console.log(chalk.dim('Shadow mode tracks issue status locally without modifying the tracker.'));
+  console.log('');
+
+  const { shadowModeChoice } = await inquirer.prompt([{
+    type: 'list',
+    name: 'shadowModeChoice',
+    message: 'How should Panopticon interact with issue trackers?',
+    choices: [
+      { name: 'Normal - Update issue status in tracker (default)', value: 'normal' },
+      { name: 'Shadow - Track status locally, don\'t modify tracker', value: 'shadow' },
+      { name: 'Ask per-project - Configure each project separately', value: 'ask' },
+    ],
+    default: 'normal',
+  }]);
+
+  if (shadowModeChoice === 'shadow') {
+    config.shadow.enabled = true;
+    console.log(chalk.cyan('👻 Shadow mode enabled globally'));
+  } else if (shadowModeChoice === 'normal') {
+    config.shadow.enabled = false;
+  }
+  // For 'ask', we leave the default (false) and let projects configure it
+
+  // Per-tracker shadow configuration
+  if (shadowModeChoice !== 'shadow') {
+    console.log('');
+    const { configurePerTracker } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'configurePerTracker',
+      message: 'Configure shadow mode per tracker?',
+      default: false,
+    }]);
+
+    if (configurePerTracker) {
+      const trackers = ['linear', 'github', 'gitlab', 'rally'];
+      for (const tracker of trackers) {
+        const { enableShadow } = await inquirer.prompt([{
+          type: 'confirm',
+          name: 'enableShadow',
+          message: `Enable shadow mode for ${tracker}?`,
+          default: false,
+        }]);
+        config.shadow.trackers[tracker as keyof typeof config.shadow.trackers] = enableShadow;
+      }
+    }
+  }
+
+  spinner.start('Saving configuration...');
+  saveConfig(config);
+  spinner.succeed(configExists ? 'Config updated' : 'Config created');
 
   // Done!
   console.log('');

@@ -20,8 +20,17 @@ import {
 } from '../../lib/workspace-manager.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { homedir } from 'os';
+import { loadConfig } from '../../lib/config.js';
+import { createExeProvider, isRemoteAvailable } from '../../lib/remote/index.js';
+import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
+import { parse, stringify } from 'yaml';
+import { readFileSync, readdirSync } from 'fs';
 
 const execAsync = promisify(exec);
+
+// Path for workspace metadata
+const WORKSPACES_DIR = join(homedir(), '.panopticon', 'workspaces');
 
 /**
  * Check beads version to determine which approach to use
@@ -104,7 +113,30 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--labels <labels>', 'Comma-separated labels for routing (e.g., docs,marketing)')
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .option('--docker', 'Start Docker containers after workspace creation')
+    .option('--remote', 'Create workspace on remote VM (exe.dev)')
+    .option('--local', 'Create workspace locally (explicit override)')
     .action(createCommand);
+
+  workspace
+    .command('migrate <issueId>')
+    .description('Migrate workspace between local and remote')
+    .option('--to <location>', 'Target location: "remote" or "local"')
+    .action(migrateCommand);
+
+  workspace
+    .command('ssh <issueId>')
+    .description('SSH into remote workspace VM')
+    .action(sshCommand);
+
+  workspace
+    .command('start <issueId>')
+    .description('Start a stopped remote workspace')
+    .action(startCommand);
+
+  workspace
+    .command('stop <issueId>')
+    .description('Stop (hibernate) a remote workspace')
+    .action(stopCommand);
 
   workspace
     .command('list')
@@ -127,6 +159,8 @@ interface CreateOptions {
   labels?: string;
   project?: string;
   docker?: boolean;
+  remote?: boolean;
+  local?: boolean;
 }
 
 async function createCommand(issueId: string, options: CreateOptions): Promise<void> {
@@ -137,6 +171,31 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const branchName = `feature/${normalizedId}`;
     const folderName = `feature-${normalizedId}`;
+
+    // Determine if we should create remote or local workspace
+    const config = loadConfig();
+    const remoteConfig = config.remote;
+    let useRemote = false;
+
+    if (options.remote && options.local) {
+      spinner.fail('Cannot specify both --remote and --local');
+      process.exit(1);
+    }
+
+    if (options.remote) {
+      useRemote = true;
+    } else if (options.local) {
+      useRemote = false;
+    } else if (remoteConfig?.enabled && remoteConfig.default_location === 'remote') {
+      useRemote = true;
+    }
+
+    // Handle remote workspace creation
+    if (useRemote) {
+      spinner.text = 'Creating remote workspace...';
+      await createRemoteWorkspace(issueId, normalizedId, branchName, spinner, options);
+      return;
+    }
 
     // Parse labels if provided
     const labels = options.labels
@@ -535,6 +594,13 @@ async function destroyCommand(issueId: string, options: DestroyOptions): Promise
     const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const folderName = `feature-${normalizedId}`;
 
+    // Check if this is a remote workspace
+    const metadata = loadWorkspaceMetadata(normalizedId);
+    if (metadata && metadata.location === 'remote') {
+      await destroyRemoteWorkspace(issueId, normalizedId, metadata, spinner, options);
+      return;
+    }
+
     // Try to find project config from registry
     const teamPrefix = extractTeamPrefix(issueId);
     const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
@@ -624,6 +690,503 @@ async function destroyCommand(issueId: string, options: DestroyOptions): Promise
     spinner.fail(error.message);
     if (!options.force) {
       console.log(chalk.dim('Tip: Use --force to remove even with uncommitted changes'));
+    }
+    process.exit(1);
+  }
+}
+
+// ============================================================================
+// Remote Workspace Functions
+// ============================================================================
+
+/**
+ * Save workspace metadata to ~/.panopticon/workspaces/{issueId}.yaml
+ */
+function saveWorkspaceMetadata(metadata: RemoteWorkspaceMetadata): void {
+  if (!existsSync(WORKSPACES_DIR)) {
+    mkdirSync(WORKSPACES_DIR, { recursive: true });
+  }
+
+  const filename = join(WORKSPACES_DIR, `${metadata.id}.yaml`);
+  writeFileSync(filename, stringify(metadata), 'utf-8');
+}
+
+/**
+ * Load workspace metadata from ~/.panopticon/workspaces/{issueId}.yaml
+ */
+function loadWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata | null {
+  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
+
+  if (!existsSync(filename)) {
+    return null;
+  }
+
+  try {
+    const content = readFileSync(filename, 'utf-8');
+    return parse(content) as RemoteWorkspaceMetadata;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * List all workspace metadata files
+ */
+function listWorkspaceMetadata(): RemoteWorkspaceMetadata[] {
+  if (!existsSync(WORKSPACES_DIR)) {
+    return [];
+  }
+
+  const files = readdirSync(WORKSPACES_DIR).filter(f => f.endsWith('.yaml'));
+  const workspaces: RemoteWorkspaceMetadata[] = [];
+
+  for (const file of files) {
+    try {
+      const content = readFileSync(join(WORKSPACES_DIR, file), 'utf-8');
+      workspaces.push(parse(content) as RemoteWorkspaceMetadata);
+    } catch {
+      // Skip invalid files
+    }
+  }
+
+  return workspaces;
+}
+
+/**
+ * Create a remote workspace on exe.dev
+ */
+async function createRemoteWorkspace(
+  issueId: string,
+  normalizedId: string,
+  branchName: string,
+  spinner: ora.Ora,
+  options: CreateOptions
+): Promise<void> {
+  const config = loadConfig();
+  const remoteConfig = config.remote;
+
+  if (!remoteConfig?.enabled) {
+    spinner.fail('Remote workspaces not enabled');
+    console.log('');
+    console.log(chalk.dim('Run: pan remote setup'));
+    process.exit(1);
+  }
+
+  // Check availability
+  const availability = await isRemoteAvailable();
+  if (!availability.available) {
+    spinner.fail('Remote not available');
+    console.log('');
+    console.log(chalk.yellow(availability.reason || 'Unknown error'));
+    process.exit(1);
+  }
+
+  const infraVm = remoteConfig.exe?.infra_vm || 'pan-infra';
+  const exe = createExeProvider({ infraVm });
+
+  // Determine project context first (needed for VM naming)
+  const teamPrefix = extractTeamPrefix(issueId);
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const projectRoot = projectConfig?.path || process.cwd();
+
+  // Determine project identifier for VM name
+  // Priority: team prefix from issue > linear_team from project > repo name
+  let projectId = teamPrefix?.toLowerCase();
+  if (!projectId && projectConfig?.linear_team) {
+    projectId = projectConfig.linear_team.toLowerCase();
+  }
+  if (!projectId) {
+    // Fall back to git repo name
+    try {
+      const { stdout } = await execAsync('git remote get-url origin', {
+        cwd: projectRoot,
+        encoding: 'utf-8',
+      });
+      const repoMatch = stdout.trim().match(/\/([^\/]+?)(\.git)?$/);
+      projectId = repoMatch ? repoMatch[1].toLowerCase().replace(/[^a-z0-9-]/g, '-') : 'proj';
+    } catch {
+      projectId = 'proj';
+    }
+  }
+
+  // VM names must be valid hostnames (start with letter, alphanumeric + hyphens)
+  // exe.dev reserves names ending in bare numbers (e.g., "foo-123"), so add "-ws" suffix
+  // Include project ID to avoid collisions across projects
+  const vmName = `${projectId}-${normalizedId}-ws`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
+  if (options.dryRun) {
+    spinner.info('Dry run - would create remote workspace');
+    console.log('');
+    console.log(chalk.bold('Would create:'));
+    console.log(`  VM:        ${chalk.cyan(vmName)}`);
+    console.log(`  Project:   ${chalk.dim(projectId)}`);
+    console.log(`  Infra:     ${chalk.dim(infraVm)}`);
+    console.log(`  Branch:    ${chalk.dim(branchName)}`);
+    return;
+  }
+
+  try {
+    // Step 1: Create VM
+    spinner.text = 'Creating VM (this may take 1-2 minutes)...';
+    await exe.createVm(vmName);
+
+    // Get git remote URL
+    let repoUrl = '';
+    try {
+      const { stdout } = await execAsync('git remote get-url origin', {
+        cwd: projectRoot,
+        encoding: 'utf-8',
+      });
+      repoUrl = stdout.trim();
+    } catch {
+      spinner.fail('Could not determine git remote URL');
+      console.log('');
+      console.log(chalk.dim('Make sure you are in a git repository with a remote origin.'));
+      // Clean up VM
+      await exe.deleteVm(vmName);
+      process.exit(1);
+    }
+
+    // Step 3: Add GitHub host key and clone repository on VM
+    spinner.text = 'Cloning repository on VM...';
+    // Add GitHub's SSH host keys to known_hosts to avoid verification prompt
+    await exe.ssh(vmName, 'mkdir -p ~/.ssh && ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null');
+    const cloneResult = await exe.ssh(vmName, `git clone ${repoUrl} ~/workspace`);
+    if (cloneResult.exitCode !== 0) {
+      throw new Error(`Failed to clone: ${cloneResult.stderr}`);
+    }
+
+    // Step 4: Create feature branch
+    spinner.text = 'Creating feature branch...';
+    const branchResult = await exe.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
+    if (branchResult.exitCode !== 0) {
+      // Branch might already exist remotely
+      await exe.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+    }
+
+    // Step 5: Configure environment for shared infra
+    spinner.text = 'Configuring environment...';
+    const envContent = `
+# Panopticon Remote Workspace
+WORKSPACE_ID=${normalizedId}
+ISSUE_ID=${issueId.toUpperCase()}
+
+# Shared Infrastructure
+POSTGRES_HOST=${infraVm}
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=\${PAN_POSTGRES_PASSWORD:-panopticon}
+DATABASE_NAME=myn_${normalizedId.replace(/-/g, '_')}
+
+REDIS_HOST=${infraVm}
+REDIS_PORT=6379
+REDIS_DATABASE=0
+
+# Spring Boot (if applicable)
+SPRING_DATASOURCE_URL=jdbc:postgresql://${infraVm}:5432/myn_${normalizedId.replace(/-/g, '_')}
+SPRING_DATA_REDIS_HOST=${infraVm}
+`;
+
+    await exe.ssh(vmName, `cat > ~/workspace/.env.remote << 'EOF'
+${envContent}
+EOF`);
+
+    // Step 6: Create database on shared postgres (if infra VM is running)
+    spinner.text = 'Creating database on shared postgres...';
+    const dbName = `myn_${normalizedId.replace(/-/g, '_')}`;
+    await exe.ssh(infraVm, `docker exec pan-postgres psql -U postgres -c "CREATE DATABASE ${dbName}" 2>/dev/null || true`);
+
+    // Step 7: Install dependencies and start containers if docker compose exists
+    spinner.text = 'Checking for Docker Compose...';
+    const composeCheck = await exe.ssh(vmName, 'ls ~/workspace/docker-compose.yml ~/workspace/.devcontainer/docker-compose.yml 2>/dev/null | head -1');
+
+    let containersStarted = false;
+    let frontendUrl = '';
+    let apiUrl = '';
+
+    if (composeCheck.stdout.trim()) {
+      spinner.text = 'Starting containers...';
+      const composeDir = composeCheck.stdout.includes('.devcontainer')
+        ? '~/workspace/.devcontainer'
+        : '~/workspace';
+
+      const upResult = await exe.ssh(vmName, `cd ${composeDir} && docker compose up -d 2>&1`);
+      containersStarted = upResult.exitCode === 0;
+
+      // Expose ports
+      if (containersStarted) {
+        spinner.text = 'Exposing ports...';
+        try {
+          frontendUrl = await exe.exposePort(vmName, 4173);
+          apiUrl = await exe.exposePort(vmName, 7000);
+        } catch {
+          // Port exposure failed - not critical
+        }
+      }
+    }
+
+    // Step 8: Save workspace metadata
+    const metadata: RemoteWorkspaceMetadata = {
+      id: normalizedId,
+      issue: issueId.toUpperCase(),
+      provider: 'exe',
+      vmName,
+      infraVm,
+      database: dbName,
+      redisDb: 0,
+      urls: {
+        frontend: frontendUrl || undefined,
+        api: apiUrl || undefined,
+      },
+      created: new Date(),
+      location: 'remote',
+    };
+
+    saveWorkspaceMetadata(metadata);
+
+    spinner.succeed('Remote workspace created!');
+
+    console.log('');
+    console.log(chalk.bold('Workspace Details:'));
+    console.log(`  Issue:    ${chalk.green(issueId.toUpperCase())}`);
+    console.log(`  VM:       ${chalk.cyan(vmName)}`);
+    console.log(`  Branch:   ${chalk.dim(branchName)}`);
+    console.log(`  Location: ${chalk.yellow('Remote (exe.dev)')}`);
+    console.log('');
+
+    if (containersStarted) {
+      console.log(chalk.bold('Services:'));
+      console.log(`  Status: ${chalk.green('Running')}`);
+      if (frontendUrl) {
+        console.log(`  Frontend: ${chalk.cyan(frontendUrl)}`);
+      }
+      if (apiUrl) {
+        console.log(`  API:      ${chalk.cyan(apiUrl)}`);
+      }
+      console.log('');
+    }
+
+    console.log(chalk.bold('Commands:'));
+    console.log(`  SSH:    ${chalk.dim(`pan workspace ssh ${issueId}`)}`);
+    console.log(`  Stop:   ${chalk.dim(`pan workspace stop ${issueId}`)}`);
+    console.log(`  Delete: ${chalk.dim(`pan workspace destroy ${issueId}`)}`);
+    console.log('');
+
+  } catch (error: any) {
+    spinner.fail(`Failed to create remote workspace: ${error.message}`);
+    // Try to clean up
+    try {
+      await exe.deleteVm(vmName);
+    } catch {
+      // Ignore cleanup errors
+    }
+    process.exit(1);
+  }
+}
+
+/**
+ * Migrate workspace between local and remote
+ */
+interface MigrateOptions {
+  to?: 'local' | 'remote';
+}
+
+async function migrateCommand(issueId: string, options: MigrateOptions): Promise<void> {
+  const spinner = ora('Migrating workspace...').start();
+
+  if (!options.to) {
+    spinner.fail('Must specify target location: --to remote or --to local');
+    process.exit(1);
+  }
+
+  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const metadata = loadWorkspaceMetadata(normalizedId);
+
+  if (options.to === 'remote') {
+    if (metadata?.location === 'remote') {
+      spinner.info('Workspace is already remote');
+      return;
+    }
+
+    // Sync beads before migrating
+    spinner.text = 'Syncing beads...';
+    try {
+      await execAsync('bd sync', { encoding: 'utf-8' });
+      await execAsync('git add .beads/ && git commit -m "Sync beads before migration" && git push', { encoding: 'utf-8' });
+    } catch {
+      // Non-fatal - beads sync might not be needed
+    }
+
+    // Create remote workspace
+    const branchName = `feature/${normalizedId}`;
+    await createRemoteWorkspace(issueId, normalizedId, branchName, spinner, {});
+
+    spinner.succeed('Migrated to remote!');
+    console.log('');
+    console.log(chalk.dim('Local workspace remains unchanged. Delete it manually if no longer needed.'));
+
+  } else if (options.to === 'local') {
+    if (!metadata || metadata.location !== 'remote') {
+      spinner.info('Workspace is already local (or not found)');
+      return;
+    }
+
+    spinner.text = 'Migration to local not yet implemented';
+    spinner.warn('Migration from remote to local coming soon');
+    console.log('');
+    console.log(chalk.dim('For now, create a local workspace manually:'));
+    console.log(chalk.dim(`  pan workspace create ${issueId} --local`));
+  }
+}
+
+/**
+ * SSH into remote workspace
+ */
+async function sshCommand(issueId: string): Promise<void> {
+  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const metadata = loadWorkspaceMetadata(normalizedId);
+
+  if (!metadata || metadata.location !== 'remote') {
+    console.error(chalk.red(`No remote workspace found for ${issueId}`));
+    console.log(chalk.dim('Create one with: pan workspace create --remote ' + issueId));
+    process.exit(1);
+  }
+
+  const { spawn } = await import('child_process');
+
+  // Spawn interactive SSH session
+  const child = spawn('exe', ['ssh', metadata.vmName], {
+    stdio: 'inherit',
+  });
+
+  child.on('exit', (code) => {
+    process.exit(code || 0);
+  });
+}
+
+/**
+ * Start a stopped remote workspace
+ */
+async function startCommand(issueId: string): Promise<void> {
+  const spinner = ora('Starting workspace...').start();
+
+  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const metadata = loadWorkspaceMetadata(normalizedId);
+
+  if (!metadata || metadata.location !== 'remote') {
+    spinner.fail(`No remote workspace found for ${issueId}`);
+    process.exit(1);
+  }
+
+  try {
+    const exe = createExeProvider({ infraVm: metadata.infraVm });
+    await exe.startVm(metadata.vmName);
+
+    // Start containers
+    spinner.text = 'Starting containers...';
+    await exe.ssh(metadata.vmName, 'cd ~/workspace && docker compose up -d 2>/dev/null || true');
+
+    spinner.succeed(`Workspace ${issueId} started`);
+
+    if (metadata.urls.frontend) {
+      console.log(`  Frontend: ${chalk.cyan(metadata.urls.frontend)}`);
+    }
+    if (metadata.urls.api) {
+      console.log(`  API:      ${chalk.cyan(metadata.urls.api)}`);
+    }
+
+  } catch (error: any) {
+    spinner.fail(`Failed to start: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Stop (hibernate) a remote workspace
+ */
+async function stopCommand(issueId: string): Promise<void> {
+  const spinner = ora('Stopping workspace...').start();
+
+  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const metadata = loadWorkspaceMetadata(normalizedId);
+
+  if (!metadata || metadata.location !== 'remote') {
+    spinner.fail(`No remote workspace found for ${issueId}`);
+    process.exit(1);
+  }
+
+  try {
+    const exe = createExeProvider({ infraVm: metadata.infraVm });
+
+    // Stop containers first
+    spinner.text = 'Stopping containers...';
+    await exe.ssh(metadata.vmName, 'docker compose down 2>/dev/null || true');
+
+    // Stop VM
+    spinner.text = 'Hibernating VM...';
+    await exe.stopVm(metadata.vmName);
+
+    spinner.succeed(`Workspace ${issueId} stopped (hibernated)`);
+    console.log(chalk.dim('  Start again with: pan workspace start ' + issueId));
+
+  } catch (error: any) {
+    spinner.fail(`Failed to stop: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Destroy a remote workspace
+ */
+async function destroyRemoteWorkspace(
+  issueId: string,
+  normalizedId: string,
+  metadata: RemoteWorkspaceMetadata,
+  spinner: ora.Ora,
+  options: DestroyOptions
+): Promise<void> {
+  const config = loadConfig();
+  const exe = createExeProvider({ infraVm: metadata.infraVm });
+
+  try {
+    // Step 1: Kill any running agent
+    spinner.text = 'Stopping agent...';
+    const agentId = `agent-${normalizedId}`;
+    await exe.ssh(metadata.vmName, `tmux kill-session -t ${agentId} 2>/dev/null || true`);
+
+    // Step 2: Stop containers
+    spinner.text = 'Stopping containers...';
+    await exe.ssh(metadata.vmName, 'cd ~/workspace && docker compose down 2>/dev/null || true');
+
+    // Step 3: Delete VM
+    spinner.text = 'Deleting VM...';
+    await exe.deleteVm(metadata.vmName);
+
+    // Step 4: Drop database on shared postgres (if infra VM is running)
+    if (metadata.database && metadata.infraVm) {
+      spinner.text = 'Cleaning up database...';
+      try {
+        await exe.ssh(metadata.infraVm, `docker exec pan-postgres psql -U postgres -c "DROP DATABASE IF EXISTS ${metadata.database}" 2>/dev/null || true`);
+      } catch {
+        // Non-fatal - database cleanup failed
+      }
+    }
+
+    // Step 5: Remove workspace metadata file
+    const metadataFile = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
+    if (existsSync(metadataFile)) {
+      rmSync(metadataFile);
+    }
+
+    spinner.succeed(`Remote workspace ${issueId} destroyed`);
+    console.log('');
+    console.log(chalk.dim('  VM deleted, database dropped, metadata removed.'));
+
+  } catch (error: any) {
+    spinner.fail(`Failed to destroy remote workspace: ${error.message}`);
+    if (!options.force) {
+      console.log(chalk.dim('  Tip: Use --force to forcefully clean up'));
     }
     process.exit(1);
   }
