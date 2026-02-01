@@ -1,9 +1,12 @@
 /**
  * Unit tests for shadow-mode.ts
+ *
+ * @vitest-environment node
+ * These tests use the filesystem and should not run in parallel with other shadow tests
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, unlinkSync, rmdirSync, mkdirSync } from 'fs';
+import { existsSync, unlinkSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -27,10 +30,14 @@ const TEST_SHADOW_STATE_DIR = join(homedir(), '.panopticon', 'shadow-state');
 // Helper to clean up test files
 function cleanupTestFiles() {
   if (existsSync(TEST_SHADOW_STATE_DIR)) {
-    const files = require('fs').readdirSync(TEST_SHADOW_STATE_DIR);
+    const files = readdirSync(TEST_SHADOW_STATE_DIR);
     for (const file of files) {
       if (file.startsWith('TEST-')) {
-        unlinkSync(join(TEST_SHADOW_STATE_DIR, file));
+        try {
+          unlinkSync(join(TEST_SHADOW_STATE_DIR, file));
+        } catch {
+          // Ignore errors during cleanup
+        }
       }
     }
   }
@@ -38,9 +45,16 @@ function cleanupTestFiles() {
   delete process.env.SHADOW_MODE;
 }
 
+// Unique ID generator for test isolation
+let testIdCounter = 0;
+function getUniqueId(base: string): string {
+  return `TEST-${base}-${Date.now()}-${++testIdCounter}`;
+}
+
 describe('shadow-mode', () => {
   beforeEach(() => {
     cleanupTestFiles();
+    testIdCounter = 0;
   });
 
   afterEach(() => {
@@ -59,18 +73,19 @@ describe('shadow-mode', () => {
     });
 
     it('should return existing source when issue is already shadowed', () => {
-      createShadowState('TEST-EXISTING', 'open');
+      const id = getUniqueId('existing');
+      createShadowState(id, 'open');
 
-      const result = resolveShadowMode({ issueId: 'TEST-EXISTING' });
+      const result = resolveShadowMode({ issueId: id });
 
       expect(result.enabled).toBe(true);
       expect(result.source).toBe('existing');
 
-      removeShadowState('TEST-EXISTING');
+      removeShadowState(id);
     });
 
     it('should return default when no config is set', () => {
-      const result = resolveShadowMode({ issueId: 'TEST-NOTSHADOWED' });
+      const result = resolveShadowMode({ issueId: getUniqueId('notshadowed') });
       expect(result.source).toBe('default');
     });
 
@@ -90,33 +105,34 @@ describe('shadow-mode', () => {
     });
 
     it('should return true for shadowed issues', () => {
-      createShadowState('TEST-ENABLED', 'open');
+      const id = getUniqueId('enabled');
+      createShadowState(id, 'open');
 
-      expect(isShadowModeEnabled({ issueId: 'TEST-ENABLED' })).toBe(true);
+      expect(isShadowModeEnabled({ issueId: id })).toBe(true);
 
-      removeShadowState('TEST-ENABLED');
+      removeShadowState(id);
     });
   });
 
   describe('shouldSkipTrackerUpdate', () => {
     it('should return true when cliFlag is true', () => {
-      expect(shouldSkipTrackerUpdate('TEST-123', true)).toBe(true);
+      expect(shouldSkipTrackerUpdate(getUniqueId('skip'), true)).toBe(true);
     });
 
     it('should return false when cliFlag is false', () => {
-      expect(shouldSkipTrackerUpdate('TEST-123', false)).toBe(false);
+      expect(shouldSkipTrackerUpdate(getUniqueId('noskip'), false)).toBe(false);
     });
 
     it('should use default tracker type when not specified', () => {
-      const result = shouldSkipTrackerUpdate('TEST-123', undefined);
+      const result = shouldSkipTrackerUpdate(getUniqueId('default'), undefined);
       // Default should be false unless env/config says otherwise
       expect(typeof result).toBe('boolean');
     });
 
     it('should respect tracker type parameter', () => {
       // Test with different tracker types
-      expect(typeof shouldSkipTrackerUpdate('TEST-123', undefined, 'github')).toBe('boolean');
-      expect(typeof shouldSkipTrackerUpdate('TEST-123', undefined, 'gitlab')).toBe('boolean');
+      expect(typeof shouldSkipTrackerUpdate(getUniqueId('github'), undefined, 'github')).toBe('boolean');
+      expect(typeof shouldSkipTrackerUpdate(getUniqueId('gitlab'), undefined, 'gitlab')).toBe('boolean');
     });
   });
 
