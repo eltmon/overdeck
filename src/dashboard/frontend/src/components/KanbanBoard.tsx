@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2 } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
@@ -810,6 +810,33 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
                 <AgentBadge key={i} type={b.type} name={b.name} isConflict={hasConflict} />
               ));
             })()}
+            {/* Model badge - shows which model the active agent is using */}
+            {activeAgent && activeAgent.model && (
+              <span
+                className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-600 text-gray-300"
+                title={`Model: ${activeAgent.model}`}
+              >
+                {activeAgent.model.replace('claude-', '').replace(/-4-5$/, '').replace(/-20[0-9]{6}$/, '')}
+              </span>
+            )}
+            {/* Workspace location badge - shows if running locally or on remote VM */}
+            {activeAgent && activeAgent.workspaceLocation && (
+              <span
+                className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${
+                  activeAgent.workspaceLocation === 'remote'
+                    ? 'bg-cyan-900/50 text-cyan-400'
+                    : 'bg-gray-600 text-gray-300'
+                }`}
+                title={activeAgent.workspaceLocation === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
+              >
+                {activeAgent.workspaceLocation === 'remote' ? (
+                  <Cloud className="w-3 h-3" />
+                ) : (
+                  <Monitor className="w-3 h-3" />
+                )}
+                {activeAgent.workspaceLocation}
+              </span>
+            )}
             {/* Review Ready badge - prominent indicator that agent completed work */}
             {isReviewReady && (
               <span

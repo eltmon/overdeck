@@ -281,10 +281,9 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
     }
 
-    // Connect to WebSocket on backend port (3011)
+    // Connect to WebSocket on same port as the page (frontend and API are served together)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const backendPort = '3011';
-    const wsUrl = `${protocol}//${window.location.hostname}:${backendPort}/ws/terminal?session=${encodeURIComponent(sessionName)}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

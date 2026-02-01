@@ -42,6 +42,42 @@ export interface TrackersConfig {
   rally?: RallyConfig;
 }
 
+export interface RemoteExeConfig {
+  /** Shared infrastructure VM for postgres/redis/traefik */
+  infra_vm?: string;
+  /** Postgres settings on infra VM */
+  postgres_host?: string;
+  postgres_port?: number;
+  postgres_user?: string;
+  postgres_password_env?: string;
+  /** Redis settings on infra VM */
+  redis_host?: string;
+  redis_port?: number;
+}
+
+export interface RemoteConfig {
+  /** Enable remote workspace support */
+  enabled: boolean;
+  /** Remote provider type */
+  provider?: 'exe';
+  /** Default location for new workspaces */
+  default_location?: 'local' | 'remote';
+  /** Auto-hibernate idle workspaces after N minutes (0 = disabled) */
+  auto_hibernate_minutes?: number;
+  /** exe.dev specific configuration */
+  exe?: RemoteExeConfig;
+}
+
+export interface ShadowConfig {
+  enabled: boolean;
+  trackers: {
+    linear: boolean;
+    github: boolean;
+    gitlab: boolean;
+    rally: boolean;
+  };
+}
+
 export interface PanopticonConfig {
   panopticon: {
     version: string;
@@ -62,6 +98,8 @@ export interface PanopticonConfig {
     dashboard_port?: number;
     domain?: string;
   };
+  remote?: RemoteConfig;
+  shadow: ShadowConfig;
 }
 
 const DEFAULT_CONFIG: PanopticonConfig = {
@@ -84,6 +122,15 @@ const DEFAULT_CONFIG: PanopticonConfig = {
   dashboard: {
     port: 3001,
     api_port: 3002,
+  },
+  shadow: {
+    enabled: false,
+    trackers: {
+      linear: false,
+      github: false,
+      gitlab: false,
+      rally: false,
+    },
   },
 };
 

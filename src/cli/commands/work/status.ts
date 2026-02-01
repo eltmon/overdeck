@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { listRunningAgents } from '../../../lib/agents.js';
+import { isShadowed, getShadowState } from '../../../lib/shadow-state.js';
 
 interface StatusOptions {
   json?: boolean;
@@ -9,7 +10,18 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const agents = listRunningAgents();
 
   if (options.json) {
-    console.log(JSON.stringify(agents, null, 2));
+    // Add shadow mode info to JSON output
+    const agentsWithShadow = agents.map(agent => {
+      const shadowed = isShadowed(agent.issueId);
+      const shadowState = shadowed ? getShadowState(agent.issueId) : null;
+      return {
+        ...agent,
+        shadowMode: shadowed,
+        shadowStatus: shadowState?.shadowStatus,
+        trackerStatus: shadowState?.trackerStatus,
+      };
+    });
+    console.log(JSON.stringify(agentsWithShadow, null, 2));
     return;
   }
 
@@ -28,12 +40,29 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const startedAt = new Date(agent.startedAt);
     const duration = Math.floor((Date.now() - startedAt.getTime()) / 1000 / 60);
 
+    // Check shadow mode
+    const shadowed = isShadowed(agent.issueId);
+    const shadowState = shadowed ? getShadowState(agent.issueId) : null;
+
     console.log(`${chalk.cyan(agent.id)}`);
     console.log(`  Issue:    ${agent.issueId}`);
     console.log(`  Status:   ${statusColor(status)}`);
+
+    if (shadowed && shadowState) {
+      const statusStr = `${shadowState.shadowStatus}${shadowState.trackerStatus !== shadowState.shadowStatus ? ` (tracker: ${shadowState.trackerStatus})` : ''}`;
+      console.log(`  Shadow:   ${chalk.cyan('👻')} ${statusStr}`);
+    }
+
     console.log(`  Runtime:  ${agent.runtime} (${agent.model})`);
     console.log(`  Duration: ${duration} min`);
     console.log(`  Workspace: ${chalk.dim(agent.workspace)}`);
+    console.log('');
+  }
+
+  // Show legend
+  const anyShadowed = agents.some(agent => isShadowed(agent.issueId));
+  if (anyShadowed) {
+    console.log(chalk.dim('👻 = Shadow mode (tracking status locally)'));
     console.log('');
   }
 }

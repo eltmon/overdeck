@@ -27,6 +27,22 @@ export interface ProviderConfig {
 }
 
 /**
+ * Shadow mode configuration
+ */
+export interface ShadowConfig {
+  /** Global shadow mode default */
+  enabled?: boolean;
+
+  /** Per-tracker overrides */
+  trackers?: {
+    linear?: boolean;
+    github?: boolean;
+    gitlab?: boolean;
+    rally?: boolean;
+  };
+}
+
+/**
  * Complete configuration structure (YAML schema)
  */
 export interface YamlConfig {
@@ -55,6 +71,25 @@ export interface YamlConfig {
     zai?: string;
     kimi?: string;
   };
+
+  /** Shadow mode configuration */
+  shadow?: ShadowConfig;
+}
+
+/**
+ * Normalized shadow configuration
+ */
+export interface NormalizedShadowConfig {
+  /** Global shadow mode enabled */
+  enabled: boolean;
+
+  /** Per-tracker overrides */
+  trackers: {
+    linear: boolean;
+    github: boolean;
+    gitlab: boolean;
+    rally: boolean;
+  };
 }
 
 /**
@@ -77,6 +112,9 @@ export interface NormalizedConfig {
 
   /** Gemini thinking level */
   geminiThinkingLevel: 1 | 2 | 3 | 4;
+
+  /** Shadow mode configuration */
+  shadow: NormalizedShadowConfig;
 }
 
 /**
@@ -87,6 +125,15 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   apiKeys: {},
   overrides: {},
   geminiThinkingLevel: 3,
+  shadow: {
+    enabled: false,
+    trackers: {
+      linear: false,
+      github: false,
+      gitlab: false,
+      rally: false,
+    },
+  },
 };
 
 /**
@@ -186,12 +233,47 @@ function loadGlobalConfig(): YamlConfig | null {
 }
 
 /**
+ * Merge shadow configuration from multiple sources
+ */
+function mergeShadowConfig(
+  result: NormalizedShadowConfig,
+  config: YamlConfig | null
+): void {
+  if (!config?.shadow) return;
+
+  // Merge global enabled flag
+  if (config.shadow.enabled !== undefined) {
+    result.enabled = config.shadow.enabled;
+  }
+
+  // Merge per-tracker overrides
+  if (config.shadow.trackers) {
+    if (config.shadow.trackers.linear !== undefined) {
+      result.trackers.linear = config.shadow.trackers.linear;
+    }
+    if (config.shadow.trackers.github !== undefined) {
+      result.trackers.github = config.shadow.trackers.github;
+    }
+    if (config.shadow.trackers.gitlab !== undefined) {
+      result.trackers.gitlab = config.shadow.trackers.gitlab;
+    }
+    if (config.shadow.trackers.rally !== undefined) {
+      result.trackers.rally = config.shadow.trackers.rally;
+    }
+  }
+}
+
+/**
  * Merge multiple configs with precedence: project > global > defaults
  */
 function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+    shadow: {
+      enabled: DEFAULT_CONFIG.shadow.enabled,
+      trackers: { ...DEFAULT_CONFIG.shadow.trackers },
+    },
   };
 
   // Filter out null configs
@@ -276,6 +358,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
     if (config.models?.gemini_thinking_level) {
       result.geminiThinkingLevel = config.models.gemini_thinking_level;
     }
+
+    // Merge shadow configuration
+    mergeShadowConfig(result.shadow, config);
   }
 
   return result;
@@ -307,6 +392,13 @@ export function loadConfig(): NormalizedConfig {
   if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
     config.apiKeys.kimi = process.env.KIMI_API_KEY;
     config.enabledProviders.add('kimi');
+  }
+
+  // Load shadow mode from environment as fallback
+  // Environment variable takes precedence over config file
+  if (process.env.SHADOW_MODE !== undefined) {
+    const envShadowMode = ['true', '1', 'yes'].includes(process.env.SHADOW_MODE.toLowerCase());
+    config.shadow.enabled = envShadowMode;
   }
 
   return config;

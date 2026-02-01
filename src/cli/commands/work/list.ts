@@ -9,6 +9,7 @@ import ora from 'ora';
 import { loadConfig } from '../../../lib/config.js';
 import type { Issue, IssueTracker, TrackerType } from '../../../lib/tracker/index.js';
 import { createTracker, TrackerConfig } from '../../../lib/tracker/index.js';
+import { isShadowed, getPendingSyncCount } from '../../../lib/shadow-state.js';
 
 interface ListOptions {
   all?: boolean;
@@ -16,6 +17,7 @@ interface ListOptions {
   json?: boolean;
   tracker?: string;
   allTrackers?: boolean;
+  shadowOnly?: boolean;
 }
 
 const PRIORITY_LABELS: Record<number, string> = {
@@ -103,8 +105,9 @@ function displayIssues(issues: Issue[], trackerName: string): void {
       const priorityLabel = issue.priority ? PRIORITY_LABELS[issue.priority] || '' : '';
       const assigneeStr = issue.assignee ? chalk.dim(` @${issue.assignee.split(' ')[0]}`) : '';
       const priorityStr = issue.priority && issue.priority < 3 ? ` ${priorityLabel}` : '';
+      const shadowIndicator = isShadowed(issue.ref) ? chalk.cyan('👻 ') : '';
 
-      console.log(`    ${chalk.cyan(issue.ref)} ${issue.title}${assigneeStr}${priorityStr}`);
+      console.log(`    ${shadowIndicator}${chalk.cyan(issue.ref)} ${issue.title}${assigneeStr}${priorityStr}`);
     }
     console.log('');
   }
@@ -189,6 +192,23 @@ export async function listCommand(options: ListOptions): Promise<void> {
       displayIssues(issues, tracker);
     }
 
+    // Filter for shadow-only if requested
+    if (options.shadowOnly) {
+      const filteredIssues = allIssues.map(({ tracker, issues }) => ({
+        tracker,
+        issues: issues.filter(issue => isShadowed(issue.ref))
+      })).filter(({ issues }) => issues.length > 0);
+
+      if (filteredIssues.length === 0) {
+        console.log(chalk.dim('\nNo shadowed issues found.'));
+      } else {
+        for (const { tracker, issues } of filteredIssues) {
+          console.log(chalk.bold(`\n${tracker.toUpperCase()} (${issues.length} shadowed issues)\n`));
+          displayIssues(issues, tracker);
+        }
+      }
+    }
+
     // Footer
     const trackerNames = trackersToQuery.join(', ');
     console.log(chalk.dim(`Showing ${totalIssues} issues from ${trackerNames}.`));
@@ -197,6 +217,12 @@ export async function listCommand(options: ListOptions): Promise<void> {
     }
     if (!options.allTrackers && trackersToQuery.length === 1) {
       console.log(chalk.dim('Use --all-trackers to query all configured trackers.'));
+    }
+
+    // Show shadow mode info
+    const pendingSync = getPendingSyncCount();
+    if (pendingSync > 0) {
+      console.log(chalk.cyan(`👻 ${pendingSync} shadowed issue(s) pending sync`));
     }
 
   } catch (error: any) {

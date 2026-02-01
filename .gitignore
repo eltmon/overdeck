@@ -42,7 +42,8 @@ src/dashboard/restart.sh
 
 # Workspace-specific generated files
 CLAUDE.md
-.planning/
+# Note: .planning/ is intentionally NOT gitignored - it's tracked on feature branches
+# but excluded when merging to main (see merge-agent.md)
 
 # Beads daemon files
 .beads/

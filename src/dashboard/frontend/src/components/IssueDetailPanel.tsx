@@ -25,6 +25,8 @@ import {
   RefreshCw,
   DollarSign,
   Cpu,
+  Cloud,
+  Monitor,
 } from 'lucide-react';
 
 // Cost data types
@@ -112,6 +114,7 @@ interface WorkspaceInfo {
   containers?: Record<string, ContainerStatus> | null;
   hasDocker?: boolean;
   canContainerize?: boolean;
+  location?: 'local' | 'remote';
 }
 
 interface IssueDetailPanelProps {
@@ -550,7 +553,27 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
                 <AlertTriangle className="w-4 h-4 text-yellow-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-yellow-400">Workspace Corrupted</h4>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-medium text-yellow-400">Workspace Corrupted</h4>
+                  {/* Location badge - local vs remote */}
+                  {workspace.location && (
+                    <span
+                      className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded ${
+                        workspace.location === 'remote'
+                          ? 'bg-cyan-900/50 text-cyan-400'
+                          : 'bg-gray-700 text-gray-400'
+                      }`}
+                      title={workspace.location === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
+                    >
+                      {workspace.location === 'remote' ? (
+                        <Cloud className="w-3 h-3" />
+                      ) : (
+                        <Monitor className="w-3 h-3" />
+                      )}
+                      {workspace.location}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-400 mt-1">
                   {workspace.message || 'The workspace exists but is not a valid git worktree.'}
                 </p>
@@ -601,6 +624,24 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-sm font-medium text-green-400">Workspace Ready</h4>
+                  {/* Location badge - local vs remote */}
+                  {workspace.location && (
+                    <span
+                      className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded ${
+                        workspace.location === 'remote'
+                          ? 'bg-cyan-900/50 text-cyan-400'
+                          : 'bg-gray-700 text-gray-400'
+                      }`}
+                      title={workspace.location === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
+                    >
+                      {workspace.location === 'remote' ? (
+                        <Cloud className="w-3 h-3" />
+                      ) : (
+                        <Monitor className="w-3 h-3" />
+                      )}
+                      {workspace.location}
+                    </span>
+                  )}
                   {!workspace.hasDocker && (
                     <span className="px-2 py-0.5 bg-gray-700 text-gray-400 text-xs rounded">
                       Git only

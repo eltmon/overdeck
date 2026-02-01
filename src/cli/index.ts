@@ -50,6 +50,8 @@ import { updateCommand } from './commands/update.js';
 import { registerDbCommands } from './commands/db.js';
 import { registerBeadsCommands } from './commands/beads.js';
 import { migrateConfigCommand } from './commands/migrate-config.js';
+import { registerRemoteCommands } from './commands/remote/index.js';
+import { registerConfigCommand } from './commands/config.js';
 
 const program = new Command();
 
@@ -126,6 +128,12 @@ registerDbCommands(program);
 
 // Register beads commands (pan beads compact, pan beads stats)
 registerBeadsCommands(program);
+
+// Register remote commands (pan remote status, init, resources, setup)
+registerRemoteCommands(program);
+
+// Register config commands (pan config shadow)
+registerConfigCommand(program);
 
 // Config migration
 program

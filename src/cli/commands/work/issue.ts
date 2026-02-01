@@ -62,10 +62,14 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
   }
 }
 
+import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../../lib/shadow-mode.js';
+import { createShadowState, updateShadowState } from '../../../lib/shadow-state.js';
+
 interface IssueOptions {
   model: string;
   runtime: string;
   dryRun?: boolean;
+  shadow?: boolean;
 }
 
 /**
@@ -570,8 +574,16 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
-    // Update Linear issue to "In Progress" if applicable
-    if (isLinearIssue(id)) {
+    // Check shadow mode
+    const skipTrackerUpdate = shouldSkipTrackerUpdate(id, options.shadow);
+
+    if (skipTrackerUpdate) {
+      // Create shadow state instead of updating tracker
+      createShadowState(id, 'open', 'pan work issue');
+      updateShadowState(id, 'in_progress', 'pan work issue');
+      console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
+    } else if (isLinearIssue(id)) {
+      // Update Linear issue to "In Progress" if applicable
       const apiKey = getLinearApiKey();
       if (apiKey) {
         const updated = await updateLinearToInProgress(apiKey, id);

@@ -14,7 +14,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 
 const execAsync = promisify(exec);
 import { loadCloisterConfig, saveCloisterConfig, shouldAutoStart } from '../../lib/cloister/config.js';
-import { loadSettings, saveSettings, validateSettings, getAvailableModels } from '../../lib/settings.js';
+import { loadSettings, saveSettings, validateSettings, getAvailableModels, isAnthropicModel, getClaudeModelFlag, getAgentCommand } from '../../lib/settings.js';
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getOptimalDefaultsApi } from '../../lib/settings-api.js';
 import { generateRouterConfig, writeRouterConfig } from '../../lib/router-config.js';
 import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
@@ -1690,6 +1690,37 @@ async function getGitStatus(workspacePath: string): Promise<{ branch: string; un
   }
 }
 
+/**
+ * Get workspace location (local or remote) for an issue
+ * Checks ~/.panopticon/workspaces/{issueId}.yaml for metadata
+ */
+function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
+  try {
+    const workspacesDir = join(homedir(), '.panopticon', 'workspaces');
+    // Try various case variations
+    const variations = [
+      issueId.toLowerCase(),
+      issueId.toUpperCase(),
+      issueId,
+    ];
+
+    for (const id of variations) {
+      const metadataFile = join(workspacesDir, `${id}.yaml`);
+      if (existsSync(metadataFile)) {
+        const content = readFileSync(metadataFile, 'utf-8');
+        // Simple YAML parsing for location field
+        const locationMatch = content.match(/^location:\s*(local|remote)\s*$/m);
+        if (locationMatch) {
+          return locationMatch[1] as 'local' | 'remote';
+        }
+      }
+    }
+    return undefined; // No workspace metadata found
+  } catch {
+    return undefined;
+  }
+}
+
 // Get running agents from tmux sessions
 app.get('/api/agents', async (_req, res) => {
   try {
@@ -1743,6 +1774,9 @@ app.get('/api/agents', async (_req, res) => {
         // Check for pending AskUserQuestion (agent waiting for user input)
         const pendingQuestions = await getAgentPendingQuestions(name);
 
+        // Check workspace location (local vs remote)
+        const workspaceLocation = getWorkspaceLocation(issueId);
+
         return {
           id: name,
           issueId,
@@ -1753,6 +1787,7 @@ app.get('/api/agents', async (_req, res) => {
           consecutiveFailures: health.consecutiveFailures || 0,
           killCount: health.killCount || 0,
           workspace: state.workspace || null,
+          workspaceLocation,
           git: gitStatus,
           type: isPlanning ? 'planning' : 'agent',
           hasPendingQuestion: pendingQuestions.length > 0,
@@ -2829,10 +2864,19 @@ app.post('/api/specialists/:name/wake', async (req, res) => {
 
     const useSessionId = sessionId || existingSessionId;
 
-    // Spawn Claude via router with resume flag in tmux
+    // Get specialist model from settings
+    const specSettings = loadSettings();
+    const specModelKey = `${name}_agent` as keyof typeof specSettings.models.specialists;
+    const specModel = specSettings.models.specialists[specModelKey] || 'claude-sonnet-4-5';
+    const specCmd = getAgentCommand(specModel);
+    const specCmdWithArgs = specCmd.args.length > 0
+      ? `${specCmd.command} ${specCmd.args.join(' ')} --dangerously-skip-permissions`
+      : `${specCmd.command} --dangerously-skip-permissions`;
+
+    // Spawn Claude with resume flag in tmux
     const cwd = homedir();
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "claude-code-router --resume ${useSessionId}"`,
+      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${specCmdWithArgs} --resume ${useSessionId}"`,
       { encoding: 'utf-8' }
     );
 
@@ -4015,12 +4059,15 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
                             existsSync(claudeMd);         // Panopticon workspace
 
   if (!hasValidStructure) {
+    // Get workspace location even for corrupted workspaces
+    const location = getWorkspaceLocation(issueId);
     return res.json({
       exists: true,
       corrupted: true,
       issueId,
       path: workspacePath,
       message: 'Workspace exists but is not a valid git worktree or containerized workspace',
+      location,
     });
   }
 
@@ -4123,6 +4170,9 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
   // Get any pending operation for this issue
   const pendingOperation = getPendingOperation(issueId);
 
+  // Get workspace location (local vs remote)
+  const location = getWorkspaceLocation(issueId);
+
   res.json({
     exists: true,
     issueId,
@@ -4141,6 +4191,7 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     hasDocker,
     canContainerize,
     pendingOperation,
+    location,
   });
 });
 
@@ -6871,14 +6922,26 @@ Start by exploring the codebase to understand the context, then begin the discov
       const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
       await execAsync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
 
+      // Get planning agent model from settings
+      const agentSettings = loadSettings();
+      const planningModel = agentSettings.models.planning_agent;
+      const agentCmd = getAgentCommand(planningModel);
+
       // Write a launcher script that safely passes the prompt
       const launcherScript = join(agentStateDir, 'launcher.sh');
       const promptFile = join(agentStateDir, 'init-prompt.txt');
       writeFileSync(promptFile, initMessage);
+
+      // Build the command - use 'claude' directly for Anthropic models, 'claude-code-router' for others
+      // Add --dangerously-skip-permissions to bypass the trust prompt for automated agents
+      const cmdWithArgs = agentCmd.args.length > 0
+        ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
+        : `${agentCmd.command} --dangerously-skip-permissions`;
+
       writeFileSync(launcherScript, `#!/bin/bash
 cd "${agentCwd}"
 prompt=$(cat "${promptFile}")
-exec claude-code-router "$prompt"
+exec ${cmdWithArgs} "$prompt"
 `, { mode: 0o755 });
 
       // Ensure tmux is running before starting session
@@ -6890,8 +6953,8 @@ exec claude-code-router "$prompt"
         id: sessionName,
         issueId: issue.identifier,
         workspace: agentCwd,
-        runtime: 'claude',
-        model: 'opus', // Planning uses Opus
+        runtime: isAnthropicModel(planningModel) ? 'claude' : 'claude-code-router',
+        model: planningModel, // From settings
         status: 'running',
         startedAt: new Date().toISOString(),
         type: 'planning'
@@ -7158,7 +7221,14 @@ Continue the PLANNING session. Do NOT implement anything.
       renameSync(outputFile, backupPath);
     }
 
-    const claudeCommand = `cd "${agentCwd}" && claude-code-router --print --verbose --output-format stream-json -p "${continuationPromptPath}" 2>&1 | tee "${outputFile}"`;
+    // Get planning agent model from settings
+    const msgSettings = loadSettings();
+    const msgPlanningModel = msgSettings.models.planning_agent;
+    const msgAgentCmd = getAgentCommand(msgPlanningModel);
+    const msgCmdWithArgs = msgAgentCmd.args.length > 0
+      ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} --dangerously-skip-permissions`
+      : `${msgAgentCmd.command} --dangerously-skip-permissions`;
+    const claudeCommand = `cd "${agentCwd}" && ${msgCmdWithArgs} --print --verbose --output-format stream-json -p "${continuationPromptPath}" 2>&1 | tee "${outputFile}"`;
 
     await ensureTmuxRunning();
     await execAsync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
@@ -8725,6 +8795,327 @@ wss.on('connection', (ws: WebSocket, req) => {
       activePtys.delete(sessionName);
     });
   })();
+});
+
+// ============================================================================
+// Remote Workspaces API (exe.dev)
+// ============================================================================
+
+import {
+  createExeProvider,
+  isRemoteAvailable,
+  loadRemoteAgentState,
+  listRemoteAgents,
+  spawnRemoteAgent,
+  killRemoteAgent,
+  getRemoteAgentOutput,
+  sendToRemoteAgent,
+} from '../../lib/remote/index.js';
+import { loadConfig as loadPanConfig, type RemoteConfig } from '../../lib/config.js';
+
+// Helper to load workspace metadata
+function loadRemoteWorkspaceMetadata(issueId: string): any | null {
+  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const metadataPath = join(process.env.HOME || '', '.panopticon', 'workspaces', `${normalizedId}.yaml`);
+
+  if (!existsSync(metadataPath)) {
+    return null;
+  }
+
+  try {
+    const yaml = require('yaml');
+    const content = readFileSync(metadataPath, 'utf-8');
+    return yaml.parse(content);
+  } catch {
+    return null;
+  }
+}
+
+// Helper to list all remote workspace metadata files
+function listRemoteWorkspaceMetadata(): any[] {
+  const workspacesDir = join(process.env.HOME || '', '.panopticon', 'workspaces');
+
+  if (!existsSync(workspacesDir)) {
+    return [];
+  }
+
+  try {
+    const yaml = require('yaml');
+    const files = readdirSync(workspacesDir).filter(f => f.endsWith('.yaml'));
+    const workspaces: any[] = [];
+
+    for (const file of files) {
+      try {
+        const content = readFileSync(join(workspacesDir, file), 'utf-8');
+        const metadata = yaml.parse(content);
+        if (metadata.location === 'remote') {
+          workspaces.push(metadata);
+        }
+      } catch {
+        // Skip invalid files
+      }
+    }
+
+    return workspaces;
+  } catch {
+    return [];
+  }
+}
+
+// GET /api/remote/status - Get remote provider status
+app.get('/api/remote/status', async (_req, res) => {
+  try {
+    const config = loadPanConfig();
+    const remoteConfig = config.remote;
+    const enabled = remoteConfig?.enabled ?? false;
+
+    if (!enabled) {
+      return res.json({
+        enabled: false,
+        available: false,
+        reason: 'Remote workspaces not enabled. Run: pan remote setup',
+      });
+    }
+
+    const availability = await isRemoteAvailable();
+
+    if (!availability.available) {
+      return res.json({
+        enabled: true,
+        available: false,
+        reason: availability.reason,
+      });
+    }
+
+    const exe = createExeProvider({ infraVm: remoteConfig?.exe?.infra_vm });
+    const vms = await exe.listVms();
+
+    res.json({
+      enabled: true,
+      available: true,
+      provider: remoteConfig?.provider || 'exe',
+      infraVm: remoteConfig?.exe?.infra_vm,
+      vms: vms.map(vm => ({
+        name: vm.name,
+        status: vm.status,
+        isInfra: vm.name === remoteConfig?.exe?.infra_vm,
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/remote/workspaces - List remote workspaces
+app.get('/api/remote/workspaces', async (_req, res) => {
+  try {
+    const workspaces = listRemoteWorkspaceMetadata();
+
+    // Enrich with VM status if possible
+    const config = loadPanConfig();
+    const exe = createExeProvider({ infraVm: config.remote?.exe?.infra_vm });
+
+    let vms: any[] = [];
+    try {
+      vms = await exe.listVms();
+    } catch {
+      // Can't get VM status - return workspaces without status
+    }
+
+    const enriched = workspaces.map(ws => {
+      const vmInfo = vms.find(vm => vm.name === ws.vmName);
+      return {
+        ...ws,
+        vmStatus: vmInfo?.status || 'unknown',
+      };
+    });
+
+    res.json(enriched);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/remote/workspaces/:issueId - Get specific remote workspace
+app.get('/api/remote/workspaces/:issueId', async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const metadata = loadRemoteWorkspaceMetadata(issueId);
+
+    if (!metadata) {
+      return res.status(404).json({ error: 'Remote workspace not found' });
+    }
+
+    // Get VM status
+    const config = loadPanConfig();
+    const exe = createExeProvider({ infraVm: config.remote?.exe?.infra_vm });
+
+    let vmStatus = 'unknown';
+    try {
+      vmStatus = await exe.getStatus(metadata.vmName);
+    } catch {
+      // Ignore - status unknown
+    }
+
+    // Get agent status if running
+    let agentStatus = null;
+    if (vmStatus === 'running') {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      const agentState = loadRemoteAgentState(agentId);
+      if (agentState) {
+        agentStatus = {
+          id: agentState.id,
+          status: agentState.status,
+          model: agentState.model,
+          startedAt: agentState.startedAt,
+        };
+      }
+    }
+
+    res.json({
+      ...metadata,
+      vmStatus,
+      agent: agentStatus,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/remote/workspaces/:issueId/start - Start remote workspace
+app.post('/api/remote/workspaces/:issueId/start', async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const metadata = loadRemoteWorkspaceMetadata(issueId);
+
+    if (!metadata) {
+      return res.status(404).json({ error: 'Remote workspace not found' });
+    }
+
+    const config = loadPanConfig();
+    const exe = createExeProvider({ infraVm: config.remote?.exe?.infra_vm });
+
+    await exe.startVm(metadata.vmName);
+
+    // Start containers
+    await exe.ssh(metadata.vmName, 'cd /workspace && docker compose up -d 2>/dev/null || true');
+
+    res.json({ success: true, message: `Workspace ${issueId} started` });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/remote/workspaces/:issueId/stop - Stop remote workspace
+app.post('/api/remote/workspaces/:issueId/stop', async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const metadata = loadRemoteWorkspaceMetadata(issueId);
+
+    if (!metadata) {
+      return res.status(404).json({ error: 'Remote workspace not found' });
+    }
+
+    const config = loadPanConfig();
+    const exe = createExeProvider({ infraVm: config.remote?.exe?.infra_vm });
+
+    // Stop containers first
+    await exe.ssh(metadata.vmName, 'docker compose down 2>/dev/null || true');
+
+    // Stop VM
+    await exe.stopVm(metadata.vmName);
+
+    res.json({ success: true, message: `Workspace ${issueId} stopped` });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/remote/workspaces/:issueId/agent/start - Start agent on remote workspace
+app.post('/api/remote/workspaces/:issueId/agent/start', async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const { prompt, model } = req.body;
+
+    const metadata = loadRemoteWorkspaceMetadata(issueId);
+    if (!metadata) {
+      return res.status(404).json({ error: 'Remote workspace not found' });
+    }
+
+    const state = await spawnRemoteAgent({
+      issueId,
+      workspace: metadata,
+      prompt,
+      model,
+    });
+
+    res.json(state);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/remote/workspaces/:issueId/agent/stop - Stop agent on remote workspace
+app.post('/api/remote/workspaces/:issueId/agent/stop', async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const metadata = loadRemoteWorkspaceMetadata(issueId);
+
+    if (!metadata) {
+      return res.status(404).json({ error: 'Remote workspace not found' });
+    }
+
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    await killRemoteAgent(agentId, metadata.vmName);
+
+    res.json({ success: true, message: `Agent ${agentId} stopped` });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/remote/workspaces/:issueId/agent/output - Get agent output
+app.get('/api/remote/workspaces/:issueId/agent/output', async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const lines = parseInt(req.query.lines as string) || 100;
+
+    const metadata = loadRemoteWorkspaceMetadata(issueId);
+    if (!metadata) {
+      return res.status(404).json({ error: 'Remote workspace not found' });
+    }
+
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    const output = await getRemoteAgentOutput(agentId, metadata.vmName, lines);
+
+    res.json({ output });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/remote/workspaces/:issueId/agent/tell - Send message to agent
+app.post('/api/remote/workspaces/:issueId/agent/tell', async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const metadata = loadRemoteWorkspaceMetadata(issueId);
+    if (!metadata) {
+      return res.status(404).json({ error: 'Remote workspace not found' });
+    }
+
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    await sendToRemoteAgent(agentId, metadata.vmName, message);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Serve static files in production mode

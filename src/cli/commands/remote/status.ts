@@ -1,0 +1,110 @@
+/**
+ * pan remote status
+ *
+ * Shows exe.dev connection status and list of VMs.
+ */
+
+import chalk from 'chalk';
+import ora from 'ora';
+import { loadConfig } from '../../../lib/config.js';
+import { createExeProvider, isRemoteAvailable } from '../../../lib/remote/index.js';
+
+interface StatusOptions {
+  json?: boolean;
+}
+
+export async function statusCommand(options: StatusOptions): Promise<void> {
+  const spinner = ora('Checking remote status...').start();
+
+  try {
+    const config = loadConfig();
+    const remoteConfig = config.remote;
+
+    // Check if remote is enabled
+    const enabled = remoteConfig?.enabled ?? false;
+    const provider = remoteConfig?.provider ?? 'exe';
+    const infraVm = remoteConfig?.exe?.infra_vm;
+
+    // Check availability
+    const availability = await isRemoteAvailable();
+
+    if (!availability.available) {
+      spinner.warn('Remote not available');
+
+      if (options.json) {
+        console.log(JSON.stringify({
+          enabled,
+          provider,
+          authenticated: false,
+          available: false,
+          reason: availability.reason,
+          vms: [],
+        }, null, 2));
+        return;
+      }
+
+      console.log('');
+      console.log(chalk.bold('Remote Workspaces Status'));
+      console.log('');
+      console.log(`  Provider:       ${chalk.cyan(provider)}`);
+      console.log(`  Enabled:        ${enabled ? chalk.green('Yes') : chalk.dim('No')}`);
+      console.log(`  Authenticated:  ${chalk.red('No')}`);
+      console.log('');
+      console.log(chalk.yellow(`  ${availability.reason}`));
+      console.log('');
+      console.log(chalk.dim('  Run: pan remote setup'));
+      return;
+    }
+
+    // Get VM list
+    const exe = createExeProvider({ infraVm });
+    const vms = await exe.listVms();
+
+    spinner.succeed('Connected to exe.dev');
+
+    if (options.json) {
+      console.log(JSON.stringify({
+        enabled,
+        provider,
+        authenticated: true,
+        available: true,
+        infraVm,
+        vms,
+      }, null, 2));
+      return;
+    }
+
+    console.log('');
+    console.log(chalk.bold('Remote Workspaces Status'));
+    console.log('');
+    console.log(`  Provider:       ${chalk.cyan(provider)}`);
+    console.log(`  Enabled:        ${enabled ? chalk.green('Yes') : chalk.dim('No')}`);
+    console.log(`  Authenticated:  ${chalk.green('Yes')}`);
+    console.log(`  Infra VM:       ${infraVm ? chalk.cyan(infraVm) : chalk.dim('Not configured')}`);
+    console.log('');
+
+    if (vms.length === 0) {
+      console.log(chalk.dim('  No VMs found.'));
+      console.log(chalk.dim('  Run: pan remote init'));
+    } else {
+      console.log(chalk.bold('  VMs:'));
+      console.log('');
+
+      for (const vm of vms) {
+        const statusIcon = vm.status === 'running'
+          ? chalk.green('●')
+          : vm.status === 'stopped'
+            ? chalk.yellow('○')
+            : chalk.dim('◌');
+
+        const isInfra = vm.name === infraVm ? chalk.dim(' (infra)') : '';
+        console.log(`    ${statusIcon} ${vm.name}${isInfra} - ${vm.status}`);
+      }
+    }
+
+    console.log('');
+  } catch (error: any) {
+    spinner.fail(`Failed to get status: ${error.message}`);
+    process.exit(1);
+  }
+}
