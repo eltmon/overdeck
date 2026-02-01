@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { startConvoy, waitForConvoy, type ConvoyContext } from '../convoy.js';
+import { sendKeys } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -245,14 +246,9 @@ async function sendFeedbackToWorkAgent(
     feedback += `**Next Steps:**\nYour code has been approved! It will proceed to testing.\n`;
   }
 
-  // Escape the feedback for tmux
-  const escapedFeedback = feedback.replace(/"/g, '\\"').replace(/\$/g, '\\$');
-
   try {
-    // Send the feedback message (non-blocking)
-    await execAsync(`tmux send-keys -t ${agentSession} "${escapedFeedback}"`);
-    // Send Enter to submit
-    await execAsync(`tmux send-keys -t "${agentSession}" C-m`, { encoding: 'utf-8' });
+    // Send the feedback message using centralized sendKeys
+    sendKeys(agentSession, feedback);
     console.log(`[review-agent] Sent feedback to ${agentSession}`);
   } catch (error) {
     console.error(`[review-agent] Failed to send feedback to ${agentSession}:`, error);

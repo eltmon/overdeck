@@ -24,6 +24,7 @@ import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getH
 import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../lib/cloister/specialist-handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
 import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent } from '../../lib/agents.js';
+import { sendKeys } from '../../lib/tmux.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig, findProjectByTeam, extractTeamPrefix } from '../../lib/projects.js';
@@ -2803,11 +2804,9 @@ app.post('/api/confirmations/:id/respond', async (req, res) => {
   }
 
   try {
-    // Send response to the agent's tmux session
+    // Send response to the agent's tmux session using centralized sendKeys
     const response = confirmed ? 'y' : 'n';
-    await execAsync(`tmux send-keys -t "${request.sessionName}" '${response}'`, { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 100));
-    await execAsync(`tmux send-keys -t "${request.sessionName}" C-m`, { encoding: 'utf-8' });
+    sendKeys(request.sessionName, response);
 
     // Remove from pending
     pendingConfirmations.delete(id);

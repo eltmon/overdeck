@@ -7,7 +7,7 @@
 
 import { loadConfig } from './config-yaml.js';
 import { getShadowModeFromEnv } from './env-loader.js';
-import { isShadowed } from './shadow-state.js';
+import { isShadowed, getPendingSyncCount } from './shadow-state.js';
 import type { TrackerType } from './tracker/interface.js';
 
 /**
@@ -188,6 +188,6 @@ export function getShadowModeSummary(): {
     globalEnabled: config.shadow.enabled,
     perTracker: config.shadow.trackers,
     envSet: process.env.SHADOW_MODE !== undefined,
-    pendingSyncCount: 0, // TODO: Import and use getPendingSyncCount from shadow-state
+    pendingSyncCount: getPendingSyncCount(),
   };
 }

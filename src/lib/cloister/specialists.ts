@@ -15,6 +15,7 @@ import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-pa
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import { loadSettings } from '../settings.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
+import { sendKeys } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -708,10 +709,8 @@ async function resetSpecialist(name: SpecialistType): Promise<void> {
     await execAsync(`tmux send-keys -t "${tmuxSession}" C-c`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    // 2. Reset working directory
-    await execAsync(`tmux send-keys -t "${tmuxSession}" 'cd ~'`, { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 100));
-    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    // 2. Reset working directory using centralized sendKeys
+    sendKeys(tmuxSession, 'cd ~');
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // 3. Clear the prompt buffer with Ctrl+U
@@ -821,16 +820,13 @@ export async function wakeSpecialist(
       writeFileSync(taskFile, taskPrompt, 'utf-8');
 
       // Send a short message pointing to the task file
+      // Use centralized sendKeys which handles Enter correctly
       const shortMessage = `Read and execute the task in: ${taskFile}`;
-      await execAsync(`tmux send-keys -t "${tmuxSession}" '${shortMessage}'`, { encoding: 'utf-8' });
-      await new Promise(resolve => setTimeout(resolve, 200));
-      await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+      sendKeys(tmuxSession, shortMessage);
     } else {
       // For short prompts, send directly via tmux
-      const escapedPrompt = taskPrompt.replace(/'/g, "'\\''");
-      await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
-      await new Promise(resolve => setTimeout(resolve, 200));
-      await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+      // Use centralized sendKeys which handles Enter correctly
+      sendKeys(tmuxSession, taskPrompt);
     }
 
     // Record wake event

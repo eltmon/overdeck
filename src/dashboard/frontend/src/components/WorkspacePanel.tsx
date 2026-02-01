@@ -19,6 +19,8 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
+  Cloud,
+  Monitor,
 } from 'lucide-react';
 import { Agent } from '../types';
 
@@ -58,6 +60,7 @@ interface WorkspaceInfo {
   hasDocker?: boolean;
   canContainerize?: boolean;
   pendingOperation?: PendingOperation | null;
+  location?: 'local' | 'remote';
 }
 
 // Clipboard helper that works without HTTPS
@@ -528,6 +531,24 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             <div className="flex items-center gap-2 text-yellow-500 mb-2">
               <AlertTriangle className="w-4 h-4" />
               <span className="text-xs font-medium">Workspace Corrupted</span>
+              {/* Location badge - local vs remote */}
+              {workspace.location && (
+                <span
+                  className={`flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded ${
+                    workspace.location === 'remote'
+                      ? 'bg-cyan-900/50 text-cyan-400'
+                      : 'bg-gray-700 text-gray-400'
+                  }`}
+                  title={workspace.location === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
+                >
+                  {workspace.location === 'remote' ? (
+                    <Cloud className="w-3 h-3" />
+                  ) : (
+                    <Monitor className="w-3 h-3" />
+                  )}
+                  {workspace.location}
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400 mb-2">
               {workspace.message || 'The workspace exists but is not a valid git worktree.'}

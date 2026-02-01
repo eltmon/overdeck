@@ -7,8 +7,8 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 import {
   getShadowState,
@@ -17,6 +17,7 @@ import {
   updateTrackerStatusCache,
 } from '../../../lib/shadow-state.js';
 import type { IssueState } from '../../../lib/tracker/interface.js';
+import { getLinearApiKey, isLinearIssue, getLinearStateName } from '../../../lib/shadow-utils.js';
 
 interface SyncOptions {
   force?: boolean;
@@ -24,40 +25,20 @@ interface SyncOptions {
 }
 
 /**
- * Get Linear API key from environment or config file
+ * Sync queue entry for deferred operations
  */
-function getLinearApiKey(): string | null {
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-  return process.env.LINEAR_API_KEY || null;
+interface SyncQueueEntry {
+  issueId: string;
+  targetState: IssueState;
+  queuedAt: string;
+  retryCount: number;
+  lastError?: string;
 }
 
 /**
- * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
+ * Sync queue storage file
  */
-function isLinearIssue(issueId: string): boolean {
-  return /^[A-Z]+-\d+$/i.test(issueId);
-}
-
-/**
- * Map canonical state to Linear state name
- */
-function getLinearStateName(state: IssueState): string {
-  switch (state) {
-    case 'open':
-      return 'Backlog';
-    case 'in_progress':
-      return 'In Progress';
-    case 'closed':
-      return 'Done';
-    default:
-      return 'Backlog';
-  }
-}
+const SYNC_QUEUE_FILE = join(homedir(), '.panopticon', 'sync-queue.json');
 
 /**
  * Sync shadow state to Linear
@@ -285,6 +266,39 @@ export async function syncCommand(id: string, options: SyncOptions = {}): Promis
 }
 
 /**
+ * Load sync queue from disk
+ */
+function loadSyncQueue(): SyncQueueEntry[] {
+  if (!existsSync(SYNC_QUEUE_FILE)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(SYNC_QUEUE_FILE, 'utf-8');
+    return JSON.parse(content) as SyncQueueEntry[];
+  } catch (error) {
+    console.error(chalk.yellow('Warning: Failed to load sync queue'));
+    return [];
+  }
+}
+
+/**
+ * Save sync queue to disk
+ */
+function saveSyncQueue(queue: SyncQueueEntry[]): void {
+  const dir = dirname(SYNC_QUEUE_FILE);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  try {
+    writeFileSync(SYNC_QUEUE_FILE, JSON.stringify(queue, null, 2), 'utf-8');
+  } catch (error) {
+    console.error(chalk.red('Error: Failed to save sync queue'));
+  }
+}
+
+/**
  * Queue a sync operation for later processing
  */
 function queueForLater(
@@ -292,10 +306,54 @@ function queueForLater(
   targetState: IssueState,
   error?: string
 ): void {
-  // TODO: Implement sync queue persistence
-  // For now, just log it
-  console.log(chalk.dim(`Queue entry: ${issueId} → ${targetState}`));
+  const queue = loadSyncQueue();
+
+  // Check if entry already exists for this issue
+  const existingIndex = queue.findIndex(entry => entry.issueId === issueId);
+
+  const entry: SyncQueueEntry = {
+    issueId,
+    targetState,
+    queuedAt: new Date().toISOString(),
+    retryCount: existingIndex >= 0 ? queue[existingIndex].retryCount + 1 : 0,
+    lastError: error,
+  };
+
+  if (existingIndex >= 0) {
+    queue[existingIndex] = entry;
+  } else {
+    queue.push(entry);
+  }
+
+  saveSyncQueue(queue);
+
+  console.log(chalk.dim(`Queued: ${issueId} → ${targetState}`));
   if (error) {
     console.log(chalk.dim(`  Error: ${error}`));
+  }
+}
+
+/**
+ * Get all queued sync operations
+ */
+export function getQueuedSyncs(): SyncQueueEntry[] {
+  return loadSyncQueue();
+}
+
+/**
+ * Remove an issue from the sync queue
+ */
+export function removeFromQueue(issueId: string): void {
+  const queue = loadSyncQueue();
+  const filtered = queue.filter(entry => entry.issueId !== issueId);
+  saveSyncQueue(filtered);
+}
+
+/**
+ * Clear the entire sync queue
+ */
+export function clearSyncQueue(): void {
+  if (existsSync(SYNC_QUEUE_FILE)) {
+    writeFileSync(SYNC_QUEUE_FILE, JSON.stringify([], null, 2), 'utf-8');
   }
 }

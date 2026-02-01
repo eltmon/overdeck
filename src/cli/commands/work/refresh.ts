@@ -6,37 +6,15 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
 import {
   getShadowState,
   updateTrackerStatusCache,
 } from '../../../lib/shadow-state.js';
 import type { IssueState } from '../../../lib/tracker/interface.js';
+import { getLinearApiKey, isLinearIssue, formatState } from '../../../lib/shadow-utils.js';
 
 interface RefreshOptions {
   json?: boolean;
-}
-
-/**
- * Get Linear API key from environment or config file
- */
-function getLinearApiKey(): string | null {
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-  return process.env.LINEAR_API_KEY || null;
-}
-
-/**
- * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
- */
-function isLinearIssue(issueId: string): boolean {
-  return /^[A-Z]+-\d+$/i.test(issueId);
 }
 
 /**
@@ -154,19 +132,4 @@ export async function refreshCommand(id: string, options: RefreshOptions = {}): 
   }
 
   console.log('');
-}
-
-/**
- * Format state for display
- */
-function formatState(state: string): string {
-  const colors: Record<string, (s: string) => string> = {
-    'open': chalk.blue,
-    'in_progress': chalk.yellow,
-    'closed': chalk.green,
-  };
-
-  const display = state.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-  const colorFn = colors[state] || chalk.white;
-  return colorFn(display);
 }

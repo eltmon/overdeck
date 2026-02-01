@@ -7,6 +7,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
+import { sendKeys, sessionExists } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -515,13 +516,13 @@ async function sendMessageToAgent(issueId: string, message: string): Promise<boo
 
   try {
     // Check if session exists
-    await execAsync(`tmux has-session -t "${sessionName}" 2>/dev/null`, { encoding: 'utf-8' });
+    if (!sessionExists(sessionName)) {
+      console.log(`[merge-agent] Could not send message to ${sessionName} (session does not exist)`);
+      return false;
+    }
 
-    // Send the message (with delay before Enter to avoid race condition)
-    const escapedMessage = message.replace(/'/g, "'\\''");
-    await execAsync(`tmux send-keys -t "${sessionName}" '${escapedMessage}'`, { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 200)); // Small delay for terminal to process text
-    await execAsync(`tmux send-keys -t "${sessionName}" C-m`, { encoding: 'utf-8' });
+    // Send the message using centralized sendKeys
+    sendKeys(sessionName, message);
 
     console.log(`[merge-agent] Sent message to ${sessionName}`);
     logActivity('agent_message', `Sent to ${sessionName}: ${message.slice(0, 100)}...`);
@@ -564,15 +565,10 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
   // Build prompt
   const prompt = buildMergePrompt(context);
 
-  // Escape prompt for tmux send-keys
-  const escapedPrompt = prompt.replace(/'/g, "'\\''");
-
   try {
-    // Send prompt to tmux session
+    // Send prompt to tmux session using centralized sendKeys
     console.log(`[merge-agent] Sending task to ${tmuxSession}...`);
-    await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedPrompt}'`, { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    sendKeys(tmuxSession, prompt);
 
     // Record wake event
     recordWake('merge-agent');
