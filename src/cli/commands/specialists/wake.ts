@@ -18,18 +18,16 @@ import {
   type SpecialistType,
 } from '../../../lib/cloister/specialists.js';
 import { PANOPTICON_HOME } from '../../../lib/paths.js';
+import { sendKeys } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 const TASKS_DIR = join(PANOPTICON_HOME, 'specialists', 'tasks');
-
-// Helper for async sleep
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Send a task to a specialist via tmux
  * For large prompts, writes to a file to avoid tmux paste issues
  */
-async function sendTask(tmuxSession: string, specialistName: string, task: string): Promise<void> {
+function sendTask(tmuxSession: string, specialistName: string, task: string): void {
   const isLargeTask = task.length > 500 || task.includes('\n');
 
   if (isLargeTask) {
@@ -41,14 +39,9 @@ async function sendTask(tmuxSession: string, specialistName: string, task: strin
     writeFileSync(taskFile, task, 'utf-8');
 
     const shortMessage = `Read and execute the task in: ${taskFile}`;
-    await execAsync(`tmux send-keys -t "${tmuxSession}" '${shortMessage}'`, { encoding: 'utf-8' });
-    await sleep(200);
-    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    sendKeys(tmuxSession, shortMessage);
   } else {
-    const escapedTask = task.replace(/'/g, "'\\''");
-    await execAsync(`tmux send-keys -t "${tmuxSession}" '${escapedTask}'`, { encoding: 'utf-8' });
-    await sleep(200);
-    await execAsync(`tmux send-keys -t "${tmuxSession}" C-m`, { encoding: 'utf-8' });
+    sendKeys(tmuxSession, task);
   }
 }
 
