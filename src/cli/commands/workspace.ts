@@ -815,13 +815,46 @@ async function createRemoteWorkspace(
     // Step 4.5: Create /workspace symlink for consistent paths
     await exe.ssh(vmName, `sudo ln -sf /home/exedev/workspace /workspace 2>/dev/null || true`);
 
-    // Step 4.6: Pre-configure Claude Code to skip onboarding
-    const claudeSettings = JSON.stringify({
-      theme: 'dark',
-      hasCompletedOnboarding: true,
-    });
+    // Step 4.6: Configure Claude Code - copy credentials and skip onboarding
+    spinner.text = 'Configuring Claude Code...';
+    await exe.ssh(vmName, `mkdir -p ~/.claude`);
+
+    // Copy credentials from macOS Keychain to remote
+    try {
+      const { stdout: credentials } = await execAsync(
+        'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
+        { encoding: 'utf-8' }
+      );
+      if (credentials && credentials.trim()) {
+        const credsBase64 = Buffer.from(credentials.trim()).toString('base64');
+        await exe.ssh(vmName, `echo '${credsBase64}' | base64 -d > ~/.claude/.credentials.json`);
+      }
+    } catch {
+      spinner.warn('Could not copy Claude credentials - you may need to login on the VM');
+    }
+
+    // Set onboarding complete in ~/.claude.json (NOT ~/.claude/settings.json!)
+    // This is the file Claude Code checks for onboarding status
+    const onboardingPatch = `
+import json
+import os
+path = os.path.expanduser("~/.claude.json")
+data = {}
+if os.path.exists(path):
+    with open(path, "r") as f:
+        data = json.load(f)
+data["hasCompletedOnboarding"] = True
+data["lastOnboardingVersion"] = "2.0.50"
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+`;
+    const patchBase64 = Buffer.from(onboardingPatch).toString('base64');
+    await exe.ssh(vmName, `echo '${patchBase64}' | base64 -d | python3`);
+
+    // Set theme preference in settings.json
+    const claudeSettings = JSON.stringify({ theme: 'dark' });
     const settingsBase64 = Buffer.from(claudeSettings).toString('base64');
-    await exe.ssh(vmName, `mkdir -p ~/.claude && echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
+    await exe.ssh(vmName, `echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
 
     // Step 5: Configure environment for shared infra
     spinner.text = 'Configuring environment...';
