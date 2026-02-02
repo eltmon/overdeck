@@ -91,11 +91,12 @@ describe('config-migration', () => {
 
       const yamlConfig = convertToYamlConfig(legacySettings);
 
-      expect(yamlConfig.models?.preset).toBeDefined();
+      // New format uses providers instead of presets
+      expect(yamlConfig.models?.providers).toBeDefined();
       expect(yamlConfig.api_keys).toEqual({ openai: 'sk-test-123' });
     });
 
-    it('should detect balanced preset from default model distribution', () => {
+    it('should detect enabled providers from API keys', () => {
       const legacySettings: SettingsConfig = {
         models: {
           specialists: {
@@ -112,15 +113,21 @@ describe('config-migration', () => {
             expert: 'claude-opus-4-5',
           },
         },
-        api_keys: {},
+        api_keys: {
+          openai: 'sk-test-123',
+          google: 'AIza-test-456',
+        },
       };
 
       const yamlConfig = convertToYamlConfig(legacySettings);
 
-      expect(yamlConfig.models?.preset).toBe('balanced');
+      // Providers should be enabled based on API keys
+      expect(yamlConfig.models?.providers?.anthropic).toBe(true);
+      expect(yamlConfig.models?.providers?.openai).toBe(true);
+      expect(yamlConfig.models?.providers?.google).toBe(true);
     });
 
-    it('should detect budget preset when only haiku/flash models used', () => {
+    it('should only enable providers with API keys', () => {
       const legacySettings: SettingsConfig = {
         models: {
           specialists: {
@@ -142,14 +149,17 @@ describe('config-migration', () => {
 
       const yamlConfig = convertToYamlConfig(legacySettings);
 
-      expect(yamlConfig.models?.preset).toBe('budget');
+      // Only anthropic should be enabled by default (no API keys needed)
+      expect(yamlConfig.models?.providers?.anthropic).toBe(true);
+      expect(yamlConfig.models?.providers?.openai).toBe(false);
+      expect(yamlConfig.models?.providers?.google).toBe(false);
     });
 
-    it('should create overrides for non-standard model assignments', () => {
+    it('should return empty overrides for legacy settings', () => {
       const legacySettings: SettingsConfig = {
         models: {
           specialists: {
-            review_agent: 'claude-opus-4-5', // Non-standard
+            review_agent: 'claude-opus-4-5',
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
@@ -167,8 +177,9 @@ describe('config-migration', () => {
 
       const yamlConfig = convertToYamlConfig(legacySettings);
 
+      // Legacy conversion doesn't create overrides (smart selection handles this)
       expect(yamlConfig.models?.overrides).toBeDefined();
-      expect(yamlConfig.models?.overrides?.['specialist-review-agent']).toBe('claude-opus-4-5');
+      expect(Object.keys(yamlConfig.models?.overrides || {})).toHaveLength(0);
     });
 
     it('should preserve all API keys', () => {

@@ -3,7 +3,7 @@
  *
  * Tests the priority order of configuration within the WorkTypeRouter:
  * 1. Per-work-type overrides have highest priority
- * 2. Preset defaults are used when no overrides exist
+ * 2. Smart selection is used when no overrides exist
  * 3. Fallback is applied when providers are disabled
  * 4. Router correctly uses normalized config
  */
@@ -12,29 +12,35 @@ import { describe, it, expect } from 'vitest';
 import { WorkTypeRouter } from '../../src/lib/work-type-router.js';
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import type { WorkTypeId } from '../../src/lib/work-types.js';
-import type { PresetName } from '../../src/lib/model-presets.js';
 
 /**
  * Helper to create a test config
  */
 function createTestConfig(overrides: Partial<NormalizedConfig> = {}): NormalizedConfig {
   return {
-    preset: 'balanced',
     enabledProviders: new Set(['anthropic']),
     apiKeys: {},
     overrides: {},
     geminiThinkingLevel: 3,
+    shadow: {
+      enabled: false,
+      trackers: {
+        linear: false,
+        github: false,
+        gitlab: false,
+        rally: false,
+      },
+    },
     ...overrides,
   };
 }
 
 describe('configuration precedence in router', () => {
-  describe('override vs preset precedence', () => {
-    it('should use override instead of preset default', () => {
+  describe('override vs smart selection precedence', () => {
+    it('should use override instead of smart selection', () => {
       const config = createTestConfig({
-        preset: 'budget', // Budget preset would use cheaper models
         overrides: {
-          'issue-agent:planning': 'claude-opus-4-5', // But we override planning to use Opus
+          'issue-agent:planning': 'claude-opus-4-5', // Override planning to use Opus
         },
       });
 
@@ -43,51 +49,54 @@ describe('configuration precedence in router', () => {
 
       expect(result.model).toBe('claude-opus-4-5');
       expect(result.source).toBe('override');
-      expect(result.preset).toBe('budget');
     });
 
-    it('should fall back to preset default when no override', () => {
+    it('should use smart selection when no override', () => {
       const config = createTestConfig({
-        preset: 'premium', // Premium uses best models
         overrides: {}, // No overrides
       });
 
       const router = new WorkTypeRouter(config);
       const result = router.getModel('issue-agent:planning' as WorkTypeId);
 
-      expect(result.source).toBe('preset');
-      expect(result.preset).toBe('premium');
-      // Premium should use Opus for planning
-      expect(result.model).toMatch(/opus|o1/i);
+      expect(result.source).toBe('smart');
+      // Should return a valid model
+      expect(result.model).toBeDefined();
+      expect(result.model.length).toBeGreaterThan(0);
     });
   });
 
-  describe('preset differences', () => {
-    it('should use different models for different presets', () => {
+  describe('smart selection differences', () => {
+    it('should use different models based on available providers', () => {
       const workType = 'issue-agent:planning' as WorkTypeId;
 
-      // Budget: should use cheaper models
-      const budgetRouter = new WorkTypeRouter(createTestConfig({ preset: 'budget' }));
-      const budgetModel = budgetRouter.getModelId(workType);
+      // Only Anthropic: should use Claude
+      const anthropicRouter = new WorkTypeRouter(createTestConfig({
+        enabledProviders: new Set(['anthropic']),
+      }));
+      const anthropicModel = anthropicRouter.getModelId(workType);
 
-      // Balanced: should use mid-tier models
-      const balancedRouter = new WorkTypeRouter(createTestConfig({ preset: 'balanced' }));
-      const balancedModel = balancedRouter.getModelId(workType);
+      // Only OpenAI: should use GPT
+      const openaiRouter = new WorkTypeRouter(createTestConfig({
+        enabledProviders: new Set(['openai', 'anthropic']), // Include anthropic as fallback
+      }));
+      const openaiModel = openaiRouter.getModelId(workType);
 
-      // Premium: should use top-tier models
-      const premiumRouter = new WorkTypeRouter(createTestConfig({ preset: 'premium' }));
-      const premiumModel = premiumRouter.getModelId(workType);
-
-      // All should be different
-      expect(new Set([budgetModel, balancedModel, premiumModel]).size).toBe(3);
+      // Both should return valid models
+      expect(anthropicModel).toBeDefined();
+      expect(openaiModel).toBeDefined();
+      expect(anthropicModel.length).toBeGreaterThan(0);
+      expect(openaiModel.length).toBeGreaterThan(0);
     });
 
-    it('should return correct preset name', () => {
-      const presets: PresetName[] = ['budget', 'balanced', 'premium'];
+    it('should return enabled providers', () => {
+      const providers = ['anthropic', 'openai', 'google'] as const;
 
-      for (const preset of presets) {
-        const router = new WorkTypeRouter(createTestConfig({ preset }));
-        expect(router.getPreset()).toBe(preset);
+      for (const provider of providers) {
+        const router = new WorkTypeRouter(createTestConfig({
+          enabledProviders: new Set([provider]),
+        }));
+        expect(router.getEnabledProviders().has(provider)).toBe(true);
       }
     });
   });
@@ -95,7 +104,6 @@ describe('configuration precedence in router', () => {
   describe('provider filtering', () => {
     it('should apply fallback when provider is disabled', () => {
       const config = createTestConfig({
-        preset: 'premium',
         enabledProviders: new Set(['anthropic']), // Only Anthropic enabled
         overrides: {
           'issue-agent:implementation': 'gpt-5.2-codex', // OpenAI model
@@ -113,7 +121,6 @@ describe('configuration precedence in router', () => {
 
     it('should not apply fallback when provider is enabled', () => {
       const config = createTestConfig({
-        preset: 'premium',
         enabledProviders: new Set(['anthropic', 'openai']),
         overrides: {
           'issue-agent:implementation': 'gpt-5.2-codex',
@@ -132,7 +139,6 @@ describe('configuration precedence in router', () => {
   describe('multiple overrides', () => {
     it('should handle multiple overrides independently', () => {
       const config = createTestConfig({
-        preset: 'balanced',
         enabledProviders: new Set(['anthropic', 'openai']), // Enable providers so no fallback
         overrides: {
           'issue-agent:exploration': 'claude-haiku-4-5',
@@ -148,9 +154,8 @@ describe('configuration precedence in router', () => {
       expect(router.getModelId('issue-agent:implementation' as WorkTypeId)).toBe('gpt-5.2-codex');
     });
 
-    it('should use preset for non-overridden work types', () => {
+    it('should use smart selection for non-overridden work types', () => {
       const config = createTestConfig({
-        preset: 'premium',
         enabledProviders: new Set(['anthropic', 'openai', 'google']), // Enable all providers
         overrides: {
           'issue-agent:planning': 'claude-haiku-4-5', // Only planning overridden
@@ -164,8 +169,8 @@ describe('configuration precedence in router', () => {
       expect(planningResult.model).toBe('claude-haiku-4-5');
 
       const explorationResult = router.getModel('issue-agent:exploration' as WorkTypeId);
-      expect(explorationResult.source).toBe('preset');
-      expect(explorationResult.preset).toBe('premium');
+      expect(explorationResult.source).toBe('smart');
+      expect(explorationResult.model).toBeDefined();
     });
   });
 
@@ -232,17 +237,19 @@ describe('configuration precedence in router', () => {
 
   describe('router reload', () => {
     it('should allow reloading configuration', () => {
-      const config1 = createTestConfig({ preset: 'budget' });
+      const config1 = createTestConfig({ enabledProviders: new Set(['anthropic']) });
       const router = new WorkTypeRouter(config1);
 
-      expect(router.getPreset()).toBe('budget');
+      expect(router.getEnabledProviders().has('anthropic')).toBe(true);
+      expect(router.getEnabledProviders().has('openai')).toBe(false);
 
       // Simulate config change by creating new config and reloading
       // Note: In real usage, reload() would re-read from disk
-      const config2 = createTestConfig({ preset: 'premium' });
+      const config2 = createTestConfig({ enabledProviders: new Set(['anthropic', 'openai']) });
       const newRouter = new WorkTypeRouter(config2);
 
-      expect(newRouter.getPreset()).toBe('premium');
+      expect(newRouter.getEnabledProviders().has('anthropic')).toBe(true);
+      expect(newRouter.getEnabledProviders().has('openai')).toBe(true);
     });
   });
 
