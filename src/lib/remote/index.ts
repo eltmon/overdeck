@@ -30,6 +30,16 @@ export {
 } from './remote-agents.js';
 export type { RemoteAgentState, SpawnRemoteAgentOptions } from './remote-agents.js';
 
+// Workspace metadata management
+export {
+  saveWorkspaceMetadata,
+  loadWorkspaceMetadata,
+  listWorkspaceMetadata,
+  deleteWorkspaceMetadata,
+  findRemoteWorkspaceMetadata,
+  WORKSPACES_DIR,
+} from './workspace-metadata.js';
+
 import { ExeProvider, createExeProvider } from './exe-provider.js';
 import type { RemoteProvider, RemoteProviderConfig } from './interface.js';
 

@@ -64,20 +64,98 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
 
 import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../../lib/shadow-mode.js';
 import { createShadowState, updateShadowState } from '../../../lib/shadow-state.js';
+import { loadConfig } from '../../../lib/config.js';
+import {
+  loadWorkspaceMetadata,
+  findRemoteWorkspaceMetadata,
+} from '../../../lib/remote/workspace-metadata.js';
+import {
+  spawnRemoteAgent,
+  isRemoteAgentRunning,
+} from '../../../lib/remote/index.js';
+import { isRemoteAvailable } from '../../../lib/remote/index.js';
+import type { RemoteWorkspaceMetadata } from '../../../lib/remote/interface.js';
+import type { SpawnRemoteAgentOptions } from '../../../lib/remote/remote-agents.js';
 
 interface IssueOptions {
   model: string;
   runtime: string;
   dryRun?: boolean;
   shadow?: boolean;
+  remote?: boolean;
+  local?: boolean;
 }
 
 /**
- * Find the workspace directory for an issue.
- * First checks project registry for the correct project path,
- * then looks for workspaces/feature-{issue-id}/ in the project root.
+ * Determine workspace location based on flags and config
+ * Returns: 'local' | 'remote' | null (null means check both)
  */
-function findWorkspace(issueId: string, labels: string[] = []): string | null {
+function determineWorkspaceLocation(options: IssueOptions): 'local' | 'remote' | null {
+  // Explicit flags take precedence
+  if (options.remote && options.local) {
+    throw new Error('Cannot specify both --remote and --local');
+  }
+
+  if (options.remote) {
+    return 'remote';
+  }
+
+  if (options.local) {
+    return 'local';
+  }
+
+  // Check config for default location
+  const config = loadConfig();
+  if (config.remote?.enabled && config.remote.default_location) {
+    return config.remote.default_location;
+  }
+
+  // Default: check both (local takes precedence if both exist)
+  return null;
+}
+
+/**
+ * Find workspace directory - checks local first, then remote metadata
+ */
+function findWorkspaceWithLocation(
+  issueId: string,
+  location: 'local' | 'remote' | null,
+  labels: string[] = []
+): { workspacePath: string | null; isRemote: boolean } {
+  const normalizedId = issueId.toLowerCase();
+
+  // If explicitly remote, only check remote
+  if (location === 'remote') {
+    const remoteMetadata = findRemoteWorkspaceMetadata(issueId);
+    if (remoteMetadata) {
+      return { workspacePath: remoteMetadata.id, isRemote: true };
+    }
+    return { workspacePath: null, isRemote: true };
+  }
+
+  // If explicitly local or no preference, check local first
+  if (location === 'local' || location === null) {
+    const localWorkspace = findLocalWorkspace(issueId, labels);
+    if (localWorkspace) {
+      return { workspacePath: localWorkspace, isRemote: false };
+    }
+  }
+
+  // If no local workspace found and no explicit local preference, check remote
+  if (location === null || location === 'remote') {
+    const remoteMetadata = findRemoteWorkspaceMetadata(issueId);
+    if (remoteMetadata) {
+      return { workspacePath: remoteMetadata.id, isRemote: true };
+    }
+  }
+
+  return { workspacePath: null, isRemote: false };
+}
+
+/**
+ * Find the local workspace directory for an issue.
+ */
+function findLocalWorkspace(issueId: string, labels: string[] = []): string | null {
   const normalizedId = issueId.toLowerCase();
 
   // First, try to resolve from project registry
@@ -120,6 +198,195 @@ function findWorkspace(issueId: string, labels: string[] = []): string | null {
   }
 
   return null;
+}
+
+/**
+ * Find the workspace directory for an issue (local only - backward compatible).
+ * @deprecated Use findLocalWorkspace or findWorkspaceWithLocation instead
+ */
+function findWorkspace(issueId: string, labels: string[] = []): string | null {
+  return findLocalWorkspace(issueId, labels);
+}
+
+/**
+ * Handle remote workspace agent spawning
+ */
+async function handleRemoteWorkspace(
+  issueId: string,
+  options: IssueOptions,
+  spinner: ora.Ora
+): Promise<void> {
+  const config = loadConfig();
+
+  // Verify remote is enabled
+  if (!config.remote?.enabled) {
+    spinner.fail('Remote workspaces not enabled');
+    console.log('');
+    console.log(chalk.dim('Run: pan config set remote.enabled true'));
+    console.log(chalk.dim('Then: pan remote setup'));
+    process.exit(1);
+  }
+
+  // Check remote availability
+  spinner.text = 'Checking remote availability...';
+  const availability = await isRemoteAvailable();
+  if (!availability.available) {
+    spinner.fail('Remote not available');
+    console.log('');
+    console.log(chalk.yellow(availability.reason || 'Unknown error'));
+
+    // If user explicitly requested remote, fail
+    if (options.remote) {
+      process.exit(1);
+    }
+
+    // Otherwise, suggest creating local workspace
+    console.log('');
+    console.log(chalk.bold('To create a local workspace instead:'));
+    console.log(`  ${chalk.cyan(`pan workspace ${issueId} --local`)}`);
+    console.log(`  ${chalk.cyan(`pan work issue ${issueId} --local`)}`);
+    process.exit(1);
+  }
+
+  // Check for existing remote workspace
+  let remoteMetadata = findRemoteWorkspaceMetadata(issueId);
+
+  // Auto-create if not found
+  if (!remoteMetadata) {
+    spinner.text = 'Remote workspace not found, creating...';
+    try {
+      const { createRemoteWorkspace } = await import('../../../lib/remote-workspace.js');
+      remoteMetadata = await createRemoteWorkspace(issueId, { spinner });
+    } catch (error: any) {
+      spinner.fail(`Failed to create remote workspace: ${error.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Check if remote agent already running
+  spinner.text = 'Checking for existing agent...';
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  const isRunning = await isRemoteAgentRunning(agentId, remoteMetadata.vmName);
+
+  if (isRunning) {
+    spinner.fail(`Agent ${agentId} already running on remote VM`);
+    console.log('');
+    console.log(chalk.dim(`Use 'pan work tell ${issueId} "message"' to send commands`));
+    process.exit(1);
+  }
+
+  if (options.dryRun) {
+    spinner.info('Dry run mode (remote)');
+    console.log('');
+    console.log(chalk.bold('Would create:'));
+    console.log(`  Agent ID:   ${agentId}`);
+    console.log(`  VM:         ${chalk.cyan(remoteMetadata.vmName)}`);
+    console.log(`  Provider:   ${remoteMetadata.provider}`);
+    console.log(`  Model:      ${options.model || 'default'}`);
+    return;
+  }
+
+  // Build prompt for remote agent
+  spinner.text = 'Building agent prompt...';
+  const projectRoot = findProjectRoot(issueId);
+  const prompt = buildAgentPrompt(issueId, `/workspace`, projectRoot);
+
+  // Spawn remote agent
+  spinner.text = 'Spawning remote agent...';
+
+  try {
+    const remoteAgent = await spawnRemoteAgent({
+      issueId,
+      workspace: remoteMetadata,
+      model: options.model,
+      prompt,
+    });
+
+    spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
+
+    // Handle shadow mode
+    const skipTrackerUpdate = shouldSkipTrackerUpdate(issueId, options.shadow);
+
+    if (skipTrackerUpdate) {
+      createShadowState(issueId, 'open', 'pan work issue');
+      updateShadowState(issueId, 'in_progress', 'pan work issue');
+      console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
+    } else if (isLinearIssue(issueId)) {
+      const apiKey = getLinearApiKey();
+      if (apiKey) {
+        const updated = await updateLinearToInProgress(apiKey, issueId);
+        if (updated) {
+          console.log(chalk.green(`  ✓ Updated ${issueId.toUpperCase()} to In Progress`));
+        }
+      }
+    }
+
+    console.log('');
+    console.log(chalk.bold('Agent Details:'));
+    console.log(`  Session:    ${chalk.cyan(remoteAgent.id)}`);
+    console.log(`  VM:         ${chalk.cyan(remoteMetadata.vmName)}`);
+    console.log(`  Location:   ${chalk.yellow('Remote (exe.dev)')}`);
+    console.log(`  Model:      ${remoteAgent.model}`);
+
+    if (remoteMetadata.urls.frontend || remoteMetadata.urls.api) {
+      console.log('');
+      console.log(chalk.bold('URLs:'));
+      if (remoteMetadata.urls.frontend) {
+        console.log(`  Frontend: ${chalk.cyan(remoteMetadata.urls.frontend)}`);
+      }
+      if (remoteMetadata.urls.api) {
+        console.log(`  API:      ${chalk.cyan(remoteMetadata.urls.api)}`);
+      }
+    }
+
+    console.log('');
+    console.log(chalk.dim('Commands:'));
+    console.log(`  SSH:      pan workspace ssh ${issueId}`);
+    console.log(`  Message:  pan work tell ${issueId} "your message"`);
+    console.log(`  Kill:     pan work kill ${issueId}`);
+
+  } catch (error: any) {
+    spinner.fail(`Failed to spawn remote agent: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * Ensure remote workspace exists, auto-create if needed
+ */
+async function ensureRemoteWorkspace(
+  issueId: string,
+  spinner: ora.Ora
+): Promise<RemoteWorkspaceMetadata | null> {
+  // Check if remote workspace already exists
+  const existing = findRemoteWorkspaceMetadata(issueId);
+  if (existing) {
+    return existing;
+  }
+
+  // Auto-create remote workspace
+  spinner.text = 'Creating remote workspace...';
+
+  const config = loadConfig();
+  if (!config.remote?.enabled) {
+    throw new Error('Remote workspaces not enabled. Run `pan remote setup`');
+  }
+
+  // Check remote availability
+  const availability = await isRemoteAvailable();
+  if (!availability.available) {
+    throw new Error(`Remote not available: ${availability.reason}`);
+  }
+
+  // Import workspace creation logic
+  const { createRemoteWorkspace } = await import('../../../lib/remote-workspace.js');
+
+  try {
+    const metadata = await createRemoteWorkspace(issueId);
+    return metadata;
+  } catch (error: any) {
+    throw new Error(`Failed to create remote workspace: ${error.message}`);
+  }
 }
 
 /**
@@ -536,15 +803,27 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
     const normalizedId = id.toLowerCase();
 
-    // Find workspace for this issue (using project registry first, then cwd fallback)
-    const projectRoot = findProjectRoot(id);
-    let workspace = findWorkspace(id);
+    // Determine workspace location preference
+    const locationPreference = determineWorkspaceLocation(options);
 
     // Log project resolution info
     const resolved = resolveProjectFromIssue(id);
     if (resolved) {
       spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
     }
+
+    // Find workspace (local or remote based on preference)
+    const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
+
+    // Handle remote workspace
+    if (isRemote || (locationPreference === 'remote' && !workspacePath)) {
+      await handleRemoteWorkspace(id, options, spinner);
+      return;
+    }
+
+    // Handle local workspace
+    const projectRoot = findProjectRoot(id);
+    let workspace = workspacePath;
 
     if (!workspace) {
       spinner.fail(`No workspace found for ${id}`);
