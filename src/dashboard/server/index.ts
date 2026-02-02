@@ -7022,12 +7022,10 @@ Start by exploring the codebase to understand the context, then begin the discov
         await exe.ssh(vmName, `echo '${initMsgBase64}' | base64 -d > ${remotePromptFile}`);
 
         // Write launcher script using base64
-        // Use --print mode with stream-json to bypass TUI onboarding
-        const remoteOutputFile = `${remotePlanningDir}/output.jsonl`;
         const launcherContent = `#!/bin/bash
 cd /workspace
-export LANG=en_US.UTF-8
-exec claude --dangerously-skip-permissions --model ${planningModel} --print --verbose --output-format stream-json -p "${remotePromptFile}" 2>&1 | tee "${remoteOutputFile}"
+prompt=$(cat "${remotePromptFile}")
+exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
 `;
         const launcherBase64 = Buffer.from(launcherContent).toString('base64');
         await exe.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${remoteLauncherScript}`);

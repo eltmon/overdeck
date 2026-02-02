@@ -815,57 +815,13 @@ async function createRemoteWorkspace(
     // Step 4.5: Create /workspace symlink for consistent paths
     await exe.ssh(vmName, `sudo ln -sf /home/exedev/workspace /workspace 2>/dev/null || true`);
 
-    // Step 4.6: Copy Claude Code config from local machine to VM
-    spinner.text = 'Configuring Claude Code...';
-    await exe.ssh(vmName, `mkdir -p ~/.claude/statsig`);
-
-    // Copy credentials from macOS Keychain
-    try {
-      const { stdout: credentials } = await execAsync(
-        'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
-        { encoding: 'utf-8' }
-      );
-      if (credentials && credentials.trim()) {
-        const credsBase64 = Buffer.from(credentials.trim()).toString('base64');
-        await exe.ssh(vmName, `echo '${credsBase64}' | base64 -d > ~/.claude/.credentials.json`);
-      }
-    } catch {
-      spinner.warn('Could not copy Claude credentials - you may need to login on the VM');
-    }
-
-    // Copy settings.json with onboarding completion and remote-safe settings
-    try {
-      const settingsPath = join(homedir(), '.claude', 'settings.json');
-      let settings: Record<string, any> = {};
-      if (existsSync(settingsPath)) {
-        settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
-      }
-      // Ensure onboarding is marked complete for remote VMs
-      settings.hasCompletedOnboarding = true;
-      settings.theme = settings.theme || 'dark';
-      // Remove hooks that reference local paths (they won't work on remote)
-      delete settings.hooks;
-      const settingsJson = JSON.stringify(settings, null, 2);
-      const settingsBase64 = Buffer.from(settingsJson).toString('base64');
-      await exe.ssh(vmName, `echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
-    } catch {
-      // Settings copy failed - not critical
-    }
-
-    // Copy statsig files (user state/feature flags)
-    try {
-      const statsigDir = join(homedir(), '.claude', 'statsig');
-      if (existsSync(statsigDir)) {
-        const files = readdirSync(statsigDir);
-        for (const file of files) {
-          const content = readFileSync(join(statsigDir, file), 'utf-8');
-          const contentBase64 = Buffer.from(content).toString('base64');
-          await exe.ssh(vmName, `echo '${contentBase64}' | base64 -d > ~/.claude/statsig/${file}`);
-        }
-      }
-    } catch {
-      // Statsig copy failed - not critical
-    }
+    // Step 4.6: Pre-configure Claude Code to skip onboarding
+    const claudeSettings = JSON.stringify({
+      theme: 'dark',
+      hasCompletedOnboarding: true,
+    });
+    const settingsBase64 = Buffer.from(claudeSettings).toString('base64');
+    await exe.ssh(vmName, `mkdir -p ~/.claude && echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
 
     // Step 5: Configure environment for shared infra
     spinner.text = 'Configuring environment...';
