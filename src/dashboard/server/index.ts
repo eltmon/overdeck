@@ -6564,6 +6564,7 @@ async function addGitHubPlanningLabel(owner: string, repo: string, number: numbe
 app.post('/api/issues/:id/start-planning', async (req, res) => {
   const { id } = req.params;
   const { skipWorkspace = false, startDocker = false, workspaceLocation = 'local' } = req.body;
+  console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}`);
 
   try {
     // Check if a work agent is already running for this issue
@@ -6620,8 +6621,10 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       };
 
       // Add "planning" label to GitHub issue
+      console.log(`[start-planning] Fetched GitHub issue, adding planning label...`);
       await addGitHubPlanningLabel(githubCheck.owner, githubCheck.repo, githubCheck.number);
       newStateName = 'Planning (label added)';
+      console.log(`[start-planning] GitHub issue setup complete`);
 
     } else {
       // Handle Linear issue
@@ -6763,16 +6766,20 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
     let existingRemoteWorkspace: any = null;
 
     // Check for existing remote workspace FIRST (before trying to create)
+    console.log(`[start-planning] Checking for existing workspace, location=${workspaceLocation}`);
     if (workspaceLocation === 'remote') {
       try {
         const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
+        console.log(`[start-planning] Loading workspace metadata for ${issue.identifier}...`);
         existingRemoteWorkspace = loadWorkspaceMetadata(issue.identifier);
         if (existingRemoteWorkspace) {
           console.log(`[start-planning] Found existing remote workspace: ${existingRemoteWorkspace.vmName}`);
           workspaceCreated = true; // Remote workspace already exists
+        } else {
+          console.log(`[start-planning] No existing remote workspace found`);
         }
       } catch (err) {
-        console.log('[start-planning] Could not check for existing remote workspace');
+        console.log('[start-planning] Could not check for existing remote workspace:', err);
       }
     }
 
@@ -6987,33 +6994,42 @@ Start by exploring the codebase to understand the context, then begin the discov
         const remotePlanningDir = '/workspace/.planning';
         const remotePlanningPromptPath = `${remotePlanningDir}/PLANNING_PROMPT.md`;
 
+        console.log(`[start-planning] Step 1: mkdir -p ${remotePlanningDir}`);
         await exe.ssh(vmName, `mkdir -p ${remotePlanningDir}`);
+        console.log(`[start-planning] Step 1 complete`);
 
         // Clear stale STATE.md on remote
+        console.log(`[start-planning] Step 2: rm -f STATE.md`);
         await exe.ssh(vmName, `rm -f ${remotePlanningDir}/STATE.md`);
+        console.log(`[start-planning] Step 2 complete`);
 
-        // Write planning prompt to remote (escape for heredoc)
-        const escapedPrompt = planningPrompt.replace(/\\/g, '\\\\').replace(/\$/g, '\\$');
-        await exe.ssh(vmName, `cat > ${remotePlanningPromptPath} << 'PLANNING_PROMPT_EOF'
-${planningPrompt}
-PLANNING_PROMPT_EOF`);
+        // Write planning prompt to remote using base64 to avoid heredoc escaping issues
+        console.log(`[start-planning] Step 3: write planning prompt`);
+        const promptBase64 = Buffer.from(planningPrompt).toString('base64');
+        await exe.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${remotePlanningPromptPath}`);
+        console.log(`[start-planning] Step 3 complete`);
 
         // Create launcher script on remote
         const initMessage = `Please read the planning prompt file at ${remotePlanningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
         const remotePromptFile = `/workspace/.panopticon/prompts/${sessionName}.txt`;
         const remoteLauncherScript = `/workspace/.panopticon/prompts/${sessionName}-launcher.sh`;
 
+        console.log(`[start-planning] Step 4: create launcher files`);
         await exe.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
-        await exe.ssh(vmName, `cat > ${remotePromptFile} << 'PROMPT_EOF'
-${initMessage}
-PROMPT_EOF`);
 
-        await exe.ssh(vmName, `cat > ${remoteLauncherScript} << 'LAUNCHER_EOF'
-#!/bin/bash
+        // Write init message using base64
+        const initMsgBase64 = Buffer.from(initMessage).toString('base64');
+        await exe.ssh(vmName, `echo '${initMsgBase64}' | base64 -d > ${remotePromptFile}`);
+
+        // Write launcher script using base64
+        const launcherContent = `#!/bin/bash
 cd /workspace
 prompt=$(cat "${remotePromptFile}")
 exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
-LAUNCHER_EOF`);
+`;
+        const launcherBase64 = Buffer.from(launcherContent).toString('base64');
+        await exe.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${remoteLauncherScript}`);
+        console.log(`[start-planning] Step 4 complete`);
         await exe.ssh(vmName, `chmod +x ${remoteLauncherScript}`);
 
         // Start tmux session on remote VM
