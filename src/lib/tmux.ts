@@ -1,5 +1,50 @@
 import { execSync } from 'child_process';
-import { writeFileSync, chmodSync } from 'fs';
+import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
+import { PANOPTICON_HOME } from './paths.js';
+
+/**
+ * Log file for tmux sendKeys operations
+ * This helps debug mysterious messages appearing in agent prompts
+ */
+const SENDKEYS_LOG_FILE = join(PANOPTICON_HOME, 'logs', 'sendkeys.jsonl');
+
+/**
+ * Ensure log directory exists
+ */
+function ensureLogDir(): void {
+  const logDir = join(PANOPTICON_HOME, 'logs');
+  if (!existsSync(logDir)) {
+    mkdirSync(logDir, { recursive: true });
+  }
+}
+
+/**
+ * Log a sendKeys operation for debugging
+ */
+function logSendKeys(sessionName: string, keys: string, caller?: string): void {
+  try {
+    ensureLogDir();
+
+    // Get call stack to identify caller if not provided
+    const stack = new Error().stack || '';
+    const stackLines = stack.split('\n').slice(3, 6); // Skip Error, logSendKeys, sendKeys
+    const callerInfo = caller || stackLines.map(l => l.trim()).join(' <- ');
+
+    const entry = {
+      timestamp: new Date().toISOString(),
+      sessionName,
+      keysLength: keys.length,
+      keysPreview: keys.length > 200 ? keys.slice(0, 200) + '...' : keys,
+      caller: callerInfo,
+      pid: process.pid,
+    };
+
+    appendFileSync(SENDKEYS_LOG_FILE, JSON.stringify(entry) + '\n', 'utf-8');
+  } catch {
+    // Silently fail - logging should never break functionality
+  }
+}
 
 export interface TmuxSession {
   name: string;
@@ -83,7 +128,10 @@ export function killSession(name: string): void {
   execSync(`tmux kill-session -t ${name}`);
 }
 
-export function sendKeys(sessionName: string, keys: string): void {
+export function sendKeys(sessionName: string, keys: string, caller?: string): void {
+  // Log the sendKeys operation for debugging
+  logSendKeys(sessionName, keys, caller);
+
   // CRITICAL: Send keys and Enter as separate commands
   // This is the correct way - combining them doesn't work
   const escapedKeys = keys.replace(/"/g, '\\"');
