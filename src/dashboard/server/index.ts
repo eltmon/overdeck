@@ -1132,6 +1132,34 @@ app.get('/api/issues', async (req, res) => {
     // Merge all issues
     let allFormatted = [...linearFormatted, ...githubIssues, ...rallyIssues];
 
+    // Merge shadow state into issues (don't modify status - let frontend handle column placement)
+    try {
+      const { listShadowedIssues } = await import('../../lib/shadow-state.js');
+      const shadowStates = listShadowedIssues();
+
+      // Build lookup map by issue ID (case-insensitive)
+      const shadowMap = new Map<string, typeof shadowStates[0]>();
+      for (const state of shadowStates) {
+        shadowMap.set(state.issueId.toLowerCase(), state);
+      }
+
+      allFormatted = allFormatted.map(issue => {
+        const shadowState = shadowMap.get(issue.identifier.toLowerCase());
+        if (shadowState) {
+          return {
+            ...issue,
+            shadowStatus: shadowState.shadowStatus,
+            shadowedAt: shadowState.shadowedAt,
+          };
+        }
+        return { ...issue, shadowStatus: null };
+      });
+    } catch (e) {
+      console.error('Error loading shadow states:', e);
+      // Continue without shadow state if there's an error
+      allFormatted = allFormatted.map(issue => ({ ...issue, shadowStatus: null }));
+    }
+
     const oneDayAgoTime = getOneDayAgo().getTime();
 
     allFormatted = allFormatted.filter((issue: Issue) => {
