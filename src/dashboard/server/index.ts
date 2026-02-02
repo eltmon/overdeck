@@ -7822,6 +7822,107 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
   }
 });
 
+// Move an issue to a new status - supports both shadow state and tracker sync
+app.post('/api/issues/:id/move-status', async (req, res) => {
+  const { id } = req.params;
+  const { targetStatus, syncToTracker = false } = req.body || {};
+
+  // Validate targetStatus (CanonicalState)
+  const validStatuses = ['backlog', 'todo', 'planning', 'in_progress', 'in_review', 'done'];
+  if (!targetStatus || !validStatuses.includes(targetStatus)) {
+    return res.status(400).json({ error: `Invalid targetStatus. Must be one of: ${validStatuses.join(', ')}` });
+  }
+
+  try {
+    // Import shadow state module
+    const { updateShadowState } = await import('../../lib/shadow-state.js');
+
+    // Map CanonicalState to IssueState for shadow state
+    const canonicalToIssueState: Record<string, 'open' | 'in_progress' | 'closed'> = {
+      backlog: 'open',
+      todo: 'open',
+      planning: 'in_progress',
+      in_progress: 'in_progress',
+      in_review: 'in_progress',
+      done: 'closed',
+    };
+
+    const issueState = canonicalToIssueState[targetStatus];
+
+    // Update shadow state first (always)
+    const shadowResult = await updateShadowState(id, issueState, 'dashboard-drag-drop');
+
+    // If syncToTracker is true and it's a Linear issue, also update Linear
+    if (syncToTracker) {
+      const linearKey = process.env.LINEAR_API_KEY || '';
+      if (!linearKey) {
+        return res.status(400).json({ error: 'LINEAR_API_KEY not configured for sync' });
+      }
+
+      // Check if it's a GitHub issue (skip Linear sync for those)
+      const githubCheck = isGitHubIssue(id);
+      if (githubCheck.isGitHub) {
+        // GitHub issues don't support sync to tracker in this implementation
+        console.log(`GitHub issue ${id} - skipping tracker sync`);
+      } else {
+        // Import Linear SDK
+        const { LinearClient } = await import('@linear/sdk');
+        const client = new LinearClient({ apiKey: linearKey });
+
+        // Find the issue by identifier
+        const issue = await client.issue(id);
+
+        if (!issue) {
+          return res.status(404).json({ error: `Issue ${id} not found in Linear` });
+        }
+
+        // Get team states to find the target state
+        const team = await issue.team;
+        if (!team) {
+          return res.status(400).json({ error: 'Could not determine team for issue' });
+        }
+
+        const states = await team.states();
+
+        // Map canonical state to Linear state type
+        const stateTypeMap: Record<string, string> = {
+          backlog: 'backlog',
+          todo: 'unstarted',
+          planning: 'started',
+          in_progress: 'started',
+          in_review: 'started',
+          done: 'completed',
+        };
+
+        const targetStateType = stateTypeMap[targetStatus];
+
+        // Find the first matching state for the target type
+        const targetState = states.nodes.find(s => s.type === targetStateType);
+
+        if (!targetState) {
+          return res.status(400).json({ error: `Could not find state of type '${targetStateType}' for team` });
+        }
+
+        // Update the issue state in Linear
+        await issue.update({ stateId: targetState.id });
+        console.log(`Synced issue ${id} to Linear state: ${targetState.name}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Issue ${id} moved to ${targetStatus}`,
+      issueId: id,
+      newStatus: targetStatus,
+      syncToTracker,
+      shadowState: shadowResult,
+    });
+  } catch (error: any) {
+    console.error('Error moving issue status:', error);
+    res.status(500).json({ error: 'Failed to move issue status: ' + error.message });
+  }
+});
+
 // Deep wipe - completely clean up all state for an issue
 app.post('/api/issues/:id/deep-wipe', async (req, res) => {
   const { id } = req.params;

@@ -1,7 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor } from 'lucide-react';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  defaultDropAnimationSideEffects,
+  DropAnimation,
+} from '@dnd-kit/core';
+import {
+  useDraggable,
+  useDroppable,
+} from '@dnd-kit/core';
+import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
@@ -174,6 +191,14 @@ interface KanbanBoardProps {
 
 type CycleFilter = 'current' | 'all' | 'backlog';
 
+// Undo history entry
+interface UndoEntry {
+  issueId: string;
+  fromStatus: CanonicalState;
+  toStatus: CanonicalState;
+  timestamp: number;
+}
+
 export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
@@ -182,6 +207,26 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [beadsDialogIssue, setBeadsDialogIssue] = useState<Issue | null>(null); // Beads viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
+
+  // DnD state
+  const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
+  const [activeDragStatus, setActiveDragStatus] = useState<CanonicalState | null>(null);
+
+  // Undo state
+  const [undoHistory, setUndoHistory] = useState<UndoEntry[]>([]);
+  const [showUndoToast, setShowUndoToast] = useState(false);
+  const [undoTimeoutId, setUndoTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
+  // Dialog states
+  const [agentWarningDialog, setAgentWarningDialog] = useState<{
+    open: boolean;
+    issue: Issue | null;
+    targetStatus: CanonicalState | null;
+  }>({ open: false, issue: null, targetStatus: null });
+  const [syncPromptDialog, setSyncPromptDialog] = useState<{
+    open: boolean;
+    issue: Issue | null;
+  }>({ open: false, issue: null });
 
   // Use external state if provided, otherwise use internal state
   const selectedIssue = externalSelectedIssue !== undefined ? externalSelectedIssue : internalSelectedIssue;
@@ -203,6 +248,174 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     queryFn: fetchSpecialists,
     refetchInterval: 5000, // Refresh every 5 seconds
   });
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  // Move status mutation
+  const moveStatusMutation = useMutation({
+    mutationFn: async ({ issueId, targetStatus, syncToTracker }: { issueId: string; targetStatus: CanonicalState; syncToTracker?: boolean }) => {
+      const res = await fetch(`/api/issues/${issueId}/move-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetStatus, syncToTracker }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to move issue');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+    },
+  });
+
+  // Handle undo
+  const handleUndo = useCallback(() => {
+    if (undoHistory.length === 0) return;
+
+    const lastEntry = undoHistory[undoHistory.length - 1];
+    moveStatusMutation.mutate({
+      issueId: lastEntry.issueId,
+      targetStatus: lastEntry.fromStatus,
+    });
+
+    setUndoHistory(prev => prev.slice(0, -1));
+    setShowUndoToast(false);
+    if (undoTimeoutId) {
+      clearTimeout(undoTimeoutId);
+      setUndoTimeoutId(null);
+    }
+  }, [undoHistory, moveStatusMutation, undoTimeoutId]);
+
+  // Keyboard shortcut for undo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo]);
+
+  // Show undo toast
+  const showUndoNotification = useCallback((issueId: string, fromStatus: CanonicalState, toStatus: CanonicalState) => {
+    setUndoHistory(prev => [...prev, { issueId, fromStatus, toStatus, timestamp: Date.now() }]);
+    setShowUndoToast(true);
+
+    if (undoTimeoutId) {
+      clearTimeout(undoTimeoutId);
+    }
+
+    const timeoutId = setTimeout(() => {
+      setShowUndoToast(false);
+    }, 8000);
+    setUndoTimeoutId(timeoutId);
+  }, [undoTimeoutId]);
+
+  // Handle drag start
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event;
+    const issueId = active.id as string;
+    const issue = issues?.find(i => i.id === issueId);
+    if (issue) {
+      setActiveDragIssue(issue);
+      setActiveDragStatus(STATUS_LABELS[issue.status] as CanonicalState);
+    }
+  }, [issues]);
+
+  // Handle drag end
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragIssue(null);
+    setActiveDragStatus(null);
+
+    if (!over) return;
+
+    const issueId = active.id as string;
+    const targetStatus = over.id as CanonicalState;
+
+    const issue = issues?.find(i => i.id === issueId);
+    if (!issue) return;
+
+    const currentStatus = STATUS_LABELS[issue.status] as CanonicalState;
+
+    // No change
+    if (currentStatus === targetStatus) return;
+
+    // Check for active agents
+    const issueIdLower = issue.identifier.toLowerCase();
+    const hasActiveAgent = agents.some(
+      a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead'
+    );
+
+    if (hasActiveAgent) {
+      setAgentWarningDialog({ open: true, issue, targetStatus });
+      return;
+    }
+
+    // Check if moving to done
+    if (targetStatus === 'done') {
+      setSyncPromptDialog({ open: true, issue });
+      return;
+    }
+
+    // Proceed with move
+    showUndoNotification(issue.identifier, currentStatus, targetStatus);
+    moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus });
+  }, [issues, agents, moveStatusMutation, showUndoNotification]);
+
+  // Confirm agent warning
+  const confirmAgentMove = useCallback(() => {
+    const { issue, targetStatus } = agentWarningDialog;
+    if (!issue || !targetStatus) return;
+
+    setAgentWarningDialog({ open: false, issue: null, targetStatus: null });
+
+    const currentStatus = STATUS_LABELS[issue.status] as CanonicalState;
+
+    if (targetStatus === 'done') {
+      setSyncPromptDialog({ open: true, issue });
+      return;
+    }
+
+    showUndoNotification(issue.identifier, currentStatus, targetStatus);
+    moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus });
+  }, [agentWarningDialog, moveStatusMutation, showUndoNotification]);
+
+  // Handle sync prompt response
+  const handleSyncPrompt = useCallback((syncToTracker: boolean) => {
+    const { issue } = syncPromptDialog;
+    if (!issue) return;
+
+    setSyncPromptDialog({ open: false, issue: null });
+
+    const currentStatus = STATUS_LABELS[issue.status] as CanonicalState;
+
+    showUndoNotification(issue.identifier, currentStatus, 'done');
+    moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus: 'done', syncToTracker });
+  }, [syncPromptDialog, moveStatusMutation, showUndoNotification]);
+
+  // Drop animation config
+  const dropAnimation: DropAnimation = {
+    sideEffects: defaultDropAnimationSideEffects({
+      styles: {
+        active: {
+          opacity: '0.5',
+        },
+      },
+    }),
+  };
 
   // Fetch costs for all issues
   const { data: issueCosts = {} } = useQuery({
@@ -375,58 +588,94 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         )}
       </div>
 
-      {/* Kanban columns */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
-      {STATUS_ORDER.map((status) => (
-        <div key={status} className="flex-shrink-0 w-80">
-          <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-gray-800 rounded-lg`}>
-            <div className="px-4 py-3 border-b border-gray-700">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-white">{COLUMN_TITLES[status]}</h3>
-                <span className="text-sm text-gray-400">{grouped[status].length}</span>
-              </div>
-            </div>
-            <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
-              {grouped[status].map((issue) => {
-                const issueIdLower = issue.identifier.toLowerCase();
-                // Find both planning and work agents separately
-                const planningAgent = agents.find(
-                  (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'planning'
-                );
-                const workAgent = agents.find(
-                  (a) => a.issueId?.toLowerCase() === issueIdLower && a.type !== 'planning'
-                );
-                // Find specialists working on this issue
-                const issueSpecialists = specialists.filter(
-                  (s) => s.currentIssue?.toLowerCase() === issueIdLower
-                );
-                return (
-                  <IssueCard
-                    key={issue.id}
-                    issue={issue}
-                    planningAgent={planningAgent}
-                    workAgent={workAgent}
-                    specialists={issueSpecialists}
-                    cost={issueCosts[issue.identifier.toLowerCase()]}
-                    isSelected={selectedIssue === issue.identifier}
-                    onSelect={() => onSelectIssue(
-                      selectedIssue === issue.identifier ? null : issue.identifier
-                    )}
-                    onPlan={() => setPlanDialogIssue(issue)}
-                    onViewBeads={(i) => setBeadsDialogIssue(i)}
-                  />
-                );
-              })}
-              {grouped[status].length === 0 && (
-                <div className="text-center text-gray-500 py-8 text-sm">
-                  No issues
+      {/* Kanban columns with DnD */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {STATUS_ORDER.map((status) => (
+            <DroppableColumn key={status} status={status}>
+              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-gray-800 rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-gray-800/80' : ''}`}>
+                <div className="px-4 py-3 border-b border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-white">{COLUMN_TITLES[status]}</h3>
+                    <span className="text-sm text-gray-400">{grouped[status].length}</span>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+                <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
+                  {grouped[status].map((issue) => {
+                    const issueIdLower = issue.identifier.toLowerCase();
+                    // Find both planning and work agents separately
+                    const planningAgent = agents.find(
+                      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'planning'
+                    );
+                    const workAgent = agents.find(
+                      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type !== 'planning'
+                    );
+                    // Find specialists working on this issue
+                    const issueSpecialists = specialists.filter(
+                      (s) => s.currentIssue?.toLowerCase() === issueIdLower
+                    );
+                    return (
+                      <DraggableCardWrapper key={issue.id} issue={issue}>
+                        <IssueCard
+                          issue={issue}
+                          planningAgent={planningAgent}
+                          workAgent={workAgent}
+                          specialists={issueSpecialists}
+                          cost={issueCosts[issue.identifier.toLowerCase()]}
+                          isSelected={selectedIssue === issue.identifier}
+                          onSelect={() => onSelectIssue(
+                            selectedIssue === issue.identifier ? null : issue.identifier
+                          )}
+                          onPlan={() => setPlanDialogIssue(issue)}
+                          onViewBeads={(i) => setBeadsDialogIssue(i)}
+                        />
+                      </DraggableCardWrapper>
+                    );
+                  })}
+                  {grouped[status].length === 0 && (
+                    <div className="text-center text-gray-500 py-8 text-sm">
+                      No issues
+                    </div>
+                  )}
+                </div>
+              </div>
+            </DroppableColumn>
+          ))}
         </div>
-      ))}
-      </div>
+
+        {/* Drag Overlay - Ghost card following cursor */}
+        <DragOverlay dropAnimation={dropAnimation}>
+          {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
+        </DragOverlay>
+      </DndContext>
+
+      {/* Undo Toast */}
+      <UndoToast
+        isVisible={showUndoToast}
+        onUndo={handleUndo}
+        onClose={() => setShowUndoToast(false)}
+      />
+
+      {/* Agent Warning Dialog */}
+      <AgentWarningDialog
+        isOpen={agentWarningDialog.open}
+        onClose={() => setAgentWarningDialog({ open: false, issue: null, targetStatus: null })}
+        onConfirm={confirmAgentMove}
+        issue={agentWarningDialog.issue}
+      />
+
+      {/* Sync Prompt Dialog */}
+      <SyncPromptDialog
+        isOpen={syncPromptDialog.open}
+        onClose={() => setSyncPromptDialog({ open: false, issue: null })}
+        onSync={handleSyncPrompt}
+        issue={syncPromptDialog.issue}
+      />
 
       {/* Plan Dialog - lifted to survive IssueCard re-renders */}
       {planDialogIssue && (
@@ -448,6 +697,202 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onClose={() => setBeadsDialogIssue(null)}
         />
       )}
+    </div>
+  );
+}
+
+// DroppableColumn component
+function DroppableColumn({ status, children }: { status: CanonicalState; children: React.ReactNode }) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: status,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex-shrink-0 w-80 transition-all ${isOver ? 'scale-[1.02]' : ''}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// DraggableCard wrapper component
+interface DraggableCardWrapperProps {
+  issue: Issue;
+  children: React.ReactNode;
+}
+
+function DraggableCardWrapper({ issue, children }: DraggableCardWrapperProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: issue.id,
+    data: { issue },
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      }
+    : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`${isDragging ? 'opacity-30' : 'opacity-100'} cursor-grab active:cursor-grabbing`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// DragOverlayCard component for ghost card
+interface DragOverlayCardProps {
+  issue: Issue;
+}
+
+function DragOverlayCard({ issue }: DragOverlayCardProps) {
+  return (
+    <div className="bg-gray-700 rounded-lg p-3 border-l-4 border-l-blue-500 shadow-2xl rotate-2 scale-105 opacity-90">
+      <div className="flex items-center gap-2">
+        <span className="text-gray-400 text-sm">{issue.identifier}</span>
+      </div>
+      <p className="text-sm text-white mt-1 line-clamp-2">{issue.title}</p>
+    </div>
+  );
+}
+
+// Agent Warning Dialog
+interface AgentWarningDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  issue: Issue | null;
+}
+
+function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningDialogProps) {
+  if (!isOpen || !issue) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-start gap-4">
+          <div className="p-2 bg-amber-900/50 rounded-lg">
+            <AlertTriangle className="w-6 h-6 text-amber-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              Active Agent Warning
+            </h3>
+            <p className="text-gray-300 text-sm mb-4">
+              <strong>{issue.identifier}</strong> has an active agent working on it.
+              Moving this issue may disrupt the agent's work.
+            </p>
+            <p className="text-gray-400 text-xs mb-6">
+              Are you sure you want to proceed?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-gray-400 hover:text-white transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors text-sm"
+              >
+                Move Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sync Prompt Dialog
+interface SyncPromptDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSync: (syncToTracker: boolean) => void;
+  issue: Issue | null;
+}
+
+function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogProps) {
+  if (!isOpen || !issue) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-start gap-4">
+          <div className="p-2 bg-green-900/50 rounded-lg">
+            <Check className="w-6 h-6 text-green-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              Move to Done
+            </h3>
+            <p className="text-gray-300 text-sm mb-4">
+              You're moving <strong>{issue.identifier}</strong> to Done.
+            </p>
+            <p className="text-gray-400 text-xs mb-6">
+              Would you like to sync this change to Linear, or keep it in shadow state only?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => onSync(false)}
+                className="px-4 py-2 text-gray-400 hover:text-white transition-colors text-sm"
+              >
+                Shadow Only
+              </button>
+              <button
+                onClick={() => onSync(true)}
+                className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm"
+              >
+                Sync to Linear
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Undo Toast component
+interface UndoToastProps {
+  isVisible: boolean;
+  onUndo: () => void;
+  onClose: () => void;
+}
+
+function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+      <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
+        <span className="text-sm text-gray-300">Issue moved</span>
+        <button
+          onClick={onUndo}
+          className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          <Undo className="w-4 h-4" />
+          Undo
+        </button>
+        <button
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-400"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
