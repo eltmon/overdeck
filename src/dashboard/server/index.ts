@@ -9018,33 +9018,80 @@ wss.on('connection', (ws: WebSocket, req) => {
 
   // Check if tmux session exists (async to avoid blocking event loop)
   (async () => {
-    try {
-      const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""');
-      const sessions = stdout.trim().split('\n').filter(Boolean);
+    // Check if this is a remote session by reading agent state
+    let isRemote = false;
+    let vmName = '';
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    const stateFile = join(agentStateDir, 'state.json');
 
-      if (!sessions.includes(sessionName)) {
-        ws.close(1008, `Session ${sessionName} not found`);
-        return;
+    try {
+      if (existsSync(stateFile)) {
+        const stateContent = readFileSync(stateFile, 'utf-8');
+        const state = JSON.parse(stateContent);
+        if (state.location === 'remote' && state.vmName) {
+          isRemote = true;
+          vmName = state.vmName;
+          console.log(`[ws] Session ${sessionName} is remote on VM: ${vmName}`);
+        }
       }
-    } catch {
-      ws.close(1008, 'Failed to list tmux sessions');
+    } catch (err) {
+      console.log(`[ws] Could not read agent state for ${sessionName}:`, err);
+    }
+
+    // Check if tmux session exists (local or remote)
+    try {
+      if (isRemote) {
+        const { stdout } = await execAsync(`ssh -A ${vmName}.exe.xyz "tmux list-sessions -F \\"#{session_name}\\" 2>/dev/null || echo \\"\\""`, { timeout: 10000 });
+        const sessions = stdout.trim().split('\n').filter(Boolean);
+        if (!sessions.includes(sessionName)) {
+          ws.close(1008, `Remote session ${sessionName} not found on ${vmName}`);
+          return;
+        }
+      } else {
+        const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""');
+        const sessions = stdout.trim().split('\n').filter(Boolean);
+        if (!sessions.includes(sessionName)) {
+          ws.close(1008, `Session ${sessionName} not found`);
+          return;
+        }
+      }
+    } catch (err) {
+      ws.close(1008, `Failed to list tmux sessions: ${err}`);
       return;
     }
 
-    // Spawn a PTY that attaches to the tmux session
+    // Spawn a PTY that attaches to the tmux session (local or remote)
     // The PTY will receive the full screen content including alternate buffer
     // Initial dimensions match frontend xterm.js (120x30) to avoid resize flicker
-    const ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
-      name: 'xterm-256color',
-      cols: 120,
-      rows: 30,
-      cwd: homedir(),
-      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
-    });
+    let ptyProcess: pty.IPty;
+
+    if (isRemote) {
+      // For remote sessions, SSH to the VM and attach to tmux there
+      ptyProcess = pty.spawn('ssh', ['-A', '-t', `${vmName}.exe.xyz`, `tmux attach-session -t ${sessionName}`], {
+        name: 'xterm-256color',
+        cols: 120,
+        rows: 30,
+        cwd: homedir(),
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
+      });
+    } else {
+      ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
+        name: 'xterm-256color',
+        cols: 120,
+        rows: 30,
+        cwd: homedir(),
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
+      });
+    }
 
     // Pre-resize tmux window to match initial PTY dimensions
-    execAsync(`tmux resize-window -t ${sessionName} -x 120 -y 30 2>/dev/null || true`)
-      .catch(() => { /* ignore initial resize errors */ });
+    if (isRemote) {
+      execAsync(`ssh -A ${vmName}.exe.xyz "tmux resize-window -t ${sessionName} -x 120 -y 30 2>/dev/null || true"`, { timeout: 10000 })
+        .catch(() => { /* ignore initial resize errors */ });
+    } else {
+      execAsync(`tmux resize-window -t ${sessionName} -x 120 -y 30 2>/dev/null || true`)
+        .catch(() => { /* ignore initial resize errors */ });
+    }
 
     activePtys.set(sessionName, ptyProcess);
 
@@ -9056,7 +9103,10 @@ wss.on('connection', (ws: WebSocket, req) => {
         try {
           // Capture with -e to include escape sequences (colors, formatting)
           // -p prints to stdout, -S - -E - captures only the visible viewport (not scrollback)
-          const { stdout } = await execAsync(`tmux capture-pane -t "${sessionName}" -e -p -S - -E - 2>/dev/null || echo ""`);
+          const captureCmd = isRemote
+            ? `ssh -A ${vmName}.exe.xyz "tmux capture-pane -t \\"${sessionName}\\" -e -p -S - -E - 2>/dev/null || echo \\"\\""`
+            : `tmux capture-pane -t "${sessionName}" -e -p -S - -E - 2>/dev/null || echo ""`;
+          const { stdout } = await execAsync(captureCmd, { timeout: 10000 });
           if (stdout.trim()) {
             // Send a clear screen sequence first, then the captured content
             ws.send('\x1b[2J\x1b[H' + stdout);
