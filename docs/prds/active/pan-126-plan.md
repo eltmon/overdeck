@@ -1,6 +1,6 @@
 # PAN-126: pan work issue should use remote workspaces when configured
 
-## Status: Implementation Complete
+## Status: Planning Complete
 
 ## Problem Statement
 
@@ -138,26 +138,7 @@ Add:
 
 ## Remaining Work
 
-All implementation tasks completed. See completed beads below.
-
-## Completed Work
-
-1. **Extract workspace metadata functions (v605)** - Created `src/lib/remote/workspace-metadata.ts` with shared functions for loading/saving workspace metadata
-2. **Add --remote/--local flags (bzfo)** - Added flags to `pan work issue` command
-3. **Implement determineWorkspaceLocation (3sbs)** - Added logic to determine workspace location based on flags and config
-4. **Create remote-workspace module** - Created `src/lib/remote-workspace.ts` for shared remote workspace creation
-5. **Wire pan work issue to use remote workspaces (rw01)** - Updated `issueCommand` to:
-   - Check for remote workspace metadata
-   - Auto-create remote workspace if needed
-   - Spawn agent on remote VM using `spawnRemoteAgent`
-   - Handle shadow mode and Linear status updates for remote agents
-
-## Implementation Notes
-
-- Local workspaces take precedence when both local and remote exist (per decision table)
-- Remote workspace auto-creation happens when `default_location = remote` and no workspace exists
-- Error handling includes fallback suggestions when remote is unavailable
-- All remote agent functionality uses existing `remote-agents.ts` module
+Implementation needed - see beads tasks below.
 
 ## Beads Tasks
 

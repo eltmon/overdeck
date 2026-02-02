@@ -24,13 +24,14 @@ import { homedir } from 'os';
 import { loadConfig } from '../../lib/config.js';
 import { createExeProvider, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
-import { parse, stringify } from 'yaml';
-import { readFileSync, readdirSync } from 'fs';
+import {
+  saveWorkspaceMetadata,
+  loadWorkspaceMetadata,
+  listWorkspaceMetadata,
+  WORKSPACES_DIR,
+} from '../../lib/remote/workspace-metadata.js';
 
 const execAsync = promisify(exec);
-
-// Path for workspace metadata
-const WORKSPACES_DIR = join(homedir(), '.panopticon', 'workspaces');
 
 /**
  * Check beads version to determine which approach to use
@@ -698,60 +699,6 @@ async function destroyCommand(issueId: string, options: DestroyOptions): Promise
 // ============================================================================
 // Remote Workspace Functions
 // ============================================================================
-
-/**
- * Save workspace metadata to ~/.panopticon/workspaces/{issueId}.yaml
- */
-function saveWorkspaceMetadata(metadata: RemoteWorkspaceMetadata): void {
-  if (!existsSync(WORKSPACES_DIR)) {
-    mkdirSync(WORKSPACES_DIR, { recursive: true });
-  }
-
-  const filename = join(WORKSPACES_DIR, `${metadata.id}.yaml`);
-  writeFileSync(filename, stringify(metadata), 'utf-8');
-}
-
-/**
- * Load workspace metadata from ~/.panopticon/workspaces/{issueId}.yaml
- */
-function loadWorkspaceMetadata(issueId: string): RemoteWorkspaceMetadata | null {
-  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const filename = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
-
-  if (!existsSync(filename)) {
-    return null;
-  }
-
-  try {
-    const content = readFileSync(filename, 'utf-8');
-    return parse(content) as RemoteWorkspaceMetadata;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * List all workspace metadata files
- */
-function listWorkspaceMetadata(): RemoteWorkspaceMetadata[] {
-  if (!existsSync(WORKSPACES_DIR)) {
-    return [];
-  }
-
-  const files = readdirSync(WORKSPACES_DIR).filter(f => f.endsWith('.yaml'));
-  const workspaces: RemoteWorkspaceMetadata[] = [];
-
-  for (const file of files) {
-    try {
-      const content = readFileSync(join(WORKSPACES_DIR, file), 'utf-8');
-      workspaces.push(parse(content) as RemoteWorkspaceMetadata);
-    } catch {
-      // Skip invalid files
-    }
-  }
-
-  return workspaces;
-}
 
 /**
  * Create a remote workspace on exe.dev
