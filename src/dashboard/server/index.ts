@@ -6760,8 +6760,23 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
 
     let workspaceCreated = false;
     let workspaceError: string | undefined;
+    let existingRemoteWorkspace: any = null;
 
-    if (!skipWorkspace) {
+    // Check for existing remote workspace FIRST (before trying to create)
+    if (workspaceLocation === 'remote') {
+      try {
+        const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
+        existingRemoteWorkspace = loadWorkspaceMetadata(issue.identifier);
+        if (existingRemoteWorkspace) {
+          console.log(`[start-planning] Found existing remote workspace: ${existingRemoteWorkspace.vmName}`);
+          workspaceCreated = true; // Remote workspace already exists
+        }
+      } catch (err) {
+        console.log('[start-planning] Could not check for existing remote workspace');
+      }
+    }
+
+    if (!skipWorkspace && !workspaceCreated) {
       try {
         // Check if workspace needs to be created
         // A workspace with only .planning is incomplete (from a failed previous attempt)
@@ -6809,19 +6824,11 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
     let planningAgentError: string | undefined;
     let isRemotePlanning = false;
 
-    // Check if we're using a remote workspace
-    let remoteWorkspaceMetadata: any = null;
-    if (workspaceLocation === 'remote' && workspaceCreated) {
-      try {
-        const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
-        remoteWorkspaceMetadata = loadWorkspaceMetadata(issue.identifier);
-        if (remoteWorkspaceMetadata) {
-          isRemotePlanning = true;
-          console.log(`[start-planning] Using remote workspace on VM: ${remoteWorkspaceMetadata.vmName}`);
-        }
-      } catch (err) {
-        console.log('[start-planning] Could not load remote workspace metadata, falling back to local');
-      }
+    // Use existing remote workspace metadata if we already loaded it
+    let remoteWorkspaceMetadata: any = existingRemoteWorkspace;
+    if (workspaceLocation === 'remote' && workspaceCreated && remoteWorkspaceMetadata) {
+      isRemotePlanning = true;
+      console.log(`[start-planning] Using remote workspace on VM: ${remoteWorkspaceMetadata.vmName}`);
     }
 
     try {
