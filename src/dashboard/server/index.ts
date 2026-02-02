@@ -7923,6 +7923,75 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
   }
 });
 
+// Cleanup workspace for an issue (delete workspace directory and git worktree)
+app.post('/api/issues/:id/cleanup-workspace', async (req, res) => {
+  const { id } = req.params;
+  const cleanupLog: string[] = [];
+
+  try {
+    const issueLower = id.toLowerCase();
+    const githubCheck = isGitHubIssue(id);
+
+    // Find the workspace path
+    let projectRoot: string | null = null;
+    if (githubCheck.isGitHub) {
+      const localPaths = getGitHubLocalPaths();
+      const repoKey = `${githubCheck.owner}/${githubCheck.repo}`;
+      projectRoot = localPaths[repoKey] || null;
+    }
+    // TODO: Add Linear project path resolution
+
+    if (projectRoot) {
+      const workspacePath = join(projectRoot, 'workspaces', `feature-${issueLower}`);
+
+      // Check if it's a git worktree
+      try {
+        const worktreeList = await execAsync(`git worktree list --porcelain`, { cwd: projectRoot, encoding: 'utf-8' });
+        if (worktreeList.stdout.includes(workspacePath)) {
+          // It's a proper worktree - remove it
+          await execAsync(`git worktree remove "${workspacePath}" --force`, { cwd: projectRoot, encoding: 'utf-8' });
+          cleanupLog.push(`Removed git worktree: ${workspacePath}`);
+        } else if (existsSync(workspacePath)) {
+          // Just a directory - remove it
+          await execAsync(`rm -rf "${workspacePath}"`, { encoding: 'utf-8' });
+          cleanupLog.push(`Removed directory: ${workspacePath}`);
+        }
+      } catch (e) {
+        // Try simple removal if worktree commands fail
+        if (existsSync(workspacePath)) {
+          await execAsync(`rm -rf "${workspacePath}"`, { encoding: 'utf-8' });
+          cleanupLog.push(`Removed directory: ${workspacePath}`);
+        }
+      }
+
+      // Also remove feature branch if it exists
+      const branchName = `feature/${issueLower}`;
+      try {
+        await execAsync(`git branch -D "${branchName}" 2>/dev/null || true`, { cwd: projectRoot, encoding: 'utf-8' });
+        cleanupLog.push(`Deleted local branch: ${branchName}`);
+      } catch {
+        // Branch might not exist
+      }
+    }
+
+    // Clean up agent state directory
+    const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+    if (existsSync(agentDir)) {
+      await execAsync(`rm -rf "${agentDir}"`, { encoding: 'utf-8' });
+      cleanupLog.push(`Removed agent state: ${agentDir}`);
+    }
+
+    res.json({
+      success: true,
+      message: `Workspace cleaned up for ${id}`,
+      cleanupLog,
+    });
+  } catch (error: any) {
+    console.error('Error cleaning up workspace:', error);
+    res.status(500).json({ error: 'Failed to cleanup workspace: ' + error.message, cleanupLog });
+  }
+});
+
 // Deep wipe - completely clean up all state for an issue
 app.post('/api/issues/:id/deep-wipe', async (req, res) => {
   const { id } = req.params;
