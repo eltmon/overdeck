@@ -547,11 +547,46 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     if (!workspace) {
-      spinner.warn(`No workspace found for ${id}, using project root`);
-      workspace = projectRoot;
-    } else {
-      spinner.text = `Found workspace: ${workspace}`;
+      spinner.fail(`No workspace found for ${id}`);
+      console.log('');
+      console.log(chalk.red('CRITICAL: Work agents must run in a workspace with a feature branch.'));
+      console.log(chalk.red('Running on main branch is NOT allowed - it bypasses the review workflow.'));
+      console.log('');
+      console.log(chalk.bold('To fix, create a workspace first:'));
+      console.log(`  ${chalk.cyan(`pan workspace ${id}`)}`);
+      console.log('');
+      console.log('Or if planning was done, the workspace should exist at:');
+      console.log(`  ${chalk.dim(`workspaces/feature-${normalizedId}/`)}`);
+      process.exit(1);
     }
+
+    // CRITICAL: Verify workspace is NOT on main/master branch
+    try {
+      const { execSync } = await import('child_process');
+      const branch = execSync('git branch --show-current', {
+        cwd: workspace,
+        encoding: 'utf8'
+      }).trim();
+
+      if (branch === 'main' || branch === 'master') {
+        spinner.fail(`Workspace is on ${branch} branch`);
+        console.log('');
+        console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
+        console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
+        console.log('');
+        console.log(chalk.bold('To fix:'));
+        console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
+        console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
+        process.exit(1);
+      }
+
+      spinner.text = `Found workspace on branch: ${branch}`;
+    } catch (e) {
+      // If git check fails, continue but warn
+      spinner.warn('Could not verify branch - ensure you are NOT on main');
+    }
+
+    spinner.text = `Found workspace: ${workspace}`;
 
     if (options.dryRun) {
       spinner.info('Dry run mode');
