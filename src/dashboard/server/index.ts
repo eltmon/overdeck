@@ -6803,17 +6803,40 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       }
     }
 
-    // 5. Spawn planning agent in tmux
+    // 5. Spawn planning agent (local tmux or remote VM)
     const sessionName = `planning-${issueLower}`;
     let planningAgentStarted = false;
     let planningAgentError: string | undefined;
+    let isRemotePlanning = false;
+
+    // Check if we're using a remote workspace
+    let remoteWorkspaceMetadata: any = null;
+    if (workspaceLocation === 'remote' && workspaceCreated) {
+      try {
+        const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
+        remoteWorkspaceMetadata = loadWorkspaceMetadata(issue.identifier);
+        if (remoteWorkspaceMetadata) {
+          isRemotePlanning = true;
+          console.log(`[start-planning] Using remote workspace on VM: ${remoteWorkspaceMetadata.vmName}`);
+        }
+      } catch (err) {
+        console.log('[start-planning] Could not load remote workspace metadata, falling back to local');
+      }
+    }
 
     try {
-      // Kill existing planning session if any
-      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+      // Kill existing planning session if any (local or remote)
+      if (isRemotePlanning && remoteWorkspaceMetadata) {
+        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
+        const exe = createExeProvider({ infraVm: remoteWorkspaceMetadata.infraVm });
+        await exe.ssh(remoteWorkspaceMetadata.vmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
+      } else {
+        await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+      }
 
       // Create planning prompt file - store IN workspace if exists (for git-backed planning)
-      const planningDir = workspaceCreated
+      // For remote workspaces, we'll write to the remote VM later
+      const planningDir = workspaceCreated && !isRemotePlanning
         ? join(workspacePath, '.planning')
         : join(projectPath, '.planning', issueLower);
       if (!existsSync(planningDir)) {
@@ -6939,63 +6962,135 @@ When discovery is complete:
 Start by exploring the codebase to understand the context, then begin the discovery conversation.
 `;
 
-      writeFileSync(planningPromptPath, planningPrompt);
-
-      // Determine working directory - use workspace if created, otherwise project root
-      const agentCwd = workspaceCreated ? workspacePath : projectPath;
-
-      // Start tmux session with Claude Code for planning (interactive TUI mode)
-      // Use a launcher script to safely pass the prompt (avoids shell escaping issues)
-      const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
-      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-      await execAsync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
-
       // Get planning agent model from settings
       const agentSettings = loadSettings();
       const planningModel = agentSettings.models.planning_agent;
-      const agentCmd = getAgentCommand(planningModel);
+      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+      await execAsync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
 
-      // Write a launcher script that safely passes the prompt
-      const launcherScript = join(agentStateDir, 'launcher.sh');
-      const promptFile = join(agentStateDir, 'init-prompt.txt');
-      writeFileSync(promptFile, initMessage);
+      if (isRemotePlanning && remoteWorkspaceMetadata) {
+        // ===== REMOTE PLANNING AGENT =====
+        console.log(`[start-planning] Spawning remote planning agent on ${remoteWorkspaceMetadata.vmName}`);
 
-      // Build the command - use 'claude' directly for Anthropic models, 'claude-code-router' for others
-      // Add --dangerously-skip-permissions to bypass the trust prompt for automated agents
-      const cmdWithArgs = agentCmd.args.length > 0
-        ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
-        : `${agentCmd.command} --dangerously-skip-permissions`;
+        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
+        const exe = createExeProvider({ infraVm: remoteWorkspaceMetadata.infraVm });
+        const vmName = remoteWorkspaceMetadata.vmName;
 
-      writeFileSync(launcherScript, `#!/bin/bash
+        // Write planning prompt to remote VM
+        const remotePlanningDir = '/workspace/.planning';
+        const remotePlanningPromptPath = `${remotePlanningDir}/PLANNING_PROMPT.md`;
+
+        await exe.ssh(vmName, `mkdir -p ${remotePlanningDir}`);
+
+        // Clear stale STATE.md on remote
+        await exe.ssh(vmName, `rm -f ${remotePlanningDir}/STATE.md`);
+
+        // Write planning prompt to remote (escape for heredoc)
+        const escapedPrompt = planningPrompt.replace(/\\/g, '\\\\').replace(/\$/g, '\\$');
+        await exe.ssh(vmName, `cat > ${remotePlanningPromptPath} << 'PLANNING_PROMPT_EOF'
+${planningPrompt}
+PLANNING_PROMPT_EOF`);
+
+        // Create launcher script on remote
+        const initMessage = `Please read the planning prompt file at ${remotePlanningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
+        const remotePromptFile = `/workspace/.panopticon/prompts/${sessionName}.txt`;
+        const remoteLauncherScript = `/workspace/.panopticon/prompts/${sessionName}-launcher.sh`;
+
+        await exe.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
+        await exe.ssh(vmName, `cat > ${remotePromptFile} << 'PROMPT_EOF'
+${initMessage}
+PROMPT_EOF`);
+
+        await exe.ssh(vmName, `cat > ${remoteLauncherScript} << 'LAUNCHER_EOF'
+#!/bin/bash
+cd /workspace
+prompt=$(cat "${remotePromptFile}")
+exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
+LAUNCHER_EOF`);
+        await exe.ssh(vmName, `chmod +x ${remoteLauncherScript}`);
+
+        // Start tmux session on remote VM
+        const tmuxResult = await exe.ssh(vmName, `tmux new-session -d -s ${sessionName} -c /workspace "bash '${remoteLauncherScript}'"`);
+
+        if (tmuxResult.exitCode !== 0) {
+          throw new Error(`Failed to start remote planning agent: ${tmuxResult.stderr}`);
+        }
+
+        // Resize remote tmux window
+        await exe.ssh(vmName, `tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null || true`);
+
+        // Write agent state file with remote info
+        writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+          id: sessionName,
+          issueId: issue.identifier,
+          workspace: '/workspace',
+          runtime: 'claude',
+          model: planningModel,
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          type: 'planning',
+          location: 'remote',
+          vmName: vmName,
+          infraVm: remoteWorkspaceMetadata.infraVm,
+        }, null, 2));
+
+        console.log(`Started remote planning agent ${sessionName} on ${vmName}`);
+
+      } else {
+        // ===== LOCAL PLANNING AGENT =====
+        writeFileSync(planningPromptPath, planningPrompt);
+
+        // Determine working directory - use workspace if created, otherwise project root
+        const agentCwd = workspaceCreated ? workspacePath : projectPath;
+
+        // Start tmux session with Claude Code for planning (interactive TUI mode)
+        // Use a launcher script to safely pass the prompt (avoids shell escaping issues)
+        const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
+        const agentCmd = getAgentCommand(planningModel);
+
+        // Write a launcher script that safely passes the prompt
+        const launcherScript = join(agentStateDir, 'launcher.sh');
+        const promptFile = join(agentStateDir, 'init-prompt.txt');
+        writeFileSync(promptFile, initMessage);
+
+        // Build the command - use 'claude' directly for Anthropic models, 'claude-code-router' for others
+        // Add --dangerously-skip-permissions to bypass the trust prompt for automated agents
+        const cmdWithArgs = agentCmd.args.length > 0
+          ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
+          : `${agentCmd.command} --dangerously-skip-permissions`;
+
+        writeFileSync(launcherScript, `#!/bin/bash
 cd "${agentCwd}"
 prompt=$(cat "${promptFile}")
 exec ${cmdWithArgs} "$prompt"
 `, { mode: 0o755 });
 
-      // Ensure tmux is running before starting session
-      await ensureTmuxRunning();
-      await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
+        // Ensure tmux is running before starting session
+        await ensureTmuxRunning();
+        await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
 
-      // Write agent state file so QuestionDialog can find the JSONL path
-      writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
-        id: sessionName,
-        issueId: issue.identifier,
-        workspace: agentCwd,
-        runtime: isAnthropicModel(planningModel) ? 'claude' : 'claude-code-router',
-        model: planningModel, // From settings
-        status: 'running',
-        startedAt: new Date().toISOString(),
-        type: 'planning'
-      }, null, 2));
+        // Write agent state file so QuestionDialog can find the JSONL path
+        writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+          id: sessionName,
+          issueId: issue.identifier,
+          workspace: agentCwd,
+          runtime: isAnthropicModel(planningModel) ? 'claude' : 'claude-code-router',
+          model: planningModel,
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          type: 'planning',
+          location: 'local',
+        }, null, 2));
 
-      // Resize the tmux window to be wide enough for Claude's TUI
-      try {
-        await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
-      } catch {
-        // Ignore resize errors
+        // Resize the tmux window to be wide enough for Claude's TUI
+        try {
+          await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
+        } catch {
+          // Ignore resize errors
+        }
+
+        console.log(`Started local planning agent ${sessionName} with initial prompt`);
       }
-
-      console.log(`Started planning agent ${sessionName} with initial prompt`);
 
       planningAgentStarted = true;
     } catch (err: any) {
