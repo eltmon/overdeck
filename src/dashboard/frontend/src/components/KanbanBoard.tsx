@@ -1237,13 +1237,13 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
               if (workAgent) {
                 badges.push({
                   type: 'work' as const,
-                  name: workAgent.issueId || workAgent.id.split('-').pop() || workAgent.id
+                  name: 'work' // Don't show issue ID - it's already displayed in the card header
                 });
               }
               if (planningAgent) {
                 badges.push({
                   type: 'planning' as const,
-                  name: planningAgent.issueId || planningAgent.id.split('-').pop() || planningAgent.id
+                  name: 'plan' // Don't show issue ID - it's already displayed in the card header
                 });
               }
               for (const spec of specialists) {

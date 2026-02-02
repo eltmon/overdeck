@@ -435,11 +435,31 @@ function buildAgentPrompt(issueId: string, workspacePath: string, projectRoot: s
     lines.push('');
   }
 
+  // CRITICAL: Fast-path for already-complete work
+  lines.push('## CRITICAL: Check Completion Status FIRST');
+  lines.push('');
+  lines.push('**Before doing ANY work, check if this issue is already complete:**');
+  lines.push('');
+  lines.push('1. Read `.planning/STATE.md` and check the "Remaining Work" section');
+  lines.push('2. If it says "None" or "Implementation complete" or similar → work is DONE');
+  lines.push('3. If done, check if a specialist is already processing this issue:');
+  lines.push('   ```bash');
+  lines.push('   curl -s http://localhost:3011/api/specialists | jq .');
+  lines.push('   ```');
+  lines.push('4. If NO specialist is working on this issue, signal completion immediately:');
+  lines.push('   ```bash');
+  lines.push(`   pan work done ${issueId} -c "Work already complete from previous session"`);
+  lines.push('   ```');
+  lines.push('5. If a specialist IS working on it, exit gracefully - do NOT interfere');
+  lines.push('');
+  lines.push('**This fast-path check should take < 30 seconds. Do NOT re-analyze the entire codebase if work is done.**');
+  lines.push('');
+
   lines.push('## Your Task');
   lines.push('');
   lines.push('1. Read the context files listed above');
-  lines.push('2. Check STATE.md for current status and what work remains');
-  lines.push('3. Continue implementing the planned work');
+  lines.push('2. **FIRST:** Check STATE.md for completion status (see above)');
+  lines.push('3. If not complete, continue implementing the planned work');
   lines.push('4. Mark beads tasks as complete as you finish them: `bd update <task-id> --status closed`');
   lines.push('');
 
