@@ -815,6 +815,14 @@ async function createRemoteWorkspace(
     // Step 4.5: Create /workspace symlink for consistent paths
     await exe.ssh(vmName, `sudo ln -sf /home/exedev/workspace /workspace 2>/dev/null || true`);
 
+    // Step 4.6: Pre-configure Claude Code to skip onboarding
+    const claudeSettings = JSON.stringify({
+      theme: 'dark',
+      hasCompletedOnboarding: true,
+    });
+    const settingsBase64 = Buffer.from(claudeSettings).toString('base64');
+    await exe.ssh(vmName, `mkdir -p ~/.claude && echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
+
     // Step 5: Configure environment for shared infra
     spinner.text = 'Configuring environment...';
     const envContent = `
