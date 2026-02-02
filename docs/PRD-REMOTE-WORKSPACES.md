@@ -2,6 +2,9 @@
 
 > *"Your laptop is a thin client. The cloud does the heavy lifting."*
 
+**Implementation:** PAN-125
+**Status:** Partial - infrastructure complete, `pan work issue` integration missing
+
 ## Overview
 
 Remote Workspaces allows Panopticon to offload Docker containers and Claude agents to exe.dev VMs, freeing local machine resources. Instead of running postgres, redis, frontend, backend, and agents locally, everything runs on remote VMs with persistent storage.
