@@ -152,7 +152,16 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
   };
 
   for (const issue of issues) {
-    const status = STATUS_LABELS[issue.status] || 'backlog';
+    // Use shadowStatus for column placement if it exists (shadow mode)
+    let status: string;
+    if (issue.shadowStatus) {
+      // Map shadow status to canonical state
+      status = issue.shadowStatus === 'closed' ? 'done' :
+               issue.shadowStatus === 'in_progress' ? (STATUS_LABELS[issue.status] || 'in_progress') :
+               STATUS_LABELS[issue.status] || 'backlog';
+    } else {
+      status = STATUS_LABELS[issue.status] || 'backlog';
+    }
     // Handle 'canceled' by putting in done
     if (status === 'canceled') {
       grouped.done.push(issue);
