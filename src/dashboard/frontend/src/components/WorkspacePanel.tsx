@@ -519,7 +519,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                 className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300"
               >
                 <ExternalLink className="w-3 h-3" />
-                <span>Linear Issue</span>
+                <span>{issueId.toUpperCase().startsWith('PAN-') ? 'GitHub Issue' : 'Linear Issue'}</span>
               </a>
             )}
           </div>
