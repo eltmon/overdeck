@@ -394,7 +394,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, [agentWarningDialog, moveStatusMutation, showUndoNotification]);
 
   // Handle sync prompt response
-  const handleSyncPrompt = useCallback((syncToTracker: boolean) => {
+  const handleSyncPrompt = useCallback(async (syncToTracker: boolean, options?: { cleanupWorkspace?: boolean; stopAgents?: boolean }) => {
     const { issue } = syncPromptDialog;
     if (!issue) return;
 
@@ -402,9 +402,36 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
     const currentStatus = STATUS_LABELS[issue.status] as CanonicalState;
 
+    // Stop agents if requested
+    if (options?.stopAgents) {
+      const issueIdLower = issue.identifier.toLowerCase();
+      const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issueIdLower);
+      for (const agent of issueAgents) {
+        try {
+          await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
+        } catch (e) {
+          console.error(`Failed to stop agent ${agent.id}:`, e);
+        }
+      }
+    }
+
+    // Cleanup workspace if requested
+    if (options?.cleanupWorkspace) {
+      try {
+        await fetch(`/api/issues/${issue.identifier}/cleanup-workspace`, { method: 'POST' });
+      } catch (e) {
+        console.error(`Failed to cleanup workspace for ${issue.identifier}:`, e);
+      }
+    }
+
     showUndoNotification(issue.identifier, currentStatus, 'done');
     moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus: 'done', syncToTracker });
-  }, [syncPromptDialog, moveStatusMutation, showUndoNotification]);
+
+    // Invalidate agents query to refresh the list
+    if (options?.stopAgents) {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    }
+  }, [syncPromptDialog, moveStatusMutation, showUndoNotification, agents, queryClient]);
 
   // Drop animation config
   const dropAnimation: DropAnimation = {
@@ -819,12 +846,18 @@ function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningD
 interface SyncPromptDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSync: (syncToTracker: boolean) => void;
+  onSync: (syncToTracker: boolean, options?: { cleanupWorkspace?: boolean; stopAgents?: boolean }) => void;
   issue: Issue | null;
 }
 
 function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogProps) {
+  const [cleanupWorkspace, setCleanupWorkspace] = useState(false);
+  const [stopAgents, setStopAgents] = useState(false);
+
   if (!isOpen || !issue) return null;
+
+  // Determine tracker type from issue source
+  const trackerName = issue.source === 'github' ? 'GitHub' : 'Linear';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -841,21 +874,44 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
             <p className="text-gray-300 text-sm mb-4">
               You're moving <strong>{issue.identifier}</strong> to Done.
             </p>
-            <p className="text-gray-400 text-xs mb-6">
-              Would you like to sync this change to Linear, or keep it in shadow state only?
+
+            {/* Cleanup options */}
+            <div className="space-y-2 mb-4 p-3 bg-gray-700/50 rounded-lg">
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={cleanupWorkspace}
+                  onChange={(e) => setCleanupWorkspace(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500"
+                />
+                Clean up workspace
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={stopAgents}
+                  onChange={(e) => setStopAgents(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500"
+                />
+                Stop running agents
+              </label>
+            </div>
+
+            <p className="text-gray-400 text-xs mb-4">
+              Sync status change to {trackerName}?
             </p>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => onSync(false)}
+                onClick={() => onSync(false, { cleanupWorkspace, stopAgents })}
                 className="px-4 py-2 text-gray-400 hover:text-white transition-colors text-sm"
               >
                 Shadow Only
               </button>
               <button
-                onClick={() => onSync(true)}
+                onClick={() => onSync(true, { cleanupWorkspace, stopAgents })}
                 className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm"
               >
-                Sync to Linear
+                Sync to {trackerName}
               </button>
             </div>
           </div>
