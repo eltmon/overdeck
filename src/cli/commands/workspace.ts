@@ -812,6 +812,9 @@ async function createRemoteWorkspace(
       await exe.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
     }
 
+    // Step 4.5: Create /workspace symlink for consistent paths
+    await exe.ssh(vmName, `sudo ln -sf /home/exedev/workspace /workspace 2>/dev/null || true`);
+
     // Step 5: Configure environment for shared infra
     spinner.text = 'Configuring environment...';
     const envContent = `
