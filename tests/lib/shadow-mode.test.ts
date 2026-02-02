@@ -27,12 +27,15 @@ import {
 
 const TEST_SHADOW_STATE_DIR = join(homedir(), '.panopticon', 'shadow-state');
 
+// Unique prefix for this test file to avoid conflicts with shadow-state.test.ts
+const TEST_PREFIX = 'TEST-SMODE';
+
 // Helper to clean up test files
 function cleanupTestFiles() {
   if (existsSync(TEST_SHADOW_STATE_DIR)) {
     const files = readdirSync(TEST_SHADOW_STATE_DIR);
     for (const file of files) {
-      if (file.startsWith('TEST-')) {
+      if (file.startsWith(TEST_PREFIX)) {
         try {
           unlinkSync(join(TEST_SHADOW_STATE_DIR, file));
         } catch {
@@ -48,7 +51,7 @@ function cleanupTestFiles() {
 // Unique ID generator for test isolation
 let testIdCounter = 0;
 function getUniqueId(base: string): string {
-  return `TEST-${base}-${Date.now()}-${++testIdCounter}`;
+  return `${TEST_PREFIX}-${base}-${Date.now()}-${++testIdCounter}`;
 }
 
 describe('shadow-mode', () => {
