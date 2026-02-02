@@ -7551,15 +7551,34 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
         let projectPath: string | undefined;
         const prefix = issueIdentifier.split('-')[0].toUpperCase();
 
-        const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
-        if (existsSync(projectsYamlPath)) {
-          const yaml = await import('js-yaml');
-          const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
-          for (const [, config] of Object.entries(projectsConfig.projects || {})) {
-            const projConfig = config as any;
-            if (projConfig.linear_team?.toUpperCase() === prefix) {
-              projectPath = projConfig.path;
-              break;
+        // For GitHub issues, use GitHub local paths
+        if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+          const localPaths = getGitHubLocalPaths();
+          projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
+        }
+
+        // For Linear issues or if GitHub path not found, check projects.yaml
+        if (!projectPath) {
+          const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+          if (existsSync(projectsYamlPath)) {
+            const yaml = await import('js-yaml');
+            const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
+            for (const [, config] of Object.entries(projectsConfig.projects || {})) {
+              const projConfig = config as any;
+              // Check for Linear team match
+              if (projConfig.linear_team?.toUpperCase() === prefix) {
+                projectPath = projConfig.path;
+                break;
+              }
+              // Check for GitHub issue_tracker with matching prefix (for PAN-* etc.)
+              if (projConfig.issue_tracker === 'github' && projConfig.repo) {
+                // Match by checking if the repo config uses this prefix
+                const repoPrefix = projConfig.repo.split('/')[1]?.toUpperCase().slice(0, 3);
+                if (prefix === 'PAN' && projConfig.repo.includes('panopticon')) {
+                  projectPath = projConfig.path;
+                  break;
+                }
+              }
             }
           }
         }
@@ -7568,11 +7587,11 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
           const legacyPlanningDir = join(projectPath, '.planning', issueIdentifier.toLowerCase());
           if (existsSync(legacyPlanningDir)) {
             rmSync(legacyPlanningDir, { recursive: true, force: true });
-            console.log(`Cleaned up legacy planning dir: ${legacyPlanningDir}`);
+            console.log(`[abort-planning] ✓ Cleaned up legacy planning dir: ${legacyPlanningDir}`);
           }
         }
       } catch (planningCleanupErr) {
-        console.log('Warning: Could not clean up legacy planning dir:', planningCleanupErr);
+        console.log('[abort-planning] Warning: Could not clean up legacy planning dir:', planningCleanupErr);
       }
     }
 
