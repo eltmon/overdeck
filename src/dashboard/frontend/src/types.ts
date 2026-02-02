@@ -26,6 +26,7 @@ export interface Issue {
   project?: LinearProject;
   source?: IssueSource;
   sourceRepo?: string;
+  shadowStatus?: 'open' | 'in_progress' | 'closed';  // Shadow mode status tracking
 }
 
 export interface GitStatus {

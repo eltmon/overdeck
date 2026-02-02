@@ -223,7 +223,8 @@ export class ExeProvider implements RemoteProvider {
       const sshHost = `${vm}.exe.xyz`;
       const escapedCmd = command.replace(/"/g, '\\"');
 
-      const { stdout, stderr } = await execAsync(`ssh ${sshHost} "${escapedCmd}"`, {
+      // Use -A for agent forwarding so the VM can access GitHub with user's SSH keys
+      const { stdout, stderr } = await execAsync(`ssh -A ${sshHost} "${escapedCmd}"`, {
         timeout: 300000, // 5 minutes
         maxBuffer: 50 * 1024 * 1024, // 50MB
       });
@@ -243,7 +244,8 @@ export class ExeProvider implements RemoteProvider {
    */
   async *sshStream(vm: string, command: string): AsyncIterable<string> {
     const sshHost = `${vm}.exe.xyz`;
-    const child = spawn('ssh', [sshHost, command], {
+    // Use -A for agent forwarding
+    const child = spawn('ssh', ['-A', sshHost, command], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
