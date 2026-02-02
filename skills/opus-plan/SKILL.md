@@ -38,7 +38,7 @@ Do NOT leave any decisions for the implementation agent. Every architectural cho
 
 ## EXECUTION STEPS
 
-### Step 1: Parse Issue ID and Setup
+### Step 1: Parse Issue ID and Create Workspace
 
 ```bash
 # PAN-XXX -> /home/eltmon/projects/panopticon (GitHub)
@@ -46,8 +46,18 @@ Do NOT leave any decisions for the implementation agent. Every architectural cho
 # HH-XXX  -> /home/eltmon/projects/househunt (Linear)
 # JH-XXX  -> /home/eltmon/projects/jobhunt (Linear)
 
-mkdir -p <project>/workspaces/feature-<issue-id-lowercase>/.planning
+# CRITICAL: Create a proper git worktree with feature branch
+# DO NOT use mkdir -p - that creates a directory without git tracking!
+cd <project>
+pan workspace <issue-id>   # Creates workspaces/feature-<id>/ with feature branch
+
+# Then create planning directory inside the workspace
+mkdir -p workspaces/feature-<issue-id-lowercase>/.planning
 ```
+
+**IMPORTANT:** The `pan workspace` command creates a git worktree on a feature branch.
+This is REQUIRED so that work agents don't commit directly to main.
+If `pan workspace` fails, fix the issue before continuing.
 
 ### Step 2: Fetch Issue Details
 
