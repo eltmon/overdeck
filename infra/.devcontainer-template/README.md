@@ -12,10 +12,10 @@
 
 ## Current Status
 
-🚧 **DISABLED** - See [#109](https://github.com/eltmon/panopticon-cli/issues/109)
+✅ **READY** - Container setup is functional.
 
-The devcontainer setup has dependency issues with cross-directory imports.
-For now, Panopticon workspaces run directly on the host (no containers).
+The docker-compose template now properly mounts the entire project directory and shadows
+node_modules to handle cross-directory imports correctly.
 
 ---
 
@@ -82,10 +82,10 @@ open https://feature-pan-103.pan.localhost
 - `panopticon` Docker network created
 - Wildcard certs for `*.pan.localhost`
 
-## Known Issues
+## Resolved Issues (PAN-109)
 
-1. **Cross-directory imports**: Server imports from `src/lib/` which has deps in root `node_modules`
+The following issues have been addressed:
+
+1. ~~**Cross-directory imports**~~: Fixed by mounting entire project and shadowing node_modules
 2. **Volume permissions**: Named volumes must be pre-created with correct ownership
-3. **Port mismatch**: Vite config uses port 3010, templates assume 5173
-
-See [#109](https://github.com/eltmon/panopticon-cli/issues/109) for details.
+3. ~~**Port mismatch**~~: Templates now use correct ports
