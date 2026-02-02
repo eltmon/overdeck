@@ -47,6 +47,12 @@ const getDefaultStartDocker = (): boolean => {
   return stored !== null ? stored === 'true' : true; // Default to true
 };
 
+// Default for workspace location - can be overridden by localStorage
+const getDefaultWorkspaceLocation = (): 'local' | 'remote' => {
+  const stored = localStorage.getItem('panopticon.planning.workspaceLocation');
+  return stored === 'remote' ? 'remote' : 'local'; // Default to local
+};
+
 export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogProps) {
   const [step, setStep] = useState<Step>('checking');
   const [result, setResult] = useState<StartPlanningResult | null>(null);
@@ -55,7 +61,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [position, setPosition] = useState({ x: -1, y: -1 }); // -1 means centered
   const [size, setSize] = useState({ width: 900, height: 600 });
   const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
-  
+  const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
+
   // Track if we've actually connected to a planning session in THIS dialog instance
   // This prevents stale cache from incorrectly triggering 'complete' state
   const hasConnectedToSession = useRef(false);
@@ -67,7 +74,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDocker }),
+        body: JSON.stringify({ startDocker, workspaceLocation }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -468,9 +475,44 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                           </li>
                           <li className="flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4 text-green-400" />
-                            Opus agent starts discovery conversation
+                            Planning agent starts discovery conversation
                           </li>
                         </ul>
+                      </div>
+
+                      {/* Workspace location option */}
+                      <div className="mb-4 w-full max-w-md">
+                        <label className="text-sm font-medium text-gray-300 mb-2 block">Workspace Location</label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="workspaceLocation"
+                              value="local"
+                              checked={workspaceLocation === 'local'}
+                              onChange={() => {
+                                setWorkspaceLocation('local');
+                                localStorage.setItem('panopticon.planning.workspaceLocation', 'local');
+                              }}
+                              className="w-4 h-4 border-gray-500 bg-gray-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                            />
+                            <span className="text-sm text-gray-300">Local</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="workspaceLocation"
+                              value="remote"
+                              checked={workspaceLocation === 'remote'}
+                              onChange={() => {
+                                setWorkspaceLocation('remote');
+                                localStorage.setItem('panopticon.planning.workspaceLocation', 'remote');
+                              }}
+                              className="w-4 h-4 border-gray-500 bg-gray-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                            />
+                            <span className="text-sm text-gray-300">Remote (exe.dev)</span>
+                          </label>
+                        </div>
                       </div>
 
                       {/* Docker option */}

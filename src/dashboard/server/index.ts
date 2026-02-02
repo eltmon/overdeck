@@ -6563,7 +6563,7 @@ async function addGitHubPlanningLabel(owner: string, repo: string, number: numbe
 // Start planning for an issue - moves to "In Planning", creates workspace, spawns planning agent
 app.post('/api/issues/:id/start-planning', async (req, res) => {
   const { id } = req.params;
-  const { skipWorkspace = false, startDocker = false } = req.body;
+  const { skipWorkspace = false, startDocker = false, workspaceLocation = 'local' } = req.body;
 
   try {
     // Check if a work agent is already running for this issue
@@ -6771,7 +6771,8 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         if (workspaceNeedsCreation) {
           // Create workspace using pan workspace create
           const dockerFlag = startDocker ? ' --docker' : '';
-          const createCmd = `pan workspace create ${issue.identifier}${dockerFlag}`;
+          const locationFlag = workspaceLocation === 'remote' ? ' --remote' : ' --local';
+          const createCmd = `pan workspace create ${issue.identifier}${locationFlag}${dockerFlag}`;
           const activityId = Date.now().toString();
           logActivity({
             id: activityId,
