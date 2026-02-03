@@ -63,9 +63,9 @@ const cost = calculateCost({
 }, pricing);
 
 // Get agent and issue context from environment
-const agentId = process.env.PANOPTICON_AGENT_ID ||
-                process.env.TMUX_PANE?.replace(/^%/, '') ||
-                'main-cli';
+// PANOPTICON_AGENT_ID should always be set by pan work or heartbeat-hook
+// If not set, use a fallback that makes it clear costs are unattributed
+const agentId = process.env.PANOPTICON_AGENT_ID || 'unattributed';
 
 const issueId = process.env.PANOPTICON_ISSUE_ID || 'UNKNOWN';
 const sessionType = process.env.PANOPTICON_SESSION_TYPE || 'implementation';

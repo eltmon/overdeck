@@ -62,6 +62,16 @@ function ensureEventsFile(): void {
 
 /**
  * Append a cost event to the log
+ *
+ * CONCURRENCY NOTE: This function uses appendFileSync which provides atomicity
+ * for individual line writes. Each event is a single line, so concurrent writes
+ * from different processes won't interleave within a line. However, the order
+ * of events from concurrent processes is non-deterministic.
+ *
+ * This is acceptable because:
+ * 1. Each agent runs in its own process with its own heartbeat-hook
+ * 2. Event timestamps provide ordering
+ * 3. Aggregation is commutative (order doesn't affect totals)
  */
 export function appendCostEvent(event: CostEvent): void {
   ensureEventsFile();
@@ -71,7 +81,7 @@ export function appendCostEvent(event: CostEvent): void {
     throw new Error('Missing required event fields: ts, agentId, issueId, model');
   }
 
-  // Append to log
+  // Append to log atomically (single write operation, newline-terminated)
   const line = JSON.stringify(event) + '\n';
   appendFileSync(EVENTS_FILE, line, 'utf-8');
 }
@@ -162,10 +172,11 @@ export function tailEvents(n: number): CostEvent[] {
 /**
  * Read events starting from a specific line number
  * Useful for incremental processing
+ * Returns both events and the new line position to handle malformed lines correctly
  */
-export function readEventsFromLine(startLine: number): CostEvent[] {
+export function readEventsFromLine(startLine: number): { events: CostEvent[]; newLine: number } {
   if (!existsSync(EVENTS_FILE)) {
-    return [];
+    return { events: [], newLine: startLine };
   }
 
   const content = readFileSync(EVENTS_FILE, 'utf-8');
@@ -177,11 +188,12 @@ export function readEventsFromLine(startLine: number): CostEvent[] {
     try {
       events.push(JSON.parse(lines[i]) as CostEvent);
     } catch {
-      // Skip malformed lines
+      // Skip malformed lines but track position
+      console.warn(`Skipping malformed event at line ${i}`);
     }
   }
 
-  return events;
+  return { events, newLine: lines.length };
 }
 
 /**
@@ -226,7 +238,9 @@ export function replaceEventsFile(events: CostEvent[]): void {
 
   // Write to temp file first
   const tempFile = EVENTS_FILE + '.tmp';
-  const content = events.map(e => JSON.stringify(e)).join('\n') + '\n';
+  const content = events.length > 0
+    ? events.map(e => JSON.stringify(e)).join('\n') + '\n'
+    : '';
   writeFileSync(tempFile, content, 'utf-8');
 
   // Atomic rename
