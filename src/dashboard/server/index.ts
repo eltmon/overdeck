@@ -6093,13 +6093,31 @@ app.post('/api/agents', async (req, res) => {
 
   const issueLower = issueId.toLowerCase();
 
+  // Check if this is a remote workspace
+  const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
+  const workspaceMetadata = loadWorkspaceMetadata(issueId);
+  const isRemote = workspaceMetadata?.location === 'remote';
+
   // SAFEGUARD: Check if planning agent is still running
   // Never start work agent while planning agent is active - they'll conflict
   const planningSession = `planning-${issueLower}`;
   try {
-    const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
-    if (sessions.split('\n').includes(planningSession)) {
-      console.warn(`[start-agent] BLOCKED: Planning agent still running for ${issueId}`);
+    let planningStillRunning = false;
+
+    if (isRemote && workspaceMetadata?.vmName) {
+      // Check on remote VM
+      const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
+      const exe = createExeProvider({ infraVm: workspaceMetadata.infraVm });
+      const result = await exe.ssh(workspaceMetadata.vmName, `tmux list-sessions -F '#{session_name}' 2>/dev/null || true`);
+      planningStillRunning = result.stdout.split('\n').includes(planningSession);
+    } else {
+      // Check locally
+      const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
+      planningStillRunning = sessions.split('\n').includes(planningSession);
+    }
+
+    if (planningStillRunning) {
+      console.warn(`[start-agent] BLOCKED: Planning agent still running for ${issueId}${isRemote ? ' (remote)' : ''}`);
       return res.status(409).json({
         error: `Planning agent is still running for ${issueId}. Kill the planning session first or wait for it to complete.`,
         planningSession,
@@ -6168,7 +6186,64 @@ app.post('/api/agents', async (req, res) => {
       }
     }
 
-    // First, start containers if workspace has ./dev script
+    // For REMOTE workspaces, spawn agent on remote VM
+    if (isRemote && workspaceMetadata) {
+      console.log(`[start-agent] Spawning REMOTE agent for ${issueId} on ${workspaceMetadata.vmName}`);
+
+      // Sync credentials and spawn remote agent
+      const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
+      const { spawnRemoteAgent } = await import('../../lib/remote/remote-agents.js');
+      const exe = createExeProvider({ infraVm: workspaceMetadata.infraVm });
+      await exe.syncAllCredentials(workspaceMetadata.vmName);
+
+      const state = await spawnRemoteAgent({
+        issueId,
+        workspace: workspaceMetadata,
+      });
+
+      console.log(`[start-agent] Remote agent spawned for ${issueId}: ${state.id}`);
+
+      // Update issue status (GitHub/Linear) - same logic as local
+      const apiKey = getLinearApiKey();
+      const isGitHubIssue = issueId.startsWith('PAN-');
+
+      if (isGitHubIssue) {
+        try {
+          const ghConfig = getGitHubConfig();
+          if (ghConfig) {
+            const number = parseInt(issueId.split('-')[1], 10);
+            const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
+            const { owner, repo } = repoConfig;
+            const token = ghConfig.token;
+
+            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
+            }).catch(() => {});
+
+            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+              method: 'POST',
+              headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ labels: ['in-progress'] }),
+            });
+            console.log(`Updated ${issueId} GitHub labels to in-progress`);
+          }
+        } catch (ghError) {
+          console.error('Failed to update GitHub labels:', ghError);
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: `Starting remote agent for ${issueId}`,
+        remote: true,
+        vmName: workspaceMetadata.vmName,
+        agentId: state.id,
+        projectPath,
+      });
+    }
+
+    // LOCAL workspace: start containers if workspace has ./dev script
     // We must wait for containers to be ready BEFORE starting the agent
     const devScript = join(workspacePath, 'dev');
     let containerActivityId: string | null = null;
