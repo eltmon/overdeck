@@ -115,21 +115,20 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
   let claudeCmd: string;
 
   if (prompt) {
-    // Write prompt to file on VM
+    // Write prompt to file on VM using base64 to avoid escaping issues
     const promptFile = `/workspace/.panopticon/prompts/${agentId}.md`;
     await exe.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
-    await exe.ssh(vmName, `cat > ${promptFile} << 'PROMPT_EOF'
-${prompt}
-PROMPT_EOF`);
+    const promptBase64 = Buffer.from(prompt).toString('base64');
+    await exe.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${promptFile}`);
 
-    // Create launcher script
+    // Create launcher script using base64 to avoid shell interpretation
     const launcherScript = `/workspace/.panopticon/prompts/${agentId}-launcher.sh`;
-    await exe.ssh(vmName, `cat > ${launcherScript} << 'LAUNCHER_EOF'
-#!/bin/bash
-prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --model ${model} "$prompt"
-LAUNCHER_EOF`);
-    await exe.ssh(vmName, `chmod +x ${launcherScript}`);
+    const launcherContent = `#!/bin/bash
+prompt=\$(cat "${promptFile}")
+exec claude --dangerously-skip-permissions --model ${model} "\$prompt"
+`;
+    const launcherBase64 = Buffer.from(launcherContent).toString('base64');
+    await exe.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${launcherScript} && chmod +x ${launcherScript}`);
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
