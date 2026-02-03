@@ -436,6 +436,87 @@ COMPOSE_EOF`);
   }
 
   /**
+   * Sync GitHub CLI authentication from local macOS to remote VM
+   *
+   * GitHub CLI on macOS stores tokens in Keychain. On Linux VMs, it stores
+   * them directly in ~/.config/gh/hosts.yml. This extracts from Keychain
+   * and writes to the VM's config file.
+   *
+   * @returns true if auth was synced, false if not available
+   */
+  async syncGitHubAuth(vmName: string): Promise<boolean> {
+    try {
+      // Get GitHub token from macOS Keychain
+      const { stdout: tokenRaw } = await execAsync(
+        'security find-generic-password -s "gh:github.com" -w 2>/dev/null',
+        { encoding: 'utf-8' }
+      );
+
+      if (!tokenRaw || !tokenRaw.trim()) {
+        return false;
+      }
+
+      // The token may be base64-encoded with go-keyring prefix
+      let token = tokenRaw.trim();
+      if (token.startsWith('go-keyring-base64:')) {
+        token = Buffer.from(token.replace('go-keyring-base64:', ''), 'base64').toString('utf-8');
+      }
+
+      // Get GitHub username from local config
+      let username = 'user';
+      try {
+        const { stdout: configOutput } = await execAsync('cat ~/.config/gh/hosts.yml 2>/dev/null', { encoding: 'utf-8' });
+        const userMatch = configOutput.match(/user:\s*(\S+)/);
+        if (userMatch) {
+          username = userMatch[1];
+        }
+      } catch {
+        // Use default
+      }
+
+      // Create hosts.yml content for Linux (token stored directly in file)
+      const hostsYml = `github.com:
+    oauth_token: ${token}
+    git_protocol: ssh
+    user: ${username}
+`;
+
+      // Ensure ~/.config/gh directory exists and write hosts.yml
+      await this.ssh(vmName, 'mkdir -p ~/.config/gh');
+      const hostsBase64 = Buffer.from(hostsYml).toString('base64');
+      const result = await this.ssh(vmName, `echo '${hostsBase64}' | base64 -d > ~/.config/gh/hosts.yml && chmod 600 ~/.config/gh/hosts.yml`);
+
+      return result.exitCode === 0;
+    } catch (error: any) {
+      // Token not found in Keychain or other error
+      return false;
+    }
+  }
+
+  /**
+   * Sync all credentials needed for remote workspace operation
+   *
+   * This syncs:
+   * - Claude Code OAuth credentials
+   * - GitHub CLI authentication
+   *
+   * Call this before spawning agents to ensure fresh credentials.
+   *
+   * @returns object with sync status for each credential type
+   */
+  async syncAllCredentials(vmName: string): Promise<{
+    claude: boolean;
+    github: boolean;
+  }> {
+    const [claude, github] = await Promise.all([
+      this.syncClaudeCredentials(vmName),
+      this.syncGitHubAuth(vmName),
+    ]);
+
+    return { claude, github };
+  }
+
+  /**
    * Configure Claude Code on a VM for autonomous operation
    *
    * Sets up:

@@ -292,12 +292,15 @@ async function handleRemoteWorkspace(
   const projectRoot = findProjectRoot(issueId);
   const prompt = buildAgentPrompt(issueId, `/workspace`, projectRoot);
 
-  // Sync Claude credentials before spawning (tokens may have expired)
-  spinner.text = 'Syncing Claude credentials...';
+  // Sync all credentials before spawning (tokens may have expired)
+  spinner.text = 'Syncing credentials (Claude, GitHub)...';
   const exe = createExeProvider({ infraVm: remoteMetadata.infraVm });
-  const credsSynced = await exe.syncClaudeCredentials(remoteMetadata.vmName);
-  if (!credsSynced) {
+  const credsSynced = await exe.syncAllCredentials(remoteMetadata.vmName);
+  if (!credsSynced.claude) {
     spinner.warn('Could not sync Claude credentials - agent may need to re-authenticate');
+  }
+  if (!credsSynced.github) {
+    spinner.warn('Could not sync GitHub CLI auth - gh commands may fail');
   }
 
   // Spawn remote agent

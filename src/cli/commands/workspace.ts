@@ -1070,18 +1070,29 @@ async function syncAuthCommand(issueId: string): Promise<void> {
   try {
     const exe = createExeProvider({ infraVm: metadata.infraVm });
 
-    // Sync credentials
-    const synced = await exe.syncClaudeCredentials(metadata.vmName);
+    // Sync all credentials (Claude, GitHub, etc.)
+    const synced = await exe.syncAllCredentials(metadata.vmName);
 
-    if (synced) {
-      spinner.succeed('Credentials synced to remote workspace');
+    const allSynced = synced.claude && synced.github;
+    if (allSynced) {
+      spinner.succeed('All credentials synced to remote workspace');
       console.log(chalk.dim(`  VM: ${metadata.vmName}`));
+      console.log(chalk.dim(`  Claude: ✓  GitHub: ✓`));
     } else {
-      spinner.warn('Could not sync credentials');
+      spinner.warn('Some credentials could not be synced');
+      console.log(chalk.dim(`  VM: ${metadata.vmName}`));
+      console.log(chalk.dim(`  Claude: ${synced.claude ? '✓' : '✗'}  GitHub: ${synced.github ? '✓' : '✗'}`));
       console.log('');
-      console.log(chalk.yellow('Claude Code credentials not found in Keychain.'));
-      console.log(chalk.dim('You may need to authenticate Claude Code locally first:'));
-      console.log(chalk.dim('  claude --help'));
+      if (!synced.claude) {
+        console.log(chalk.yellow('Claude Code credentials not found in Keychain.'));
+        console.log(chalk.dim('You may need to authenticate Claude Code locally first:'));
+        console.log(chalk.dim('  claude --help'));
+      }
+      if (!synced.github) {
+        console.log(chalk.yellow('GitHub CLI auth not found in Keychain.'));
+        console.log(chalk.dim('You may need to authenticate GitHub CLI locally first:'));
+        console.log(chalk.dim('  gh auth login'));
+      }
       console.log('');
       console.log(chalk.dim('Or SSH into the VM and authenticate directly:'));
       console.log(chalk.dim(`  pan workspace ssh ${issueId}`));
