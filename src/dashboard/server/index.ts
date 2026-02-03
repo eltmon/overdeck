@@ -33,6 +33,7 @@ import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
+import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue } from '../../lib/costs/index.js';
 import type { Issue } from '../frontend/src/types.js';
 
 // Load environment variables from ~/.panopticon.env at startup
@@ -8693,24 +8694,10 @@ app.get('/api/issues/:id/beads', async (req, res) => {
 
 // ============== Cost & Metrics API ==============
 
-// Cost tracking imports (inline to avoid external module issues)
+// Cost tracking paths
 const COSTS_DIR = join(homedir(), '.panopticon', 'costs');
 const SESSION_MAP_FILE = join(homedir(), '.panopticon', 'session-map.json');
 const METRICS_FILE = join(homedir(), '.panopticon', 'runtime-metrics.json');
-
-// Model pricing data
-const MODEL_PRICING: Record<string, { inputPer1k: number; outputPer1k: number; cacheReadPer1k?: number; cacheWrite5mPer1k?: number; cacheWrite1hPer1k?: number }> = {
-  // 4.5 series
-  'claude-opus-4.5': { inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01 },
-  'claude-sonnet-4.5': { inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006 },
-  'claude-haiku-4.5': { inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.0001, cacheWrite5mPer1k: 0.00125, cacheWrite1hPer1k: 0.002 },
-  // 4.x series
-  'claude-opus-4-1': { inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03 },
-  'claude-opus-4': { inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03 },
-  'claude-sonnet-4': { inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006 },
-  // Legacy
-  'claude-haiku-3': { inputPer1k: 0.00025, outputPer1k: 0.00125, cacheReadPer1k: 0.00003, cacheWrite5mPer1k: 0.0003, cacheWrite1hPer1k: 0.0005 },
-};
 
 function readCostFiles(startDate: string, endDate: string): any[] {
   const entries: any[] = [];
@@ -8845,19 +8832,22 @@ async function parseWorkspaceSessionUsageAsync(workspacePath: string): Promise<{
       }
     }
 
-    // Calculate cost based on model pricing
-    let pricing = MODEL_PRICING['claude-sonnet-4']; // default
-    if (model.includes('opus')) {
-      pricing = MODEL_PRICING['claude-opus-4'];
-    } else if (model.includes('haiku')) {
-      pricing = MODEL_PRICING['claude-haiku-4.5'];
-    }
+    // Calculate cost using centralized pricing
+    const pricing = getPricing('anthropic', model);
+    let cost = 0;
 
-    const cost =
-      (totalInputTokens / 1000) * pricing.inputPer1k +
-      (totalOutputTokens / 1000) * pricing.outputPer1k +
-      (totalCacheReadTokens / 1000) * (pricing.cacheReadPer1k || 0) +
-      (totalCacheWriteTokens / 1000) * (pricing.cacheWrite5mPer1k || 0);  // Default to 5-minute TTL
+    if (pricing) {
+      const usage: TokenUsage = {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        cacheReadTokens: totalCacheReadTokens,
+        cacheWriteTokens: totalCacheWriteTokens,
+        cacheTTL: '5m',
+      };
+      cost = calculateCost(usage, pricing);
+    } else {
+      console.warn(`No pricing found for model: ${model}`);
+    }
 
     const tokenCount = totalInputTokens + totalOutputTokens + totalCacheReadTokens + totalCacheWriteTokens;
 
@@ -9035,155 +9025,127 @@ app.get('/api/costs/summary', (_req, res) => {
   }
 });
 
-// GET /api/costs/by-issue - Costs grouped by issue (calculated from actual session files)
+// GET /api/costs/by-issue - Costs grouped by issue (from event-sourced cache)
 app.get('/api/costs/by-issue', async (_req, res) => {
   try {
-    const issueMap: Record<string, { totalCost: number; tokenCount: number; sessionCount: number; model?: string; durationMinutes?: number }> = {};
-
-    // Read all agent state files and calculate costs from actual session data
-    // Include both regular agents (agent-*) and planning agents (planning-*)
-    const agentsDir = join(homedir(), '.panopticon', 'agents');
-    if (existsSync(agentsDir)) {
-      const agentDirs = readdirSync(agentsDir).filter(name => name.startsWith('agent-') || name.startsWith('planning-'));
-
-      // Process agents in parallel batches to avoid blocking (ASYNC)
-      const BATCH_SIZE = 5;
-      for (let i = 0; i < agentDirs.length; i += BATCH_SIZE) {
-        const batch = agentDirs.slice(i, i + BATCH_SIZE);
-        const results = await Promise.all(
-          batch.map(async (agentDir) => {
-            try {
-              const stateFile = join(agentsDir, agentDir, 'state.json');
-              if (!existsSync(stateFile)) return null;
-
-              const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-              if (!state.issueId || !state.workspace) return null;
-
-              const sessionData = await parseWorkspaceSessionUsageAsync(state.workspace);
-              return { issueId: state.issueId, sessionData };
-            } catch {
-              return null;
-            }
-          })
-        );
-
-        // Aggregate results
-        for (const result of results) {
-          if (!result) continue;
-          const key = result.issueId.toLowerCase();
-          const sessionData = result.sessionData;
-
-          if (!issueMap[key]) {
-            issueMap[key] = { totalCost: 0, tokenCount: 0, sessionCount: 0 };
-          }
-
-          issueMap[key].totalCost += sessionData.cost;
-          issueMap[key].tokenCount += sessionData.tokenCount;
-          issueMap[key].sessionCount += 1;
-          issueMap[key].model = sessionData.model;
-
-          if (sessionData.startTime && sessionData.endTime) {
-            const start = new Date(sessionData.startTime).getTime();
-            const end = new Date(sessionData.endTime).getTime();
-            const minutes = (end - start) / (1000 * 60);
-            issueMap[key].durationMinutes = (issueMap[key].durationMinutes || 0) + minutes;
-          }
-        }
+    // Check if migration is needed and run it
+    if (needsMigration()) {
+      console.log('Running cost migration on first request...');
+      const stats = migrateIfNeeded();
+      if (stats) {
+        console.log(`Migration complete: ${stats.eventsCreated} events created, ${stats.errors.length} errors`);
       }
     }
 
-    // Also check legacy tracking files for any historical data
-    const sessionMap = loadSessionMap();
-    const runtimeMetrics = loadRuntimeMetrics();
+    // Sync cache with latest events (fast incremental update)
+    const cache = syncCache();
 
-    // Add from session-map (legacy format) if not already present
-    for (const [issueId, issueData] of Object.entries(sessionMap.issues || {})) {
-      const data = issueData as any;
-      const key = issueId.toLowerCase();
-      if (!issueMap[key] && (data.totalCost || 0) > 0) {
-        issueMap[key] = {
-          totalCost: data.totalCost || 0,
-          tokenCount: data.totalTokens || 0,
-          sessionCount: data.sessions?.length || 0,
-        };
-      }
-    }
+    // Get cache status
+    const cacheStatus = getCacheStatus();
 
-    // Add from runtime-metrics if it has higher values (legacy)
-    for (const task of runtimeMetrics.tasks || []) {
-      if (task.issueId) {
-        const key = task.issueId.toLowerCase();
-        if (!issueMap[key]) {
-          issueMap[key] = { totalCost: 0, tokenCount: 0, sessionCount: 0 };
-        }
-        // Only use if higher than what we calculated from sessions
-        if (task.cost > issueMap[key].totalCost) {
-          issueMap[key].totalCost = task.cost;
-          issueMap[key].tokenCount = task.tokenCount;
-          issueMap[key].model = task.model;
-          issueMap[key].durationMinutes = task.durationMinutes;
-        }
-      }
-    }
-
-    // Convert to array
-    const issues = Object.entries(issueMap).map(([issueId, data]) => ({
-      issueId: issueId.toUpperCase(),
+    // Convert cache data to API response format
+    const issues = Object.entries(cache.issues).map(([issueId, data]) => ({
+      issueId,
       totalCost: data.totalCost,
-      tokenCount: data.tokenCount,
-      sessionCount: data.sessionCount,
-      model: data.model,
-      durationMinutes: data.durationMinutes,
+      tokenCount: data.inputTokens + data.outputTokens + data.cacheReadTokens + data.cacheWriteTokens,
+      inputTokens: data.inputTokens,
+      outputTokens: data.outputTokens,
+      cacheReadTokens: data.cacheReadTokens,
+      cacheWriteTokens: data.cacheWriteTokens,
+      models: data.models,
+      providers: data.providers,
+      budget: data.budget,
+      budgetWarning: data.budgetWarning,
+      lastUpdated: data.lastUpdated,
     }));
 
     // Sort by cost descending
     issues.sort((a, b) => b.totalCost - a.totalCost);
 
-    res.json({ issues });
+    res.json({
+      status: cacheStatus.status,
+      lastEventTs: cacheStatus.lastEventTs,
+      eventCount: cacheStatus.eventCount,
+      issues,
+    });
   } catch (error: any) {
     console.error('Error getting costs by issue:', error);
     res.status(500).json({ error: 'Failed to get costs by issue: ' + error.message });
   }
 });
 
-// GET /api/issues/:id/costs - Cost summary for a specific issue
+// POST /api/costs/rebuild - Force rebuild of cost cache from events
+app.post('/api/costs/rebuild', async (_req, res) => {
+  try {
+    console.log('Manual cost cache rebuild requested...');
+
+    // Run migration if needed
+    const migrationStats = migrateAllSessions();
+
+    // Rebuild cache
+    const cache = rebuildCache();
+
+    res.json({
+      success: true,
+      message: 'Cost cache rebuilt successfully',
+      migration: {
+        eventsCreated: migrationStats.eventsCreated,
+        totalCost: migrationStats.totalCost,
+        errors: migrationStats.errors.length,
+        warnings: migrationStats.warnings.length,
+      },
+      cache: {
+        issueCount: Object.keys(cache.issues).length,
+        eventCount: cache.lastEventLine,
+        lastEventTs: cache.lastEventTs,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error rebuilding cost cache:', error);
+    res.status(500).json({ error: 'Failed to rebuild cost cache: ' + error.message });
+  }
+});
+
+// GET /api/issues/:id/costs - Cost summary for a specific issue (from event-sourced cache)
 app.get('/api/issues/:id/costs', (req, res) => {
   try {
     const { id } = req.params;
-    const sessionMap = loadSessionMap();
-    const issueData = sessionMap.issues?.[id] || sessionMap.issues?.[id.toUpperCase()];
+
+    // Sync cache to get latest data
+    syncCache();
+
+    // Get costs for the issue
+    const issueData = getCostsForIssue(id);
 
     if (!issueData) {
-      // Try to find by searching (case-insensitive)
-      const issueKey = Object.keys(sessionMap.issues || {}).find(
-        k => k.toLowerCase() === id.toLowerCase()
-      );
-      if (!issueKey) {
-        return res.json({
-          issueId: id,
-          totalCost: 0,
-          totalTokens: 0,
-          sessions: [],
-          byModel: {},
-        });
-      }
-    }
-
-    const data = issueData || { sessions: [], totalCost: 0, totalTokens: 0 };
-
-    // Calculate by-model breakdown
-    const byModel: Record<string, number> = {};
-    for (const session of data.sessions || []) {
-      const model = session.model || 'unknown';
-      byModel[model] = (byModel[model] || 0) + (session.cost || 0);
+      return res.json({
+        issueId: id.toUpperCase(),
+        totalCost: 0,
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        models: {},
+        providers: {},
+        budget: undefined,
+        budgetWarning: false,
+      });
     }
 
     res.json({
-      issueId: id,
-      totalCost: data.totalCost || 0,
-      totalTokens: data.totalTokens || 0,
-      sessions: data.sessions || [],
-      byModel,
+      issueId: id.toUpperCase(),
+      totalCost: issueData.totalCost,
+      totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
+      inputTokens: issueData.inputTokens,
+      outputTokens: issueData.outputTokens,
+      cacheReadTokens: issueData.cacheReadTokens,
+      cacheWriteTokens: issueData.cacheWriteTokens,
+      models: issueData.models,
+      providers: issueData.providers,
+      budget: issueData.budget,
+      budgetWarning: issueData.budgetWarning,
+      lastUpdated: issueData.lastUpdated,
     });
   } catch (error: any) {
     console.error('Error getting issue costs:', error);

@@ -127,5 +127,23 @@ else
     }' > "$STATE_FILE" 2>/dev/null || true
 fi
 
+# Record cost event from tool usage (PAN-81)
+# Find the record-cost-event.js script - check multiple locations
+COST_SCRIPT=""
+if [ -f "$HOME/.panopticon/bin/record-cost-event.js" ]; then
+  COST_SCRIPT="$HOME/.panopticon/bin/record-cost-event.js"
+elif [ -f "$(dirname "$0")/record-cost-event.js" ]; then
+  COST_SCRIPT="$(dirname "$0")/record-cost-event.js"
+fi
+
+if [ -n "$COST_SCRIPT" ] && [ -f "$COST_SCRIPT" ]; then
+  # Export issue context for the cost recording script
+  export PANOPTICON_ISSUE_ID="${PANOPTICON_ISSUE_ID:-UNKNOWN}"
+  export PANOPTICON_SESSION_TYPE="${PANOPTICON_SESSION_TYPE:-implementation}"
+
+  # Call cost recording script with tool info on stdin
+  echo "$TOOL_INFO" | node "$COST_SCRIPT" 2>/dev/null || true
+fi
+
 # Always exit successfully - never break Claude Code execution
 exit 0
