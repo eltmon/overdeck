@@ -216,9 +216,9 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         fontSize: 14,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cols: 120,
-        rows: 30,
-        scrollback: 10000,
-        convertEol: true,
+        rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
+        scrollback: 0,  // DISABLE scrollback - prevents tmux status bar from duplicating
+        convertEol: false,  // Don't convert EOL - let escape sequences pass through raw
         scrollOnUserInput: true,
         allowProposedApi: true,
         theme: {
@@ -286,6 +286,9 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     const wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}`;
 
     const ws = new WebSocket(wsUrl);
+    // IMPORTANT: Use arraybuffer for synchronous binary processing
+    // Default 'blob' requires async handling which can cause out-of-order writes
+    ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -293,27 +296,96 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       reconnectAttempts.current = 0;
       term!.clear();
 
-      setTimeout(() => {
-        if (ws.readyState !== WebSocket.OPEN) return;
-        fit?.fit();
-        console.log('XTerminal: After fit, size:', term!.cols, 'x', term!.rows);
-        ws.send(JSON.stringify({ type: 'resize', cols: term!.cols, rows: term!.rows }));
-      }, 100);
+      // CRITICAL: Send dimensions IMMEDIATELY on connection, before any data flows
+      // The server waits for this resize message before starting the SSH session
+      // This ensures tmux is created with the correct dimensions from the start
+      fit?.fit();
+      console.log('XTerminal: Sending initial dimensions:', term!.cols, 'x', term!.rows);
+      ws.send(JSON.stringify({ type: 'resize', cols: term!.cols, rows: term!.rows }));
+    };
+
+    // DEBUG: Enable detailed logging to diagnose terminal corruption
+    // Set localStorage.setItem('DEBUG_TERMINAL', '1') to enable
+    const DEBUG_TERMINAL = localStorage.getItem('DEBUG_TERMINAL') === '1';
+    let debugMsgCount = 0;
+    const debugLog: string[] = [];
+
+    // Helper to show escape sequences in readable form
+    const escapeForLog = (str: string): string => {
+      return str.replace(/[\x00-\x1f\x7f-\xff]/g, (c) => {
+        const code = c.charCodeAt(0);
+        if (code === 0x1b) return '\\e';
+        if (code === 0x0a) return '\\n';
+        if (code === 0x0d) return '\\r';
+        return `\\x${code.toString(16).padStart(2, '0')}`;
+      });
+    };
+
+    if (DEBUG_TERMINAL) {
+      console.log('XTerminal: Debug logging enabled. Messages will be logged to console and window.terminalDebugLog');
+      (window as any).terminalDebugLog = debugLog;
+      (window as any).showTerminalDebug = () => {
+        debugLog.forEach(entry => console.log(entry));
+      };
+    }
+
+    // ATTEMPT 13: Force viewport to stay at bottom after every write
+    // The issue: when content scrolls, xterm.js viewport can desync from cursor position
+    // tmux status bar writes to row 29 with \e[29;1H, but if viewport has scrolled,
+    // row 29 is no longer at the visual bottom
+    //
+    // Solution: Call scrollToBottom() after each write to keep viewport aligned
+    const writeQueue: string[] = [];
+    let isWriting = false;
+
+    const processWriteQueue = () => {
+      if (isWriting || writeQueue.length === 0 || !term) return;
+
+      isWriting = true;
+      const data = writeQueue.shift()!;
+
+      if (DEBUG_TERMINAL) {
+        console.log(`XTerminal-debug: WRITE len=${data.length}`);
+      }
+
+      // Use write callback to know when this write completes
+      term.write(data, () => {
+        // ATTEMPT 13: Force scroll to bottom after every write
+        // This keeps the viewport aligned with cursor position
+        term!.scrollToBottom();
+
+        isWriting = false;
+        // Process next item in queue
+        if (writeQueue.length > 0) {
+          // Use setTimeout(0) to avoid deep recursion
+          setTimeout(processWriteQueue, 0);
+        }
+      });
     };
 
     ws.onmessage = (event) => {
-      const writeAndScroll = (data: string | Uint8Array) => {
-        term!.write(data);
-        term!.scrollToBottom();
-      };
+      let dataStr = '';
 
-      if (typeof event.data === 'string') {
-        writeAndScroll(event.data);
-      } else if (event.data instanceof ArrayBuffer) {
-        writeAndScroll(new Uint8Array(event.data));
-      } else if (event.data instanceof Blob) {
-        event.data.text().then(text => writeAndScroll(text));
+      // Normalize data to string
+      if (event.data instanceof ArrayBuffer) {
+        dataStr = new TextDecoder().decode(new Uint8Array(event.data));
+      } else if (typeof event.data === 'string') {
+        dataStr = event.data;
       }
+
+      // DEBUG: Log incoming data
+      if (DEBUG_TERMINAL) {
+        debugMsgCount++;
+        const logEntry = `[${new Date().toISOString()}] RECV #${debugMsgCount} len=${dataStr.length}\n  DATA: ${escapeForLog(dataStr).slice(0, 500)}${dataStr.length > 500 ? '...' : ''}`;
+        debugLog.push(logEntry);
+        if (debugMsgCount <= 20 || debugMsgCount % 100 === 0) {
+          console.log(`XTerminal-debug: RECV #${debugMsgCount} len=${dataStr.length}`);
+        }
+      }
+
+      // Add to queue and trigger processing
+      writeQueue.push(dataStr);
+      processWriteQueue();
     };
 
     ws.onclose = (event) => {

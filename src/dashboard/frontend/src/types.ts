@@ -27,6 +27,8 @@ export interface Issue {
   source?: IssueSource;
   sourceRepo?: string;
   shadowStatus?: 'open' | 'in_progress' | 'closed';  // Shadow mode status tracking
+  targetCanonicalState?: CanonicalState;  // Explicit column placement from drag-drop
+  shadowedAt?: string;  // When shadow state was created
 }
 
 export interface GitStatus {

@@ -32,6 +32,11 @@ export interface ShadowHistoryEntry {
 }
 
 /**
+ * Canonical state for Kanban column placement
+ */
+export type CanonicalState = 'backlog' | 'todo' | 'planning' | 'in_progress' | 'in_review' | 'done';
+
+/**
  * Shadow state for an issue
  */
 export interface ShadowState {
@@ -39,6 +44,8 @@ export interface ShadowState {
   issueId: string;
   /** Panopticon's view of the issue status */
   shadowStatus: IssueState;
+  /** Target canonical state for Kanban column placement */
+  targetCanonicalState?: CanonicalState;
   /** Last known tracker status (cached) */
   trackerStatus: IssueState;
   /** When tracker status was last fetched */
@@ -144,7 +151,8 @@ export function createShadowState(
 export function updateShadowState(
   issueId: string,
   newStatus: IssueState,
-  triggeredBy: string
+  triggeredBy: string,
+  targetCanonicalState?: CanonicalState
 ): ShadowState {
   ensureShadowStateDir();
 
@@ -155,6 +163,7 @@ export function updateShadowState(
     state = {
       issueId: issueId.toUpperCase(),
       shadowStatus: newStatus,
+      targetCanonicalState,
       trackerStatus: newStatus,
       trackerStatusUpdatedAt: new Date().toISOString(),
       shadowedAt: new Date().toISOString(),
@@ -174,6 +183,11 @@ export function updateShadowState(
 
     state.history.push(transition);
     state.shadowStatus = newStatus;
+  }
+
+  // Always update target canonical state if provided
+  if (targetCanonicalState) {
+    state.targetCanonicalState = targetCanonicalState;
   }
 
   const filePath = getShadowStatePath(issueId);
