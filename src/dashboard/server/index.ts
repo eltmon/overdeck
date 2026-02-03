@@ -33,7 +33,7 @@ import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
-import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue } from '../../lib/costs/index.js';
+import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents } from '../../lib/costs/index.js';
 import type { Issue } from '../frontend/src/types.js';
 
 // Load environment variables from ~/.panopticon.env at startup
@@ -9103,6 +9103,49 @@ app.post('/api/costs/rebuild', async (_req, res) => {
   } catch (error: any) {
     console.error('Error rebuilding cost cache:', error);
     res.status(500).json({ error: 'Failed to rebuild cost cache: ' + error.message });
+  }
+});
+
+// GET /api/costs/stream - Stream recent cost events for real-time updates
+app.get('/api/costs/stream', (req, res) => {
+  try {
+    const { since, limit = 50 } = req.query;
+
+    let events;
+    if (since) {
+      // Get events since a specific timestamp
+      events = readEvents({
+        startDate: since as string,
+        limit: parseInt(limit as string, 10),
+      });
+    } else {
+      // Get last N events
+      events = tailEvents(parseInt(limit as string, 10));
+    }
+
+    // Group events by issue for easier consumption
+    const byIssue: Record<string, any[]> = {};
+    for (const event of events) {
+      if (!byIssue[event.issueId]) {
+        byIssue[event.issueId] = [];
+      }
+      byIssue[event.issueId].push({
+        ts: event.ts,
+        model: event.model,
+        provider: event.provider,
+        cost: event.cost,
+        tokens: event.input + event.output + event.cacheRead + event.cacheWrite,
+      });
+    }
+
+    res.json({
+      events: events.slice(0, 50), // Limit to 50 most recent
+      byIssue,
+      count: events.length,
+    });
+  } catch (error: any) {
+    console.error('Error streaming cost events:', error);
+    res.status(500).json({ error: 'Failed to stream cost events: ' + error.message });
   }
 });
 
