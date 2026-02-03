@@ -3,6 +3,7 @@ import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import { Client as SSHClient } from 'ssh2';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync, rmSync, symlinkSync, chmodSync } from 'fs';
@@ -447,7 +448,7 @@ function spawnPanCommand(args: string[], description: string, cwd?: string): str
 
 const app = express();
 // Support both DASHBOARD_PORT (preferred) and PORT for backward compatibility
-const PORT = parseInt(process.env.DASHBOARD_PORT || process.env.PORT || '3010', 10);
+const PORT = parseInt(process.env.API_PORT || process.env.PORT || '3011', 10);
 
 app.use(cors());
 app.use(express.json());
@@ -1149,10 +1150,11 @@ app.get('/api/issues', async (req, res) => {
           return {
             ...issue,
             shadowStatus: shadowState.shadowStatus,
+            targetCanonicalState: shadowState.targetCanonicalState,
             shadowedAt: shadowState.shadowedAt,
           };
         }
-        return { ...issue, shadowStatus: null };
+        return { ...issue, shadowStatus: null, targetCanonicalState: null };
       });
     } catch (e) {
       console.error('Error loading shadow states:', e);
@@ -6812,6 +6814,20 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
             timeout: startDocker ? 300000 : 120000, // 5 min with docker, 2 min without
           });
           workspaceCreated = true;
+
+          // If we just created a remote workspace, reload the metadata
+          if (workspaceLocation === 'remote') {
+            try {
+              const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
+              existingRemoteWorkspace = loadWorkspaceMetadata(issue.identifier);
+              if (existingRemoteWorkspace) {
+                console.log(`[start-planning] Remote workspace created: ${existingRemoteWorkspace.vmName}`);
+              }
+            } catch (err) {
+              console.log('[start-planning] Could not load new remote workspace metadata:', err);
+            }
+          }
+
           const successMsg = startDocker
             ? 'Workspace created, Docker containers starting in background'
             : 'Workspace created successfully';
@@ -6834,18 +6850,52 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
     // Use existing remote workspace metadata if we already loaded it
     let remoteWorkspaceMetadata: any = existingRemoteWorkspace;
     if (workspaceLocation === 'remote' && workspaceCreated && remoteWorkspaceMetadata) {
-      isRemotePlanning = true;
-      console.log(`[start-planning] Using remote workspace on VM: ${remoteWorkspaceMetadata.vmName}`);
+      // Verify VM exists AND /workspace is properly set up (has .git directory)
+      console.log(`[start-planning] Verifying remote workspace on ${remoteWorkspaceMetadata.vmName}...`);
+      try {
+        const { stdout } = await execAsync(
+          `ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ${remoteWorkspaceMetadata.vmName}.exe.xyz "test -d /workspace/.git && echo 'ready' || echo 'not-ready'"`,
+          { timeout: 15000 }
+        );
+        if (stdout.trim() === 'ready') {
+          isRemotePlanning = true;
+          console.log(`[start-planning] Remote workspace verified on VM: ${remoteWorkspaceMetadata.vmName}`);
+        } else {
+          throw new Error('Workspace /workspace/.git not found');
+        }
+      } catch (vmCheckErr: any) {
+        console.log(`[start-planning] Remote workspace not ready on ${remoteWorkspaceMetadata.vmName}: ${vmCheckErr.message}`);
+        // Workspace not properly set up - clear stale metadata and recreate
+        remoteWorkspaceMetadata = null;
+        workspaceCreated = false;
+        // Remove stale workspace metadata so workspace create runs
+        try {
+          const { deleteWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
+          deleteWorkspaceMetadata(issue.identifier);
+          console.log(`[start-planning] Cleared stale workspace metadata, will recreate workspace`);
+        } catch {
+          // Ignore cleanup errors
+        }
+        // Also clear stale agent state if exists
+        const staleAgentDir = join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`);
+        if (existsSync(staleAgentDir)) {
+          await execAsync(`rm -rf "${staleAgentDir}"`, { encoding: 'utf-8' });
+          console.log(`[start-planning] Cleared stale agent state: ${staleAgentDir}`);
+        }
+      }
     }
 
     try {
-      // Kill existing planning session if any (local or remote)
+      // Kill existing planning session if any
+      // IMPORTANT: Always kill LOCAL session first to prevent WebSocket connecting to stale local session
+      // when starting a remote agent (see PAN-105 terminal sync bug)
+      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+      // Also kill remote session if we're starting a remote agent
       if (isRemotePlanning && remoteWorkspaceMetadata) {
         const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
         const exe = createExeProvider({ infraVm: remoteWorkspaceMetadata.infraVm });
         await exe.ssh(remoteWorkspaceMetadata.vmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
-      } else {
-        await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
       }
 
       // Create planning prompt file - store IN workspace if exists (for git-backed planning)
@@ -7023,6 +7073,12 @@ Start by exploring the codebase to understand the context, then begin the discov
 
         // Write launcher script using base64
         const launcherContent = `#!/bin/bash
+# Set terminal environment for proper rendering
+export TERM=xterm-256color
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+export COLORTERM=truecolor
+
 cd /workspace
 prompt=$(cat "${remotePromptFile}")
 exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
@@ -7032,8 +7088,26 @@ exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
         console.log(`[start-planning] Step 4 complete`);
         await exe.ssh(vmName, `chmod +x ${remoteLauncherScript}`);
 
-        // Start tmux session on remote VM
-        const tmuxResult = await exe.ssh(vmName, `tmux new-session -d -s ${sessionName} -c /workspace "bash '${remoteLauncherScript}'"`);
+        // Step 5: Configure Claude Code for autonomous operation (bypass permissions + skip onboarding)
+        console.log(`[start-planning] Step 5: configure Claude Code`);
+        await exe.configureClaudeCode(vmName);
+        console.log(`[start-planning] Step 5 complete`);
+
+        // Step 5.5: Configure tmux for proper terminal handling
+        console.log(`[start-planning] Step 5.5: configure tmux`);
+        const tmuxConf = `
+# Panopticon tmux settings for proper terminal rendering
+set -g default-terminal "xterm-256color"
+set -ga terminal-overrides ",xterm-256color:Tc"
+set -g mouse on
+set -s escape-time 0
+`;
+        const tmuxConfBase64 = Buffer.from(tmuxConf).toString('base64');
+        await exe.ssh(vmName, `grep -q "Panopticon tmux settings" ~/.tmux.conf 2>/dev/null || echo '${tmuxConfBase64}' | base64 -d >> ~/.tmux.conf`);
+        console.log(`[start-planning] Step 5.5 complete`);
+
+        // Start tmux session on remote VM with proper terminal settings
+        const tmuxResult = await exe.ssh(vmName, `TERM=xterm-256color tmux new-session -d -s ${sessionName} -c /workspace "bash '${remoteLauncherScript}'"`);
 
         if (tmuxResult.exitCode !== 0) {
           throw new Error(`Failed to start remote planning agent: ${tmuxResult.stderr}`);
@@ -7157,13 +7231,43 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
   try {
-    // Check if tmux session exists
-    const { stdout: sessionsOutput } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
-      encoding: 'utf-8',
-    });
-    const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
+    // Check agent state to see if this is a remote session
+    let isRemote = false;
+    let vmName = '';
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    const stateFile = join(agentStateDir, 'state.json');
 
-    const sessionExists = sessions.includes(sessionName);
+    try {
+      if (existsSync(stateFile)) {
+        const stateContent = readFileSync(stateFile, 'utf-8');
+        const state = JSON.parse(stateContent);
+        if (state.location === 'remote' && state.vmName) {
+          isRemote = true;
+          vmName = state.vmName;
+        }
+      }
+    } catch (err) {
+      // Ignore - will check locally
+    }
+
+    // Check if tmux session exists (local or remote)
+    let sessionExists = false;
+    if (isRemote && vmName) {
+      try {
+        const { stdout } = await execAsync(`ssh -A -o ConnectTimeout=5 ${vmName}.exe.xyz "tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''"`, { timeout: 10000 });
+        const sessions = stdout.trim().split('\n').filter(Boolean);
+        sessionExists = sessions.includes(sessionName);
+      } catch (err) {
+        // SSH failed - session might still exist but VM unreachable
+        console.log(`[planning status] SSH to ${vmName} failed:`, err);
+      }
+    } else {
+      const { stdout: sessionsOutput } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
+        encoding: 'utf-8',
+      });
+      const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
+      sessionExists = sessions.includes(sessionName);
+    }
 
     // Check if planning artifacts exist (indicates planning was done but not marked complete)
     const planningDirInWorkspace = join(workspacePath, '.planning');
@@ -7182,6 +7286,8 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
       planningCompleted: !sessionExists && hasStateFile,
       hasStateFile,
       hasPromptFile,
+      isRemote,
+      vmName: isRemote ? vmName : undefined,
     });
   } catch (error: any) {
     res.json({
@@ -7928,6 +8034,155 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
   }
 });
 
+// Reset an issue - kills agents (local+remote), resets Linear status to Todo
+app.post('/api/issues/:id/reset', async (req, res) => {
+  const { id } = req.params;
+  const cleanupLog: string[] = [];
+
+  try {
+    const issueLower = id.toLowerCase();
+
+    // 1. Kill local tmux sessions
+    const localSessions = [`planning-${issueLower}`, `agent-${issueLower}`];
+    for (const session of localSessions) {
+      try {
+        await execAsync(`tmux kill-session -t ${session} 2>/dev/null || true`);
+        cleanupLog.push(`Killed local tmux: ${session}`);
+      } catch {
+        // Session might not exist
+      }
+    }
+
+    // 2. Check for remote session and kill it
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`);
+    const stateFile = join(agentStateDir, 'state.json');
+    let vmName = '';
+
+    try {
+      if (existsSync(stateFile)) {
+        const stateContent = readFileSync(stateFile, 'utf-8');
+        const state = JSON.parse(stateContent);
+        if (state.location === 'remote' && state.vmName) {
+          vmName = state.vmName;
+        }
+      }
+    } catch {
+      // No state file, try to detect from session name patterns
+    }
+
+    // If no state file, try common exe.dev VM patterns
+    if (!vmName) {
+      const vmPatterns = [`pan-${issueLower}-ws`, `pan-${id.replace('-', '-')}-ws`];
+      for (const pattern of vmPatterns) {
+        try {
+          await execAsync(`ssh ${pattern}.exe.xyz "echo ok" 2>/dev/null`, { timeout: 5000 });
+          vmName = pattern;
+          break;
+        } catch {
+          // VM doesn't exist or not accessible
+        }
+      }
+    }
+
+    // Kill remote sessions
+    if (vmName) {
+      for (const session of localSessions) {
+        try {
+          await execAsync(`ssh ${vmName}.exe.xyz "tmux kill-session -t ${session}" 2>/dev/null || true`, { timeout: 10000 });
+          cleanupLog.push(`Killed remote tmux on ${vmName}: ${session}`);
+        } catch {
+          // Session might not exist
+        }
+      }
+    }
+
+    // 3. Clean up agent state directories
+    const agentDirs = [
+      join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`),
+      join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`),
+    ];
+    for (const dir of agentDirs) {
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true });
+        cleanupLog.push(`Deleted agent state: ${dir}`);
+      }
+    }
+
+    // 4. Clear shadow state
+    try {
+      const { removeShadowState } = await import('../../lib/shadow-state.js');
+      const shadowResult = removeShadowState(id);
+      if (shadowResult.success) {
+        cleanupLog.push(`Cleared shadow state for ${id}`);
+      }
+    } catch {
+      // Shadow state might not exist
+    }
+
+    // 5. Reset issue status to Todo/Open
+    const githubCheck = isGitHubIssue(id);
+
+    // Handle GitHub issues
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+      const ghConfig = getGitHubConfig();
+      if (ghConfig) {
+        const labelsToRemove = ['in-progress', 'planning', 'planned', 'review-ready'];
+        for (const label of labelsToRemove) {
+          try {
+            await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/${encodeURIComponent(label)}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `token ${ghConfig.token}`,
+                'Accept': 'application/vnd.github.v3+json',
+              },
+            });
+            cleanupLog.push(`Removed GitHub label: ${label}`);
+          } catch {
+            // Label might not exist
+          }
+        }
+      }
+    }
+
+    // Handle Linear issues
+    if (!githubCheck.isGitHub && LINEAR_API_KEY) {
+      const linearClient = new LinearClient({ apiKey: LINEAR_API_KEY });
+      const [teamKey] = id.split('-');
+
+      // Find the team and its Todo state
+      const teams = await linearClient.teams();
+      const team = teams.nodes.find(t => t.key.toLowerCase() === teamKey.toLowerCase());
+
+      if (team) {
+        const states = await team.states();
+        const todoState = states.nodes.find(s => s.type === 'unstarted' && s.name.toLowerCase().includes('todo'));
+
+        if (todoState) {
+          // Find the issue
+          const issues = await linearClient.issues({
+            filter: { identifier: { eq: id.toUpperCase() } }
+          });
+          const issue = issues.nodes[0];
+
+          if (issue) {
+            await issue.update({ stateId: todoState.id });
+            cleanupLog.push(`Reset Linear status to: ${todoState.name}`);
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, cleanupLog });
+  } catch (error) {
+    console.error('Reset failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      cleanupLog
+    });
+  }
+});
+
 // Reopen a done/closed issue - moves back to Backlog and optionally starts planning
 app.post('/api/issues/:id/reopen', async (req, res) => {
   const { id } = req.params;
@@ -8015,8 +8270,8 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
 
     const issueState = canonicalToIssueState[targetStatus];
 
-    // Update shadow state first (always)
-    const shadowResult = await updateShadowState(id, issueState, 'dashboard-drag-drop');
+    // Update shadow state first (always) - include targetCanonicalState for column placement
+    const shadowResult = await updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus);
 
     // If syncToTracker is true and it's a Linear issue, also update Linear
     if (syncToTracker) {
@@ -8194,6 +8449,17 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
       }
     }
 
+    // 2.5 Clear shadow state for this issue
+    try {
+      const { removeShadowState } = await import('../../lib/shadow-state.js');
+      const shadowResult = removeShadowState(id);
+      if (shadowResult.success) {
+        cleanupLog.push(`Cleared shadow state for ${id}`);
+      }
+    } catch (shadowErr) {
+      // Shadow state might not exist, that's fine
+    }
+
     // 3. Find project path for workspace and planning dir cleanup
     let projectPath: string | undefined;
     if (!githubCheck.isGitHub) {
@@ -8268,8 +8534,29 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
       cleanupLog.push(`Deleted workspace and branches: ${branchName}`);
     }
 
-    // 6. Reset Linear issue state and remove labels
-    if (!githubCheck.isGitHub) {
+    // 6. Reset issue state and remove labels (Linear or GitHub)
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+      // GitHub: remove planning-related labels
+      const config = getGitHubConfig();
+      if (config) {
+        const labelsToRemove = ['planning', 'planned', 'in-progress', 'review-ready'];
+        for (const label of labelsToRemove) {
+          try {
+            await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/${label}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `token ${config.token}`,
+                'Accept': 'application/vnd.github.v3+json',
+              },
+            });
+            cleanupLog.push(`Removed GitHub label: ${label}`);
+          } catch (e) {
+            // Label might not exist, that's fine
+          }
+        }
+      }
+    } else {
+      // Linear: reset state and remove labels
       const linearKey = process.env.LINEAR_API_KEY || '';
       if (linearKey) {
         try {
@@ -8278,15 +8565,20 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
           const issue = await client.issue(id);
 
           if (issue) {
-            // Get team and backlog state
+            // Get team and Todo state
             const team = await issue.team;
             if (team) {
               const states = await team.states();
-              const backlogState = states.nodes.find(s => s.type === 'backlog');
+              // Find Todo/Unstarted state (same logic as abort-planning)
+              const todoState = states.nodes.find(s =>
+                s.name.toLowerCase() === 'todo' ||
+                s.name.toLowerCase() === 'to do' ||
+                s.type === 'unstarted'
+              );
 
-              if (backlogState) {
-                await issue.update({ stateId: backlogState.id });
-                cleanupLog.push(`Reset Linear status to Backlog`);
+              if (todoState) {
+                await issue.update({ stateId: todoState.id });
+                cleanupLog.push(`Reset Linear status to ${todoState.name}`);
               }
 
               // Remove labels
@@ -9016,6 +9308,22 @@ wss.on('connection', (ws: WebSocket, req) => {
 
   console.log(`WebSocket connected for session: ${sessionName}`);
 
+  // IMPORTANT: Buffer messages immediately to avoid losing them during async setup
+  // The client sends resize dimensions immediately on connect, but we have async
+  // operations (SSH checks) that take time. Without buffering, messages are lost.
+  const earlyMessages: string[] = [];
+  let messageHandler: ((data: string) => void) | null = null;
+
+  ws.on('message', (data) => {
+    const message = data.toString();
+    if (messageHandler) {
+      messageHandler(message);
+    } else {
+      earlyMessages.push(message);
+      console.log(`[ws] Buffered early message for ${sessionName}: ${message.slice(0, 50)}...`);
+    }
+  });
+
   // Check if tmux session exists (async to avoid blocking event loop)
   (async () => {
     // Check if this is a remote session by reading agent state
@@ -9060,62 +9368,269 @@ wss.on('connection', (ws: WebSocket, req) => {
       return;
     }
 
-    // Spawn a PTY that attaches to the tmux session (local or remote)
-    // The PTY will receive the full screen content including alternate buffer
-    // Initial dimensions match frontend xterm.js (120x30) to avoid resize flicker
+    // Check for existing PTY connection and clean it up to prevent duplicates
+    // This can happen if user refreshes the page or opens multiple tabs
+    const existingPty = activePtys.get(sessionName);
+    if (existingPty) {
+      console.log(`[ws] Cleaning up existing PTY for ${sessionName} before creating new one`);
+      try {
+        existingPty.write('\x02d'); // Ctrl-b d to detach from tmux
+        setTimeout(() => existingPty.kill(), 100);
+      } catch {
+        // Ignore errors during cleanup
+      }
+      activePtys.delete(sessionName);
+    }
+
+    // For remote sessions, skip the pre-resize since we'll use client dimensions
+    // For local sessions, do the pre-resize
+    if (!isRemote) {
+      try {
+        await execAsync(`tmux resize-window -t ${sessionName} -x 120 -y 29 2>/dev/null || true`, { timeout: 5000 });
+      } catch {
+        console.log(`[ws] Initial resize failed for ${sessionName}`);
+      }
+    }
+
+    if (isRemote) {
+      // ATTEMPT 14: Wait for client dimensions before starting SSH
+      // The root cause of the terminal visual bug is a dimension mismatch:
+      // - Server was starting SSH at hardcoded 120x29
+      // - Client would later send its actual dimensions (e.g., 106x29 after FitAddon)
+      // - By then, tmux was already outputting at 120 columns, causing status bar to wrap
+      //
+      // Fix: Wait for the client to send its dimensions FIRST, then start SSH
+      // with the correct dimensions from the beginning.
+
+      let sshClient: InstanceType<typeof SSHClient> | null = null;
+      let sshStream: any = null;
+      let currentCols = 120;
+      let currentRows = 29;
+      let sshStarted = false;
+      let pendingInput: string[] = [];  // Buffer input until SSH is ready
+
+      // Read the SSH private key for exe.xyz hosts (do this early)
+      const sshKeyPath = join(homedir(), '.ssh', 'id_ed25519_exedev');
+      let privateKey: Buffer | undefined;
+      try {
+        privateKey = readFileSync(sshKeyPath);
+        console.log(`[ssh2] Using private key: ${sshKeyPath}`);
+      } catch (e) {
+        console.error(`[ssh2] Failed to read SSH key ${sshKeyPath}:`, e);
+        ws.close(1011, 'SSH key not found');
+        return;
+      }
+
+      // Function to start SSH connection with correct dimensions
+      const startSSH = async (cols: number, rows: number) => {
+        if (sshStarted) return;
+        sshStarted = true;
+
+        currentCols = cols;
+        currentRows = rows;
+
+        console.log(`[ssh2] Starting SSH with client dimensions: ${cols}x${rows}`);
+
+        // Pre-resize tmux window BEFORE attaching with CLIENT dimensions
+        await execAsync(`ssh -A ${vmName}.exe.xyz "tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true"`, { timeout: 10000 })
+          .catch(() => {});
+
+        sshClient = new SSHClient();
+
+        sshClient.on('ready', () => {
+          console.log(`[ssh2] Connected to ${vmName}.exe.xyz for ${sessionName}`);
+
+          // Use exec() with PTY to directly attach to tmux
+          // Use the client's dimensions, not hardcoded values
+          const tmuxCmd = `TERM=xterm-256color COLORTERM=truecolor LANG=en_US.UTF-8 tmux attach-session -t ${sessionName}`;
+          sshClient!.exec(tmuxCmd, {
+            pty: {
+              term: 'xterm-256color',
+              cols: currentCols,  // Use client dimensions
+              rows: currentRows,
+              modes: {
+                // Input modes
+                ECHO: 1,        // Enable echo
+                ICANON: 0,      // Disable canonical mode (raw input)
+                ICRNL: 0,       // Don't map CR to NL (raw)
+                ISIG: 1,        // Enable signals
+                IEXTEN: 0,      // Disable extended input
+                // Output modes - DISABLE post-processing to let escape sequences through raw
+                OPOST: 0,       // Disable output processing - pass escape sequences through raw
+                ONLCR: 0,       // Don't map NL to CR-NL
+              }
+            }
+          }, (err, stream) => {
+            if (err) {
+              console.error(`[ssh2] Exec error:`, err);
+              ws.close(1011, 'Failed to exec tmux');
+              return;
+            }
+
+            sshStream = stream;
+            console.log(`[ssh2] Tmux attached for ${sessionName} at ${currentCols}x${currentRows}`);
+
+            // Flush any pending input that arrived before SSH was ready
+            if (pendingInput.length > 0) {
+              console.log(`[ssh2] Flushing ${pendingInput.length} pending inputs`);
+              for (const input of pendingInput) {
+                sshStream.write(input);
+              }
+              pendingInput = [];
+            }
+
+            // DEBUG: Enable detailed logging to diagnose terminal corruption
+            const DEBUG_TERMINAL = process.env.DEBUG_TERMINAL === '1';
+            let debugMsgCount = 0;
+            let sshInCount = 0;
+
+            // Helper to show escape sequences in readable form
+            const escapeForLog = (buf: Buffer): string => {
+              return buf.toString('utf8').replace(/[\x00-\x1f\x7f-\xff]/g, (c) => {
+                const code = c.charCodeAt(0);
+                if (code === 0x1b) return '\\e';
+                if (code === 0x0a) return '\\n';
+                if (code === 0x0d) return '\\r';
+                return `\\x${code.toString(16).padStart(2, '0')}`;
+              });
+            };
+
+            // Send data immediately like WebSSH2 does
+            stream.on('data', (data: Buffer) => {
+              // DEBUG: Log incoming SSH data chunks
+              if (DEBUG_TERMINAL) {
+                sshInCount++;
+                debugMsgCount++;
+                if (sshInCount <= 50 || sshInCount % 100 === 0) {
+                  console.log(`[ssh2-debug] SSH-IN #${sshInCount} len=${data.length}`);
+                  console.log(`[ssh2-debug]   DATA: ${escapeForLog(data).slice(0, 200)}${data.length > 200 ? '...' : ''}`);
+                }
+              }
+
+              // Send immediately as UTF-8 string (like WebSSH2)
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(data.toString('utf8'));
+              }
+            });
+
+            if (DEBUG_TERMINAL) {
+              console.log(`[ssh2-debug] Terminal debug logging enabled for ${sessionName}`);
+            }
+
+            stream.on('close', () => {
+              console.log(`[ssh2] Stream closed for ${sessionName}`);
+              sshClient?.end();
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.close(1000, 'Session ended');
+              }
+            });
+
+            stream.stderr.on('data', (data: Buffer) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(data.toString('utf8'));
+              }
+            });
+          });
+        });
+
+        sshClient.on('error', (err) => {
+          console.error(`[ssh2] Connection error:`, err);
+          ws.close(1011, 'SSH connection failed');
+        });
+
+        sshClient.on('close', () => {
+          console.log(`[ssh2] Connection closed for ${sessionName}`);
+        });
+
+        // Connect using private key (exe.xyz hosts use id_ed25519_exedev)
+        sshClient.connect({
+          host: `${vmName}.exe.xyz`,
+          port: 22,
+          username: process.env.USER || 'root',
+          privateKey: privateKey,
+          algorithms: {
+            serverHostKey: ['rsa-sha2-512', 'rsa-sha2-256', 'ssh-rsa', 'ecdsa-sha2-nistp256', 'ssh-ed25519'],
+          },
+        });
+      };
+
+      // Handle WebSocket messages - wait for resize before starting SSH
+      // Use the messageHandler pattern to process buffered early messages
+      const handleMessage = (message: string) => {
+        console.log(`[ws] Processing message for ${sessionName}: ${message.slice(0, 100)}${message.length > 100 ? '...' : ''}`);
+
+        if (message.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(message);
+            if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
+              if (!sshStarted) {
+                // First resize message - start SSH with these dimensions
+                startSSH(parsed.cols, parsed.rows);
+              } else {
+                // Subsequent resize - update dimensions
+                currentCols = parsed.cols;
+                currentRows = parsed.rows;
+                if (sshStream) {
+                  // Resize the SSH PTY
+                  sshStream.setWindow(parsed.rows, parsed.cols, 0, 0);
+                  // ALSO resize the tmux window to match
+                  execAsync(`ssh -A ${vmName}.exe.xyz "tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true"`, { timeout: 5000 })
+                    .catch(() => {}); // Ignore errors - best effort
+                }
+              }
+              return;
+            }
+          } catch {
+            // Invalid JSON, treat as terminal input
+          }
+        }
+
+        // Terminal input
+        if (sshStream) {
+          sshStream.write(message);
+        } else {
+          // Buffer input until SSH is ready
+          pendingInput.push(message);
+        }
+      };
+
+      // Set the message handler and process any buffered early messages
+      messageHandler = handleMessage;
+      console.log(`[ws] Processing ${earlyMessages.length} buffered messages for ${sessionName}`);
+      for (const msg of earlyMessages) {
+        handleMessage(msg);
+      }
+      earlyMessages.length = 0;  // Clear the buffer
+
+      ws.on('close', () => {
+        console.log(`WebSocket closed for session: ${sessionName}`);
+        if (sshStream) {
+          sshStream.write('\x02d'); // Ctrl-b d to detach
+          setTimeout(() => sshClient?.end(), 100);
+        } else {
+          sshClient?.end();
+        }
+      });
+
+      ws.on('error', (err) => {
+        console.error(`WebSocket error for ${sessionName}:`, err);
+        sshClient?.end();
+      });
+
+      return;
+    }
+
+    // Local sessions use node-pty directly
     let ptyProcess: pty.IPty;
-
-    if (isRemote) {
-      // For remote sessions, SSH to the VM and attach to tmux there
-      ptyProcess = pty.spawn('ssh', ['-A', '-t', `${vmName}.exe.xyz`, `tmux attach-session -t ${sessionName}`], {
-        name: 'xterm-256color',
-        cols: 120,
-        rows: 30,
-        cwd: homedir(),
-        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
-      });
-    } else {
-      ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
-        name: 'xterm-256color',
-        cols: 120,
-        rows: 30,
-        cwd: homedir(),
-        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
-      });
-    }
-
-    // Pre-resize tmux window to match initial PTY dimensions
-    if (isRemote) {
-      execAsync(`ssh -A ${vmName}.exe.xyz "tmux resize-window -t ${sessionName} -x 120 -y 30 2>/dev/null || true"`, { timeout: 10000 })
-        .catch(() => { /* ignore initial resize errors */ });
-    } else {
-      execAsync(`tmux resize-window -t ${sessionName} -x 120 -y 30 2>/dev/null || true`)
-        .catch(() => { /* ignore initial resize errors */ });
-    }
+    ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
+      name: 'xterm-256color',
+      cols: 120,
+      rows: 30,
+      cwd: homedir(),
+      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
+    });
 
     activePtys.set(sessionName, ptyProcess);
-
-    // Capture and send the current visible screen state with ANSI escape codes
-    // This ensures the client sees the actual current terminal state immediately
-    // The PTY will then handle live updates going forward
-    setTimeout(async () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        try {
-          // Capture with -e to include escape sequences (colors, formatting)
-          // -p prints to stdout, -S - -E - captures only the visible viewport (not scrollback)
-          const captureCmd = isRemote
-            ? `ssh -A ${vmName}.exe.xyz "tmux capture-pane -t \\"${sessionName}\\" -e -p -S - -E - 2>/dev/null || echo \\"\\""`
-            : `tmux capture-pane -t "${sessionName}" -e -p -S - -E - 2>/dev/null || echo ""`;
-          const { stdout } = await execAsync(captureCmd, { timeout: 10000 });
-          if (stdout.trim()) {
-            // Send a clear screen sequence first, then the captured content
-            ws.send('\x1b[2J\x1b[H' + stdout);
-          }
-        } catch {
-          // Ignore capture errors
-        }
-      }
-    }, 200);
 
     // Forward PTY output to WebSocket
     ptyProcess.onData((data) => {
@@ -9133,26 +9648,25 @@ wss.on('connection', (ws: WebSocket, req) => {
       }
     });
 
-    // Forward WebSocket input to PTY
-    ws.on('message', (data) => {
-      const message = data.toString();
+    // Track last resize to debounce/dedupe
+    let lastResizeCols = 120;
+    let lastResizeRows = 30;
 
-      // Handle resize messages (JSON format: {"type":"resize","cols":80,"rows":24})
-      // Only attempt JSON parse if message looks like JSON (starts with '{')
+    // Set up message handler for local sessions (using the buffered message pattern)
+    const handleLocalMessage = (message: string) => {
+      // Handle resize messages
       if (message.startsWith('{')) {
         try {
           const parsed = JSON.parse(message);
           if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
-            // Resize tmux window FIRST, then PTY (order matters for proper sync)
-            // tmux resize triggers SIGWINCH which the application uses to redraw
+            if (parsed.cols === lastResizeCols && parsed.rows === lastResizeRows) {
+              return;
+            }
+            lastResizeCols = parsed.cols;
+            lastResizeRows = parsed.rows;
+            ptyProcess.resize(parsed.cols, parsed.rows);
             execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
-              .then(() => {
-                ptyProcess.resize(parsed.cols, parsed.rows);
-              })
-              .catch(() => {
-                // Still resize PTY even if tmux resize fails
-                ptyProcess.resize(parsed.cols, parsed.rows);
-              });
+              .catch(() => {});
             return;
           }
         } catch {
@@ -9161,12 +9675,18 @@ wss.on('connection', (ws: WebSocket, req) => {
       }
 
       ptyProcess.write(message);
-    });
+    };
+
+    // Set the message handler and process any buffered early messages
+    messageHandler = handleLocalMessage;
+    for (const msg of earlyMessages) {
+      handleLocalMessage(msg);
+    }
+    earlyMessages.length = 0;
 
     // Clean up on WebSocket close
     ws.on('close', () => {
       console.log(`WebSocket closed for session: ${sessionName}`);
-      // Detach from tmux (Ctrl-b d) before killing PTY to leave tmux session running
       ptyProcess.write('\x02d'); // Ctrl-b d
       setTimeout(() => {
         ptyProcess.kill();
@@ -9426,6 +9946,10 @@ app.post('/api/remote/workspaces/:issueId/agent/start', async (req, res) => {
     if (!metadata) {
       return res.status(404).json({ error: 'Remote workspace not found' });
     }
+
+    // Sync Claude credentials before spawning (tokens may have expired)
+    const exe = createExeProvider({ infraVm: metadata.infraVm });
+    await exe.syncClaudeCredentials(metadata.vmName);
 
     const state = await spawnRemoteAgent({
       issueId,

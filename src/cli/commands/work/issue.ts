@@ -72,6 +72,7 @@ import {
 import {
   spawnRemoteAgent,
   isRemoteAgentRunning,
+  createExeProvider,
 } from '../../../lib/remote/index.js';
 import { isRemoteAvailable } from '../../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../../lib/remote/interface.js';
@@ -290,6 +291,14 @@ async function handleRemoteWorkspace(
   spinner.text = 'Building agent prompt...';
   const projectRoot = findProjectRoot(issueId);
   const prompt = buildAgentPrompt(issueId, `/workspace`, projectRoot);
+
+  // Sync Claude credentials before spawning (tokens may have expired)
+  spinner.text = 'Syncing Claude credentials...';
+  const exe = createExeProvider({ infraVm: remoteMetadata.infraVm });
+  const credsSynced = await exe.syncClaudeCredentials(remoteMetadata.vmName);
+  if (!credsSynced) {
+    spinner.warn('Could not sync Claude credentials - agent may need to re-authenticate');
+  }
 
   // Spawn remote agent
   spinner.text = 'Spawning remote agent...';
