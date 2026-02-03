@@ -128,9 +128,13 @@ else
 fi
 
 # Record cost event from tool usage (PAN-81)
-# Find the record-cost-event.js script - check multiple locations
+# Find the record-cost-event script - check multiple locations (prefer .ts, fallback to .js)
 COST_SCRIPT=""
-if [ -f "$HOME/.panopticon/bin/record-cost-event.js" ]; then
+if [ -f "$HOME/.panopticon/bin/record-cost-event.ts" ]; then
+  COST_SCRIPT="$HOME/.panopticon/bin/record-cost-event.ts"
+elif [ -f "$(dirname "$0")/record-cost-event.ts" ]; then
+  COST_SCRIPT="$(dirname "$0")/record-cost-event.ts"
+elif [ -f "$HOME/.panopticon/bin/record-cost-event.js" ]; then
   COST_SCRIPT="$HOME/.panopticon/bin/record-cost-event.js"
 elif [ -f "$(dirname "$0")/record-cost-event.js" ]; then
   COST_SCRIPT="$(dirname "$0")/record-cost-event.js"

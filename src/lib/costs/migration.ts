@@ -9,7 +9,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { appendCostEvent, CostEvent, eventsFileExists, getLastEventMetadata } from './events.js';
-import { getPricing, calculateCost, TokenUsage } from '../cost.js';
+import { getPricing, calculateCost, TokenUsage, AIProvider } from '../cost.js';
 
 // ============== Types ==============
 
@@ -102,7 +102,7 @@ function usageToCostEvents(
 
   for (const usage of usages) {
     // Determine provider from model name
-    let provider = 'anthropic';
+    let provider: AIProvider = 'anthropic';
     if (usage.model.includes('gpt')) {
       provider = 'openai';
     } else if (usage.model.includes('gemini')) {
@@ -110,7 +110,7 @@ function usageToCostEvents(
     }
 
     // Get pricing and calculate cost
-    const pricing = getPricing(provider as any, usage.model);
+    const pricing = getPricing(provider, usage.model);
     if (!pricing) {
       continue; // Skip if no pricing found
     }

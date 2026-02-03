@@ -5,21 +5,41 @@
  */
 
 import { readFileSync } from 'fs';
-import { calculateCost, getPricing } from '../src/lib/cost.js';
+import { calculateCost, getPricing, AIProvider } from '../src/lib/cost.js';
 import { appendCostEvent } from '../src/lib/costs/events.js';
 
+// ============== Types ==============
+
+interface UsageData {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+}
+
+interface ToolInfo {
+  model?: string;
+  usage?: UsageData;
+  message?: {
+    model?: string;
+    usage?: UsageData;
+  };
+}
+
+// ============== Main ==============
+
 // Read tool info from stdin
-let toolInfo;
+let toolInfo: ToolInfo;
 try {
   const input = readFileSync(0, 'utf-8');
-  toolInfo = JSON.parse(input);
+  toolInfo = JSON.parse(input) as ToolInfo;
 } catch (err) {
   // Silent failure - don't break Claude Code execution
   process.exit(0);
 }
 
 // Extract usage data from tool info
-const usage = toolInfo?.usage || toolInfo?.message?.usage;
+const usage: UsageData | undefined = toolInfo?.usage || toolInfo?.message?.usage;
 if (!usage) {
   // No usage data - not a Claude API call
   process.exit(0);
@@ -37,10 +57,10 @@ if (inputTokens === 0 && outputTokens === 0 && cacheReadTokens === 0 && cacheWri
 }
 
 // Extract model name
-const model = toolInfo?.model || toolInfo?.message?.model || 'claude-sonnet-4';
+const model: string = toolInfo?.model || toolInfo?.message?.model || 'claude-sonnet-4';
 
 // Determine provider from model name
-let provider = 'anthropic';
+let provider: AIProvider = 'anthropic';
 if (model.includes('gpt')) {
   provider = 'openai';
 } else if (model.includes('gemini')) {
@@ -65,10 +85,9 @@ const cost = calculateCost({
 // Get agent and issue context from environment
 // PANOPTICON_AGENT_ID should always be set by pan work or heartbeat-hook
 // If not set, use a fallback that makes it clear costs are unattributed
-const agentId = process.env.PANOPTICON_AGENT_ID || 'unattributed';
-
-const issueId = process.env.PANOPTICON_ISSUE_ID || 'UNKNOWN';
-const sessionType = process.env.PANOPTICON_SESSION_TYPE || 'implementation';
+const agentId: string = process.env.PANOPTICON_AGENT_ID || 'unattributed';
+const issueId: string = process.env.PANOPTICON_ISSUE_ID || 'UNKNOWN';
+const sessionType: string = process.env.PANOPTICON_SESSION_TYPE || 'implementation';
 
 // Record cost event
 try {

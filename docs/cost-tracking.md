@@ -258,7 +258,7 @@ Migration is best-effort and logs warnings for corrupted files. Check logs:
 
 ~/.panopticon/bin/
   ├── heartbeat-hook        # Updated with cost tracking
-  └── record-cost-event.js  # Cost recording script
+  └── record-cost-event.ts  # Cost recording script
 
 ~/.claude/projects/
   └── -<workspace>/         # Session files (legacy)
@@ -284,7 +284,7 @@ For implementation details, see:
 - `src/dashboard/server/index.ts` - API endpoints
 - `src/dashboard/frontend/src/components/CostsPage.tsx` - UI component
 - `scripts/heartbeat-hook` - Real-time cost recording
-- `scripts/record-cost-event.js` - Cost calculation logic
+- `scripts/record-cost-event.ts` - Cost calculation logic
 
 ## Related Issues
 

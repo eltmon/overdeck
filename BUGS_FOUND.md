@@ -34,10 +34,10 @@ Track actual line numbers, not event count. Modify `readEventsFromLine` to retur
 
 ---
 
-## 🟡 MEDIUM: Agent ID Fallback Issue
+## 🟡 MEDIUM: Agent ID Fallback Issue (FIXED)
 
-**File**: `scripts/record-cost-event.js`
-**Line**: 67
+**File**: `scripts/record-cost-event.ts` (converted from .js)
+**Line**: 88
 **Severity**: MEDIUM - Incorrect agent tracking
 
 ### Problem
