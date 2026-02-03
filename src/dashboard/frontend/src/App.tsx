@@ -14,12 +14,13 @@ import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { MetricsSummary } from './components/MetricsSummary';
 import { MetricsPage } from './components/MetricsPage';
+import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
-import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, ArrowRightLeft, Settings } from 'lucide-react';
+import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings } from 'lucide-react';
 import { Agent, Issue } from './types';
 
-type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'handoffs' | 'settings';
+type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
 const MIN_PANEL_WIDTH = 400;
 const MAX_PANEL_WIDTH = 1200;
@@ -201,6 +202,7 @@ export default function App() {
               { id: 'handoffs', label: 'Handoffs', icon: ArrowRightLeft },
               { id: 'activity', label: 'Activity', icon: Terminal },
               { id: 'metrics', label: 'Metrics', icon: BarChart3 },
+              { id: 'costs', label: 'Costs', icon: DollarSign },
               { id: 'skills', label: 'Skills', icon: BookOpen },
               { id: 'health', label: 'Health', icon: Activity },
               { id: 'settings', label: 'Settings', icon: Settings },
@@ -303,6 +305,11 @@ export default function App() {
         {activeTab === 'metrics' && (
           <div className="w-full overflow-auto">
             <MetricsPage />
+          </div>
+        )}
+        {activeTab === 'costs' && (
+          <div className="w-full overflow-auto">
+            <CostsPage />
           </div>
         )}
         {activeTab === 'handoffs' && (
