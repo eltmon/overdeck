@@ -44,14 +44,17 @@ function parseVmList(output: string): VmInfo[] {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('Your VMs')) continue;
 
-    // Parse VM name - first word before any whitespace or parens
-    const match = trimmed.match(/^([a-z0-9-]+)/i);
+    // exe.dev format: "  • pan-pan-81-ws.exe.xyz - running (boldsoftware/exeuntu)"
+    // Extract VM name (without .exe.xyz suffix) and status
+    const match = trimmed.match(/[•\-]\s*([a-z0-9-]+)\.exe\.xyz\s*-\s*(\w+)/i);
     if (match) {
       const name = match[1];
-      // Default to running since exe.dev VMs are persistent
-      vms.push({ name, status: 'running' });
+      const statusText = match[2].toLowerCase();
+      const status: VmStatus = statusText === 'running' ? 'running' :
+                               statusText === 'stopped' ? 'stopped' : 'unknown';
+      vms.push({ name, status });
     }
   }
 
