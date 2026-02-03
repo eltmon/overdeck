@@ -109,8 +109,10 @@ export function saveCache(cache: CostCache): void {
 
 /**
  * Update cache incrementally from new events
+ * @param events Array of events to add
+ * @param newLineNumber Optional new line number (for correct tracking with malformed lines)
  */
-export function updateCacheFromEvents(events: CostEvent[]): CostCache {
+export function updateCacheFromEvents(events: CostEvent[], newLineNumber?: number): CostCache {
   const cache = loadCache();
 
   for (const event of events) {
@@ -121,7 +123,14 @@ export function updateCacheFromEvents(events: CostEvent[]): CostCache {
   if (events.length > 0) {
     const lastEvent = events[events.length - 1];
     cache.lastEventTs = lastEvent.ts;
-    cache.lastEventLine += events.length;
+
+    // Use provided line number if available (handles malformed lines correctly)
+    // Otherwise fall back to incrementing by event count (for backward compatibility)
+    if (newLineNumber !== undefined) {
+      cache.lastEventLine = newLineNumber;
+    } else {
+      cache.lastEventLine += events.length;
+    }
   }
 
   cache.status = 'live';
@@ -242,12 +251,18 @@ export function syncCache(): CostCache {
     return rebuildCache();
   }
 
-  // Read new events
-  const newEvents = readEventsFromLine(cache.lastEventLine);
+  // Read new events (returns both events and new line position)
+  const { events: newEvents, newLine } = readEventsFromLine(cache.lastEventLine);
 
   if (newEvents.length > 0) {
     console.log(`Syncing cache with ${newEvents.length} new events...`);
-    return updateCacheFromEvents(newEvents);
+    return updateCacheFromEvents(newEvents, newLine);
+  }
+
+  // Even if no events, update line number in case file was appended with only malformed lines
+  if (newLine !== cache.lastEventLine) {
+    cache.lastEventLine = newLine;
+    saveCache(cache);
   }
 
   return cache;
