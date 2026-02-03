@@ -6196,9 +6196,23 @@ app.post('/api/agents', async (req, res) => {
       const exe = createExeProvider({ infraVm: workspaceMetadata.infraVm });
       await exe.syncAllCredentials(workspaceMetadata.vmName);
 
+      // Generate initial prompt for the agent
+      const agentPrompt = `You are working on issue ${issueId}.
+
+Your workspace is at /workspace. Check for planning artifacts:
+- /workspace/.planning/STATE.md - Contains the implementation plan
+- /workspace/.planning/${issueId.toLowerCase()}/STATE.md - Alternative location
+- /workspace/docs/prds/ - May contain PRD documents
+
+Start by reading the STATE.md file to understand the plan, then begin implementation.
+If no STATE.md exists, check the issue tracker for requirements.
+
+Work autonomously. Commit your changes frequently with clear commit messages.`;
+
       const state = await spawnRemoteAgent({
         issueId,
         workspace: workspaceMetadata,
+        prompt: agentPrompt,
       });
 
       console.log(`[start-agent] Remote agent spawned for ${issueId}: ${state.id}`);
