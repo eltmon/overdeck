@@ -532,6 +532,33 @@ ssh <vm-name>.exe.xyz 'echo "{\"bypassPermissionsModeAccepted\": true, \"hasComp
 
 > **Note:** The bypass setting is `bypassPermissionsModeAccepted`, not `hasAcceptedBypassPermissionsWarning` (an older/incorrect name).
 
+### Credential Syncing (Automatic)
+
+Panopticon automatically syncs credentials from your local macOS machine to remote VMs before spawning agents. This ensures agents have fresh authentication tokens even after OAuth tokens expire.
+
+**Credentials synced:**
+
+| Credential | Local Source | Remote Destination | Purpose |
+|------------|--------------|-------------------|---------|
+| Claude Code OAuth | macOS Keychain (`Claude Code-credentials`) | `~/.claude/.credentials.json` | API authentication for Claude agents |
+| GitHub CLI | macOS Keychain (`gh:github.com`) | `~/.config/gh/hosts.yml` | `gh` CLI commands (PR creation, issue updates) |
+
+**When credentials are synced:**
+- Before spawning planning agents (dashboard "Plan" button)
+- Before spawning work agents (dashboard "Start Agent" button)
+- When using `pan workspace sync-auth <issue-id>` CLI command
+- When using `pan work issue` to start remote work
+
+**Manual sync (if needed):**
+```bash
+pan workspace sync-auth <issue-id>
+```
+
+**Troubleshooting:**
+- If Claude auth fails: Run `claude` locally to re-authenticate, then sync again
+- If GitHub auth fails: Run `gh auth login` locally, then sync again
+- Both credentials are extracted from macOS Keychain and written to standard config locations on Linux VMs
+
 ## Configuration
 
 ### User Config (`~/.panopticon/config.toml`)
