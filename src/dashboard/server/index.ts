@@ -1762,12 +1762,34 @@ app.get('/api/agents', async (_req, res) => {
       return res.json(agentsCache.data);
     }
 
+    // Get local tmux sessions
     const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}|#{session_created}" 2>/dev/null || true');
 
     const agentLines = stdout
       .trim()
       .split('\n')
       .filter((line) => line.startsWith('agent-') || line.startsWith('planning-'));
+
+    // Also check for remote agents from state files
+    const agentsDir = join(homedir(), '.panopticon', 'agents');
+    const remoteAgentIds: string[] = [];
+    if (existsSync(agentsDir)) {
+      const dirs = readdirSync(agentsDir).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
+      for (const dir of dirs) {
+        const remoteStateFile = join(agentsDir, dir, 'remote-state.json');
+        if (existsSync(remoteStateFile)) {
+          try {
+            const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+            if (state.location === 'remote' && state.status === 'running') {
+              // Check if not already in local list
+              if (!agentLines.some(line => line.startsWith(dir + '|'))) {
+                remoteAgentIds.push(dir);
+              }
+            }
+          } catch {}
+        }
+      }
+    }
 
     // Process agents in parallel to avoid blocking
     const agents = await Promise.all(
@@ -1827,9 +1849,49 @@ app.get('/api/agents', async (_req, res) => {
       })
     );
 
+    // Process remote agents from state files
+    const remoteAgents = await Promise.all(
+      remoteAgentIds.map(async (name) => {
+        const remoteStateFile = join(homedir(), '.panopticon', 'agents', name, 'remote-state.json');
+        const isPlanning = name.startsWith('planning-');
+
+        try {
+          const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+          const issueId = state.issueId?.toUpperCase() || name.replace(/^(agent-|planning-)/, '').toUpperCase();
+
+          // Check workspace location
+          const workspaceLocation = getWorkspaceLocation(issueId);
+
+          return {
+            id: name,
+            issueId,
+            runtime: 'claude',
+            model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+            status: 'healthy' as const,
+            startedAt: state.startedAt || new Date().toISOString(),
+            consecutiveFailures: 0,
+            killCount: 0,
+            workspace: `/workspace (${state.vmName})`,
+            workspaceLocation: 'remote',
+            vmName: state.vmName,
+            git: null,
+            type: isPlanning ? 'planning' : 'agent',
+            hasPendingQuestion: false,
+            pendingQuestionCount: 0,
+            remote: true,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    // Combine local and remote agents
+    const allAgents = [...agents, ...remoteAgents.filter(Boolean)];
+
     // Cache the result
-    agentsCache = { data: agents, timestamp: now };
-    res.json(agents);
+    agentsCache = { data: allAgents, timestamp: now };
+    res.json(allAgents);
   } catch (error) {
     console.error('Error listing agents:', error);
     res.json([]);
