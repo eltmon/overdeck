@@ -9420,19 +9420,31 @@ wss.on('connection', (ws: WebSocket, req) => {
   // Check if tmux session exists (async to avoid blocking event loop)
   (async () => {
     // Check if this is a remote session by reading agent state
+    // Check both state.json (local agents) and remote-state.json (remote agents)
     let isRemote = false;
     let vmName = '';
     const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
     const stateFile = join(agentStateDir, 'state.json');
+    const remoteStateFile = join(agentStateDir, 'remote-state.json');
 
     try {
-      if (existsSync(stateFile)) {
+      // Try remote-state.json first (for remote agents)
+      if (existsSync(remoteStateFile)) {
+        const stateContent = readFileSync(remoteStateFile, 'utf-8');
+        const state = JSON.parse(stateContent);
+        if (state.location === 'remote' && state.vmName) {
+          isRemote = true;
+          vmName = state.vmName;
+          console.log(`[ws] Session ${sessionName} is remote on VM: ${vmName} (from remote-state.json)`);
+        }
+      } else if (existsSync(stateFile)) {
+        // Fall back to state.json (for local agents or legacy format)
         const stateContent = readFileSync(stateFile, 'utf-8');
         const state = JSON.parse(stateContent);
         if (state.location === 'remote' && state.vmName) {
           isRemote = true;
           vmName = state.vmName;
-          console.log(`[ws] Session ${sessionName} is remote on VM: ${vmName}`);
+          console.log(`[ws] Session ${sessionName} is remote on VM: ${vmName} (from state.json)`);
         }
       }
     } catch (err) {
