@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join, basename } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
@@ -128,6 +128,11 @@ export function registerWorkspaceCommands(program: Command): void {
     .command('ssh <issueId>')
     .description('SSH into remote workspace VM')
     .action(sshCommand);
+
+  workspace
+    .command('sync-auth <issueId>')
+    .description('Sync Claude Code credentials to remote workspace')
+    .action(syncAuthCommand);
 
   workspace
     .command('start <issueId>')
@@ -798,7 +803,15 @@ async function createRemoteWorkspace(
     // Step 3: Add GitHub host key and clone repository on VM
     spinner.text = 'Cloning repository on VM...';
     // Add GitHub's SSH host keys to known_hosts to avoid verification prompt
-    await exe.ssh(vmName, 'mkdir -p ~/.ssh && ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null');
+    await exe.ssh(vmName, 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null');
+
+    // Inject SSH key for GitHub access if available
+    const sshKeyPath = join(homedir(), '.panopticon', 'ssh', 'exe-dev-key');
+    if (existsSync(sshKeyPath)) {
+      const sshKeyBase64 = Buffer.from(readFileSync(sshKeyPath, 'utf-8')).toString('base64');
+      await exe.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519`);
+    }
+
     const cloneResult = await exe.ssh(vmName, `git clone ${repoUrl} ~/workspace`);
     if (cloneResult.exitCode !== 0) {
       throw new Error(`Failed to clone: ${cloneResult.stderr}`);
@@ -851,10 +864,18 @@ with open(path, "w") as f:
     const patchBase64 = Buffer.from(onboardingPatch).toString('base64');
     await exe.ssh(vmName, `echo '${patchBase64}' | base64 -d | python3`);
 
-    // Set theme preference in settings.json
-    const claudeSettings = JSON.stringify({ theme: 'dark' });
+    // Set theme preference and bypass permissions in settings.json
+    const claudeSettings = JSON.stringify({
+      theme: 'dark',
+      permissions: {
+        defaultMode: 'bypassPermissions',
+      },
+    });
     const settingsBase64 = Buffer.from(claudeSettings).toString('base64');
     await exe.ssh(vmName, `echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
+
+    // Configure Claude Code for autonomous operation (bypass permissions + skip onboarding)
+    await exe.configureClaudeCode(vmName);
 
     // Step 5: Configure environment for shared infra
     spinner.text = 'Configuring environment...';
@@ -1028,6 +1049,46 @@ async function migrateCommand(issueId: string, options: MigrateOptions): Promise
     console.log('');
     console.log(chalk.dim('For now, create a local workspace manually:'));
     console.log(chalk.dim(`  pan workspace create ${issueId} --local`));
+  }
+}
+
+/**
+ * Sync Claude Code credentials to remote workspace
+ */
+async function syncAuthCommand(issueId: string): Promise<void> {
+  const spinner = ora('Syncing credentials...').start();
+
+  const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const metadata = loadWorkspaceMetadata(normalizedId);
+
+  if (!metadata || metadata.location !== 'remote') {
+    spinner.fail(`No remote workspace found for ${issueId}`);
+    console.log(chalk.dim('Create one with: pan workspace create --remote ' + issueId));
+    process.exit(1);
+  }
+
+  try {
+    const exe = createExeProvider({ infraVm: metadata.infraVm });
+
+    // Sync credentials
+    const synced = await exe.syncClaudeCredentials(metadata.vmName);
+
+    if (synced) {
+      spinner.succeed('Credentials synced to remote workspace');
+      console.log(chalk.dim(`  VM: ${metadata.vmName}`));
+    } else {
+      spinner.warn('Could not sync credentials');
+      console.log('');
+      console.log(chalk.yellow('Claude Code credentials not found in Keychain.'));
+      console.log(chalk.dim('You may need to authenticate Claude Code locally first:'));
+      console.log(chalk.dim('  claude --help'));
+      console.log('');
+      console.log(chalk.dim('Or SSH into the VM and authenticate directly:'));
+      console.log(chalk.dim(`  pan workspace ssh ${issueId}`));
+    }
+  } catch (error: any) {
+    spinner.fail(`Failed to sync credentials: ${error.message}`);
+    process.exit(1);
   }
 }
 

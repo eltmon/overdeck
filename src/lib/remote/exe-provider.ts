@@ -400,6 +400,81 @@ COMPOSE_EOF`);
     // Store as infra VM
     this.config.infraVm = vmName;
   }
+
+  /**
+   * Sync Claude Code credentials from local macOS Keychain to remote VM
+   *
+   * This should be called before spawning agents to ensure fresh credentials.
+   * Credentials can expire, and re-running this ensures the VM has valid auth.
+   *
+   * @returns true if credentials were synced, false if not available
+   */
+  async syncClaudeCredentials(vmName: string): Promise<boolean> {
+    try {
+      // Get credentials from macOS Keychain
+      const { stdout: credentials } = await execAsync(
+        'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
+        { encoding: 'utf-8' }
+      );
+
+      if (!credentials || !credentials.trim()) {
+        return false;
+      }
+
+      // Ensure ~/.claude directory exists
+      await this.ssh(vmName, 'mkdir -p ~/.claude');
+
+      // Send credentials to VM (base64 encode to handle special characters)
+      const credsBase64 = Buffer.from(credentials.trim()).toString('base64');
+      const result = await this.ssh(vmName, `echo '${credsBase64}' | base64 -d > ~/.claude/.credentials.json`);
+
+      return result.exitCode === 0;
+    } catch (error: any) {
+      // Credentials not found in Keychain or other error
+      return false;
+    }
+  }
+
+  /**
+   * Configure Claude Code on a VM for autonomous operation
+   *
+   * Sets up:
+   * - ~/.claude.json with bypass permissions and onboarding settings
+   * - ~/.bashrc with proper terminal environment (TERM, LANG, etc.)
+   *
+   * This is required for remote agents to run without human interaction.
+   */
+  async configureClaudeCode(vmName: string): Promise<void> {
+    // Configure Claude settings
+    const setupScript = `
+import json, os
+path = os.path.expanduser("~/.claude.json")
+data = {}
+if os.path.exists(path):
+    with open(path, "r") as f:
+        data = json.load(f)
+data["bypassPermissionsModeAccepted"] = True
+data["hasCompletedOnboarding"] = True
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+`;
+    const scriptBase64 = Buffer.from(setupScript).toString('base64');
+    const result = await this.ssh(vmName, `echo '${scriptBase64}' | base64 -d | python3`);
+    if (result.exitCode !== 0) {
+      throw new Error(`Failed to configure Claude Code on ${vmName}: ${result.stderr}`);
+    }
+
+    // Configure terminal environment in .bashrc for proper rendering
+    const termEnv = `
+# Panopticon terminal settings
+export TERM=xterm-256color
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+export COLORTERM=truecolor
+`;
+    const termEnvBase64 = Buffer.from(termEnv).toString('base64');
+    await this.ssh(vmName, `grep -q "Panopticon terminal settings" ~/.bashrc 2>/dev/null || echo '${termEnvBase64}' | base64 -d >> ~/.bashrc`);
+  }
 }
 
 /**
