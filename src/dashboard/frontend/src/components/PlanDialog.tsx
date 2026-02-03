@@ -37,6 +37,8 @@ interface PlanningStatus {
   sessionName: string;
   workspacePath?: string;
   error?: string;
+  isRemote?: boolean;
+  vmName?: string;
 }
 
 type Step = 'checking' | 'ready' | 'starting' | 'planning' | 'complete' | 'error';
@@ -322,7 +324,14 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         </div>
         <span className="text-sm text-white font-medium">Plan: {issue.identifier}</span>
         {step === 'planning' && (
-          <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+          <>
+            <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+            {statusQuery.data?.isRemote ? (
+              <span className="px-1.5 py-0.5 bg-blue-500/30 text-blue-300 text-xs rounded">Remote</span>
+            ) : (
+              <span className="px-1.5 py-0.5 bg-gray-500/30 text-gray-400 text-xs rounded">Local</span>
+            )}
+          </>
         )}
       </div>
     );
@@ -376,6 +385,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
                       Planning Active
                     </span>
+                    {statusQuery.data?.isRemote ? (
+                      <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full" title={statusQuery.data.vmName ? `VM: ${statusQuery.data.vmName}` : undefined}>
+                        Remote
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded-full">
+                        Local
+                      </span>
+                    )}
                     <button
                       onClick={handleStopPlanning}
                       disabled={stopPlanningMutation.isPending}
