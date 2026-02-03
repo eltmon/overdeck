@@ -7040,6 +7040,10 @@ Start by exploring the codebase to understand the context, then begin the discov
         const exe = createExeProvider({ infraVm: remoteWorkspaceMetadata.infraVm });
         const vmName = remoteWorkspaceMetadata.vmName;
 
+        // Sync all credentials before spawning (tokens may have expired)
+        console.log(`[start-planning] Syncing credentials to ${vmName}...`);
+        await exe.syncAllCredentials(vmName);
+
         // Write planning prompt to remote VM
         const remotePlanningDir = '/workspace/.planning';
         const remotePlanningPromptPath = `${remotePlanningDir}/PLANNING_PROMPT.md`;
@@ -9947,9 +9951,9 @@ app.post('/api/remote/workspaces/:issueId/agent/start', async (req, res) => {
       return res.status(404).json({ error: 'Remote workspace not found' });
     }
 
-    // Sync Claude credentials before spawning (tokens may have expired)
+    // Sync all credentials before spawning (tokens may have expired)
     const exe = createExeProvider({ infraVm: metadata.infraVm });
-    await exe.syncClaudeCredentials(metadata.vmName);
+    await exe.syncAllCredentials(metadata.vmName);
 
     const state = await spawnRemoteAgent({
       issueId,
