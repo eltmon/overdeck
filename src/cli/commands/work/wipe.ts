@@ -1,11 +1,13 @@
 import chalk from 'chalk';
 import { homedir } from 'os';
 import { join } from 'path';
-import { existsSync, rmSync, readFileSync } from 'fs';
+import { existsSync, rmSync, readFileSync, readdirSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { stopAgent } from '../../../lib/agents.js';
+import { stopAgent, getAgentState } from '../../../lib/agents.js';
 import { sessionExists, killSession } from '../../../lib/tmux.js';
+import { createExeProvider } from '../../../lib/remote/index.js';
+import { loadWorkspaceMetadata, deleteWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 
 const execAsync = promisify(exec);
 
@@ -59,7 +61,69 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 2. Clean up agent state directories
+  // 2. Clean up remote workspace and VM (check workspace metadata FIRST)
+  // This ensures we can clean up even if agent state was already deleted
+  const workspaceMetadata = loadWorkspaceMetadata(issueLower);
+  if (workspaceMetadata?.location === 'remote' && workspaceMetadata?.vmName) {
+    const vmName = workspaceMetadata.vmName;
+    console.log(chalk.gray(`  → Found remote workspace on VM: ${vmName}`));
+
+    try {
+      const exe = createExeProvider({ infraVm: workspaceMetadata.infraVm || 'pan-infra' });
+
+      // Kill all processes on VM (tmux, claude, etc.)
+      try {
+        await exe.ssh(vmName, `tmux kill-server 2>/dev/null || true; pkill -f claude 2>/dev/null || true`);
+        cleanupLog.push(`Killed processes on VM: ${vmName}`);
+        console.log(chalk.green(`  ✓ Killed processes on VM: ${vmName}`));
+      } catch (e) {
+        // Processes might not exist
+      }
+
+      // DELETE the VM (deep wipe = full cleanup)
+      try {
+        await exe.deleteVm(vmName);
+        cleanupLog.push(`Deleted remote VM: ${vmName}`);
+        console.log(chalk.green(`  ✓ Deleted remote VM: ${vmName}`));
+      } catch (e: any) {
+        console.log(chalk.yellow(`  ⚠ Could not delete VM: ${vmName} - ${e.message}`));
+      }
+    } catch (e: any) {
+      console.log(chalk.yellow(`  ⚠ Remote cleanup failed: ${e.message}`));
+    }
+
+    // Delete workspace metadata
+    if (deleteWorkspaceMetadata(issueLower)) {
+      cleanupLog.push(`Deleted workspace metadata`);
+      console.log(chalk.green(`  ✓ Deleted workspace metadata`));
+    }
+  } else {
+    // No workspace metadata - still check agent state for remote info (fallback)
+    const agentIds = [`planning-${issueLower}`, `agent-${issueLower}`];
+    for (const agentId of agentIds) {
+      const state = getAgentState(agentId) as any;
+      if (state?.location === 'remote' && state?.vmName) {
+        console.log(chalk.gray(`  → Found remote agent on VM: ${state.vmName}`));
+        try {
+          const exe = createExeProvider({ infraVm: state.infraVm || 'pan-infra' });
+
+          // Kill processes and delete VM
+          try {
+            await exe.ssh(state.vmName, `tmux kill-server 2>/dev/null || true; pkill -f claude 2>/dev/null || true`);
+            await exe.deleteVm(state.vmName);
+            cleanupLog.push(`Deleted remote VM: ${state.vmName}`);
+            console.log(chalk.green(`  ✓ Deleted remote VM: ${state.vmName}`));
+          } catch (e: any) {
+            console.log(chalk.yellow(`  ⚠ Could not delete VM: ${state.vmName} - ${e.message}`));
+          }
+        } catch (e: any) {
+          console.log(chalk.yellow(`  ⚠ Remote cleanup failed: ${e.message}`));
+        }
+      }
+    }
+  }
+
+  // 3. Clean up agent state directories
   const agentDirs = [
     join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`),
     join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`),
@@ -73,7 +137,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 3. Find project path
+  // 4. Find project path
   let projectPath: string | undefined;
   const prefix = issueId.split('-')[0].toUpperCase();
   const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
@@ -94,7 +158,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 4. Clean up legacy planning directory
+  // 5. Clean up legacy planning directory
   if (projectPath) {
     const legacyPlanningDir = join(projectPath, '.planning', issueLower);
     if (existsSync(legacyPlanningDir)) {
@@ -104,7 +168,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 5. Delete workspace if requested
+  // 6. Delete workspace if requested
   if (options.workspace && projectPath) {
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (existsSync(workspacePath)) {
@@ -128,7 +192,25 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 6. Reset Linear issue (if LINEAR_API_KEY is available)
+  // 7. Reset GitHub issue labels (remove planning label)
+  // Check if this looks like a GitHub issue (PAN-XXX format where PAN repo exists)
+  try {
+    const ghLabelResult = await execAsync(
+      `gh issue edit ${issueId.split('-')[1] || issueId} --repo eltmon/panopticon-cli --remove-label "planning" 2>&1`,
+      { timeout: 10000 }
+    );
+    if (!ghLabelResult.stderr?.includes('not found')) {
+      cleanupLog.push('Removed GitHub planning label');
+      console.log(chalk.green('  ✓ Removed GitHub planning label'));
+    }
+  } catch (ghErr: any) {
+    // Not a GitHub issue or label doesn't exist - that's fine
+    if (!ghErr.message?.includes('not found') && !ghErr.message?.includes('Could not find')) {
+      console.log(chalk.gray(`  - GitHub label cleanup skipped: ${ghErr.message?.split('\n')[0] || 'not a GitHub issue'}`));
+    }
+  }
+
+  // 8. Reset Linear issue (if LINEAR_API_KEY is available)
   const linearKey = process.env.LINEAR_API_KEY;
   if (linearKey) {
     try {

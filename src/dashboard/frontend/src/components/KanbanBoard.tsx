@@ -152,10 +152,14 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
   };
 
   for (const issue of issues) {
-    // Use shadowStatus for column placement if it exists (shadow mode)
+    // Use targetCanonicalState if available (explicit column from drag-drop)
+    // Otherwise fall back to shadowStatus mapping, then tracker status
     let status: string;
-    if (issue.shadowStatus) {
-      // Map shadow status to canonical state
+    if (issue.targetCanonicalState) {
+      // Explicit canonical state from drag-drop - use directly
+      status = issue.targetCanonicalState;
+    } else if (issue.shadowStatus) {
+      // Legacy shadow status mapping
       status = issue.shadowStatus === 'closed' ? 'done' :
                issue.shadowStatus === 'in_progress' ? (STATUS_LABELS[issue.status] || 'in_progress') :
                STATUS_LABELS[issue.status] || 'backlog';
@@ -1628,6 +1632,26 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
           >
             <Play className="w-3.5 h-3.5" />
             Resume Agent
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm(`Reset ${issue.identifier}?\n\nThis will:\n• Kill any running agents (local and remote)\n• Move the issue back to To Do in Linear\n• Keep the workspace for reference`)) {
+                // Call the reset endpoint
+                fetch(`/api/issues/${issue.identifier}/reset`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                }).then(() => {
+                  queryClient.invalidateQueries({ queryKey: ['issues'] });
+                  queryClient.invalidateQueries({ queryKey: ['agents'] });
+                }).catch(err => console.error('Reset failed:', err));
+              }
+            }}
+            className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors"
+            title="Reset to To Do - kills agents, resets Linear status"
+          >
+            <Undo className="w-3.5 h-3.5" />
+            Reset
           </button>
         </div>
       )}

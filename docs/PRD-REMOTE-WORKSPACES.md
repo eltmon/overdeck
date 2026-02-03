@@ -479,6 +479,59 @@ pan remote resources
 #   Per workspace: ~1.5GB average
 ```
 
+## Prerequisites
+
+### SSH Key for GitHub Access
+
+Remote VMs need SSH access to clone repositories from GitHub. Panopticon automatically injects an SSH key from `~/.panopticon/ssh/exe-dev-key` into new VMs.
+
+**One-time setup:**
+
+1. **Generate a dedicated SSH key for exe.dev:**
+   ```bash
+   mkdir -p ~/.panopticon/ssh
+   ssh-keygen -t ed25519 -C "exe.dev-panopticon" -f ~/.panopticon/ssh/exe-dev-key -N ""
+   ```
+
+2. **Add the public key to GitHub:**
+   ```bash
+   cat ~/.panopticon/ssh/exe-dev-key.pub | pbcopy  # Copy to clipboard
+   # Then add at: https://github.com/settings/ssh/new
+   ```
+
+3. **Verify it works:**
+   ```bash
+   ssh -i ~/.panopticon/ssh/exe-dev-key -T git@github.com
+   # Should see: "Hi <username>! You've successfully authenticated..."
+   ```
+
+> **Note:** This key is separate from your regular SSH keys. It's dedicated to exe.dev VMs and can be revoked without affecting your local development.
+
+### exe.dev Account
+
+You need an exe.dev account with SSH access configured. Test with:
+```bash
+ssh exe.dev help
+```
+
+### Claude Code Bypass Permissions (Automatic)
+
+Remote agents run with `--dangerously-skip-permissions` which requires accepting a one-time warning, and Claude Code has an onboarding flow for new users. Panopticon automatically configures both on new VMs by creating `~/.claude.json` with:
+
+```json
+{
+  "bypassPermissionsModeAccepted": true,
+  "hasCompletedOnboarding": true
+}
+```
+
+This is done automatically during workspace creation. If you need to manually configure a VM:
+```bash
+ssh <vm-name>.exe.xyz 'echo "{\"bypassPermissionsModeAccepted\": true, \"hasCompletedOnboarding\": true}" > ~/.claude.json'
+```
+
+> **Note:** The bypass setting is `bypassPermissionsModeAccepted`, not `hasAcceptedBypassPermissionsWarning` (an older/incorrect name).
+
 ## Configuration
 
 ### User Config (`~/.panopticon/config.toml`)

@@ -7,12 +7,15 @@ interface StatusOptions {
 }
 
 export async function statusCommand(options: StatusOptions): Promise<void> {
-  const agents = listRunningAgents();
+  // Filter out invalid agent states (missing required fields)
+  const agents = listRunningAgents().filter(agent =>
+    agent.id && agent.issueId && agent.workspace
+  );
 
   if (options.json) {
     // Add shadow mode info to JSON output
     const agentsWithShadow = agents.map(agent => {
-      const shadowed = isShadowed(agent.issueId);
+      const shadowed = agent.issueId ? isShadowed(agent.issueId) : false;
       const shadowState = shadowed ? getShadowState(agent.issueId) : null;
       return {
         ...agent,
@@ -40,8 +43,8 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const startedAt = new Date(agent.startedAt);
     const duration = Math.floor((Date.now() - startedAt.getTime()) / 1000 / 60);
 
-    // Check shadow mode
-    const shadowed = isShadowed(agent.issueId);
+    // Check shadow mode (only if issueId exists)
+    const shadowed = agent.issueId ? isShadowed(agent.issueId) : false;
     const shadowState = shadowed ? getShadowState(agent.issueId) : null;
 
     console.log(`${chalk.cyan(agent.id)}`);
@@ -60,7 +63,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   }
 
   // Show legend
-  const anyShadowed = agents.some(agent => isShadowed(agent.issueId));
+  const anyShadowed = agents.some(agent => agent.issueId && isShadowed(agent.issueId));
   if (anyShadowed) {
     console.log(chalk.dim('👻 = Shadow mode (tracking status locally)'));
     console.log('');
