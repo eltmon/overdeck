@@ -4,7 +4,7 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -387,7 +387,10 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     // Create worktrees for each repo
     for (const repo of workspaceConfig.repos) {
-      const repoPath = join(projectConfig.path, repo.path);
+      // Resolve symlinks to get the actual git repository path
+      // (e.g., myn/frontend -> ../frontend needs to resolve to actual path)
+      const rawRepoPath = join(projectConfig.path, repo.path);
+      const repoPath = existsSync(rawRepoPath) ? realpathSync(rawRepoPath) : rawRepoPath;
       const targetPath = join(workspacePath, repo.name);
       const branchPrefix = repo.branch_prefix || 'feature/';
       const branchName = `${branchPrefix}${featureName}`;
@@ -398,7 +401,8 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       if (worktreeResult.success) {
         result.steps.push(`Created worktree for ${repo.name}: ${branchName} (from ${defaultBranch})`);
       } else {
-        result.errors.push(worktreeResult.message);
+        result.errors.push(`${repo.name}: ${worktreeResult.message}`);
+        result.success = false; // Fail the entire workspace creation if any worktree fails
       }
     }
   } else {
@@ -410,6 +414,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       result.steps.push(`Created worktree: ${branchName} (from ${defaultBranch})`);
     } else {
       result.errors.push(worktreeResult.message);
+      result.success = false; // Fail the entire workspace creation if worktree fails
     }
   }
 
