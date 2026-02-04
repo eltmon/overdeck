@@ -19,10 +19,12 @@ import {
 } from '../aggregator.js';
 import { appendCostEvent, CostEvent } from '../events.js';
 
-const TEST_ROOT = join(tmpdir(), `panopticon-agg-test-${Date.now()}`);
+let TEST_ROOT: string;
 const originalHomedir = process.env.HOME;
 
 beforeEach(() => {
+  // Create unique test directory for each test
+  TEST_ROOT = join(tmpdir(), `panopticon-agg-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const costsDir = join(TEST_ROOT, '.panopticon', 'costs');
   mkdirSync(costsDir, { recursive: true });
   process.env.HOME = TEST_ROOT;
@@ -30,7 +32,7 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env.HOME = originalHomedir;
-  if (existsSync(TEST_ROOT)) {
+  if (TEST_ROOT && existsSync(TEST_ROOT)) {
     rmSync(TEST_ROOT, { recursive: true, force: true });
   }
 });
@@ -381,24 +383,23 @@ describe('Aggregator Cache Management', () => {
     });
 
     it('should query costs by issue', () => {
-      const events: CostEvent[] = [
-        {
-          ts: new Date().toISOString(),
-          type: 'cost',
-          agentId: 'agent-1',
-          issueId: 'TEST-10',
-          sessionType: 'implementation',
-          provider: 'anthropic',
-          model: 'claude-sonnet-4',
-          input: 1000,
-          output: 500,
-          cacheRead: 0,
-          cacheWrite: 0,
-          cost: 0.01
-        }
-      ];
+      const event: CostEvent = {
+        ts: new Date().toISOString(),
+        type: 'cost',
+        agentId: 'agent-1',
+        issueId: 'TEST-10',
+        sessionType: 'implementation',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4',
+        input: 1000,
+        output: 500,
+        cacheRead: 0,
+        cacheWrite: 0,
+        cost: 0.01
+      };
 
-      updateCacheFromEvents(events);
+      // Write to events file - syncCache will pick it up
+      appendCostEvent(event);
 
       const issueData = getCostsForIssue('TEST-10');
       expect(issueData).toBeDefined();
@@ -406,24 +407,23 @@ describe('Aggregator Cache Management', () => {
     });
 
     it('should handle case-insensitive issue lookup', () => {
-      const events: CostEvent[] = [
-        {
-          ts: new Date().toISOString(),
-          type: 'cost',
-          agentId: 'agent-1',
-          issueId: 'TEST-11',
-          sessionType: 'implementation',
-          provider: 'anthropic',
-          model: 'claude-sonnet-4',
-          input: 1000,
-          output: 500,
-          cacheRead: 0,
-          cacheWrite: 0,
-          cost: 0.01
-        }
-      ];
+      const event: CostEvent = {
+        ts: new Date().toISOString(),
+        type: 'cost',
+        agentId: 'agent-1',
+        issueId: 'TEST-11',
+        sessionType: 'implementation',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4',
+        input: 1000,
+        output: 500,
+        cacheRead: 0,
+        cacheWrite: 0,
+        cost: 0.01
+      };
 
-      updateCacheFromEvents(events);
+      // Write to events file - syncCache will pick it up
+      appendCostEvent(event);
 
       // Should find with lowercase query
       const issueData = getCostsForIssue('test-11');
