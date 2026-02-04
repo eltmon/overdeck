@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'fs';
 import { join, basename } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
@@ -863,21 +863,68 @@ async function createRemoteWorkspace(
       await exe.syncGitLabAuth(vmName);
     }
 
-    // Convert HTTPS URLs to SSH format for remote VM cloning
-    // Remote VMs use SSH keys, not interactive HTTPS credentials
-    const sshRepoUrl = convertToSshUrl(repoUrl);
+    // Check if this is a polyrepo project
+    const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo' && projectConfig.workspace.repos;
 
-    const cloneResult = await exe.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`);
-    if (cloneResult.exitCode !== 0) {
-      throw new Error(`Failed to clone: ${cloneResult.stderr}`);
-    }
+    if (isPolyrepo) {
+      // Polyrepo: Clone each repo separately
+      spinner.text = 'Cloning repositories (polyrepo)...';
+      await exe.ssh(vmName, 'mkdir -p ~/workspace');
 
-    // Step 4: Create feature branch
-    spinner.text = 'Creating feature branch...';
-    const branchResult = await exe.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
-    if (branchResult.exitCode !== 0) {
-      // Branch might already exist remotely
-      await exe.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+      for (const repo of projectConfig!.workspace!.repos!) {
+        spinner.text = `Cloning ${repo.name}...`;
+
+        // Resolve symlink to get actual repo path
+        const rawRepoPath = join(projectRoot, repo.path);
+        const actualRepoPath = existsSync(rawRepoPath) ? realpathSync(rawRepoPath) : rawRepoPath;
+
+        // Get git remote URL for this repo
+        let repoRemoteUrl: string;
+        try {
+          const { stdout } = await execAsync('git remote get-url origin', {
+            cwd: actualRepoPath,
+            encoding: 'utf-8',
+          });
+          repoRemoteUrl = convertToSshUrl(stdout.trim());
+        } catch (err) {
+          throw new Error(`Failed to get remote URL for ${repo.name} at ${actualRepoPath}: ${err}`);
+        }
+
+        // Clone this repo on the remote VM
+        const cloneResult = await exe.ssh(vmName, `git clone ${repoRemoteUrl} ~/workspace/${repo.name}`);
+        if (cloneResult.exitCode !== 0) {
+          throw new Error(`Failed to clone ${repo.name}: ${cloneResult.stderr}`);
+        }
+
+        // Create feature branch for this repo
+        const repoBranchPrefix = repo.branch_prefix || 'feature/';
+        const repoBranchName = `${repoBranchPrefix}${normalizedId}`;
+        const branchResult = await exe.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout -b ${repoBranchName}`);
+        if (branchResult.exitCode !== 0) {
+          // Branch might already exist remotely
+          await exe.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout ${repoBranchName} || git checkout -b ${repoBranchName}`);
+        }
+      }
+
+      spinner.text = 'Setting up workspace structure...';
+    } else {
+      // Single repo: use existing logic
+      // Convert HTTPS URLs to SSH format for remote VM cloning
+      // Remote VMs use SSH keys, not interactive HTTPS credentials
+      const sshRepoUrl = convertToSshUrl(repoUrl);
+
+      const cloneResult = await exe.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`);
+      if (cloneResult.exitCode !== 0) {
+        throw new Error(`Failed to clone: ${cloneResult.stderr}`);
+      }
+
+      // Step 4: Create feature branch
+      spinner.text = 'Creating feature branch...';
+      const branchResult = await exe.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
+      if (branchResult.exitCode !== 0) {
+        // Branch might already exist remotely
+        await exe.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+      }
     }
 
     // Step 4.5: Create /workspace symlink for consistent paths
