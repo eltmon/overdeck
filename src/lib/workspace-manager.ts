@@ -53,7 +53,34 @@ function createPlaceholders(
     PROJECT_NAME: basename(projectConfig.path),
     PROJECT_PATH: projectConfig.path,
     WORKSPACE_PATH: workspacePath,
+    HOME: homedir(),
   };
+}
+
+/**
+ * Sanitize docker-compose files to use platform-agnostic paths
+ * Replaces hardcoded /home/username paths with ${HOME}
+ */
+function sanitizeComposeFile(filePath: string): void {
+  if (!existsSync(filePath)) return;
+
+  let content = readFileSync(filePath, 'utf-8');
+  const originalContent = content;
+
+  // Pattern to match hardcoded home paths like /home/username or /Users/username
+  // Replace with ${HOME} which docker-compose expands
+  const homePatterns = [
+    /\/home\/[a-zA-Z0-9_-]+\//g,      // Linux: /home/username/
+    /\/Users\/[a-zA-Z0-9_-]+\//g,     // macOS: /Users/username/
+  ];
+
+  for (const pattern of homePatterns) {
+    content = content.replace(pattern, '${HOME}/');
+  }
+
+  if (content !== originalContent) {
+    writeFileSync(filePath, content, 'utf-8');
+  }
 }
 
 /**
@@ -386,6 +413,20 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
+  // Sanitize any docker-compose files in the workspace to use platform-agnostic paths
+  // This handles files inherited from worktrees that may have hardcoded home paths
+  const devcontainerDir = join(workspacePath, '.devcontainer');
+  if (existsSync(devcontainerDir)) {
+    const composeFiles = readdirSync(devcontainerDir)
+      .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
+    for (const composeFile of composeFiles) {
+      sanitizeComposeFile(join(devcontainerDir, composeFile));
+    }
+    if (composeFiles.length > 0) {
+      result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
+    }
+  }
+
   // Configure DNS
   if (workspaceConfig.dns) {
     for (const entryPattern of workspaceConfig.dns.entries) {
@@ -468,6 +509,17 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
           copyFileSync(sourcePath, targetPath);
         }
       }
+    }
+
+    // Sanitize docker-compose files to use platform-agnostic paths
+    // This fixes hardcoded /home/username or /Users/username paths
+    const composeFiles = readdirSync(devcontainerDir)
+      .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
+    for (const composeFile of composeFiles) {
+      sanitizeComposeFile(join(devcontainerDir, composeFile));
+    }
+    if (composeFiles.length > 0) {
+      result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
     }
 
     // Create ./dev symlink at workspace root pointing to .devcontainer/dev
