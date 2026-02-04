@@ -41,6 +41,19 @@
 
 Panopticon is an **opinionated multi-agent orchestration system** for Claude Code. It manages projects, agents, and provides a unified set of skills, commands, and integrations that sync to your Claude Code environment.
 
+### Opinionated Decisions
+
+Panopticon makes deliberate, opinionated choices to reduce complexity and ensure consistent behavior:
+
+| Decision | Rationale |
+|----------|-----------|
+| **SSH for all git operations** | HTTPS requires interactive credentials or credential helpers that vary by platform. SSH keys work consistently across local machines, remote VMs, and CI environments. Panopticon automatically converts HTTPS URLs to SSH format. |
+| **Beads over GitHub Issues** | Local-first issue tracking that works offline, integrates with git, and provides resumability across sessions. |
+| **Skills over custom prompts** | Standardized SKILL.md format works across Claude Code, Codex, Cursor, and Gemini. |
+| **Linear as source of truth** | One issue tracker, synced to beads. No scattered TODO files. |
+| **Worktrees over branches** | Each feature gets an isolated directory, not just a branch. Enables parallel work. |
+| **Remote-first workspaces** | Heavy workloads (Docker, agents) run on remote VMs by default, keeping local machines responsive. |
+
 ### Key Insights
 
 This document synthesizes insights from:

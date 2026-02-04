@@ -481,11 +481,35 @@ pan remote resources
 
 ## Prerequisites
 
-### SSH Key for GitHub Access
+### SSH for All Git Operations
 
-Remote VMs need SSH access to clone repositories from GitHub. Panopticon automatically injects an SSH key from `~/.panopticon/ssh/exe-dev-key` into new VMs.
+**Panopticon uses SSH for all git operations.** This is an opinionated decision:
 
-**One-time setup:**
+- HTTPS requires interactive credentials or platform-specific credential helpers
+- SSH keys work consistently across local machines, remote VMs, and CI
+- Panopticon automatically converts HTTPS URLs to SSH format when cloning on remote VMs
+
+Example conversion:
+```
+https://github.com/owner/repo.git  → git@github.com:owner/repo.git
+https://gitlab.com/owner/repo.git → git@gitlab.com:owner/repo.git
+```
+
+### SSH Key Configuration
+
+Panopticon checks for SSH keys in this order:
+
+1. `~/.panopticon/ssh/exe-dev-key` (panopticon-specific, recommended)
+2. `~/.ssh/id_ed25519` (standard Ed25519 key)
+3. `~/.ssh/id_rsa` (legacy RSA key)
+
+The first key found is automatically copied to remote VMs.
+
+**Option A: Use existing SSH key** (if you already have one)
+
+Your existing `~/.ssh/id_ed25519` or `~/.ssh/id_rsa` will be used automatically. Ensure it's added to GitHub/GitLab.
+
+**Option B: Generate a dedicated key** (recommended for security isolation)
 
 1. **Generate a dedicated SSH key for exe.dev:**
    ```bash
@@ -493,19 +517,24 @@ Remote VMs need SSH access to clone repositories from GitHub. Panopticon automat
    ssh-keygen -t ed25519 -C "exe.dev-panopticon" -f ~/.panopticon/ssh/exe-dev-key -N ""
    ```
 
-2. **Add the public key to GitHub:**
+2. **Add the public key to your git host:**
    ```bash
    cat ~/.panopticon/ssh/exe-dev-key.pub | pbcopy  # Copy to clipboard
-   # Then add at: https://github.com/settings/ssh/new
+
+   # GitHub: https://github.com/settings/ssh/new
+   # GitLab: https://gitlab.com/-/user_settings/ssh_keys
    ```
 
 3. **Verify it works:**
    ```bash
+   # For GitHub:
    ssh -i ~/.panopticon/ssh/exe-dev-key -T git@github.com
-   # Should see: "Hi <username>! You've successfully authenticated..."
+
+   # For GitLab:
+   ssh -i ~/.panopticon/ssh/exe-dev-key -T git@gitlab.com
    ```
 
-> **Note:** This key is separate from your regular SSH keys. It's dedicated to exe.dev VMs and can be revoked without affecting your local development.
+> **Note:** A dedicated key can be revoked without affecting your local development if needed.
 
 ### exe.dev Account
 
