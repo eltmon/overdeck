@@ -925,16 +925,18 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
 
   // Check and auto-suspend idle agents (PAN-80)
-  const suspendActions = await checkAndSuspendIdleAgents();
-  actions.push(...suspendActions);
+  // DISABLED: False positives on planning agents - see PAN-133
+  // const suspendActions = await checkAndSuspendIdleAgents();
+  // actions.push(...suspendActions);
 
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
 
   // Check for lazy agent behavior and auto-correct
-  const lazyActions = await checkAndCorrectLazyAgents();
-  actions.push(...lazyActions);
+  // DISABLED: False positives on planning agents - see PAN-133
+  // const lazyActions = await checkAndCorrectLazyAgents();
+  // actions.push(...lazyActions);
 
   saveState(state);
 
