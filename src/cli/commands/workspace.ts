@@ -50,6 +50,30 @@ async function getBeadsVersion(): Promise<number> {
 }
 
 /**
+ * Convert HTTPS git URLs to SSH format for remote VM cloning
+ * Remote VMs use SSH keys for authentication, not HTTPS credentials
+ *
+ * Examples:
+ *   https://github.com/owner/repo.git → git@github.com:owner/repo.git
+ *   https://gitlab.com/owner/repo.git → git@gitlab.com:owner/repo.git
+ */
+function convertToSshUrl(httpsUrl: string): string {
+  // Match common HTTPS git URL patterns
+  const httpsPattern = /^https:\/\/([^/]+)\/(.+?)(?:\.git)?$/;
+  const match = httpsUrl.match(httpsPattern);
+
+  if (match) {
+    const [, host, path] = match;
+    // Ensure .git suffix
+    const repoPath = path.endsWith('.git') ? path : `${path}.git`;
+    return `git@${host}:${repoPath}`;
+  }
+
+  // Already SSH format or unrecognized - return as-is
+  return httpsUrl;
+}
+
+/**
  * Initialize beads for a workspace
  *
  * Beads v0.47.1+ uses shared database with labels for isolation (recommended)
@@ -815,10 +839,18 @@ async function createRemoteWorkspace(
     }
 
     // Inject SSH key for git access if available
-    const sshKeyPath = join(homedir(), '.panopticon', 'ssh', 'exe-dev-key');
-    if (existsSync(sshKeyPath)) {
+    // Check multiple locations: panopticon-specific key first, then standard SSH keys
+    const sshKeyPaths = [
+      join(homedir(), '.panopticon', 'ssh', 'exe-dev-key'),
+      join(homedir(), '.ssh', 'id_ed25519'),
+      join(homedir(), '.ssh', 'id_rsa'),
+    ];
+    const sshKeyPath = sshKeyPaths.find((p) => existsSync(p));
+    if (sshKeyPath) {
       const sshKeyBase64 = Buffer.from(readFileSync(sshKeyPath, 'utf-8')).toString('base64');
-      await exe.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519`);
+      // Determine key type from filename for remote VM
+      const keyFilename = sshKeyPath.includes('id_rsa') ? 'id_rsa' : 'id_ed25519';
+      await exe.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/${keyFilename} && chmod 600 ~/.ssh/${keyFilename}`);
     }
 
     // Sync git CLI auth for the detected host
@@ -831,7 +863,11 @@ async function createRemoteWorkspace(
       await exe.syncGitLabAuth(vmName);
     }
 
-    const cloneResult = await exe.ssh(vmName, `git clone ${repoUrl} ~/workspace`);
+    // Convert HTTPS URLs to SSH format for remote VM cloning
+    // Remote VMs use SSH keys, not interactive HTTPS credentials
+    const sshRepoUrl = convertToSshUrl(repoUrl);
+
+    const cloneResult = await exe.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`);
     if (cloneResult.exitCode !== 0) {
       throw new Error(`Failed to clone: ${cloneResult.stderr}`);
     }
