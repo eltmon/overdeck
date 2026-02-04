@@ -7528,8 +7528,11 @@ bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
 1. Create STATE.md with decisions made
-2. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
-3. Summarize the plan and STOP
+2. Copy STATE.md to PRD at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
+3. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
+4. Summarize the plan and STOP
+
+**IMPORTANT:** Create the PRD file BEFORE creating beads tasks.
 
 **Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
 
