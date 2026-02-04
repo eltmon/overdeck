@@ -922,15 +922,27 @@ Your task:
 IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.
 The TEST agent will run tests in the next step.
 
+## REQUIRED: Update Status via API
+
+You MUST execute these curl commands and verify they succeed. Do NOT just describe them - actually RUN them with Bash.
+
 If issues found:
-- Update status: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[issues]"}'
-- Use send-feedback-to-agent skill to notify issue agent
+\`\`\`bash
+# EXECUTE THIS - verify you see JSON response with reviewStatus
+curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[describe issues]"}' | jq .
+\`\`\`
+Then use send-feedback-to-agent skill to notify issue agent.
 
 If review passes:
-- Update status: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
-- Queue test-agent: curl -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${task.issueId}","workspace":"${task.workspace}","branch":"${task.branch}"}'
+\`\`\`bash
+# EXECUTE THIS FIRST - verify you see JSON response with reviewStatus:"passed"
+curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}' | jq .
 
-IMPORTANT: Use the queue API, not 'pan specialists wake' directly.`;
+# THEN EXECUTE THIS - verify you see JSON response with queued task
+curl -s -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${task.issueId}","workspace":"${task.workspace}","branch":"${task.branch}"}' | jq .
+\`\`\`
+
+⚠️ VERIFICATION: After running each curl, confirm you see valid JSON output. If you get an error, report it.`;
       break;
 
     case 'test-agent':
@@ -945,10 +957,24 @@ Your task:
 3. Identify root causes (code bug vs test bug vs environment issue)
 4. Update status via API when done
 
-When done:
-- If PASS: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed"}'
-- If FAIL: curl -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[details]"}'
-- Use send-feedback-to-agent skill to notify issue agent of any failures
+## REQUIRED: Update Status via API
+
+You MUST execute the appropriate curl command and verify it succeeds. Do NOT just describe it - actually RUN it with Bash.
+
+If tests PASS:
+\`\`\`bash
+# EXECUTE THIS - verify you see JSON response with testStatus:"passed"
+curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed"}' | jq .
+\`\`\`
+
+If tests FAIL:
+\`\`\`bash
+# EXECUTE THIS - verify you see JSON response with testStatus:"failed"
+curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe failures]"}' | jq .
+\`\`\`
+Then use send-feedback-to-agent skill to notify issue agent of failures.
+
+⚠️ VERIFICATION: After running curl, confirm you see valid JSON output with the updated status. If you get an error or empty response, the update FAILED - report this.
 
 IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
       break;
