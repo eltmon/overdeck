@@ -144,6 +144,7 @@ interface ReviewStatus {
   updatedAt: string;
   readyForMerge: boolean;
   autoRequeueCount?: number; // Circuit breaker: max 3 auto-requeues before human intervention required
+  prUrl?: string; // URL of the PR created for this issue
 }
 
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -192,6 +193,9 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
     ? update.readyForMerge
     : (merged.reviewStatus === 'passed' && merged.testStatus === 'passed' && merged.mergeStatus !== 'merged');
 
+  // Check if readyForMerge is transitioning from false to true
+  const becameReadyForMerge = readyForMerge && !existing.readyForMerge;
+
   const updated: ReviewStatus = {
     ...merged,
     issueId,
@@ -201,6 +205,27 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
 
   statuses[issueId] = updated;
   saveReviewStatuses(statuses);
+
+  // Auto-create PR when ready for merge (fire-and-forget)
+  if (becameReadyForMerge && !updated.prUrl) {
+    console.log(`[pr] Issue ${issueId} is ready for merge, auto-creating PR...`);
+    ensurePRExists(issueId).then(result => {
+      if (result.prUrl) {
+        // Update status with PR URL
+        const freshStatuses = loadReviewStatuses();
+        if (freshStatuses[issueId]) {
+          freshStatuses[issueId].prUrl = result.prUrl;
+          saveReviewStatuses(freshStatuses);
+          console.log(`[pr] Updated ${issueId} with PR URL: ${result.prUrl}`);
+        }
+      } else if (result.error) {
+        console.error(`[pr] Failed to create PR for ${issueId}: ${result.error}`);
+      }
+    }).catch(err => {
+      console.error(`[pr] Error creating PR for ${issueId}:`, err);
+    });
+  }
+
   return updated;
 }
 
@@ -213,6 +238,111 @@ function clearReviewStatus(issueId: string): void {
   const statuses = loadReviewStatuses();
   delete statuses[issueId];
   saveReviewStatuses(statuses);
+}
+
+/**
+ * Create a PR for an issue if one doesn't already exist
+ * Handles both local and remote workspaces
+ */
+async function ensurePRExists(issueId: string): Promise<{ created: boolean; prUrl?: string; error?: string }> {
+  const issueLower = issueId.toLowerCase();
+  const branchName = `feature/${issueLower}`;
+
+  try {
+    // Check if PR already exists
+    const { stdout: existingPR } = await execAsync(
+      `gh pr list --repo eltmon/panopticon-cli --head "${branchName}" --json number,url --jq '.[0].url // empty'`,
+      { encoding: 'utf-8' }
+    );
+
+    if (existingPR.trim()) {
+      console.log(`[pr] PR already exists for ${issueId}: ${existingPR.trim()}`);
+      return { created: false, prUrl: existingPR.trim() };
+    }
+
+    // Get workspace info to determine if remote or local
+    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+
+    if (!workspaceInfo.exists) {
+      return { created: false, error: 'Workspace does not exist' };
+    }
+
+    // Get issue title for PR title
+    let issueTitle = issueId;
+    if (issueId.toUpperCase().startsWith('PAN-')) {
+      const issueNumber = issueId.replace(/^PAN-/i, '');
+      try {
+        const { stdout } = await execAsync(
+          `gh issue view ${issueNumber} --repo eltmon/panopticon-cli --json title --jq '.title'`,
+          { encoding: 'utf-8' }
+        );
+        issueTitle = stdout.trim() || issueId;
+      } catch {
+        // Use issueId as fallback
+      }
+    }
+
+    // Create PR - different command for remote vs local
+    let prUrl: string;
+
+    if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+      // Remote workspace: SSH to VM and create PR
+      console.log(`[pr] Creating PR for ${issueId} from remote workspace ${workspaceInfo.vmName}...`);
+
+      // First ensure branch is pushed
+      await execAsync(
+        `ssh -A ${workspaceInfo.vmName}.exe.xyz "cd /workspace && git push -u origin ${branchName} 2>&1 || true"`,
+        { encoding: 'utf-8' }
+      );
+
+      // Create PR from remote
+      const { stdout } = await execAsync(
+        `ssh -A ${workspaceInfo.vmName}.exe.xyz "cd /workspace && gh pr create --title '${issueTitle} (${issueId})' --body 'Closes #${issueId.replace(/^PAN-/i, '')}
+
+## Summary
+Auto-created PR for ${issueId}
+
+## Test plan
+- [x] Review passed
+- [x] Tests passed
+
+🤖 Generated with Panopticon' --base main --head ${branchName} 2>&1"`,
+        { encoding: 'utf-8' }
+      );
+      prUrl = stdout.trim();
+    } else {
+      // Local workspace: create PR directly
+      const workspacePath = workspaceInfo.path!;
+      console.log(`[pr] Creating PR for ${issueId} from local workspace...`);
+
+      // Ensure branch is pushed
+      await execAsync(`git push -u origin ${branchName} 2>&1 || true`, { cwd: workspacePath, encoding: 'utf-8' });
+
+      // Create PR
+      const { stdout } = await execAsync(
+        `gh pr create --title "${issueTitle} (${issueId})" --body "Closes #${issueId.replace(/^PAN-/i, '')}
+
+## Summary
+Auto-created PR for ${issueId}
+
+## Test plan
+- [x] Review passed
+- [x] Tests passed
+
+🤖 Generated with Panopticon" --base main --head ${branchName}`,
+        { cwd: workspacePath, encoding: 'utf-8' }
+      );
+      prUrl = stdout.trim();
+    }
+
+    console.log(`[pr] Created PR for ${issueId}: ${prUrl}`);
+    return { created: true, prUrl };
+
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[pr] Failed to create PR for ${issueId}:`, message);
+    return { created: false, error: message };
+  }
 }
 
 /**
@@ -567,6 +697,59 @@ function getAgentWorkspace(agentId: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Get workspace info for an issue, detecting remote vs local workspaces
+ * Returns info about where the workspace exists and how to access it
+ */
+interface WorkspaceInfo {
+  exists: boolean;
+  isRemote: boolean;
+  vmName?: string;
+  remotePath?: string;  // Path on the remote VM (usually /workspace)
+  localPath?: string;   // Path on local machine
+  agentId?: string;     // The agent ID if a remote agent is associated
+}
+
+function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
+  const issueLower = issueId.toLowerCase();
+  const agentId = `agent-${issueLower}`;
+
+  // Check for remote agent first
+  const remoteStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'remote-state.json');
+  if (existsSync(remoteStateFile)) {
+    try {
+      const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+      if (state.location === 'remote' && state.vmName) {
+        return {
+          exists: true,
+          isRemote: true,
+          vmName: state.vmName,
+          remotePath: '/workspace',  // Standard remote workspace path
+          agentId,
+        };
+      }
+    } catch {
+      // Ignore parse errors, fall through to local check
+    }
+  }
+
+  // Check for local workspace
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const localPath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+  if (existsSync(localPath)) {
+    return {
+      exists: true,
+      isRemote: false,
+      localPath,
+      agentId: existsSync(join(homedir(), '.panopticon', 'agents', agentId)) ? agentId : undefined,
+    };
+  }
+
+  return { exists: false, isRemote: false };
 }
 
 /**
@@ -1905,10 +2088,41 @@ app.get('/api/agents/:id/output', async (req, res) => {
   const lines = req.query.lines || 100;
 
   try {
-    const { stdout } = await execAsync(
-      `tmux capture-pane -t "${id}" -p -S -${lines} 2>/dev/null || echo "Session not found"`,
-      { maxBuffer: 10 * 1024 * 1024 }
-    );
+    // Check if this is a remote agent
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+    const remoteStateFile = join(agentStateDir, 'remote-state.json');
+
+    let isRemote = false;
+    let vmName = '';
+
+    if (existsSync(remoteStateFile)) {
+      try {
+        const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+        if (state.location === 'remote' && state.vmName) {
+          isRemote = true;
+          vmName = state.vmName;
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    let stdout: string;
+    if (isRemote && vmName) {
+      // Capture output from remote VM via SSH
+      const result = await execAsync(
+        `ssh -A ${vmName}.exe.xyz "tmux capture-pane -t '${id}' -p -S -${lines} 2>/dev/null || echo 'Session not found'"`,
+        { maxBuffer: 10 * 1024 * 1024, timeout: 15000 }
+      );
+      stdout = result.stdout;
+    } else {
+      // Local tmux capture
+      const result = await execAsync(
+        `tmux capture-pane -t "${id}" -p -S -${lines} 2>/dev/null || echo "Session not found"`,
+        { maxBuffer: 10 * 1024 * 1024 }
+      );
+      stdout = result.stdout;
+    }
 
     res.json({ output: stdout });
   } catch (error) {
@@ -1926,9 +2140,39 @@ app.post('/api/agents/:id/message', async (req, res) => {
   }
 
   try {
-    const { messageAgent } = await import('../lib/agents.js');
-    await messageAgent(id, message);
-    res.json({ success: true });
+    // Check if this is a remote agent
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+    const remoteStateFile = join(agentStateDir, 'remote-state.json');
+
+    let isRemote = false;
+    let vmName = '';
+
+    if (existsSync(remoteStateFile)) {
+      try {
+        const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+        if (state.location === 'remote' && state.vmName) {
+          isRemote = true;
+          vmName = state.vmName;
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    if (isRemote && vmName) {
+      // Send message to remote agent via SSH
+      // Use -l for literal text to avoid key interpretation issues
+      const escapedMessage = message.replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/"/g, '\\"');
+      await execAsync(
+        `ssh -A ${vmName}.exe.xyz "tmux send-keys -t '${id}' -l '${escapedMessage}' && tmux send-keys -t '${id}' Enter"`,
+        { timeout: 15000 }
+      );
+      res.json({ success: true, remote: true });
+    } else {
+      const { messageAgent } = await import('../lib/agents.js');
+      await messageAgent(id, message);
+      res.json({ success: true });
+    }
   } catch (error) {
     console.error('Error sending message:', error);
     res.status(500).json({ error: 'Failed to send message' });
@@ -4126,6 +4370,24 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
 
+  // Check for remote workspace first
+  const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+
+  // If remote workspace exists, return info about it
+  if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+    return res.json({
+      exists: true,
+      issueId,
+      isRemote: true,
+      vmName: workspaceInfo.vmName,
+      remotePath: workspaceInfo.remotePath,
+      agentId: workspaceInfo.agentId,
+      path: `${workspaceInfo.vmName}:${workspaceInfo.remotePath}`,
+      location: 'remote',
+      message: `Workspace is on remote VM: ${workspaceInfo.vmName}.exe.xyz`,
+    });
+  }
+
   // Convert issue ID to workspace path (e.g., MIN-645 -> feature-min-645)
   const workspaceName = `feature-${issueLower}`;
   const workspacePath = join(projectPath, 'workspaces', workspaceName);
@@ -5212,8 +5474,13 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   const branchName = `feature/${issueLower}`;
+
+  // Check workspace exists (local or remote)
+  const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+  const workspacePath = workspaceInfo.isRemote
+    ? workspaceInfo.remotePath!
+    : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
 
   // Check if issue was already reviewed with feedback that needs addressing
   const existingStatus = getReviewStatus(issueId);
@@ -5234,8 +5501,8 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
   setReviewStatus(issueId, { reviewStatus: 'reviewing', testStatus: 'pending', autoRequeueCount: 0 });
 
   try {
-    // 1. Check workspace exists
-    if (!existsSync(workspacePath)) {
+    // 1. Check workspace exists (local or remote)
+    if (!workspaceInfo.exists) {
       completePendingOperation(issueId, 'Workspace does not exist');
       setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: 'Workspace does not exist' });
       return res.status(400).json({ error: 'Workspace does not exist' });
@@ -5285,8 +5552,17 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
 
     // 2. Push the feature branch to remote first
     try {
-      await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
-      console.log(`Pushed ${branchName} to remote`);
+      if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+        // Push from remote VM via SSH
+        await execAsync(
+          `ssh -A ${workspaceInfo.vmName}.exe.xyz "cd ${workspacePath} && git push origin ${branchName} 2>&1 || true"`,
+          { encoding: 'utf-8', timeout: 30000 }
+        );
+        console.log(`Pushed ${branchName} to remote (via SSH to ${workspaceInfo.vmName})`);
+      } else {
+        await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
+        console.log(`Pushed ${branchName} to remote`);
+      }
     } catch (pushErr: any) {
       console.log(`Feature branch push note: ${pushErr.message}`);
     }
@@ -5301,6 +5577,15 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     const reviewState = getAgentRuntimeState(reviewSession);
     const reviewIdle = reviewState?.state === 'idle' || reviewState?.state === 'suspended' || !reviewRunning;
 
+    // Build workspace access instructions based on local vs remote
+    const isRemoteWorkspace = workspaceInfo.isRemote && workspaceInfo.vmName;
+    const sshPrefix = isRemoteWorkspace ? `ssh -A ${workspaceInfo.vmName}.exe.xyz "` : '';
+    const sshSuffix = isRemoteWorkspace ? '"' : '';
+    const cdPrefix = isRemoteWorkspace ? `cd ${workspacePath} && ` : '';
+    const workspaceAccessInstructions = isRemoteWorkspace
+      ? `**REMOTE WORKSPACE** - SSH to access:\n   ssh -A ${workspaceInfo.vmName}.exe.xyz\n   cd ${workspacePath}`
+      : `cd ${workspacePath}`;
+
     // If review-agent is busy, queue this task instead
     if (!reviewIdle) {
       console.log(`[review] review-agent busy, queuing ${issueId}`);
@@ -5310,12 +5595,15 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
         issueId,
         workspace: workspacePath,
         branch: branchName,
+        isRemote: workspaceInfo.isRemote,
+        vmName: workspaceInfo.vmName,
       });
       completePendingOperation(issueId, null);
       return res.json({
         success: true,
         queued: true,
         message: `Review queued for ${issueId} - review-agent is busy`,
+        isRemote: workspaceInfo.isRemote,
       });
     }
 
@@ -5324,7 +5612,7 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       state: 'active',
       lastActivity: new Date().toISOString(),
     });
-    console.log(`[review] Marked review-agent active, starting pipeline for ${issueId}...`);
+    console.log(`[review] Marked review-agent active, starting pipeline for ${issueId}${isRemoteWorkspace ? ' (remote)' : ''}...`);
 
     const reviewPrompt = `STRICT REVIEW for ${issueId}
 
@@ -5333,9 +5621,13 @@ DO NOT BE NICE. BE THOROUGH.
 
 === CONTEXT ===
 ISSUE: ${issueId}
-WORKSPACE: ${workspacePath}
+WORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}
 BRANCH: ${branchName}
 PROJECT: ${projectPath}
+${isRemoteWorkspace ? `REMOTE VM: ${workspaceInfo.vmName}.exe.xyz` : ''}
+
+=== WORKSPACE ACCESS ===
+${workspaceAccessInstructions}
 
 === MANDATORY REQUIREMENTS (Block if ANY violated) ===
 1. **Tests Required** - Every new function MUST have test files. No exceptions.
@@ -5345,8 +5637,8 @@ PROJECT: ${projectPath}
 5. **Type Safety** - No \`any\` without justification.
 
 === YOUR TASK ===
-1. cd ${workspacePath}
-2. Review ALL changes: git diff main...${branchName}
+1. ${workspaceAccessInstructions}
+2. Review ALL changes: ${sshPrefix}${cdPrefix}git diff main...${branchName}${sshSuffix}
 3. Check EVERY file for issues
 4. List EVERY issue found with file:line references
 
@@ -5363,7 +5655,7 @@ PROJECT: ${projectPath}
 - Update status: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
 - Queue test-agent (DO NOT use pan specialists wake directly):
 
-curl -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","customPrompt":"TEST for ${issueId}:\\nWORKSPACE: ${workspacePath}\\nBRANCH: ${branchName}\\n\\n1. cd ${workspacePath}\\n2. Run tests: npm test\\n3. Update status:\\n   - PASS: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Just update status. Human will click Merge."}'`;
+curl -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","isRemote":${workspaceInfo.isRemote},"vmName":"${workspaceInfo.vmName || ''}","customPrompt":"TEST for ${issueId}:\\nWORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}\\nBRANCH: ${branchName}\\n\\n1. ${isRemoteWorkspace ? `SSH: ssh -A ${workspaceInfo.vmName}.exe.xyz then cd ${workspacePath}` : `cd ${workspacePath}`}\\n2. Run tests: npm test\\n3. Update status:\\n   - PASS: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:3011/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Just update status. Human will click Merge."}'`;
 
     const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
       waitForReady: true,
@@ -5418,14 +5710,18 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
     });
   }
 
-  // Check if workspace exists
+  // Check if workspace exists (local or remote)
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   const branchName = `feature/${issueLower}`;
 
-  if (!existsSync(workspacePath)) {
+  const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+  const workspacePath = workspaceInfo.isRemote
+    ? workspaceInfo.remotePath!
+    : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+  if (!workspaceInfo.exists) {
     return res.status(400).json({
       success: false,
       error: 'Workspace does not exist',
@@ -5443,7 +5739,7 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
     reviewNotes,
   });
 
-  console.log(`[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})`);
+  console.log(`[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`);
 
   // Queue for review-agent (same logic as human-initiated review)
   try {
@@ -5453,6 +5749,8 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
       issueId,
       workspace: workspacePath,
       branch: branchName,
+      isRemote: workspaceInfo.isRemote,
+      vmName: workspaceInfo.vmName,
     }, {
       priority: 'normal',
       source: 'agent-request',
@@ -5523,12 +5821,72 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   const branchName = `feature/${issueLower}`;
 
+  // Check if this is a remote workspace
+  const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+
   // Mark merge as in progress
   setReviewStatus(issueId, { mergeStatus: 'merging' });
 
   // Mark operation as pending
   setPendingOperation(issueId, 'merge');
 
+  // REMOTE WORKSPACE: Merge via GitHub PR
+  if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+    console.log(`[merge] Remote workspace detected for ${issueId}, using GitHub PR merge...`);
+
+    try {
+      // Ensure PR exists
+      const prResult = await ensurePRExists(issueId);
+      if (!prResult.prUrl) {
+        const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        completePendingOperation(issueId, error);
+        return res.status(400).json({ error });
+      }
+
+      // Extract PR number from URL
+      const prMatch = prResult.prUrl.match(/\/pull\/(\d+)/);
+      if (!prMatch) {
+        const error = `Could not parse PR number from URL: ${prResult.prUrl}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        completePendingOperation(issueId, error);
+        return res.status(400).json({ error });
+      }
+      const prNumber = prMatch[1];
+
+      // Merge the PR via GitHub CLI (squash merge, do NOT delete branch)
+      console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
+      const { stdout: mergeOutput } = await execAsync(
+        `gh pr merge ${prNumber} --repo eltmon/panopticon-cli --squash`,
+        { encoding: 'utf-8' }
+      );
+      console.log(`[merge] PR merge output: ${mergeOutput}`);
+
+      // Mark as merged
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      clearReviewStatus(issueId);
+      completePendingOperation(issueId, null);
+
+      // Close the issue
+      await closeIssueAfterMerge(issueId);
+
+      return res.json({
+        success: true,
+        message: `Successfully merged PR #${prNumber} for ${issueId}`,
+        prUrl: prResult.prUrl,
+        remote: true,
+      });
+    } catch (error: any) {
+      console.error(`[merge] Remote merge failed for ${issueId}:`, error);
+      setReviewStatus(issueId, { mergeStatus: 'failed' });
+      completePendingOperation(issueId, error.message);
+      return res.status(500).json({
+        error: `Remote merge failed: ${error.message}`,
+      });
+    }
+  }
+
+  // LOCAL WORKSPACE: Use merge-agent for local git merge
   try {
     // 1. Check workspace exists
     if (!existsSync(workspacePath)) {
