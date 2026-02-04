@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, writeFileSync, rmSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { tmpdir } from 'os';
 import {
   loadCache,
   saveCache,
@@ -19,20 +19,19 @@ import {
 } from '../aggregator.js';
 import { appendCostEvent, CostEvent } from '../events.js';
 
-// Tests use the real .panopticon/costs directory since paths are fixed at module load time
-const COSTS_DIR = join(homedir(), '.panopticon', 'costs');
+const TEST_ROOT = join(tmpdir(), `panopticon-agg-test-${Date.now()}`);
+const originalHomedir = process.env.HOME;
 
 beforeEach(() => {
-  // Clean up real directory before each test
-  if (existsSync(COSTS_DIR)) {
-    rmSync(COSTS_DIR, { recursive: true, force: true });
-  }
+  const costsDir = join(TEST_ROOT, '.panopticon', 'costs');
+  mkdirSync(costsDir, { recursive: true });
+  process.env.HOME = TEST_ROOT;
 });
 
 afterEach(() => {
-  // Clean up after each test
-  if (existsSync(COSTS_DIR)) {
-    rmSync(COSTS_DIR, { recursive: true, force: true });
+  process.env.HOME = originalHomedir;
+  if (existsSync(TEST_ROOT)) {
+    rmSync(TEST_ROOT, { recursive: true, force: true });
   }
 });
 
@@ -75,8 +74,7 @@ describe('Aggregator Cache Management', () => {
     });
 
     it('should handle cache version mismatch', () => {
-      const cacheFile = join(COSTS_DIR, 'by-issue.json');
-      mkdirSync(COSTS_DIR, { recursive: true });
+      const cacheFile = join(TEST_ROOT, '.panopticon', 'costs', 'by-issue.json');
       writeFileSync(
         cacheFile,
         JSON.stringify({ version: 1, status: 'live', issues: {} })
@@ -383,20 +381,24 @@ describe('Aggregator Cache Management', () => {
     });
 
     it('should query costs by issue', () => {
-      appendCostEvent({
-        ts: new Date().toISOString(),
-        type: 'cost',
-        agentId: 'agent-1',
-        issueId: 'TEST-10',
-        sessionType: 'implementation',
-        provider: 'anthropic',
-        model: 'claude-sonnet-4',
-        input: 1000,
-        output: 500,
-        cacheRead: 0,
-        cacheWrite: 0,
-        cost: 0.01
-      });
+      const events: CostEvent[] = [
+        {
+          ts: new Date().toISOString(),
+          type: 'cost',
+          agentId: 'agent-1',
+          issueId: 'TEST-10',
+          sessionType: 'implementation',
+          provider: 'anthropic',
+          model: 'claude-sonnet-4',
+          input: 1000,
+          output: 500,
+          cacheRead: 0,
+          cacheWrite: 0,
+          cost: 0.01
+        }
+      ];
+
+      updateCacheFromEvents(events);
 
       const issueData = getCostsForIssue('TEST-10');
       expect(issueData).toBeDefined();
@@ -404,20 +406,24 @@ describe('Aggregator Cache Management', () => {
     });
 
     it('should handle case-insensitive issue lookup', () => {
-      appendCostEvent({
-        ts: new Date().toISOString(),
-        type: 'cost',
-        agentId: 'agent-1',
-        issueId: 'TEST-11',
-        sessionType: 'implementation',
-        provider: 'anthropic',
-        model: 'claude-sonnet-4',
-        input: 1000,
-        output: 500,
-        cacheRead: 0,
-        cacheWrite: 0,
-        cost: 0.01
-      });
+      const events: CostEvent[] = [
+        {
+          ts: new Date().toISOString(),
+          type: 'cost',
+          agentId: 'agent-1',
+          issueId: 'TEST-11',
+          sessionType: 'implementation',
+          provider: 'anthropic',
+          model: 'claude-sonnet-4',
+          input: 1000,
+          output: 500,
+          cacheRead: 0,
+          cacheWrite: 0,
+          cost: 0.01
+        }
+      ];
+
+      updateCacheFromEvents(events);
 
       // Should find with lowercase query
       const issueData = getCostsForIssue('test-11');
