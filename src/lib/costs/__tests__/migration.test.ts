@@ -7,43 +7,37 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { tmpdir } from 'os';
 import { migrateAllSessions } from '../migration.js';
 import { readEvents, eventsFileExists, getLastEventMetadata } from '../events.js';
 import { loadCache, rebuildCache } from '../aggregator.js';
 
-// Use real directories since migration paths are fixed at module load time
-const REAL_AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
-const REAL_CLAUDE_DIR = join(homedir(), '.claude', 'projects');
-const REAL_COSTS_DIR = join(homedir(), '.panopticon', 'costs');
+// Test directory setup
+const TEST_ROOT = join(tmpdir(), `panopticon-test-${Date.now()}`);
+const TEST_AGENTS_DIR = join(TEST_ROOT, '.panopticon', 'agents');
+const TEST_CLAUDE_DIR = join(TEST_ROOT, '.claude', 'projects');
+const TEST_COSTS_DIR = join(TEST_ROOT, '.panopticon', 'costs');
+
+// Mock homedir to use test directory
+const originalHomedir = process.env.HOME;
 
 beforeEach(() => {
-  // Clean up real directories before each test
-  if (existsSync(REAL_AGENTS_DIR)) {
-    rmSync(REAL_AGENTS_DIR, { recursive: true, force: true });
-  }
-  if (existsSync(REAL_CLAUDE_DIR)) {
-    rmSync(REAL_CLAUDE_DIR, { recursive: true, force: true });
-  }
-  if (existsSync(REAL_COSTS_DIR)) {
-    rmSync(REAL_COSTS_DIR, { recursive: true, force: true });
-  }
+  // Set up test directories
+  mkdirSync(TEST_AGENTS_DIR, { recursive: true });
+  mkdirSync(TEST_CLAUDE_DIR, { recursive: true });
+  mkdirSync(TEST_COSTS_DIR, { recursive: true });
 
-  // Create test directories
-  mkdirSync(REAL_AGENTS_DIR, { recursive: true });
-  mkdirSync(REAL_CLAUDE_DIR, { recursive: true });
+  // Mock HOME to test directory
+  process.env.HOME = TEST_ROOT;
 });
 
 afterEach(() => {
-  // Clean up real directories after each test
-  if (existsSync(REAL_AGENTS_DIR)) {
-    rmSync(REAL_AGENTS_DIR, { recursive: true, force: true });
-  }
-  if (existsSync(REAL_CLAUDE_DIR)) {
-    rmSync(REAL_CLAUDE_DIR, { recursive: true, force: true });
-  }
-  if (existsSync(REAL_COSTS_DIR)) {
-    rmSync(REAL_COSTS_DIR, { recursive: true, force: true });
+  // Restore HOME
+  process.env.HOME = originalHomedir;
+
+  // Clean up test directories
+  if (existsSync(TEST_ROOT)) {
+    rmSync(TEST_ROOT, { recursive: true, force: true });
   }
 });
 
@@ -62,7 +56,7 @@ describe('Migration Safety Tests', () => {
 
     it('should handle agent with no workspace', () => {
       // Create agent with no workspace field
-      const agentDir = join(REAL_AGENTS_DIR, 'agent-test-1');
+      const agentDir = join(TEST_AGENTS_DIR, 'agent-test-1');
       mkdirSync(agentDir);
       writeFileSync(
         join(agentDir, 'state.json'),
@@ -78,7 +72,7 @@ describe('Migration Safety Tests', () => {
 
     it('should handle agent with missing session directory', () => {
       // Create agent with workspace that doesn't exist
-      const agentDir = join(REAL_AGENTS_DIR, 'agent-test-2');
+      const agentDir = join(TEST_AGENTS_DIR, 'agent-test-2');
       mkdirSync(agentDir);
       writeFileSync(
         join(agentDir, 'state.json'),
@@ -97,7 +91,7 @@ describe('Migration Safety Tests', () => {
 
   describe('Corrupted Data Handling', () => {
     it('should skip corrupted state.json files', () => {
-      const agentDir = join(REAL_AGENTS_DIR, 'agent-corrupt');
+      const agentDir = join(TEST_AGENTS_DIR, 'agent-corrupt');
       mkdirSync(agentDir);
       writeFileSync(
         join(agentDir, 'state.json'),
@@ -112,7 +106,7 @@ describe('Migration Safety Tests', () => {
 
     it('should skip corrupted session JSONL lines', () => {
       // Create agent
-      const agentDir = join(REAL_AGENTS_DIR, 'agent-test-3');
+      const agentDir = join(TEST_AGENTS_DIR, 'agent-test-3');
       mkdirSync(agentDir);
       writeFileSync(
         join(agentDir, 'state.json'),
@@ -123,7 +117,7 @@ describe('Migration Safety Tests', () => {
       );
 
       // Create session directory with corrupted data
-      const sessionDir = join(REAL_CLAUDE_DIR, '-test-workspace');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace');
       mkdirSync(sessionDir);
       writeFileSync(
         join(sessionDir, 'session.jsonl'),
@@ -141,7 +135,7 @@ describe('Migration Safety Tests', () => {
   describe('Subagent Cost Inclusion', () => {
     it('should include subagent costs in migration', () => {
       // Create main agent
-      const agentDir = join(REAL_AGENTS_DIR, 'agent-test-4');
+      const agentDir = join(TEST_AGENTS_DIR, 'agent-test-4');
       mkdirSync(agentDir);
       writeFileSync(
         join(agentDir, 'state.json'),
@@ -152,7 +146,7 @@ describe('Migration Safety Tests', () => {
       );
 
       // Create session with main and subagent files
-      const sessionDir = join(REAL_CLAUDE_DIR, '-test-workspace4');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace4');
       const subagentsDir = join(sessionDir, 'subagents');
       mkdirSync(subagentsDir, { recursive: true });
 
@@ -196,7 +190,7 @@ describe('Migration Safety Tests', () => {
   describe('Idempotency', () => {
     it('should produce same results when run twice', () => {
       // Create test data
-      const agentDir = join(REAL_AGENTS_DIR, 'agent-test-5');
+      const agentDir = join(TEST_AGENTS_DIR, 'agent-test-5');
       mkdirSync(agentDir);
       writeFileSync(
         join(agentDir, 'state.json'),
@@ -206,7 +200,7 @@ describe('Migration Safety Tests', () => {
         })
       );
 
-      const sessionDir = join(REAL_CLAUDE_DIR, '-test-workspace5');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace5');
       mkdirSync(sessionDir);
       writeFileSync(
         join(sessionDir, 'session.jsonl'),
@@ -222,7 +216,7 @@ describe('Migration Safety Tests', () => {
       const cache1 = rebuildCache();
 
       // Clear events file for second run
-      const eventsFile = join(REAL_COSTS_DIR, 'events.jsonl');
+      const eventsFile = join(TEST_COSTS_DIR, 'events.jsonl');
       if (existsSync(eventsFile)) {
         unlinkSync(eventsFile);
       }
@@ -246,7 +240,7 @@ describe('Migration Safety Tests', () => {
   describe('Partial State Recovery', () => {
     it('should handle partially migrated state', () => {
       // Create agent
-      const agentDir = join(REAL_AGENTS_DIR, 'agent-test-6');
+      const agentDir = join(TEST_AGENTS_DIR, 'agent-test-6');
       mkdirSync(agentDir);
       writeFileSync(
         join(agentDir, 'state.json'),
@@ -256,7 +250,7 @@ describe('Migration Safety Tests', () => {
         })
       );
 
-      const sessionDir = join(REAL_CLAUDE_DIR, '-test-workspace6');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace6');
       mkdirSync(sessionDir);
       writeFileSync(
         join(sessionDir, 'session.jsonl'),
@@ -267,8 +261,7 @@ describe('Migration Safety Tests', () => {
       );
 
       // Partially migrate (create some events)
-      mkdirSync(REAL_COSTS_DIR, { recursive: true });
-      const eventsFile = join(REAL_COSTS_DIR, 'events.jsonl');
+      const eventsFile = join(TEST_COSTS_DIR, 'events.jsonl');
       writeFileSync(
         eventsFile,
         JSON.stringify({
@@ -298,7 +291,7 @@ describe('Migration Safety Tests', () => {
 
   describe('Cost Calculation Accuracy', () => {
     it('should calculate costs correctly for all token types', () => {
-      const agentDir = join(REAL_AGENTS_DIR, 'agent-test-7');
+      const agentDir = join(TEST_AGENTS_DIR, 'agent-test-7');
       mkdirSync(agentDir);
       writeFileSync(
         join(agentDir, 'state.json'),
@@ -308,7 +301,7 @@ describe('Migration Safety Tests', () => {
         })
       );
 
-      const sessionDir = join(REAL_CLAUDE_DIR, '-test-workspace7');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace7');
       mkdirSync(sessionDir);
 
       // Known values for testing
