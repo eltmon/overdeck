@@ -3,26 +3,27 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, rmSync } from 'fs';
+import { existsSync, rmSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { homedir } from 'os';
 import { pruneOldEvents, needsPruning, getRetentionStatus, RetentionStats } from '../retention.js';
-import { appendCostEvent, readEvents, CostEvent } from '../events.js';
+import { appendCostEvent, readEvents, CostEvent, getEventsFilePath } from '../events.js';
 import { rebuildCache, loadCache } from '../aggregator.js';
 
-const TEST_ROOT = join(tmpdir(), `panopticon-retention-test-${Date.now()}`);
-const originalHomedir = process.env.HOME;
+// Tests use the real .panopticon/costs directory since paths are fixed at module load time
+const COSTS_DIR = join(homedir(), '.panopticon', 'costs');
 
 beforeEach(() => {
-  const costsDir = join(TEST_ROOT, '.panopticon', 'costs');
-  mkdirSync(costsDir, { recursive: true });
-  process.env.HOME = TEST_ROOT;
+  // Clean up real directory before each test
+  if (existsSync(COSTS_DIR)) {
+    rmSync(COSTS_DIR, { recursive: true, force: true });
+  }
 });
 
 afterEach(() => {
-  process.env.HOME = originalHomedir;
-  if (existsSync(TEST_ROOT)) {
-    rmSync(TEST_ROOT, { recursive: true, force: true });
+  // Clean up after each test
+  if (existsSync(COSTS_DIR)) {
+    rmSync(COSTS_DIR, { recursive: true, force: true });
   }
 });
 
