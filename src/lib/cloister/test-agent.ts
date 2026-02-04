@@ -2,7 +2,7 @@
  * Test Agent - Automatic test execution and analysis using Claude Code
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
@@ -396,7 +396,81 @@ async function validateWorkspaceAndBranch(context: TestContext): Promise<{ valid
 }
 
 /**
+ * Ensure tmux server is running
+ */
+async function ensureTmuxRunning(): Promise<void> {
+  try {
+    await execAsync('tmux start-server 2>/dev/null || true', { encoding: 'utf-8' });
+  } catch {
+    // Server might already be running
+  }
+}
+
+/**
+ * Check if a tmux session exists
+ */
+async function tmuxSessionExists(sessionName: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
+      encoding: 'utf-8',
+    });
+    const sessions = stdout.trim().split('\n').filter(Boolean);
+    return sessions.includes(sessionName);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wait for output file to contain completion markers or session to end
+ */
+async function waitForTestCompletion(
+  outputFile: string,
+  tmuxSessionName: string,
+  timeoutMs: number,
+  checkIntervalMs: number = 2000
+): Promise<{ completed: boolean; output: string }> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      let content = '';
+      if (existsSync(outputFile)) {
+        content = readFileSync(outputFile, 'utf-8');
+      }
+
+      // Check if session has ended (Claude finished processing)
+      const sessionAlive = await tmuxSessionExists(tmuxSessionName);
+      if (!sessionAlive && content.length > 0) {
+        // Session ended and we have output - consider complete
+        return { completed: true, output: content };
+      }
+
+      // Look for completion markers in the output while session still running
+      if (content.includes('TEST_RESULT:') ||
+          content.includes('"testResult":') ||
+          content.includes('Tests completed') ||
+          content.includes('All tests passed') ||
+          content.includes('Some tests failed')) {
+        return { completed: true, output: content };
+      }
+    } catch {
+      // File might not exist yet or be in use
+    }
+
+    // Wait before checking again
+    await new Promise(resolve => setTimeout(resolve, checkIntervalMs));
+  }
+
+  // Timeout reached
+  return { completed: false, output: '' };
+}
+
+/**
  * Spawn test-agent to execute tests
+ *
+ * Uses interactive tmux sessions (no --print mode) for better control
+ * and the ability to interact with the agent if needed.
  *
  * @param context - Test context
  * @returns Promise that resolves with test result
@@ -444,97 +518,131 @@ export async function spawnTestAgent(context: TestContext): Promise<TestResult> 
 
   console.log(`[test-agent] Detected test command: ${testCommand}`);
 
-  // Get existing session ID
+  // Get existing session ID for resuming
   const sessionId = getSessionId('test-agent');
 
   // Build prompt
   const prompt = buildTestPrompt(context);
 
-  // Build Claude command args - Use Haiku for test agent (cheaper, simpler tasks)
-  const args = ['--model', 'haiku', '--print', '-p', prompt];
+  // Setup test-agent directory for state and output
+  const testAgentDir = join(SPECIALISTS_DIR, 'test-agent', context.issueId.toLowerCase());
+  mkdirSync(testAgentDir, { recursive: true });
 
-  if (sessionId) {
-    args.push('--resume', sessionId);
+  // Write prompt to file for safe handling
+  const promptFile = join(testAgentDir, 'prompt.txt');
+  writeFileSync(promptFile, prompt);
+
+  // Output file for capturing results
+  const outputFile = join(testAgentDir, 'output.txt');
+  // Clear previous output
+  if (existsSync(outputFile)) {
+    unlinkSync(outputFile);
   }
+
+  // Create launcher script for safe prompt handling
+  // Use Haiku for test agent (cheaper, simpler tasks), interactive mode (no --print)
+  const launcherScript = join(testAgentDir, 'launcher.sh');
+  const resumeArg = sessionId ? `--resume ${sessionId}` : '';
+
+  writeFileSync(launcherScript, `#!/bin/bash
+cd "${workingDir}"
+export PANOPTICON_AGENT_ID=test-agent
+prompt=$(cat "${promptFile}")
+exec claude --model haiku --dangerously-skip-permissions ${resumeArg} "$prompt" 2>&1 | tee "${outputFile}"
+`, { mode: 0o755 });
+
+  const tmuxSessionName = 'test-agent';
 
   console.log(`[test-agent] Session: ${sessionId || 'new session'}`);
 
-  // Spawn Claude process in the WORKSPACE (not projectPath!)
-  // Workspace has the feature branch checked out; projectPath should stay on main
-  const proc = spawn('claude', args, {
-    cwd: workingDir,
-    env: {
-      ...process.env,
-      PANOPTICON_AGENT_ID: 'test-agent',
-    },
-  });
+  try {
+    // Kill any existing test-agent session first
+    try {
+      await execAsync(`tmux kill-session -t ${tmuxSessionName} 2>/dev/null`, { encoding: 'utf-8' });
+    } catch {
+      // Session might not exist
+    }
 
-  // Capture output
-  let output = '';
-  let errorOutput = '';
+    // Ensure tmux is running
+    await ensureTmuxRunning();
 
-  proc.stdout?.on('data', (data) => {
-    const chunk = data.toString();
-    output += chunk;
-    // Also stream to console for visibility
-    process.stdout.write(chunk);
-  });
+    // Start new tmux session with the launcher script
+    await execAsync(`tmux new-session -d -s ${tmuxSessionName} "bash '${launcherScript}'"`, {
+      encoding: 'utf-8',
+    });
 
-  proc.stderr?.on('data', (data) => {
-    const chunk = data.toString();
-    errorOutput += chunk;
-    process.stderr.write(chunk);
-  });
+    // Resize window for better output
+    try {
+      await execAsync(`tmux resize-window -t ${tmuxSessionName} -x 200 -y 50 2>/dev/null`, {
+        encoding: 'utf-8',
+      });
+    } catch {
+      // Ignore resize errors
+    }
 
-  // Create timeout promise
-  const timeoutPromise = new Promise<TestResult>((_, reject) => {
-    setTimeout(() => {
-      proc.kill('SIGTERM');
-      reject(new Error('test-agent timeout after 15 minutes'));
-    }, TEST_TIMEOUT_MS);
-  });
+    console.log(`[test-agent] Started tmux session ${tmuxSessionName}`);
 
-  // Create completion promise
-  const completionPromise = new Promise<TestResult>((resolve, reject) => {
-    proc.on('close', (code) => {
-      console.log(`[test-agent] Process exited with code ${code}`);
+    // Wait for completion with timeout
+    const { completed, output } = await waitForTestCompletion(outputFile, tmuxSessionName, TEST_TIMEOUT_MS);
 
-      // Try to extract session ID from output if this was a new session
-      if (!sessionId && output) {
-        // Look for session ID in output (Claude Code prints it)
-        const sessionMatch = output.match(/Session ID: ([a-f0-9-]+)/i);
-        if (sessionMatch) {
-          const newSessionId = sessionMatch[1];
-          setSessionId('test-agent', newSessionId);
-          recordWake('test-agent', newSessionId);
-          console.log(`[test-agent] Captured session ID: ${newSessionId}`);
-        }
-      } else if (sessionId) {
-        recordWake('test-agent');
+    if (!completed) {
+      // Timeout - kill the session
+      try {
+        await execAsync(`tmux kill-session -t ${tmuxSessionName} 2>/dev/null`, { encoding: 'utf-8' });
+      } catch {
+        // Ignore
       }
 
-      // Parse output for results
-      const result = parseAgentOutput(output);
-      result.detectedTestCommand = testCommand;
+      const result: TestResult = {
+        success: false,
+        testResult: 'ERROR',
+        testsRun: 0,
+        testsPassed: 0,
+        testsFailed: 0,
+        fixAttempted: false,
+        fixResult: 'NOT_ATTEMPTED',
+        notes: 'test-agent timeout after 15 minutes',
+        output: existsSync(outputFile) ? readFileSync(outputFile, 'utf-8') : '',
+        detectedTestCommand: testCommand,
+      };
 
-      // Log to history
       logTestHistory(context, result, sessionId || undefined);
+      return result;
+    }
 
-      resolve(result);
-    });
+    console.log(`[test-agent] Completed, parsing output`);
 
-    proc.on('error', (error) => {
-      console.error(`[test-agent] Process error:`, error);
-      reject(error);
-    });
-  });
+    // Try to extract new session ID from output
+    if (!sessionId && output) {
+      const sessionMatch = output.match(/Session ID: ([a-f0-9-]+)/i);
+      if (sessionMatch) {
+        const newSessionId = sessionMatch[1];
+        setSessionId('test-agent', newSessionId);
+        recordWake('test-agent', newSessionId);
+        console.log(`[test-agent] Captured session ID: ${newSessionId}`);
+      }
+    } else if (sessionId) {
+      recordWake('test-agent');
+    }
 
-  // Race between timeout and completion
-  try {
-    const result = await Promise.race([completionPromise, timeoutPromise]);
+    // Parse output for results
+    const result = parseAgentOutput(output);
+    result.detectedTestCommand = testCommand;
+    result.output = output;
+
+    // Log to history
+    logTestHistory(context, result, sessionId || undefined);
+
     return result;
   } catch (error: any) {
     console.error(`[test-agent] Failed:`, error);
+
+    // Try to kill session on error
+    try {
+      await execAsync(`tmux kill-session -t ${tmuxSessionName} 2>/dev/null`, { encoding: 'utf-8' });
+    } catch {
+      // Ignore
+    }
 
     const result: TestResult = {
       success: false,
@@ -545,7 +653,7 @@ export async function spawnTestAgent(context: TestContext): Promise<TestResult> 
       fixAttempted: false,
       fixResult: 'NOT_ATTEMPTED',
       notes: error.message || 'Unknown error',
-      output: output || errorOutput,
+      output: existsSync(outputFile) ? readFileSync(outputFile, 'utf-8') : '',
       detectedTestCommand: testCommand,
     };
 

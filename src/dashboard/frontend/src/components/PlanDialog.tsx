@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink } from 'lucide-react';
+import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
+import { BeadsDialog } from './BeadsDialog';
 
 interface PlanDialogProps {
   issue: Issue;
@@ -64,6 +65,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [size, setSize] = useState({ width: 900, height: 600 });
   const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
+  const [showBeadsDialog, setShowBeadsDialog] = useState(false);
 
   // Track if we've actually connected to a planning session in THIS dialog instance
   // This prevents stale cache from incorrectly triggering 'complete' state
@@ -618,6 +620,14 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => setShowBeadsDialog(true)}
+                        className="flex items-center gap-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors"
+                        title="View tasks created during planning"
+                      >
+                        <List className="w-4 h-4" />
+                        Tasks
+                      </button>
+                      <button
                         onClick={handleAbortPlanning}
                         disabled={abortPlanningMutation.isPending}
                         className="flex items-center gap-1 px-3 py-1 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 text-sm rounded transition-colors disabled:opacity-50"
@@ -674,6 +684,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       </div>
                     </div>
                   )}
+
+                  {/* Tasks Link */}
+                  <button
+                    onClick={() => setShowBeadsDialog(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors mb-6"
+                  >
+                    <List className="w-5 h-5" />
+                    View Tasks
+                    <span className="text-xs text-green-600">(beads created during planning)</span>
+                  </button>
 
                   {result && (
                     <div className="bg-gray-700/50 rounded-lg p-4 mb-6 max-w-md w-full">
@@ -751,6 +771,13 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
             </div>
           </div>
         </Rnd>
+
+      {/* Beads Tasks Dialog */}
+      <BeadsDialog
+        issueId={issue.identifier}
+        isOpen={showBeadsDialog}
+        onClose={() => setShowBeadsDialog(false)}
+      />
     </div>
   );
 }

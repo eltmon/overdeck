@@ -7554,6 +7554,21 @@ Start by exploring the codebase to understand the context, then begin the discov
         console.log(`[start-planning] Syncing credentials to ${vmName}...`);
         await exe.syncAllCredentials(vmName);
 
+        // Also write planning prompt LOCALLY for debugging and consistency
+        console.log(`[start-planning] Writing planning prompt locally to ${planningPromptPath}`);
+        writeFileSync(planningPromptPath, planningPrompt);
+
+        // Install bd (beads CLI) on remote if not present
+        console.log(`[start-planning] Ensuring bd (beads CLI) is available on ${vmName}...`);
+        const bdInstalled = await exe.installBeads(vmName);
+        if (!bdInstalled) {
+          console.warn(`[start-planning] bd installation failed on ${vmName} - beads tasks may not work`);
+        }
+
+        // Initialize beads on remote workspace
+        console.log(`[start-planning] Initializing beads on ${vmName}...`);
+        await exe.initBeads(vmName, '/workspace');
+
         // Write planning prompt to remote VM
         const remotePlanningDir = '/workspace/.planning';
         const remotePlanningPromptPath = `${remotePlanningDir}/PLANNING_PROMPT.md`;
@@ -7783,7 +7798,7 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
       sessionExists = sessions.includes(sessionName);
     }
 
-    // Check if planning artifacts exist (indicates planning was done but not marked complete)
+    // Check if planning artifacts exist
     const planningDirInWorkspace = join(workspacePath, '.planning');
     const legacyPlanningDir = join(projectPath, '.planning', issueLower);
     const planningDir = existsSync(planningDirInWorkspace) ? planningDirInWorkspace :
@@ -7792,14 +7807,35 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
     const hasStateFile = planningDir ? existsSync(join(planningDir, 'STATE.md')) : false;
     const hasPromptFile = planningDir ? existsSync(join(planningDir, 'PLANNING_PROMPT.md')) : false;
 
+    // Planning is only "completed" if explicitly marked via the .planning-complete marker file
+    // This prevents false positives when session crashes or exits unexpectedly
+    const hasCompletionMarker = planningDir ? existsSync(join(planningDir, '.planning-complete')) : false;
+
+    // Check STATE.md for explicit completion status (look for "## Status: Complete" marker)
+    let hasStatusComplete = false;
+    if (hasStateFile && planningDir) {
+      try {
+        const stateContent = readFileSync(join(planningDir, 'STATE.md'), 'utf-8');
+        // Look for explicit completion markers in STATE.md
+        hasStatusComplete = /##\s*Status:\s*Complete/i.test(stateContent) ||
+                          /##\s*Planning Status:\s*Complete/i.test(stateContent);
+      } catch {
+        // Ignore read errors
+      }
+    }
+
+    // Planning is completed ONLY if there's an explicit completion marker OR STATE.md says complete
+    // Having STATE.md alone doesn't mean planning is done - it's a working document
+    const planningCompleted = hasCompletionMarker || hasStatusComplete;
+
     res.json({
       active: sessionExists,
       sessionName,
       workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
-      // If session is NOT active but STATE.md exists, planning was completed but not marked done
-      planningCompleted: !sessionExists && hasStateFile,
+      planningCompleted,
       hasStateFile,
       hasPromptFile,
+      hasCompletionMarker,
       isRemote,
       vmName: isRemote ? vmName : undefined,
     });
@@ -7814,7 +7850,8 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
   }
 });
 
-// Send message to planning session - starts a new Claude run with context
+// Send message to planning session - sends input to the EXISTING interactive session
+// This keeps the Claude session alive for back-and-forth conversation
 app.post('/api/planning/:issueId/message', async (req, res) => {
   const { issueId } = req.params;
   const { message } = req.body;
@@ -7826,14 +7863,7 @@ app.post('/api/planning/:issueId/message', async (req, res) => {
   }
 
   try {
-    // Kill any existing session first (Claude with --print will have exited anyway)
-    try {
-      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
-    } catch (e) {
-      // Session might not exist
-    }
-
-    // Find planning directory - check workspace first, then legacy
+    // Find planning directory and workspace - check workspace first, then legacy
     const githubCheck = isGitHubIssue(issueId);
     let projectPath = '';
     let planningDir = '';
@@ -7880,9 +7910,82 @@ app.post('/api/planning/:issueId/message', async (req, res) => {
       return res.status(404).json({ error: 'Planning directory not found', sessionEnded: true });
     }
 
-    const outputFile = join(planningDir, 'output.jsonl');
+    // Check if agent state file indicates remote session
+    let isRemote = false;
+    let vmName = '';
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    const stateFile = join(agentStateDir, 'state.json');
 
-    // Read previous output to get FULL context
+    try {
+      if (existsSync(stateFile)) {
+        const stateContent = readFileSync(stateFile, 'utf-8');
+        const state = JSON.parse(stateContent);
+        if (state.location === 'remote' && state.vmName) {
+          isRemote = true;
+          vmName = state.vmName;
+        }
+      }
+    } catch (err) {
+      // Ignore - will check locally
+    }
+
+    // Check if the session is still alive
+    let sessionExists = false;
+    if (isRemote && vmName) {
+      try {
+        const { stdout } = await execAsync(`ssh -A -o ConnectTimeout=5 ${vmName}.exe.xyz "tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''"`, { timeout: 10000 });
+        const sessions = stdout.trim().split('\n').filter(Boolean);
+        sessionExists = sessions.includes(sessionName);
+      } catch (err) {
+        console.log(`[planning message] SSH to ${vmName} failed:`, err);
+      }
+    } else {
+      try {
+        const { stdout: sessionsOutput } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
+          encoding: 'utf-8',
+        });
+        const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
+        sessionExists = sessions.includes(sessionName);
+      } catch (e) {
+        // No sessions
+      }
+    }
+
+    // If session exists, send the message directly to it using tmux send-keys
+    if (sessionExists) {
+      // Write message to a temp file to avoid shell escaping issues
+      const messageFile = join(planningDir, 'user-message.txt');
+      writeFileSync(messageFile, message);
+
+      if (isRemote && vmName) {
+        // For remote sessions, we need to copy the message file and use send-keys
+        // First, write to remote
+        const exe = await import('../lib/exe.js');
+        const remoteMessagePath = `/workspace/.planning/user-message.txt`;
+        await exe.ssh(vmName, `mkdir -p /workspace/.planning && cat > ${remoteMessagePath} << 'PANOPTICON_MSG_EOF'
+${message}
+PANOPTICON_MSG_EOF`);
+
+        // Send keys to remote tmux - type the message content
+        // Use tmux load-buffer to safely handle special characters
+        await exe.ssh(vmName, `tmux load-buffer ${remoteMessagePath} && tmux paste-buffer -t ${sessionName}`);
+        await exe.ssh(vmName, `tmux send-keys -t ${sessionName} Enter`);
+      } else {
+        // Local session - use tmux send-keys with load-buffer for safe character handling
+        await execAsync(`tmux load-buffer "${messageFile}"`, { encoding: 'utf-8' });
+        await execAsync(`tmux paste-buffer -t ${sessionName}`, { encoding: 'utf-8' });
+        await execAsync(`tmux send-keys -t ${sessionName} Enter`, { encoding: 'utf-8' });
+      }
+
+      res.json({ success: true, sessionName, message: 'Message sent to active session' });
+      return;
+    }
+
+    // Session doesn't exist - need to restart it in INTERACTIVE mode (not --print)
+    console.log(`[planning message] Session ${sessionName} not found, starting new interactive session`);
+
+    // Read previous output to get context for continuation
+    const outputFile = join(planningDir, 'output.jsonl');
     let conversationLog = '';
     if (existsSync(outputFile)) {
       const content = readFileSync(outputFile, 'utf-8');
@@ -7981,25 +8084,40 @@ Continue the PLANNING session. Do NOT implement anything.
     // Determine working directory
     const agentCwd = existsSync(workspacePath) ? workspacePath : projectPath;
 
-    // Backup old output and start new session
+    // Backup old output for the new session
     if (existsSync(outputFile)) {
       const backupPath = join(planningDir, `output-${Date.now()}.jsonl`);
       renameSync(outputFile, backupPath);
     }
 
-    // Get planning agent model from settings
+    // Get planning agent model from settings and start INTERACTIVE session (no --print)
     const msgSettings = loadSettings();
     const msgPlanningModel = msgSettings.models.planning_agent;
     const msgAgentCmd = getAgentCommand(msgPlanningModel);
     const msgCmdWithArgs = msgAgentCmd.args.length > 0
       ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} --dangerously-skip-permissions`
       : `${msgAgentCmd.command} --dangerously-skip-permissions`;
-    const claudeCommand = `cd "${agentCwd}" && ${msgCmdWithArgs} --print --verbose --output-format stream-json -p "${continuationPromptPath}" 2>&1 | tee "${outputFile}"`;
+
+    // Create launcher script for safe prompt handling (same as initial planning start)
+    const launcherScript = join(agentStateDir, 'continuation-launcher.sh');
+    mkdirSync(agentStateDir, { recursive: true });
+
+    writeFileSync(launcherScript, `#!/bin/bash
+cd "${agentCwd}"
+exec ${msgCmdWithArgs} "Please read the continuation prompt at ${continuationPromptPath} and continue the planning session."
+`, { mode: 0o755 });
 
     await ensureTmuxRunning();
-    await execAsync(`tmux new-session -d -s ${sessionName} "${claudeCommand}"`, { encoding: 'utf-8' });
+    await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
 
-    res.json({ success: true, sessionName, message: 'Planning session continued' });
+    // Resize window for Claude TUI
+    try {
+      await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
+    } catch {
+      // Ignore resize errors
+    }
+
+    res.json({ success: true, sessionName, message: 'Planning session restarted in interactive mode' });
   } catch (error: any) {
     console.error('Error sending message:', error);
     res.status(500).json({ error: 'Failed to send message: ' + error.message });
@@ -8371,11 +8489,61 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
   const issueLower = id.toLowerCase();
 
   try {
-    // Kill any running planning session
+    // Check if this was a remote planning session
+    let isRemotePlanning = false;
+    let remoteVmName: string | null = null;
+    let remoteInfraVm: string | null = null;
+
+    try {
+      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+
+      // Check agent state.json for remote info
+      const stateJsonPath = join(agentStateDir, 'state.json');
+      if (existsSync(stateJsonPath)) {
+        const agentState = JSON.parse(readFileSync(stateJsonPath, 'utf-8'));
+        if (agentState.location === 'remote' && agentState.vmName) {
+          isRemotePlanning = true;
+          remoteVmName = agentState.vmName;
+          remoteInfraVm = agentState.infraVm;
+          console.log(`[complete-planning] Detected remote planning session on ${remoteVmName}`);
+        }
+      }
+
+      // Also check legacy remote-workspace.json path
+      if (!isRemotePlanning) {
+        const remoteMetadataPath = join(agentStateDir, 'remote-workspace.json');
+        if (existsSync(remoteMetadataPath)) {
+          const remoteMetadata = JSON.parse(readFileSync(remoteMetadataPath, 'utf-8'));
+          if (remoteMetadata.vmName) {
+            isRemotePlanning = true;
+            remoteVmName = remoteMetadata.vmName;
+            remoteInfraVm = remoteMetadata.infraVm;
+            console.log(`[complete-planning] Detected remote planning session on ${remoteVmName}`);
+          }
+        }
+      }
+    } catch (err) {
+      // Not a remote session, continue with local flow
+      console.log(`[complete-planning] Could not detect remote session: ${err}`);
+    }
+
+    // Kill any running planning session (local)
     try {
       await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
     } catch (e) {
       // Session might not exist
+    }
+
+    // Also kill remote session if applicable
+    if (isRemotePlanning && remoteVmName) {
+      try {
+        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
+        const exe = createExeProvider({ infraVm: remoteInfraVm || undefined });
+        await exe.ssh(remoteVmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
+        console.log(`[complete-planning] Killed remote tmux session on ${remoteVmName}`);
+      } catch (err) {
+        console.log(`[complete-planning] Could not kill remote session: ${err}`);
+      }
     }
 
     // Find planning directory and commit/push
@@ -8407,9 +8575,54 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
       }
     }
 
-    // Git commit and push if planning dir exists
+    // For remote planning, sync beads from remote VM first
     let gitPushed = false;
-    if (projectPath) {
+    let beadsSynced = false;
+
+    if (isRemotePlanning && remoteVmName) {
+      console.log(`[complete-planning] Syncing beads from remote VM ${remoteVmName}...`);
+      try {
+        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
+        const exe = createExeProvider({ infraVm: remoteInfraVm || undefined });
+
+        // Sync beads on remote (export to JSONL), commit, and push
+        const syncResult = await exe.syncBeadsToGit(remoteVmName, '/workspace', `Complete planning for ${id}`);
+        beadsSynced = syncResult;
+
+        if (syncResult) {
+          console.log(`[complete-planning] Remote beads synced and pushed`);
+
+          // Now pull locally to get the changes
+          if (projectPath) {
+            const localGitRoot = join(projectPath, 'workspaces', `feature-${issueLower}`);
+            if (existsSync(localGitRoot)) {
+              console.log(`[complete-planning] Pulling remote changes to local workspace...`);
+              try {
+                await execAsync(`git pull --rebase`, { cwd: localGitRoot, encoding: 'utf-8', timeout: 30000 });
+                console.log(`[complete-planning] Local workspace updated`);
+
+                // Import beads locally
+                try {
+                  await execAsync(`bd sync --import 2>/dev/null || true`, { cwd: localGitRoot, encoding: 'utf-8', timeout: 10000 });
+                  console.log(`[complete-planning] Local beads imported`);
+                } catch (importErr) {
+                  console.log(`[complete-planning] Beads import skipped (may not have local bd)`);
+                }
+              } catch (pullErr: any) {
+                console.warn(`[complete-planning] Git pull failed: ${pullErr.message}`);
+              }
+            }
+          }
+          gitPushed = true; // Remote already pushed
+        }
+      } catch (remoteErr: any) {
+        console.error(`[complete-planning] Remote sync failed: ${remoteErr.message}`);
+        // Continue with local flow as fallback
+      }
+    }
+
+    // Local git handling (for local planning or as fallback)
+    if (projectPath && !gitPushed) {
       const workspacePlanningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
       const legacyPlanningDir = join(projectPath, '.planning', issueLower);
 
@@ -8425,6 +8638,13 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           const gitRoot = planningDir.includes('/workspaces/')
             ? join(projectPath, 'workspaces', `feature-${issueLower}`)
             : projectPath;
+
+          // Run bd sync locally first to export beads to JSONL
+          try {
+            await execAsync(`bd sync 2>/dev/null || true`, { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 });
+          } catch (bdErr) {
+            // bd might not be installed or .beads might not exist
+          }
 
           // Git add planning and beads directories
           await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
@@ -9157,48 +9377,122 @@ app.get('/api/issues/:id/beads', async (req, res) => {
 
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
 
-    // Use bd search CLI to get beads - this queries the SQLite database directly
-    // which is always up to date (unlike the JSONL export file)
-    try {
-      const { stdout } = await execAsync(`bd search "${id}" --json`, {
-        cwd: projectPath || homedir(),
-        encoding: 'utf-8',
-        timeout: 10000,
-      });
+    // Check if this is a remote workspace
+    let isRemoteWorkspace = false;
+    let remoteVmName: string | null = null;
+    let remoteInfraVm: string | null = null;
 
-      const beads = JSON.parse(stdout || '[]');
-      const tasks = beads.map((bead: any) => ({
-        id: bead.id,
-        title: bead.title,
-        status: bead.status,
-        type: bead.issue_type || bead.type || 'task',
-        blockedBy: bead.blocked_by || [],
-        createdAt: bead.created_at,
-        labels: bead.labels || [],
-        priority: bead.priority,
-      }));
+    // Check agent state for remote metadata (for active planning sessions)
+    const sessionName = `planning-${issueLower}`;
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
-      // Sort by priority (P1 first) then by creation date
-      tasks.sort((a: any, b: any) => {
-        if (a.priority !== b.priority) return (a.priority || 4) - (b.priority || 4);
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      });
-
-      res.json({
-        tasks,
-        workspacePath,
-        count: tasks.length,
-      });
-    } catch (bdError: any) {
-      // bd command not found or failed - return empty
-      console.error('bd search failed:', bdError.message);
-      res.json({
-        tasks: [],
-        workspacePath,
-        count: 0,
-        message: 'bd (beads) CLI not available or search failed',
-      });
+    // First check state.json for remote info
+    const stateJsonPath = join(agentStateDir, 'state.json');
+    if (existsSync(stateJsonPath)) {
+      try {
+        const agentState = JSON.parse(readFileSync(stateJsonPath, 'utf-8'));
+        if (agentState.location === 'remote' && agentState.vmName) {
+          isRemoteWorkspace = true;
+          remoteVmName = agentState.vmName;
+          remoteInfraVm = agentState.infraVm;
+        }
+      } catch (err) {
+        // Ignore parse errors
+      }
     }
+
+    // Also check legacy remote-workspace.json path
+    if (!isRemoteWorkspace) {
+      const remoteMetadataPath = join(agentStateDir, 'remote-workspace.json');
+      if (existsSync(remoteMetadataPath)) {
+        try {
+          const remoteMetadata = JSON.parse(readFileSync(remoteMetadataPath, 'utf-8'));
+          if (remoteMetadata.vmName) {
+            isRemoteWorkspace = true;
+            remoteVmName = remoteMetadata.vmName;
+            remoteInfraVm = remoteMetadata.infraVm;
+          }
+        } catch (err) {
+          // Ignore parse errors
+        }
+      }
+    }
+
+    // Also check workspace metadata file
+    if (!isRemoteWorkspace) {
+      try {
+        const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
+        const wsMetadata = loadWorkspaceMetadata(id);
+        if (wsMetadata?.vmName) {
+          isRemoteWorkspace = true;
+          remoteVmName = wsMetadata.vmName;
+          remoteInfraVm = wsMetadata.infraVm;
+        }
+      } catch (err) {
+        // Not a remote workspace
+      }
+    }
+
+    let beads: any[] = [];
+    let querySource = 'local';
+
+    // Try remote query first if this is a remote workspace
+    if (isRemoteWorkspace && remoteVmName) {
+      try {
+        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
+        const exe = createExeProvider({ infraVm: remoteInfraVm || undefined });
+
+        console.log(`[beads-api] Querying beads on remote VM ${remoteVmName} for ${id}`);
+        beads = await exe.queryBeads(remoteVmName, id, '/workspace');
+        querySource = 'remote';
+        console.log(`[beads-api] Found ${beads.length} beads on remote`);
+      } catch (remoteErr: any) {
+        console.warn(`[beads-api] Remote query failed: ${remoteErr.message}, falling back to local`);
+        // Fall through to local query
+      }
+    }
+
+    // If no remote results, try local query
+    if (beads.length === 0) {
+      try {
+        const { stdout } = await execAsync(`bd search "${id}" --json`, {
+          cwd: projectPath || homedir(),
+          encoding: 'utf-8',
+          timeout: 10000,
+        });
+
+        beads = JSON.parse(stdout || '[]');
+        querySource = 'local';
+      } catch (bdError: any) {
+        // bd command not found or failed
+        console.error('bd search failed:', bdError.message);
+      }
+    }
+
+    const tasks = beads.map((bead: any) => ({
+      id: bead.id,
+      title: bead.title,
+      status: bead.status,
+      type: bead.issue_type || bead.type || 'task',
+      blockedBy: bead.blocked_by || [],
+      createdAt: bead.created_at,
+      labels: bead.labels || [],
+      priority: bead.priority,
+    }));
+
+    // Sort by priority (P1 first) then by creation date
+    tasks.sort((a: any, b: any) => {
+      if (a.priority !== b.priority) return (a.priority || 4) - (b.priority || 4);
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
+    res.json({
+      tasks,
+      workspacePath,
+      count: tasks.length,
+      source: querySource,
+      isRemote: isRemoteWorkspace,
+    });
   } catch (error: any) {
     console.error('Error fetching beads:', error);
     res.status(500).json({ error: 'Failed to fetch beads: ' + error.message });

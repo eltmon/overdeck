@@ -6,6 +6,7 @@ tools:
   - Read
   - Grep
   - Glob
+  - Bash
   - WebFetch
   - AskUserQuestion
 permissionMode: plan
