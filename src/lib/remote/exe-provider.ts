@@ -20,6 +20,9 @@
 
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import type {
   RemoteProvider,
   VmInfo,
@@ -492,6 +495,44 @@ COMPOSE_EOF`);
       return result.exitCode === 0;
     } catch (error: any) {
       // Token not found in Keychain or other error
+      return false;
+    }
+  }
+
+  /**
+   * Sync GitLab CLI (glab) authentication to a remote VM
+   *
+   * Copies the glab config from local machine to the remote VM.
+   * This allows the remote agent to use glab commands for MRs, etc.
+   */
+  async syncGitLabAuth(vmName: string): Promise<boolean> {
+    try {
+      // glab stores config in ~/.config/glab-cli/config.yml
+      const glabConfigPath = join(homedir(), '.config', 'glab-cli', 'config.yml');
+
+      if (!existsSync(glabConfigPath)) {
+        console.log(`[exe-provider] No glab config found at ${glabConfigPath}`);
+        return false;
+      }
+
+      // Read local glab config
+      const glabConfig = readFileSync(glabConfigPath, 'utf-8');
+
+      // Ensure ~/.config/glab-cli directory exists on remote
+      await this.ssh(vmName, 'mkdir -p ~/.config/glab-cli');
+
+      // Write config to remote
+      const configBase64 = Buffer.from(glabConfig).toString('base64');
+      const result = await this.ssh(vmName, `echo '${configBase64}' | base64 -d > ~/.config/glab-cli/config.yml && chmod 600 ~/.config/glab-cli/config.yml`);
+
+      if (result.exitCode === 0) {
+        console.log(`[exe-provider] GitLab auth synced to ${vmName}`);
+        return true;
+      }
+
+      return false;
+    } catch (error: any) {
+      console.error(`[exe-provider] Failed to sync GitLab auth: ${error.message}`);
       return false;
     }
   }

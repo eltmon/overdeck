@@ -800,16 +800,35 @@ async function createRemoteWorkspace(
       process.exit(1);
     }
 
-    // Step 3: Add GitHub host key and clone repository on VM
+    // Step 3: Add SSH host keys and clone repository on VM
     spinner.text = 'Cloning repository on VM...';
-    // Add GitHub's SSH host keys to known_hosts to avoid verification prompt
-    await exe.ssh(vmName, 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null');
 
-    // Inject SSH key for GitHub access if available
+    // Detect git host from repo URL
+    const isGitHub = repoUrl.includes('github.com');
+    const isGitLab = repoUrl.includes('gitlab.com');
+    const gitHost = isGitHub ? 'github.com' : isGitLab ? 'gitlab.com' : null;
+
+    // Add SSH host keys to known_hosts for the detected host
+    await exe.ssh(vmName, 'mkdir -p ~/.ssh && chmod 700 ~/.ssh');
+    if (gitHost) {
+      await exe.ssh(vmName, `ssh-keyscan -t ed25519,rsa ${gitHost} >> ~/.ssh/known_hosts 2>/dev/null`);
+    }
+
+    // Inject SSH key for git access if available
     const sshKeyPath = join(homedir(), '.panopticon', 'ssh', 'exe-dev-key');
     if (existsSync(sshKeyPath)) {
       const sshKeyBase64 = Buffer.from(readFileSync(sshKeyPath, 'utf-8')).toString('base64');
       await exe.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519`);
+    }
+
+    // Sync git CLI auth for the detected host
+    if (isGitHub) {
+      // GitHub: sync gh CLI auth
+      await exe.syncGitHubAuth(vmName);
+    } else if (isGitLab) {
+      // GitLab: sync glab CLI auth
+      spinner.text = 'Syncing GitLab credentials...';
+      await exe.syncGitLabAuth(vmName);
     }
 
     const cloneResult = await exe.ssh(vmName, `git clone ${repoUrl} ~/workspace`);
