@@ -26,7 +26,7 @@ interface BeadsResponse {
 }
 
 export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
-  const { data, isLoading, error } = useQuery<BeadsResponse>({
+  const { data, isLoading, isFetching, error } = useQuery<BeadsResponse>({
     queryKey: ['beads', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/issues/${issueId}/beads`);
@@ -34,6 +34,8 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
       return res.json();
     },
     enabled: isOpen,
+    staleTime: 0, // Always refetch when dialog opens
+    refetchOnMount: 'always',
   });
 
   if (!isOpen) return null;
@@ -61,10 +63,22 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {isLoading && (
-            <div className="flex items-center justify-center py-8 text-gray-400">
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              Loading tasks...
+          {(isLoading || isFetching) && !data?.tasks?.length && (
+            <div className="space-y-2">
+              {/* Skeleton loading */}
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-gray-700 bg-gray-700/30 animate-pulse">
+                  <div className="w-4 h-4 bg-gray-600 rounded-full mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-600 rounded w-3/4" />
+                    <div className="h-3 bg-gray-700 rounded w-1/4" />
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-center py-2 text-gray-500 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Loading tasks from workspace...
+              </div>
             </div>
           )}
 
@@ -74,7 +88,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
             </div>
           )}
 
-          {data && data.tasks?.length === 0 && (
+          {data && data.tasks?.length === 0 && !isFetching && (
             <div className="text-gray-500 text-center py-8">
               <List className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p>No tasks created yet</p>
