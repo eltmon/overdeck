@@ -65,30 +65,51 @@ export function createClaudeAdapter(): RuntimeAdapter {
     async spawnAgent(id: string, options: AgentSpawnOptions): Promise<boolean> {
       try {
         const { execa } = await import('execa');
+        const { mkdirSync, writeFileSync } = await import('fs');
+        const { join } = await import('path');
+        const { homedir } = await import('os');
 
-        // Build the command
-        const args = ['--print'];
+        // Build the command args - no --print, use interactive mode for long-running agents
+        const args: string[] = [];
 
         if (options.model) {
           args.push('--model', options.model);
         }
 
-        // Spawn in tmux session
+        // Add --dangerously-skip-permissions for autonomous agents
+        args.push('--dangerously-skip-permissions');
+
+        // Spawn in tmux session using a launcher script (safer for prompts with special chars)
         const sessionName = `agent-${id}`;
-        const claudeCmd = `cd "${options.workingDir}" && claude ${args.join(' ')}`;
+        const agentDir = join(homedir(), '.panopticon', 'agents', sessionName);
+        mkdirSync(agentDir, { recursive: true });
+
+        // Write prompt to file
+        const promptFile = join(agentDir, 'init-prompt.txt');
+        writeFileSync(promptFile, options.prompt);
+
+        // Create launcher script
+        const launcherScript = join(agentDir, 'launcher.sh');
+        const argsStr = args.length > 0 ? ` ${args.join(' ')}` : '';
+        writeFileSync(launcherScript, `#!/bin/bash
+cd "${options.workingDir}"
+prompt=$(cat "${promptFile}")
+exec claude${argsStr} "$prompt"
+`, { mode: 0o755 });
 
         await execa('tmux', [
           'new-session',
           '-d',
           '-s', sessionName,
-          'bash', '-c', claudeCmd,
+          'bash', launcherScript,
         ]);
 
-        // Wait a moment then send the prompt
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        await execa('tmux', ['send-keys', '-t', sessionName, options.prompt]);
-        await execa('tmux', ['send-keys', '-t', sessionName, 'Enter']);
+        // Resize window for Claude TUI
+        try {
+          await execa('tmux', ['resize-window', '-t', sessionName, '-x', '200', '-y', '50'], { reject: false });
+        } catch {
+          // Ignore resize errors
+        }
 
         return true;
       } catch (error) {

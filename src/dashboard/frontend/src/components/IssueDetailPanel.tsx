@@ -441,7 +441,7 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
         )}
 
         {/* Cost Summary */}
-        {costData && (costData.totalCost > 0 || costData.sessions.length > 0) && (
+        {costData && (costData.totalCost > 0 || (costData.sessions?.length ?? 0) > 0) && (
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
               <DollarSign className="w-4 h-4" />
@@ -490,7 +490,7 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
               )}
 
               {/* Sessions */}
-              {costData.sessions.length > 0 && (
+              {costData.sessions && costData.sessions.length > 0 && (
                 <div className="border-t border-gray-700 pt-2">
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
                     Sessions ({costData.sessions.length})

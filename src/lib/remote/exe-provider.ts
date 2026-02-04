@@ -520,6 +520,155 @@ COMPOSE_EOF`);
   }
 
   /**
+   * Install beads CLI (bd) on a remote VM
+   *
+   * Beads is required for planning agents to create task breakdowns.
+   * Downloads the binary from GitHub releases since npm/node are often
+   * not available on exe.dev VMs.
+   *
+   * @returns true if bd is available (already installed or just installed)
+   */
+  async installBeads(vmName: string): Promise<boolean> {
+    try {
+      // Check if bd is already installed
+      const checkResult = await this.ssh(vmName, 'which bd');
+      if (checkResult.exitCode === 0 && checkResult.stdout.trim()) {
+        console.log(`[exe-provider] bd already installed on ${vmName}`);
+        return true;
+      }
+
+      console.log(`[exe-provider] Installing bd (beads CLI) on ${vmName}...`);
+
+      // Download from GitHub releases - exe.dev VMs typically don't have npm/node
+      // but do have curl and sudo access
+      const installCmd = `
+        cd /tmp && \
+        curl -sL "https://github.com/steveyegge/beads/releases/latest/download/beads_0.49.3_linux_amd64.tar.gz" -o beads.tar.gz && \
+        tar -xzf beads.tar.gz && \
+        sudo mv bd /usr/local/bin/ && \
+        rm -f beads.tar.gz CHANGELOG.md LICENSE README.md
+      `.trim().replace(/\n\s+/g, ' ');
+
+      const installResult = await this.ssh(vmName, installCmd);
+
+      // Verify installation
+      const verifyResult = await this.ssh(vmName, 'which bd && bd --version');
+      if (verifyResult.exitCode === 0 && verifyResult.stdout.includes('bd version')) {
+        console.log(`[exe-provider] bd installed successfully on ${vmName}: ${verifyResult.stdout.trim()}`);
+        return true;
+      }
+
+      console.warn(`[exe-provider] Failed to install bd on ${vmName}`);
+      return false;
+    } catch (error: any) {
+      console.error(`[exe-provider] Error installing bd on ${vmName}:`, error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Initialize beads in a workspace on a remote VM
+   *
+   * Creates .beads/ directory and initializes the database if needed.
+   */
+  async initBeads(vmName: string, workspacePath: string = '/workspace'): Promise<boolean> {
+    try {
+      // Check if .beads already exists
+      const checkResult = await this.ssh(vmName, `test -d ${workspacePath}/.beads && echo "exists"`);
+      if (checkResult.stdout.includes('exists')) {
+        console.log(`[exe-provider] .beads already initialized on ${vmName}`);
+        return true;
+      }
+
+      console.log(`[exe-provider] Initializing beads on ${vmName}...`);
+
+      // Initialize beads in the workspace
+      const initResult = await this.ssh(vmName, `cd ${workspacePath} && bd init 2>/dev/null || true`);
+
+      // Verify
+      const verifyResult = await this.ssh(vmName, `test -d ${workspacePath}/.beads && echo "ok"`);
+      if (verifyResult.stdout.includes('ok')) {
+        console.log(`[exe-provider] beads initialized on ${vmName}`);
+        return true;
+      }
+
+      // If bd init failed, create the directory manually
+      await this.ssh(vmName, `mkdir -p ${workspacePath}/.beads`);
+      return true;
+    } catch (error: any) {
+      console.error(`[exe-provider] Error initializing beads on ${vmName}:`, error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Sync beads from remote VM to git
+   *
+   * Exports beads database to JSONL, commits, and pushes.
+   * This should be called after planning completes to persist tasks.
+   */
+  async syncBeadsToGit(vmName: string, workspacePath: string = '/workspace', commitMessage?: string): Promise<boolean> {
+    try {
+      console.log(`[exe-provider] Syncing beads to git on ${vmName}...`);
+
+      // Export beads to JSONL
+      const syncResult = await this.ssh(vmName, `cd ${workspacePath} && bd sync 2>/dev/null || true`);
+
+      // Check if there are changes to commit
+      const statusResult = await this.ssh(vmName, `cd ${workspacePath} && git status --porcelain .beads/ .planning/ 2>/dev/null`);
+
+      if (!statusResult.stdout.trim()) {
+        console.log(`[exe-provider] No beads changes to commit on ${vmName}`);
+        return true;
+      }
+
+      // Add and commit
+      const msg = commitMessage || 'Sync beads from planning session';
+      await this.ssh(vmName, `cd ${workspacePath} && git add .beads/ .planning/ 2>/dev/null || true`);
+      await this.ssh(vmName, `cd ${workspacePath} && git commit -m "${msg}" 2>/dev/null || true`);
+
+      // Push - use -u to set upstream if not already set
+      const branchResult = await this.ssh(vmName, `cd ${workspacePath} && git branch --show-current`);
+      const branch = branchResult.stdout.trim() || 'main';
+      const pushResult = await this.ssh(vmName, `cd ${workspacePath} && git push -u origin ${branch} 2>&1`);
+      if (pushResult.exitCode !== 0) {
+        console.warn(`[exe-provider] Git push failed on ${vmName}: ${pushResult.stderr || pushResult.stdout}`);
+        return false;
+      }
+
+      console.log(`[exe-provider] Beads synced and pushed from ${vmName}`);
+      return true;
+    } catch (error: any) {
+      console.error(`[exe-provider] Error syncing beads on ${vmName}:`, error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Query beads on a remote VM
+   *
+   * Runs bd search on the remote and returns results.
+   */
+  async queryBeads(vmName: string, searchTerm: string, workspacePath: string = '/workspace'): Promise<any[]> {
+    try {
+      const result = await this.ssh(vmName, `cd ${workspacePath} && bd search "${searchTerm}" --json 2>/dev/null || echo "[]"`);
+
+      if (result.exitCode !== 0 || !result.stdout.trim()) {
+        return [];
+      }
+
+      try {
+        return JSON.parse(result.stdout.trim());
+      } catch {
+        return [];
+      }
+    } catch (error: any) {
+      console.error(`[exe-provider] Error querying beads on ${vmName}:`, error.message);
+      return [];
+    }
+  }
+
+  /**
    * Configure Claude Code on a VM for autonomous operation
    *
    * Sets up:
