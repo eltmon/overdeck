@@ -33,6 +33,7 @@ export {
   type CostCache,
   type IssueStats,
   type ModelStats,
+  type StageStats,
 } from './aggregator.js';
 
 // Historical data migration

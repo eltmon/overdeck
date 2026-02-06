@@ -9862,8 +9862,23 @@ app.get('/api/costs/by-issue', async (_req, res) => {
       outputTokens: data.outputTokens,
       cacheReadTokens: data.cacheReadTokens,
       cacheWriteTokens: data.cacheWriteTokens,
+      // Legacy fields (keep for backward compatibility)
       models: data.models,
       providers: data.providers,
+      // New per-model breakdown (PAN-105)
+      byModel: Object.fromEntries(
+        Object.entries(data.models).map(([model, stats]) => [
+          model,
+          { cost: stats.cost, tokens: stats.tokens }
+        ])
+      ),
+      // New per-stage breakdown (PAN-105)
+      byStage: Object.fromEntries(
+        Object.entries(data.stages || {}).map(([stage, stats]) => [
+          stage,
+          { cost: stats.cost, tokens: stats.tokens }
+        ])
+      ),
       budget: data.budget,
       budgetWarning: data.budgetWarning,
       lastUpdated: data.lastUpdated,
@@ -9979,8 +9994,12 @@ app.get('/api/issues/:id/costs', (req, res) => {
         outputTokens: 0,
         cacheReadTokens: 0,
         cacheWriteTokens: 0,
+        // Legacy fields
         models: {},
         providers: {},
+        // New per-model and per-stage breakdown (PAN-105)
+        byModel: {},
+        byStage: {},
         budget: undefined,
         budgetWarning: false,
       });
@@ -9994,8 +10013,23 @@ app.get('/api/issues/:id/costs', (req, res) => {
       outputTokens: issueData.outputTokens,
       cacheReadTokens: issueData.cacheReadTokens,
       cacheWriteTokens: issueData.cacheWriteTokens,
+      // Legacy fields (keep for backward compatibility)
       models: issueData.models,
       providers: issueData.providers,
+      // New per-model breakdown (PAN-105)
+      byModel: Object.fromEntries(
+        Object.entries(issueData.models).map(([model, stats]) => [
+          model,
+          { cost: stats.cost, tokens: stats.tokens }
+        ])
+      ),
+      // New per-stage breakdown (PAN-105)
+      byStage: Object.fromEntries(
+        Object.entries(issueData.stages || {}).map(([stage, stats]) => [
+          stage,
+          { cost: stats.cost, tokens: stats.tokens }
+        ])
+      ),
       budget: issueData.budget,
       budgetWarning: issueData.budgetWarning,
       lastUpdated: issueData.lastUpdated,

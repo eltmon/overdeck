@@ -40,12 +40,23 @@ interface SessionCost {
   tokenCount?: number;
 }
 
+interface ModelCostInfo {
+  cost: number;
+  tokens: number;
+}
+
+interface StageCostInfo {
+  cost: number;
+  tokens: number;
+}
+
 interface IssueCostData {
   issueId: string;
   totalCost: number;
   totalTokens: number;
   sessions: SessionCost[];
-  byModel: Record<string, number>;
+  byModel: Record<string, ModelCostInfo>;
+  byStage?: Record<string, StageCostInfo>;
 }
 
 // Fetch cost data for an issue
@@ -473,8 +484,8 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">By Model</p>
                   <div className="space-y-1">
                     {Object.entries(costData.byModel)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([model, cost]) => (
+                      .sort(([, a], [, b]) => b.cost - a.cost)
+                      .map(([model, modelInfo]) => (
                         <div key={model} className="flex items-center justify-between text-sm">
                           <span
                             className="text-gray-400 truncate"
@@ -482,7 +493,35 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
                           >
                             {getFriendlyModelName(model)}
                           </span>
-                          <span className="text-gray-300">{formatCost(cost)}</span>
+                          <div className="text-right">
+                            <span className="text-gray-300">{formatCost(modelInfo.cost)}</span>
+                            <span className="text-gray-500 text-xs ml-1">({formatTokens(modelInfo.tokens)})</span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* By Stage breakdown */}
+              {costData.byStage && Object.keys(costData.byStage).length > 0 && (
+                <div className="border-t border-gray-700 pt-2">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">By Stage</p>
+                  <div className="space-y-1">
+                    {Object.entries(costData.byStage)
+                      .sort(([, a], [, b]) => b.cost - a.cost)
+                      .map(([stage, stageInfo]) => (
+                        <div key={stage} className="flex items-center justify-between text-sm">
+                          <span
+                            className="text-gray-400 truncate"
+                            title={stage}
+                          >
+                            {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                          </span>
+                          <div className="text-right">
+                            <span className="text-gray-300">{formatCost(stageInfo.cost)}</span>
+                            <span className="text-gray-500 text-xs ml-1">({formatTokens(stageInfo.tokens)})</span>
+                          </div>
                         </div>
                       ))}
                   </div>
