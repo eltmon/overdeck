@@ -99,6 +99,9 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Google
   { provider: 'google', model: 'gemini-1.5-pro', inputPer1k: 0.00125, outputPer1k: 0.005, currency: 'USD' },
   { provider: 'google', model: 'gemini-1.5-flash', inputPer1k: 0.000075, outputPer1k: 0.0003, currency: 'USD' },
+  // Moonshot AI (Kimi)
+  { provider: 'custom', model: 'kimi-for-coding', inputPer1k: 0.0006, outputPer1k: 0.002, cacheReadPer1k: 0.00006, cacheWrite5mPer1k: 0.00075, currency: 'USD' },
+  { provider: 'custom', model: 'kimi-k2.5', inputPer1k: 0.0006, outputPer1k: 0.002, cacheReadPer1k: 0.00006, cacheWrite5mPer1k: 0.00075, currency: 'USD' },
 ];
 
 // ============== Cost Calculation ==============

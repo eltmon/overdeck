@@ -50,6 +50,96 @@ function getClaudeProjectsDir(): string {
   return join(process.env.HOME || homedir(), '.claude', 'projects');
 }
 
+function getProjectsYamlPath(): string {
+  return join(process.env.HOME || homedir(), '.panopticon', 'projects.yaml');
+}
+
+// ============== Workspace Resolution ==============
+
+/**
+ * Infer issueId from agent directory name
+ * e.g., 'agent-pan-105' -> 'PAN-105', 'agent-min-663' -> 'MIN-663'
+ */
+function inferIssueId(agentDir: string): string | null {
+  // Strip 'agent-' or 'planning-' prefix
+  const stripped = agentDir.replace(/^(agent|planning)-/, '');
+  // Match pattern like 'pan-105' or 'min-663'
+  const match = stripped.match(/^([a-z]+)-(\d+)$/i);
+  if (match) {
+    return `${match[1].toUpperCase()}-${match[2]}`;
+  }
+  return null;
+}
+
+/**
+ * Load project paths from projects.yaml
+ */
+function getProjectPaths(): string[] {
+  const paths: string[] = [];
+  try {
+    const yamlPath = getProjectsYamlPath();
+    if (existsSync(yamlPath)) {
+      const content = readFileSync(yamlPath, 'utf-8');
+      // Simple YAML parsing for path: values
+      const pathMatches = content.match(/^\s+path:\s+(.+)$/gm);
+      if (pathMatches) {
+        for (const m of pathMatches) {
+          const pathMatch = m.match(/path:\s+(.+)/);
+          if (pathMatch) {
+            paths.push(pathMatch[1].trim());
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return paths;
+}
+
+/**
+ * Try to find workspace directory for an issue
+ * Searches known project paths for workspaces/feature-{issue-id}
+ */
+function resolveWorkspace(issueId: string): string | null {
+  const issueLower = issueId.toLowerCase();
+  const projectPaths = getProjectPaths();
+
+  for (const projectPath of projectPaths) {
+    const wsPath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    if (existsSync(wsPath)) {
+      return wsPath;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find Claude session directories by scanning the Claude projects dir
+ * This is a fallback when workspace path is not known
+ */
+function findSessionDirsByIssue(issueId: string): string[] {
+  const dirs: string[] = [];
+  const issueLower = issueId.toLowerCase();
+  const claudeDir = getClaudeProjectsDir();
+
+  try {
+    const entries = readdirSync(claudeDir);
+    for (const entry of entries) {
+      // Match directories that contain the issue ID pattern
+      if (entry.includes(`feature-${issueLower}`)) {
+        const fullPath = join(claudeDir, entry);
+        dirs.push(fullPath);
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return dirs;
+}
+
 // ============== Session Parsing ==============
 
 /**
@@ -112,6 +202,8 @@ function usageToCostEvents(
       provider = 'openai';
     } else if (usage.model.includes('gemini')) {
       provider = 'google';
+    } else if (usage.model.includes('kimi')) {
+      provider = 'custom';
     }
 
     // Get pricing and calculate cost
@@ -191,28 +283,39 @@ function migrateAgent(agentDir: string, stats: MigrationStats): void {
     return;
   }
 
-  // Extract context
+  // Extract context - infer issueId and workspace when not in state.json
+  const inferredIssueId = inferIssueId(agentDir);
   const context: AgentContext = {
     agentId: agentDir,
-    issueId: state.issueId || 'UNKNOWN',
+    issueId: state.issueId || inferredIssueId || 'UNKNOWN',
     sessionType: state.sessionType || (agentDir.startsWith('planning-') ? 'planning' : 'implementation'),
     workspace: state.workspace,
   };
 
-  if (!context.workspace) {
-    stats.warnings.push({
-      file: stateFile,
-      message: 'No workspace found in state',
-    });
-    return;
+  // Try to resolve workspace if not in state
+  if (!context.workspace && context.issueId !== 'UNKNOWN') {
+    context.workspace = resolveWorkspace(context.issueId) || '';
   }
 
-  // Find session directory
-  const sessionDir = getSessionDir(context.workspace);
+  // Find session directory - try workspace path first, then scan by issue
+  let sessionDir: string | null = null;
+
+  if (context.workspace) {
+    sessionDir = getSessionDir(context.workspace);
+  }
+
+  // Fallback: scan Claude projects directory for matching session dirs
+  if (!sessionDir && context.issueId !== 'UNKNOWN') {
+    const sessionDirs = findSessionDirsByIssue(context.issueId);
+    if (sessionDirs.length > 0) {
+      sessionDir = sessionDirs[0];
+    }
+  }
+
   if (!sessionDir) {
     stats.warnings.push({
-      file: context.workspace,
-      message: 'Session directory not found',
+      file: stateFile,
+      message: `No session directory found for ${context.issueId} (workspace: ${context.workspace || 'unknown'})`,
     });
     return;
   }
