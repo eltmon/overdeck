@@ -32,14 +32,15 @@ describe('settings', () => {
   });
 
   describe('getDefaultSettings', () => {
-    it('should return default Anthropic-only configuration', async () => {
+    it('should return default Kimi configuration', async () => {
       const { getDefaultSettings } = await import('../../src/lib/settings.js');
       const defaults = getDefaultSettings();
 
-      expect(defaults.models.specialists.review_agent).toBe('claude-sonnet-4-5');
-      expect(defaults.models.specialists.test_agent).toBe('claude-haiku-4-5');
-      expect(defaults.models.specialists.merge_agent).toBe('claude-sonnet-4-5');
-      expect(defaults.models.planning_agent).toBe('claude-opus-4-5');
+      // Default is Kimi K2.5 for all work types
+      expect(defaults.models.specialists.review_agent).toBe('kimi-k2.5');
+      expect(defaults.models.specialists.test_agent).toBe('kimi-k2.5');
+      expect(defaults.models.specialists.merge_agent).toBe('kimi-k2.5');
+      expect(defaults.models.planning_agent).toBe('kimi-k2.5');
       expect(defaults.api_keys).toEqual({});
     });
 
@@ -47,11 +48,12 @@ describe('settings', () => {
       const { getDefaultSettings } = await import('../../src/lib/settings.js');
       const defaults = getDefaultSettings();
 
-      expect(defaults.models.complexity.trivial).toBe('claude-haiku-4-5');
-      expect(defaults.models.complexity.simple).toBe('claude-haiku-4-5');
-      expect(defaults.models.complexity.medium).toBe('claude-sonnet-4-5');
-      expect(defaults.models.complexity.complex).toBe('claude-sonnet-4-5');
-      expect(defaults.models.complexity.expert).toBe('claude-opus-4-5');
+      // All complexity levels default to Kimi K2.5
+      expect(defaults.models.complexity.trivial).toBe('kimi-k2.5');
+      expect(defaults.models.complexity.simple).toBe('kimi-k2.5');
+      expect(defaults.models.complexity.medium).toBe('kimi-k2.5');
+      expect(defaults.models.complexity.complex).toBe('kimi-k2.5');
+      expect(defaults.models.complexity.expert).toBe('kimi-k2.5');
     });
 
     it('should return a deep copy (not same reference)', async () => {
@@ -68,10 +70,29 @@ describe('settings', () => {
   describe('loadSettings', () => {
     it('should return defaults when file does not exist', async () => {
       const { loadSettings, getDefaultSettings } = await import('../../src/lib/settings.js');
-      const loaded = loadSettings();
-      const defaults = getDefaultSettings();
 
-      expect(loaded).toEqual(defaults);
+      // Clear any env vars that might affect API keys
+      const originalOpenAI = process.env.OPENAI_API_KEY;
+      const originalGoogle = process.env.GOOGLE_API_KEY;
+      const originalZai = process.env.ZAI_API_KEY;
+      const originalKimi = process.env.KIMI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.GOOGLE_API_KEY;
+      delete process.env.ZAI_API_KEY;
+      delete process.env.KIMI_API_KEY;
+
+      try {
+        const loaded = loadSettings();
+        const defaults = getDefaultSettings();
+
+        expect(loaded).toEqual(defaults);
+      } finally {
+        // Restore env vars
+        if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
+        if (originalGoogle) process.env.GOOGLE_API_KEY = originalGoogle;
+        if (originalZai) process.env.ZAI_API_KEY = originalZai;
+        if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
+      }
     });
 
     it('should merge user settings with defaults', async () => {
@@ -97,38 +118,74 @@ describe('settings', () => {
       expect(loaded.models.specialists.test_agent).toBe('gpt-4o-mini');
       expect(loaded.api_keys.openai).toBe('sk-test-key');
 
-      // Other values should be defaults
-      expect(loaded.models.specialists.review_agent).toBe('claude-sonnet-4-5');
-      expect(loaded.models.planning_agent).toBe('claude-opus-4-5');
-      expect(loaded.models.complexity.trivial).toBe('claude-haiku-4-5');
+      // Other values should be defaults (Kimi K2.5)
+      expect(loaded.models.specialists.review_agent).toBe('kimi-k2.5');
+      expect(loaded.models.planning_agent).toBe('kimi-k2.5');
+      expect(loaded.models.complexity.trivial).toBe('kimi-k2.5');
     });
 
     it('should handle invalid JSON gracefully', async () => {
       const { loadSettings, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      // Write invalid JSON
-      const settingsPath = join(tempDir, 'settings.json');
-      writeFileSync(settingsPath, '{ invalid json }', 'utf8');
+      // Clear any env vars that might affect API keys
+      const originalOpenAI = process.env.OPENAI_API_KEY;
+      const originalGoogle = process.env.GOOGLE_API_KEY;
+      const originalZai = process.env.ZAI_API_KEY;
+      const originalKimi = process.env.KIMI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.GOOGLE_API_KEY;
+      delete process.env.ZAI_API_KEY;
+      delete process.env.KIMI_API_KEY;
 
-      const loaded = loadSettings();
-      const defaults = getDefaultSettings();
+      try {
+        // Write invalid JSON
+        const settingsPath = join(tempDir, 'settings.json');
+        writeFileSync(settingsPath, '{ invalid json }', 'utf8');
 
-      // Should return defaults on parse error
-      expect(loaded).toEqual(defaults);
+        const loaded = loadSettings();
+        const defaults = getDefaultSettings();
+
+        // Should return defaults on parse error
+        expect(loaded).toEqual(defaults);
+      } finally {
+        // Restore env vars
+        if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
+        if (originalGoogle) process.env.GOOGLE_API_KEY = originalGoogle;
+        if (originalZai) process.env.ZAI_API_KEY = originalZai;
+        if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
+      }
     });
 
     it('should handle empty JSON object', async () => {
       const { loadSettings, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      // Write empty JSON
-      const settingsPath = join(tempDir, 'settings.json');
-      writeFileSync(settingsPath, '{}', 'utf8');
+      // Clear any env vars that might affect API keys
+      const originalOpenAI = process.env.OPENAI_API_KEY;
+      const originalGoogle = process.env.GOOGLE_API_KEY;
+      const originalZai = process.env.ZAI_API_KEY;
+      const originalKimi = process.env.KIMI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.GOOGLE_API_KEY;
+      delete process.env.ZAI_API_KEY;
+      delete process.env.KIMI_API_KEY;
 
-      const loaded = loadSettings();
-      const defaults = getDefaultSettings();
+      try {
+        // Write empty JSON
+        const settingsPath = join(tempDir, 'settings.json');
+        writeFileSync(settingsPath, '{}', 'utf8');
 
-      // Should return defaults when merging with empty object
-      expect(loaded).toEqual(defaults);
+        const loaded = loadSettings();
+        const defaults = getDefaultSettings();
+
+        // Should return defaults when merging with empty object
+        expect(loaded).toEqual(defaults);
+      } finally {
+        // Restore env vars
+        if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
+        if (originalGoogle) process.env.GOOGLE_API_KEY = originalGoogle;
+        if (originalZai) process.env.ZAI_API_KEY = originalZai;
+        if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
+      }
     });
 
     it('should deep merge nested objects', async () => {
@@ -150,15 +207,15 @@ describe('settings', () => {
       // User override should apply
       expect(loaded.models.complexity.expert).toBe('gpt-5.2-codex');
 
-      // Other complexity levels should be defaults
-      expect(loaded.models.complexity.trivial).toBe('claude-haiku-4-5');
-      expect(loaded.models.complexity.simple).toBe('claude-haiku-4-5');
-      expect(loaded.models.complexity.medium).toBe('claude-sonnet-4-5');
-      expect(loaded.models.complexity.complex).toBe('claude-sonnet-4-5');
+      // Other complexity levels should be defaults (Kimi K2.5)
+      expect(loaded.models.complexity.trivial).toBe('kimi-k2.5');
+      expect(loaded.models.complexity.simple).toBe('kimi-k2.5');
+      expect(loaded.models.complexity.medium).toBe('kimi-k2.5');
+      expect(loaded.models.complexity.complex).toBe('kimi-k2.5');
 
-      // Other sections should be defaults
-      expect(loaded.models.specialists.review_agent).toBe('claude-sonnet-4-5');
-      expect(loaded.models.planning_agent).toBe('claude-opus-4-5');
+      // Other sections should be defaults (Kimi K2.5)
+      expect(loaded.models.specialists.review_agent).toBe('kimi-k2.5');
+      expect(loaded.models.planning_agent).toBe('kimi-k2.5');
     });
   });
 
@@ -166,15 +223,33 @@ describe('settings', () => {
     it('should write settings to file with pretty formatting', async () => {
       const { saveSettings, loadSettings, getDefaultSettings } = await import('../../src/lib/settings.js');
 
-      const settings = getDefaultSettings();
-      settings.api_keys.openai = 'sk-test-key';
-      settings.models.specialists.test_agent = 'gpt-4o-mini';
+      // Clear any env vars that might affect API keys
+      const originalOpenAI = process.env.OPENAI_API_KEY;
+      const originalGoogle = process.env.GOOGLE_API_KEY;
+      const originalZai = process.env.ZAI_API_KEY;
+      const originalKimi = process.env.KIMI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.GOOGLE_API_KEY;
+      delete process.env.ZAI_API_KEY;
+      delete process.env.KIMI_API_KEY;
 
-      saveSettings(settings);
+      try {
+        const settings = getDefaultSettings();
+        settings.api_keys.openai = 'sk-test-key';
+        settings.models.specialists.test_agent = 'gpt-4o-mini';
 
-      // Verify file was written
-      const loaded = loadSettings();
-      expect(loaded).toEqual(settings);
+        saveSettings(settings);
+
+        // Verify file was written
+        const loaded = loadSettings();
+        expect(loaded).toEqual(settings);
+      } finally {
+        // Restore env vars
+        if (originalOpenAI) process.env.OPENAI_API_KEY = originalOpenAI;
+        if (originalGoogle) process.env.GOOGLE_API_KEY = originalGoogle;
+        if (originalZai) process.env.ZAI_API_KEY = originalZai;
+        if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
+      }
     });
 
     it('should create valid JSON', async () => {
@@ -370,6 +445,7 @@ describe('settings', () => {
       expect(available.openai).toEqual([]);
       expect(available.google).toEqual([]);
       expect(available.zai).toEqual([]);
+      expect(available.kimi).toEqual([]);
     });
 
     it('should return OpenAI models when API key is configured', async () => {
@@ -411,6 +487,18 @@ describe('settings', () => {
       const available = getAvailableModels(settings);
 
       expect(available.zai).toEqual(['glm-4.7', 'glm-4.7-flash']);
+    });
+
+    it('should return Kimi models when API key is configured', async () => {
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
+
+      const settings = getDefaultSettings();
+      settings.api_keys.kimi = 'kimi-test-key';
+
+      const available = getAvailableModels(settings);
+
+      // Kimi uses Anthropic-compatible model names
+      expect(available.kimi).toEqual([]);
     });
 
     it('should return multiple providers when multiple API keys configured', async () => {

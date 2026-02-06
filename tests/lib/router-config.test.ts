@@ -155,7 +155,7 @@ describe('router-config', () => {
       ]);
     });
 
-    it('should include Z.AI provider when API key configured', async () => {
+    it('should NOT include Z.AI provider (uses direct API, not router)', async () => {
       const { generateRouterConfig } = await import('../../src/lib/router-config.js');
 
       const settings: SettingsConfig = {
@@ -181,16 +181,12 @@ describe('router-config', () => {
 
       const config = generateRouterConfig(settings);
 
-      expect(config.providers).toHaveLength(2);
-
-      const zaiProvider = config.providers.find((p) => p.name === 'zai');
-      expect(zaiProvider).toBeDefined();
-      expect(zaiProvider?.baseURL).toBe('https://open.bigmodel.cn/api/paas/v4');
-      expect(zaiProvider?.apiKey).toBe('zai-test-key');
-      expect(zaiProvider?.models).toEqual(['glm-4.7', 'glm-4.7-flash']);
+      // Z.AI is intentionally excluded - it uses direct API, not the router
+      expect(config.providers).toHaveLength(1);
+      expect(config.providers[0].name).toBe('anthropic');
     });
 
-    it('should include all providers when all API keys configured', async () => {
+    it('should include all router-supported providers when all API keys configured', async () => {
       const { generateRouterConfig } = await import('../../src/lib/router-config.js');
 
       const settings: SettingsConfig = {
@@ -212,15 +208,17 @@ describe('router-config', () => {
         api_keys: {
           openai: 'sk-test-key',
           google: 'AIza-test-key',
-          zai: 'zai-test-key',
+          zai: 'zai-test-key', // Z.AI uses direct API, not router
         },
       };
 
       const config = generateRouterConfig(settings);
 
-      expect(config.providers).toHaveLength(4);
+      // 3 providers: anthropic (always) + openai + google
+      // Z.AI is intentionally excluded (uses direct API, not router)
+      expect(config.providers).toHaveLength(3);
       expect(config.providers.map((p) => p.name)).toEqual(
-        expect.arrayContaining(['anthropic', 'openai', 'google', 'zai'])
+        expect.arrayContaining(['anthropic', 'openai', 'google'])
       );
     });
 
