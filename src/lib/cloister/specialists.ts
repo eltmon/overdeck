@@ -58,11 +58,35 @@ export interface SpecialistStatus extends SpecialistMetadata {
 }
 
 /**
- * Registry of all specialist agents
+ * Per-project specialist metadata
+ */
+export interface ProjectSpecialistMetadata {
+  runCount: number;
+  lastRunAt: string | null;
+  lastRunStatus: 'passed' | 'failed' | 'blocked' | null;
+  currentRun: string | null; // Run ID if active
+  sessionId?: string; // Legacy session ID for transition period
+}
+
+/**
+ * Registry of all specialist agents (per-project structure)
  */
 export interface SpecialistRegistry {
   version: string;
-  specialists: SpecialistMetadata[];
+  // Global defaults for specialist configuration
+  defaults: {
+    contextRuns: number;
+    digestModel: string | null;
+    retention: { maxDays: number; maxRuns: number };
+  };
+  // Per-project specialist metadata
+  projects: {
+    [projectKey: string]: {
+      [specialistType: string]: ProjectSpecialistMetadata;
+    };
+  };
+  // Legacy: Global specialists list (for backward compatibility)
+  specialists?: SpecialistMetadata[];
   lastUpdated: string; // ISO 8601 timestamp
 }
 
@@ -108,11 +132,62 @@ export function initSpecialistsDirectory(): void {
   // Create default registry if it doesn't exist
   if (!existsSync(REGISTRY_FILE)) {
     const registry: SpecialistRegistry = {
-      version: '1.0',
+      version: '2.0', // Updated for per-project structure
+      defaults: {
+        contextRuns: 5,
+        digestModel: null,
+        retention: {
+          maxDays: 30,
+          maxRuns: 50,
+        },
+      },
+      projects: {},
+      // Keep legacy specialists for backward compatibility during transition
       specialists: DEFAULT_SPECIALISTS,
       lastUpdated: new Date().toISOString(),
     };
     saveRegistry(registry);
+  } else {
+    // Migrate old registry if needed
+    migrateRegistryIfNeeded();
+  }
+}
+
+/**
+ * Migrate old registry format to new per-project structure
+ */
+function migrateRegistryIfNeeded(): void {
+  try {
+    const content = readFileSync(REGISTRY_FILE, 'utf-8');
+    const registry = JSON.parse(content) as SpecialistRegistry;
+
+    // Check if already migrated
+    if (registry.version === '2.0' || registry.projects) {
+      return;
+    }
+
+    // Migrate to new structure
+    console.log('[specialists] Migrating registry to per-project structure...');
+
+    const migratedRegistry: SpecialistRegistry = {
+      version: '2.0',
+      defaults: {
+        contextRuns: 5,
+        digestModel: null,
+        retention: {
+          maxDays: 30,
+          maxRuns: 50,
+        },
+      },
+      projects: {},
+      specialists: registry.specialists, // Keep for backward compat
+      lastUpdated: new Date().toISOString(),
+    };
+
+    saveRegistry(migratedRegistry);
+    console.log('[specialists] Registry migration complete');
+  } catch (error) {
+    console.error('[specialists] Failed to migrate registry:', error);
   }
 }
 
@@ -307,9 +382,14 @@ export function getSpecialistState(name: SpecialistType): Exclude<SpecialistStat
  * Get tmux session name for a specialist
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key for per-project specialists
  * @returns Expected tmux session name
  */
-export function getTmuxSessionName(name: SpecialistType): string {
+export function getTmuxSessionName(name: SpecialistType, projectKey?: string): string {
+  if (projectKey) {
+    return `specialist-${projectKey}-${name}`;
+  }
+  // Legacy format for backward compatibility
   return `specialist-${name}`;
 }
 
@@ -329,6 +409,185 @@ export function recordWake(name: SpecialistType, sessionId?: string): void {
   }
 
   updateSpecialistMetadata(name, updates);
+}
+
+/**
+ * ===========================================================================
+ * Per-Project Specialist Functions
+ * ===========================================================================
+ */
+
+/**
+ * Get the directory for a project's specialist
+ */
+export function getProjectSpecialistDir(projectKey: string, specialistType: SpecialistType): string {
+  return join(SPECIALISTS_DIR, projectKey, specialistType);
+}
+
+/**
+ * Ensure per-project specialist directory structure exists
+ */
+export function ensureProjectSpecialistDir(projectKey: string, specialistType: SpecialistType): void {
+  const specialistDir = getProjectSpecialistDir(projectKey, specialistType);
+  const runsDir = join(specialistDir, 'runs');
+  const contextDir = join(specialistDir, 'context');
+
+  if (!existsSync(runsDir)) {
+    mkdirSync(runsDir, { recursive: true });
+  }
+  if (!existsSync(contextDir)) {
+    mkdirSync(contextDir, { recursive: true });
+  }
+}
+
+/**
+ * Get per-project specialist metadata
+ */
+export function getProjectSpecialistMetadata(
+  projectKey: string,
+  specialistType: SpecialistType
+): ProjectSpecialistMetadata {
+  const registry = loadRegistry();
+
+  if (!registry.projects[projectKey]) {
+    registry.projects[projectKey] = {};
+  }
+
+  if (!registry.projects[projectKey][specialistType]) {
+    // Initialize with defaults
+    registry.projects[projectKey][specialistType] = {
+      runCount: 0,
+      lastRunAt: null,
+      lastRunStatus: null,
+      currentRun: null,
+    };
+    saveRegistry(registry);
+  }
+
+  return registry.projects[projectKey][specialistType];
+}
+
+/**
+ * Update per-project specialist metadata
+ */
+export function updateProjectSpecialistMetadata(
+  projectKey: string,
+  specialistType: SpecialistType,
+  updates: Partial<ProjectSpecialistMetadata>
+): void {
+  const registry = loadRegistry();
+
+  if (!registry.projects[projectKey]) {
+    registry.projects[projectKey] = {};
+  }
+
+  if (!registry.projects[projectKey][specialistType]) {
+    registry.projects[projectKey][specialistType] = {
+      runCount: 0,
+      lastRunAt: null,
+      lastRunStatus: null,
+      currentRun: null,
+    };
+  }
+
+  registry.projects[projectKey][specialistType] = {
+    ...registry.projects[projectKey][specialistType],
+    ...updates,
+  };
+
+  saveRegistry(registry);
+}
+
+/**
+ * Increment run count for a project's specialist
+ */
+export function incrementProjectRunCount(projectKey: string, specialistType: SpecialistType): void {
+  const metadata = getProjectSpecialistMetadata(projectKey, specialistType);
+  updateProjectSpecialistMetadata(projectKey, specialistType, {
+    runCount: metadata.runCount + 1,
+    lastRunAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Set current run for a project's specialist
+ */
+export function setCurrentRun(
+  projectKey: string,
+  specialistType: SpecialistType,
+  runId: string | null
+): void {
+  updateProjectSpecialistMetadata(projectKey, specialistType, { currentRun: runId });
+}
+
+/**
+ * Update run status for a project's specialist
+ */
+export function updateRunStatus(
+  projectKey: string,
+  specialistType: SpecialistType,
+  status: 'passed' | 'failed' | 'blocked' | null
+): void {
+  updateProjectSpecialistMetadata(projectKey, specialistType, { lastRunStatus: status });
+}
+
+/**
+ * List all projects that have specialists configured
+ */
+export function listProjectsWithSpecialists(): string[] {
+  const registry = loadRegistry();
+  return Object.keys(registry.projects);
+}
+
+/**
+ * List all specialist types for a project
+ */
+export function listSpecialistsForProject(projectKey: string): SpecialistType[] {
+  const registry = loadRegistry();
+  const project = registry.projects[projectKey];
+
+  if (!project) {
+    return [];
+  }
+
+  return Object.keys(project) as SpecialistType[];
+}
+
+/**
+ * Get all per-project specialist statuses
+ */
+export async function getAllProjectSpecialistStatuses(): Promise<Array<{
+  projectKey: string;
+  specialistType: SpecialistType;
+  metadata: ProjectSpecialistMetadata;
+  isRunning: boolean;
+  tmuxSession: string;
+}>> {
+  const registry = loadRegistry();
+  const results: Array<{
+    projectKey: string;
+    specialistType: SpecialistType;
+    metadata: ProjectSpecialistMetadata;
+    isRunning: boolean;
+    tmuxSession: string;
+  }> = [];
+
+  for (const [projectKey, specialists] of Object.entries(registry.projects)) {
+    for (const [specialistType, metadata] of Object.entries(specialists)) {
+      const tmuxSession = getTmuxSessionName(specialistType as SpecialistType, projectKey);
+      const running = await isRunning(specialistType as SpecialistType, projectKey);
+
+      results.push({
+        projectKey,
+        specialistType: specialistType as SpecialistType,
+        metadata,
+        isRunning: running,
+        tmuxSession,
+      });
+    }
+  }
+
+  return results;
 }
 
 /**
@@ -464,10 +723,11 @@ export function countContextTokens(name: SpecialistType): number | null {
  * Check if a specialist is currently running in tmux
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key for per-project specialists
  * @returns True if specialist has an active tmux session
  */
-export async function isRunning(name: SpecialistType): Promise<boolean> {
-  const tmuxSession = getTmuxSessionName(name);
+export async function isRunning(name: SpecialistType, projectKey?: string): Promise<boolean> {
+  const tmuxSession = getTmuxSessionName(name, projectKey);
 
   try {
     await execAsync(`tmux has-session -t ${tmuxSession}`);
@@ -483,9 +743,13 @@ export async function isRunning(name: SpecialistType): Promise<boolean> {
  * Combines metadata, session info, and runtime state (PAN-80: uses hook-based state).
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key for per-project specialists
  * @returns Complete specialist status
  */
-export async function getSpecialistStatus(name: SpecialistType): Promise<SpecialistStatus> {
+export async function getSpecialistStatus(
+  name: SpecialistType,
+  projectKey?: string
+): Promise<SpecialistStatus> {
   const metadata = getSpecialistMetadata(name) || {
     name,
     displayName: name,
@@ -495,12 +759,12 @@ export async function getSpecialistStatus(name: SpecialistType): Promise<Special
   };
 
   const sessionId = getSessionId(name);
-  const running = await isRunning(name);
+  const running = await isRunning(name, projectKey);
   const contextTokens = countContextTokens(name);
 
   // Determine state from hook-based runtime state (PAN-80)
   const { getAgentRuntimeState } = await import('../agents.js');
-  const tmuxSession = getTmuxSessionName(name);
+  const tmuxSession = getTmuxSessionName(name, projectKey);
   const runtimeState = getAgentRuntimeState(tmuxSession);
 
   let state: SpecialistState;
@@ -538,7 +802,7 @@ export async function getSpecialistStatus(name: SpecialistType): Promise<Special
     contextTokens: contextTokens || undefined,
     state,
     isRunning: running,
-    tmuxSession: getTmuxSessionName(name),
+    tmuxSession: getTmuxSessionName(name, projectKey),
     currentIssue: runtimeState?.currentIssue,
   };
 }
