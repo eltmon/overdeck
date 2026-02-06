@@ -843,6 +843,34 @@ export async function terminateSpecialist(
   // Schedule digest generation (async, fire-and-forget)
   const { scheduleDigestGeneration } = await import('./specialist-context.js');
   scheduleDigestGeneration(projectKey, specialistType);
+
+  // Run log cleanup for this project/specialist (async, fire-and-forget)
+  scheduleLogCleanup(projectKey, specialistType);
+}
+
+/**
+ * Schedule log cleanup for a project's specialist (async, fire-and-forget)
+ *
+ * @param projectKey - Project identifier
+ * @param specialistType - Specialist type
+ */
+function scheduleLogCleanup(projectKey: string, specialistType: SpecialistType): void {
+  // Run async without awaiting
+  Promise.resolve().then(async () => {
+    try {
+      const { cleanupOldLogs } = await import('./specialist-logs.js');
+      const { getSpecialistRetention } = await import('../projects.js');
+
+      const retention = getSpecialistRetention(projectKey);
+      const deleted = cleanupOldLogs(projectKey, specialistType, retention);
+
+      if (deleted > 0) {
+        console.log(`[specialist] Cleaned up ${deleted} old logs for ${projectKey}/${specialistType}`);
+      }
+    } catch (error) {
+      console.error(`[specialist] Log cleanup failed for ${projectKey}/${specialistType}:`, error);
+    }
+  });
 }
 
 /**

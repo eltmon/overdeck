@@ -4138,6 +4138,46 @@ app.post('/api/specialists/:project/:type/complete', async (req, res) => {
   }
 });
 
+// Clean up old logs for a specific project/specialist
+app.post('/api/specialists/:project/:type/logs/cleanup', async (req, res) => {
+  const { project, type } = req.params;
+
+  try {
+    const { cleanupOldLogs } = await import('../../lib/cloister/specialist-logs.js');
+    const { getSpecialistRetention } = await import('../../lib/projects.js');
+
+    const retention = getSpecialistRetention(project);
+    const deleted = cleanupOldLogs(project, type, retention);
+
+    res.json({
+      success: true,
+      deleted,
+      message: `Cleaned up ${deleted} old logs`,
+    });
+  } catch (error: any) {
+    console.error('Error cleaning up logs:', error);
+    res.status(500).json({ error: 'Failed to clean up logs: ' + error.message });
+  }
+});
+
+// Clean up old logs for all projects and specialists
+app.post('/api/specialists/logs/cleanup-all', async (_req, res) => {
+  try {
+    const { cleanupAllLogs } = await import('../../lib/cloister/specialist-logs.js');
+    const results = cleanupAllLogs();
+
+    res.json({
+      success: true,
+      totalDeleted: results.totalDeleted,
+      byProject: results.byProject,
+      message: `Cleaned up ${results.totalDeleted} old logs`,
+    });
+  } catch (error: any) {
+    console.error('Error cleaning up all logs:', error);
+    res.status(500).json({ error: 'Failed to clean up logs: ' + error.message });
+  }
+});
+
 // ============================================================================
 // Convoy API Endpoints
 // ============================================================================

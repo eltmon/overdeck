@@ -475,3 +475,49 @@ export function checkLogSizeLimit(
 
   return null;
 }
+
+/**
+ * Clean up old logs for all projects and specialists
+ *
+ * Runs cleanup based on retention policies configured in projects.yaml.
+ * This should be called periodically (e.g., daily cron job).
+ *
+ * @returns Summary of cleanup results
+ */
+export function cleanupAllLogs(): {
+  totalDeleted: number;
+  byProject: Record<string, Record<string, number>>;
+} {
+  const { listProjectsWithSpecialists } = require('./specialists.js');
+  const { getSpecialistRetention } = require('../projects.js');
+
+  const results = {
+    totalDeleted: 0,
+    byProject: {} as Record<string, Record<string, number>>,
+  };
+
+  const projects = listProjectsWithSpecialists();
+
+  for (const projectKey of projects) {
+    results.byProject[projectKey] = {};
+
+    // Get retention policy for this project
+    const retention = getSpecialistRetention(projectKey);
+
+    // Clean up each specialist type
+    const specialistTypes = ['review-agent', 'test-agent', 'merge-agent'];
+
+    for (const specialistType of specialistTypes) {
+      const deleted = cleanupOldLogs(projectKey, specialistType, retention);
+
+      if (deleted > 0) {
+        results.byProject[projectKey][specialistType] = deleted;
+        results.totalDeleted += deleted;
+      }
+    }
+  }
+
+  console.log(`[specialist-logs] Cleanup complete: deleted ${results.totalDeleted} old logs`);
+
+  return results;
+}
