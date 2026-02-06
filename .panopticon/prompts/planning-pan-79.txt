@@ -1,0 +1,1 @@
+Please read the planning prompt file at /workspace/.planning/PLANNING_PROMPT.md and begin the planning session for PAN-79: Per-project specialist agents with ephemeral lifecycle and persistent logs
