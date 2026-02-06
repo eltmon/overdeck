@@ -3160,11 +3160,26 @@ app.post('/api/confirmations/:id/respond', async (req, res) => {
 // ============================================================================
 
 // Get all specialists with status
+// Returns both legacy global specialists and new per-project specialists
 app.get('/api/specialists', async (_req, res) => {
   try {
-    const { getAllSpecialistStatus } = await import('../../lib/cloister/specialists.js');
-    const specialists = await getAllSpecialistStatus();
-    res.json(specialists);
+    const {
+      getAllSpecialistStatus,
+      getAllProjectSpecialistStatuses
+    } = await import('../../lib/cloister/specialists.js');
+
+    // Get legacy global specialists
+    const legacySpecialists = await getAllSpecialistStatus();
+
+    // Get per-project specialists
+    const projectSpecialists = await getAllProjectSpecialistStatuses();
+
+    res.json({
+      // Legacy format (for backward compatibility)
+      specialists: legacySpecialists,
+      // New per-project format
+      projects: projectSpecialists,
+    });
   } catch (error: any) {
     console.error('Error getting specialists:', error);
     res.status(500).json({ error: 'Failed to get specialists: ' + error.message });
@@ -3823,6 +3838,304 @@ app.get('/api/activity/:id', (req, res) => {
     return res.status(404).json({ error: 'Activity not found' });
   }
   res.json(activity);
+});
+
+// ============================================================================
+// Per-Project Specialist API Endpoints (PAN-79)
+// ============================================================================
+
+// Get all per-project specialist statuses
+app.get('/api/specialists/projects', async (_req, res) => {
+  try {
+    const { getAllProjectSpecialistStatuses } = await import('../../lib/cloister/specialists.js');
+    const specialists = await getAllProjectSpecialistStatuses();
+    res.json(specialists);
+  } catch (error: any) {
+    console.error('Error getting project specialists:', error);
+    res.status(500).json({ error: 'Failed to get project specialists: ' + error.message });
+  }
+});
+
+// Spawn ephemeral specialist for a project
+app.post('/api/specialists/:project/:type/spawn', async (req, res) => {
+  const { project, type } = req.params;
+  const { issueId, branch, workspace, prUrl, context } = req.body;
+
+  if (!issueId) {
+    return res.status(400).json({ error: 'issueId is required' });
+  }
+
+  try {
+    const { spawnEphemeralSpecialist } = await import('../../lib/cloister/specialists.js');
+
+    const result = await spawnEphemeralSpecialist(
+      project,
+      type as any,
+      { issueId, branch, workspace, prUrl, context }
+    );
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json({ error: result.message });
+    }
+  } catch (error: any) {
+    console.error('Error spawning specialist:', error);
+    res.status(500).json({ error: 'Failed to spawn specialist: ' + error.message });
+  }
+});
+
+// Get run logs for a project's specialist
+app.get('/api/specialists/:project/:type/runs', async (req, res) => {
+  const { project, type } = req.params;
+  const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+  const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+
+  try {
+    const { listRunLogs } = await import('../../lib/cloister/specialist-logs.js');
+    const runs = listRunLogs(project, type, { limit, offset });
+    res.json(runs);
+  } catch (error: any) {
+    console.error('Error listing run logs:', error);
+    res.status(500).json({ error: 'Failed to list run logs: ' + error.message });
+  }
+});
+
+// Get a specific run log
+app.get('/api/specialists/:project/:type/runs/:runId', async (req, res) => {
+  const { project, type, runId } = req.params;
+
+  try {
+    const { getRunLog, parseLogMetadata } = await import('../../lib/cloister/specialist-logs.js');
+    const content = getRunLog(project, type, runId);
+
+    if (!content) {
+      return res.status(404).json({ error: 'Run log not found' });
+    }
+
+    const metadata = parseLogMetadata(content);
+    res.json({
+      runId,
+      content,
+      metadata,
+    });
+  } catch (error: any) {
+    console.error('Error getting run log:', error);
+    res.status(500).json({ error: 'Failed to get run log: ' + error.message });
+  }
+});
+
+// Stream run log in real-time (SSE)
+app.get('/api/specialists/:project/:type/runs/:runId/stream', async (req, res) => {
+  const { project, type, runId } = req.params;
+
+  try {
+    const {
+      getRunLogPath,
+      isRunLogActive,
+    } = await import('../../lib/cloister/specialist-logs.js');
+
+    const logPath = getRunLogPath(project, type, runId);
+
+    if (!existsSync(logPath)) {
+      return res.status(404).json({ error: 'Run log not found' });
+    }
+
+    // Set up SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    // Read existing content
+    let lastSize = 0;
+    const content = readFileSync(logPath, 'utf-8');
+    res.write(`data: ${JSON.stringify({ type: 'content', data: content })}\n\n`);
+    lastSize = content.length;
+
+    // Poll for updates if log is still active
+    const checkForUpdates = async () => {
+      if (!isRunLogActive(project, type, runId)) {
+        // Log completed, send final update and close
+        const finalContent = readFileSync(logPath, 'utf-8');
+        if (finalContent.length > lastSize) {
+          const newContent = finalContent.substring(lastSize);
+          res.write(`data: ${JSON.stringify({ type: 'append', data: newContent })}\n\n`);
+        }
+        res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
+        res.end();
+        return;
+      }
+
+      // Check for new content
+      try {
+        const currentContent = readFileSync(logPath, 'utf-8');
+        if (currentContent.length > lastSize) {
+          const newContent = currentContent.substring(lastSize);
+          res.write(`data: ${JSON.stringify({ type: 'append', data: newContent })}\n\n`);
+          lastSize = currentContent.length;
+        }
+      } catch (error) {
+        console.error('Error reading log file:', error);
+      }
+
+      // Continue polling
+      setTimeout(checkForUpdates, 1000);
+    };
+
+    // Start polling after initial send
+    setTimeout(checkForUpdates, 1000);
+
+    // Handle client disconnect
+    req.on('close', () => {
+      console.log(`[SSE] Client disconnected from ${project}/${type}/${runId}`);
+    });
+  } catch (error: any) {
+    console.error('Error streaming run log:', error);
+    res.status(500).json({ error: 'Failed to stream run log: ' + error.message });
+  }
+});
+
+// Terminate a specific run
+app.post('/api/specialists/:project/:type/runs/:runId/terminate', async (req, res) => {
+  const { project, type } = req.params;
+
+  try {
+    const { terminateSpecialist } = await import('../../lib/cloister/specialists.js');
+    await terminateSpecialist(project, type as any);
+    res.json({ success: true, message: 'Specialist terminated' });
+  } catch (error: any) {
+    console.error('Error terminating specialist:', error);
+    res.status(500).json({ error: 'Failed to terminate specialist: ' + error.message });
+  }
+});
+
+// Pause grace period
+app.post('/api/specialists/:project/:type/grace/pause', async (req, res) => {
+  const { project, type } = req.params;
+
+  try {
+    const { pauseGracePeriod } = await import('../../lib/cloister/specialists.js');
+    const success = pauseGracePeriod(project, type as any);
+
+    if (success) {
+      res.json({ success: true, message: 'Grace period paused' });
+    } else {
+      res.status(400).json({ error: 'No active grace period to pause' });
+    }
+  } catch (error: any) {
+    console.error('Error pausing grace period:', error);
+    res.status(500).json({ error: 'Failed to pause grace period: ' + error.message });
+  }
+});
+
+// Resume grace period
+app.post('/api/specialists/:project/:type/grace/resume', async (req, res) => {
+  const { project, type } = req.params;
+
+  try {
+    const { resumeGracePeriod } = await import('../../lib/cloister/specialists.js');
+    const success = resumeGracePeriod(project, type as any);
+
+    if (success) {
+      res.json({ success: true, message: 'Grace period resumed' });
+    } else {
+      res.status(400).json({ error: 'No paused grace period to resume' });
+    }
+  } catch (error: any) {
+    console.error('Error resuming grace period:', error);
+    res.status(500).json({ error: 'Failed to resume grace period: ' + error.message });
+  }
+});
+
+// Exit grace period immediately
+app.post('/api/specialists/:project/:type/grace/exit', async (req, res) => {
+  const { project, type } = req.params;
+
+  try {
+    const { exitGracePeriod } = await import('../../lib/cloister/specialists.js');
+    exitGracePeriod(project, type as any);
+    res.json({ success: true, message: 'Specialist terminated immediately' });
+  } catch (error: any) {
+    console.error('Error exiting grace period:', error);
+    res.status(500).json({ error: 'Failed to exit grace period: ' + error.message });
+  }
+});
+
+// Get grace period state
+app.get('/api/specialists/:project/:type/grace', async (req, res) => {
+  const { project, type } = req.params;
+
+  try {
+    const { getGracePeriodState } = await import('../../lib/cloister/specialists.js');
+    const state = getGracePeriodState(project, type as any);
+
+    if (state) {
+      res.json(state);
+    } else {
+      res.status(404).json({ error: 'No active grace period' });
+    }
+  } catch (error: any) {
+    console.error('Error getting grace period state:', error);
+    res.status(500).json({ error: 'Failed to get grace period state: ' + error.message });
+  }
+});
+
+// Get context digest for a project's specialist
+app.get('/api/specialists/:project/:type/context', async (req, res) => {
+  const { project, type } = req.params;
+
+  try {
+    const { loadContextDigest } = await import('../../lib/cloister/specialist-context.js');
+    const digest = loadContextDigest(project, type);
+
+    if (digest) {
+      res.json({ digest });
+    } else {
+      res.status(404).json({ error: 'No context digest found' });
+    }
+  } catch (error: any) {
+    console.error('Error getting context digest:', error);
+    res.status(500).json({ error: 'Failed to get context digest: ' + error.message });
+  }
+});
+
+// Regenerate context digest
+app.post('/api/specialists/:project/:type/context/regenerate', async (req, res) => {
+  const { project, type } = req.params;
+
+  try {
+    const { regenerateContextDigest } = await import('../../lib/cloister/specialist-context.js');
+    const digest = await regenerateContextDigest(project, type);
+
+    if (digest) {
+      res.json({ digest, message: 'Context digest regenerated' });
+    } else {
+      res.status(500).json({ error: 'Failed to generate context digest' });
+    }
+  } catch (error: any) {
+    console.error('Error regenerating context digest:', error);
+    res.status(500).json({ error: 'Failed to regenerate context digest: ' + error.message });
+  }
+});
+
+// Signal specialist completion (for specialists to call)
+app.post('/api/specialists/:project/:type/complete', async (req, res) => {
+  const { project, type } = req.params;
+  const { status, notes } = req.body;
+
+  if (!status || !['passed', 'failed', 'blocked'].includes(status)) {
+    return res.status(400).json({ error: 'Valid status (passed/failed/blocked) is required' });
+  }
+
+  try {
+    const { signalSpecialistCompletion } = await import('../../lib/cloister/specialists.js');
+    signalSpecialistCompletion(project, type as any, { status, notes });
+    res.json({ success: true, message: 'Specialist completion signaled, grace period started' });
+  } catch (error: any) {
+    console.error('Error signaling completion:', error);
+    res.status(500).json({ error: 'Failed to signal completion: ' + error.message });
+  }
 });
 
 // ============================================================================
