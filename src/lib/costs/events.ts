@@ -43,8 +43,14 @@ export interface ReadEventsOptions {
 
 // ============== Constants ==============
 
-const COSTS_DIR = join(homedir(), '.panopticon', 'costs');
-const EVENTS_FILE = join(COSTS_DIR, 'events.jsonl');
+// Use functions for paths to allow test mocking via process.env.HOME
+function getCostsDir(): string {
+  return join(process.env.HOME || homedir(), '.panopticon', 'costs');
+}
+
+function getEventsFile(): string {
+  return join(getCostsDir(), 'events.jsonl');
+}
 
 // ============== Initialization ==============
 
@@ -52,9 +58,11 @@ const EVENTS_FILE = join(COSTS_DIR, 'events.jsonl');
  * Ensure the costs directory and events file exist
  */
 function ensureEventsFile(): void {
-  mkdirSync(COSTS_DIR, { recursive: true });
-  if (!existsSync(EVENTS_FILE)) {
-    writeFileSync(EVENTS_FILE, '', 'utf-8');
+  const costsDir = getCostsDir();
+  const eventsFile = getEventsFile();
+  mkdirSync(costsDir, { recursive: true });
+  if (!existsSync(eventsFile)) {
+    writeFileSync(eventsFile, '', 'utf-8');
   }
 }
 
@@ -83,7 +91,7 @@ export function appendCostEvent(event: CostEvent): void {
 
   // Append to log atomically (single write operation, newline-terminated)
   const line = JSON.stringify(event) + '\n';
-  appendFileSync(EVENTS_FILE, line, 'utf-8');
+  appendFileSync(getEventsFile(), line, 'utf-8');
 }
 
 // ============== Event Reading ==============
@@ -92,11 +100,11 @@ export function appendCostEvent(event: CostEvent): void {
  * Read all events from the log with optional filters
  */
 export function readEvents(options: ReadEventsOptions = {}): CostEvent[] {
-  if (!existsSync(EVENTS_FILE)) {
+  if (!existsSync(getEventsFile())) {
     return [];
   }
 
-  const content = readFileSync(EVENTS_FILE, 'utf-8');
+  const content = readFileSync(getEventsFile(), 'utf-8');
   const lines = content.split('\n').filter(line => line.trim());
 
   let events: CostEvent[] = [];
@@ -148,11 +156,11 @@ export function readEvents(options: ReadEventsOptions = {}): CostEvent[] {
  * Get the last N events from the log
  */
 export function tailEvents(n: number): CostEvent[] {
-  if (!existsSync(EVENTS_FILE)) {
+  if (!existsSync(getEventsFile())) {
     return [];
   }
 
-  const content = readFileSync(EVENTS_FILE, 'utf-8');
+  const content = readFileSync(getEventsFile(), 'utf-8');
   const lines = content.split('\n').filter(line => line.trim());
 
   const lastLines = lines.slice(-n);
@@ -175,11 +183,11 @@ export function tailEvents(n: number): CostEvent[] {
  * Returns both events and the new line position to handle malformed lines correctly
  */
 export function readEventsFromLine(startLine: number): { events: CostEvent[]; newLine: number } {
-  if (!existsSync(EVENTS_FILE)) {
+  if (!existsSync(getEventsFile())) {
     return { events: [], newLine: startLine };
   }
 
-  const content = readFileSync(EVENTS_FILE, 'utf-8');
+  const content = readFileSync(getEventsFile(), 'utf-8');
   const lines = content.split('\n').filter(line => line.trim());
 
   const events: CostEvent[] = [];
@@ -200,7 +208,7 @@ export function readEventsFromLine(startLine: number): { events: CostEvent[]; ne
  * Get metadata about the event log
  */
 export function getLastEventMetadata(): EventMetadata {
-  if (!existsSync(EVENTS_FILE)) {
+  if (!existsSync(getEventsFile())) {
     return {
       lastEventTs: null,
       lastEventLine: 0,
@@ -208,7 +216,7 @@ export function getLastEventMetadata(): EventMetadata {
     };
   }
 
-  const content = readFileSync(EVENTS_FILE, 'utf-8');
+  const content = readFileSync(getEventsFile(), 'utf-8');
   const lines = content.split('\n').filter(line => line.trim());
 
   let lastEventTs: string | null = null;
@@ -237,7 +245,7 @@ export function replaceEventsFile(events: CostEvent[]): void {
   ensureEventsFile();
 
   // Write to temp file first
-  const tempFile = EVENTS_FILE + '.tmp';
+  const tempFile = getEventsFile() + '.tmp';
   const content = events.length > 0
     ? events.map(e => JSON.stringify(e)).join('\n') + '\n'
     : '';
@@ -245,19 +253,19 @@ export function replaceEventsFile(events: CostEvent[]): void {
 
   // Atomic rename
   const { renameSync } = require('fs');
-  renameSync(tempFile, EVENTS_FILE);
+  renameSync(tempFile, getEventsFile());
 }
 
 /**
  * Check if events file exists
  */
 export function eventsFileExists(): boolean {
-  return existsSync(EVENTS_FILE);
+  return existsSync(getEventsFile());
 }
 
 /**
  * Get the path to the events file
  */
 export function getEventsFilePath(): string {
-  return EVENTS_FILE;
+  return getEventsFile();
 }

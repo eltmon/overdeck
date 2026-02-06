@@ -33,12 +33,12 @@ describe('settings-api', () => {
     it('should convert NormalizedConfig to ApiSettingsConfig format', () => {
       const settings = loadSettingsApi();
 
-      expect(settings.models.preset).toBe('balanced');
+      // Note: preset was removed - we now use smart capability-based selection
       expect(settings.models.providers.anthropic).toBe(true);
       expect(settings.models.providers.openai).toBe(true);
       expect(settings.models.providers.google).toBe(false);
       expect(settings.models.providers.zai).toBe(false);
-      expect(settings.api_keys.openai).toBe('sk-test-123');
+      expect(settings.models.providers.kimi).toBe(false);
       expect(settings.models.gemini_thinking_level).toBe(3);
     });
 
@@ -51,12 +51,12 @@ describe('settings-api', () => {
   describe('validateSettingsApi', () => {
     const validSettings: ApiSettingsConfig = {
       models: {
-        preset: 'balanced',
         providers: {
           anthropic: true,
           openai: true,
           google: false,
           zai: false,
+          kimi: false,
         },
         overrides: {},
         gemini_thinking_level: 3,
@@ -66,29 +66,18 @@ describe('settings-api', () => {
       },
     };
 
-    it('should return null for valid settings', () => {
-      const error = validateSettingsApi(validSettings);
-      expect(error).toBeNull();
+    it('should return valid for valid settings', () => {
+      const result = validateSettingsApi(validSettings);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
     it('should reject missing models configuration', () => {
       const invalid = { ...validSettings, models: undefined } as any;
-      const error = validateSettingsApi(invalid);
+      const result = validateSettingsApi(invalid);
 
-      expect(error).toBe('Missing models configuration');
-    });
-
-    it('should reject invalid preset', () => {
-      const invalid = {
-        ...validSettings,
-        models: {
-          ...validSettings.models,
-          preset: 'invalid' as any,
-        },
-      };
-      const error = validateSettingsApi(invalid);
-
-      expect(error).toContain('Invalid preset');
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing providers configuration');
     });
 
     it('should reject missing providers configuration', () => {
@@ -99,9 +88,10 @@ describe('settings-api', () => {
           providers: undefined as any,
         },
       };
-      const error = validateSettingsApi(invalid);
+      const result = validateSettingsApi(invalid);
 
-      expect(error).toBe('Missing providers configuration');
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Missing providers configuration');
     });
 
     it('should reject disabled anthropic provider', () => {
@@ -115,9 +105,10 @@ describe('settings-api', () => {
           },
         },
       };
-      const error = validateSettingsApi(invalid);
+      const result = validateSettingsApi(invalid);
 
-      expect(error).toBe('Anthropic provider must be enabled (required)');
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Anthropic provider must be enabled');
     });
 
     it('should reject invalid gemini thinking level', () => {
@@ -128,9 +119,10 @@ describe('settings-api', () => {
           gemini_thinking_level: 5,
         },
       };
-      const error = validateSettingsApi(invalid);
+      const result = validateSettingsApi(invalid);
 
-      expect(error).toContain('Gemini thinking level must be an integer between 1 and 4');
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Gemini thinking level must be between 1 and 4');
     });
 
     it('should accept valid gemini thinking levels (1-4)', () => {
@@ -142,77 +134,45 @@ describe('settings-api', () => {
             gemini_thinking_level: level,
           },
         };
-        const error = validateSettingsApi(settings);
-        expect(error).toBeNull();
+        const result = validateSettingsApi(settings);
+        expect(result.valid).toBe(true);
       }
     });
   });
 
   describe('getAvailableModelsApi', () => {
-    it('should return only enabled provider models', () => {
-      const settings: ApiSettingsConfig = {
-        models: {
-          preset: 'balanced',
-          providers: {
-            anthropic: true,
-            openai: true,
-            google: false,
-            zai: false,
-          },
-          overrides: {},
-        },
-        api_keys: {},
-      };
+    it('should return all providers with model objects', () => {
+      const models = getAvailableModelsApi();
 
-      const models = getAvailableModelsApi(settings);
-
+      // All providers should be defined as arrays
       expect(models.anthropic).toBeDefined();
       expect(models.openai).toBeDefined();
-      expect(models.google).toBeUndefined();
-      expect(models.zai).toBeUndefined();
+      expect(models.google).toBeDefined();
+      expect(models.zai).toBeDefined();
+      expect(models.kimi).toBeDefined();
+
+      // Each model should have id and name properties
+      if (models.anthropic.length > 0) {
+        expect(models.anthropic[0]).toHaveProperty('id');
+        expect(models.anthropic[0]).toHaveProperty('name');
+      }
     });
 
-    it('should include all anthropic models when enabled', () => {
-      const settings: ApiSettingsConfig = {
-        models: {
-          preset: 'balanced',
-          providers: {
-            anthropic: true,
-            openai: false,
-            google: false,
-            zai: false,
-          },
-          overrides: {},
-        },
-        api_keys: {},
-      };
+    it('should include all anthropic models', () => {
+      const models = getAvailableModelsApi();
 
-      const models = getAvailableModelsApi(settings);
-
-      expect(models.anthropic).toContain('claude-opus-4-5');
-      expect(models.anthropic).toContain('claude-sonnet-4-5');
-      expect(models.anthropic).toContain('claude-haiku-4-5');
+      const anthropicIds = models.anthropic.map(m => m.id);
+      expect(anthropicIds).toContain('claude-opus-4-5');
+      expect(anthropicIds).toContain('claude-sonnet-4-5');
+      expect(anthropicIds).toContain('claude-haiku-4-5');
     });
 
-    it('should include openai models when enabled', () => {
-      const settings: ApiSettingsConfig = {
-        models: {
-          preset: 'balanced',
-          providers: {
-            anthropic: true,
-            openai: true,
-            google: false,
-            zai: false,
-          },
-          overrides: {},
-        },
-        api_keys: {},
-      };
+    it('should include openai models as objects', () => {
+      const models = getAvailableModelsApi();
 
-      const models = getAvailableModelsApi(settings);
-
-      expect(models.openai).toContain('gpt-5.2-codex');
-      expect(models.openai).toContain('gpt-4o');
+      const openaiIds = models.openai.map(m => m.id);
+      expect(openaiIds).toContain('gpt-5.2-codex');
+      expect(openaiIds).toContain('gpt-4o');
     });
   });
 
@@ -221,12 +181,12 @@ describe('settings-api', () => {
       const { writeFileSync } = await import('fs');
       const settings: ApiSettingsConfig = {
         models: {
-          preset: 'premium',
           providers: {
             anthropic: true,
             openai: true,
             google: false,
             zai: false,
+            kimi: false,
           },
           overrides: {
             'issue-agent:planning': 'claude-opus-4-5',
@@ -247,7 +207,7 @@ describe('settings-api', () => {
       // Verify the YAML content contains expected fields
       const callArgs = vi.mocked(writeFileSync).mock.calls[0];
       const yamlContent = callArgs[1] as string;
-      expect(yamlContent).toContain('preset: premium');
+      // Note: preset was removed from the API
       expect(yamlContent).toContain('anthropic: true');
       expect(yamlContent).toContain('openai: true');
       expect(yamlContent).toContain('issue-agent:planning: claude-opus-4-5');

@@ -6,7 +6,7 @@ await build({
   platform: 'node',
   format: 'esm',
   outfile: '../../../dist/dashboard/server.js',
-  external: ['@homebridge/node-pty-prebuilt-multiarch', 'better-sqlite3'],
+  external: ['@homebridge/node-pty-prebuilt-multiarch', 'better-sqlite3', 'ssh2'],
   banner: {
     js: `import { createRequire } from 'module';
 const require = createRequire(import.meta.url);`

@@ -17,6 +17,12 @@ export interface ModelStats {
   tokens: number;
 }
 
+export interface StageStats {
+  cost: number;
+  tokens: number;
+  calls: number;
+}
+
 export interface IssueStats {
   totalCost: number;
   budget?: number;
@@ -27,6 +33,7 @@ export interface IssueStats {
   cacheWriteTokens: number;
   models: Record<string, ModelStats>;
   providers: Record<string, number>;
+  stages: Record<string, StageStats>;
   lastUpdated: string;
 }
 
@@ -41,10 +48,17 @@ export interface CostCache {
 
 // ============== Constants ==============
 
-const COSTS_DIR = join(homedir(), '.panopticon', 'costs');
-const CACHE_FILE = join(COSTS_DIR, 'by-issue.json');
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const DEFAULT_RETENTION_DAYS = 90;
+
+// Use functions for paths to allow test mocking via process.env.HOME
+function getCostsDir(): string {
+  return join(process.env.HOME || homedir(), '.panopticon', 'costs');
+}
+
+function getCacheFile(): string {
+  return join(getCostsDir(), 'by-issue.json');
+}
 
 // ============== Cache Loading ==============
 
@@ -52,12 +66,13 @@ const DEFAULT_RETENTION_DAYS = 90;
  * Load the cache from disk
  */
 export function loadCache(): CostCache {
-  if (!existsSync(CACHE_FILE)) {
+  const cacheFile = getCacheFile();
+  if (!existsSync(cacheFile)) {
     return createEmptyCache();
   }
 
   try {
-    const content = readFileSync(CACHE_FILE, 'utf-8');
+    const content = readFileSync(cacheFile, 'utf-8');
     const cache = JSON.parse(content) as CostCache;
 
     // Validate version
@@ -93,16 +108,18 @@ function createEmptyCache(): CostCache {
  * Save the cache to disk atomically
  */
 export function saveCache(cache: CostCache): void {
-  mkdirSync(COSTS_DIR, { recursive: true });
+  const costsDir = getCostsDir();
+  const cacheFile = getCacheFile();
+  mkdirSync(costsDir, { recursive: true });
 
   // Write to temp file first
-  const tempFile = CACHE_FILE + '.tmp';
+  const tempFile = cacheFile + '.tmp';
   const content = JSON.stringify(cache, null, 2);
   writeFileSync(tempFile, content, 'utf-8');
 
   // Atomic rename
   const { renameSync } = require('fs');
-  renameSync(tempFile, CACHE_FILE);
+  renameSync(tempFile, cacheFile);
 }
 
 // ============== Cache Updates ==============
@@ -156,6 +173,7 @@ function addEventToCache(cache: CostCache, event: CostEvent): void {
       cacheWriteTokens: 0,
       models: {},
       providers: {},
+      stages: {},
       lastUpdated: event.ts,
     };
   }
@@ -190,6 +208,20 @@ function addEventToCache(cache: CostCache, event: CostEvent): void {
   }
   issue.providers[event.provider] += event.cost;
 
+  // Update stage stats (using sessionType as stage)
+  const stage = event.sessionType || 'unknown';
+  if (!issue.stages[stage]) {
+    issue.stages[stage] = {
+      cost: 0,
+      tokens: 0,
+      calls: 0,
+    };
+  }
+  const stageStats = issue.stages[stage];
+  stageStats.cost += event.cost;
+  stageStats.calls += 1;
+  stageStats.tokens += event.input + event.output + event.cacheRead + event.cacheWrite;
+
   // Check budget warning
   if (issue.budget) {
     issue.budgetWarning = issue.totalCost >= issue.budget * 0.8;
@@ -199,6 +231,7 @@ function addEventToCache(cache: CostCache, event: CostEvent): void {
   issue.totalCost = Math.round(issue.totalCost * 1000000) / 1000000;
   modelStats.cost = Math.round(modelStats.cost * 1000000) / 1000000;
   issue.providers[event.provider] = Math.round(issue.providers[event.provider] * 1000000) / 1000000;
+  stageStats.cost = Math.round(stageStats.cost * 1000000) / 1000000;
 }
 
 /**
@@ -304,6 +337,7 @@ export function setIssueBudget(issueId: string, budget: number): void {
       cacheWriteTokens: 0,
       models: {},
       providers: {},
+      stages: {},
       lastUpdated: new Date().toISOString(),
     };
   }

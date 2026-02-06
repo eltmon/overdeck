@@ -4,7 +4,7 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -53,7 +53,34 @@ function createPlaceholders(
     PROJECT_NAME: basename(projectConfig.path),
     PROJECT_PATH: projectConfig.path,
     WORKSPACE_PATH: workspacePath,
+    HOME: homedir(),
   };
+}
+
+/**
+ * Sanitize docker-compose files to use platform-agnostic paths
+ * Replaces hardcoded /home/username paths with ${HOME}
+ */
+function sanitizeComposeFile(filePath: string): void {
+  if (!existsSync(filePath)) return;
+
+  let content = readFileSync(filePath, 'utf-8');
+  const originalContent = content;
+
+  // Pattern to match hardcoded home paths like /home/username or /Users/username
+  // Replace with ${HOME} which docker-compose expands
+  const homePatterns = [
+    /\/home\/[a-zA-Z0-9_-]+\//g,      // Linux: /home/username/
+    /\/Users\/[a-zA-Z0-9_-]+\//g,     // macOS: /Users/username/
+  ];
+
+  for (const pattern of homePatterns) {
+    content = content.replace(pattern, '${HOME}/');
+  }
+
+  if (content !== originalContent) {
+    writeFileSync(filePath, content, 'utf-8');
+  }
 }
 
 /**
@@ -360,7 +387,10 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     // Create worktrees for each repo
     for (const repo of workspaceConfig.repos) {
-      const repoPath = join(projectConfig.path, repo.path);
+      // Resolve symlinks to get the actual git repository path
+      // (e.g., myn/frontend -> ../frontend needs to resolve to actual path)
+      const rawRepoPath = join(projectConfig.path, repo.path);
+      const repoPath = existsSync(rawRepoPath) ? realpathSync(rawRepoPath) : rawRepoPath;
       const targetPath = join(workspacePath, repo.name);
       const branchPrefix = repo.branch_prefix || 'feature/';
       const branchName = `${branchPrefix}${featureName}`;
@@ -371,7 +401,8 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       if (worktreeResult.success) {
         result.steps.push(`Created worktree for ${repo.name}: ${branchName} (from ${defaultBranch})`);
       } else {
-        result.errors.push(worktreeResult.message);
+        result.errors.push(`${repo.name}: ${worktreeResult.message}`);
+        result.success = false; // Fail the entire workspace creation if any worktree fails
       }
     }
   } else {
@@ -383,6 +414,21 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       result.steps.push(`Created worktree: ${branchName} (from ${defaultBranch})`);
     } else {
       result.errors.push(worktreeResult.message);
+      result.success = false; // Fail the entire workspace creation if worktree fails
+    }
+  }
+
+  // Sanitize any docker-compose files in the workspace to use platform-agnostic paths
+  // This handles files inherited from worktrees that may have hardcoded home paths
+  const devcontainerDir = join(workspacePath, '.devcontainer');
+  if (existsSync(devcontainerDir)) {
+    const composeFiles = readdirSync(devcontainerDir)
+      .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
+    for (const composeFile of composeFiles) {
+      sanitizeComposeFile(join(devcontainerDir, composeFile));
+    }
+    if (composeFiles.length > 0) {
+      result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
     }
   }
 
@@ -468,6 +514,17 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
           copyFileSync(sourcePath, targetPath);
         }
       }
+    }
+
+    // Sanitize docker-compose files to use platform-agnostic paths
+    // This fixes hardcoded /home/username or /Users/username paths
+    const composeFiles = readdirSync(devcontainerDir)
+      .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
+    for (const composeFile of composeFiles) {
+      sanitizeComposeFile(join(devcontainerDir, composeFile));
+    }
+    if (composeFiles.length > 0) {
+      result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
     }
 
     // Create ./dev symlink at workspace root pointing to .devcontainer/dev

@@ -1,6 +1,7 @@
 # Panopticon-managed symlinks (not committed)
 beads
 beads-completion-check
+beads-panopticon-guide
 bug-fix
 code-review
 code-review-performance
@@ -10,6 +11,8 @@ feature-work
 incident-response
 knowledge-capture
 onboard-codebase
+opencode
+opus-plan
 pan-approve
 pan-code-review
 pan-config
@@ -27,6 +30,7 @@ pan-network
 pan-plan
 pan-projects
 pan-quickstart
+pan-reload
 pan-rescue
 pan-restart
 pan-setup
@@ -36,8 +40,10 @@ pan-stitch
 pan-subagent-creator
 pan-sync
 pan-tell
+pan-test-config
 pan-tracker
 pan-up
+pan-workspace-config
 refactor
 refactor-radar
 release
@@ -46,6 +52,6 @@ session-health
 skill-creator
 stitch-design-md
 stitch-react-components
+stitch-setup
 web-design-guidelines
 work-complete
-opencode

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
-import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'fs';
 import { join, basename } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
@@ -47,6 +47,30 @@ async function getBeadsVersion(): Promise<number> {
     }
   } catch {}
   return 0;
+}
+
+/**
+ * Convert HTTPS git URLs to SSH format for remote VM cloning
+ * Remote VMs use SSH keys for authentication, not HTTPS credentials
+ *
+ * Examples:
+ *   https://github.com/owner/repo.git → git@github.com:owner/repo.git
+ *   https://gitlab.com/owner/repo.git → git@gitlab.com:owner/repo.git
+ */
+function convertToSshUrl(httpsUrl: string): string {
+  // Match common HTTPS git URL patterns
+  const httpsPattern = /^https:\/\/([^/]+)\/(.+?)(?:\.git)?$/;
+  const match = httpsUrl.match(httpsPattern);
+
+  if (match) {
+    const [, host, path] = match;
+    // Ensure .git suffix
+    const repoPath = path.endsWith('.git') ? path : `${path}.git`;
+    return `git@${host}:${repoPath}`;
+  }
+
+  // Already SSH format or unrecognized - return as-is
+  return httpsUrl;
 }
 
 /**
@@ -815,10 +839,18 @@ async function createRemoteWorkspace(
     }
 
     // Inject SSH key for git access if available
-    const sshKeyPath = join(homedir(), '.panopticon', 'ssh', 'exe-dev-key');
-    if (existsSync(sshKeyPath)) {
+    // Check multiple locations: panopticon-specific key first, then standard SSH keys
+    const sshKeyPaths = [
+      join(homedir(), '.panopticon', 'ssh', 'exe-dev-key'),
+      join(homedir(), '.ssh', 'id_ed25519'),
+      join(homedir(), '.ssh', 'id_rsa'),
+    ];
+    const sshKeyPath = sshKeyPaths.find((p) => existsSync(p));
+    if (sshKeyPath) {
       const sshKeyBase64 = Buffer.from(readFileSync(sshKeyPath, 'utf-8')).toString('base64');
-      await exe.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519`);
+      // Determine key type from filename for remote VM
+      const keyFilename = sshKeyPath.includes('id_rsa') ? 'id_rsa' : 'id_ed25519';
+      await exe.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/${keyFilename} && chmod 600 ~/.ssh/${keyFilename}`);
     }
 
     // Sync git CLI auth for the detected host
@@ -831,17 +863,68 @@ async function createRemoteWorkspace(
       await exe.syncGitLabAuth(vmName);
     }
 
-    const cloneResult = await exe.ssh(vmName, `git clone ${repoUrl} ~/workspace`);
-    if (cloneResult.exitCode !== 0) {
-      throw new Error(`Failed to clone: ${cloneResult.stderr}`);
-    }
+    // Check if this is a polyrepo project
+    const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo' && projectConfig.workspace.repos;
 
-    // Step 4: Create feature branch
-    spinner.text = 'Creating feature branch...';
-    const branchResult = await exe.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
-    if (branchResult.exitCode !== 0) {
-      // Branch might already exist remotely
-      await exe.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+    if (isPolyrepo) {
+      // Polyrepo: Clone each repo separately
+      spinner.text = 'Cloning repositories (polyrepo)...';
+      await exe.ssh(vmName, 'mkdir -p ~/workspace');
+
+      for (const repo of projectConfig!.workspace!.repos!) {
+        spinner.text = `Cloning ${repo.name}...`;
+
+        // Resolve symlink to get actual repo path
+        const rawRepoPath = join(projectRoot, repo.path);
+        const actualRepoPath = existsSync(rawRepoPath) ? realpathSync(rawRepoPath) : rawRepoPath;
+
+        // Get git remote URL for this repo
+        let repoRemoteUrl: string;
+        try {
+          const { stdout } = await execAsync('git remote get-url origin', {
+            cwd: actualRepoPath,
+            encoding: 'utf-8',
+          });
+          repoRemoteUrl = convertToSshUrl(stdout.trim());
+        } catch (err) {
+          throw new Error(`Failed to get remote URL for ${repo.name} at ${actualRepoPath}: ${err}`);
+        }
+
+        // Clone this repo on the remote VM
+        const cloneResult = await exe.ssh(vmName, `git clone ${repoRemoteUrl} ~/workspace/${repo.name}`);
+        if (cloneResult.exitCode !== 0) {
+          throw new Error(`Failed to clone ${repo.name}: ${cloneResult.stderr}`);
+        }
+
+        // Create feature branch for this repo
+        const repoBranchPrefix = repo.branch_prefix || 'feature/';
+        const repoBranchName = `${repoBranchPrefix}${normalizedId}`;
+        const branchResult = await exe.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout -b ${repoBranchName}`);
+        if (branchResult.exitCode !== 0) {
+          // Branch might already exist remotely
+          await exe.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout ${repoBranchName} || git checkout -b ${repoBranchName}`);
+        }
+      }
+
+      spinner.text = 'Setting up workspace structure...';
+    } else {
+      // Single repo: use existing logic
+      // Convert HTTPS URLs to SSH format for remote VM cloning
+      // Remote VMs use SSH keys, not interactive HTTPS credentials
+      const sshRepoUrl = convertToSshUrl(repoUrl);
+
+      const cloneResult = await exe.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`);
+      if (cloneResult.exitCode !== 0) {
+        throw new Error(`Failed to clone: ${cloneResult.stderr}`);
+      }
+
+      // Step 4: Create feature branch
+      spinner.text = 'Creating feature branch...';
+      const branchResult = await exe.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
+      if (branchResult.exitCode !== 0) {
+        // Branch might already exist remotely
+        await exe.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+      }
     }
 
     // Step 4.5: Create /workspace symlink for consistent paths

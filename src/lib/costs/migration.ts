@@ -40,10 +40,15 @@ interface AgentContext {
   workspace: string;
 }
 
-// ============== Constants ==============
+// ============== Path Helpers ==============
+// Use functions for paths to allow test mocking via process.env.HOME
+function getAgentsDir(): string {
+  return join(process.env.HOME || homedir(), '.panopticon', 'agents');
+}
 
-const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
-const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
+function getClaudeProjectsDir(): string {
+  return join(process.env.HOME || homedir(), '.claude', 'projects');
+}
 
 // ============== Session Parsing ==============
 
@@ -151,7 +156,7 @@ function getSessionDir(workspacePath: string): string | null {
   // Claude Code session directory name format: path with leading / removed and / replaced by -
   // e.g., /home/user/projects/foo -> -home-user-projects-foo
   const sessionDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
-  const sessionDir = join(CLAUDE_PROJECTS_DIR, sessionDirName);
+  const sessionDir = join(getClaudeProjectsDir(), sessionDirName);
 
   if (existsSync(sessionDir)) {
     return sessionDir;
@@ -164,7 +169,7 @@ function getSessionDir(workspacePath: string): string | null {
  * Migrate a single agent's session data
  */
 function migrateAgent(agentDir: string, stats: MigrationStats): void {
-  const stateFile = join(AGENTS_DIR, agentDir, 'state.json');
+  const stateFile = join(getAgentsDir(), agentDir, 'state.json');
 
   if (!existsSync(stateFile)) {
     stats.warnings.push({
@@ -310,14 +315,16 @@ export function migrateAllSessions(): MigrationStats {
 
   console.log('Starting migration of historical session data...');
 
+  const agentsDir = getAgentsDir();
+
   // Check if agents directory exists
-  if (!existsSync(AGENTS_DIR)) {
+  if (!existsSync(agentsDir)) {
     console.log('No agents directory found - nothing to migrate');
     return stats;
   }
 
   // Get all agent directories
-  const agentDirs = readdirSync(AGENTS_DIR).filter(
+  const agentDirs = readdirSync(agentsDir).filter(
     name => name.startsWith('agent-') || name.startsWith('planning-')
   );
 

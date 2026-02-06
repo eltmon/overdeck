@@ -42,7 +42,7 @@ describe('Aggregator Cache Management', () => {
     it('should create empty cache if none exists', () => {
       const cache = loadCache();
 
-      expect(cache.version).toBe(2);
+      expect(cache.version).toBe(3);
       expect(cache.status).toBe('live');
       expect(cache.issues).toEqual({});
       expect(cache.lastEventLine).toBe(0);
@@ -65,6 +65,9 @@ describe('Aggregator Cache Management', () => {
           openai: 0,
           google: 0
         },
+        stages: {
+          implementation: { cost: 10.5, calls: 5, tokens: 16500 }
+        },
         lastUpdated: new Date().toISOString()
       };
 
@@ -85,7 +88,7 @@ describe('Aggregator Cache Management', () => {
       const cache = loadCache();
 
       // Should create new cache with correct version
-      expect(cache.version).toBe(2);
+      expect(cache.version).toBe(3);
       expect(cache.issues).toEqual({});
     });
   });
