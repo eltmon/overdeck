@@ -95,7 +95,9 @@ describe('model-fallback', () => {
       const models = getModelsByProvider('google');
       expect(models).toContain('gemini-3-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
-      expect(models).toHaveLength(2);
+      expect(models).toContain('gemini-2.5-pro');
+      expect(models).toContain('gemini-2.5-flash');
+      expect(models).toHaveLength(4);
     });
 
     it('should return all Z.AI models', () => {
@@ -336,10 +338,10 @@ describe('model-fallback', () => {
     });
 
     it('should return all models when all providers enabled', () => {
-      const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai']);
+      const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(11); // 3 Anthropic + 4 OpenAI + 2 Google + 2 Z.AI
+      expect(models.length).toBe(15); // 3 Anthropic + 4 OpenAI + 4 Google + 2 Z.AI + 2 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -357,7 +359,9 @@ describe('model-fallback', () => {
 
       expect(models).toContain('gemini-3-pro-preview');
       expect(models).toContain('gemini-3-flash-preview');
-      expect(models.length).toBe(5); // 3 Anthropic + 2 Google
+      expect(models).toContain('gemini-2.5-pro');
+      expect(models).toContain('gemini-2.5-flash');
+      expect(models.length).toBe(7); // 3 Anthropic + 4 Google
     });
   });
 

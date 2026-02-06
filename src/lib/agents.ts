@@ -400,7 +400,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   let providerEnv: Record<string, string> = {};
   if (provider.name !== 'anthropic') {
     // Get API key for this provider
-    const apiKey = settings.api_keys[provider.name as keyof typeof settings.api_keys];
+    const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
     if (apiKey) {
       providerEnv = getProviderEnv(provider, apiKey);
     } else {
