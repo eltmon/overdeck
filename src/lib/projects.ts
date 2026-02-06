@@ -49,6 +49,29 @@ export interface TestConfig {
 }
 
 /**
+ * Specialist configuration for per-project specialists
+ */
+export interface SpecialistConfig {
+  /** Number of recent runs to include in context digest (default: 5) */
+  context_runs?: number;
+  /** Model to use for generating context digests (null = same as specialist) */
+  digest_model?: string | null;
+  /** Log retention policy */
+  retention?: {
+    /** Maximum days to keep logs */
+    max_days: number;
+    /** Maximum number of runs to keep (whichever is more permissive) */
+    max_runs: number;
+  };
+  /** Per-specialist prompt overrides */
+  prompts?: {
+    'review-agent'?: string;
+    'test-agent'?: string;
+    'merge-agent'?: string;
+  };
+}
+
+/**
  * Project configuration
  */
 export interface ProjectConfig {
@@ -64,6 +87,8 @@ export interface ProjectConfig {
   workspace_command?: string;
   /** Custom command to remove workspaces */
   workspace_remove_command?: string;
+  /** Specialist agent configuration */
+  specialists?: SpecialistConfig;
 }
 
 /**
@@ -296,6 +321,17 @@ projects:
   #     # Default: main repo
   #     - default: true
   #       path: /home/user/projects/myn
+  #   specialists:
+  #     context_runs: 5
+  #     digest_model: null  # Use same model as specialist
+  #     retention:
+  #       max_days: 30
+  #       max_runs: 50
+  #     prompts:
+  #       review-agent: |
+  #         Pay special attention to:
+  #         - Database migration safety
+  #         - API backward compatibility
 
   # Example: Panopticon itself
   # panopticon:
@@ -311,4 +347,67 @@ projects:
 
   writeFileSync(PROJECTS_CONFIG_FILE, exampleYaml, 'utf-8');
   console.log(`Created example projects config at ${PROJECTS_CONFIG_FILE}`);
+}
+
+/**
+ * Default specialist configuration values
+ */
+const DEFAULT_SPECIALIST_CONFIG: Required<SpecialistConfig> = {
+  context_runs: 5,
+  digest_model: null,
+  retention: {
+    max_days: 30,
+    max_runs: 50,
+  },
+  prompts: {},
+};
+
+/**
+ * Get specialist configuration for a project with defaults
+ *
+ * @param projectKey - Project key
+ * @returns Specialist config with defaults applied
+ */
+export function getSpecialistConfig(projectKey: string): Required<SpecialistConfig> {
+  const project = getProject(projectKey);
+
+  if (!project || !project.specialists) {
+    return DEFAULT_SPECIALIST_CONFIG;
+  }
+
+  return {
+    context_runs: project.specialists.context_runs ?? DEFAULT_SPECIALIST_CONFIG.context_runs,
+    digest_model: project.specialists.digest_model ?? DEFAULT_SPECIALIST_CONFIG.digest_model,
+    retention: {
+      max_days: project.specialists.retention?.max_days ?? DEFAULT_SPECIALIST_CONFIG.retention.max_days,
+      max_runs: project.specialists.retention?.max_runs ?? DEFAULT_SPECIALIST_CONFIG.retention.max_runs,
+    },
+    prompts: project.specialists.prompts ?? DEFAULT_SPECIALIST_CONFIG.prompts,
+  };
+}
+
+/**
+ * Get retention policy for a project's specialists
+ *
+ * @param projectKey - Project key
+ * @returns Retention policy
+ */
+export function getSpecialistRetention(projectKey: string): { max_days: number; max_runs: number } {
+  const config = getSpecialistConfig(projectKey);
+  return config.retention;
+}
+
+/**
+ * Get custom prompt override for a specialist (if configured)
+ *
+ * @param projectKey - Project key
+ * @param specialistType - Specialist type
+ * @returns Custom prompt or null if not configured
+ */
+export function getSpecialistPromptOverride(
+  projectKey: string,
+  specialistType: 'review-agent' | 'test-agent' | 'merge-agent'
+): string | null {
+  const config = getSpecialistConfig(projectKey);
+  return config.prompts[specialistType] || null;
 }
