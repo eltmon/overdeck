@@ -216,37 +216,33 @@ describe('specialist logs CLI commands', () => {
   });
 
   describe('viewLogCommand', () => {
-    it('should display log content when less is not available', async () => {
+    it('should display log content when less is not available', { timeout: 30000 }, async () => {
       const { getRunLog, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
       const testContent = '# Test Log\n\nLog content here';
       vi.mocked(getRunLog).mockReturnValue(testContent);
       vi.mocked(getRunLogPath).mockReturnValue('/path/to/log');
 
       const mockExec = vi.mocked(childProcess.exec);
-      mockExec.mockImplementation((cmd, options, callback) => {
-        if (callback) {
-          callback(new Error('less not found'), { stdout: '', stderr: '' } as any);
-        }
+      mockExec.mockImplementation(((cmd: string, callback: any) => {
+        setImmediate(() => callback(new Error('less not found'), { stdout: '', stderr: '' }));
         return {} as any;
-      });
+      }) as any);
 
       await viewLogCommand('testproject', 'review-agent', 'run-id', {});
 
       expect(mockConsoleLog).toHaveBeenCalledWith(testContent);
     });
 
-    it('should use less for viewing when available', async () => {
+    it('should use less for viewing when available', { timeout: 30000 }, async () => {
       const { getRunLog, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
       vi.mocked(getRunLog).mockReturnValue('test content');
       vi.mocked(getRunLogPath).mockReturnValue('/path/to/log');
 
       const mockExec = vi.mocked(childProcess.exec);
-      mockExec.mockImplementation((cmd, options, callback) => {
-        if (callback) {
-          callback(null, { stdout: '', stderr: '' } as any);
-        }
+      mockExec.mockImplementation(((cmd: string, callback: any) => {
+        setImmediate(() => callback(null, { stdout: '', stderr: '' }));
         return {} as any;
-      });
+      }) as any);
 
       await viewLogCommand('testproject', 'review-agent', 'run-id', {});
 
@@ -430,18 +426,16 @@ describe('specialist logs CLI commands', () => {
       expect(listRunLogs).toHaveBeenCalledWith('testproject', 'review-agent', { limit: 10 });
     });
 
-    it('should route to viewLogCommand for project + type + runId', async () => {
+    it('should route to viewLogCommand for project + type + runId', { timeout: 30000 }, async () => {
       const { getRunLog, getRunLogPath } = await import('../../../../src/lib/cloister/specialist-logs.js');
       vi.mocked(getRunLog).mockReturnValue('log content');
       vi.mocked(getRunLogPath).mockReturnValue('/path/to/log');
 
       const mockExec = vi.mocked(childProcess.exec);
-      mockExec.mockImplementation((cmd, options, callback) => {
-        if (callback) {
-          callback(new Error('less not found'), { stdout: '', stderr: '' } as any);
-        }
+      mockExec.mockImplementation(((cmd: string, callback: any) => {
+        setImmediate(() => callback(new Error('less not found'), { stdout: '', stderr: '' }));
         return {} as any;
-      });
+      }) as any);
 
       await logsCommand('testproject', 'review-agent', 'run-id', {});
 

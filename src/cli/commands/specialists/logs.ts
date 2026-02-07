@@ -124,14 +124,11 @@ export async function viewLogCommand(
  */
 export async function tailLogCommand(project: string, type: string): Promise<void> {
   try {
-    const {
-      getProjectSpecialistMetadata,
-      getRunLogPath,
-    } = await import('../../../lib/cloister/specialist-logs.js');
+    const { getRunLogPath } = await import('../../../lib/cloister/specialist-logs.js');
 
     // Get current run ID
-    const { getProjectSpecialistMetadata: getMetadata } = await import('../../../lib/cloister/specialists.js');
-    const metadata = getMetadata(project, type as any);
+    const { getProjectSpecialistMetadata } = await import('../../../lib/cloister/specialists.js');
+    const metadata = getProjectSpecialistMetadata(project, type as any);
 
     if (!metadata.currentRun) {
       console.error(`❌ No active run for ${project}/${type}`);
