@@ -7,7 +7,6 @@ import {
   getModel,
   getModelId,
   hasOverride,
-  getPresetName,
   getDebugInfo,
 } from '../../src/lib/work-type-router.js';
 import { NormalizedConfig } from '../../src/lib/config-yaml.js';
@@ -24,7 +23,6 @@ describe('work-type-router', () => {
     describe('constructor', () => {
       it('should accept custom config', () => {
         const config: NormalizedConfig = {
-          preset: 'premium',
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {},
@@ -32,20 +30,18 @@ describe('work-type-router', () => {
         };
 
         const router = new WorkTypeRouter(config);
-        expect(router.getPreset()).toBe('premium');
+        expect(router.getEnabledProviders()).toContain('anthropic');
       });
 
       it('should load default config when not provided', () => {
         const router = new WorkTypeRouter();
-        expect(router.getPreset()).toBeTruthy();
         expect(router.getEnabledProviders()).toContain('anthropic');
       });
     });
 
     describe('getModel', () => {
-      it('should resolve model from preset', () => {
+      it('should resolve model using smart selection', () => {
         const config: NormalizedConfig = {
-          preset: 'premium',
           enabledProviders: new Set<ModelProvider>(['anthropic', 'openai']),
           apiKeys: { openai: 'test' },
           overrides: {},
@@ -55,20 +51,18 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const result = router.getModel('issue-agent:planning');
 
-        expect(result.model).toBe('claude-opus-4-5');
+        expect(result.model).toBeTruthy();
         expect(result.workType).toBe('issue-agent:planning');
-        expect(result.source).toBe('preset');
-        expect(result.preset).toBe('premium');
+        expect(result.source).toBe('smart');
         expect(result.usedFallback).toBe(false);
       });
 
       it('should use override when configured', () => {
         const config: NormalizedConfig = {
-          preset: 'budget',
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5',
+            'issue-agent:planning': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -76,33 +70,33 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const result = router.getModel('issue-agent:planning');
 
-        expect(result.model).toBe('claude-opus-4-5');
+        expect(result.model).toBe('claude-opus-4-6');
         expect(result.source).toBe('override');
         expect(result.usedFallback).toBe(false);
       });
 
       it('should apply fallback when provider disabled', () => {
         const config: NormalizedConfig = {
-          preset: 'premium',
           enabledProviders: new Set<ModelProvider>(['anthropic']), // OpenAI disabled
           apiKeys: {},
-          overrides: {},
+          overrides: {
+            'issue-agent:implementation': 'gpt-4o', // Override with disabled provider
+          },
           geminiThinkingLevel: 3,
         };
 
         const router = new WorkTypeRouter(config);
         const result = router.getModel('issue-agent:implementation');
 
-        // Premium preset uses gpt-5.2-codex, should fallback to Sonnet
-        expect(result.model).toBe('claude-sonnet-4-5');
-        expect(result.source).toBe('preset');
+        // Should fallback to an enabled provider
+        expect(result.model).toMatch(/^claude-/);
+        expect(result.source).toBe('override');
         expect(result.usedFallback).toBe(true);
-        expect(result.originalModel).toBe('gpt-5.2-codex');
+        expect(result.originalModel).toBe('gpt-4o');
       });
 
       it('should apply fallback to overrides', () => {
         const config: NormalizedConfig = {
-          preset: 'budget',
           enabledProviders: new Set<ModelProvider>(['anthropic']), // OpenAI disabled
           apiKeys: {},
           overrides: {
@@ -114,7 +108,7 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const result = router.getModel('issue-agent:testing');
 
-        expect(result.model).toBe('claude-sonnet-4-5'); // Fallback
+        expect(result.model).toMatch(/^claude-/); // Fallback to enabled provider
         expect(result.source).toBe('override');
         expect(result.usedFallback).toBe(true);
         expect(result.originalModel).toBe('gpt-4o');
@@ -127,7 +121,6 @@ describe('work-type-router', () => {
 
       it('should work for all valid work types', () => {
         const config: NormalizedConfig = {
-          preset: 'balanced',
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {},
@@ -156,7 +149,6 @@ describe('work-type-router', () => {
     describe('getModelId', () => {
       it('should return just the model ID', () => {
         const config: NormalizedConfig = {
-          preset: 'premium',
           enabledProviders: new Set<ModelProvider>(['anthropic', 'openai']),
           apiKeys: { openai: 'test' },
           overrides: {},
@@ -166,19 +158,18 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const modelId = router.getModelId('issue-agent:planning');
 
-        expect(modelId).toBe('claude-opus-4-5');
         expect(typeof modelId).toBe('string');
+        expect(modelId).toBeTruthy();
       });
     });
 
     describe('hasOverride', () => {
       it('should return true when override exists', () => {
         const config: NormalizedConfig = {
-          preset: 'budget',
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5',
+            'issue-agent:planning': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -189,7 +180,6 @@ describe('work-type-router', () => {
 
       it('should return false when no override exists', () => {
         const config: NormalizedConfig = {
-          preset: 'budget',
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {},
@@ -201,25 +191,9 @@ describe('work-type-router', () => {
       });
     });
 
-    describe('getPreset', () => {
-      it('should return configured preset', () => {
-        const config: NormalizedConfig = {
-          preset: 'premium',
-          enabledProviders: new Set<ModelProvider>(['anthropic']),
-          apiKeys: {},
-          overrides: {},
-          geminiThinkingLevel: 3,
-        };
-
-        const router = new WorkTypeRouter(config);
-        expect(router.getPreset()).toBe('premium');
-      });
-    });
-
     describe('getEnabledProviders', () => {
       it('should return set of enabled providers', () => {
         const config: NormalizedConfig = {
-          preset: 'balanced',
           enabledProviders: new Set<ModelProvider>(['anthropic', 'openai', 'google']),
           apiKeys: { openai: 'test', google: 'test' },
           overrides: {},
@@ -239,12 +213,11 @@ describe('work-type-router', () => {
     describe('getOverrides', () => {
       it('should return all configured overrides', () => {
         const config: NormalizedConfig = {
-          preset: 'budget',
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5',
-            'convoy:security-reviewer': 'claude-opus-4-5',
+            'issue-agent:planning': 'claude-opus-4-6',
+            'convoy:security-reviewer': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -252,17 +225,16 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const overrides = router.getOverrides();
 
-        expect(overrides['issue-agent:planning']).toBe('claude-opus-4-5');
-        expect(overrides['convoy:security-reviewer']).toBe('claude-opus-4-5');
+        expect(overrides['issue-agent:planning']).toBe('claude-opus-4-6');
+        expect(overrides['convoy:security-reviewer']).toBe('claude-opus-4-6');
       });
 
       it('should return copy (not reference)', () => {
         const config: NormalizedConfig = {
-          preset: 'budget',
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5',
+            'issue-agent:planning': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -279,7 +251,6 @@ describe('work-type-router', () => {
     describe('getApiKeys', () => {
       it('should return configured API keys', () => {
         const config: NormalizedConfig = {
-          preset: 'balanced',
           enabledProviders: new Set<ModelProvider>(['anthropic', 'openai']),
           apiKeys: { openai: 'sk-test' },
           overrides: {},
@@ -296,7 +267,6 @@ describe('work-type-router', () => {
     describe('getGeminiThinkingLevel', () => {
       it('should return configured thinking level', () => {
         const config: NormalizedConfig = {
-          preset: 'balanced',
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {},
@@ -311,11 +281,10 @@ describe('work-type-router', () => {
     describe('getDebugInfo', () => {
       it('should return complete debug information', () => {
         const config: NormalizedConfig = {
-          preset: 'premium',
           enabledProviders: new Set<ModelProvider>(['anthropic', 'openai']),
           apiKeys: { openai: 'sk-test' },
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5',
+            'issue-agent:planning': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -323,12 +292,12 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const debug = router.getDebugInfo();
 
-        expect(debug.preset).toBe('premium');
         expect(debug.enabledProviders).toContain('anthropic');
         expect(debug.enabledProviders).toContain('openai');
         expect(debug.overrideCount).toBe(1);
         expect(debug.hasApiKeys.openai).toBe(true);
         expect(debug.hasApiKeys.google).toBe(false);
+        expect(debug.availableModelCount).toBeGreaterThan(0);
       });
     });
   });
@@ -386,30 +355,22 @@ describe('work-type-router', () => {
       });
     });
 
-    describe('getPresetName (global)', () => {
-      it('should use global router', () => {
-        const preset = getPresetName();
-        expect(['premium', 'balanced', 'budget']).toContain(preset);
-      });
-    });
-
     describe('getDebugInfo (global)', () => {
       it('should use global router', () => {
         const debug = getDebugInfo();
-        expect(debug.preset).toBeTruthy();
         expect(debug.enabledProviders).toBeDefined();
+        expect(debug.availableModelCount).toBeGreaterThan(0);
       });
     });
   });
 
   describe('resolution precedence', () => {
-    it('should prefer override over preset', () => {
+    it('should prefer override over smart selection', () => {
       const config: NormalizedConfig = {
-        preset: 'budget', // Would use Haiku
         enabledProviders: new Set<ModelProvider>(['anthropic']),
         apiKeys: {},
         overrides: {
-          'issue-agent:planning': 'claude-opus-4-5', // Override to Opus
+          'issue-agent:planning': 'claude-opus-4-6',
         },
         geminiThinkingLevel: 3,
       };
@@ -417,13 +378,12 @@ describe('work-type-router', () => {
       const router = new WorkTypeRouter(config);
       const result = router.getModel('issue-agent:planning');
 
-      expect(result.model).toBe('claude-opus-4-5');
+      expect(result.model).toBe('claude-opus-4-6');
       expect(result.source).toBe('override');
     });
 
-    it('should use preset when no override', () => {
+    it('should use smart selection when no override', () => {
       const config: NormalizedConfig = {
-        preset: 'premium',
         enabledProviders: new Set<ModelProvider>(['anthropic', 'openai']),
         apiKeys: { openai: 'test' },
         overrides: {},
@@ -433,17 +393,16 @@ describe('work-type-router', () => {
       const router = new WorkTypeRouter(config);
       const result = router.getModel('issue-agent:implementation');
 
-      expect(result.model).toBe('gpt-5.2-codex'); // From premium preset
-      expect(result.source).toBe('preset');
+      expect(result.model).toBeTruthy();
+      expect(result.source).toBe('smart');
     });
 
     it('should apply fallback after override resolution', () => {
       const config: NormalizedConfig = {
-        preset: 'budget',
         enabledProviders: new Set<ModelProvider>(['anthropic']), // No OpenAI
         apiKeys: {},
         overrides: {
-          'issue-agent:testing': 'gpt-5.2-codex', // Override requires OpenAI
+          'issue-agent:testing': 'gpt-4o', // Override requires OpenAI
         },
         geminiThinkingLevel: 3,
       };
@@ -453,34 +412,15 @@ describe('work-type-router', () => {
 
       // Override takes precedence, but then fallback is applied
       expect(result.source).toBe('override');
-      expect(result.model).toBe('claude-sonnet-4-5'); // Fallback
+      expect(result.model).toMatch(/^claude-/); // Fallback
       expect(result.usedFallback).toBe(true);
-      expect(result.originalModel).toBe('gpt-5.2-codex');
-    });
-
-    it('should apply fallback after preset resolution', () => {
-      const config: NormalizedConfig = {
-        preset: 'balanced', // Uses Gemini Pro for implementation
-        enabledProviders: new Set<ModelProvider>(['anthropic']), // No Google
-        apiKeys: {},
-        overrides: {},
-        geminiThinkingLevel: 3,
-      };
-
-      const router = new WorkTypeRouter(config);
-      const result = router.getModel('issue-agent:implementation');
-
-      expect(result.source).toBe('preset');
-      expect(result.model).toBe('claude-sonnet-4-5'); // Fallback
-      expect(result.usedFallback).toBe(true);
-      expect(result.originalModel).toBe('gemini-3-pro-preview');
+      expect(result.originalModel).toBe('gpt-4o');
     });
   });
 
   describe('multi-provider scenarios', () => {
     it('should work with all providers enabled', () => {
       const config: NormalizedConfig = {
-        preset: 'premium',
         enabledProviders: new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai']),
         apiKeys: {
           openai: 'sk-test',
@@ -493,19 +433,18 @@ describe('work-type-router', () => {
 
       const router = new WorkTypeRouter(config);
 
-      // Should use all providers without fallback
+      // Should select models from available providers
       const impl = router.getModel('issue-agent:implementation');
-      expect(impl.model).toBe('gpt-5.2-codex');
-      expect(impl.usedFallback).toBe(false);
+      expect(impl.model).toBeTruthy();
+      expect(impl.source).toBe('smart');
 
       const explore = router.getModel('issue-agent:exploration');
-      expect(explore.model).toBe('gemini-3-flash-preview');
-      expect(explore.usedFallback).toBe(false);
+      expect(explore.model).toBeTruthy();
+      expect(explore.source).toBe('smart');
     });
 
     it('should work with only Anthropic', () => {
       const config: NormalizedConfig = {
-        preset: 'balanced',
         enabledProviders: new Set<ModelProvider>(['anthropic']),
         apiKeys: {},
         overrides: {},
@@ -514,13 +453,13 @@ describe('work-type-router', () => {
 
       const router = new WorkTypeRouter(config);
 
-      // All should fallback to Anthropic models
+      // All should use Anthropic models
       const impl = router.getModel('issue-agent:implementation');
-      expect(impl.model).toBe('claude-sonnet-4-5'); // Fallback from Gemini Pro
-      expect(impl.usedFallback).toBe(true);
+      expect(impl.model).toMatch(/^claude-/);
+      expect(impl.source).toBe('smart');
 
       const explore = router.getModel('issue-agent:exploration');
-      expect(explore.model).toBe('claude-haiku-4-5'); // Fallback from Gemini Flash
+      expect(explore.model).toMatch(/^claude-/);
       expect(explore.usedFallback).toBe(true);
     });
 
