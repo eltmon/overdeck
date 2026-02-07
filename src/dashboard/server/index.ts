@@ -3844,15 +3844,23 @@ app.get('/api/activity/:id', (req, res) => {
 // Per-Project Specialist API Endpoints (PAN-79)
 // ============================================================================
 
+/**
+ * Validate and return specialist type
+ */
+function validateSpecialistType(type: string): type is 'review-agent' | 'test-agent' | 'merge-agent' {
+  return type === 'review-agent' || type === 'test-agent' || type === 'merge-agent';
+}
+
 // Get all per-project specialist statuses
 app.get('/api/specialists/projects', async (_req, res) => {
   try {
     const { getAllProjectSpecialistStatuses } = await import('../../lib/cloister/specialists.js');
     const specialists = await getAllProjectSpecialistStatuses();
     res.json(specialists);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error getting project specialists:', error);
-    res.status(500).json({ error: 'Failed to get project specialists: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to get project specialists: ' + message });
   }
 });
 
@@ -3865,12 +3873,16 @@ app.post('/api/specialists/:project/:type/spawn', async (req, res) => {
     return res.status(400).json({ error: 'issueId is required' });
   }
 
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
   try {
     const { spawnEphemeralSpecialist } = await import('../../lib/cloister/specialists.js');
 
     const result = await spawnEphemeralSpecialist(
       project,
-      type as any,
+      type,
       { issueId, branch, workspace, prUrl, context }
     );
 
@@ -3879,9 +3891,10 @@ app.post('/api/specialists/:project/:type/spawn', async (req, res) => {
     } else {
       res.status(500).json({ error: result.message });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error spawning specialist:', error);
-    res.status(500).json({ error: 'Failed to spawn specialist: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to spawn specialist: ' + message });
   }
 });
 
@@ -3895,9 +3908,10 @@ app.get('/api/specialists/:project/:type/runs', async (req, res) => {
     const { listRunLogs } = await import('../../lib/cloister/specialist-logs.js');
     const runs = listRunLogs(project, type, { limit, offset });
     res.json(runs);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error listing run logs:', error);
-    res.status(500).json({ error: 'Failed to list run logs: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to list run logs: ' + message });
   }
 });
 
@@ -3919,9 +3933,10 @@ app.get('/api/specialists/:project/:type/runs/:runId', async (req, res) => {
       content,
       metadata,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error getting run log:', error);
-    res.status(500).json({ error: 'Failed to get run log: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to get run log: ' + message });
   }
 });
 
@@ -3990,9 +4005,10 @@ app.get('/api/specialists/:project/:type/runs/:runId/stream', async (req, res) =
     req.on('close', () => {
       console.log(`[SSE] Client disconnected from ${project}/${type}/${runId}`);
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error streaming run log:', error);
-    res.status(500).json({ error: 'Failed to stream run log: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to stream run log: ' + message });
   }
 });
 
@@ -4000,13 +4016,18 @@ app.get('/api/specialists/:project/:type/runs/:runId/stream', async (req, res) =
 app.post('/api/specialists/:project/:type/runs/:runId/terminate', async (req, res) => {
   const { project, type } = req.params;
 
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
   try {
     const { terminateSpecialist } = await import('../../lib/cloister/specialists.js');
-    await terminateSpecialist(project, type as any);
+    await terminateSpecialist(project, type);
     res.json({ success: true, message: 'Specialist terminated' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error terminating specialist:', error);
-    res.status(500).json({ error: 'Failed to terminate specialist: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to terminate specialist: ' + message });
   }
 });
 
@@ -4014,18 +4035,23 @@ app.post('/api/specialists/:project/:type/runs/:runId/terminate', async (req, re
 app.post('/api/specialists/:project/:type/grace/pause', async (req, res) => {
   const { project, type } = req.params;
 
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
   try {
     const { pauseGracePeriod } = await import('../../lib/cloister/specialists.js');
-    const success = pauseGracePeriod(project, type as any);
+    const success = pauseGracePeriod(project, type);
 
     if (success) {
       res.json({ success: true, message: 'Grace period paused' });
     } else {
       res.status(400).json({ error: 'No active grace period to pause' });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error pausing grace period:', error);
-    res.status(500).json({ error: 'Failed to pause grace period: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to pause grace period: ' + message });
   }
 });
 
@@ -4033,18 +4059,23 @@ app.post('/api/specialists/:project/:type/grace/pause', async (req, res) => {
 app.post('/api/specialists/:project/:type/grace/resume', async (req, res) => {
   const { project, type } = req.params;
 
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
   try {
     const { resumeGracePeriod } = await import('../../lib/cloister/specialists.js');
-    const success = resumeGracePeriod(project, type as any);
+    const success = resumeGracePeriod(project, type);
 
     if (success) {
       res.json({ success: true, message: 'Grace period resumed' });
     } else {
       res.status(400).json({ error: 'No paused grace period to resume' });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error resuming grace period:', error);
-    res.status(500).json({ error: 'Failed to resume grace period: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to resume grace period: ' + message });
   }
 });
 
@@ -4052,13 +4083,18 @@ app.post('/api/specialists/:project/:type/grace/resume', async (req, res) => {
 app.post('/api/specialists/:project/:type/grace/exit', async (req, res) => {
   const { project, type } = req.params;
 
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
   try {
     const { exitGracePeriod } = await import('../../lib/cloister/specialists.js');
-    exitGracePeriod(project, type as any);
+    exitGracePeriod(project, type);
     res.json({ success: true, message: 'Specialist terminated immediately' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error exiting grace period:', error);
-    res.status(500).json({ error: 'Failed to exit grace period: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to exit grace period: ' + message });
   }
 });
 
@@ -4066,18 +4102,23 @@ app.post('/api/specialists/:project/:type/grace/exit', async (req, res) => {
 app.get('/api/specialists/:project/:type/grace', async (req, res) => {
   const { project, type } = req.params;
 
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
   try {
     const { getGracePeriodState } = await import('../../lib/cloister/specialists.js');
-    const state = getGracePeriodState(project, type as any);
+    const state = getGracePeriodState(project, type);
 
     if (state) {
       res.json(state);
     } else {
       res.status(404).json({ error: 'No active grace period' });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error getting grace period state:', error);
-    res.status(500).json({ error: 'Failed to get grace period state: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to get grace period state: ' + message });
   }
 });
 
@@ -4094,9 +4135,10 @@ app.get('/api/specialists/:project/:type/context', async (req, res) => {
     } else {
       res.status(404).json({ error: 'No context digest found' });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error getting context digest:', error);
-    res.status(500).json({ error: 'Failed to get context digest: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to get context digest: ' + message });
   }
 });
 
@@ -4113,9 +4155,10 @@ app.post('/api/specialists/:project/:type/context/regenerate', async (req, res) 
     } else {
       res.status(500).json({ error: 'Failed to generate context digest' });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error regenerating context digest:', error);
-    res.status(500).json({ error: 'Failed to regenerate context digest: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to regenerate context digest: ' + message });
   }
 });
 
@@ -4128,13 +4171,18 @@ app.post('/api/specialists/:project/:type/complete', async (req, res) => {
     return res.status(400).json({ error: 'Valid status (passed/failed/blocked) is required' });
   }
 
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
   try {
     const { signalSpecialistCompletion } = await import('../../lib/cloister/specialists.js');
-    signalSpecialistCompletion(project, type as any, { status, notes });
+    signalSpecialistCompletion(project, type, { status, notes });
     res.json({ success: true, message: 'Specialist completion signaled, grace period started' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error signaling completion:', error);
-    res.status(500).json({ error: 'Failed to signal completion: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to signal completion: ' + message });
   }
 });
 
@@ -4154,9 +4202,10 @@ app.post('/api/specialists/:project/:type/logs/cleanup', async (req, res) => {
       deleted,
       message: `Cleaned up ${deleted} old logs`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error cleaning up logs:', error);
-    res.status(500).json({ error: 'Failed to clean up logs: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to clean up logs: ' + message });
   }
 });
 
@@ -4172,9 +4221,10 @@ app.post('/api/specialists/logs/cleanup-all', async (_req, res) => {
       byProject: results.byProject,
       message: `Cleaned up ${results.totalDeleted} old logs`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error cleaning up all logs:', error);
-    res.status(500).json({ error: 'Failed to clean up logs: ' + error.message });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to clean up logs: ' + message });
   }
 });
 
