@@ -150,7 +150,22 @@ EOF`);
     // Non-fatal - database might already exist
   }
 
-  // Step 6: Start containers if docker compose exists
+  // Step 6: Install beads CLI globally on remote VM
+  if (options.spinner) {
+    options.spinner.text = 'Installing beads CLI...';
+  }
+  const bdInstalled = await exe.installBeads(vmName);
+  if (bdInstalled) {
+    await exe.initBeads(vmName, '~/workspace');
+  }
+
+  // Step 6.5: Copy essential skills to remote VM
+  if (options.spinner) {
+    options.spinner.text = 'Copying skills to remote VM...';
+  }
+  await exe.copySkillsToVm(vmName);
+
+  // Step 7: Start containers if docker compose exists
   let containersStarted = false;
   let frontendUrl = '';
   let apiUrl = '';
@@ -181,7 +196,7 @@ EOF`);
     }
   }
 
-  // Step 7: Save workspace metadata
+  // Step 8: Save workspace metadata
   const metadata: RemoteWorkspaceMetadata = {
     id: normalizedId,
     issue: issueId.toUpperCase(),

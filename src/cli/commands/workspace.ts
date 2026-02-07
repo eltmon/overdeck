@@ -979,6 +979,10 @@ with open(path, "w") as f:
     // Configure Claude Code for autonomous operation (bypass permissions + skip onboarding)
     await exe.configureClaudeCode(vmName);
 
+    // Step 4.7: Copy essential skills to remote VM
+    spinner.text = 'Copying skills to remote VM...';
+    await exe.copySkillsToVm(vmName);
+
     // Step 5: Configure environment for shared infra
     spinner.text = 'Configuring environment...';
     const envContent = `
@@ -1010,6 +1014,13 @@ EOF`);
     spinner.text = 'Creating database on shared postgres...';
     const dbName = `myn_${normalizedId.replace(/-/g, '_')}`;
     await exe.ssh(infraVm, `docker exec pan-postgres psql -U postgres -c "CREATE DATABASE ${dbName}" 2>/dev/null || true`);
+
+    // Step 6.5: Install beads CLI on remote VM
+    spinner.text = 'Installing beads CLI...';
+    const bdInstalled = await exe.installBeads(vmName);
+    if (bdInstalled) {
+      await exe.initBeads(vmName, '~/workspace');
+    }
 
     // Step 7: Install dependencies and start containers if docker compose exists
     spinner.text = 'Checking for Docker Compose...';

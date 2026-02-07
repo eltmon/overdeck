@@ -21,6 +21,41 @@ export function loadTemplate(templatePath: string): string {
   return readFileSync(templatePath, 'utf8');
 }
 
+/**
+ * Process {{#env LOCAL}}...{{/env}} and {{#env REMOTE}}...{{/env}} blocks.
+ * Keeps content for matching env, strips blocks for non-matching env.
+ */
+export function processEnvBlocks(template: string, env: 'LOCAL' | 'REMOTE'): string {
+  // Keep matching env blocks (strip the tags, keep content)
+  let result = template.replace(
+    new RegExp(`\\{\\{#env ${env}\\}\\}([\\s\\S]*?)\\{\\{/env\\}\\}`, 'g'),
+    '$1'
+  );
+
+  // Remove non-matching env blocks entirely
+  const otherEnv = env === 'LOCAL' ? 'REMOTE' : 'LOCAL';
+  result = result.replace(
+    new RegExp(`\\{\\{#env ${otherEnv}\\}\\}[\\s\\S]*?\\{\\{/env\\}\\}`, 'g'),
+    ''
+  );
+
+  return result;
+}
+
+/**
+ * Process {{#if varName}}...{{/if}} blocks.
+ * Keeps content when the variable is truthy (non-empty string), strips otherwise.
+ */
+export function processIfBlocks(template: string, vars: Record<string, string | undefined>): string {
+  return template.replace(
+    /\{\{#if (\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (_match, varName: string, content: string) => {
+      const value = vars[varName];
+      return value && value.trim() ? content : '';
+    }
+  );
+}
+
 export function substituteVariables(
   template: string,
   variables: TemplateVariables

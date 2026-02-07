@@ -45,7 +45,8 @@ async function fetchHealthHistory(agentId: string, hours: number = 24): Promise<
 async function fetchSpecialists(): Promise<SpecialistStatus[]> {
   const res = await fetch('/api/specialists');
   if (!res.ok) throw new Error('Failed to fetch specialists');
-  return res.json();
+  const data = await res.json();
+  return data.specialists ?? data;
 }
 
 const HEALTH_STATE_EMOJI = {

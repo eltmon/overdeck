@@ -53,7 +53,8 @@ async function fetchAgents(): Promise<IssueAgent[]> {
 async function fetchSpecialists(): Promise<SpecialistAgent[]> {
   const res = await fetch('/api/specialists');
   if (!res.ok) throw new Error('Failed to fetch specialists');
-  return res.json();
+  const data = await res.json();
+  return data.specialists ?? data;
 }
 
 async function fetchCloisterHealth(): Promise<CloisterHealthResponse> {

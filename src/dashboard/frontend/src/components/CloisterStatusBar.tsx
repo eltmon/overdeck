@@ -131,62 +131,43 @@ export function CloisterStatusBar() {
   const needsAttention = status.agentsNeedingAttention.length;
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-1.5 shrink-0">
       {/* Cloister Status Indicator */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1" title={status.running ? 'Cloister: Running' : 'Cloister: Stopped'}>
         {status.running ? (
-          <Bell className="w-5 h-5 text-green-400" />
+          <Bell className="w-3.5 h-3.5 text-green-400" />
         ) : (
-          <BellOff className="w-5 h-5 text-gray-500" />
+          <BellOff className="w-3.5 h-3.5 text-gray-500" />
         )}
-        <span className="text-sm text-gray-300">
-          {status.running ? 'Cloister: Running' : 'Cloister: Stopped'}
-        </span>
       </div>
 
       {/* Agent Summary */}
       {status.running && status.summary.total > 0 && (
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-1 text-xs">
           {status.summary.active > 0 && (
-            <span className="text-green-400">
-              🟢 {status.summary.active}
-            </span>
-          )}
-          {status.summary.stale > 0 && (
-            <span className="text-yellow-400">
-              🟡 {status.summary.stale}
-            </span>
+            <span className="text-green-400">{status.summary.active}</span>
           )}
           {status.summary.warning > 0 && (
-            <span className="text-orange-400">
-              🟠 {status.summary.warning}
-            </span>
+            <span className="text-orange-400">{status.summary.warning}</span>
           )}
           {status.summary.stuck > 0 && (
-            <span className="text-red-400">
-              🔴 {status.summary.stuck}
-            </span>
+            <span className="text-red-400">{status.summary.stuck}</span>
           )}
         </div>
       )}
 
       {/* Warning Indicator */}
       {hasWarnings && (
-        <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/20 rounded-lg border border-orange-500/30">
-          <AlertTriangle className="w-4 h-4 text-orange-400" />
-          <span className="text-xs text-orange-300">
-            {needsAttention} agent{needsAttention !== 1 ? 's' : ''} need attention
-          </span>
-        </div>
+        <AlertTriangle className="w-3.5 h-3.5 text-orange-400" title={`${needsAttention} agent${needsAttention !== 1 ? 's' : ''} need attention`} />
       )}
 
       {/* Control Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         {/* Toggle Monitoring */}
         <button
           onClick={handleToggle}
           disabled={isToggling}
-          className={`px-3 py-1 rounded text-xs transition-colors ${
+          className={`px-2 py-0.5 rounded text-xs transition-colors ${
             isToggling
               ? 'bg-gray-600 text-gray-400 cursor-wait'
               : status.running
@@ -195,7 +176,7 @@ export function CloisterStatusBar() {
           }`}
         >
           {isToggling
-            ? (status.running ? 'Stopping...' : 'Starting...')
+            ? (status.running ? '...' : '...')
             : (status.running ? 'Pause' : 'Start')}
         </button>
 
@@ -203,23 +184,23 @@ export function CloisterStatusBar() {
         {!showEmergencyConfirm ? (
           <button
             onClick={() => setShowEmergencyConfirm(true)}
-            className="px-3 py-1 rounded text-xs bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30 transition-colors"
+            className="p-1 rounded text-xs bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600/30 transition-colors"
             title="Emergency stop - kill all agents"
           >
-            <StopCircle className="w-4 h-4" />
+            <StopCircle className="w-3.5 h-3.5" />
           </button>
         ) : (
-          <div className="flex items-center gap-2 px-3 py-1 bg-red-600/20 rounded border border-red-600/30">
-            <span className="text-xs text-red-300">Confirm?</span>
+          <div className="flex items-center gap-1 px-2 py-0.5 bg-red-600/20 rounded border border-red-600/30">
+            <span className="text-xs text-red-300">Kill all?</span>
             <button
               onClick={handleEmergencyStop}
-              className="px-2 py-0.5 rounded text-xs bg-red-600 text-white hover:bg-red-700"
+              className="px-1.5 py-0.5 rounded text-xs bg-red-600 text-white hover:bg-red-700"
             >
               Yes
             </button>
             <button
               onClick={() => setShowEmergencyConfirm(false)}
-              className="px-2 py-0.5 rounded text-xs bg-gray-700 text-gray-300 hover:bg-gray-600"
+              className="px-1.5 py-0.5 rounded text-xs bg-gray-700 text-gray-300 hover:bg-gray-600"
             >
               No
             </button>
@@ -230,14 +211,14 @@ export function CloisterStatusBar() {
         <div className="relative">
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className={`px-2 py-1 rounded text-xs transition-colors ${
+            className={`p-1 rounded text-xs transition-colors ${
               showSettings
                 ? 'bg-gray-600 text-white'
                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
             title="Cloister settings"
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-3.5 h-3.5" />
           </button>
 
           {/* Settings Dropdown */}

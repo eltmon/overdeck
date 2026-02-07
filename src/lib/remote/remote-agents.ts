@@ -124,6 +124,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     // Create launcher script using base64 to avoid shell interpretation
     const launcherScript = `/workspace/.panopticon/prompts/${agentId}-launcher.sh`;
     const launcherContent = `#!/bin/bash
+export PATH="/usr/local/bin:\$PATH"
 prompt=\$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --model ${model} "\$prompt"
 `;

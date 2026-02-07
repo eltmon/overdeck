@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Brain, Play, XCircle, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { Brain, XCircle, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 

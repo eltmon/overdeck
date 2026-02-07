@@ -138,7 +138,8 @@ async function fetchAgents(): Promise<Agent[]> {
 async function fetchSpecialists(): Promise<SpecialistAgent[]> {
   const res = await fetch('/api/specialists');
   if (!res.ok) throw new Error('Failed to fetch specialists');
-  return res.json();
+  const data = await res.json();
+  return data.specialists ?? data;
 }
 
 function groupByStatus(issues: Issue[]): Record<string, Issue[]> {

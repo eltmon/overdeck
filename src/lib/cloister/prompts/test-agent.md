@@ -108,13 +108,35 @@ Execute the detected test command:
 
 **Set a reasonable timeout** - If tests take longer than 10 minutes, consider them hung and report failure.
 
-### 3. Analyze Results
+### 3. Establish Baseline (Main Branch)
+
+**CRITICAL: Compare against main branch to distinguish pre-existing failures from new regressions.**
+
+```bash
+# Save current state, run tests on main, restore
+git stash
+git checkout main
+npm test 2>&1 | tee /tmp/main-test-results.txt
+git checkout {{branch}}
+git stash pop 2>/dev/null
+```
+
+Record which tests fail on main. These are **pre-existing failures**.
+
+### 4. Analyze Results
 
 Parse the test output to extract:
 - **Total tests run**
 - **Tests passed**
 - **Tests failed**
+- **NEW failures** (fail on feature branch but pass on main) - these are BLOCKERS
+- **Pre-existing failures** (also fail on main) - these are INFORMATIONAL only
 - **Specific failure details** (test name, error message, file/line if available)
+
+**Pass/Fail Criteria:**
+- **PASS** if the feature branch introduces ZERO new test failures vs main
+- **FAIL** only if the feature branch introduces NEW failures not present on main
+- Pre-existing failures should be noted but must NOT block the feature branch
 
 ### 4. Attempt Simple Fixes (Optional)
 
