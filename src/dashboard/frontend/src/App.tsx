@@ -185,16 +185,16 @@ export default function App() {
 
   return (
     <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
+      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 shrink-0">
             <div className="flex items-center gap-3">
               <Eye className="w-6 h-6 text-blue-400" />
               <h1 className="text-xl font-bold text-white">Panopticon</h1>
             </div>
             <CloisterStatusBar />
           </div>
-          <nav className="flex gap-2">
+          <nav className="flex flex-wrap gap-1 overflow-x-auto">
             {([
               { id: 'kanban', label: 'Board', icon: LayoutGrid },
               { id: 'agents', label: 'Agents', icon: Users },
@@ -210,7 +210,7 @@ export default function App() {
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                   activeTab === id
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-400 hover:text-white hover:bg-gray-700'
