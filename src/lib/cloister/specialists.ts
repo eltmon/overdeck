@@ -58,11 +58,35 @@ export interface SpecialistStatus extends SpecialistMetadata {
 }
 
 /**
- * Registry of all specialist agents
+ * Per-project specialist metadata
+ */
+export interface ProjectSpecialistMetadata {
+  runCount: number;
+  lastRunAt: string | null;
+  lastRunStatus: 'passed' | 'failed' | 'blocked' | null;
+  currentRun: string | null; // Run ID if active
+  sessionId?: string; // Legacy session ID for transition period
+}
+
+/**
+ * Registry of all specialist agents (per-project structure)
  */
 export interface SpecialistRegistry {
   version: string;
-  specialists: SpecialistMetadata[];
+  // Global defaults for specialist configuration
+  defaults: {
+    contextRuns: number;
+    digestModel: string | null;
+    retention: { maxDays: number; maxRuns: number };
+  };
+  // Per-project specialist metadata
+  projects: {
+    [projectKey: string]: {
+      [specialistType: string]: ProjectSpecialistMetadata;
+    };
+  };
+  // Legacy: Global specialists list (for backward compatibility)
+  specialists?: SpecialistMetadata[];
   lastUpdated: string; // ISO 8601 timestamp
 }
 
@@ -108,11 +132,62 @@ export function initSpecialistsDirectory(): void {
   // Create default registry if it doesn't exist
   if (!existsSync(REGISTRY_FILE)) {
     const registry: SpecialistRegistry = {
-      version: '1.0',
+      version: '2.0', // Updated for per-project structure
+      defaults: {
+        contextRuns: 5,
+        digestModel: null,
+        retention: {
+          maxDays: 30,
+          maxRuns: 50,
+        },
+      },
+      projects: {},
+      // Keep legacy specialists for backward compatibility during transition
       specialists: DEFAULT_SPECIALISTS,
       lastUpdated: new Date().toISOString(),
     };
     saveRegistry(registry);
+  } else {
+    // Migrate old registry if needed
+    migrateRegistryIfNeeded();
+  }
+}
+
+/**
+ * Migrate old registry format to new per-project structure
+ */
+function migrateRegistryIfNeeded(): void {
+  try {
+    const content = readFileSync(REGISTRY_FILE, 'utf-8');
+    const registry = JSON.parse(content) as SpecialistRegistry;
+
+    // Check if already migrated
+    if (registry.version === '2.0' || registry.projects) {
+      return;
+    }
+
+    // Migrate to new structure
+    console.log('[specialists] Migrating registry to per-project structure...');
+
+    const migratedRegistry: SpecialistRegistry = {
+      version: '2.0',
+      defaults: {
+        contextRuns: 5,
+        digestModel: null,
+        retention: {
+          maxDays: 30,
+          maxRuns: 50,
+        },
+      },
+      projects: {},
+      specialists: registry.specialists, // Keep for backward compat
+      lastUpdated: new Date().toISOString(),
+    };
+
+    saveRegistry(migratedRegistry);
+    console.log('[specialists] Registry migration complete');
+  } catch (error) {
+    console.error('[specialists] Failed to migrate registry:', error);
   }
 }
 
@@ -307,9 +382,14 @@ export function getSpecialistState(name: SpecialistType): Exclude<SpecialistStat
  * Get tmux session name for a specialist
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key for per-project specialists
  * @returns Expected tmux session name
  */
-export function getTmuxSessionName(name: SpecialistType): string {
+export function getTmuxSessionName(name: SpecialistType, projectKey?: string): string {
+  if (projectKey) {
+    return `specialist-${projectKey}-${name}`;
+  }
+  // Legacy format for backward compatibility
   return `specialist-${name}`;
 }
 
@@ -329,6 +409,647 @@ export function recordWake(name: SpecialistType, sessionId?: string): void {
   }
 
   updateSpecialistMetadata(name, updates);
+}
+
+/**
+ * ===========================================================================
+ * Ephemeral Lifecycle Management
+ * ===========================================================================
+ */
+
+/**
+ * Grace period state for a specialist
+ */
+export interface GracePeriodState {
+  active: boolean;
+  startedAt: string;
+  duration: number; // milliseconds
+  paused: boolean;
+  pausedAt?: string;
+  remainingTime?: number; // milliseconds when paused
+}
+
+const gracePeriodStates = new Map<string, GracePeriodState>();
+
+/**
+ * Spawn an ephemeral specialist for a project
+ *
+ * Creates a new specialist session that will run for this task and then terminate.
+ * The specialist is seeded with context from recent runs.
+ *
+ * @param projectKey - Project identifier
+ * @param specialistType - Specialist type
+ * @param task - Task details
+ * @returns Spawn result with run ID and session info
+ */
+export async function spawnEphemeralSpecialist(
+  projectKey: string,
+  specialistType: SpecialistType,
+  task: {
+    issueId: string;
+    branch?: string;
+    workspace?: string;
+    prUrl?: string;
+    context?: TaskContext;
+  }
+): Promise<{
+  success: boolean;
+  runId?: string;
+  tmuxSession?: string;
+  message: string;
+  error?: string;
+}> {
+  // Ensure project specialist directory exists
+  ensureProjectSpecialistDir(projectKey, specialistType);
+
+  // Load context digest
+  const { loadContextDigest } = await import('./specialist-context.js');
+  const contextDigest = loadContextDigest(projectKey, specialistType);
+
+  // Create run log
+  const { createRunLog } = await import('./specialist-logs.js');
+  const { runId, filePath: logFilePath } = createRunLog(
+    projectKey,
+    specialistType,
+    task.issueId,
+    contextDigest || undefined
+  );
+
+  // Update metadata
+  setCurrentRun(projectKey, specialistType, runId);
+  incrementProjectRunCount(projectKey, specialistType);
+
+  // Build task prompt
+  const taskPrompt = await buildTaskPrompt(projectKey, specialistType, task, contextDigest);
+
+  // Spawn tmux session
+  const tmuxSession = getTmuxSessionName(specialistType, projectKey);
+  const cwd = process.env.HOME || '/home/exedev';
+
+  try {
+    // Determine model for this specialist
+    let model = 'claude-sonnet-4-5'; // default
+    try {
+      const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
+      model = getModelId(workTypeId);
+    } catch (error) {
+      console.warn(`Warning: Could not resolve model for ${specialistType}, using default`);
+    }
+
+    // Permission flags based on specialist type
+    const permissionFlags = specialistType === 'merge-agent'
+      ? '--dangerously-skip-permissions --permission-mode bypassPermissions'
+      : '--dangerously-skip-permissions';
+
+    // Write task prompt to file to avoid shell escaping issues
+    const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
+    await execAsync(`mkdir -p "${agentDir}"`, { encoding: 'utf-8' });
+
+    const promptFile = join(agentDir, 'task-prompt.md');
+    writeFileSync(promptFile, taskPrompt);
+
+    // Create launcher script that pipes output to log file
+    const launcherScript = join(agentDir, 'launcher.sh');
+    writeFileSync(launcherScript, `#!/bin/bash
+cd "${cwd}"
+prompt=$(cat "${promptFile}")
+
+# Run Claude and tee output to log file
+claude ${permissionFlags} --model ${model} "$prompt" 2>&1 | tee -a "${logFilePath}"
+
+# Signal completion
+echo ""
+echo "## Specialist completed task"
+`, { mode: 0o755 });
+
+    // Spawn Claude Code via launcher script
+    await execAsync(
+      `tmux new-session -d -s "${tmuxSession}" "bash '${launcherScript}'"`,
+      { encoding: 'utf-8' }
+    );
+
+    // Set state to active
+    const { saveAgentRuntimeState } = await import('../agents.js');
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+      currentIssue: task.issueId,
+    });
+
+    console.log(`[specialist] Spawned ephemeral ${specialistType} for ${projectKey}/${task.issueId} (run: ${runId})`);
+
+    return {
+      success: true,
+      runId,
+      tmuxSession,
+      message: `Spawned specialist ${specialistType} for ${task.issueId}`,
+    };
+  } catch (error: any) {
+    console.error(`[specialist] Failed to spawn ${specialistType}:`, error);
+
+    // Clean up metadata
+    setCurrentRun(projectKey, specialistType, null);
+
+    return {
+      success: false,
+      message: `Failed to spawn specialist: ${error.message}`,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Build task prompt for a specialist
+ */
+async function buildTaskPrompt(
+  projectKey: string,
+  specialistType: SpecialistType,
+  task: {
+    issueId: string;
+    branch?: string;
+    workspace?: string;
+    prUrl?: string;
+    context?: TaskContext;
+  },
+  contextDigest: string | null
+): Promise<string> {
+  const { getSpecialistPromptOverride } = await import('../projects.js');
+  const customPrompt = getSpecialistPromptOverride(projectKey, specialistType);
+
+  let prompt = `# ${specialistType} Task - ${task.issueId}\n\n`;
+
+  // Add context digest if available
+  if (contextDigest) {
+    prompt += `## Context from Recent Runs\n\n${contextDigest}\n\n`;
+  }
+
+  // Add custom project-specific prompt if configured
+  if (customPrompt) {
+    prompt += `## Project-Specific Guidelines\n\n${customPrompt}\n\n`;
+  }
+
+  // Add task details
+  prompt += `## Current Task\n\n`;
+  prompt += `Issue: ${task.issueId}\n`;
+  if (task.branch) prompt += `Branch: ${task.branch}\n`;
+  if (task.workspace) prompt += `Workspace: ${task.workspace}\n`;
+  if (task.prUrl) prompt += `PR URL: ${task.prUrl}\n`;
+  prompt += `\n`;
+
+  // Add specialist-specific instructions
+  switch (specialistType) {
+    case 'review-agent':
+      prompt += `Your task:
+1. Review all changes in the branch
+2. Check for code quality issues, security concerns, and best practices
+3. Verify test FILES exist for new code (DO NOT run tests)
+4. Provide specific, actionable feedback
+5. Update status via API when done
+
+IMPORTANT: DO NOT run tests. You are the REVIEW agent.
+
+Update status via API:
+- If issues found: POST to /api/workspaces/${task.issueId}/review-status with {"reviewStatus":"blocked","reviewNotes":"..."}
+- If review passes: POST with {"reviewStatus":"passed"} then queue test-agent`;
+      break;
+
+    case 'test-agent':
+      prompt += `Your task:
+1. Run the full test suite
+2. Analyze any failures in detail
+3. Identify root causes
+4. Update status via API when done
+
+Update status via API:
+- If tests pass: POST to /api/workspaces/${task.issueId}/review-status with {"testStatus":"passed"}
+- If tests fail: POST with {"testStatus":"failed","testNotes":"..."}`;
+      break;
+
+    case 'merge-agent':
+      prompt += `Your task:
+1. Fetch the latest main branch
+2. Attempt to merge ${task.branch} into main
+3. Resolve conflicts intelligently if needed
+4. Run tests to verify merge is clean
+5. Complete merge if tests pass`;
+      break;
+  }
+
+  prompt += `\n\nWhen you complete your task, report your findings and status.`;
+
+  return prompt;
+}
+
+/**
+ * Start grace period for a specialist
+ *
+ * @param projectKey - Project identifier
+ * @param specialistType - Specialist type
+ * @param duration - Grace period duration in milliseconds (default: 60000)
+ */
+export function startGracePeriod(
+  projectKey: string,
+  specialistType: SpecialistType,
+  duration: number = 60000
+): void {
+  const key = `${projectKey}-${specialistType}`;
+
+  gracePeriodStates.set(key, {
+    active: true,
+    startedAt: new Date().toISOString(),
+    duration,
+    paused: false,
+  });
+
+  console.log(`[specialist] Grace period started for ${projectKey}/${specialistType} (${duration}ms)`);
+
+  // Schedule termination after grace period
+  setTimeout(() => {
+    const state = gracePeriodStates.get(key);
+    if (state && state.active && !state.paused) {
+      terminateSpecialist(projectKey, specialistType);
+    }
+  }, duration);
+}
+
+/**
+ * Pause grace period countdown
+ */
+export function pauseGracePeriod(projectKey: string, specialistType: SpecialistType): boolean {
+  const key = `${projectKey}-${specialistType}`;
+  const state = gracePeriodStates.get(key);
+
+  if (!state || !state.active) {
+    return false;
+  }
+
+  const elapsed = Date.now() - new Date(state.startedAt).getTime();
+  const remaining = state.duration - elapsed;
+
+  state.paused = true;
+  state.pausedAt = new Date().toISOString();
+  state.remainingTime = remaining;
+
+  gracePeriodStates.set(key, state);
+  console.log(`[specialist] Grace period paused for ${projectKey}/${specialistType}`);
+
+  return true;
+}
+
+/**
+ * Resume grace period countdown
+ */
+export function resumeGracePeriod(projectKey: string, specialistType: SpecialistType): boolean {
+  const key = `${projectKey}-${specialistType}`;
+  const state = gracePeriodStates.get(key);
+
+  if (!state || !state.active || !state.paused) {
+    return false;
+  }
+
+  state.paused = false;
+  state.startedAt = new Date().toISOString();
+  state.pausedAt = undefined;
+
+  gracePeriodStates.set(key, state);
+  console.log(`[specialist] Grace period resumed for ${projectKey}/${specialistType}`);
+
+  // Schedule termination for remaining time
+  setTimeout(() => {
+    const currentState = gracePeriodStates.get(key);
+    if (currentState && currentState.active && !currentState.paused) {
+      terminateSpecialist(projectKey, specialistType);
+    }
+  }, state.remainingTime || 0);
+
+  return true;
+}
+
+/**
+ * Exit grace period immediately (terminate now)
+ */
+export function exitGracePeriod(projectKey: string, specialistType: SpecialistType): void {
+  const key = `${projectKey}-${specialistType}`;
+  gracePeriodStates.delete(key);
+
+  terminateSpecialist(projectKey, specialistType);
+}
+
+/**
+ * Get grace period state
+ */
+export function getGracePeriodState(
+  projectKey: string,
+  specialistType: SpecialistType
+): GracePeriodState | null {
+  const key = `${projectKey}-${specialistType}`;
+  return gracePeriodStates.get(key) || null;
+}
+
+/**
+ * Signal that a specialist has completed its task
+ *
+ * This should be called when the specialist finishes its work.
+ * It updates the run status and starts the grace period.
+ *
+ * @param projectKey - Project identifier
+ * @param specialistType - Specialist type
+ * @param result - Task result
+ */
+export function signalSpecialistCompletion(
+  projectKey: string,
+  specialistType: SpecialistType,
+  result: {
+    status: 'passed' | 'failed' | 'blocked';
+    notes?: string;
+  }
+): void {
+  const metadata = getProjectSpecialistMetadata(projectKey, specialistType);
+
+  // Update status
+  updateRunStatus(projectKey, specialistType, result.status);
+
+  // Finalize log if there's a current run
+  if (metadata.currentRun) {
+    const { finalizeRunLog } = require('./specialist-logs.js');
+
+    try {
+      finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
+        status: result.status,
+        notes: result.notes,
+      });
+    } catch (error) {
+      console.error(`[specialist] Failed to finalize log:`, error);
+    }
+  }
+
+  // Start grace period (60 seconds)
+  startGracePeriod(projectKey, specialistType, 60000);
+
+  console.log(`[specialist] ${specialistType} completed for ${projectKey} (status: ${result.status})`);
+}
+
+/**
+ * Terminate a specialist session
+ *
+ * Kills the tmux session, finalizes logs, and schedules digest generation.
+ *
+ * @param projectKey - Project identifier
+ * @param specialistType - Specialist type
+ */
+export async function terminateSpecialist(
+  projectKey: string,
+  specialistType: SpecialistType
+): Promise<void> {
+  const tmuxSession = getTmuxSessionName(specialistType, projectKey);
+  const metadata = getProjectSpecialistMetadata(projectKey, specialistType);
+
+  try {
+    // Kill tmux session
+    await execAsync(`tmux kill-session -t "${tmuxSession}"`);
+    console.log(`[specialist] Terminated ${projectKey}/${specialistType}`);
+  } catch (error) {
+    console.error(`[specialist] Failed to kill tmux session ${tmuxSession}:`, error);
+  }
+
+  // Finalize log if there's a current run
+  if (metadata.currentRun) {
+    const { finalizeRunLog } = await import('./specialist-logs.js');
+
+    try {
+      finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
+        status: metadata.lastRunStatus || 'incomplete',
+        notes: 'Specialist terminated',
+      });
+    } catch (error) {
+      console.error(`[specialist] Failed to finalize log:`, error);
+    }
+
+    // Clear current run
+    setCurrentRun(projectKey, specialistType, null);
+  }
+
+  // Clear grace period state
+  const key = `${projectKey}-${specialistType}`;
+  gracePeriodStates.delete(key);
+
+  // Update runtime state
+  const { saveAgentRuntimeState } = await import('../agents.js');
+  saveAgentRuntimeState(tmuxSession, {
+    state: 'suspended',
+    lastActivity: new Date().toISOString(),
+  });
+
+  // Schedule digest generation (async, fire-and-forget)
+  const { scheduleDigestGeneration } = await import('./specialist-context.js');
+  scheduleDigestGeneration(projectKey, specialistType);
+
+  // Run log cleanup for this project/specialist (async, fire-and-forget)
+  scheduleLogCleanup(projectKey, specialistType);
+}
+
+/**
+ * Schedule log cleanup for a project's specialist (async, fire-and-forget)
+ *
+ * @param projectKey - Project identifier
+ * @param specialistType - Specialist type
+ */
+function scheduleLogCleanup(projectKey: string, specialistType: SpecialistType): void {
+  // Run async without awaiting
+  Promise.resolve().then(async () => {
+    try {
+      const { cleanupOldLogs } = await import('./specialist-logs.js');
+      const { getSpecialistRetention } = await import('../projects.js');
+
+      const retention = getSpecialistRetention(projectKey);
+      const deleted = cleanupOldLogs(projectKey, specialistType, retention);
+
+      if (deleted > 0) {
+        console.log(`[specialist] Cleaned up ${deleted} old logs for ${projectKey}/${specialistType}`);
+      }
+    } catch (error) {
+      console.error(`[specialist] Log cleanup failed for ${projectKey}/${specialistType}:`, error);
+    }
+  });
+}
+
+/**
+ * ===========================================================================
+ * Per-Project Specialist Functions
+ * ===========================================================================
+ */
+
+/**
+ * Get the directory for a project's specialist
+ */
+export function getProjectSpecialistDir(projectKey: string, specialistType: SpecialistType): string {
+  return join(SPECIALISTS_DIR, projectKey, specialistType);
+}
+
+/**
+ * Ensure per-project specialist directory structure exists
+ */
+export function ensureProjectSpecialistDir(projectKey: string, specialistType: SpecialistType): void {
+  const specialistDir = getProjectSpecialistDir(projectKey, specialistType);
+  const runsDir = join(specialistDir, 'runs');
+  const contextDir = join(specialistDir, 'context');
+
+  if (!existsSync(runsDir)) {
+    mkdirSync(runsDir, { recursive: true });
+  }
+  if (!existsSync(contextDir)) {
+    mkdirSync(contextDir, { recursive: true });
+  }
+}
+
+/**
+ * Get per-project specialist metadata
+ */
+export function getProjectSpecialistMetadata(
+  projectKey: string,
+  specialistType: SpecialistType
+): ProjectSpecialistMetadata {
+  const registry = loadRegistry();
+
+  if (!registry.projects[projectKey]) {
+    registry.projects[projectKey] = {};
+  }
+
+  if (!registry.projects[projectKey][specialistType]) {
+    // Initialize with defaults
+    registry.projects[projectKey][specialistType] = {
+      runCount: 0,
+      lastRunAt: null,
+      lastRunStatus: null,
+      currentRun: null,
+    };
+    saveRegistry(registry);
+  }
+
+  return registry.projects[projectKey][specialistType];
+}
+
+/**
+ * Update per-project specialist metadata
+ */
+export function updateProjectSpecialistMetadata(
+  projectKey: string,
+  specialistType: SpecialistType,
+  updates: Partial<ProjectSpecialistMetadata>
+): void {
+  const registry = loadRegistry();
+
+  if (!registry.projects[projectKey]) {
+    registry.projects[projectKey] = {};
+  }
+
+  if (!registry.projects[projectKey][specialistType]) {
+    registry.projects[projectKey][specialistType] = {
+      runCount: 0,
+      lastRunAt: null,
+      lastRunStatus: null,
+      currentRun: null,
+    };
+  }
+
+  registry.projects[projectKey][specialistType] = {
+    ...registry.projects[projectKey][specialistType],
+    ...updates,
+  };
+
+  saveRegistry(registry);
+}
+
+/**
+ * Increment run count for a project's specialist
+ */
+export function incrementProjectRunCount(projectKey: string, specialistType: SpecialistType): void {
+  const metadata = getProjectSpecialistMetadata(projectKey, specialistType);
+  updateProjectSpecialistMetadata(projectKey, specialistType, {
+    runCount: metadata.runCount + 1,
+    lastRunAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Set current run for a project's specialist
+ */
+export function setCurrentRun(
+  projectKey: string,
+  specialistType: SpecialistType,
+  runId: string | null
+): void {
+  updateProjectSpecialistMetadata(projectKey, specialistType, { currentRun: runId });
+}
+
+/**
+ * Update run status for a project's specialist
+ */
+export function updateRunStatus(
+  projectKey: string,
+  specialistType: SpecialistType,
+  status: 'passed' | 'failed' | 'blocked' | null
+): void {
+  updateProjectSpecialistMetadata(projectKey, specialistType, { lastRunStatus: status });
+}
+
+/**
+ * List all projects that have specialists configured
+ */
+export function listProjectsWithSpecialists(): string[] {
+  const registry = loadRegistry();
+  return Object.keys(registry.projects);
+}
+
+/**
+ * List all specialist types for a project
+ */
+export function listSpecialistsForProject(projectKey: string): SpecialistType[] {
+  const registry = loadRegistry();
+  const project = registry.projects[projectKey];
+
+  if (!project) {
+    return [];
+  }
+
+  return Object.keys(project) as SpecialistType[];
+}
+
+/**
+ * Get all per-project specialist statuses
+ */
+export async function getAllProjectSpecialistStatuses(): Promise<Array<{
+  projectKey: string;
+  specialistType: SpecialistType;
+  metadata: ProjectSpecialistMetadata;
+  isRunning: boolean;
+  tmuxSession: string;
+}>> {
+  const registry = loadRegistry();
+  const results: Array<{
+    projectKey: string;
+    specialistType: SpecialistType;
+    metadata: ProjectSpecialistMetadata;
+    isRunning: boolean;
+    tmuxSession: string;
+  }> = [];
+
+  for (const [projectKey, specialists] of Object.entries(registry.projects)) {
+    for (const [specialistType, metadata] of Object.entries(specialists)) {
+      const tmuxSession = getTmuxSessionName(specialistType as SpecialistType, projectKey);
+      const running = await isRunning(specialistType as SpecialistType, projectKey);
+
+      results.push({
+        projectKey,
+        specialistType: specialistType as SpecialistType,
+        metadata,
+        isRunning: running,
+        tmuxSession,
+      });
+    }
+  }
+
+  return results;
 }
 
 /**
@@ -464,10 +1185,11 @@ export function countContextTokens(name: SpecialistType): number | null {
  * Check if a specialist is currently running in tmux
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key for per-project specialists
  * @returns True if specialist has an active tmux session
  */
-export async function isRunning(name: SpecialistType): Promise<boolean> {
-  const tmuxSession = getTmuxSessionName(name);
+export async function isRunning(name: SpecialistType, projectKey?: string): Promise<boolean> {
+  const tmuxSession = getTmuxSessionName(name, projectKey);
 
   try {
     await execAsync(`tmux has-session -t ${tmuxSession}`);
@@ -483,9 +1205,13 @@ export async function isRunning(name: SpecialistType): Promise<boolean> {
  * Combines metadata, session info, and runtime state (PAN-80: uses hook-based state).
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key for per-project specialists
  * @returns Complete specialist status
  */
-export async function getSpecialistStatus(name: SpecialistType): Promise<SpecialistStatus> {
+export async function getSpecialistStatus(
+  name: SpecialistType,
+  projectKey?: string
+): Promise<SpecialistStatus> {
   const metadata = getSpecialistMetadata(name) || {
     name,
     displayName: name,
@@ -495,12 +1221,12 @@ export async function getSpecialistStatus(name: SpecialistType): Promise<Special
   };
 
   const sessionId = getSessionId(name);
-  const running = await isRunning(name);
+  const running = await isRunning(name, projectKey);
   const contextTokens = countContextTokens(name);
 
   // Determine state from hook-based runtime state (PAN-80)
   const { getAgentRuntimeState } = await import('../agents.js');
-  const tmuxSession = getTmuxSessionName(name);
+  const tmuxSession = getTmuxSessionName(name, projectKey);
   const runtimeState = getAgentRuntimeState(tmuxSession);
 
   let state: SpecialistState;
@@ -538,7 +1264,7 @@ export async function getSpecialistStatus(name: SpecialistType): Promise<Special
     contextTokens: contextTokens || undefined,
     state,
     isRunning: running,
-    tmuxSession: getTmuxSessionName(name),
+    tmuxSession: getTmuxSessionName(name, projectKey),
     currentIssue: runtimeState?.currentIssue,
   };
 }
