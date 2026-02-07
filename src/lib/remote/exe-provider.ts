@@ -20,7 +20,7 @@
 
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import type {
@@ -570,6 +570,8 @@ COMPOSE_EOF`);
    * @returns true if bd is available (already installed or just installed)
    */
   async installBeads(vmName: string): Promise<boolean> {
+    const FALLBACK_BEADS_VERSION = '0.49.4';
+
     try {
       // Check if bd is already installed
       const checkResult = await this.ssh(vmName, 'which bd');
@@ -581,16 +583,26 @@ COMPOSE_EOF`);
       console.log(`[exe-provider] Installing bd (beads CLI) on ${vmName}...`);
 
       // Download from GitHub releases - exe.dev VMs typically don't have npm/node
-      // but do have curl and sudo access
+      // but do have curl and sudo access.
+      // Resolve the latest version dynamically with fallback to known-good version.
       const installCmd = `
         cd /tmp && \
-        curl -sL "https://github.com/steveyegge/beads/releases/latest/download/beads_0.49.3_linux_amd64.tar.gz" -o beads.tar.gz && \
+        BEADS_VERSION=$(curl -sI "https://github.com/steveyegge/beads/releases/latest" 2>/dev/null | grep -i '^location:' | sed 's|.*/v||' | tr -d '\\r\\n') && \
+        if [ -z "$BEADS_VERSION" ]; then BEADS_VERSION="${FALLBACK_BEADS_VERSION}"; echo "Using fallback version: $BEADS_VERSION"; else echo "Detected version: $BEADS_VERSION"; fi && \
+        echo "Downloading beads v$BEADS_VERSION..." && \
+        curl -sL "https://github.com/steveyegge/beads/releases/download/v\${BEADS_VERSION}/beads_\${BEADS_VERSION}_linux_amd64.tar.gz" -o beads.tar.gz && \
         tar -xzf beads.tar.gz && \
         sudo mv bd /usr/local/bin/ && \
         rm -f beads.tar.gz CHANGELOG.md LICENSE README.md
       `.trim().replace(/\n\s+/g, ' ');
 
       const installResult = await this.ssh(vmName, installCmd);
+      if (installResult.stderr) {
+        console.log(`[exe-provider] bd install stderr on ${vmName}: ${installResult.stderr}`);
+      }
+      if (installResult.stdout) {
+        console.log(`[exe-provider] bd install output on ${vmName}: ${installResult.stdout.trim()}`);
+      }
 
       // Verify installation
       const verifyResult = await this.ssh(vmName, 'which bd && bd --version');
@@ -599,7 +611,7 @@ COMPOSE_EOF`);
         return true;
       }
 
-      console.warn(`[exe-provider] Failed to install bd on ${vmName}`);
+      console.warn(`[exe-provider] Failed to install bd on ${vmName} - verify exitCode: ${verifyResult.exitCode}, stdout: ${verifyResult.stdout}, stderr: ${verifyResult.stderr}`);
       return false;
     } catch (error: any) {
       console.error(`[exe-provider] Error installing bd on ${vmName}:`, error.message);
@@ -748,6 +760,70 @@ export COLORTERM=truecolor
 `;
     const termEnvBase64 = Buffer.from(termEnv).toString('base64');
     await this.ssh(vmName, `grep -q "Panopticon terminal settings" ~/.bashrc 2>/dev/null || echo '${termEnvBase64}' | base64 -d >> ~/.bashrc`);
+  }
+
+  /**
+   * Copy essential skills from local ~/.panopticon/skills/ to remote VM ~/.claude/skills/
+   *
+   * Skills are read locally and written to the VM via base64-encoded SSH.
+   * Only copies SKILL.md and resource files (not symlinks or deep directories).
+   */
+  async copySkillsToVm(vmName: string): Promise<void> {
+    const essentialSkills = [
+      'beads',
+      'beads-completion-check',
+      'beads-panopticon-guide',
+      'work-complete',
+      'session-health',
+    ];
+
+    const skillsSourceDir = join(homedir(), '.panopticon', 'skills');
+    if (!existsSync(skillsSourceDir)) {
+      console.log(`[exe-provider] No skills source directory at ${skillsSourceDir}`);
+      return;
+    }
+
+    // Create skills directory on remote
+    await this.ssh(vmName, 'mkdir -p ~/.claude/skills');
+
+    for (const skillName of essentialSkills) {
+      const skillDir = join(skillsSourceDir, skillName);
+      if (!existsSync(skillDir)) {
+        continue;
+      }
+
+      try {
+        // Create skill directory on remote
+        await this.ssh(vmName, `mkdir -p ~/.claude/skills/${skillName}`);
+
+        // Copy SKILL.md
+        const skillMdPath = join(skillDir, 'SKILL.md');
+        if (existsSync(skillMdPath)) {
+          const content = readFileSync(skillMdPath, 'utf-8');
+          const contentBase64 = Buffer.from(content).toString('base64');
+          await this.ssh(vmName, `echo '${contentBase64}' | base64 -d > ~/.claude/skills/${skillName}/SKILL.md`);
+        }
+
+        // Copy resources/ directory if it exists
+        const resourcesDir = join(skillDir, 'resources');
+        if (existsSync(resourcesDir) && statSync(resourcesDir).isDirectory()) {
+          await this.ssh(vmName, `mkdir -p ~/.claude/skills/${skillName}/resources`);
+          const resourceFiles = readdirSync(resourcesDir).filter(f => f.endsWith('.md'));
+          for (const resourceFile of resourceFiles) {
+            const resourcePath = join(resourcesDir, resourceFile);
+            if (statSync(resourcePath).isFile()) {
+              const resourceContent = readFileSync(resourcePath, 'utf-8');
+              const resourceBase64 = Buffer.from(resourceContent).toString('base64');
+              await this.ssh(vmName, `echo '${resourceBase64}' | base64 -d > ~/.claude/skills/${skillName}/resources/${resourceFile}`);
+            }
+          }
+        }
+
+        console.log(`[exe-provider] Copied skill ${skillName} to ${vmName}`);
+      } catch (error: any) {
+        console.warn(`[exe-provider] Failed to copy skill ${skillName} to ${vmName}: ${error.message}`);
+      }
+    }
   }
 }
 

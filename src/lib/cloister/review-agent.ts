@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { startConvoy, waitForConvoy, type ConvoyContext } from '../convoy.js';
-import { sendKeys } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -216,14 +215,6 @@ async function sendFeedbackToWorkAgent(
 ): Promise<void> {
   const agentSession = `agent-${context.issueId.toLowerCase()}`;
 
-  try {
-    // Check if agent session exists (non-blocking)
-    await execAsync(`tmux has-session -t ${agentSession} 2>/dev/null`);
-  } catch {
-    console.log(`[review-agent] No agent session found for ${agentSession}, skipping feedback`);
-    return;
-  }
-
   // Build feedback message
   let feedback = `**Review Feedback from review-agent**\n\n`;
   feedback += `**Status:** ${result.reviewResult}\n\n`;
@@ -246,9 +237,10 @@ async function sendFeedbackToWorkAgent(
     feedback += `**Next Steps:**\nYour code has been approved! It will proceed to testing.\n`;
   }
 
+  // Use messageAgent which handles both local and remote agents
   try {
-    // Send the feedback message using centralized sendKeys
-    sendKeys(agentSession, feedback);
+    const { messageAgent } = await import('../agents.js');
+    await messageAgent(agentSession, feedback);
     console.log(`[review-agent] Sent feedback to ${agentSession}`);
   } catch (error) {
     console.error(`[review-agent] Failed to send feedback to ${agentSession}:`, error);

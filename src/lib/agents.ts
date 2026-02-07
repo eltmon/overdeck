@@ -497,6 +497,24 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     return;
   }
 
+  // Check if this is a remote agent
+  const { loadRemoteAgentState, sendToRemoteAgent } = await import('./remote/remote-agents.js');
+  const remoteState = loadRemoteAgentState(normalizedId);
+  if (remoteState && remoteState.vmName) {
+    console.log(`[agents] Sending message to remote agent ${normalizedId} on ${remoteState.vmName}`);
+    await sendToRemoteAgent(normalizedId, remoteState.vmName, message);
+
+    // Also save to mail queue for persistence
+    const mailDir = join(getAgentDir(normalizedId), 'mail');
+    mkdirSync(mailDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    writeFileSync(
+      join(mailDir, `${timestamp}.md`),
+      `# Message\n\n${message}\n`
+    );
+    return;
+  }
+
   if (!sessionExists(normalizedId)) {
     throw new Error(`Agent ${normalizedId} not running`);
   }

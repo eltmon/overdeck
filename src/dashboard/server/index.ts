@@ -1271,8 +1271,44 @@ app.get('/api/issues', async (req, res) => {
 
     console.log(`Fetched ${allIssues.length} Linear issues (cycle=${cycleFilter}, includeCompleted=${includeCompleted})`);
 
+    // Build a lookup of project data by name from issues that have real projects.
+    // This prevents duplicates when falling back to team data for unassigned issues
+    // (team and project can share a name but have different IDs).
+    const projectByName = new Map<string, { id: string; name: string; color?: string; icon?: string }>();
+    for (const issue of allIssues) {
+      if (issue.project && !projectByName.has(issue.project.name)) {
+        projectByName.set(issue.project.name, {
+          id: issue.project.id,
+          name: issue.project.name,
+          color: issue.project.color,
+          icon: issue.project.icon,
+        });
+      }
+    }
+
     // Format Linear issues (data is already resolved, no extra API calls)
-    const linearFormatted = allIssues.map((issue: any) => ({
+    const linearFormatted = allIssues.map((issue: any) => {
+      let project;
+      if (issue.project) {
+        project = {
+          id: issue.project.id,
+          name: issue.project.name,
+          color: issue.project.color,
+          icon: issue.project.icon,
+        };
+      } else if (issue.team) {
+        // Fall back to team, but reuse existing project data if a project
+        // with the same name exists to avoid duplicate filter entries
+        const existing = projectByName.get(issue.team.name);
+        project = existing || {
+          id: issue.team.id,
+          name: issue.team.name,
+          color: issue.team.color,
+          icon: issue.team.icon,
+        };
+      }
+
+      return {
       id: issue.id,
       identifier: issue.identifier,
       title: issue.title,
@@ -1286,18 +1322,7 @@ app.get('/api/issues', async (req, res) => {
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
       completedAt: issue.completedAt,
-      // Use project if available, otherwise fall back to team
-      project: issue.project ? {
-        id: issue.project.id,
-        name: issue.project.name,
-        color: issue.project.color,
-        icon: issue.project.icon,
-      } : issue.team ? {
-        id: issue.team.id,
-        name: issue.team.name,
-        color: issue.team.color,
-        icon: issue.team.icon,
-      } : undefined,
+      project,
       // Include cycle info
       cycle: issue.cycle ? {
         id: issue.cycle.id,
@@ -1306,7 +1331,8 @@ app.get('/api/issues', async (req, res) => {
       } : undefined,
       // Mark source as Linear
       source: 'linear',
-    }));
+    };
+    });
 
     // Fetch GitHub and Rally issues in parallel
     const [githubIssues, rallyIssues] = await Promise.all([
@@ -6953,6 +6979,21 @@ app.post('/api/agents', async (req, res) => {
     console.warn(`[start-agent] Could not check for planning session: ${tmuxErr}`);
   }
 
+  // Mark planning agent state as stopped since we're transitioning to work agent
+  const planningStateFile = join(homedir(), '.panopticon', 'agents', planningSession, 'state.json');
+  if (existsSync(planningStateFile)) {
+    try {
+      const planningState = JSON.parse(readFileSync(planningStateFile, 'utf-8'));
+      planningState.status = 'stopped';
+      planningState.stoppedAt = new Date().toISOString();
+      planningState.stoppedReason = 'work-agent-started';
+      writeFileSync(planningStateFile, JSON.stringify(planningState, null, 2));
+      console.log(`[start-agent] Marked planning agent ${planningSession} as stopped`);
+    } catch (stateErr) {
+      console.warn(`[start-agent] Could not update planning state: ${stateErr}`);
+    }
+  }
+
   try {
     // Extract prefix from issue ID (e.g., "MIN" from "MIN-645")
     const issuePrefix = issueId.split('-')[0];
@@ -7021,17 +7062,13 @@ app.post('/api/agents', async (req, res) => {
       await exe.syncAllCredentials(workspaceMetadata.vmName);
 
       // Generate initial prompt for the agent
-      const agentPrompt = `You are working on issue ${issueId}.
-
-Your workspace is at /workspace. Check for planning artifacts:
-- /workspace/.planning/STATE.md - Contains the implementation plan
-- /workspace/.planning/${issueId.toLowerCase()}/STATE.md - Alternative location
-- /workspace/docs/prds/ - May contain PRD documents
-
-Start by reading the STATE.md file to understand the plan, then begin implementation.
-If no STATE.md exists, check the issue tracker for requirements.
-
-Work autonomously. Commit your changes frequently with clear commit messages.`;
+      const { buildWorkAgentPrompt } = await import('../../lib/cloister/work-agent-prompt.js');
+      const agentPrompt = buildWorkAgentPrompt({
+        issueId,
+        env: 'REMOTE',
+        workspacePath: '/workspace',
+        skipDynamicContext: true,
+      });
 
       const state = await spawnRemoteAgent({
         issueId,
@@ -8013,6 +8050,7 @@ export TERM=xterm-256color
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 export COLORTERM=truecolor
+export PATH="/usr/local/bin:\$PATH"
 
 cd /workspace
 prompt=$(cat "${remotePromptFile}")
@@ -8027,6 +8065,11 @@ exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
         console.log(`[start-planning] Step 5: configure Claude Code`);
         await exe.configureClaudeCode(vmName);
         console.log(`[start-planning] Step 5 complete`);
+
+        // Step 5.1: Copy essential skills to remote VM
+        console.log(`[start-planning] Step 5.1: copy skills to ${vmName}`);
+        await exe.copySkillsToVm(vmName);
+        console.log(`[start-planning] Step 5.1 complete`);
 
         // Step 5.5: Configure tmux for proper terminal handling
         console.log(`[start-planning] Step 5.5: configure tmux`);

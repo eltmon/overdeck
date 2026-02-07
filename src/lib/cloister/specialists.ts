@@ -1678,27 +1678,45 @@ Branch: ${task.branch || 'unknown'}
 Workspace: ${task.workspace || 'unknown'}
 
 Your task:
-1. Run the full test suite
-2. Analyze any failures in detail
-3. Identify root causes (code bug vs test bug vs environment issue)
-4. Update status via API when done
+1. Run the full test suite on the feature branch
+2. Run the same test suite on the main branch (baseline)
+3. Compare results: identify which failures are NEW vs pre-existing
+4. Only fail the feature branch for NEW regressions
+5. Update status via API when done
+
+## CRITICAL: Baseline Comparison
+
+**You MUST compare test results against the main branch baseline.**
+
+Pre-existing failures that also occur on main branch should NOT block the feature branch.
+
+Steps:
+1. Run \`npm test\` (or detected command) on the feature branch - record results
+2. Run \`git stash && git checkout main && npm test 2>&1 | tail -30 && git checkout ${task.branch || 'feature-branch'} && git stash pop\` to get baseline
+3. Compare: any test that fails on BOTH branches is pre-existing
+4. Only NEW failures (pass on main, fail on feature) should block
+
+**Pass criteria:** The feature branch introduces ZERO new test failures compared to main.
+**Fail criteria:** The feature branch introduces one or more NEW test failures not present on main.
+
+Report pre-existing failures as informational notes, but do NOT block the feature for them.
 
 ## REQUIRED: Update Status via API
 
 You MUST execute the appropriate curl command and verify it succeeds. Do NOT just describe it - actually RUN it with Bash.
 
-If tests PASS:
+If NO new regressions (tests PASS):
 \`\`\`bash
 # EXECUTE THIS - verify you see JSON response with testStatus:"passed"
-curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed"}' | jq .
+curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any]"}' | jq .
 \`\`\`
 
-If tests FAIL:
+If NEW regressions found (tests FAIL):
 \`\`\`bash
 # EXECUTE THIS - verify you see JSON response with testStatus:"failed"
-curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe failures]"}' | jq .
+curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures only]"}' | jq .
 \`\`\`
-Then use send-feedback-to-agent skill to notify issue agent of failures.
+Then use send-feedback-to-agent skill to notify issue agent of NEW failures only.
 
 ⚠️ VERIFICATION: After running curl, confirm you see valid JSON output with the updated status. If you get an error or empty response, the update FAILED - report this.
 
