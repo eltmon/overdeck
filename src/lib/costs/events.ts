@@ -4,7 +4,7 @@
  * Manages the append-only events.jsonl log that records all cost events.
  */
 
-import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, renameSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -252,7 +252,6 @@ export function replaceEventsFile(events: CostEvent[]): void {
   writeFileSync(tempFile, content, 'utf-8');
 
   // Atomic rename
-  const { renameSync } = require('fs');
   renameSync(tempFile, getEventsFile());
 }
 

@@ -4,7 +4,7 @@
  * Manages the by-issue.json cache that stores pre-computed cost aggregations.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { CostEvent, readEvents, readEventsFromLine, getLastEventMetadata } from './events.js';
@@ -118,7 +118,6 @@ export function saveCache(cache: CostCache): void {
   writeFileSync(tempFile, content, 'utf-8');
 
   // Atomic rename
-  const { renameSync } = require('fs');
   renameSync(tempFile, cacheFile);
 }
 
