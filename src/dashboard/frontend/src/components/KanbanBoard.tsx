@@ -1642,9 +1642,9 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
                 fetch(`/api/issues/${issue.identifier}/reset`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                }).then(() => {
-                  queryClient.invalidateQueries({ queryKey: ['issues'] });
-                  queryClient.invalidateQueries({ queryKey: ['agents'] });
+                }).then(async () => {
+                  await queryClient.refetchQueries({ queryKey: ['issues'] });
+                  await queryClient.refetchQueries({ queryKey: ['agents'] });
                 }).catch(err => console.error('Reset failed:', err));
               }
             }}
@@ -1682,8 +1682,8 @@ function ReopenSection({ issue }: { issue: Issue }) {
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ['issues'] });
     },
   });
 
