@@ -26,10 +26,9 @@ export interface RetentionStats {
 export function pruneOldEvents(retentionDays: number = 90): RetentionStats {
   console.log(`Pruning events older than ${retentionDays} days...`);
 
-  // Calculate cutoff date, floored to start of day to handle boundary cases
-  const cutoffMs = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
-  const cutoffDate = new Date(cutoffMs);
-  cutoffDate.setUTCHours(0, 0, 0, 0);
+  // Calculate cutoff date
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
   const cutoffTs = cutoffDate.toISOString();
 
   // Read all events
@@ -87,14 +86,13 @@ export function needsPruning(retentionDays: number = 90): boolean {
     return false;
   }
 
-  // Check oldest event, floored to start of day to handle boundary cases
+  // Check oldest event
   const oldestEvent = allEvents[0];
   const oldestDate = new Date(oldestEvent.ts);
-  const cutoffMs = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
-  const cutoffDate = new Date(cutoffMs);
-  cutoffDate.setUTCHours(0, 0, 0, 0);
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
-  return oldestDate.getTime() < cutoffDate.getTime();
+  return oldestDate < cutoffDate;
 }
 
 /**
@@ -124,9 +122,8 @@ export function getRetentionStatus(retentionDays: number = 90): {
   const now = new Date();
   const oldestEventAge = Math.floor((now.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
 
-  const cutoffMs = Date.now() - (retentionDays * 24 * 60 * 60 * 1000);
-  const cutoffDate = new Date(cutoffMs);
-  cutoffDate.setUTCHours(0, 0, 0, 0);
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
   const cutoffTs = cutoffDate.toISOString();
 
   const eventsToRemove = allEvents.filter(e => e.ts < cutoffTs).length;
