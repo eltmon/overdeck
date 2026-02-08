@@ -19,10 +19,10 @@ export function SpecialistRunLog() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-divider">
         <Link
           to={`/specialists/${project}/${type}`}
-          className="flex items-center gap-2 text-gray-400 hover:text-white"
+          className="flex items-center gap-2 text-content-subtle hover:text-content"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to {project}/{type}

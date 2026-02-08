@@ -17,8 +17,9 @@ import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
-import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings } from 'lucide-react';
+import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon } from 'lucide-react';
 import { Agent, Issue } from './types';
+import { useTheme } from './hooks/useTheme';
 
 type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
@@ -63,6 +64,14 @@ export default function App() {
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Theme management
+  const { theme, toggleTheme, initTheme } = useTheme();
+
+  // Initialize theme on mount
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
 
   // Fetch agents to find if selected issue has an agent
   const { data: agents = [] } = useQuery({
@@ -184,12 +193,12 @@ export default function App() {
   const actualPanelWidth = isExpanded ? 'calc(100% - 300px)' : `${panelWidth}px`;
 
   return (
-    <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-2 shrink-0">
+    <div className="h-screen bg-surface flex flex-col overflow-hidden transition-colors duration-150">
+      <header className="bg-surface-raised border-b border-divider px-4 py-2 shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 shrink-0">
             <Eye className="w-5 h-5 text-blue-400" />
-            <h1 className="text-lg font-bold text-white whitespace-nowrap">Panopticon</h1>
+            <h1 className="text-lg font-bold text-content whitespace-nowrap">Panopticon</h1>
           </div>
           <CloisterStatusBar />
           <nav className="flex gap-0.5 overflow-x-auto min-w-0 scrollbar-hide">
@@ -211,7 +220,7 @@ export default function App() {
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors ${
                   activeTab === id
                     ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                    : 'text-content-subtle hover:text-content hover:bg-surface-overlay'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -219,6 +228,13 @@ export default function App() {
               </button>
             ))}
           </nav>
+          <button
+            onClick={toggleTheme}
+            className="ml-auto px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors text-content-subtle hover:text-content hover:bg-surface-overlay"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
         </div>
       </header>
 
@@ -232,12 +248,12 @@ export default function App() {
                 onSelectIssue={setSelectedIssue}
               />
             </div>
-            {selectedIssue && selectedIssueAgent && (
+            {selectedIssue && (selectedIssueAgent || selectedIssueData) && (
               <>
                 {/* Resize handle */}
                 <div
                   onMouseDown={handleMouseDown}
-                  className={`w-1 hover:w-1.5 bg-gray-700 hover:bg-blue-500 cursor-col-resize transition-colors shrink-0 ${
+                  className={`w-1 hover:w-1.5 bg-surface-overlay hover:bg-blue-500 cursor-col-resize transition-colors shrink-0 ${
                     isResizing ? 'bg-blue-500' : ''
                   }`}
                 />
@@ -245,27 +261,27 @@ export default function App() {
                   {/* Expand/collapse button */}
                   <button
                     onClick={toggleExpand}
-                    className="absolute top-2 left-2 z-10 p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-white"
+                    className="absolute top-2 left-2 z-10 p-1.5 bg-surface-overlay hover:bg-surface-emphasis rounded text-content-subtle hover:text-content"
                     title={isExpanded ? 'Collapse panel' : 'Expand panel'}
                   >
                     {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </button>
-                  <WorkspacePanel
-                    agent={selectedIssueAgent}
-                    issueId={selectedIssue}
-                    issueUrl={selectedIssueData?.url}
-                    onClose={() => setSelectedIssue(null)}
-                  />
+                  {selectedIssueAgent ? (
+                    <WorkspacePanel
+                      agent={selectedIssueAgent}
+                      issueId={selectedIssue}
+                      issueUrl={selectedIssueData?.url}
+                      issue={selectedIssueData ?? undefined}
+                      onClose={() => setSelectedIssue(null)}
+                    />
+                  ) : selectedIssueData ? (
+                    <IssueDetailPanel
+                      issue={selectedIssueData}
+                      onClose={() => setSelectedIssue(null)}
+                    />
+                  ) : null}
                 </div>
               </>
-            )}
-            {selectedIssue && !selectedIssueAgent && selectedIssueData && (
-              <div className="w-[400px] shrink-0 h-full">
-                <IssueDetailPanel
-                  issue={selectedIssueData}
-                  onClose={() => setSelectedIssue(null)}
-                />
-              </div>
             )}
           </>
         )}

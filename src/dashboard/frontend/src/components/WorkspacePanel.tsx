@@ -22,7 +22,7 @@ import {
   Cloud,
   Monitor,
 } from 'lucide-react';
-import { Agent } from '../types';
+import { Agent, Issue } from '../types';
 
 interface ContainerStatus {
   running: boolean;
@@ -89,10 +89,68 @@ function copyToClipboard(text: string): boolean {
   }
 }
 
+// Cost data types
+interface SessionCost {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  type: string;
+  model: string;
+  cost?: number;
+  tokenCount?: number;
+}
+
+interface ModelCostInfo {
+  cost: number;
+  tokens: number;
+}
+
+interface StageCostInfo {
+  cost: number;
+  tokens: number;
+}
+
+interface IssueCostData {
+  issueId: string;
+  totalCost: number;
+  totalTokens: number;
+  sessions: SessionCost[];
+  byModel: Record<string, ModelCostInfo>;
+  byStage?: Record<string, StageCostInfo>;
+}
+
+// Cost formatting helpers
+function formatCost(cost: number): string {
+  if (cost >= 100) return `$${cost.toFixed(0)}`;
+  if (cost >= 10) return `$${cost.toFixed(1)}`;
+  if (cost >= 1) return `$${cost.toFixed(2)}`;
+  if (cost > 0) return `$${cost.toFixed(3)}`;
+  return '$0.00';
+}
+
+function formatTokens(tokens: number): string {
+  if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(2)}M`;
+  if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
+  return tokens.toString();
+}
+
+function getFriendlyModelName(fullModel: string): string {
+  if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
+  if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
+  if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus 4';
+  if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
+  if (fullModel.includes('sonnet-4') || fullModel.includes('sonnet')) return 'Sonnet 4';
+  if (fullModel.includes('haiku-4-5') || fullModel.includes('haiku-4.5')) return 'Haiku 4.5';
+  if (fullModel.includes('haiku-3')) return 'Haiku 3';
+  if (fullModel.includes('haiku')) return 'Haiku 4.5';
+  return fullModel;
+}
+
 interface WorkspacePanelProps {
   agent: Agent;
   issueId: string;
   issueUrl?: string;
+  issue?: Issue;
   onClose: () => void;
 }
 
@@ -103,7 +161,7 @@ async function fetchOutput(agentId: string): Promise<string> {
   return data.output || '';
 }
 
-export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspacePanelProps) {
+export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: WorkspacePanelProps) {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
@@ -140,6 +198,18 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
       return res.json();
     },
     refetchInterval: 3000, // Check frequently during review
+  });
+
+  // Fetch cost data
+  const { data: costData } = useQuery<IssueCostData>({
+    queryKey: ['issueCosts', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/issues/${issueId}/costs`);
+      if (!res.ok) throw new Error('Failed to fetch costs');
+      return res.json();
+    },
+    refetchInterval: 30000,
+    staleTime: 10000,
   });
 
   const startContainersMutation = useMutation({
@@ -433,53 +503,86 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
   return (
     <>
-      <div className="flex h-full bg-gray-800 border-l border-gray-700">
+      <div className="flex h-full bg-surface-raised border-l border-divider">
         {/* Left sidebar - Workspace info */}
-        <div className="w-64 border-r border-gray-700 flex flex-col overflow-y-auto">
+        <div className="w-64 border-r border-divider flex flex-col overflow-y-auto">
           {/* Header */}
-          <div className="px-3 py-2 border-b border-gray-700">
+          <div className="px-3 py-2 border-b border-divider">
             <div className="flex items-center gap-2">
               <div className="flex gap-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '0ms' }} />
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '150ms' }} />
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-xs text-gray-400">Agent Running</span>
+              <span className="text-xs text-content-subtle">Agent Running</span>
             </div>
-            <h2 className="font-mono text-sm text-white font-medium mt-1">
+            <h2 className="font-mono text-sm text-content font-medium mt-1">
               {agent.issueId}
             </h2>
+            {issue && (
+              <p className="text-xs text-content-subtle mt-1 line-clamp-2" title={issue.title}>
+                {issue.title}
+              </p>
+            )}
         </div>
 
+        {/* Issue metadata */}
+        {issue && (
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="px-1.5 py-0.5 bg-surface-overlay text-content rounded text-[10px]">
+                {issue.status}
+              </span>
+              {issue.priority > 0 && (
+                <span className={`text-[10px] ${
+                  issue.priority === 1 ? 'text-red-400' :
+                  issue.priority === 2 ? 'text-orange-400' :
+                  issue.priority === 3 ? 'text-yellow-400' :
+                  'text-blue-400'
+                }`}>
+                  {issue.priority === 1 ? 'Urgent' :
+                   issue.priority === 2 ? 'High' :
+                   issue.priority === 3 ? 'Medium' : 'Low'}
+                </span>
+              )}
+              {issue.labels.slice(0, 3).map((label) => (
+                <span key={label} className="px-1.5 py-0.5 bg-surface-overlay text-content-muted rounded text-[10px]">
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Agent info */}
-        <div className="px-3 py-2 border-b border-gray-700 text-xs">
-          <div className="text-gray-500 uppercase tracking-wider mb-2">Agent</div>
+        <div className="px-3 py-2 border-b border-divider text-xs">
+          <div className="text-content-muted uppercase tracking-wider mb-2">Agent</div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-gray-400">Model</span>
-              <span className="text-white">{agent.model}</span>
+              <span className="text-content-subtle">Model</span>
+              <span className="text-content">{agent.model}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-400">Runtime</span>
-              <span className="text-white">{agent.runtime}</span>
+              <span className="text-content-subtle">Runtime</span>
+              <span className="text-content">{agent.runtime}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-400">Uptime</span>
-              <span className="text-white">{duration}</span>
+              <span className="text-content-subtle">Uptime</span>
+              <span className="text-content">{duration}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-400">Session</span>
-              <span className="text-white font-mono text-[10px]">{agent.id}</span>
+              <span className="text-content-subtle">Session</span>
+              <span className="text-content font-mono text-[10px]">{agent.id}</span>
             </div>
           </div>
         </div>
 
         {/* Git Status */}
         {agent.git && (
-          <div className="px-3 py-2 border-b border-gray-700 text-xs">
-            <div className="text-gray-500 uppercase tracking-wider mb-2">Git Status</div>
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="text-content-muted uppercase tracking-wider mb-2">Git Status</div>
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-white">
+              <div className="flex items-center gap-1.5 text-content">
                 <GitBranch className="w-3 h-3" />
                 <span className="font-mono">{agent.git.branch}</span>
               </div>
@@ -488,7 +591,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                   {agent.git.uncommittedFiles} uncommitted files
                 </div>
               )}
-              <div className="text-gray-400 text-[10px] mt-1 truncate" title={agent.git.latestCommit}>
+              <div className="text-content-subtle text-[10px] mt-1 truncate" title={agent.git.latestCommit}>
                 {agent.git.latestCommit}
               </div>
             </div>
@@ -497,8 +600,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
         {/* Workspace path */}
         {agent.workspace && (
-          <div className="px-3 py-2 border-b border-gray-700 text-xs">
-            <div className="flex items-center gap-1.5 text-gray-400">
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="flex items-center gap-1.5 text-content-subtle">
               <Folder className="w-3 h-3" />
               <span className="font-mono truncate text-[10px]" title={agent.workspace}>
                 {agent.workspace}
@@ -508,8 +611,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
         )}
 
         {/* Links */}
-        <div className="px-3 py-2 border-b border-gray-700 text-xs">
-          <div className="text-gray-500 uppercase tracking-wider mb-2">Links</div>
+        <div className="px-3 py-2 border-b border-divider text-xs">
+          <div className="text-content-muted uppercase tracking-wider mb-2">Links</div>
           <div className="space-y-1.5">
             {issueUrl && (
               <a
@@ -525,9 +628,42 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
           </div>
         </div>
 
+        {/* Cost Summary */}
+        {costData && (costData.totalCost > 0 || (costData.sessions?.length ?? 0) > 0) && (
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="text-content-muted uppercase tracking-wider mb-2">Cost</div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-content-subtle">Total</span>
+                <span className="text-green-400 font-medium">{formatCost(costData.totalCost)}</span>
+              </div>
+              {costData.totalTokens > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-content-subtle">Tokens</span>
+                  <span className="text-content">{formatTokens(costData.totalTokens)}</span>
+                </div>
+              )}
+              {Object.keys(costData.byModel).length > 0 && (
+                <div className="border-t border-divider pt-1.5 mt-1.5">
+                  {Object.entries(costData.byModel)
+                    .sort(([, a], [, b]) => b.cost - a.cost)
+                    .map(([model, info]) => (
+                      <div key={model} className="flex items-center justify-between text-[10px]">
+                        <span className="text-content-subtle truncate" title={model}>
+                          {getFriendlyModelName(model)}
+                        </span>
+                        <span className="text-content-body">{formatCost(info.cost)}</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Corrupted Workspace Warning */}
         {workspace?.corrupted && (
-          <div className="px-3 py-2 border-b border-gray-700">
+          <div className="px-3 py-2 border-b border-divider">
             <div className="flex items-center gap-2 text-yellow-500 mb-2">
               <AlertTriangle className="w-4 h-4" />
               <span className="text-xs font-medium">Workspace Corrupted</span>
@@ -537,7 +673,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                   className={`flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded ${
                     workspace.location === 'remote'
                       ? 'bg-cyan-900/50 text-cyan-400'
-                      : 'bg-gray-700 text-gray-400'
+                      : 'bg-surface-overlay text-content-subtle'
                   }`}
                   title={workspace.location === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
                 >
@@ -550,13 +686,13 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-400 mb-2">
+            <p className="text-xs text-content-subtle mb-2">
               {workspace.message || 'The workspace exists but is not a valid git worktree.'}
             </p>
             <button
               onClick={handleCleanWorkspace}
               disabled={cleanMutation.isPending}
-              className="flex items-center gap-1 px-2 py-1 bg-yellow-600 hover:bg-yellow-500 disabled:bg-yellow-800 text-white text-xs rounded transition-colors w-full justify-center"
+              className="flex items-center gap-1 px-2 py-1 bg-yellow-600 hover:bg-yellow-500 disabled:bg-yellow-800 text-content text-xs rounded transition-colors w-full justify-center"
             >
               {cleanMutation.isPending ? (
                 <>
@@ -587,8 +723,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
         {/* Service URLs */}
         {workspace?.hasDocker && (workspace?.frontendUrl || workspace?.apiUrl) && (
-          <div className="px-3 py-2 border-b border-gray-700 text-xs">
-            <div className="text-gray-500 uppercase tracking-wider mb-2">Services</div>
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="text-content-muted uppercase tracking-wider mb-2">Services</div>
             <div className="space-y-1.5">
               {workspace.frontendUrl && (
                 <a
@@ -618,13 +754,13 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
         {/* Container Controls - Start containers button when ANY container is stopped */}
         {workspace?.hasDocker && workspace.containers && Object.values(workspace.containers).some(c => !c.running) && (
-          <div className="px-3 py-2 border-b border-gray-700">
+          <div className="px-3 py-2 border-b border-divider">
             <div className="flex items-center gap-2">
               <span className="text-xs text-yellow-500">Some containers stopped</span>
               <button
                 onClick={handleStartContainers}
                 disabled={startContainersMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-500 disabled:bg-green-800 text-white text-xs rounded transition-colors"
+                className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-500 disabled:bg-green-800 text-content text-xs rounded transition-colors"
               >
                 {startContainersMutation.isPending ? (
                   <>
@@ -651,16 +787,16 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
         {/* Git-only workspace - offer containerize option or show status */}
         {workspace?.exists && !workspace.hasDocker && (
-          <div className="px-3 py-2 border-b border-gray-700">
-            <div className="text-gray-500 uppercase tracking-wider text-xs mb-2">Containers</div>
+          <div className="px-3 py-2 border-b border-divider">
+            <div className="text-content-muted uppercase tracking-wider text-xs mb-2">Containers</div>
             {workspace.canContainerize ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Git-only workspace</span>
+                  <span className="text-xs text-content-muted">Git-only workspace</span>
                   <button
                     onClick={handleContainerize}
                     disabled={containerizeMutation.isPending}
-                    className="flex items-center gap-1 px-2 py-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 text-white text-xs rounded transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 text-content text-xs rounded transition-colors"
                   >
                     {containerizeMutation.isPending ? (
                       <>
@@ -684,8 +820,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                 )}
               </div>
             ) : (
-              <div className="text-xs text-gray-400 bg-gray-800 px-2 py-2 rounded">
-                <span className="text-gray-500">No Docker support.</span> This workspace doesn't have container infrastructure set up yet.
+              <div className="text-xs text-content-subtle bg-surface-raised px-2 py-2 rounded">
+                <span className="text-content-muted">No Docker support.</span> This workspace doesn't have container infrastructure set up yet.
               </div>
             )}
           </div>
@@ -693,8 +829,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
         {/* Container Status - show when containers exist */}
         {workspace?.containers && Object.keys(workspace.containers).length > 0 && (
-          <div className="px-3 py-2 border-b border-gray-700 text-xs">
-            <div className="text-gray-500 uppercase tracking-wider mb-2">
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="text-content-muted uppercase tracking-wider mb-2">
               Containers
               <span className="text-gray-600 font-normal ml-2">(right-click for options)</span>
             </div>
@@ -711,7 +847,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                         ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50'
                         : isStarting || isControlling
                         ? 'bg-yellow-900/30 text-yellow-400 animate-pulse'
-                        : 'bg-gray-700 text-gray-500 hover:bg-gray-600'
+                        : 'bg-surface-overlay text-content-muted hover:bg-surface-emphasis'
                     }`}
                     title="Right-click for start/stop/restart options"
                   >
@@ -724,7 +860,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                     )}
                     {name}
                     {status.running && status.uptime && (
-                      <span className="text-gray-400 ml-1">{status.uptime}</span>
+                      <span className="text-content-subtle ml-1">{status.uptime}</span>
                     )}
                     {(isStarting || isControlling) && (
                       <span className="text-yellow-500 ml-1">...</span>
@@ -737,10 +873,10 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
         )}
 
         {/* Tmux attach command */}
-        <div className="px-3 py-2 border-b border-gray-700 text-xs">
-          <div className="text-gray-500 uppercase tracking-wider mb-2">Attach Command</div>
+        <div className="px-3 py-2 border-b border-divider text-xs">
+          <div className="text-content-muted uppercase tracking-wider mb-2">Attach Command</div>
           <div className="flex items-center gap-2">
-            <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 bg-gray-900 rounded font-mono text-[11px] text-gray-300 overflow-hidden">
+            <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 bg-surface rounded font-mono text-[11px] text-content-body overflow-hidden">
               <Terminal className="w-3 h-3 shrink-0 text-blue-400" />
               <span className="truncate">{tmuxCommand}</span>
             </div>
@@ -749,7 +885,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               className={`p-1.5 rounded transition-colors ${
                 copied
                   ? 'bg-green-900/30 text-green-400'
-                  : 'bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white'
+                  : 'bg-surface-overlay hover:bg-surface-emphasis text-content-subtle hover:text-content'
               }`}
               title="Copy to clipboard"
             >
@@ -759,8 +895,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
         </div>
 
         {/* Actions */}
-        <div className="px-3 py-2 border-b border-gray-700">
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Actions</div>
+        <div className="px-3 py-2 border-b border-divider">
+          <div className="text-xs text-content-muted uppercase tracking-wider mb-2">Actions</div>
           {/* Server-side pending operation status */}
           {workspace?.pendingOperation?.type === 'approve' && workspace.pendingOperation.status === 'running' && (
             <div className="flex items-center gap-2 text-xs text-blue-400 bg-blue-900/20 px-2 py-1.5 rounded mb-2">
@@ -774,27 +910,27 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                 <span className="font-medium">Operation failed</span>
                 <button
                   onClick={() => dismissPendingMutation.mutate()}
-                  className="text-gray-400 hover:text-white"
+                  className="text-content-subtle hover:text-content"
                   title="Dismiss"
                 >
                   <X className="w-3 h-3" />
                 </button>
               </div>
-              <div className="mt-1 text-gray-400 whitespace-pre-wrap">
+              <div className="mt-1 text-content-subtle whitespace-pre-wrap">
                 {workspace.pendingOperation.error}
               </div>
             </div>
           )}
           {/* Review Status Display */}
           {reviewStatus && (reviewStatus.reviewStatus !== 'pending' || reviewStatus.testStatus !== 'pending') && (
-            <div className="mb-2 p-2 bg-gray-900/50 rounded text-xs">
+            <div className="mb-2 p-2 bg-surface/50 rounded text-xs">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-gray-400">Review:</span>
+                <span className="text-content-subtle">Review:</span>
                 <span className={
                   reviewStatus.reviewStatus === 'passed' ? 'text-green-400' :
                   reviewStatus.reviewStatus === 'blocked' || reviewStatus.reviewStatus === 'failed' ? 'text-red-400' :
                   reviewStatus.reviewStatus === 'reviewing' ? 'text-yellow-400' :
-                  'text-gray-500'
+                  'text-content-muted'
                 }>
                   {reviewStatus.reviewStatus === 'passed' ? '✓ Passed' :
                    reviewStatus.reviewStatus === 'blocked' ? '✗ Blocked' :
@@ -804,12 +940,12 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-gray-400">Tests:</span>
+                <span className="text-content-subtle">Tests:</span>
                 <span className={
                   reviewStatus.testStatus === 'passed' ? 'text-green-400' :
                   reviewStatus.testStatus === 'failed' ? 'text-red-400' :
                   reviewStatus.testStatus === 'testing' ? 'text-yellow-400' :
-                  'text-gray-500'
+                  'text-content-muted'
                 }>
                   {reviewStatus.testStatus === 'passed' ? '✓ Passed' :
                    reviewStatus.testStatus === 'failed' ? '✗ Failed' :
@@ -819,10 +955,10 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                 </span>
               </div>
               {reviewStatus.reviewNotes && (
-                <div className="mt-1 text-gray-400 text-xs">{reviewStatus.reviewNotes}</div>
+                <div className="mt-1 text-content-subtle text-xs">{reviewStatus.reviewNotes}</div>
               )}
               {reviewStatus.testNotes && (
-                <div className="mt-1 text-gray-400 text-xs">{reviewStatus.testNotes}</div>
+                <div className="mt-1 text-content-subtle text-xs">{reviewStatus.testNotes}</div>
               )}
             </div>
           )}
@@ -833,7 +969,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               <button
                 onClick={handleMerge}
                 disabled={mergeMutation.isPending || reviewStatus?.mergeStatus === 'merging'}
-                className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-500 disabled:opacity-50 font-medium"
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-content rounded hover:bg-green-500 disabled:opacity-50 font-medium"
               >
                 {(mergeMutation.isPending || reviewStatus?.mergeStatus === 'merging') ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -857,7 +993,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
               className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 ${
                 reviewStatus?.readyForMerge
-                  ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
+                  ? 'bg-surface-overlay/50 text-content-body hover:bg-surface-overlay'
                   : 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50'
               }`}
             >
@@ -920,14 +1056,14 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
       {/* Right side - Logs */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Tabs header */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-700">
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-divider">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setActiveTab('logs')}
               className={`px-2 py-1 text-xs rounded transition-colors ${
                 activeTab === 'logs'
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-surface-overlay text-content'
+                  : 'text-content-subtle hover:text-content'
               }`}
             >
               Logs
@@ -936,8 +1072,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               onClick={() => setActiveTab('status')}
               className={`px-2 py-1 text-xs rounded transition-colors ${
                 activeTab === 'status'
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-surface-overlay text-content'
+                  : 'text-content-subtle hover:text-content'
               }`}
             >
               Status
@@ -946,12 +1082,12 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
           <div className="flex items-center gap-1">
             <button
               onClick={() => refetch()}
-              className="p-1 text-gray-400 hover:text-white"
+              className="p-1 text-content-subtle hover:text-content"
               title="Refresh"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
-            <button onClick={onClose} className="p-1 text-gray-400 hover:text-white">
+            <button onClick={onClose} className="p-1 text-content-subtle hover:text-content">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -963,7 +1099,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             <pre
               ref={terminalRef}
               onScroll={handleScroll}
-              className="flex-1 min-h-0 overflow-auto p-3 bg-gray-900 text-gray-200 font-mono text-xs leading-relaxed m-0 whitespace-pre"
+              className="flex-1 min-h-0 overflow-auto p-3 bg-surface text-content font-mono text-xs leading-relaxed m-0 whitespace-pre"
             >
               {output || (agent.status === 'stopped' ? 'No saved output available.' : 'Connecting to agent...')}
               <div ref={bottomRef} />
@@ -971,7 +1107,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
             {/* Input — hidden for stopped agents */}
             {agent.status !== 'stopped' && (
-              <div className="p-2 border-t border-gray-700 bg-gray-800">
+              <div className="p-2 border-t border-divider bg-surface-raised">
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
@@ -979,12 +1115,12 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                     placeholder="Send message to agent..."
-                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="flex-1 px-3 py-2 bg-surface-overlay border border-divider-strong rounded text-sm text-content placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <button
                     onClick={handleSend}
                     disabled={!message.trim() || sendMutation.isPending}
-                    className="px-3 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-3 py-2 bg-blue-600 text-content rounded text-sm font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     <Send className="w-4 h-4" />
                     Send
@@ -994,11 +1130,11 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             )}
           </>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-gray-900">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-surface">
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-white mb-2">Agent Summary</h3>
-                <div className="text-xs text-gray-300 space-y-1">
+                <h3 className="text-sm font-medium text-content mb-2">Agent Summary</h3>
+                <div className="text-xs text-content-body space-y-1">
                   <p><strong>Issue:</strong> {agent.issueId}</p>
                   <p><strong>Session:</strong> <span className="font-mono text-[10px]">{agent.id}</span></p>
                   <p><strong>Model:</strong> {agent.model}</p>
@@ -1010,8 +1146,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
               {agent.workspace && (
                 <div>
-                  <h3 className="text-sm font-medium text-white mb-2">Workspace</h3>
-                  <div className="text-xs text-gray-300 space-y-1">
+                  <h3 className="text-sm font-medium text-content mb-2">Workspace</h3>
+                  <div className="text-xs text-content-body space-y-1">
                     <p className="font-mono text-[10px] break-all">{agent.workspace}</p>
                   </div>
                 </div>
@@ -1019,8 +1155,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
 
               {agent.git && (
                 <div>
-                  <h3 className="text-sm font-medium text-white mb-2">Git Status</h3>
-                  <div className="text-xs text-gray-300 space-y-1">
+                  <h3 className="text-sm font-medium text-content mb-2">Git Status</h3>
+                  <div className="text-xs text-content-body space-y-1">
                     <p><strong>Branch:</strong> <span className="font-mono">{agent.git.branch}</span></p>
                     <p><strong>Uncommitted:</strong> {agent.git.uncommittedFiles} files</p>
                     <p><strong>Latest:</strong> {agent.git.latestCommit}</p>
@@ -1029,8 +1165,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               )}
 
               <div>
-                <h3 className="text-sm font-medium text-white mb-2">Health</h3>
-                <div className="text-xs text-gray-300 space-y-1">
+                <h3 className="text-sm font-medium text-content mb-2">Health</h3>
+                <div className="text-xs text-content-body space-y-1">
                   <p><strong>Status:</strong> <span className="text-green-400">{agent.status}</span></p>
                   <p><strong>Consecutive Failures:</strong> {agent.consecutiveFailures}</p>
                   <p><strong>Total Restarts:</strong> {agent.killCount}</p>
@@ -1045,11 +1181,11 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
     {/* Container Context Menu */}
     {containerMenu && (
       <div
-        className="fixed z-50 bg-gray-800 border border-gray-600 rounded shadow-lg py-1 min-w-[140px]"
+        className="fixed z-50 bg-surface-raised border border-divider-strong rounded shadow-lg py-1 min-w-[140px]"
         style={{ left: containerMenu.x, top: containerMenu.y }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-3 py-1 text-xs text-gray-400 border-b border-gray-700 mb-1">
+        <div className="px-3 py-1 text-xs text-content-subtle border-b border-divider mb-1">
           {containerMenu.containerName}
         </div>
         {containerMenu.isRunning ? (
@@ -1057,7 +1193,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             <button
               onClick={() => containerControlMutation.mutate({ containerName: containerMenu.containerName, action: 'restart' })}
               disabled={containerControlMutation.isPending}
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-200 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
+              className="w-full text-left px-3 py-1.5 text-xs text-content hover:bg-surface-overlay flex items-center gap-2 disabled:opacity-50"
             >
               <RefreshCw className="w-3 h-3" />
               Restart
@@ -1065,7 +1201,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             <button
               onClick={() => containerControlMutation.mutate({ containerName: containerMenu.containerName, action: 'stop' })}
               disabled={containerControlMutation.isPending}
-              className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
+              className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-surface-overlay flex items-center gap-2 disabled:opacity-50"
             >
               <Square className="w-3 h-3" />
               Stop
@@ -1075,14 +1211,14 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
           <button
             onClick={() => containerControlMutation.mutate({ containerName: containerMenu.containerName, action: 'start' })}
             disabled={containerControlMutation.isPending}
-            className="w-full text-left px-3 py-1.5 text-xs text-green-400 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
+            className="w-full text-left px-3 py-1.5 text-xs text-green-400 hover:bg-surface-overlay flex items-center gap-2 disabled:opacity-50"
           >
             <Play className="w-3 h-3" />
             Start
           </button>
         )}
         {containerControlMutation.isError && (
-          <div className="px-3 py-1 text-xs text-red-400 border-t border-gray-700 mt-1">
+          <div className="px-3 py-1 text-xs text-red-400 border-t border-divider mt-1">
             {containerControlMutation.error instanceof Error
               ? containerControlMutation.error.message
               : 'Action failed'}

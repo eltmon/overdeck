@@ -109,7 +109,7 @@ const TRIGGER_COLORS: Record<string, string> = {
   planning_complete: 'text-green-400',
   test_failure: 'text-orange-400',
   task_complete: 'text-blue-400',
-  manual: 'text-gray-400',
+  manual: 'text-content-subtle',
 };
 
 const SPECIALIST_COLORS = {
@@ -130,7 +130,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: 'text-red-400',
   high: 'text-orange-400',
   normal: 'text-blue-400',
-  low: 'text-gray-400',
+  low: 'text-content-subtle',
 };
 
 export function HandoffsPage() {
@@ -161,7 +161,7 @@ export function HandoffsPage() {
   if (isLoadingHandoffs || isLoadingStats || isLoadingSpecialistHandoffs || isLoadingSpecialistStats) {
     return (
       <div className="p-6">
-        <div className="text-gray-400">Loading handoff data...</div>
+        <div className="text-content-subtle">Loading handoff data...</div>
       </div>
     );
   }
@@ -170,8 +170,8 @@ export function HandoffsPage() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white mb-2">Model Handoffs</h2>
-        <p className="text-gray-400">
+        <h2 className="text-2xl font-bold text-content mb-2">Model Handoffs</h2>
+        <p className="text-content-subtle">
           History of automatic and manual model handoffs across agents
         </p>
       </div>
@@ -179,31 +179,31 @@ export function HandoffsPage() {
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-            <div className="text-sm text-gray-400 mb-1">Total Handoffs</div>
-            <div className="text-2xl font-bold text-white">{stats.totalHandoffs}</div>
+          <div className="p-4 bg-surface-raised rounded-lg border border-divider">
+            <div className="text-sm text-content-subtle mb-1">Total Handoffs</div>
+            <div className="text-2xl font-bold text-content">{stats.totalHandoffs}</div>
           </div>
-          <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-            <div className="text-sm text-gray-400 mb-1">Success Rate</div>
+          <div className="p-4 bg-surface-raised rounded-lg border border-divider">
+            <div className="text-sm text-content-subtle mb-1">Success Rate</div>
             <div className="text-2xl font-bold text-green-400">
               {(stats.successRate * 100).toFixed(0)}%
             </div>
           </div>
-          <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-            <div className="text-sm text-gray-400 mb-1">Most Common Trigger</div>
-            <div className="text-sm font-medium text-white">
+          <div className="p-4 bg-surface-raised rounded-lg border border-divider">
+            <div className="text-sm text-content-subtle mb-1">Most Common Trigger</div>
+            <div className="text-sm font-medium text-content">
               {Object.entries(stats.byTrigger).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-content-muted">
               {Object.entries(stats.byTrigger).sort((a, b) => b[1] - a[1])[0]?.[1] || 0} times
             </div>
           </div>
-          <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-            <div className="text-sm text-gray-400 mb-1">Most Popular Target</div>
-            <div className="text-sm font-medium text-white">
+          <div className="p-4 bg-surface-raised rounded-lg border border-divider">
+            <div className="text-sm text-content-subtle mb-1">Most Popular Target</div>
+            <div className="text-sm font-medium text-content">
               {Object.entries(stats.byModel.to).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-content-muted">
               {Object.entries(stats.byModel.to).sort((a, b) => b[1] - a[1])[0]?.[1] || 0} handoffs
             </div>
           </div>
@@ -211,14 +211,14 @@ export function HandoffsPage() {
       )}
 
       {/* Handoff History Table */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-        <div className="p-4 border-b border-gray-700">
-          <h3 className="text-lg font-semibold text-white">Recent Handoffs</h3>
+      <div className="bg-surface-raised rounded-lg border border-divider overflow-hidden">
+        <div className="p-4 border-b border-divider">
+          <h3 className="text-lg font-semibold text-content">Recent Handoffs</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-750 text-left text-sm text-gray-400">
+              <tr className="bg-gray-750 text-left text-sm text-content-subtle">
                 <th className="px-4 py-3">Timestamp</th>
                 <th className="px-4 py-3">Agent</th>
                 <th className="px-4 py-3">Transition</th>
@@ -233,33 +233,33 @@ export function HandoffsPage() {
                 handoffsData.handoffs.map((handoff, index) => (
                   <tr
                     key={`${handoff.timestamp}-${index}`}
-                    className="border-t border-gray-700 hover:bg-gray-750"
+                    className="border-t border-divider hover:bg-gray-750"
                   >
-                    <td className="px-4 py-3 text-gray-400">
+                    <td className="px-4 py-3 text-content-subtle">
                       <div className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {formatTimestamp(handoff.timestamp)}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-white">{handoff.agentId}</div>
-                      <div className="text-xs text-gray-500">{handoff.issueId}</div>
+                      <div className="font-medium text-content">{handoff.agentId}</div>
+                      <div className="text-xs text-content-muted">{handoff.issueId}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span
                           className={`px-2 py-0.5 text-xs rounded border ${
                             MODEL_COLORS[handoff.from.model as keyof typeof MODEL_COLORS] ||
-                            'text-gray-400 bg-gray-700'
+                            'text-content-subtle bg-surface-overlay'
                           }`}
                         >
                           {handoff.from.model}
                         </span>
-                        <ArrowRight className="w-3 h-3 text-gray-500" />
+                        <ArrowRight className="w-3 h-3 text-content-muted" />
                         <span
                           className={`px-2 py-0.5 text-xs rounded border ${
                             MODEL_COLORS[handoff.to.model as keyof typeof MODEL_COLORS] ||
-                            'text-gray-400 bg-gray-700'
+                            'text-content-subtle bg-surface-overlay'
                           }`}
                         >
                           {handoff.to.model}
@@ -269,13 +269,13 @@ export function HandoffsPage() {
                     <td className="px-4 py-3">
                       <span
                         className={`text-xs ${
-                          TRIGGER_COLORS[handoff.trigger] || 'text-gray-400'
+                          TRIGGER_COLORS[handoff.trigger] || 'text-content-subtle'
                         }`}
                       >
                         {TRIGGER_LABELS[handoff.trigger] || handoff.trigger}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-300 max-w-xs truncate">
+                    <td className="px-4 py-3 text-content-body max-w-xs truncate">
                       {handoff.reason}
                     </td>
                     <td className="px-4 py-3 text-emerald-400">
@@ -296,7 +296,7 @@ export function HandoffsPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-content-muted">
                     No handoffs recorded yet
                   </td>
                 </tr>
@@ -309,8 +309,8 @@ export function HandoffsPage() {
       {/* Specialist Handoffs Section */}
       <div className="mt-12">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-white mb-2">Specialist Handoffs</h2>
-          <p className="text-gray-400">
+          <h2 className="text-2xl font-bold text-content mb-2">Specialist Handoffs</h2>
+          <p className="text-content-subtle">
             Queue-based work handoffs between specialist agents (review, test, merge)
           </p>
         </div>
@@ -318,25 +318,25 @@ export function HandoffsPage() {
         {/* Specialist Stats Cards */}
         {specialistStats && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-              <div className="text-sm text-gray-400 mb-1">Today's Handoffs</div>
-              <div className="text-2xl font-bold text-white">{specialistStats.todayCount}</div>
+            <div className="p-4 bg-surface-raised rounded-lg border border-divider">
+              <div className="text-sm text-content-subtle mb-1">Today's Handoffs</div>
+              <div className="text-2xl font-bold text-content">{specialistStats.todayCount}</div>
             </div>
-            <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-              <div className="text-sm text-gray-400 mb-1">Queue Depth</div>
+            <div className="p-4 bg-surface-raised rounded-lg border border-divider">
+              <div className="text-sm text-content-subtle mb-1">Queue Depth</div>
               <div className="text-2xl font-bold text-orange-400">
                 {specialistStats.queueDepth}
               </div>
             </div>
-            <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-              <div className="text-sm text-gray-400 mb-1">Success Rate</div>
+            <div className="p-4 bg-surface-raised rounded-lg border border-divider">
+              <div className="text-sm text-content-subtle mb-1">Success Rate</div>
               <div className="text-2xl font-bold text-green-400">
                 {(specialistStats.successRate * 100).toFixed(0)}%
               </div>
             </div>
-            <div className="p-4 bg-gray-800 rounded-lg border border-gray-700">
-              <div className="text-sm text-gray-400 mb-1">Most Active</div>
-              <div className="text-sm font-medium text-white">
+            <div className="p-4 bg-surface-raised rounded-lg border border-divider">
+              <div className="text-sm text-content-subtle mb-1">Most Active</div>
+              <div className="text-sm font-medium text-content">
                 {Object.entries(specialistStats.bySpecialist)
                   .map(([name, counts]) => ({ name, total: counts.sent + counts.received }))
                   .sort((a, b) => b.total - a.total)[0]?.name || 'N/A'}
@@ -346,14 +346,14 @@ export function HandoffsPage() {
         )}
 
         {/* Specialist Handoffs Table */}
-        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mt-6">
-          <div className="p-4 border-b border-gray-700">
-            <h3 className="text-lg font-semibold text-white">Recent Specialist Handoffs</h3>
+        <div className="bg-surface-raised rounded-lg border border-divider overflow-hidden mt-6">
+          <div className="p-4 border-b border-divider">
+            <h3 className="text-lg font-semibold text-content">Recent Specialist Handoffs</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-750 text-left text-sm text-gray-400">
+                <tr className="bg-gray-750 text-left text-sm text-content-subtle">
                   <th className="px-4 py-3">Timestamp</th>
                   <th className="px-4 py-3">Issue</th>
                   <th className="px-4 py-3">Transition</th>
@@ -365,17 +365,17 @@ export function HandoffsPage() {
               <tbody className="text-sm">
                 {specialistHandoffsData && specialistHandoffsData.handoffs.length > 0 ? (
                   specialistHandoffsData.handoffs.map((handoff) => (
-                    <tr key={handoff.id} className="border-t border-gray-700 hover:bg-gray-750">
-                      <td className="px-4 py-3 text-gray-400">
+                    <tr key={handoff.id} className="border-t border-divider hover:bg-gray-750">
+                      <td className="px-4 py-3 text-content-subtle">
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {formatTimestamp(handoff.timestamp)}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-white">{handoff.issueId}</div>
+                        <div className="font-medium text-content">{handoff.issueId}</div>
                         {handoff.context?.branch && (
-                          <div className="text-xs text-gray-500">{handoff.context.branch}</div>
+                          <div className="text-xs text-content-muted">{handoff.context.branch}</div>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -384,17 +384,17 @@ export function HandoffsPage() {
                             className={`px-2 py-0.5 text-xs rounded border ${
                               SPECIALIST_COLORS[
                                 handoff.fromSpecialist as keyof typeof SPECIALIST_COLORS
-                              ] || 'text-gray-400 bg-gray-700'
+                              ] || 'text-content-subtle bg-surface-overlay'
                             }`}
                           >
                             {handoff.fromSpecialist}
                           </span>
-                          <ArrowRight className="w-3 h-3 text-gray-500" />
+                          <ArrowRight className="w-3 h-3 text-content-muted" />
                           <span
                             className={`px-2 py-0.5 text-xs rounded border ${
                               SPECIALIST_COLORS[
                                 handoff.toSpecialist as keyof typeof SPECIALIST_COLORS
-                              ] || 'text-gray-400 bg-gray-700'
+                              ] || 'text-content-subtle bg-surface-overlay'
                             }`}
                           >
                             {handoff.toSpecialist}
@@ -411,19 +411,19 @@ export function HandoffsPage() {
                           {handoff.status}
                         </span>
                         {handoff.result && (
-                          <span className="ml-2 text-xs text-gray-500">
+                          <span className="ml-2 text-xs text-content-muted">
                             ({handoff.result})
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs">
+                      <td className="px-4 py-3 text-content-subtle text-xs">
                         {handoff.context?.workspace || '-'}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-content-muted">
                       No specialist handoffs recorded yet
                     </td>
                   </tr>

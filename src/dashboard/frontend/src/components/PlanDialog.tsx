@@ -318,20 +318,20 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   if (minimized) {
     return (
       <div
-        className="fixed bottom-4 right-4 z-50 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-gray-700 transition-colors"
+        className="fixed bottom-4 right-4 z-50 bg-surface-raised rounded-lg shadow-2xl border border-divider px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-surface-overlay transition-colors"
         onClick={() => setMinimized(false)}
       >
         <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-          <Sparkles className="w-3 h-3 text-white" />
+          <Sparkles className="w-3 h-3 text-content" />
         </div>
-        <span className="text-sm text-white font-medium">Plan: {issue.identifier}</span>
+        <span className="text-sm text-content font-medium">Plan: {issue.identifier}</span>
         {step === 'planning' && (
           <>
             <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
             {statusQuery.data?.isRemote ? (
               <span className="px-1.5 py-0.5 bg-blue-500/30 text-blue-300 text-xs rounded">Remote</span>
             ) : (
-              <span className="px-1.5 py-0.5 bg-gray-500/30 text-gray-400 text-xs rounded">Local</span>
+              <span className="px-1.5 py-0.5 bg-gray-500/30 text-content-subtle text-xs rounded">Local</span>
             )}
           </>
         )}
@@ -368,16 +368,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
             topLeft: true,
           }}
         >
-          <div className="w-full h-full bg-gray-800 rounded-xl shadow-2xl border border-gray-700 overflow-hidden flex flex-col">
+          <div className="w-full h-full bg-surface-raised rounded-xl shadow-2xl border border-divider overflow-hidden flex flex-col">
             {/* Header - drag handle */}
-            <div className="drag-handle flex items-center justify-between px-6 py-4 border-b border-gray-700 cursor-move">
+            <div className="drag-handle flex items-center justify-between px-6 py-4 border-b border-divider cursor-move">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+                  <Sparkles className="w-5 h-5 text-content" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Plan: {issue.identifier}</h2>
-                  <p className="text-sm text-gray-400 line-clamp-1">{issue.title}</p>
+                  <h2 className="text-lg font-semibold text-content">Plan: {issue.identifier}</h2>
+                  <p className="text-sm text-content-subtle line-clamp-1">{issue.title}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -392,14 +392,14 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         Remote
                       </span>
                     ) : (
-                      <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded-full">
+                      <span className="px-2 py-1 bg-gray-500/20 text-content-subtle text-xs rounded-full">
                         Local
                       </span>
                     )}
                     <button
                       onClick={handleStopPlanning}
                       disabled={stopPlanningMutation.isPending}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-content text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                       title="Stop the planning agent"
                     >
                       <Square className="w-4 h-4" />
@@ -409,7 +409,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                 )}
                 <button
                   onClick={() => setMinimized(true)}
-                  className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                  className="p-2 text-content-subtle hover:text-content hover:bg-surface-overlay rounded-lg transition-colors"
                   title="Hide (planning continues in background)"
                 >
                   <X className="w-5 h-5" />
@@ -423,7 +423,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               {step === 'checking' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
                   <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
-                  <p className="text-gray-300">Checking session status...</p>
+                  <p className="text-content-body">Checking session status...</p>
                 </div>
               )}
 
@@ -436,15 +436,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                   {/* Check if already in planning state */}
                   {['In Planning', 'Planning', 'Planned', 'Discovery'].includes(issue.status) ? (
                     <>
-                      <h3 className="text-xl font-semibold text-white mb-2">Resume Planning Session</h3>
-                      <p className="text-gray-400 text-center max-w-md mb-6">
+                      <h3 className="text-xl font-semibold text-content mb-2">Resume Planning Session</h3>
+                      <p className="text-content-subtle text-center max-w-md mb-6">
                         This issue is in <span className="text-purple-400 font-medium">"In Planning"</span> state.
                         You can resume planning or abort to return to Todo.
                       </p>
 
-                      <div className="bg-gray-700/50 rounded-lg p-4 mb-6 max-w-md w-full">
-                        <h4 className="text-sm font-medium text-gray-300 mb-2">Options:</h4>
-                        <ul className="space-y-2 text-sm text-gray-400">
+                      <div className="bg-surface-overlay/50 rounded-lg p-4 mb-6 max-w-md w-full">
+                        <h4 className="text-sm font-medium text-content-body mb-2">Options:</h4>
+                        <ul className="space-y-2 text-sm text-content-subtle">
                           <li className="flex items-center gap-2">
                             <Play className="w-4 h-4 text-purple-400" />
                             <span><strong className="text-purple-400">Resume</strong> - Start a new planning agent session</span>
@@ -467,7 +467,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         </button>
                         <button
                           onClick={handleStartPlanning}
-                          className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors font-medium"
+                          className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-content rounded-lg transition-colors font-medium"
                         >
                           <Play className="w-5 h-5" />
                           Resume Planning
@@ -476,15 +476,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     </>
                   ) : (
                     <>
-                      <h3 className="text-xl font-semibold text-white mb-2">Start Planning Session</h3>
-                      <p className="text-gray-400 text-center max-w-md mb-6">
+                      <h3 className="text-xl font-semibold text-content mb-2">Start Planning Session</h3>
+                      <p className="text-content-subtle text-center max-w-md mb-6">
                         This will move the issue to <span className="text-purple-400 font-medium">"In Planning"</span>,
                         create a workspace, and start an AI discovery session to help define the implementation plan.
                       </p>
 
-                      <div className="bg-gray-700/50 rounded-lg p-4 mb-6 max-w-md w-full">
-                        <h4 className="text-sm font-medium text-gray-300 mb-2">What happens:</h4>
-                        <ul className="space-y-2 text-sm text-gray-400">
+                      <div className="bg-surface-overlay/50 rounded-lg p-4 mb-6 max-w-md w-full">
+                        <h4 className="text-sm font-medium text-content-body mb-2">What happens:</h4>
+                        <ul className="space-y-2 text-sm text-content-subtle">
                           <li className="flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4 text-green-400" />
                             Issue moves to "In Planning" in {issue.source === 'github' ? 'GitHub' : 'Linear'}
@@ -502,7 +502,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
 
                       {/* Workspace location option */}
                       <div className="mb-4 w-full max-w-md">
-                        <label className="text-sm font-medium text-gray-300 mb-2 block">Workspace Location</label>
+                        <label className="text-sm font-medium text-content-body mb-2 block">Workspace Location</label>
                         <div className="flex gap-4">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -514,9 +514,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                                 setWorkspaceLocation('local');
                                 localStorage.setItem('panopticon.planning.workspaceLocation', 'local');
                               }}
-                              className="w-4 h-4 border-gray-500 bg-gray-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                              className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
                             />
-                            <span className="text-sm text-gray-300">Local</span>
+                            <span className="text-sm text-content-body">Local</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -528,9 +528,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                                 setWorkspaceLocation('remote');
                                 localStorage.setItem('panopticon.planning.workspaceLocation', 'remote');
                               }}
-                              className="w-4 h-4 border-gray-500 bg-gray-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                              className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
                             />
-                            <span className="text-sm text-gray-300">Remote (exe.dev)</span>
+                            <span className="text-sm text-content-body">Remote (exe.dev)</span>
                           </label>
                         </div>
                       </div>
@@ -544,17 +544,17 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             setStartDocker(e.target.checked);
                             localStorage.setItem('panopticon.planning.startDocker', String(e.target.checked));
                           }}
-                          className="w-4 h-4 rounded border-gray-500 bg-gray-700 text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                          className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
                         />
-                        <span className="text-sm text-gray-300">
+                        <span className="text-sm text-content-body">
                           Start Docker containers
-                          <span className="text-gray-500 ml-1">(dev environment ready for testing)</span>
+                          <span className="text-content-muted ml-1">(dev environment ready for testing)</span>
                         </span>
                       </label>
 
                       <button
                         onClick={handleStartPlanning}
-                        className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors font-medium"
+                        className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-content rounded-lg transition-colors font-medium"
                       >
                         <Play className="w-5 h-5" />
                         Start Planning
@@ -568,8 +568,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               {step === 'starting' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
                   <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
-                  <p className="text-gray-300">Starting planning session...</p>
-                  <p className="text-sm text-gray-500 mt-2">Moving to In Planning, creating workspace, spawning agent</p>
+                  <p className="text-content-body">Starting planning session...</p>
+                  <p className="text-sm text-content-muted mt-2">Moving to In Planning, creating workspace, spawning agent</p>
                 </div>
               )}
 
@@ -604,7 +604,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full">
-                        <div className="flex items-center gap-2 text-gray-500">
+                        <div className="flex items-center gap-2 text-content-muted">
                           <Loader2 className="w-4 h-4 animate-spin" />
                           Connecting to terminal...
                         </div>
@@ -613,15 +613,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                   </div>
 
                   {/* Footer with controls */}
-                  <div className="border-t border-gray-700 px-4 py-2 flex items-center justify-between bg-gray-800">
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <div className="border-t border-divider px-4 py-2 flex items-center justify-between bg-surface-raised">
+                    <div className="flex items-center gap-2 text-sm text-content-subtle">
                       <Terminal className="w-4 h-4" />
                       Interactive planning session
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setShowBeadsDialog(true)}
-                        className="flex items-center gap-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded transition-colors"
+                        className="flex items-center gap-1 px-3 py-1 bg-surface-overlay hover:bg-surface-emphasis text-content-body text-sm rounded transition-colors"
                         title="View tasks created during planning"
                       >
                         <List className="w-4 h-4" />
@@ -659,8 +659,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                   <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
                     <CheckCircle2 className="w-10 h-10 text-green-400" />
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Planning Complete</h3>
-                  <p className="text-gray-400 text-center max-w-md mb-6">
+                  <h3 className="text-xl font-semibold text-content mb-2">Planning Complete</h3>
+                  <p className="text-content-subtle text-center max-w-md mb-6">
                     The planning session has ended. Review the plan and start the execution agent.
                   </p>
 
@@ -670,12 +670,12 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       <div className="flex items-center gap-3">
                         <FileText className="w-8 h-8 text-purple-400" />
                         <div className="flex-1">
-                          <p className="text-sm text-gray-300 font-medium">Feature Plan</p>
-                          <p className="text-xs text-gray-500 font-mono truncate">{getPrdPath()}</p>
+                          <p className="text-sm text-content-body font-medium">Feature Plan</p>
+                          <p className="text-xs text-content-muted font-mono truncate">{getPrdPath()}</p>
                         </div>
                         <a
                           href={`vscode://file${getPrdPath()}`}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg transition-colors"
+                          className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-content text-sm rounded-lg transition-colors"
                           title="Open in VS Code"
                         >
                           <ExternalLink className="w-4 h-4" />
@@ -696,19 +696,19 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                   </button>
 
                   {result && (
-                    <div className="bg-gray-700/50 rounded-lg p-4 mb-6 max-w-md w-full">
-                      <p className="text-sm text-gray-400 mb-2">Summary:</p>
+                    <div className="bg-surface-overlay/50 rounded-lg p-4 mb-6 max-w-md w-full">
+                      <p className="text-sm text-content-subtle mb-2">Summary:</p>
                       <ul className="space-y-1 text-sm">
-                        <li className="text-gray-300">
-                          <span className="text-gray-500">Issue:</span> {result.issue.identifier}
+                        <li className="text-content-body">
+                          <span className="text-content-muted">Issue:</span> {result.issue.identifier}
                         </li>
-                        <li className="text-gray-300">
-                          <span className="text-gray-500">State:</span>{' '}
+                        <li className="text-content-body">
+                          <span className="text-content-muted">State:</span>{' '}
                           <span className="text-purple-400">{result.issue.newState}</span>
                         </li>
                         {result.workspace.created && (
-                          <li className="text-gray-300">
-                            <span className="text-gray-500">Workspace:</span>{' '}
+                          <li className="text-content-body">
+                            <span className="text-content-muted">Workspace:</span>{' '}
                             <span className="text-blue-400 font-mono text-xs">{result.workspace.path}</span>
                           </li>
                         )}
@@ -720,14 +720,14 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     <button
                       onClick={onClose}
                       disabled={startAgentMutation.isPending}
-                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                      className="px-4 py-2 bg-surface-overlay hover:bg-surface-emphasis text-content rounded-lg transition-colors disabled:opacity-50"
                     >
                       Close
                     </button>
                     <button
                       onClick={handleComplete}
                       disabled={startAgentMutation.isPending}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-content rounded-lg transition-colors disabled:opacity-50"
                     >
                       {startAgentMutation.isPending ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
@@ -746,13 +746,13 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                   <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
                     <AlertCircle className="w-10 h-10 text-red-400" />
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Planning Failed</h3>
+                  <h3 className="text-xl font-semibold text-content mb-2">Planning Failed</h3>
                   <p className="text-red-400 text-center max-w-md mb-6">{error}</p>
 
                   <div className="flex gap-3">
                     <button
                       onClick={onClose}
-                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                      className="px-4 py-2 bg-surface-overlay hover:bg-surface-emphasis text-content rounded-lg transition-colors"
                     >
                       Close
                     </button>
@@ -761,7 +761,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         setStep('ready');
                         setError(null);
                       }}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-content rounded-lg transition-colors"
                     >
                       Try Again
                     </button>

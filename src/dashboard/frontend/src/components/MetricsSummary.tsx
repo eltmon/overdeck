@@ -89,18 +89,18 @@ export function MetricsSummary() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       {/* Cost Today */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+      <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-green-400" />
-            <span className="text-sm text-gray-400">Cost Today</span>
+            <span className="text-sm text-content-subtle">Cost Today</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-white">
+        <div className="text-2xl font-bold text-content">
           ${metrics.today.totalCost.toFixed(2)}
         </div>
         {metrics.topSpenders.agents.length > 0 && (
-          <div className="mt-2 text-xs text-gray-500">
+          <div className="mt-2 text-xs text-content-muted">
             Top: {metrics.topSpenders.agents[0].agentId} ($
             {metrics.topSpenders.agents[0].cost.toFixed(2)})
           </div>
@@ -108,48 +108,48 @@ export function MetricsSummary() {
       </div>
 
       {/* Active Agents */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+      <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-blue-400" />
-            <span className="text-sm text-gray-400">Agents</span>
+            <span className="text-sm text-content-subtle">Agents</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-white">
+        <div className="text-2xl font-bold text-content">
           {metrics.today.activeCount} / {metrics.today.agentCount}
         </div>
-        <div className="mt-2 text-xs text-gray-500">
+        <div className="mt-2 text-xs text-content-muted">
           {metrics.today.activeCount} active, {metrics.today.agentCount - metrics.today.activeCount}{' '}
           idle
         </div>
       </div>
 
       {/* Stuck Agents */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+      <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-red-400" />
-            <span className="text-sm text-gray-400">Stuck Agents</span>
+            <span className="text-sm text-content-subtle">Stuck Agents</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-white">{metrics.today.stuckCount}</div>
-        <div className="mt-2 text-xs text-gray-500">
+        <div className="text-2xl font-bold text-content">{metrics.today.stuckCount}</div>
+        <div className="mt-2 text-xs text-content-muted">
           {metrics.today.warningCount} warnings
         </div>
       </div>
 
       {/* Specialist Handoffs */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+      <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <GitBranch className="w-5 h-5 text-cyan-400" />
-            <span className="text-sm text-gray-400">Specialist Handoffs</span>
+            <span className="text-sm text-content-subtle">Specialist Handoffs</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-white">
+        <div className="text-2xl font-bold text-content">
           {specialistStats?.todayCount ?? 0}
         </div>
-        <div className="mt-2 text-xs text-gray-500">
+        <div className="mt-2 text-xs text-content-muted">
           {specialistStats
             ? `${(specialistStats.successRate * 100).toFixed(0)}% success rate`
             : 'No data'}
@@ -157,15 +157,15 @@ export function MetricsSummary() {
       </div>
 
       {/* Cost Escalations */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+      <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-purple-400" />
-            <span className="text-sm text-gray-400">Cost Escalations</span>
+            <span className="text-sm text-content-subtle">Cost Escalations</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-white">{costEscalations}</div>
-        <div className="mt-2 text-xs text-gray-500">
+        <div className="text-2xl font-bold text-content">{costEscalations}</div>
+        <div className="mt-2 text-xs text-content-muted">
           {handoffStats
             ? `${(handoffStats.successRate * 100).toFixed(0)}% success rate`
             : 'No data'}
@@ -173,17 +173,17 @@ export function MetricsSummary() {
       </div>
 
       {/* Queue Depth */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+      <div className="bg-surface-raised border border-divider rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Layers className="w-5 h-5 text-orange-400" />
-            <span className="text-sm text-gray-400">Queue Depth</span>
+            <span className="text-sm text-content-subtle">Queue Depth</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-white">
+        <div className="text-2xl font-bold text-content">
           {specialistStats?.queueDepth ?? 0}
         </div>
-        <div className="mt-2 text-xs text-gray-500">
+        <div className="mt-2 text-xs text-content-muted">
           {specialistStats?.queueDepth === 0
             ? 'All clear'
             : `${specialistStats?.queueDepth} pending`}

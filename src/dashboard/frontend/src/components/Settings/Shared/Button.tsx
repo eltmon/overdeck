@@ -11,9 +11,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = 'font-bold transition-all rounded-lg focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variantStyles = {
-      primary: 'bg-[#a078f7] text-white px-6 py-2 hover:bg-[#a078f7]/90 shadow-lg shadow-[#a078f7]/20 focus:ring-[#a078f7]',
-      secondary: 'text-[#a390cb] px-4 py-2 hover:text-white focus:ring-[#a390cb]',
-      link: 'text-[#a390cb] text-sm hover:text-white underline px-0 py-0',
+      primary: 'bg-[#a078f7] text-content px-6 py-2 hover:bg-[#a078f7]/90 shadow-lg shadow-[#a078f7]/20 focus:ring-[#a078f7]',
+      secondary: 'text-content-subtle px-4 py-2 hover:text-content focus:ring-[#a078f7]',
+      link: 'text-content-subtle text-sm hover:text-content underline px-0 py-0',
     };
 
     return (

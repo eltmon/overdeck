@@ -214,18 +214,18 @@ export function AgentCardsPanel({
     <div className="space-y-8">
       {/* Section Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+        <h2 className="text-2xl font-bold text-content flex items-center gap-2">
           <span className="material-symbols-outlined text-[#a078f7]">group</span>
           Active Agents
         </h2>
-        <p className="text-[#8b7aa0] mt-1">
+        <p className="text-content-muted mt-1">
           Models assigned to each agent. Click to expand phases or configure overrides.
         </p>
       </div>
 
       {/* Main Worker */}
       <div>
-        <h3 className="text-sm font-semibold text-[#6b5a80] uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
           Main Worker
         </h3>
         <AgentCard
@@ -242,7 +242,7 @@ export function AgentCardsPanel({
 
       {/* Specialist Agents */}
       <div>
-        <h3 className="text-sm font-semibold text-[#6b5a80] uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
           Specialist Agents
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -271,13 +271,13 @@ export function AgentCardsPanel({
 
       {/* Convoy Review Panel */}
       <div>
-        <h3 className="text-sm font-semibold text-[#6b5a80] uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
           <span className="inline-flex items-center gap-2">
             <span className="material-symbols-outlined text-base">diversity_3</span>
             Convoy (Parallel Review Panel)
           </span>
         </h3>
-        <div className="bg-[#1a1625] rounded-xl border border-[#2d2640] p-4">
+        <div className="bg-surface-raised rounded-xl border border-divider p-4 shadow-sm">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {(['securityReviewer', 'performanceReviewer', 'correctnessReviewer', 'synthesisAgent'] as const).map((key) => {
               const agent = AGENT_DEFINITIONS[key];
@@ -286,13 +286,13 @@ export function AgentCardsPanel({
                 <div
                   key={key}
                   onClick={() => handleConfigureOverride(agent.workType)}
-                  className="flex flex-col items-center p-3 rounded-lg bg-[#150f1d] border border-[#2d2640] cursor-pointer hover:border-[#a078f7] transition-colors"
+                  className="flex flex-col items-center p-3 rounded-lg bg-surface border border-divider cursor-pointer hover:border-[#a078f7] transition-colors"
                 >
                   <span className="material-symbols-outlined text-2xl text-[#a078f7] mb-2">
                     {agent.icon}
                   </span>
-                  <span className="text-sm font-medium text-white text-center">{agent.name}</span>
-                  <span className="text-xs text-[#8b7aa0] mt-1">{model}</span>
+                  <span className="text-sm font-medium text-content text-center">{agent.name}</span>
+                  <span className="text-xs text-content-muted mt-1">{model}</span>
                   {isOverride && (
                     <span className="text-xs text-[#a078f7] mt-1">override</span>
                   )}
@@ -300,7 +300,7 @@ export function AgentCardsPanel({
               );
             })}
           </div>
-          <div className="mt-3 text-center text-xs text-[#6b5a80]">
+          <div className="mt-3 text-center text-xs text-content-muted">
             Reviewers run in parallel, Synthesis combines findings
           </div>
         </div>
@@ -308,7 +308,7 @@ export function AgentCardsPanel({
 
       {/* Subagents */}
       <div>
-        <h3 className="text-sm font-semibold text-[#6b5a80] uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
           Subagents
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -337,7 +337,7 @@ export function AgentCardsPanel({
 
       {/* Pre-work Agents */}
       <div>
-        <h3 className="text-sm font-semibold text-[#6b5a80] uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
           Pre-work Agents
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -366,7 +366,7 @@ export function AgentCardsPanel({
 
       {/* CLI Contexts */}
       <div>
-        <h3 className="text-sm font-semibold text-[#6b5a80] uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
           CLI Contexts
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -394,14 +394,14 @@ export function AgentCardsPanel({
       </div>
 
       {/* Summary */}
-      <div className="bg-[#150f1d] rounded-lg border border-[#2d2640] p-4 flex items-center justify-between">
-        <div className="text-sm text-[#8b7aa0]">
-          <span className="text-white font-medium">{Object.keys(overrides).length}</span> custom overrides active
+      <div className="bg-surface-raised rounded-lg border border-divider p-4 flex items-center justify-between shadow-sm">
+        <div className="text-sm text-content-muted">
+          <span className="text-content font-medium">{Object.keys(overrides).length}</span> custom overrides active
         </div>
         <button
           onClick={onResetAllOverrides}
           disabled={Object.keys(overrides).length === 0}
-          className="text-sm text-[#a078f7] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="text-sm text-[#a078f7] hover:text-content transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Reset all to smart selection
         </button>

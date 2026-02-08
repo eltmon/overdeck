@@ -74,14 +74,14 @@ const STATUS_ICONS = {
   passed: <CheckCircle className="w-4 h-4 text-green-400" />,
   failed: <XCircle className="w-4 h-4 text-red-400" />,
   blocked: <AlertCircle className="w-4 h-4 text-yellow-400" />,
-  incomplete: <Clock className="w-4 h-4 text-gray-400" />,
+  incomplete: <Clock className="w-4 h-4 text-content-subtle" />,
 };
 
 const STATUS_COLORS = {
   passed: 'bg-green-900 bg-opacity-20 text-green-400 border-green-600',
   failed: 'bg-red-900 bg-opacity-20 text-red-400 border-red-600',
   blocked: 'bg-yellow-900 bg-opacity-20 text-yellow-400 border-yellow-600',
-  incomplete: 'bg-gray-900 bg-opacity-20 text-gray-400 border-gray-600',
+  incomplete: 'bg-surface bg-opacity-20 text-content-subtle border-divider-strong',
 };
 
 function formatDuration(ms: number): string {
@@ -138,7 +138,7 @@ export function SpecialistDetail() {
   if (runsLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-content-subtle animate-spin" />
       </div>
     );
   }
@@ -159,7 +159,7 @@ export function SpecialistDetail() {
       <div className="mb-6">
         <Link
           to="/specialists"
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-4"
+          className="flex items-center gap-2 text-content-subtle hover:text-content mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Specialists
@@ -168,10 +168,10 @@ export function SpecialistDetail() {
         <div className="flex items-center gap-3">
           <Brain className="w-8 h-8 text-purple-400" />
           <div>
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-2xl font-bold text-content">
               {project} / {type}
             </h1>
-            <div className="text-gray-400">{runs?.length || 0} total runs</div>
+            <div className="text-content-subtle">{runs?.length || 0} total runs</div>
           </div>
         </div>
       </div>
@@ -200,37 +200,37 @@ export function SpecialistDetail() {
       </div>
 
       {/* Context digest */}
-      <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+      <div className="mb-6 p-4 bg-surface-raised rounded-lg">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-medium text-white">Context Digest</h2>
+          <h2 className="text-lg font-medium text-content">Context Digest</h2>
           <button
             onClick={() => regenerateMutation.mutate()}
             disabled={regenerateMutation.isPending}
-            className="flex items-center gap-2 px-3 py-1 text-sm text-blue-400 hover:text-blue-300 hover:bg-gray-700 rounded disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1 text-sm text-blue-400 hover:text-blue-300 hover:bg-surface-overlay rounded disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
             Regenerate
           </button>
         </div>
         {contextDigest ? (
-          <pre className="text-sm text-gray-300 whitespace-pre-wrap max-h-64 overflow-auto">
+          <pre className="text-sm text-content-body whitespace-pre-wrap max-h-64 overflow-auto">
             {contextDigest}
           </pre>
         ) : (
-          <div className="text-gray-500">No context digest available yet</div>
+          <div className="text-content-muted">No context digest available yet</div>
         )}
       </div>
 
       {/* Run history */}
       <div>
-        <h2 className="text-lg font-medium text-white mb-3">Run History</h2>
+        <h2 className="text-lg font-medium text-content mb-3">Run History</h2>
         {runs && runs.length > 0 ? (
           <div className="space-y-2">
             {runs.map((run) => (
               <div
                 key={run.runId}
                 className={`p-4 rounded-lg border ${
-                  run.metadata.status ? STATUS_COLORS[run.metadata.status] : 'bg-gray-800 border-gray-700'
+                  run.metadata.status ? STATUS_COLORS[run.metadata.status] : 'bg-surface-raised border-divider'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -238,24 +238,24 @@ export function SpecialistDetail() {
                     {run.metadata.status && STATUS_ICONS[run.metadata.status]}
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-white">{run.metadata.issueId}</span>
-                        <span className={run.metadata.status ? STATUS_COLORS[run.metadata.status].split(' ')[2] : 'text-gray-400'}>
+                        <span className="font-mono text-content">{run.metadata.issueId}</span>
+                        <span className={run.metadata.status ? STATUS_COLORS[run.metadata.status].split(' ')[2] : 'text-content-subtle'}>
                           {run.metadata.status || 'incomplete'}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-400">
+                      <div className="text-sm text-content-subtle">
                         {formatDate(run.metadata.startedAt)}
                         {run.metadata.duration && ` • ${formatDuration(run.metadata.duration)}`}
                       </div>
                       {run.metadata.notes && (
-                        <div className="text-sm text-gray-300 mt-1">{run.metadata.notes}</div>
+                        <div className="text-sm text-content-body mt-1">{run.metadata.notes}</div>
                       )}
                     </div>
                   </div>
 
                   <Link
                     to={`/specialists/${project}/${type}/runs/${run.runId}`}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-blue-400 hover:text-blue-300 hover:bg-gray-700 rounded"
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-blue-400 hover:text-blue-300 hover:bg-surface-overlay rounded"
                   >
                     <Eye className="w-4 h-4" />
                     View Log
@@ -265,7 +265,7 @@ export function SpecialistDetail() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-content-muted">
             No runs yet for this specialist
           </div>
         )}
