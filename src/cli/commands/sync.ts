@@ -68,7 +68,14 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
 
     for (const runtime of validTargets) {
-      const plan = planSync(runtime);
+      let plan;
+      try {
+        plan = planSync(runtime);
+      } catch (err: any) {
+        console.log(chalk.red(`${runtime}: ${err.message}`));
+        console.log('');
+        continue;
+      }
 
       console.log(chalk.cyan(`${runtime}:`));
 
@@ -141,7 +148,14 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   for (const runtime of validTargets) {
     spinner.text = `Syncing to ${runtime}...`;
 
-    const result = executeSync(runtime, { force: options.force });
+    let result;
+    try {
+      result = executeSync(runtime, { force: options.force });
+    } catch (err: any) {
+      console.log('');
+      console.log(chalk.red(`  ✗ ${runtime}: ${err.message}`));
+      continue;
+    }
 
     totalCreated += result.created.length;
     totalConflicts += result.conflicts.length;

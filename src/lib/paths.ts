@@ -32,6 +32,7 @@ export const CLAUDE_DIR = join(homedir(), '.claude');
 export const CODEX_DIR = join(homedir(), '.codex');
 export const CURSOR_DIR = join(homedir(), '.cursor');
 export const GEMINI_DIR = join(homedir(), '.gemini');
+export const OPENCODE_DIR = join(homedir(), '.opencode');
 
 // Target sync locations
 export const SYNC_TARGETS = {
@@ -54,6 +55,11 @@ export const SYNC_TARGETS = {
     skills: join(GEMINI_DIR, 'skills'),
     commands: join(GEMINI_DIR, 'commands'),
     agents: join(GEMINI_DIR, 'agents'),
+  },
+  opencode: {
+    skills: join(OPENCODE_DIR, 'skills'),
+    commands: join(OPENCODE_DIR, 'commands'),
+    agents: join(OPENCODE_DIR, 'agents'),
   },
 } as const;
 
