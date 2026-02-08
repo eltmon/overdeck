@@ -252,7 +252,7 @@ export async function runMergeValidation(
  * @param projectPath - Project root path
  * @returns Promise resolving to success status
  */
-export async function autoRevertMerge(projectPath: string): Promise<boolean> {
+export async function autoRevertMerge(projectPath: string, targetCommit?: string): Promise<boolean> {
   console.log(`[validation] Auto-reverting merge in ${projectPath}`);
 
   try {
@@ -261,8 +261,10 @@ export async function autoRevertMerge(projectPath: string): Promise<boolean> {
       cwd: projectPath,
     });
 
-    // Revert the merge
-    await execAsync('git reset --hard HEAD~1', {
+    // Revert to specific commit (handles multi-commit fast-forward merges)
+    // Falls back to HEAD~1 only if no target was provided
+    const resetTarget = targetCommit || 'HEAD~1';
+    await execAsync(`git reset --hard ${resetTarget}`, {
       cwd: projectPath,
     });
 
@@ -272,7 +274,7 @@ export async function autoRevertMerge(projectPath: string): Promise<boolean> {
     });
 
     console.log(
-      `[validation] ✓ Auto-revert successful: ${beforeCommit.trim()} -> ${afterCommit.trim()}`
+      `[validation] ✓ Auto-revert successful: ${beforeCommit.trim()} -> ${afterCommit.trim()} (target: ${resetTarget})`
     );
 
     return true;
