@@ -5,6 +5,11 @@ import { existsSync } from 'fs';
 // Panopticon home directory (can be overridden for testing)
 export const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
 
+/** Get PANOPTICON_HOME dynamically (reads env var on each call, useful for testing) */
+export function getPanopticonHome(): string {
+  return process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
+}
+
 // Subdirectories
 export const CONFIG_DIR = PANOPTICON_HOME;
 export const SKILLS_DIR = join(PANOPTICON_HOME, 'skills');

@@ -8,24 +8,27 @@
  *   ~/.panopticon/specialists/{projectKey}/{specialistType}/context/latest-digest.md
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { PANOPTICON_HOME } from '../paths.js';
+import { getPanopticonHome } from '../paths.js';
 import { getRecentRunLogs, type RunLogEntry } from './specialist-logs.js';
 import { getProject } from '../projects.js';
 import { getModelId } from '../work-type-router.js';
 
 const execAsync = promisify(exec);
 
-const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
+/** Get specialists directory (lazy to support test env overrides) */
+function getSpecialistsDir(): string {
+  return join(getPanopticonHome(), 'specialists');
+}
 
 /**
  * Get the context directory for a project's specialist
  */
 export function getContextDirectory(projectKey: string, specialistType: string): string {
-  return join(SPECIALISTS_DIR, projectKey, specialistType, 'context');
+  return join(getSpecialistsDir(), projectKey, specialistType, 'context');
 }
 
 /**
@@ -148,7 +151,7 @@ export async function generateContextDigest(
 
     // Use Claude Code CLI to generate digest
     // Write prompt to temp file to avoid shell escaping issues
-    const tempDir = join(PANOPTICON_HOME, 'tmp');
+    const tempDir = join(getPanopticonHome(), 'tmp');
     if (!existsSync(tempDir)) {
       mkdirSync(tempDir, { recursive: true });
     }
@@ -168,7 +171,6 @@ export async function generateContextDigest(
 
     // Clean up temp file
     try {
-      const { unlinkSync } = await import('fs');
       unlinkSync(promptFile);
     } catch {
       // Ignore cleanup errors
@@ -356,7 +358,6 @@ export function deleteContextDigest(projectKey: string, specialistType: string):
   }
 
   try {
-    const { unlinkSync } = require('fs');
     unlinkSync(digestPath);
     return true;
   } catch (error) {

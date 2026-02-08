@@ -85,7 +85,7 @@ describe('Migration Safety Tests', () => {
       const stats = migrateAllSessions();
 
       expect(stats.warnings.length).toBeGreaterThan(0);
-      expect(stats.warnings.some(w => w.message.includes('Session directory not found'))).toBe(true);
+      expect(stats.warnings.some(w => w.message.includes('No session directory found'))).toBe(true);
     });
   });
 

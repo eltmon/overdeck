@@ -10,9 +10,12 @@
 
 import { existsSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
-import { PANOPTICON_HOME } from '../paths.js';
+import { getPanopticonHome } from '../paths.js';
 
-const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
+/** Get specialists directory (lazy to support test env overrides) */
+function getSpecialistsDir(): string {
+  return join(getPanopticonHome(), 'specialists');
+}
 
 /**
  * Log file metadata
@@ -44,7 +47,7 @@ export interface RunLogEntry {
  * Get the runs directory for a project's specialist
  */
 export function getRunsDirectory(projectKey: string, specialistType: string): string {
-  return join(SPECIALISTS_DIR, projectKey, specialistType, 'runs');
+  return join(getSpecialistsDir(), projectKey, specialistType, 'runs');
 }
 
 /**
@@ -306,8 +309,12 @@ export function listRunLogs(
         };
       });
 
-    // Sort by most recent first
-    files.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    // Sort by most recent first, with runId as tiebreaker for stable ordering
+    files.sort((a, b) => {
+      const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return b.runId.localeCompare(a.runId);
+    });
 
     // Apply pagination
     const { limit, offset = 0 } = options;
