@@ -31,7 +31,7 @@ services:
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
 
     extra_hosts:
-      # Allow Traefik to reach host services (dashboard on ports 3001/3002)
+      # Allow Traefik to reach host services (dashboard on configured ports)
       - "host.docker.internal:host-gateway"
 
 networks:

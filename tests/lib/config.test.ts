@@ -26,8 +26,18 @@ describe('config', () => {
       expect(config.sync.targets).toContain('claude');
       expect(config.sync.backup_before_sync).toBe(true);
       expect(config.trackers.primary).toBe('linear');
-      expect(config.dashboard.port).toBe(3001);
-      expect(config.dashboard.api_port).toBe(3002);
+      expect(config.dashboard.port).toBe(3010);
+      expect(config.dashboard.api_port).toBe(3011);
+    });
+
+    it('should include default traefik config', async () => {
+      const { getDefaultConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfig();
+
+      expect(config.traefik).toBeDefined();
+      expect(config.traefik.enabled).toBe(false);
+      expect(config.traefik.dashboard_port).toBe(8080);
+      expect(config.traefik.domain).toBe('pan.localhost');
     });
 
     it('should include default Linear config', async () => {
@@ -50,6 +60,7 @@ describe('config', () => {
       expect(config.sync).toBeDefined();
       expect(config.trackers).toBeDefined();
       expect(config.dashboard).toBeDefined();
+      expect(config.traefik).toBeDefined();
     });
   });
 

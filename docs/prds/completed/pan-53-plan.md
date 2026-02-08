@@ -85,8 +85,8 @@ This issue serves as a **live integration test** of the specialist workflow. The
 
 ### Dashboard URLs
 ```
-Frontend: http://localhost:3010 (or 3001 in some configs)
-API: http://localhost:3011 (or 3002 in some configs)
+Frontend: http://localhost:3010
+API: http://localhost:3011
 ```
 
 ### Specialist States to Check

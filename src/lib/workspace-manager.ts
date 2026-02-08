@@ -16,6 +16,7 @@ import {
   replacePlaceholders,
   getDefaultWorkspaceConfig,
 } from './workspace-config.js';
+import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
 
 const execAsync = promisify(exec);
 
@@ -152,56 +153,8 @@ async function removeWorktree(
   }
 }
 
-/**
- * Add DNS entry to ~/.wsl2hosts
- */
-function addWsl2HostEntry(hostname: string): boolean {
-  const wsl2hostsPath = join(homedir(), '.wsl2hosts');
-
-  try {
-    let content = '';
-    if (existsSync(wsl2hostsPath)) {
-      content = readFileSync(wsl2hostsPath, 'utf-8');
-    }
-
-    if (!content.includes(hostname)) {
-      writeFileSync(wsl2hostsPath, content + (content.endsWith('\n') ? '' : '\n') + hostname + '\n');
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Remove DNS entry from ~/.wsl2hosts
- */
-function removeWsl2HostEntry(hostname: string): boolean {
-  const wsl2hostsPath = join(homedir(), '.wsl2hosts');
-
-  try {
-    if (!existsSync(wsl2hostsPath)) return true;
-
-    let content = readFileSync(wsl2hostsPath, 'utf-8');
-    const lines = content.split('\n').filter(line => line.trim() !== hostname);
-    writeFileSync(wsl2hostsPath, lines.join('\n'));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Sync DNS to Windows hosts file via PowerShell
- */
-async function syncDnsToWindows(): Promise<boolean> {
-  try {
-    await execAsync('powershell.exe -Command "Start-ScheduledTask -TaskName \'SyncMynHosts\'"');
-    return true;
-  } catch {
-    return false;
-  }
-}
+// DNS functions (addWsl2HostEntry, removeWsl2HostEntry, syncDnsToWindows)
+// are now in src/lib/dns.ts and imported above
 
 /**
  * Assign a port from a range
@@ -434,18 +387,17 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Configure DNS
   if (workspaceConfig.dns) {
+    const dnsMethod = workspaceConfig.dns.sync_method || 'wsl2hosts';
     for (const entryPattern of workspaceConfig.dns.entries) {
       const hostname = replacePlaceholders(entryPattern, placeholders);
 
-      if (workspaceConfig.dns.sync_method === 'wsl2hosts' || !workspaceConfig.dns.sync_method) {
-        if (addWsl2HostEntry(hostname)) {
-          result.steps.push(`Added DNS entry: ${hostname}`);
-        }
+      if (addDnsEntry(dnsMethod, hostname)) {
+        result.steps.push(`Added DNS entry: ${hostname} (${dnsMethod})`);
       }
     }
 
-    // Sync to Windows if on WSL2
-    if (process.platform === 'linux') {
+    // Sync to Windows if using wsl2hosts method
+    if (dnsMethod === 'wsl2hosts') {
       const synced = await syncDnsToWindows();
       if (synced) {
         result.steps.push('Synced DNS to Windows hosts file');
@@ -723,9 +675,10 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   if (workspaceConfig.dns) {
     const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
 
+    const dnsMethod = workspaceConfig.dns.sync_method || 'wsl2hosts';
     for (const entryPattern of workspaceConfig.dns.entries) {
       const hostname = replacePlaceholders(entryPattern, placeholders);
-      if (removeWsl2HostEntry(hostname)) {
+      if (removeDnsEntry(dnsMethod, hostname)) {
         result.steps.push(`Removed DNS entry: ${hostname}`);
       }
     }

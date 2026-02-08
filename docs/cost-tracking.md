@@ -74,7 +74,7 @@ If you need to rebuild the cache:
 
 ```bash
 # Via API
-curl -X POST http://localhost:3001/api/costs/rebuild
+curl -X POST http://localhost:3011/api/costs/rebuild
 
 # Or restart the dashboard (migration runs if needed)
 pan dashboard
@@ -226,7 +226,7 @@ This means the cache is out of sync with the event log.
 
 **Solution:**
 ```bash
-curl -X POST http://localhost:3001/api/costs/rebuild
+curl -X POST http://localhost:3011/api/costs/rebuild
 ```
 
 ### Costs seem too low

@@ -174,6 +174,8 @@ program
     const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
     let traefikEnabled = false;
     let traefikDomain = 'pan.localhost';
+    let dashboardPort = 3010;
+    let dashboardApiPort = 3011;
 
     if (existsSync(configFile)) {
       try {
@@ -181,12 +183,51 @@ program
         const config = parse(configContent) as any;
         traefikEnabled = config.traefik?.enabled === true;
         traefikDomain = config.traefik?.domain || 'pan.localhost';
+        dashboardPort = config.dashboard?.port || 3010;
+        dashboardApiPort = config.dashboard?.api_port || 3011;
       } catch (error) {
         console.log(chalk.yellow('Warning: Could not read config.toml'));
       }
     }
 
     console.log(chalk.bold('Starting Panopticon...\n'));
+
+    // Regenerate Traefik dynamic config and ensure DNS
+    if (traefikEnabled && !options.skipTraefik) {
+      try {
+        const { generatePanopticonTraefikConfig } = await import('../lib/traefik.js');
+        if (generatePanopticonTraefikConfig()) {
+          console.log(chalk.dim('  Regenerated Traefik config from template'));
+        }
+      } catch {
+        console.log(chalk.yellow('Warning: Could not regenerate Traefik config'));
+      }
+
+      try {
+        const { ensureBaseDomain, detectDnsSyncMethod, syncDnsToWindows } = await import('../lib/dns.js');
+        const dnsMethod = (existsSync(configFile) ? (parse(readFileSync(configFile, 'utf-8')) as any).traefik?.dns_sync_method : null) || detectDnsSyncMethod();
+        ensureBaseDomain(dnsMethod, traefikDomain);
+        if (dnsMethod === 'wsl2hosts') {
+          syncDnsToWindows().catch(() => {});
+        }
+      } catch {
+        console.log(chalk.yellow(`Warning: Could not ensure DNS for ${traefikDomain}`));
+      }
+    } else if (!traefikEnabled) {
+      // Detect orphaned Traefik container
+      try {
+        const containerCheck = execSync(
+          'docker ps --filter "name=panopticon-traefik" --format "{{.Names}}" 2>/dev/null',
+          { encoding: 'utf-8' }
+        ).trim();
+        if (containerCheck.includes('panopticon-traefik')) {
+          console.log(chalk.yellow('⚠ Traefik container is running but traefik.enabled is not set in config'));
+          console.log(chalk.yellow('  Run `pan install` to configure Traefik, or `pan down` to stop it\n'));
+        }
+      } catch {
+        // Docker not available, ignore
+      }
+    }
 
     // Start Traefik if enabled
     if (traefikEnabled && !options.skipTraefik) {
@@ -283,22 +324,18 @@ program
       if (traefikEnabled) {
         console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
         console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
-      } else if (isProduction) {
-        console.log(`  URL: ${chalk.cyan('http://localhost:3010')}`);
       } else {
-        console.log(`  Frontend: ${chalk.cyan('http://localhost:3001')}`);
-        console.log(`  API:      ${chalk.cyan('http://localhost:3002')}`);
+        console.log(`  Frontend: ${chalk.cyan(`http://localhost:${dashboardPort}`)}`);
+        console.log(`  API:      ${chalk.cyan(`http://localhost:${dashboardApiPort}`)}`);
       }
     } else {
       // Run in foreground
       if (traefikEnabled) {
         console.log(`  Frontend: ${chalk.cyan(`https://${traefikDomain}`)}`);
         console.log(`  API:      ${chalk.cyan(`https://${traefikDomain}/api`)}`);
-      } else if (isProduction) {
-        console.log(`  URL: ${chalk.cyan('http://localhost:3010')}`);
       } else {
-        console.log(`  Frontend: ${chalk.cyan('http://localhost:3001')}`);
-        console.log(`  API:      ${chalk.cyan('http://localhost:3002')}`);
+        console.log(`  Frontend: ${chalk.cyan(`http://localhost:${dashboardPort}`)}`);
+        console.log(`  API:      ${chalk.cyan(`http://localhost:${dashboardApiPort}`)}`);
       }
       console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
 
@@ -335,10 +372,9 @@ program
     // Stop dashboard
     console.log(chalk.dim('Stopping dashboard...'));
     try {
-      // Kill processes on dashboard ports (development: 3001/3002, bundled: 3010)
-      execSync('lsof -ti:3001 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
-      execSync('lsof -ti:3002 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
+      // Kill processes on dashboard ports
       execSync('lsof -ti:3010 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
+      execSync('lsof -ti:3011 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
       console.log(chalk.green('✓ Dashboard stopped'));
     } catch {
       console.log(chalk.dim('  No dashboard processes found'));

@@ -1794,8 +1794,8 @@ enabled = true
 sync_interval = "5m"
 
 [dashboard]
-port = 3001
-api_port = 3002
+port = 3010
+api_port = 3011
 
 [sync]
 auto_sync = true                   # Auto-sync on pan commands
@@ -2748,8 +2748,8 @@ The web dashboard (`pan up`) provides:
 
 The existing dashboard at `/home/eltmon/projects/myn/infra/dashboard/` provides:
 
-- **Frontend**: http://localhost:3001 (React + Vite)
-- **API**: http://localhost:3002 (Express)
+- **Frontend**: http://localhost:3010 (React + Vite)
+- **API**: http://localhost:3011 (Express)
 
 Features already implemented:
 - Kanban board with Linear issues
@@ -2987,9 +2987,10 @@ Starting Traefik...
   → docker compose -f ~/.panopticon/traefik/docker-compose.yml up -d
   ✓ Traefik running at https://traefik.pan.localhost:8080
 
-Adding hosts entries (requires sudo)...
-  → echo "127.0.0.1 pan.localhost traefik.pan.localhost" | sudo tee -a /etc/hosts
-  ✓ Hosts file updated
+Setting up DNS...
+  → Auto-detected DNS sync method: wsl2hosts
+  → Added pan.localhost DNS entry
+  ✓ DNS configured
 
 Setting up CLI...
   → Adding pan alias to ~/.zshrc
@@ -2998,7 +2999,7 @@ Setting up CLI...
 ╔══════════════════════════════════════════════════════════════╗
 ║  ✓ PANOPTICON INSTALLED SUCCESSFULLY                          ║
 ║                                                                ║
-║  Dashboard: https://pan.localhost:3001                        ║
+║  Dashboard: https://pan.localhost                                ║
 ║  Traefik:   https://traefik.pan.localhost:8080                ║
 ║                                                                ║
 ║  Next steps:                                                   ║
@@ -3015,10 +3016,8 @@ For users who don't want/need Traefik:
 npx panopticon install --minimal
 
 # Uses port-based routing instead:
-# http://localhost:3001 (workspace 1 frontend)
-# http://localhost:7001 (workspace 1 api)
-# http://localhost:3002 (workspace 2 frontend)
-# http://localhost:7002 (workspace 2 api)
+# http://localhost:3010 (dashboard frontend)
+# http://localhost:3011 (dashboard API)
 ```
 
 ### Platform-Specific Handling
@@ -3334,7 +3333,7 @@ http:
     fe-min-648:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:3001"
+          - url: "http://host.docker.internal:3010"
     api-min-648:
       loadBalancer:
         servers:

@@ -93,10 +93,11 @@ export interface PanopticonConfig {
     port: number;
     api_port: number;
   };
-  traefik?: {
+  traefik: {
     enabled: boolean;
     dashboard_port?: number;
     domain?: string;
+    dns_sync_method?: 'wsl2hosts' | 'hosts_file' | 'dnsmasq';
   };
   remote?: RemoteConfig;
   shadow: ShadowConfig;
@@ -120,8 +121,13 @@ const DEFAULT_CONFIG: PanopticonConfig = {
     },
   },
   dashboard: {
-    port: 3001,
-    api_port: 3002,
+    port: 3010,
+    api_port: 3011,
+  },
+  traefik: {
+    enabled: false,
+    dashboard_port: 8080,
+    domain: 'pan.localhost',
   },
   shadow: {
     enabled: false,
