@@ -18,7 +18,7 @@ export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi';
  */
 const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Anthropic models
-  'claude-opus-4-5': 'anthropic',
+  'claude-opus-4-6': 'anthropic',
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
@@ -52,7 +52,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  * - GPT-4o → Sonnet 4.5 (similar tier)
  * - GLM-4.7 → Haiku 4.5 (economy tier)
  *
- * Note: We intentionally avoid Opus 4.5 as default fallback to keep costs reasonable.
+ * Note: We intentionally avoid Opus 4.6 as default fallback to keep costs reasonable.
  * Users who want Opus can explicitly set it in their config.
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {

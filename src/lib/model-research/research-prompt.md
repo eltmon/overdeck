@@ -7,7 +7,7 @@ You are a research specialist tasked with gathering comprehensive data on AI mod
 Research these models across all skill dimensions:
 
 ### Anthropic
-- Claude Opus 4.5 (`claude-opus-4-5`)
+- Claude Opus 4.6 (`claude-opus-4-6`)
 - Claude Sonnet 4.5 (`claude-sonnet-4-5`)
 - Claude Haiku 4.5 (`claude-haiku-4-5`)
 
@@ -78,8 +78,8 @@ Produce a JSON file with this structure:
   "research_date": "2026-01-29",
   "sources_consulted": ["list of URLs and sources"],
   "models": {
-    "claude-opus-4-5": {
-      "displayName": "Claude Opus 4.5",
+    "claude-opus-4-6": {
+      "displayName": "Claude Opus 4.6",
       "provider": "anthropic",
       "costPer1MTokens": 45.0,
       "contextWindow": 200000,
@@ -105,7 +105,7 @@ Produce a JSON file with this structure:
   },
   "methodology": "Description of how scores were determined",
   "confidence_levels": {
-    "high": ["claude-opus-4-5", "gpt-4o"],
+    "high": ["claude-opus-4-6", "gpt-4o"],
     "medium": ["kimi-k2.5", "glm-4.7"],
     "low": ["models with limited benchmark data"]
   }

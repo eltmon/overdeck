@@ -162,7 +162,7 @@ describe('settings-api', () => {
       const models = getAvailableModelsApi();
 
       const anthropicIds = models.anthropic.map(m => m.id);
-      expect(anthropicIds).toContain('claude-opus-4-5');
+      expect(anthropicIds).toContain('claude-opus-4-6');
       expect(anthropicIds).toContain('claude-sonnet-4-5');
       expect(anthropicIds).toContain('claude-haiku-4-5');
     });
@@ -189,7 +189,7 @@ describe('settings-api', () => {
             kimi: false,
           },
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5',
+            'issue-agent:planning': 'claude-opus-4-6',
           },
           gemini_thinking_level: 4,
         },
@@ -210,7 +210,7 @@ describe('settings-api', () => {
       // Note: preset was removed from the API
       expect(yamlContent).toContain('anthropic: true');
       expect(yamlContent).toContain('openai: true');
-      expect(yamlContent).toContain('issue-agent:planning: claude-opus-4-5');
+      expect(yamlContent).toContain('issue-agent:planning: claude-opus-4-6');
       expect(yamlContent).toContain('openai: sk-test-123');
       expect(yamlContent).toContain('gemini_thinking_level: 4');
     });

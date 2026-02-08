@@ -40,14 +40,14 @@ describe('configuration precedence in router', () => {
     it('should use override instead of smart selection', () => {
       const config = createTestConfig({
         overrides: {
-          'issue-agent:planning': 'claude-opus-4-5', // Override planning to use Opus
+          'issue-agent:planning': 'claude-opus-4-6', // Override planning to use Opus
         },
       });
 
       const router = new WorkTypeRouter(config);
       const result = router.getModel('issue-agent:planning' as WorkTypeId);
 
-      expect(result.model).toBe('claude-opus-4-5');
+      expect(result.model).toBe('claude-opus-4-6');
       expect(result.source).toBe('override');
     });
 
@@ -142,7 +142,7 @@ describe('configuration precedence in router', () => {
         enabledProviders: new Set(['anthropic', 'openai']), // Enable providers so no fallback
         overrides: {
           'issue-agent:exploration': 'claude-haiku-4-5',
-          'issue-agent:planning': 'claude-opus-4-5',
+          'issue-agent:planning': 'claude-opus-4-6',
           'issue-agent:implementation': 'gpt-5.2-codex',
         },
       });
@@ -150,7 +150,7 @@ describe('configuration precedence in router', () => {
       const router = new WorkTypeRouter(config);
 
       expect(router.getModelId('issue-agent:exploration' as WorkTypeId)).toBe('claude-haiku-4-5');
-      expect(router.getModelId('issue-agent:planning' as WorkTypeId)).toBe('claude-opus-4-5');
+      expect(router.getModelId('issue-agent:planning' as WorkTypeId)).toBe('claude-opus-4-6');
       expect(router.getModelId('issue-agent:implementation' as WorkTypeId)).toBe('gpt-5.2-codex');
     });
 
@@ -178,7 +178,7 @@ describe('configuration precedence in router', () => {
     it('should correctly report if work type has override', () => {
       const config = createTestConfig({
         overrides: {
-          'issue-agent:planning': 'claude-opus-4-5',
+          'issue-agent:planning': 'claude-opus-4-6',
         },
       });
 
