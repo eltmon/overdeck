@@ -23,6 +23,28 @@ import { useTheme } from './hooks/useTheme';
 
 type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
+const TAB_PATHS: Record<Tab, string> = {
+  kanban: '/',
+  agents: '/agents',
+  convoys: '/convoys',
+  handoffs: '/handoffs',
+  activity: '/activity',
+  metrics: '/metrics',
+  costs: '/costs',
+  skills: '/skills',
+  health: '/health',
+  settings: '/settings',
+};
+
+const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
+  Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab])
+) as Record<string, Tab>;
+
+function getTabFromPath(): Tab {
+  const path = window.location.pathname;
+  return PATH_TO_TAB[path] || 'kanban';
+}
+
 const MIN_PANEL_WIDTH = 400;
 const MAX_PANEL_WIDTH = 1200;
 const DEFAULT_PANEL_WIDTH = 700;
@@ -55,7 +77,7 @@ async function respondToConfirmation(id: string, confirmed: boolean): Promise<vo
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('kanban');
+  const [activeTab, setActiveTabState] = useState<Tab>(getTabFromPath);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
@@ -72,6 +94,24 @@ export default function App() {
   useEffect(() => {
     initTheme();
   }, [initTheme]);
+
+  // URL-synced tab navigation
+  const setActiveTab = useCallback((tab: Tab) => {
+    setActiveTabState(tab);
+    const path = TAB_PATHS[tab];
+    if (window.location.pathname !== path) {
+      window.history.pushState({ tab }, '', path);
+    }
+  }, []);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onPopState = () => {
+      setActiveTabState(getTabFromPath());
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // Fetch agents to find if selected issue has an agent
   const { data: agents = [] } = useQuery({
@@ -196,10 +236,14 @@ export default function App() {
     <div className="h-screen bg-surface flex flex-col overflow-hidden transition-colors duration-150">
       <header className="bg-surface-raised border-b border-divider px-4 py-2 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setActiveTab('kanban')}
+            className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
+            title="Go to Board"
+          >
             <Eye className="w-5 h-5 text-blue-400" />
             <h1 className="text-lg font-bold text-content whitespace-nowrap">Panopticon</h1>
-          </div>
+          </button>
           <CloisterStatusBar />
           <nav className="flex gap-0.5 overflow-x-auto min-w-0 scrollbar-hide">
             {([
