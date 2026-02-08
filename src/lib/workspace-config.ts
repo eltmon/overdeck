@@ -186,6 +186,7 @@ export interface TemplatePlaceholders {
   PROJECT_NAME: string;      // e.g., 'myn'
   PROJECT_PATH: string;      // e.g., '/home/user/projects/myn'
   WORKSPACE_PATH: string;    // e.g., '/home/user/projects/myn/workspaces/feature-min-123'
+  HOME?: string;             // e.g., '/home/user' (for docker-compose path sanitization)
 }
 
 /**

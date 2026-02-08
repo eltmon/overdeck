@@ -3,7 +3,8 @@ import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
-import { Client as SSHClient } from 'ssh2';
+// ssh2 is loaded dynamically only when remote sessions are used
+let SSHClient: any = null;
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync, rmSync, symlinkSync, chmodSync } from 'fs';
@@ -10551,11 +10552,8 @@ ensureTmuxRunning().catch((err) => {
   console.error('Failed to ensure tmux is running:', err);
 });
 
-// Auto-start Cloister if configured
-if (shouldAutoStart()) {
-  console.log('🔔 Auto-starting Cloister...');
-  getCloisterService().start();
-}
+// Cloister auto-start is handled inside server.listen() callback below
+// to avoid double-initialization race conditions
 
 // In production, serve the frontend static files
 if (process.env.NODE_ENV === 'production') {
@@ -10708,6 +10706,18 @@ wss.on('connection', (ws: WebSocket, req) => {
       //
       // Fix: Wait for the client to send its dimensions FIRST, then start SSH
       // with the correct dimensions from the beginning.
+
+      // Lazy-load ssh2 only when remote sessions are actually used
+      if (!SSHClient) {
+        try {
+          const ssh2 = await import('ssh2');
+          SSHClient = ssh2.Client;
+        } catch (e) {
+          console.error('[ssh2] ssh2 package is not installed. Install it with: npm install ssh2');
+          ws.close(1011, 'ssh2 package not installed - required for remote sessions');
+          return;
+        }
+      }
 
       let sshClient: InstanceType<typeof SSHClient> | null = null;
       let sshStream: any = null;

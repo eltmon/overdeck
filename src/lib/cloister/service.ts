@@ -171,6 +171,7 @@ export type CloisterEventListener = (event: CloisterEvent) => void;
  */
 export class CloisterService {
   private running: boolean = false;
+  private starting: boolean = false;
   private checkInterval: NodeJS.Timeout | null = null;
   private lastCheck: Date | null = null;
   private config: CloisterConfig;
@@ -189,10 +190,11 @@ export class CloisterService {
    * Start the Cloister service
    */
   async start(): Promise<void> {
-    if (this.running) {
+    if (this.running || this.starting) {
       console.warn('Cloister is already running');
       return;
     }
+    this.starting = true;
 
     console.log('🔔 Starting Cloister agent watchdog...');
 
@@ -229,6 +231,7 @@ export class CloisterService {
     }
 
     this.running = true;
+    this.starting = false;
     writeStateFile(true);
     this.emit({ type: 'started' });
 

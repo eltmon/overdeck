@@ -48,7 +48,7 @@ pan up
 **Expected Results:**
 - Starts Traefik container via docker-compose
 - Shows Traefik dashboard URL: https://traefik.pan.localhost:8080
-- Starts dashboard (frontend on 3001, API on 3002)
+- Starts dashboard (frontend on 3010, API on 3011)
 - Shows frontend URL: https://pan.localhost
 - Shows API URL: https://pan.localhost/api
 
@@ -70,7 +70,7 @@ pan down
 ```
 
 **Expected Results:**
-- Stops dashboard processes (ports 3001, 3002)
+- Stops dashboard processes (ports 3010, 3011)
 - Stops Traefik container via docker-compose down
 
 **Verification:**
@@ -78,7 +78,7 @@ pan down
 docker ps | grep traefik
 # Should show: no containers
 
-lsof -ti:3001,3002
+lsof -ti:3010,3011
 # Should show: no processes
 ```
 
@@ -91,7 +91,7 @@ pan install --minimal
 **Expected Results:**
 - Skips Traefik setup entirely
 - Creates config.toml with traefik.enabled = false
-- pan up uses port-based routing (http://localhost:3001, http://localhost:3002)
+- pan up uses port-based routing (http://localhost:3010, http://localhost:3011)
 
 ## Integration Points
 

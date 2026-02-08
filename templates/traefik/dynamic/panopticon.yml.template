@@ -1,0 +1,41 @@
+# Dynamic routing configuration for Panopticon Dashboard
+# Generated from panopticon.yml.template -- do not edit manually
+# Variables: {{TRAEFIK_DOMAIN}}, {{DASHBOARD_PORT}}, {{DASHBOARD_API_PORT}}
+
+http:
+  routers:
+    # Dashboard Frontend
+    panopticon-frontend:
+      rule: "Host(`{{TRAEFIK_DOMAIN}}`) && !PathPrefix(`/api`)"
+      entryPoints:
+        - websecure
+      service: panopticon-frontend
+      tls:
+        domains:
+          - main: "{{TRAEFIK_DOMAIN}}"
+            sans:
+              - "*.{{TRAEFIK_DOMAIN}}"
+
+    # Dashboard API
+    panopticon-api:
+      rule: "Host(`{{TRAEFIK_DOMAIN}}`) && PathPrefix(`/api`)"
+      entryPoints:
+        - websecure
+      service: panopticon-api
+      tls: {}
+
+  services:
+    panopticon-frontend:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:{{DASHBOARD_PORT}}"
+
+    panopticon-api:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:{{DASHBOARD_API_PORT}}"
+
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/_wildcard.{{TRAEFIK_DOMAIN}}.pem
+      keyFile: /etc/traefik/certs/_wildcard.{{TRAEFIK_DOMAIN}}-key.pem

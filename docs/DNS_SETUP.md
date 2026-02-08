@@ -2,7 +2,29 @@
 
 Panopticon uses local domain names for HTTPS development. This guide explains how to configure DNS resolution for `pan.localhost` and wildcard domains.
 
-## Quick Start
+## Automatic Setup (Recommended)
+
+`pan install` automatically detects your platform and configures DNS:
+
+```bash
+pan install
+# Auto-detects: WSL2 → wsl2hosts, macOS/Linux → dnsmasq (if installed) or hosts_file
+```
+
+The DNS sync method is stored in `config.toml`:
+
+```toml
+[traefik]
+enabled = true
+domain = "pan.localhost"
+dns_sync_method = "wsl2hosts"  # or "hosts_file" or "dnsmasq"
+```
+
+`pan up` also ensures DNS is configured before starting services.
+
+## Manual Setup
+
+If you need to configure DNS manually or troubleshoot, see below.
 
 ### Linux / macOS (Native)
 
@@ -29,7 +51,16 @@ ping pan.localhost
 
 WSL2 requires special handling because `/etc/hosts` changes don't sync to Windows.
 
-#### Option 1: dnsmasq (Recommended)
+#### Option 1: wsl2hosts (Default for WSL2)
+
+Panopticon uses `~/.wsl2hosts` to sync DNS entries to Windows via a scheduled task:
+
+```bash
+# pan install sets this up automatically
+# Entries are added to ~/.wsl2hosts and synced to Windows hosts file
+```
+
+#### Option 2: dnsmasq (Recommended for wildcard support)
 
 Install and configure dnsmasq for wildcard DNS:
 
@@ -62,11 +93,11 @@ EOF
 nslookup pan.localhost
 # Should resolve to 127.0.0.1
 
-nslookup feature-pan-4.myn.localhost
+nslookup feature-pan-4.pan.localhost
 # Should also resolve to 127.0.0.1
 ```
 
-#### Option 2: Manual /etc/hosts (Simple but Limited)
+#### Option 3: Manual /etc/hosts (Simple but Limited)
 
 If you don't need wildcard support, use `/etc/hosts`:
 
@@ -79,7 +110,7 @@ echo "127.0.0.1 pan.localhost" | sudo tee -a /etc/hosts
 Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "127.0.0.1 pan.localhost"
 ```
 
-**Limitation:** This won't work for wildcard domains like `feature-pan-4.myn.localhost`.
+**Limitation:** This won't work for wildcard domains like `feature-pan-4.pan.localhost`.
 
 ## Wildcard Domain Support
 
@@ -88,8 +119,8 @@ Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "127.0.0.1 pan.lo
 Good news! Modern browsers automatically resolve `*.localhost` to `127.0.0.1` without any configuration.
 
 This means domains like:
-- `feature-pan-4.myn.localhost`
-- `api-feature-pan-4.myn.localhost`
+- `feature-pan-4.pan.localhost`
+- `api-feature-pan-4.pan.localhost`
 - Any `*.localhost` subdomain
 
 ...will automatically work in your browser.

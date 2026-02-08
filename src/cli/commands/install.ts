@@ -5,7 +5,7 @@ import inquirer from 'inquirer';
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
-import { homedir, platform } from 'os';
+import { homedir } from 'os';
 import {
   PANOPTICON_HOME,
   INIT_DIRS,
@@ -18,6 +18,9 @@ import {
   SOURCE_SKILLS_DIR
 } from '../../lib/paths.js';
 import { getDefaultConfig, saveConfig, loadConfig } from '../../lib/config.js';
+import { detectPlatform } from '../../lib/platform.js';
+import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
+import { generatePanopticonTraefikConfig, cleanupTemplateFiles } from '../../lib/traefik.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -48,20 +51,7 @@ interface PrereqResult {
   fix?: string;
 }
 
-function detectPlatform(): 'linux' | 'darwin' | 'win32' | 'wsl' {
-  const os = platform();
-  if (os === 'linux') {
-    // Check for WSL
-    try {
-      const release = readFileSync('/proc/version', 'utf8').toLowerCase();
-      if (release.includes('microsoft') || release.includes('wsl')) {
-        return 'wsl';
-      }
-    } catch {}
-    return 'linux';
-  }
-  return os as 'darwin' | 'win32';
-}
+// detectPlatform() is now in src/lib/platform.ts
 
 /**
  * Recursively copy directory contents
@@ -296,7 +286,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
         const traefikKeyFile = join(TRAEFIK_CERTS_DIR, '_wildcard.pan.localhost-key.pem');
 
         execSync(
-          `mkcert -cert-file "${traefikCertFile}" -key-file "${traefikKeyFile}" "*.pan.localhost" "*.localhost" localhost 127.0.0.1 ::1`,
+          `mkcert -cert-file "${traefikCertFile}" -key-file "${traefikKeyFile}" "pan.localhost" "*.pan.localhost" "*.localhost" localhost 127.0.0.1 ::1`,
           { stdio: 'pipe' }
         );
 
@@ -446,13 +436,20 @@ async function installCommand(options: InstallOptions): Promise<void> {
     spinner.start('Setting up Traefik configuration...');
 
     try {
-      // Copy Traefik templates from package to ~/.panopticon/traefik/
+      // Copy static Traefik files (docker-compose.yml, traefik.yml, certs)
       // Only copy if files don't already exist
       if (!existsSync(join(TRAEFIK_DIR, 'docker-compose.yml'))) {
         copyDirectoryRecursive(SOURCE_TRAEFIK_TEMPLATES, TRAEFIK_DIR);
+        // Remove .template files from runtime dir (they stay in source only)
+        cleanupTemplateFiles();
         spinner.succeed('Traefik configuration created from templates');
       } else {
-        spinner.info('Traefik configuration already exists (skipping)');
+        spinner.info('Traefik static config already exists (skipping)');
+      }
+
+      // Always regenerate panopticon.yml from template to pick up config changes
+      if (generatePanopticonTraefikConfig()) {
+        spinner.succeed('Traefik dynamic config generated (panopticon.yml)');
       }
 
       // Check if existing docker-compose.yml needs migration (for upgrades)
@@ -494,13 +491,18 @@ async function installCommand(options: InstallOptions): Promise<void> {
       enabled: false,
     };
   } else {
+    const dnsMethod = config.traefik?.dns_sync_method || detectDnsSyncMethod();
     // Only set traefik config if not already configured, or if it was disabled
     if (!config.traefik || !config.traefik.enabled) {
       config.traefik = {
         enabled: true,
         dashboard_port: 8080,
         domain: 'pan.localhost',
+        dns_sync_method: dnsMethod,
       };
+    } else if (!config.traefik.dns_sync_method) {
+      // Backfill dns_sync_method on existing installs
+      config.traefik.dns_sync_method = dnsMethod;
     }
   }
 
@@ -559,6 +561,27 @@ async function installCommand(options: InstallOptions): Promise<void> {
   saveConfig(config);
   spinner.succeed(configExists ? 'Config updated' : 'Config created');
 
+  // Regenerate Traefik dynamic config now that config is saved
+  if (config.traefik?.enabled) {
+    generatePanopticonTraefikConfig();
+  }
+
+  // Ensure base domain DNS entry
+  if (config.traefik?.enabled) {
+    const domain = config.traefik.domain || 'pan.localhost';
+    const dnsMethod = config.traefik.dns_sync_method || detectDnsSyncMethod();
+    spinner.start(`Setting up DNS for ${domain}...`);
+    if (ensureBaseDomain(dnsMethod, domain)) {
+      // If using wsl2hosts, also trigger a sync to Windows
+      if (dnsMethod === 'wsl2hosts') {
+        await syncDnsToWindows();
+      }
+      spinner.succeed(`DNS entry added: ${domain} (method: ${dnsMethod})`);
+    } else {
+      spinner.warn(`Could not add DNS entry for ${domain}. You may need to add it manually.`);
+    }
+  }
+
   // Done!
   console.log('');
   console.log(chalk.green.bold('Installation complete!'));
@@ -567,14 +590,13 @@ async function installCommand(options: InstallOptions): Promise<void> {
   console.log(`  1. Run ${chalk.cyan('pan sync')} to sync skills to ~/.claude/`);
 
   if (!options.minimal) {
-    console.log(`  2. Add to ${chalk.yellow('/etc/hosts')}: ${chalk.cyan('127.0.0.1 pan.localhost')}`);
-    console.log(`  3. Run ${chalk.cyan('pan up')} to start Traefik and dashboard`);
-    console.log(`  4. Access dashboard at ${chalk.cyan('https://pan.localhost')}`);
+    console.log(`  2. Run ${chalk.cyan('pan up')} to start Traefik and dashboard`);
+    console.log(`  3. Access dashboard at ${chalk.cyan(`https://${config.traefik?.domain || 'pan.localhost'}`)}`);
   } else {
     console.log(`  2. Run ${chalk.cyan('pan up')} to start the dashboard`);
-    console.log(`  3. Access dashboard at ${chalk.cyan('http://localhost:3011')}`);
+    console.log(`  3. Access dashboard at ${chalk.cyan(`http://localhost:${config.dashboard.port}`)}`);
   }
 
-  console.log(`  ${!options.minimal ? '5' : '4'}. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
+  console.log(`  ${!options.minimal ? '4' : '4'}. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
   console.log('');
 }
