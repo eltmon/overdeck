@@ -24,6 +24,8 @@ export interface ValidationContext {
   issueId?: string;
   /** Custom validation script path (defaults to scripts/validate-merge.sh) */
   validationScript?: string;
+  /** Baseline test failure count for comparison mode (pre-existing failures) */
+  baselineTestFailures?: number;
 }
 
 /**
@@ -206,10 +208,18 @@ export async function runMergeValidation(
 
   try {
     // Run validation script
+    // Pass baseline failures as env var for baseline comparison mode
+    const env = { ...process.env };
+    if (context.baselineTestFailures !== undefined) {
+      env.BASELINE_FAILURES = String(context.baselineTestFailures);
+      console.log(`[validation] Baseline comparison mode: ${context.baselineTestFailures} pre-existing failures`);
+    }
+
     const { stdout, stderr } = await execAsync(
       `bash "${scriptPath}" "${projectPath}"`,
       {
         cwd: projectPath,
+        env,
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large outputs
         timeout: 10 * 60 * 1000, // 10 minute timeout
       }

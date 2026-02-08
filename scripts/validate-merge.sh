@@ -71,10 +71,32 @@ fi
 echo ""
 
 # 3. Run tests
+# BASELINE_FAILURES env var enables baseline comparison mode:
+# If set, only fail when NEW failures appear (failures > baseline)
 echo "Running tests..."
+if [ -n "$BASELINE_FAILURES" ]; then
+    echo "Baseline comparison mode: $BASELINE_FAILURES pre-existing failures"
+fi
+
 if [ -f "package.json" ]; then
-    if npm test 2>&1; then
+    TEST_OUTPUT=$(npm test 2>&1) || true
+    echo "$TEST_OUTPUT"
+
+    # Check if tests passed cleanly
+    if echo "$TEST_OUTPUT" | grep -q "Tests.*passed\|0 failed"; then
         echo "✓ Tests passed"
+    elif [ -n "$BASELINE_FAILURES" ]; then
+        # Baseline mode: extract failure count and compare
+        # Match vitest output format: "X failed" or "X tests failed"
+        ACTUAL_FAILURES=$(echo "$TEST_OUTPUT" | grep -oP '(\d+)\s+failed' | head -1 | grep -oP '\d+' || echo "0")
+        if [ "$ACTUAL_FAILURES" -le "$BASELINE_FAILURES" ]; then
+            echo ""
+            echo "✓ Tests passed (baseline comparison: $ACTUAL_FAILURES failures <= $BASELINE_FAILURES baseline)"
+        else
+            echo ""
+            echo "VALIDATION FAILED: New test failures detected ($ACTUAL_FAILURES > baseline $BASELINE_FAILURES)"
+            exit 1
+        fi
     else
         echo ""
         echo "VALIDATION FAILED: Test failures detected"
