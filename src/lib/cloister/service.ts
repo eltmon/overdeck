@@ -351,6 +351,13 @@ export class CloisterService {
       // Update the set of running agents for next check
       this.previousRunningAgents = currentRunningSet;
 
+      // Completion marker check runs regardless of active agents —
+      // completed agents won't have tmux sessions anymore
+      this.healthCheckCount++;
+      if (this.healthCheckCount % 5 === 0) {
+        void this.checkCompletionMarkers();
+      }
+
       if (agentIds.length === 0) {
         this.lastCheck = new Date();
         return;
@@ -404,13 +411,6 @@ export class CloisterService {
       // Check cost limits (Phase 6)
       this.checkCostAlerts(agentIds);
 
-      // Check for agent completion markers (fallback for failed HTTP triggers)
-      // Check every 5th health cycle to avoid excess I/O
-      this.healthCheckCount++;
-      if (this.healthCheckCount % 5 === 0) {
-        void this.checkCompletionMarkers();
-      }
-
       // Check for specialist session rotation needs (Phase 6)
       // Only check periodically (every ~10 checks)
       if (Math.random() < 0.1) {
@@ -446,6 +446,17 @@ export class CloisterService {
         // Skip if no completion marker or already processed
         if (!existsSync(completedFile) || existsSync(processedFile)) continue;
         if (this.processedCompletions.has(dir.name)) continue;
+
+        // Skip stale completion markers (older than 24h) — just mark as processed
+        try {
+          const content = JSON.parse(readFileSync(completedFile, 'utf-8'));
+          const ageMs = Date.now() - new Date(content.timestamp).getTime();
+          if (ageMs > 24 * 60 * 60 * 1000) {
+            this.processedCompletions.add(dir.name);
+            try { renameSync(completedFile, processedFile); } catch {}
+            continue;
+          }
+        } catch {}
 
         // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
         const issueId = dir.name.replace('agent-', '').toUpperCase();
