@@ -2976,9 +2976,9 @@ app.put('/api/settings', (req, res) => {
     const newSettings = req.body;
 
     // Validate settings
-    const validationError = validateSettingsApi(newSettings);
-    if (validationError) {
-      res.status(400).json({ error: validationError });
+    const validation = validateSettingsApi(newSettings);
+    if (!validation.valid) {
+      res.status(400).json({ error: validation.errors.join('; ') });
       return;
     }
 

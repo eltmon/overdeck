@@ -46,8 +46,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
-      { id: 'kimi-k2' as ModelId, name: 'Kimi K2', icon: 'token', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Top-tier coding, 128K context' },
-      { id: 'kimi-k2-turbo' as ModelId, name: 'Kimi K2 Turbo', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'code', 'efficiency'], description: 'Fast coding assistant' },
+      { id: 'kimi-k2' as ModelId, name: 'Kimi K2', icon: 'token', tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Strong coding, 128K context' },
+      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding model, 256K context' },
     ],
   },
   zai: {
@@ -161,7 +161,7 @@ export function getModelById(id: ModelId): ModelDef | undefined {
 
   // Kimi models
   if (idLower.includes('kimi') || idLower.includes('moonshot')) {
-    if (idLower.includes('turbo') || idLower.includes('fast')) return models.find(m => m.id === 'kimi-k2-turbo');
+    if (idLower.includes('k2.5') || idLower.includes('2.5')) return models.find(m => m.id === 'kimi-k2.5');
     return models.find(m => m.id === 'kimi-k2');
   }
 
