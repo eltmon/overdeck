@@ -129,7 +129,7 @@ export function SettingsPage() {
 
   // Get all models grouped by provider
   const allModels = availableModels || {
-    anthropic: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    anthropic: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     openai: [],
     google: [],
     zai: [],

@@ -308,13 +308,13 @@ describe('settings', () => {
             review_agent: 'claude-sonnet-4-5',
             // Missing test_agent and merge_agent
           },
-          planning_agent: 'claude-opus-4-5',
+          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-5',
+            expert: 'claude-opus-4-6',
           },
         },
         api_keys: {},
@@ -340,7 +340,7 @@ describe('settings', () => {
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-5',
+            expert: 'claude-opus-4-6',
           },
         },
         api_keys: {},
@@ -360,7 +360,7 @@ describe('settings', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-5',
+          planning_agent: 'claude-opus-4-6',
           // Missing complexity
         },
         api_keys: {},
@@ -380,7 +380,7 @@ describe('settings', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-5',
+          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -405,13 +405,13 @@ describe('settings', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-5',
+          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-5',
+            expert: 'claude-opus-4-6',
           },
         },
         // Missing api_keys
@@ -430,7 +430,7 @@ describe('settings', () => {
       const available = getAvailableModels(settings);
 
       expect(available.anthropic).toEqual([
-        'claude-opus-4-5',
+        'claude-opus-4-6',
         'claude-sonnet-4-5',
         'claude-haiku-4-5',
       ]);

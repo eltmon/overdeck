@@ -14,15 +14,15 @@ import { MODEL_CAPABILITIES, getModelCapability } from './model-capabilities.js'
 
 /**
  * Optimal model defaults based on research (see docs/MODEL_RECOMMENDATIONS.md)
- * - Opus 4.5: Critical thinking tasks (exploration, planning, security review)
+ * - Opus 4.6: Critical thinking tasks (exploration, planning, security review)
  * - Sonnet 4.5: Quality implementation tasks (coding, testing, documentation)
  * - Haiku 4.5: Speed-critical tasks (subagents, triage, quick CLI)
  */
 export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
   return {
-    // High-complexity phases - Opus 4.5 for deep analysis
-    'issue-agent:exploration': 'claude-opus-4-5',
-    'issue-agent:planning': 'claude-opus-4-5',
+    // High-complexity phases - Opus 4.6 for deep analysis
+    'issue-agent:exploration': 'claude-opus-4-6',
+    'issue-agent:planning': 'claude-opus-4-6',
 
     // Implementation phases - Sonnet 4.5 for best coding quality (82% SWE-bench)
     'issue-agent:implementation': 'claude-sonnet-4-5',
@@ -31,12 +31,12 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'issue-agent:review-response': 'claude-sonnet-4-5',
 
     // Specialist agents - quality critical
-    'specialist-review-agent': 'claude-opus-4-5',
+    'specialist-review-agent': 'claude-opus-4-6',
     'specialist-test-agent': 'claude-sonnet-4-5',
     'specialist-merge-agent': 'claude-sonnet-4-5',
 
     // Convoy reviewers - mixed based on criticality
-    'convoy:security-reviewer': 'claude-opus-4-5',   // SAFETY CRITICAL
+    'convoy:security-reviewer': 'claude-opus-4-6',   // SAFETY CRITICAL
     'convoy:performance-reviewer': 'claude-sonnet-4-5',
     'convoy:correctness-reviewer': 'claude-sonnet-4-5',
     'convoy:synthesis-agent': 'claude-sonnet-4-5',

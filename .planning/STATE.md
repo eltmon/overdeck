@@ -319,3 +319,91 @@ PAN-129 (Dark/Light Mode Toggle) has been fully implemented with:
 - Full Playwright screenshot coverage verifying visual correctness
 
 The feature is ready for code review.
+
+---
+
+## Review Feedback (2026-02-08T07:26Z)
+
+**Status:** BLOCKED - Out-of-scope changes must be reverted
+
+### Issue: OUT-OF-SCOPE CHANGES to work-type-router.test.ts [BLOCKING]
+
+**Location:** tests/lib/work-type-router.test.ts
+
+PAN-129 is about dark/light mode toggle for the dashboard. Your branch includes changes to an UNRELATED test file (work-type-router.test.ts) that:
+
+1. Changed model names: claude-opus-4-6 → claude-opus-4-5 (4 places)
+2. Changed expected behavior: usedFallback true → false
+3. Still results in 2 NEW test failures (these changes didn't fix the tests)
+
+These changes are NOT part of the theme toggle feature scope.
+
+### Required Fix:
+
+Revert ALL changes to work-type-router.test.ts:
+
+```bash
+git checkout main -- tests/lib/work-type-router.test.ts
+git add tests/lib/work-type-router.test.ts
+git commit -m "revert: remove out-of-scope changes to work-type-router.test.ts"
+git push
+```
+
+Then request re-review:
+```bash
+pan work request-review PAN-129 -m "Reverted out-of-scope work-type-router changes"
+```
+
+**Note:** The work-type-router test failures are a SEPARATE issue from PAN-129 and should be addressed in a different PR. Your theme toggle code is fine - just need to keep the PR focused on its scope.
+
+The useTheme and useSearch test improvements (jsdom environment, state reset) are GOOD and should remain.
+
+
+## Test Agent Feedback (Sat Feb  7 23:32:39 PST 2026)
+
+**Feedback from test-agent** (test) - RE-TEST RESULTS
+
+**Summary:** ❌ Tests still FAILED - 2 NEW regressions remain (same as before)
+
+**Good News:** 🎉 **Major progress!** Fixed 28 useSearch.test.ts failures!
+
+**Test Results Comparison:**
+- **Main branch baseline:** 43 tests failed
+- **Feature branch:** 18 tests failed  
+- **Net improvement:** +26 tests better than main
+- **NEW regressions:** 2 (SAME override tests as before - NOT FIXED)
+
+**NEW Failures Still Blocking (UNCHANGED):**
+
+**tests/lib/work-type-router.test.ts** (2 NEW - still present):
+1. ❌ "should use override when configured"
+   - Expected: 'claude-opus-4-6'
+   - Got: 'claude-sonnet-4-5'
+   - **Root cause:** Override model configuration not being respected
+
+2. ❌ "should prefer override over smart selection"
+   - Expected: 'claude-opus-4-6'
+   - Got: 'claude-sonnet-4-5'
+   - **Root cause:** Override precedence logic broken
+
+**What Got Fixed:** ✅
+- useSearch.test.ts: 28 failures → 0 failures (EXCELLENT!)
+
+**Pre-existing Failures (16 total - informational only):**
+- settings.test.ts: 1 failure (Kimi models)
+- work-type-router.test.ts: 2 failures (multi-provider scenarios)
+- specialist-context.test.ts: 6 failures
+- specialist-logs.test.ts: 5 failures
+- migration.test.ts: 1 failure
+- retention.test.ts: 1 failure
+
+**Critical Action Required:**
+The 2 work-type-router override tests are STILL failing. These were reported in the first test run and have NOT been fixed. You MUST fix these before tests will pass.
+
+**Debug Suggestion:**
+The error message shows "Model claude-opus-4-6 requires undefined API key - falling back to claude-sonnet-4-5". This suggests the override logic is falling back when it shouldn't. Check:
+1. Override precedence in getModel() function
+2. API key validation logic when override is set
+3. Fallback conditions - should NOT fallback when override is explicitly configured
+
+**Status:** readyForMerge = false (test gate blocked by 2 NEW regressions)
