@@ -25,7 +25,7 @@ import {
 } from './database.js';
 import { initializeEnabledSpecialists } from './specialists.js';
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgents, getAgentState } from '../agents.js';
+import { listRunningAgents, getAgentState, getAgentRuntimeState } from '../agents.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
@@ -466,6 +466,18 @@ export class CloisterService {
   private async handleAgentCrash(agentId: string): Promise<void> {
     const config = this.config.auto_restart;
     if (!config?.enabled) return;
+
+    // Check if agent was intentionally stopped or suspended (not a crash)
+    const agentState = getAgentState(agentId);
+    if (!agentState || agentState.status === 'stopped') {
+      console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
+      return;
+    }
+    const runtimeState = getAgentRuntimeState(agentId);
+    if (runtimeState?.state === 'suspended') {
+      console.log(`🔔 Agent ${agentId} is suspended, skipping restart`);
+      return;
+    }
 
     // Record death timestamp for mass death detection
     const now = new Date();
