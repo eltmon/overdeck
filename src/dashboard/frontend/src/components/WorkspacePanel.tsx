@@ -117,7 +117,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
   const { data: output, refetch } = useQuery({
     queryKey: ['agent-output', agent.id],
     queryFn: () => fetchOutput(agent.id),
-    refetchInterval: 1000, // Faster refresh for better tailing
+    refetchInterval: agent.status === 'stopped' ? false : 1000, // No polling for stopped agents
   });
 
   // Fetch workspace info for container status
@@ -965,31 +965,33 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
               onScroll={handleScroll}
               className="flex-1 min-h-0 overflow-auto p-3 bg-gray-900 text-gray-200 font-mono text-xs leading-relaxed m-0 whitespace-pre"
             >
-              {output || 'Connecting to agent...'}
+              {output || (agent.status === 'stopped' ? 'No saved output available.' : 'Connecting to agent...')}
               <div ref={bottomRef} />
             </pre>
 
-            {/* Input */}
-            <div className="p-2 border-t border-gray-700 bg-gray-800">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="Send message to agent..."
-                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={!message.trim() || sendMutation.isPending}
-                  className="px-3 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  Send
-                </button>
+            {/* Input — hidden for stopped agents */}
+            {agent.status !== 'stopped' && (
+              <div className="p-2 border-t border-gray-700 bg-gray-800">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                    placeholder="Send message to agent..."
+                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!message.trim() || sendMutation.isPending}
+                    className="px-3 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    Send
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-gray-900">

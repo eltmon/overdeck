@@ -2097,8 +2097,56 @@ app.get('/api/agents', async (_req, res) => {
       })
     );
 
-    // Combine local and remote agents
-    const allAgents = [...agents, ...remoteAgents.filter(Boolean)];
+    // Include recently-stopped agents so users can still view their logs
+    const stoppedAgents: any[] = [];
+    if (existsSync(agentsDir)) {
+      const allDirs = readdirSync(agentsDir).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
+      const alreadyListed = new Set([
+        ...agentLines.map(l => l.split('|')[0]),
+        ...remoteAgentIds,
+      ]);
+
+      for (const dir of allDirs) {
+        if (alreadyListed.has(dir)) continue;
+        const stateFile = join(agentsDir, dir, 'state.json');
+        if (!existsSync(stateFile)) continue;
+
+        try {
+          const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+          if (state.status !== 'stopped') continue;
+
+          // Only show agents stopped within the last hour
+          const stoppedAt = state.lastActivity ? new Date(state.lastActivity) : null;
+          if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000) continue;
+
+          const isPlanning = dir.startsWith('planning-');
+          const issueId = state.issueId?.toUpperCase() ||
+            (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
+
+          stoppedAgents.push({
+            id: dir,
+            issueId,
+            runtime: state.runtime || 'claude',
+            model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+            status: 'stopped' as const,
+            startedAt: state.startedAt || new Date().toISOString(),
+            consecutiveFailures: 0,
+            killCount: 0,
+            workspace: state.workspace || null,
+            workspaceLocation: 'local',
+            git: null,
+            type: isPlanning ? 'planning' : 'agent',
+            hasPendingQuestion: false,
+            pendingQuestionCount: 0,
+          });
+        } catch {
+          // Skip corrupted state files
+        }
+      }
+    }
+
+    // Combine local, remote, and recently-stopped agents
+    const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...stoppedAgents];
 
     // Cache the result
     agentsCache = { data: allAgents, timestamp: now };
@@ -2151,8 +2199,32 @@ app.get('/api/agents/:id/output', async (req, res) => {
       stdout = result.stdout;
     }
 
+    // If tmux returned nothing useful, fall back to saved output log
+    if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
+      const savedLog = join(agentStateDir, 'output.log');
+      if (existsSync(savedLog)) {
+        const logContent = readFileSync(savedLog, 'utf-8');
+        // Return the last N lines from the saved log
+        const logLines = logContent.split('\n');
+        const numLines = typeof lines === 'string' ? parseInt(lines, 10) : lines as number;
+        stdout = logLines.slice(-numLines).join('\n');
+      }
+    }
+
     res.json({ output: stdout });
   } catch (error) {
+    // Even on error, try the saved log
+    try {
+      const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+      const savedLog = join(agentStateDir, 'output.log');
+      if (existsSync(savedLog)) {
+        const logContent = readFileSync(savedLog, 'utf-8');
+        res.json({ output: logContent });
+        return;
+      }
+    } catch {
+      // Fall through
+    }
     res.json({ output: 'Failed to capture output' });
   }
 });
@@ -2206,27 +2278,17 @@ app.post('/api/agents/:id/message', async (req, res) => {
   }
 });
 
-// Kill agent (async to avoid blocking event loop)
+// Stop agent — captures output log, kills tmux, preserves state as "stopped"
 app.delete('/api/agents/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    await execAsync(`tmux kill-session -t "${id}" 2>/dev/null || true`);
-
-    // Clean up agent state files to prevent stale "running" status
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
-    try {
-      if (existsSync(agentStateDir)) {
-        rmSync(agentStateDir, { recursive: true, force: true });
-      }
-    } catch (cleanupErr) {
-      console.log('Warning: Could not clean up agent state:', cleanupErr);
-    }
-
+    const { stopAgent } = await import('../../lib/agents.js');
+    stopAgent(id);
     res.json({ success: true });
   } catch (error) {
-    console.error('Error killing agent:', error);
-    res.status(500).json({ error: 'Failed to kill agent' });
+    console.error('Error stopping agent:', error);
+    res.status(500).json({ error: 'Failed to stop agent' });
   }
 });
 

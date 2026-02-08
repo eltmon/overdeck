@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, killSession, sendKeys, sessionExists, getAgentSessions } from './tmux.js';
+import { createSession, killSession, sendKeys, sessionExists, getAgentSessions, capturePane } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -475,6 +475,18 @@ export function stopAgent(agentId: string): void {
   const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
 
   if (sessionExists(normalizedId)) {
+    // Capture tmux output before killing so logs remain viewable after stop
+    try {
+      const output = capturePane(normalizedId, 5000);
+      if (output) {
+        const agentDir = getAgentDir(normalizedId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'output.log'), output);
+      }
+    } catch {
+      // Non-fatal — best effort log capture
+    }
+
     killSession(normalizedId);
   }
 
