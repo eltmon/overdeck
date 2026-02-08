@@ -3861,22 +3861,53 @@ app.post('/api/specialists/:name/auto-complete', async (req, res) => {
     }
 
     // Check for next queued task and wake if available
-    const nextTask = getNextSpecialistTask(name as SpecialistType);
-    if (nextTask) {
-      console.log(`[specialists] Waking ${name} for next task: ${nextTask.payload.issueId}`);
+    // Validate items before waking - skip stale items
+    const specialistQueue = checkSpecialistQueue(name as SpecialistType);
+    let nextValidTask = null;
+    for (const task of specialistQueue.items) {
+      const taskIssueId = task.payload?.issueId;
+      if (!taskIssueId) {
+        completeSpecialistTask(name as SpecialistType, task.id);
+        continue;
+      }
+
+      const taskStatus = getReviewStatus(taskIssueId);
+      // Skip already-completed items based on specialist type
+      if (name === 'review-agent' && taskStatus?.reviewStatus === 'passed') {
+        completeSpecialistTask(name as SpecialistType, task.id);
+        console.log(`[specialists] Skipping stale ${name} queue item: ${taskIssueId} (already reviewed)`);
+        continue;
+      }
+      if (name === 'test-agent' && taskStatus?.testStatus === 'passed') {
+        completeSpecialistTask(name as SpecialistType, task.id);
+        console.log(`[specialists] Skipping stale ${name} queue item: ${taskIssueId} (already tested)`);
+        continue;
+      }
+      if (taskStatus?.mergeStatus === 'merged') {
+        completeSpecialistTask(name as SpecialistType, task.id);
+        console.log(`[specialists] Skipping stale ${name} queue item: ${taskIssueId} (already merged)`);
+        continue;
+      }
+
+      nextValidTask = task;
+      break;
+    }
+
+    if (nextValidTask) {
+      console.log(`[specialists] Waking ${name} for next task: ${nextValidTask.payload.issueId}`);
       await wakeSpecialistWithTask(name as SpecialistType, {
-        issueId: nextTask.payload.issueId!,
-        workspace: nextTask.payload.context?.workspace,
-        branch: nextTask.payload.context?.branch,
+        issueId: nextValidTask.payload.issueId!,
+        workspace: nextValidTask.payload.context?.workspace,
+        branch: nextValidTask.payload.context?.branch,
       });
-      completeSpecialistTask(name as SpecialistType, nextTask.id);
+      completeSpecialistTask(name as SpecialistType, nextValidTask.id);
     }
 
     res.json({
       success: true,
       status,
       issueId,
-      nextTaskQueued: !!nextTask,
+      nextTaskQueued: !!nextValidTask,
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -5796,25 +5827,92 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
       }
     }
 
+    // Auto-queue test-agent when review passes (server-side guarantee)
+    // This ensures test-agent is always triggered regardless of which prompt the review-agent used
+    if (reviewStatus === 'passed') {
+      try {
+        const { wakeSpecialistOrQueue, checkSpecialistQueue: checkTestQueue } = await import('../../lib/cloister/specialists.js');
+
+        // Dedup: check if test-agent already has this issue queued
+        const testQueue = checkTestQueue('test-agent');
+        const alreadyQueued = testQueue.items.some(
+          (item: any) => item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()
+        );
+
+        if (!alreadyQueued) {
+          // Derive workspace/branch from issueId (review-agent doesn't send these)
+          const issueLower = issueId.toLowerCase();
+          const issuePrefix = issueId.split('-')[0];
+          const projectPath = getProjectPath(undefined, issuePrefix);
+          const testWorkspace = req.body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
+          const testBranch = req.body.branch || `feature/${issueLower}`;
+
+          const testResult = await wakeSpecialistOrQueue('test-agent', {
+            issueId,
+            workspace: testWorkspace,
+            branch: testBranch,
+          }, {
+            priority: 'normal',
+            source: 'review-passed-auto',
+          });
+          console.log(`[review-status] Auto-queued test-agent for ${issueId}: ${testResult.action}`);
+        } else {
+          console.log(`[review-status] Test-agent already has ${issueId} queued, skipping`);
+        }
+      } catch (err) {
+        console.error(`[review-status] Failed to auto-queue test-agent for ${issueId}:`, err);
+      }
+    }
+
     // Immediately process next queued item (don't wait for deacon patrol)
+    // Validate items before waking - skip already-reviewed or merged items
     const remainingQueue = checkSpecialistQueue('review-agent');
     if (remainingQueue.hasWork) {
       const { getNextSpecialistTask, wakeSpecialistWithTask, completeSpecialistTask: completeTask } = await import('../../lib/cloister/specialists.js');
-      const nextTask = getNextSpecialistTask('review-agent');
-      if (nextTask) {
-        console.log(`[review-status] Immediately waking review-agent for next queued task: ${nextTask.payload.issueId}`);
+
+      // Find next VALID task (skip stale items)
+      let validTask = null;
+      for (const task of remainingQueue.items) {
+        const taskIssueId = task.payload?.issueId;
+        if (!taskIssueId) {
+          completeTask('review-agent', task.id);
+          console.log(`[review-status] Removed queue item with no issueId`);
+          continue;
+        }
+
+        // Skip if already reviewed or merged
+        const taskStatus = getReviewStatus(taskIssueId);
+        if (taskStatus?.reviewStatus === 'passed') {
+          completeTask('review-agent', task.id);
+          console.log(`[review-status] Skipping stale queue item: ${taskIssueId} (already reviewed)`);
+          continue;
+        }
+        if (taskStatus?.mergeStatus === 'merged') {
+          completeTask('review-agent', task.id);
+          console.log(`[review-status] Skipping stale queue item: ${taskIssueId} (already merged)`);
+          continue;
+        }
+
+        validTask = task;
+        break;
+      }
+
+      if (validTask) {
+        console.log(`[review-status] Immediately waking review-agent for next queued task: ${validTask.payload.issueId}`);
         const taskDetails = {
-          issueId: nextTask.payload.issueId || '',
-          branch: nextTask.payload.context?.branch,
-          workspace: nextTask.payload.context?.workspace,
+          issueId: validTask.payload.issueId || '',
+          branch: validTask.payload.context?.branch,
+          workspace: validTask.payload.context?.workspace,
         };
         const wakeResult = await wakeSpecialistWithTask('review-agent', taskDetails);
         if (wakeResult.success) {
-          completeTask('review-agent', nextTask.id);
-          console.log(`[review-status] Review-agent woken for ${nextTask.payload.issueId}`);
+          completeTask('review-agent', validTask.id);
+          console.log(`[review-status] Review-agent woken for ${validTask.payload.issueId}`);
         } else {
           console.error(`[review-status] Failed to wake review-agent for next task: ${wakeResult.error}`);
         }
+      } else {
+        console.log(`[review-status] No valid items remaining in review-agent queue`);
       }
     }
   }
@@ -5851,24 +5949,52 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     }
 
     // Immediately process next queued item for test-agent
+    // Validate items before waking - skip already-tested or merged items
     const remainingTestQueue = checkSpecialistQueue('test-agent');
     if (remainingTestQueue.hasWork) {
       const { getNextSpecialistTask, wakeSpecialistWithTask, completeSpecialistTask: completeTask } = await import('../../lib/cloister/specialists.js');
-      const nextTask = getNextSpecialistTask('test-agent');
-      if (nextTask) {
-        console.log(`[review-status] Immediately waking test-agent for next queued task: ${nextTask.payload.issueId}`);
+
+      // Find next VALID task (skip stale items)
+      let validTestTask = null;
+      for (const task of remainingTestQueue.items) {
+        const taskIssueId = task.payload?.issueId;
+        if (!taskIssueId) {
+          completeTask('test-agent', task.id);
+          continue;
+        }
+
+        const taskStatus = getReviewStatus(taskIssueId);
+        if (taskStatus?.testStatus === 'passed') {
+          completeTask('test-agent', task.id);
+          console.log(`[review-status] Skipping stale test queue item: ${taskIssueId} (already tested)`);
+          continue;
+        }
+        if (taskStatus?.mergeStatus === 'merged') {
+          completeTask('test-agent', task.id);
+          console.log(`[review-status] Skipping stale test queue item: ${taskIssueId} (already merged)`);
+          continue;
+        }
+
+        validTestTask = task;
+        break;
+      }
+
+      if (validTestTask) {
+        console.log(`[review-status] Immediately waking test-agent for next queued task: ${validTestTask.payload.issueId}`);
         const taskDetails = {
-          issueId: nextTask.payload.issueId || '',
-          branch: nextTask.payload.context?.branch,
-          workspace: nextTask.payload.context?.workspace,
+          issueId: validTestTask.payload.issueId || '',
+          branch: validTestTask.payload.context?.branch,
+          workspace: validTestTask.payload.context?.workspace,
         };
         const wakeResult = await wakeSpecialistWithTask('test-agent', taskDetails);
         if (wakeResult.success) {
-          completeTask('test-agent', nextTask.id);
-          console.log(`[review-status] Test-agent woken for ${nextTask.payload.issueId}`);
+          completeTask('test-agent', validTestTask.id);
+          console.log(`[review-status] Test-agent woken for ${validTestTask.payload.issueId}`);
         } else {
           console.error(`[review-status] Failed to wake test-agent for next task: ${wakeResult.error}`);
         }
+      } else {
+        console.log(`[review-status] No valid items remaining in test-agent queue`);
       }
     }
   }
@@ -5985,6 +6111,27 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       message: `Review already completed with status: ${existingStatus.reviewStatus}`,
       reviewNotes: existingStatus.reviewNotes,
       hint: 'Address the review feedback before requesting another review',
+    });
+  }
+
+  // Skip issues that already passed review (prevents re-reviewing stale completion markers)
+  if (existingStatus?.reviewStatus === 'passed') {
+    console.log(`[review] Skipping ${issueId}: already passed review`);
+    return res.json({
+      success: false,
+      alreadyReviewed: true,
+      message: `Review already passed for ${issueId}`,
+      hint: 'Issue already passed review — proceed to testing or merge',
+    });
+  }
+
+  // Skip issues that are already merged
+  if (existingStatus?.mergeStatus === 'merged') {
+    console.log(`[review] Skipping ${issueId}: already merged`);
+    return res.json({
+      success: false,
+      alreadyMerged: true,
+      message: `${issueId} is already merged`,
     });
   }
 
