@@ -70,7 +70,20 @@ export async function determineHealthStatusAsync(
       return null;
     }
 
-    // Status is "running" or "in_progress" but no tmux - actual crash
+    // Status is "running" or "in_progress" but no tmux — check staleness
+    // Only report as "dead" if the agent was active recently (within 24h)
+    // Older stale state files are hidden to avoid cluttering the health view
+    const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+    if (lastActivity) {
+      const ageMs = Date.now() - lastActivity.getTime();
+      if (ageMs > STALE_THRESHOLD_MS) {
+        return null; // Stale — hide from health view
+      }
+    } else {
+      // No lastActivity at all — ancient state file, hide it
+      return null;
+    }
+
     return { status: 'dead', reason: 'Agent crashed unexpectedly' };
   }
 
