@@ -562,16 +562,6 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
     };
   }
 
-  // Record pre-merge HEAD for safe rollback (handles multi-commit fast-forwards)
-  let preMergeHead: string | undefined;
-  try {
-    const { stdout: headRaw } = await execAsync('git rev-parse HEAD', {
-      cwd: context.projectPath,
-      encoding: 'utf-8',
-    });
-    preMergeHead = headRaw.trim();
-  } catch { /* best effort */ }
-
   // Build prompt
   const prompt = buildMergePrompt(context);
 
@@ -652,8 +642,8 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
               console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
               logActivity('merge_validation_fail', `Validation failed for ${context.issueId}: ${validationResult.failures.map(f => f.type).join(', ')}`);
 
-              // Attempt auto-revert to pre-merge HEAD (handles multi-commit fast-forwards)
-              const revertSuccess = await autoRevertMerge(context.projectPath, preMergeHead);
+              // Revert to ORIG_HEAD (set by git at merge time)
+              const revertSuccess = await autoRevertMerge(context.projectPath);
 
               const failureReason = validationResult.failures.map(f => `${f.type}: ${f.message}`).join('; ');
               const revertNote = revertSuccess
@@ -794,7 +784,7 @@ export async function spawnMergeAgentForBranches(
     return { success: false, reason: `Pre-flight check failed: ${error.message}` };
   }
 
-  // Record current HEAD before merge
+  // Record current HEAD to detect when merge happens (polling compares against this)
   const { stdout: headBeforeRaw } = await execAsync('git rev-parse HEAD', {
     cwd: projectPath,
     encoding: 'utf-8',
@@ -827,7 +817,6 @@ export async function spawnMergeAgentForBranches(
 PROJECT: ${projectPath}
 SOURCE BRANCH: ${sourceBranch}
 TARGET BRANCH: ${targetBranch}
-PRE_MERGE_HEAD: ${headBefore}
 
 INSTRUCTIONS:
 
@@ -860,7 +849,8 @@ PHASE 4 — DECIDE:
     - If MERGE_FAIL > BASELINE_FAIL (NEW test failures introduced): ROLLBACK (go to step 11)
     - If MERGE_FAIL <= BASELINE_FAIL (no new failures): PUSH (go to step 12)
     - Pre-existing failures on ${targetBranch} are NOT a reason to rollback
-11. ROLLBACK: git reset --hard ${headBefore}
+11. ROLLBACK: git reset --hard ORIG_HEAD
+    (ORIG_HEAD is set by git at merge time — always points to pre-merge state)
     Then report failure by calling the Panopticon API:
     curl -s -X POST http://localhost:3011/api/specialists/done \\
       -H "Content-Type: application/json" \\
@@ -885,7 +875,7 @@ DO NOT:
 - Clean up workspaces
 - Skip the build step - compile errors after merge are common
 - Skip the baseline test run — without it you cannot distinguish new failures from pre-existing ones
-- Use HEAD~1 for rollback — use PRE_MERGE_HEAD (${headBefore}) which handles fast-forward merges correctly
+- Use HEAD~1 for rollback — use ORIG_HEAD which git sets automatically at merge time
 - Run git stash — the TypeScript layer handles stash/restore automatically
 - Do anything beyond the merge, build, test, and push steps above
 
@@ -1007,8 +997,8 @@ Report any issues or conflicts you encountered.`;
                 console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
                 logActivity('merge_validation_fail', `Validation failed: ${validationResult.failures.map(f => f.type).join(', ')}`);
 
-                // Attempt auto-revert to pre-merge HEAD (handles multi-commit fast-forwards)
-                const revertSuccess = await autoRevertMerge(projectPath, headBefore);
+                // Revert to ORIG_HEAD (set by git at merge time)
+                const revertSuccess = await autoRevertMerge(projectPath);
 
                 // Force push to revert the remote as well
                 if (revertSuccess) {
