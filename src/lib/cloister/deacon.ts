@@ -11,14 +11,15 @@
  * Inspired by gastown's deacon pattern.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 
 const execAsync = promisify(exec);
-import { PANOPTICON_HOME } from '../paths.js';
+import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
+import { loadCloisterConfig } from './config.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -493,6 +494,13 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
       continue;
     }
 
+    // PAN-154: Check tmux output for active status indicators before marking idle
+    // Agents that are computing/thinking/reading are NOT idle despite hook state
+    const activeInTmux = await isAgentActiveInTmux(agent.id);
+    if (activeInTmux) {
+      continue; // Agent is actively working, skip suspension
+    }
+
     // Calculate idle time
     const lastActivity = new Date(runtimeState.lastActivity);
     const idleMs = Date.now() - lastActivity.getTime();
@@ -609,6 +617,14 @@ export async function checkLazyAgent(sessionName: string): Promise<{
 
     if (!stdout.trim()) {
       return { isLazy: false };
+    }
+
+    // PAN-154: Check if agent is actively computing/thinking before checking laziness
+    // Agents showing status indicators are working, not lazy
+    for (const pattern of ACTIVE_STATUS_PATTERNS) {
+      if (pattern.test(stdout)) {
+        return { isLazy: false };
+      }
     }
 
     // Only check if agent appears to be idle (waiting for input)
@@ -747,6 +763,143 @@ export async function checkAndCorrectLazyAgents(): Promise<string[]> {
         actions.push(`Corrected lazy agent ${agent.id} (matched: ${lazyCheck.matchedPattern})`);
       }
     }
+  }
+
+  return actions;
+}
+
+// ============================================================================
+// Agent State Cleanup
+// ============================================================================
+
+/**
+ * Status indicators in tmux output that mean the agent is actively working
+ * (not idle). These appear in Claude Code's status line.
+ */
+const ACTIVE_STATUS_PATTERNS = [
+  /computing/i,
+  /fermenting/i,
+  /thinking/i,
+  /reading/i,
+  /writing/i,
+  /editing/i,
+  /searching/i,
+  /running/i,
+  /executing/i,
+  /tool use/i,
+  /\bBash\b/,
+  /\bRead\b/,
+  /\bWrite\b/,
+  /\bEdit\b/,
+  /\bGrep\b/,
+  /\bGlob\b/,
+  /\bTask\b/,
+];
+
+/**
+ * Check if agent tmux output indicates active work (not idle)
+ * Parses last 5 lines of tmux capture-pane output for status indicators
+ */
+export async function isAgentActiveInTmux(sessionName: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      `tmux capture-pane -t "${sessionName}" -p -S -5 2>/dev/null || echo ""`,
+      { encoding: 'utf-8' }
+    );
+
+    if (!stdout.trim()) return false;
+
+    for (const pattern of ACTIVE_STATUS_PATTERNS) {
+      if (pattern.test(stdout)) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clean up stale agent state directories (PAN-154)
+ *
+ * Scans ~/.panopticon/agents/ for directories that:
+ * - Have no active tmux session
+ * - Are older than the configured retention threshold (default: 30 days)
+ * - Don't have a recently processed completion marker
+ *
+ * Runs at low frequency (~once per day) via random trigger in patrol cycle.
+ */
+export async function cleanupStaleAgentState(): Promise<string[]> {
+  const actions: string[] = [];
+  const cloisterConfig = loadCloisterConfig();
+  const retentionDays = cloisterConfig.retention?.agent_state_days ?? 30;
+  const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  if (!existsSync(AGENTS_DIR)) {
+    return actions;
+  }
+
+  try {
+    const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory());
+
+    for (const dir of dirs) {
+      const agentDir = join(AGENTS_DIR, dir.name);
+
+      try {
+        // Check if tmux session is active — never clean up running agents
+        try {
+          await execAsync(`tmux has-session -t "${dir.name}" 2>/dev/null`);
+          continue; // Session exists, skip
+        } catch {
+          // No session — candidate for cleanup
+        }
+
+        // Check directory age via state.json mtime (or dir mtime as fallback)
+        const stateFile = join(agentDir, 'state.json');
+        let mtime: number;
+
+        if (existsSync(stateFile)) {
+          mtime = statSync(stateFile).mtimeMs;
+        } else {
+          mtime = statSync(agentDir).mtimeMs;
+        }
+
+        const ageMs = now - mtime;
+        if (ageMs < retentionMs) {
+          continue; // Not old enough, skip
+        }
+
+        // Check for recently processed completion (don't delete if completed recently)
+        const completedFile = join(agentDir, 'completed');
+        if (existsSync(completedFile)) {
+          const completedAge = now - statSync(completedFile).mtimeMs;
+          // Keep completed agents for at least 7 days regardless of retention
+          if (completedAge < 7 * 24 * 60 * 60 * 1000) {
+            continue;
+          }
+        }
+
+        // Safe to remove
+        const ageDays = Math.round(ageMs / (24 * 60 * 60 * 1000));
+        rmSync(agentDir, { recursive: true, force: true });
+        actions.push(`Purged stale agent state: ${dir.name} (${ageDays} days old)`);
+        console.log(`[deacon] Purged stale agent state: ${dir.name} (${ageDays} days old)`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[deacon] Error cleaning up agent ${dir.name}:`, msg);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error during agent state cleanup:', msg);
+  }
+
+  if (actions.length > 0) {
+    console.log(`[deacon] Cleanup complete: purged ${actions.length} stale agent directories`);
   }
 
   return actions;
@@ -924,19 +1077,26 @@ export async function runPatrol(): Promise<PatrolResult> {
     }
   }
 
-  // Check and auto-suspend idle agents (PAN-80)
-  // DISABLED: False positives on planning agents - see PAN-133
-  // const suspendActions = await checkAndSuspendIdleAgents();
-  // actions.push(...suspendActions);
+  // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
+  // Now checks tmux status indicators to avoid false positives on computing agents
+  const suspendActions = await checkAndSuspendIdleAgents();
+  actions.push(...suspendActions);
 
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
 
-  // Check for lazy agent behavior and auto-correct
-  // DISABLED: False positives on planning agents - see PAN-133
-  // const lazyActions = await checkAndCorrectLazyAgents();
-  // actions.push(...lazyActions);
+  // Check for lazy agent behavior and auto-correct (PAN-80, fixed in PAN-154)
+  // Now checks tmux status indicators to avoid false positives on computing agents
+  const lazyActions = await checkAndCorrectLazyAgents();
+  actions.push(...lazyActions);
+
+  // Periodic agent state cleanup (PAN-154)
+  // Runs at ~1 in 300 patrols (~daily at 30s intervals)
+  if (Math.random() < 0.003) {
+    const cleanupActions = await cleanupStaleAgentState();
+    actions.push(...cleanupActions);
+  }
 
   saveState(state);
 

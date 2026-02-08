@@ -157,6 +157,14 @@ export interface CostLimitsConfig {
 }
 
 /**
+ * Retention policy configuration
+ */
+export interface RetentionConfig {
+  agent_state_days: number; // Days to keep agent state dirs (default: 30)
+  health_staleness_hours: number; // Hours before hiding stale agents in health API (default: 24)
+}
+
+/**
  * Complete Cloister configuration
  */
 export interface CloisterConfig {
@@ -171,6 +179,7 @@ export interface CloisterConfig {
   cost_tracking?: CostTrackingConfig;
   auto_restart?: AutoRestartConfig;
   cost_limits?: CostLimitsConfig;
+  retention?: RetentionConfig;
 }
 
 /**
@@ -266,6 +275,10 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     per_issue_usd: 25.0,
     daily_total_usd: 100.0,
     alert_threshold: 0.8, // Alert at 80%
+  },
+  retention: {
+    agent_state_days: 30,
+    health_staleness_hours: 24,
   },
 };
 
