@@ -21,7 +21,14 @@ import {
   AlertTriangle,
   Cloud,
   Monitor,
+  DollarSign,
+  Cpu,
+  FolderPlus,
+  User,
+  Tag,
+  Calendar,
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { Agent, Issue } from '../types';
 
 interface ContainerStatus {
@@ -147,7 +154,7 @@ function getFriendlyModelName(fullModel: string): string {
 }
 
 interface WorkspacePanelProps {
-  agent: Agent;
+  agent?: Agent;
   issueId: string;
   issueUrl?: string;
   issue?: Issue;
@@ -170,12 +177,13 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  const tmuxCommand = `tmux attach -t ${agent.id}`;
+  const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
 
   const { data: output, refetch } = useQuery({
-    queryKey: ['agent-output', agent.id],
-    queryFn: () => fetchOutput(agent.id),
-    refetchInterval: agent.status === 'stopped' ? false : 1000, // No polling for stopped agents
+    queryKey: ['agent-output', agent?.id],
+    queryFn: () => fetchOutput(agent!.id),
+    refetchInterval: agent?.status === 'stopped' ? false : 1000,
+    enabled: !!agent,
   });
 
   // Fetch workspace info for container status
@@ -210,6 +218,40 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     },
     refetchInterval: 30000,
     staleTime: 10000,
+  });
+
+  // Start agent (when no agent exists)
+  const startAgentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId, projectId: issue?.project?.id }),
+      });
+      if (!res.ok) throw new Error('Failed to start agent');
+      return res.json();
+    },
+    onSuccess: () => {
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['agents'] });
+      }, 2000);
+    },
+  });
+
+  // Create workspace (when no workspace exists)
+  const createWorkspaceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId, projectId: issue?.project?.id }),
+      });
+      if (!res.ok) throw new Error('Failed to create workspace');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+    },
   });
 
   const startContainersMutation = useMutation({
@@ -433,6 +475,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
 
   const sendMutation = useMutation({
     mutationFn: async (msg: string) => {
+      if (!agent) throw new Error('No agent');
       const res = await fetch(`/api/agents/${agent.id}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -448,6 +491,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
 
   const killMutation = useMutation({
     mutationFn: async () => {
+      if (!agent) throw new Error('No agent');
       const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to kill');
     },
@@ -487,14 +531,14 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
   };
 
   const handleKill = () => {
-    if (confirm(`Kill agent ${agent.id}?`)) {
+    if (agent && confirm(`Kill agent ${agent.id}?`)) {
       killMutation.mutate();
     }
   };
 
   // Format duration
-  const startedAt = new Date(agent.startedAt);
-  const durationMs = Date.now() - startedAt.getTime();
+  const startedAt = agent ? new Date(agent.startedAt) : null;
+  const durationMs = startedAt ? Date.now() - startedAt.getTime() : 0;
   const durationMins = Math.floor(durationMs / 60000);
   const durationHours = Math.floor(durationMins / 60);
   const duration = durationHours > 0
@@ -508,16 +552,25 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
         <div className="w-64 border-r border-divider flex flex-col overflow-y-auto">
           {/* Header */}
           <div className="px-3 py-2 border-b border-divider">
-            <div className="flex items-center gap-2">
-              <div className="flex gap-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '300ms' }} />
+            {agent ? (
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-xs text-content-subtle">
+                  {agent.status === 'stopped' ? 'Agent Stopped' : 'Agent Running'}
+                </span>
               </div>
-              <span className="text-xs text-content-subtle">Agent Running</span>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-content-muted" />
+                <span className="text-xs text-content-subtle">No Agent</span>
+              </div>
+            )}
             <h2 className="font-mono text-sm text-content font-medium mt-1">
-              {agent.issueId}
+              {issueId.toUpperCase()}
             </h2>
             {issue && (
               <p className="text-xs text-content-subtle mt-1 line-clamp-2" title={issue.title}>
@@ -554,31 +607,33 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
           </div>
         )}
 
-        {/* Agent info */}
-        <div className="px-3 py-2 border-b border-divider text-xs">
-          <div className="text-content-muted uppercase tracking-wider mb-2">Agent</div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-content-subtle">Model</span>
-              <span className="text-content">{agent.model}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-content-subtle">Runtime</span>
-              <span className="text-content">{agent.runtime}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-content-subtle">Uptime</span>
-              <span className="text-content">{duration}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-content-subtle">Session</span>
-              <span className="text-content font-mono text-[10px]">{agent.id}</span>
+        {/* Agent info - only when agent exists */}
+        {agent && (
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="text-content-muted uppercase tracking-wider mb-2">Agent</div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-content-subtle">Model</span>
+                <span className="text-content">{agent.model}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-content-subtle">Runtime</span>
+                <span className="text-content">{agent.runtime}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-content-subtle">Uptime</span>
+                <span className="text-content">{duration}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-content-subtle">Session</span>
+                <span className="text-content font-mono text-[10px]">{agent.id}</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Git Status */}
-        {agent.git && (
+        {agent?.git && (
           <div className="px-3 py-2 border-b border-divider text-xs">
             <div className="text-content-muted uppercase tracking-wider mb-2">Git Status</div>
             <div className="space-y-1.5">
@@ -599,7 +654,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
         )}
 
         {/* Workspace path */}
-        {agent.workspace && (
+        {agent?.workspace && (
           <div className="px-3 py-2 border-b border-divider text-xs">
             <div className="flex items-center gap-1.5 text-content-subtle">
               <Folder className="w-3 h-3" />
@@ -607,6 +662,31 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                 {agent.workspace}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Workspace path from API - when no agent but workspace exists */}
+        {!agent && workspace?.exists && workspace.path && (
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="text-content-muted uppercase tracking-wider mb-2">Workspace</div>
+            <div className="flex items-center gap-1.5 text-content-subtle">
+              <Folder className="w-3 h-3" />
+              <span className="font-mono truncate text-[10px]" title={workspace.path}>
+                {workspace.path}
+              </span>
+            </div>
+            {workspace.location && (
+              <span
+                className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded ${
+                  workspace.location === 'remote'
+                    ? 'bg-cyan-900/50 text-cyan-400'
+                    : 'bg-surface-overlay text-content-subtle'
+                }`}
+              >
+                {workspace.location === 'remote' ? <Cloud className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}
+                {workspace.location}
+              </span>
+            )}
           </div>
         )}
 
@@ -872,27 +952,29 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
           </div>
         )}
 
-        {/* Tmux attach command */}
-        <div className="px-3 py-2 border-b border-divider text-xs">
-          <div className="text-content-muted uppercase tracking-wider mb-2">Attach Command</div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 bg-surface rounded font-mono text-[11px] text-content-body overflow-hidden">
-              <Terminal className="w-3 h-3 shrink-0 text-blue-400" />
-              <span className="truncate">{tmuxCommand}</span>
+        {/* Tmux attach command - only with agent */}
+        {agent && (
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="text-content-muted uppercase tracking-wider mb-2">Attach Command</div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 bg-surface rounded font-mono text-[11px] text-content-body overflow-hidden">
+                <Terminal className="w-3 h-3 shrink-0 text-blue-400" />
+                <span className="truncate">{tmuxCommand}</span>
+              </div>
+              <button
+                onClick={handleCopy}
+                className={`p-1.5 rounded transition-colors ${
+                  copied
+                    ? 'bg-green-900/30 text-green-400'
+                    : 'bg-surface-overlay hover:bg-surface-emphasis text-content-subtle hover:text-content'
+                }`}
+                title="Copy to clipboard"
+              >
+                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
             </div>
-            <button
-              onClick={handleCopy}
-              className={`p-1.5 rounded transition-colors ${
-                copied
-                  ? 'bg-green-900/30 text-green-400'
-                  : 'bg-surface-overlay hover:bg-surface-emphasis text-content-subtle hover:text-content'
-              }`}
-              title="Copy to clipboard"
-            >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            </button>
           </div>
-        </div>
+        )}
 
         {/* Actions */}
         <div className="px-3 py-2 border-b border-divider">
@@ -1005,14 +1087,16 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               {reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test'}
             </button>
 
-            <button
-              onClick={handleKill}
-              disabled={killMutation.isPending}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-red-900/30 text-red-400 rounded hover:bg-red-900/50"
-            >
-              <Square className="w-3 h-3" />
-              Stop Agent
-            </button>
+            {agent && (
+              <button
+                onClick={handleKill}
+                disabled={killMutation.isPending}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-red-900/30 text-red-400 rounded hover:bg-red-900/50"
+              >
+                <Square className="w-3 h-3" />
+                Stop Agent
+              </button>
+            )}
             <button
               onClick={handleClose}
               disabled={closeMutation.isPending}
@@ -1025,6 +1109,42 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               )}
               Close (No Merge)
             </button>
+
+            {/* Start Agent / Create Workspace - only when no agent */}
+            {!agent && (
+              <>
+                <button
+                  onClick={() => startAgentMutation.mutate()}
+                  disabled={startAgentMutation.isPending || startAgentMutation.isSuccess}
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-content rounded hover:bg-blue-500 disabled:opacity-50 font-medium"
+                >
+                  {startAgentMutation.isPending ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : startAgentMutation.isSuccess ? (
+                    <Check className="w-3 h-3" />
+                  ) : (
+                    <Play className="w-3 h-3" />
+                  )}
+                  {startAgentMutation.isPending ? 'Starting...' : startAgentMutation.isSuccess ? 'Started!' : 'Start Agent'}
+                </button>
+                {!workspace?.exists && (
+                  <button
+                    onClick={() => createWorkspaceMutation.mutate()}
+                    disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-surface-overlay text-content rounded hover:bg-surface-emphasis disabled:opacity-50 border border-divider-strong"
+                  >
+                    {createWorkspaceMutation.isPending ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : createWorkspaceMutation.isSuccess ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <FolderPlus className="w-3 h-3" />
+                    )}
+                    {createWorkspaceMutation.isPending ? 'Creating...' : createWorkspaceMutation.isSuccess ? 'Created!' : 'Create Workspace'}
+                  </button>
+                )}
+              </>
+            )}
           </div>
           {reviewMutation.isError && (
             <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded mt-2">
@@ -1053,127 +1173,329 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
         <div className="flex-1" />
       </div>
 
-      {/* Right side - Logs */}
+      {/* Right side - Content */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-        {/* Tabs header */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-divider">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setActiveTab('logs')}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                activeTab === 'logs'
-                  ? 'bg-surface-overlay text-content'
-                  : 'text-content-subtle hover:text-content'
-              }`}
-            >
-              Logs
-            </button>
-            <button
-              onClick={() => setActiveTab('status')}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                activeTab === 'status'
-                  ? 'bg-surface-overlay text-content'
-                  : 'text-content-subtle hover:text-content'
-              }`}
-            >
-              Status
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => refetch()}
-              className="p-1 text-content-subtle hover:text-content"
-              title="Refresh"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={onClose} className="p-1 text-content-subtle hover:text-content">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        {activeTab === 'logs' ? (
+        {agent ? (
           <>
-            <pre
-              ref={terminalRef}
-              onScroll={handleScroll}
-              className="flex-1 min-h-0 overflow-auto p-3 bg-surface text-content font-mono text-xs leading-relaxed m-0 whitespace-pre"
-            >
-              {output || (agent.status === 'stopped' ? 'No saved output available.' : 'Connecting to agent...')}
-              <div ref={bottomRef} />
-            </pre>
+            {/* Tabs header - with agent */}
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-divider">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setActiveTab('logs')}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    activeTab === 'logs'
+                      ? 'bg-surface-overlay text-content'
+                      : 'text-content-subtle hover:text-content'
+                  }`}
+                >
+                  Logs
+                </button>
+                <button
+                  onClick={() => setActiveTab('status')}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    activeTab === 'status'
+                      ? 'bg-surface-overlay text-content'
+                      : 'text-content-subtle hover:text-content'
+                  }`}
+                >
+                  Status
+                </button>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => refetch()}
+                  className="p-1 text-content-subtle hover:text-content"
+                  title="Refresh"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={onClose} className="p-1 text-content-subtle hover:text-content">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
 
-            {/* Input — hidden for stopped agents */}
-            {agent.status !== 'stopped' && (
-              <div className="p-2 border-t border-divider bg-surface-raised">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder="Send message to agent..."
-                    className="flex-1 px-3 py-2 bg-surface-overlay border border-divider-strong rounded text-sm text-content placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={handleSend}
-                    disabled={!message.trim() || sendMutation.isPending}
-                    className="px-3 py-2 bg-blue-600 text-content rounded text-sm font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    <Send className="w-4 h-4" />
-                    Send
-                  </button>
+            {/* Agent content */}
+            {activeTab === 'logs' ? (
+              <>
+                <pre
+                  ref={terminalRef}
+                  onScroll={handleScroll}
+                  className="flex-1 min-h-0 overflow-auto p-3 bg-surface text-content font-mono text-xs leading-relaxed m-0 whitespace-pre"
+                >
+                  {output || (agent.status === 'stopped' ? 'No saved output available.' : 'Connecting to agent...')}
+                  <div ref={bottomRef} />
+                </pre>
+
+                {/* Input — hidden for stopped agents */}
+                {agent.status !== 'stopped' && (
+                  <div className="p-2 border-t border-divider bg-surface-raised">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        placeholder="Send message to agent..."
+                        className="flex-1 px-3 py-2 bg-surface-overlay border border-divider-strong rounded text-sm text-content placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={handleSend}
+                        disabled={!message.trim() || sendMutation.isPending}
+                        className="px-3 py-2 bg-blue-600 text-content rounded text-sm font-medium hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <Send className="w-4 h-4" />
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-surface">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-content mb-2">Agent Summary</h3>
+                    <div className="text-xs text-content-body space-y-1">
+                      <p><strong>Issue:</strong> {agent.issueId}</p>
+                      <p><strong>Session:</strong> <span className="font-mono text-[10px]">{agent.id}</span></p>
+                      <p><strong>Model:</strong> {agent.model}</p>
+                      <p><strong>Runtime:</strong> {agent.runtime}</p>
+                      <p><strong>Started:</strong> {startedAt?.toLocaleString()}</p>
+                      <p><strong>Uptime:</strong> {duration}</p>
+                    </div>
+                  </div>
+
+                  {agent.workspace && (
+                    <div>
+                      <h3 className="text-sm font-medium text-content mb-2">Workspace</h3>
+                      <div className="text-xs text-content-body space-y-1">
+                        <p className="font-mono text-[10px] break-all">{agent.workspace}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {agent.git && (
+                    <div>
+                      <h3 className="text-sm font-medium text-content mb-2">Git Status</h3>
+                      <div className="text-xs text-content-body space-y-1">
+                        <p><strong>Branch:</strong> <span className="font-mono">{agent.git.branch}</span></p>
+                        <p><strong>Uncommitted:</strong> {agent.git.uncommittedFiles} files</p>
+                        <p><strong>Latest:</strong> {agent.git.latestCommit}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-sm font-medium text-content mb-2">Health</h3>
+                    <div className="text-xs text-content-body space-y-1">
+                      <p><strong>Status:</strong> <span className="text-green-400">{agent.status}</span></p>
+                      <p><strong>Consecutive Failures:</strong> {agent.consecutiveFailures}</p>
+                      <p><strong>Total Restarts:</strong> {agent.killCount}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
           </>
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-surface">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium text-content mb-2">Agent Summary</h3>
-                <div className="text-xs text-content-body space-y-1">
-                  <p><strong>Issue:</strong> {agent.issueId}</p>
-                  <p><strong>Session:</strong> <span className="font-mono text-[10px]">{agent.id}</span></p>
-                  <p><strong>Model:</strong> {agent.model}</p>
-                  <p><strong>Runtime:</strong> {agent.runtime}</p>
-                  <p><strong>Started:</strong> {startedAt.toLocaleString()}</p>
-                  <p><strong>Uptime:</strong> {duration}</p>
+          <>
+            {/* Header bar - no agent view */}
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-divider">
+              <span className="text-xs text-content-subtle">Issue Details</span>
+              <button onClick={onClose} className="p-1 text-content-subtle hover:text-content">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* No-agent content: issue details */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-surface">
+              {/* Title */}
+              {issue && (
+                <h2 className="text-lg font-medium text-content mb-4">{issue.title}</h2>
+              )}
+
+              {/* Meta info */}
+              {issue && (
+                <div className="space-y-3 mb-6">
+                  {issue.assignee && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="w-4 h-4 text-content-subtle" />
+                      <span className="text-content-body">{issue.assignee.name}</span>
+                      {issue.assignee.email && (
+                        <span className="text-content-muted text-xs">{issue.assignee.email}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {issue.labels.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <Tag className="w-4 h-4 text-content-subtle shrink-0" />
+                      {issue.labels.map((label) => (
+                        <span
+                          key={label}
+                          className="px-2 py-0.5 bg-surface-overlay text-content-body text-xs rounded"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-sm text-content-subtle">
+                    <Calendar className="w-4 h-4" />
+                    <span>Updated {new Date(issue.updatedAt).toLocaleDateString()}</span>
+                  </div>
                 </div>
+              )}
+
+              {/* Description */}
+              {issue?.description && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-content-subtle mb-2">Description</h3>
+                  <div className="text-sm text-content-body bg-surface-raised rounded p-3 max-h-64 overflow-y-auto prose prose-sm prose-invert prose-p:my-2 prose-headings:my-2 prose-ul:my-1 prose-li:my-0">
+                    <ReactMarkdown>{issue.description}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+
+              {/* Cost Summary - full version in main content */}
+              {costData && (costData.totalCost > 0 || (costData.sessions?.length ?? 0) > 0) && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-content-subtle mb-2 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Cost Summary
+                  </h3>
+                  <div className="bg-surface-raised rounded p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-content-subtle">Total Cost</span>
+                      <span className="text-xl font-semibold text-green-400">
+                        {formatCost(costData.totalCost)}
+                      </span>
+                    </div>
+                    {costData.totalTokens > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-content-muted flex items-center gap-1">
+                          <Cpu className="w-3 h-3" />
+                          Total Tokens
+                        </span>
+                        <span className="text-content-body">{formatTokens(costData.totalTokens)}</span>
+                      </div>
+                    )}
+                    {Object.keys(costData.byModel).length > 0 && (
+                      <div className="border-t border-divider pt-2">
+                        <p className="text-xs text-content-muted uppercase tracking-wider mb-2">By Model</p>
+                        <div className="space-y-1">
+                          {Object.entries(costData.byModel)
+                            .sort(([, a], [, b]) => b.cost - a.cost)
+                            .map(([model, modelInfo]) => (
+                              <div key={model} className="flex items-center justify-between text-sm">
+                                <span className="text-content-subtle truncate" title={model}>
+                                  {getFriendlyModelName(model)}
+                                </span>
+                                <div className="text-right">
+                                  <span className="text-content-body">{formatCost(modelInfo.cost)}</span>
+                                  <span className="text-content-muted text-xs ml-1">({formatTokens(modelInfo.tokens)})</span>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                    {costData.byStage && Object.keys(costData.byStage).length > 0 && (
+                      <div className="border-t border-divider pt-2">
+                        <p className="text-xs text-content-muted uppercase tracking-wider mb-2">By Stage</p>
+                        <div className="space-y-1">
+                          {Object.entries(costData.byStage)
+                            .sort(([, a], [, b]) => b.cost - a.cost)
+                            .map(([stage, stageInfo]) => (
+                              <div key={stage} className="flex items-center justify-between text-sm">
+                                <span className="text-content-subtle truncate" title={stage}>
+                                  {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                                </span>
+                                <div className="text-right">
+                                  <span className="text-content-body">{formatCost(stageInfo.cost)}</span>
+                                  <span className="text-content-muted text-xs ml-1">({formatTokens(stageInfo.tokens)})</span>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Start Agent - prominent button */}
+              <div className="space-y-3 mt-6">
+                <button
+                  onClick={() => startAgentMutation.mutate()}
+                  disabled={startAgentMutation.isPending || startAgentMutation.isSuccess}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-content rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {startAgentMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="font-medium">Starting...</span>
+                    </>
+                  ) : startAgentMutation.isSuccess ? (
+                    <>
+                      <Check className="w-5 h-5" />
+                      <span className="font-medium">Agent Started!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-5 h-5" />
+                      <span className="font-medium">{workspace?.exists ? 'Start Agent in Workspace' : 'Start Agent'}</span>
+                    </>
+                  )}
+                </button>
+
+                {!workspace?.exists && (
+                  <button
+                    onClick={() => createWorkspaceMutation.mutate()}
+                    disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-surface-overlay text-content rounded-lg hover:bg-surface-emphasis transition-colors border border-divider-strong disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {createWorkspaceMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="font-medium">Creating...</span>
+                      </>
+                    ) : createWorkspaceMutation.isSuccess ? (
+                      <>
+                        <Check className="w-5 h-5" />
+                        <span className="font-medium">Workspace Created!</span>
+                      </>
+                    ) : (
+                      <>
+                        <FolderPlus className="w-5 h-5" />
+                        <span className="font-medium">Create Workspace Only</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {startAgentMutation.isError && (
+                  <p className="text-red-400 text-xs">Failed to start agent. Check server logs.</p>
+                )}
+                {createWorkspaceMutation.isError && (
+                  <p className="text-red-400 text-xs">Failed to create workspace. Check server logs.</p>
+                )}
               </div>
 
-              {agent.workspace && (
-                <div>
-                  <h3 className="text-sm font-medium text-content mb-2">Workspace</h3>
-                  <div className="text-xs text-content-body space-y-1">
-                    <p className="font-mono text-[10px] break-all">{agent.workspace}</p>
-                  </div>
-                </div>
-              )}
-
-              {agent.git && (
-                <div>
-                  <h3 className="text-sm font-medium text-content mb-2">Git Status</h3>
-                  <div className="text-xs text-content-body space-y-1">
-                    <p><strong>Branch:</strong> <span className="font-mono">{agent.git.branch}</span></p>
-                    <p><strong>Uncommitted:</strong> {agent.git.uncommittedFiles} files</p>
-                    <p><strong>Latest:</strong> {agent.git.latestCommit}</p>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <h3 className="text-sm font-medium text-content mb-2">Health</h3>
-                <div className="text-xs text-content-body space-y-1">
-                  <p><strong>Status:</strong> <span className="text-green-400">{agent.status}</span></p>
-                  <p><strong>Consecutive Failures:</strong> {agent.consecutiveFailures}</p>
-                  <p><strong>Total Restarts:</strong> {agent.killCount}</p>
-                </div>
+              <div className="text-xs text-content-muted mt-3 space-y-1">
+                <p>
+                  <strong>Start Agent:</strong> {workspace?.exists ? 'Starts autonomous agent in existing workspace' : 'Creates workspace + starts autonomous agent'}
+                </p>
+                {!workspace?.exists && (
+                  <p>
+                    <strong>Create Workspace:</strong> Creates git worktree for manual work
+                  </p>
+                )}
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

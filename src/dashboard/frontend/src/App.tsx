@@ -6,7 +6,7 @@ import { TerminalView } from './components/TerminalView';
 import { HealthDashboard } from './components/HealthDashboard';
 import { SkillsList } from './components/SkillsList';
 import { WorkspacePanel } from './components/WorkspacePanel';
-import { IssueDetailPanel } from './components/IssueDetailPanel';
+// IssueDetailPanel functionality is now unified into WorkspacePanel
 import { ActivityPanel } from './components/ActivityPanel';
 import { ConvoyPanel } from './components/ConvoyPanel';
 import { CloisterStatusBar } from './components/CloisterStatusBar';
@@ -248,7 +248,7 @@ export default function App() {
                 onSelectIssue={setSelectedIssue}
               />
             </div>
-            {selectedIssue && (selectedIssueAgent || selectedIssueData) && (
+            {selectedIssue && selectedIssueData && (
               <>
                 {/* Resize handle */}
                 <div
@@ -266,20 +266,13 @@ export default function App() {
                   >
                     {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </button>
-                  {selectedIssueAgent ? (
-                    <WorkspacePanel
-                      agent={selectedIssueAgent}
-                      issueId={selectedIssue}
-                      issueUrl={selectedIssueData?.url}
-                      issue={selectedIssueData ?? undefined}
-                      onClose={() => setSelectedIssue(null)}
-                    />
-                  ) : selectedIssueData ? (
-                    <IssueDetailPanel
-                      issue={selectedIssueData}
-                      onClose={() => setSelectedIssue(null)}
-                    />
-                  ) : null}
+                  <WorkspacePanel
+                    agent={selectedIssueAgent ?? undefined}
+                    issueId={selectedIssue}
+                    issueUrl={selectedIssueData.url}
+                    issue={selectedIssueData}
+                    onClose={() => setSelectedIssue(null)}
+                  />
                 </div>
               </>
             )}
