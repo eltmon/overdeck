@@ -387,7 +387,9 @@ describe('Retention Management', () => {
 
   describe('Edge Cases', () => {
     it('should handle events exactly at retention boundary', () => {
-      const exactBoundary = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      // Place event 1 second inside the boundary to avoid ms-level race
+      // between Date.now() here and inside pruneOldEvents()
+      const exactBoundary = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000 + 1000);
 
       appendCostEvent({
         ts: exactBoundary.toISOString(),

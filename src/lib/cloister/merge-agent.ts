@@ -562,6 +562,16 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
     };
   }
 
+  // Record pre-merge HEAD for safe rollback (handles multi-commit fast-forwards)
+  let preMergeHead: string | undefined;
+  try {
+    const { stdout: headRaw } = await execAsync('git rev-parse HEAD', {
+      cwd: context.projectPath,
+      encoding: 'utf-8',
+    });
+    preMergeHead = headRaw.trim();
+  } catch { /* best effort */ }
+
   // Build prompt
   const prompt = buildMergePrompt(context);
 
@@ -642,8 +652,8 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
               console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
               logActivity('merge_validation_fail', `Validation failed for ${context.issueId}: ${validationResult.failures.map(f => f.type).join(', ')}`);
 
-              // Attempt auto-revert
-              const revertSuccess = await autoRevertMerge(context.projectPath);
+              // Attempt auto-revert to pre-merge HEAD (handles multi-commit fast-forwards)
+              const revertSuccess = await autoRevertMerge(context.projectPath, preMergeHead);
 
               const failureReason = validationResult.failures.map(f => `${f.type}: ${f.message}`).join('; ');
               const revertNote = revertSuccess
@@ -791,6 +801,26 @@ export async function spawnMergeAgentForBranches(
   });
   const headBefore = headBeforeRaw.trim();
 
+  // Stash any uncommitted changes so the merge starts from a clean state
+  // We restore the stash after completion (success or rollback)
+  let stashCreated = false;
+  try {
+    const { stdout: statusOut } = await execAsync('git status --porcelain', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    if (statusOut.trim()) {
+      await execAsync('git stash push -u -m "Pre-merge stash for ' + issueId + '"', {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+      stashCreated = true;
+      console.log(`[merge-agent] Stashed uncommitted changes before merge`);
+    }
+  } catch (stashErr: any) {
+    console.warn(`[merge-agent] Failed to stash: ${stashErr.message} (continuing anyway)`);
+  }
+
   // Build the task prompt for the merge-agent specialist
   const taskPrompt = `MERGE TASK for ${issueId}:
 
@@ -856,6 +886,7 @@ DO NOT:
 - Skip the build step - compile errors after merge are common
 - Skip the baseline test run — without it you cannot distinguish new failures from pre-existing ones
 - Use HEAD~1 for rollback — use PRE_MERGE_HEAD (${headBefore}) which handles fast-forward merges correctly
+- Run git stash — the TypeScript layer handles stash/restore automatically
 - Do anything beyond the merge, build, test, and push steps above
 
 Report any issues or conflicts you encountered.`;
@@ -955,6 +986,16 @@ Report any issues or conflicts you encountered.`;
                 // Run post-merge cleanup (move PRD, update issue status)
                 await postMergeCleanup(issueId, projectPath);
 
+                // Restore stashed changes
+                if (stashCreated) {
+                  try {
+                    await execAsync('git stash pop', { cwd: projectPath, encoding: 'utf-8' });
+                    console.log(`[merge-agent] ✓ Restored stashed changes after successful merge`);
+                  } catch (popErr: any) {
+                    console.warn(`[merge-agent] ⚠ Failed to restore stash after merge: ${popErr.message}`);
+                  }
+                }
+
                 return {
                   success: true,
                   validationStatus: 'PASS',
@@ -966,8 +1007,8 @@ Report any issues or conflicts you encountered.`;
                 console.log(`[merge-agent] ✗ Validation failed:`, validationResult.failures);
                 logActivity('merge_validation_fail', `Validation failed: ${validationResult.failures.map(f => f.type).join(', ')}`);
 
-                // Attempt auto-revert
-                const revertSuccess = await autoRevertMerge(projectPath);
+                // Attempt auto-revert to pre-merge HEAD (handles multi-commit fast-forwards)
+                const revertSuccess = await autoRevertMerge(projectPath, headBefore);
 
                 // Force push to revert the remote as well
                 if (revertSuccess) {
@@ -981,6 +1022,16 @@ Report any issues or conflicts you encountered.`;
                   } catch (pushError: any) {
                     console.error(`[merge-agent] ✗ Failed to push revert: ${pushError.message}`);
                     logActivity('merge_revert_push_fail', 'Auto-revert successful but push failed');
+                  }
+                }
+
+                // Restore stashed changes after revert
+                if (stashCreated) {
+                  try {
+                    await execAsync('git stash pop', { cwd: projectPath, encoding: 'utf-8' });
+                    console.log(`[merge-agent] ✓ Restored stashed changes after revert`);
+                  } catch (popErr: any) {
+                    console.warn(`[merge-agent] ⚠ Failed to restore stash after revert: ${popErr.message}`);
                   }
                 }
 
