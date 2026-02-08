@@ -3,6 +3,7 @@ beads
 beads-completion-check
 beads-panopticon-guide
 bug-fix
+clear-writing
 code-review
 code-review-performance
 code-review-security
@@ -44,6 +45,7 @@ pan-test-config
 pan-tracker
 pan-up
 pan-workspace-config
+pan-workspace-preview
 refactor
 refactor-radar
 release

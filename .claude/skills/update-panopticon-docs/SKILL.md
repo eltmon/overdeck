@@ -96,6 +96,74 @@ Add new section after existing provider documentation:
 npm run docs  # Regenerates API documentation
 ```
 
+## Index Maintenance
+
+**IMPORTANT:** Whenever you update documentation, you MUST also update `docs/INDEX.md` to keep the documentation index current.
+
+### When to Update INDEX.md
+
+#### New File Added
+Add an entry to the appropriate category table in INDEX.md:
+
+```markdown
+| [new-file.md](./new-file.md) | Brief description of what this file covers |
+```
+
+Also add relevant keywords to the "Topic Quick-Find" section:
+```markdown
+- **"keyword"** / **"related term"** → new-file.md
+```
+
+#### File Renamed or Moved
+1. Update the file path in the category table
+2. Update any references in Topic Quick-Find
+3. Verify no broken links remain
+
+**Example:**
+```markdown
+# Before
+| [old-name.md](./old-name.md) | Description |
+
+# After
+| [new-name.md](./new-name.md) | Updated description |
+```
+
+#### File Deleted
+1. Remove the entry from the category table
+2. Remove any keywords from Topic Quick-Find that pointed to this file
+3. Check if any other documentation should be updated to fill the gap
+
+#### New Topic Coverage
+When adding new topics to existing files, update Topic Quick-Find:
+
+```markdown
+- **"new topic keyword"** → existing-file.md, other-file.md
+```
+
+### Verification Checklist
+
+After updating INDEX.md:
+- [ ] All listed files exist at the specified paths
+- [ ] All topic keywords point to correct file(s)
+- [ ] Category tables are properly formatted
+- [ ] No duplicate entries
+- [ ] Links use correct relative paths
+
+### Example Workflow
+
+```bash
+# 1. Update the documentation file
+Edit docs/CONFIGURATION.md  # Add new provider setup
+
+# 2. Update INDEX.md to reflect the change
+Edit docs/INDEX.md  # Add "new provider" to Topic Quick-Find
+
+# 3. Verify the index
+Read docs/INDEX.md  # Check formatting and links
+```
+
+---
+
 ## Best Practices
 
 ### 1. Read Before Writing
