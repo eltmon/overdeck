@@ -61,7 +61,7 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
                 )}
               >
                 {/* Work Type Name */}
-                <div className="text-white font-medium truncate">{workType.displayName}</div>
+                <div className="text-content font-medium truncate">{workType.displayName}</div>
 
                 {/* Current Model with Badge */}
                 <div className="flex items-center gap-2 min-w-0">
@@ -82,7 +82,7 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
                   ) : (
                     <button
                       onClick={() => onConfigureOverride(workType.id)}
-                      className="text-slate-400 hover:text-white transition-colors"
+                      className="text-slate-400 hover:text-content transition-colors"
                       title="Configure override"
                     >
                       <Settings className="w-4 h-4" />
@@ -97,7 +97,7 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
 
       {/* Table Footer */}
       <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700 text-sm min-w-[600px]">
-        <button className="text-slate-400 hover:text-white transition-colors">Reset all overrides to preset</button>
+        <button className="text-slate-400 hover:text-content transition-colors">Reset all overrides to preset</button>
         <span className="text-slate-500">
           {Object.keys(overrides).length} override{Object.keys(overrides).length !== 1 ? 's' : ''} active
         </span>

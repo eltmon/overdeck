@@ -37,16 +37,16 @@ export function ConfirmationDialog({
     // Overlay
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       {/* Dialog */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-md mx-4">
+      <div className="bg-surface-raised border border-divider rounded-lg shadow-2xl w-full max-w-md mx-4">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-400" />
-            <h3 className="text-lg font-semibold text-white">Confirmation Required</h3>
+            <h3 className="text-lg font-semibold text-content">Confirmation Required</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-300 transition-colors"
+            className="text-content-subtle hover:text-content-body transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -55,19 +55,19 @@ export function ConfirmationDialog({
         {/* Body */}
         <div className="p-4 space-y-3">
           <div>
-            <p className="text-sm text-gray-400 mb-1">Agent:</p>
-            <p className="text-base text-white font-medium">{request.agentId}</p>
+            <p className="text-sm text-content-subtle mb-1">Agent:</p>
+            <p className="text-base text-content font-medium">{request.agentId}</p>
           </div>
 
           <div>
-            <p className="text-sm text-gray-400 mb-1">Action:</p>
-            <p className="text-base text-white font-medium">{request.action}</p>
+            <p className="text-sm text-content-subtle mb-1">Action:</p>
+            <p className="text-base text-content font-medium">{request.action}</p>
           </div>
 
           {request.details && (
             <div>
-              <p className="text-sm text-gray-400 mb-1">Details:</p>
-              <p className="text-sm text-gray-300 bg-gray-900/50 p-2 rounded border border-gray-700">
+              <p className="text-sm text-content-subtle mb-1">Details:</p>
+              <p className="text-sm text-content-body bg-surface/50 p-2 rounded border border-divider">
                 {request.details}
               </p>
             </div>
@@ -81,16 +81,16 @@ export function ConfirmationDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-700 bg-gray-900/30">
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-divider bg-surface/30">
           <button
             onClick={onDeny}
-            className="px-4 py-2 rounded text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+            className="px-4 py-2 rounded text-sm bg-surface-overlay text-content-body hover:bg-surface-emphasis transition-colors"
           >
             Deny
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded text-sm bg-orange-600 text-white hover:bg-orange-700 transition-colors font-medium"
+            className="px-4 py-2 rounded text-sm bg-orange-600 text-content hover:bg-orange-700 transition-colors font-medium"
           >
             Confirm
           </button>

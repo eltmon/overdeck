@@ -1,4 +1,4 @@
-# Planning Session: PAN-79
+# Planning Session: PAN-129
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,114 +22,37 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-79
-- **Title:** Per-project specialist agents with ephemeral lifecycle and persistent logs
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/79
+- **ID:** PAN-129
+- **Title:** Add dark/light mode toggle to dashboard
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/129
 
 ## Description
-## Problem
+## Feature Request
 
-Currently there is a single shared set of specialist agents (review-agent, test-agent, merge-agent) that handle work across all projects. This causes issues:
+Add a toggle to switch between dark and light mode on the Panopticon dashboard.
 
-1. **Queueing conflicts** - When multiple projects have work ready for review, they compete for the same review-agent
-2. **Context pollution** - Specialists accumulate context from multiple unrelated projects
-3. **Scaling bottleneck** - Can only process one review/test/merge at a time across all projects
-4. **Project-specific configuration** - Different projects may need different review criteria, test commands, or merge strategies
-5. **Wasted resources** - Specialists stay running even when idle, consuming memory and tmux sessions
-6. **Lost history** - When specialists crash or are restarted, all context from previous runs is gone
+## Current Behavior
+
+Dashboard uses a fixed color scheme with no user preference option.
 
 ## Proposed Solution
 
-### Per-project specialist structure
-
-Each project should have its own set of specialists:
-
-```
-~/.panopticon/specialists/
-├── myn/
-│   ├── review-agent/
-│   ├── test-agent/
-│   └── merge-agent/
-├── panopticon/
-│   ├── review-agent/
-│   ├── test-agent/
-│   └── merge-agent/
-└── househunt/
-    ├── review-agent/
-    ├── test-agent/
-    └── merge-agent/
-```
-
-### Ephemeral lifecycle — start, do work, stop
-
-Specialists should NOT be long-running daemons. Instead:
-
-1. **Spawn on demand** — When work is ready (e.g., a review is requested), start the specialist
-2. **Do the work** — Run the review/test/merge to completion
-3. **Stop completely** — Once finished, the specialist agent fully terminates (no idle sessions)
-
-This is a fundamental shift from the current model where specialists stay running waiting for work. The orchestrator (dashboard/API) is responsible for spawning specialists when needed.
-
-### Persistent run logs
-
-Every specialist run must produce a persistent, viewable log:
-
-```
-~/.panopticon/specialists/<project>/<type>/runs/
-├── 2026-02-05T14-30-00-review-PAN-79.log
-├── 2026-02-04T10-15-00-review-PAN-55.log
-├── 2026-02-03T09-00-00-review-PAN-42.log
-└── ...
-```
-
-- Logs capture the full specialist session output (what the agent did, its reasoning, results)
-- Logs are viewable from the dashboard (users should be able to read exactly what the specialist did)
-- Logs persist across agent restarts, crashes, and system reboots
-
-### Context seeding on restart
-
-When a specialist starts a new run, it should be seeded with context from its recent history:
-
-- **Review agent** sees summaries of the last N reviews it performed for this project
-- **Test agent** sees recent test results and failure patterns
-- **Merge agent** sees recent merge history, any conflicts encountered and how they were resolved
-
-This gives specialists "memory" without keeping them running. The logs serve double duty: user-visible audit trail AND context for future runs.
-
-## Benefits
-
-- **Parallel processing** - Multiple projects can have reviews/tests running simultaneously
-- **Clean context** - Each specialist only knows about its project
-- **Custom prompts** - Projects can override default specialist prompts
-- **Independent queues** - Project A's backlog doesn't block Project B
-- **Resource efficient** - No idle agents consuming resources
-- **Full auditability** - Users can see exactly what every specialist did
-- **Resilient memory** - Specialists maintain effective context without persistent sessions
-- **Cost savings** - No API costs from idle long-running agent sessions
-
-## Implementation Notes
-
-- Specialist tmux sessions should be named `specialist-<project>-<type>` (e.g., `specialist-myn-review-agent`)
-- Session IDs and history should be stored per-project
-- Fallback to global specialists if project-specific ones don't exist
-- Consider lazy initialization (only create specialists when first needed)
-- Log format should be structured enough to extract summaries for context seeding
-- Dashboard needs a "Specialist Logs" view per project (or per-specialist tab in project view)
-- Configurable log retention (e.g., keep last 30 days or last 50 runs)
-- Context seeding should use summarized logs, not raw dumps (to stay within context limits)
+1. Add a toggle button (sun/moon icon) in the dashboard header
+2. Persist preference in localStorage
+3. Respect `prefers-color-scheme` media query as default
+4. Apply theme via CSS variables or Tailwind dark mode
 
 ## Acceptance Criteria
 
-- [ ] Specialists are created per-project
-- [ ] Specialist state (session ID, history) is stored per-project
-- [ ] Multiple projects can run reviews in parallel
-- [ ] Project-specific prompt overrides are supported
-- [ ] Backward compatible with existing global specialists during migration
-- [ ] Specialists fully terminate after completing their task
-- [ ] Each specialist run produces a persistent log file
-- [ ] Logs are viewable from the dashboard UI
-- [ ] On startup, specialists are seeded with context from recent runs (configurable N)
-- [ ] Log retention is configurable
+- [ ] Toggle button visible in dashboard header
+- [ ] Click toggles between dark/light themes
+- [ ] Preference persists across page reloads
+- [ ] Respects OS preference on first visit
+- [ ] Smooth transition between themes (no flash)
+
+## Priority
+
+Low - nice to have for user comfort
 
 ---
 

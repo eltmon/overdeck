@@ -21,7 +21,7 @@ function StatusIcon({ status }: { status: ConvoyState['status'] }) {
 
 function AgentStatusBadge({ status }: { status: string }) {
   const colors = {
-    pending: 'bg-gray-900/50 text-gray-400',
+    pending: 'bg-surface/50 text-content-subtle',
     running: 'bg-blue-900/50 text-blue-400',
     completed: 'bg-green-900/50 text-green-400',
     failed: 'bg-red-900/50 text-red-400',
@@ -61,20 +61,20 @@ function ConvoyDetailView({ convoy }: { convoy: ConvoyState }) {
   const { data: outputs } = useConvoyOutput(convoy.id);
 
   return (
-    <div className="border-t border-gray-700 p-4 bg-gray-900/50">
+    <div className="border-t border-divider p-4 bg-surface/50">
       <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
         <div>
-          <span className="text-gray-500">Template:</span>
-          <span className="ml-2 text-white">{convoy.template}</span>
+          <span className="text-content-muted">Template:</span>
+          <span className="ml-2 text-content">{convoy.template}</span>
         </div>
         <div>
-          <span className="text-gray-500">Duration:</span>
-          <span className="ml-2 text-white">
+          <span className="text-content-muted">Duration:</span>
+          <span className="ml-2 text-content">
             {formatDuration(convoy.startedAt, convoy.completedAt)}
           </span>
         </div>
         <div>
-          <span className="text-gray-500">Output:</span>
+          <span className="text-content-muted">Output:</span>
           <a
             href={`file://${convoy.outputDir}`}
             className="ml-2 text-blue-400 hover:text-blue-300 inline-flex items-center gap-1"
@@ -85,7 +85,7 @@ function ConvoyDetailView({ convoy }: { convoy: ConvoyState }) {
         </div>
         {convoy.context.prUrl && (
           <div>
-            <span className="text-gray-500">PR:</span>
+            <span className="text-content-muted">PR:</span>
             <a
               href={convoy.context.prUrl}
               target="_blank"
@@ -100,28 +100,28 @@ function ConvoyDetailView({ convoy }: { convoy: ConvoyState }) {
       </div>
 
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-white mb-2">Agents</h4>
+        <h4 className="text-sm font-medium text-content mb-2">Agents</h4>
         {convoy.agents.map((agent) => (
-          <div key={agent.role} className="bg-gray-800 rounded p-3">
+          <div key={agent.role} className="bg-surface-raised rounded p-3">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <StatusIcon status={agent.status as ConvoyState['status']} />
-                <span className="font-medium text-white">{agent.role}</span>
-                <span className="text-xs text-gray-500">({agent.subagent})</span>
+                <span className="font-medium text-content">{agent.role}</span>
+                <span className="text-xs text-content-muted">({agent.subagent})</span>
               </div>
               <AgentStatusBadge status={agent.status} />
             </div>
 
             {agent.startedAt && (
-              <div className="text-xs text-gray-500 mb-1">
+              <div className="text-xs text-content-muted mb-1">
                 Started: {formatTime(agent.startedAt)}
                 {agent.completedAt && ` • Completed: ${formatTime(agent.completedAt)}`}
               </div>
             )}
 
             {agent.status === 'running' && (
-              <div className="text-xs text-gray-500">
-                Tmux: <code className="text-gray-400">{agent.tmuxSession}</code>
+              <div className="text-xs text-content-muted">
+                Tmux: <code className="text-content-subtle">{agent.tmuxSession}</code>
               </div>
             )}
 
@@ -131,7 +131,7 @@ function ConvoyDetailView({ convoy }: { convoy: ConvoyState }) {
                   <summary className="cursor-pointer text-blue-400 hover:text-blue-300">
                     View output
                   </summary>
-                  <pre className="mt-2 bg-gray-900 rounded p-2 text-gray-300 font-mono overflow-x-auto max-h-64 overflow-y-auto">
+                  <pre className="mt-2 bg-surface rounded p-2 text-content-body font-mono overflow-x-auto max-h-64 overflow-y-auto">
                     {outputs[agent.role].substring(0, 1000)}
                     {outputs[agent.role].length > 1000 && '\n... (truncated)'}
                   </pre>
@@ -153,17 +153,17 @@ export function ConvoyPanel({ onClose }: ConvoyPanelProps) {
   const displayConvoy = selectedConvoy || (selectedConvoyId && convoys?.find(c => c.id === selectedConvoyId));
 
   return (
-    <div className="flex flex-col h-full bg-gray-800 border-l border-gray-700">
+    <div className="flex flex-col h-full bg-surface-raised border-l border-divider">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-purple-400" />
-          <h2 className="font-medium text-white">Convoys</h2>
+          <h2 className="font-medium text-content">Convoys</h2>
           {convoys && convoys.length > 0 && (
-            <span className="text-xs text-gray-500">({convoys.length})</span>
+            <span className="text-xs text-content-muted">({convoys.length})</span>
           )}
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+        <button onClick={onClose} className="text-content-subtle hover:text-content p-1">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -171,11 +171,11 @@ export function ConvoyPanel({ onClose }: ConvoyPanelProps) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center h-32 text-gray-400">
+          <div className="flex items-center justify-center h-32 text-content-subtle">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : !convoys || convoys.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+          <div className="flex flex-col items-center justify-center h-32 text-content-muted">
             <Users className="w-8 h-8 mb-2 opacity-50" />
             <p className="text-sm">No convoys yet</p>
             <p className="text-xs mt-1">Start a convoy to see it here</p>
@@ -191,16 +191,16 @@ export function ConvoyPanel({ onClose }: ConvoyPanelProps) {
                   {/* Convoy header */}
                   <div className="flex items-center gap-2 mb-2">
                     <StatusIcon status={convoy.status} />
-                    <code className="text-sm text-white font-mono flex-1 truncate">
+                    <code className="text-sm text-content font-mono flex-1 truncate">
                       {convoy.id}
                     </code>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-content-muted">
                       {formatDuration(convoy.startedAt, convoy.completedAt)}
                     </span>
                   </div>
 
                   {/* Summary */}
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mb-2">
+                  <div className="flex items-center gap-3 text-xs text-content-subtle mb-2">
                     <span className="text-purple-400">{convoy.template}</span>
                     <span>•</span>
                     <span>

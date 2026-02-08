@@ -212,14 +212,14 @@ export function IssueAgentCard({
     <div
       onClick={onSelect}
       className={`p-4 cursor-pointer transition-colors ${
-        isSelected ? 'bg-gray-700' : 'hover:bg-gray-750'
+        isSelected ? 'bg-surface-overlay' : 'hover:bg-gray-750'
       }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className={`w-3 h-3 rounded-full ${STATUS_COLORS[agent.status]}`} />
           <div>
-            <div className="font-medium text-white flex items-center gap-2">
+            <div className="font-medium text-content flex items-center gap-2">
               {agent.id}
               {health && (
                 <span
@@ -230,7 +230,7 @@ export function IssueAgentCard({
                 </span>
               )}
             </div>
-            <div className="text-sm text-gray-400 flex items-center gap-2">
+            <div className="text-sm text-content-subtle flex items-center gap-2">
               {agent.runtime} / {agent.model}
               {costData && costData.cost > 0 && (
                 <span
@@ -247,12 +247,12 @@ export function IssueAgentCard({
 
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className="flex items-center gap-1 text-sm text-gray-400">
+            <div className="flex items-center gap-1 text-sm text-content-subtle">
               <Clock className="w-4 h-4" />
               {formatDuration(agent.startedAt)}
             </div>
             {health && health.timeSinceActivity !== null && (
-              <div className="flex items-center gap-1 text-xs text-gray-500">
+              <div className="flex items-center gap-1 text-xs text-content-muted">
                 <Activity className="w-3 h-3" />
                 {formatTimeSince(health.timeSinceActivity)}
               </div>
@@ -270,7 +270,7 @@ export function IssueAgentCard({
             {health && (health.isRunning || health.state === 'suspended') && activityData && activityData.length > 0 && (
               <button
                 onClick={toggleActivityExpanded}
-                className="p-2 text-gray-400 hover:text-blue-400 hover:bg-gray-600 rounded"
+                className="p-2 text-content-subtle hover:text-blue-400 hover:bg-surface-emphasis rounded"
                 title={`Show activity history (${activityData.length} entries)`}
               >
                 <Activity className="w-4 h-4" />
@@ -280,8 +280,8 @@ export function IssueAgentCard({
             {/* Handoff button */}
             <button
               onClick={toggleHandoffPanel}
-              className={`p-2 hover:bg-gray-600 rounded ${
-                showHandoffPanel ? 'text-blue-400' : 'text-gray-400 hover:text-blue-400'
+              className={`p-2 hover:bg-surface-emphasis rounded ${
+                showHandoffPanel ? 'text-blue-400' : 'text-content-subtle hover:text-blue-400'
               }`}
               title="Model handoff controls"
             >
@@ -293,7 +293,7 @@ export function IssueAgentCard({
               <button
                 onClick={handleResume}
                 disabled={resumeMutation.isPending}
-                className="p-2 text-gray-400 hover:text-green-400 hover:bg-gray-600 rounded disabled:opacity-50"
+                className="p-2 text-content-subtle hover:text-green-400 hover:bg-surface-emphasis rounded disabled:opacity-50"
                 title="Resume agent"
               >
                 <Play className="w-4 h-4" />
@@ -305,7 +305,7 @@ export function IssueAgentCard({
               <button
                 onClick={handlePoke}
                 disabled={pokeMutation.isPending}
-                className="p-2 text-gray-400 hover:text-yellow-400 hover:bg-gray-600 rounded"
+                className="p-2 text-content-subtle hover:text-yellow-400 hover:bg-surface-emphasis rounded"
                 title="Poke agent (send nudge message)"
               >
                 <Bell className="w-4 h-4" />
@@ -317,7 +317,7 @@ export function IssueAgentCard({
               <button
                 onClick={handleKill}
                 disabled={killMutation.isPending}
-                className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded"
+                className="p-2 text-content-subtle hover:text-red-400 hover:bg-surface-emphasis rounded"
                 title="Kill agent"
               >
                 <Square className="w-4 h-4" />
@@ -329,26 +329,26 @@ export function IssueAgentCard({
 
       {/* Handoff Panel */}
       {showHandoffPanel && (
-        <div className="mt-3 pt-3 border-t border-gray-700">
+        <div className="mt-3 pt-3 border-t border-divider">
           <HandoffPanel agentId={agent.id} />
         </div>
       )}
 
       {/* Activity history section (PAN-80) */}
       {activityExpanded && activityData && activityData.length > 0 && (
-        <div className="mt-3 pl-8 border-l-2 border-gray-600">
-          <div className="text-xs text-gray-400 font-medium mb-2">
+        <div className="mt-3 pl-8 border-l-2 border-divider-strong">
+          <div className="text-xs text-content-subtle font-medium mb-2">
             Recent Activity ({activityData.length})
           </div>
           <div className="space-y-1">
             {activityData.slice().reverse().map((entry, index) => (
               <div key={index} className="flex items-center gap-2 bg-gray-750 px-3 py-1.5 rounded text-xs">
-                <span className="text-gray-500">
+                <span className="text-content-muted">
                   {new Date(entry.ts).toLocaleTimeString()}
                 </span>
                 <span className="text-blue-400 font-mono">{entry.tool}</span>
                 {entry.action && (
-                  <span className="text-gray-400 truncate">
+                  <span className="text-content-subtle truncate">
                     {entry.action.substring(0, 50)}
                   </span>
                 )}

@@ -312,7 +312,7 @@ export function SettingsPage() {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="material-symbols-outlined text-blue-400 text-2xl">settings</span>
-            <h1 className="text-white text-4xl font-black tracking-tight">Settings</h1>
+            <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
           </div>
           <p className="text-slate-400 text-base">Configure AI model orchestration and agent permissions.</p>
         </div>
@@ -336,7 +336,7 @@ export function SettingsPage() {
                   </div>
                   <div className="flex-1 h-px bg-gradient-to-r from-slate-700 via-blue-500 to-slate-700 mx-2" />
                   <div className="size-12 rounded-lg bg-blue-500 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)]">
-                    <span className="material-symbols-outlined text-white">bolt</span>
+                    <span className="material-symbols-outlined text-content">bolt</span>
                   </div>
                 </div>
                 <div className="flex justify-between w-full px-2 text-[10px] uppercase tracking-widest font-bold text-slate-500">
@@ -350,7 +350,7 @@ export function SettingsPage() {
             <div className="lg:w-3/5 p-8">
               <div className="flex items-center gap-2 mb-4">
                 <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-wider rounded border border-blue-500/20">Active</span>
-                <h3 className="text-white text-xl font-bold">Smart Model Selection</h3>
+                <h3 className="text-content text-xl font-bold">Smart Model Selection</h3>
               </div>
               <p className="text-slate-400 mb-6 leading-relaxed">
                 Panopticon automatically routes tasks to the optimal model based on capabilities, token budget, and latency requirements.
@@ -378,7 +378,7 @@ export function SettingsPage() {
 
       {/* Provider Configuration */}
       <section className="mb-12">
-        <h2 className="text-white text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Provider Configuration
           <div className="h-px flex-1 bg-slate-700" />
         </h2>
@@ -399,7 +399,7 @@ export function SettingsPage() {
               >
                 {isDefault && (
                   <div className="absolute -top-3 right-4">
-                    <span className="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
+                    <span className="bg-blue-500 text-content text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
                       Default
                     </span>
                   </div>
@@ -408,7 +408,7 @@ export function SettingsPage() {
                   <div className="size-10 rounded-lg bg-slate-800 flex items-center justify-center">
                     <span className="material-symbols-outlined text-slate-400">{provider.icon}</span>
                   </div>
-                  <span className="font-bold text-white">{provider.name}</span>
+                  <span className="font-bold text-content">{provider.name}</span>
                   <div className="ml-auto">
                     <button
                       onClick={() => handleProviderToggle(provider.id)}
@@ -529,7 +529,7 @@ export function SettingsPage() {
 
       {/* Agent Configuration by Category */}
       <section className="mb-12">
-        <h2 className="text-white text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Model Assignments
           <div className="h-px flex-1 bg-slate-700" />
         </h2>
@@ -588,7 +588,7 @@ export function SettingsPage() {
                           {Math.round(score * 100)}%
                         </span>
                       </div>
-                      <p className="text-xs font-semibold text-white truncate">{agent.name}</p>
+                      <p className="text-xs font-semibold text-content truncate">{agent.name}</p>
                       <p className="text-[10px] text-slate-400 truncate mb-2">{modelDisplay}</p>
 
                       {/* Capability indicators */}
@@ -648,14 +648,14 @@ export function SettingsPage() {
             <button
               onClick={handleReset}
               disabled={!hasChanges}
-              className="px-6 py-2 text-slate-400 hover:text-white font-semibold text-sm transition-colors disabled:opacity-50"
+              className="px-6 py-2 text-slate-400 hover:text-content font-semibold text-sm transition-colors disabled:opacity-50"
             >
               Undo Changes
             </button>
             <button
               onClick={handleSave}
               disabled={!hasChanges || saveMutation.isPending}
-              className="px-8 py-2 bg-blue-500 hover:bg-blue-400 text-white font-black rounded-lg transition-all shadow-lg shadow-blue-500/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-8 py-2 bg-blue-500 hover:bg-blue-400 text-content font-black rounded-lg transition-all shadow-lg shadow-blue-500/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               Save Changes
@@ -689,13 +689,13 @@ export function SettingsPage() {
                 <span className="material-symbols-outlined text-blue-400">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.icon}
                 </span>
-                <h3 className="text-white text-lg font-bold">
+                <h3 className="text-content text-lg font-bold">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
                 </h3>
               </div>
               <button
                 onClick={() => setModelsModalProvider(null)}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-content transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -745,7 +745,7 @@ export function SettingsPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="material-symbols-outlined text-slate-400 text-sm">{model.icon}</span>
-                              <h4 className="text-white font-semibold">{model.name}</h4>
+                              <h4 className="text-content font-semibold">{model.name}</h4>
                               {model.tier && (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                   model.tier === 'premium' ? 'bg-purple-500/20 text-purple-400' :

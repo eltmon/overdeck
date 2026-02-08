@@ -181,7 +181,7 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
 }
 
 const COLUMN_COLORS: Record<string, string> = {
-  backlog: 'border-gray-600',
+  backlog: 'border-divider-strong',
   todo: 'border-blue-600',
   planning: 'border-purple-600',   // NEW: Purple for planning
   in_progress: 'border-yellow-500',
@@ -502,36 +502,36 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       <div className="space-y-4">
         {/* Skeleton filter bar */}
         <div className="flex items-center gap-2 animate-pulse">
-          <div className="w-4 h-4 bg-gray-700 rounded" />
-          <div className="w-16 h-4 bg-gray-700 rounded" />
-          <div className="w-24 h-6 bg-gray-700 rounded" />
-          <div className="w-20 h-6 bg-gray-700 rounded" />
-          <div className="w-28 h-6 bg-gray-700 rounded" />
+          <div className="w-4 h-4 bg-surface-overlay rounded" />
+          <div className="w-16 h-4 bg-surface-overlay rounded" />
+          <div className="w-24 h-6 bg-surface-overlay rounded" />
+          <div className="w-20 h-6 bg-surface-overlay rounded" />
+          <div className="w-28 h-6 bg-surface-overlay rounded" />
         </div>
 
         {/* Skeleton columns */}
         <div className="flex gap-4 overflow-x-auto pb-4">
           {STATUS_ORDER.map((status) => (
             <div key={status} className="flex-shrink-0 w-80">
-              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-gray-800 rounded-lg`}>
-                <div className="px-4 py-3 border-b border-gray-700">
+              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg`}>
+                <div className="px-4 py-3 border-b border-divider">
                   <div className="flex items-center justify-between">
-                    <div className="h-5 bg-gray-700 rounded w-24 animate-pulse" />
-                    <div className="h-4 bg-gray-700 rounded w-6 animate-pulse" />
+                    <div className="h-5 bg-surface-overlay rounded w-24 animate-pulse" />
+                    <div className="h-4 bg-surface-overlay rounded w-6 animate-pulse" />
                   </div>
                 </div>
                 <div className="p-2 space-y-2">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-gray-700 rounded-lg p-3 border-l-4 border-l-gray-600 animate-pulse">
+                    <div key={i} className="bg-surface-overlay rounded-lg p-3 border-l-4 border-l-divider-strong animate-pulse">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 bg-gray-600 rounded-full" />
-                        <div className="h-4 bg-gray-600 rounded w-16" />
+                        <div className="w-2 h-2 bg-surface-emphasis rounded-full" />
+                        <div className="h-4 bg-surface-emphasis rounded w-16" />
                       </div>
-                      <div className="h-4 bg-gray-600 rounded w-full mb-1" />
-                      <div className="h-4 bg-gray-600 rounded w-3/4" />
+                      <div className="h-4 bg-surface-emphasis rounded w-full mb-1" />
+                      <div className="h-4 bg-surface-emphasis rounded w-3/4" />
                       <div className="flex gap-2 mt-3">
-                        <div className="h-5 bg-gray-600 rounded w-16" />
-                        <div className="h-5 bg-gray-600 rounded w-12" />
+                        <div className="h-5 bg-surface-emphasis rounded w-16" />
+                        <div className="h-5 bg-surface-emphasis rounded w-12" />
                       </div>
                     </div>
                   ))}
@@ -560,17 +560,17 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       <div className="flex items-center gap-4 flex-wrap">
         {/* Cycle filter */}
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-400">Cycle:</span>
-          <div className="flex rounded-lg overflow-hidden border border-gray-600">
+          <Filter className="w-4 h-4 text-content-subtle" />
+          <span className="text-sm text-content-subtle">Cycle:</span>
+          <div className="flex rounded-lg overflow-hidden border border-divider-strong">
             {(['current', 'all', 'backlog'] as CycleFilter[]).map((cycle) => (
               <button
                 key={cycle}
                 onClick={() => setCycleFilter(cycle)}
                 className={`px-3 py-1 text-xs transition-colors ${
                   cycleFilter === cycle
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                    ? 'bg-blue-600 text-content'
+                    : 'bg-surface-raised text-content-subtle hover:text-content hover:bg-surface-overlay'
                 }`}
               >
                 {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : 'Backlog'}
@@ -585,29 +585,29 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             type="checkbox"
             checked={includeCompleted}
             onChange={(e) => setIncludeCompleted(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900"
+            className="w-4 h-4 rounded border-divider-strong bg-surface-raised text-blue-600 focus:ring-blue-500 focus:ring-offset-surface"
           />
-          <span className="text-sm text-gray-400">Include completed</span>
+          <span className="text-sm text-content-subtle">Include completed</span>
         </label>
 
         {/* Issue count */}
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-content-muted">
           {issues?.length || 0} issues
         </span>
 
         {/* Project filter */}
         {projects.length > 1 && (
           <>
-            <div className="w-px h-6 bg-gray-700" />
-            <span className="text-sm text-gray-400">Projects:</span>
+            <div className="w-px h-6 bg-surface-overlay" />
+            <span className="text-sm text-content-subtle">Projects:</span>
             {projects.map((project) => (
               <button
                 key={project.id}
                 onClick={() => toggleProject(project.id)}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
                   selectedProjects.size === 0 || selectedProjects.has(project.id)
-                    ? 'bg-gray-700 text-white'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    ? 'bg-surface-overlay text-content'
+                    : 'bg-surface-raised text-content-muted hover:text-content-body'
                 }`}
               >
                 <span
@@ -620,7 +620,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             {selectedProjects.size > 0 && (
               <button
                 onClick={() => setSelectedProjects(new Set())}
-                className="text-xs text-gray-400 hover:text-white"
+                className="text-xs text-content-subtle hover:text-content"
               >
                 Clear
               </button>
@@ -639,11 +639,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         <div className="flex gap-4 overflow-x-auto pb-4">
           {STATUS_ORDER.map((status) => (
             <DroppableColumn key={status} status={status}>
-              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-gray-800 rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-gray-800/80' : ''}`}>
-                <div className="px-4 py-3 border-b border-gray-700">
+              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
+                <div className="px-4 py-3 border-b border-divider">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-white">{COLUMN_TITLES[status]}</h3>
-                    <span className="text-sm text-gray-400">{grouped[status].length}</span>
+                    <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
+                    <span className="text-sm text-content-subtle">{grouped[status].length}</span>
                   </div>
                 </div>
                 <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
@@ -679,7 +679,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     );
                   })}
                   {grouped[status].length === 0 && (
-                    <div className="text-center text-gray-500 py-8 text-sm">
+                    <div className="text-center text-content-muted py-8 text-sm">
                       No issues
                     </div>
                   )}
@@ -796,11 +796,11 @@ interface DragOverlayCardProps {
 
 function DragOverlayCard({ issue }: DragOverlayCardProps) {
   return (
-    <div className="bg-gray-700 rounded-lg p-3 border-l-4 border-l-blue-500 shadow-2xl rotate-2 scale-105 opacity-90">
+    <div className="bg-surface-overlay rounded-lg p-3 border-l-4 border-l-blue-500 shadow-2xl rotate-2 scale-105 opacity-90">
       <div className="flex items-center gap-2">
-        <span className="text-gray-400 text-sm">{issue.identifier}</span>
+        <span className="text-content-subtle text-sm">{issue.identifier}</span>
       </div>
-      <p className="text-sm text-white mt-1 line-clamp-2">{issue.title}</p>
+      <p className="text-sm text-content mt-1 line-clamp-2">{issue.title}</p>
     </div>
   );
 }
@@ -819,32 +819,32 @@ function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningD
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
           <div className="p-2 bg-amber-900/50 rounded-lg">
             <AlertTriangle className="w-6 h-6 text-amber-400" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white mb-2">
+            <h3 className="text-lg font-semibold text-content mb-2">
               Active Agent Warning
             </h3>
-            <p className="text-gray-300 text-sm mb-4">
+            <p className="text-content-body text-sm mb-4">
               <strong>{issue.identifier}</strong> has an active agent working on it.
               Moving this issue may disrupt the agent's work.
             </p>
-            <p className="text-gray-400 text-xs mb-6">
+            <p className="text-content-subtle text-xs mb-6">
               Are you sure you want to proceed?
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-gray-400 hover:text-white transition-colors text-sm"
+                className="px-4 py-2 text-content-subtle hover:text-content transition-colors text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={onConfirm}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors text-sm"
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-content rounded-lg transition-colors text-sm"
               >
                 Move Anyway
               </button>
@@ -876,54 +876,54 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
           <div className="p-2 bg-green-900/50 rounded-lg">
             <Check className="w-6 h-6 text-green-400" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-white mb-2">
+            <h3 className="text-lg font-semibold text-content mb-2">
               Move to Done
             </h3>
-            <p className="text-gray-300 text-sm mb-4">
+            <p className="text-content-body text-sm mb-4">
               You're moving <strong>{issue.identifier}</strong> to Done.
             </p>
 
             {/* Cleanup options */}
-            <div className="space-y-2 mb-4 p-3 bg-gray-700/50 rounded-lg">
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+            <div className="space-y-2 mb-4 p-3 bg-surface-overlay/50 rounded-lg">
+              <label className="flex items-center gap-2 text-sm text-content-body cursor-pointer">
                 <input
                   type="checkbox"
                   checked={cleanupWorkspace}
                   onChange={(e) => setCleanupWorkspace(e.target.checked)}
-                  className="rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500"
+                  className="rounded border-divider-strong bg-surface-overlay text-green-500 focus:ring-green-500"
                 />
                 Clean up workspace
               </label>
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-content-body cursor-pointer">
                 <input
                   type="checkbox"
                   checked={stopAgents}
                   onChange={(e) => setStopAgents(e.target.checked)}
-                  className="rounded border-gray-600 bg-gray-700 text-green-500 focus:ring-green-500"
+                  className="rounded border-divider-strong bg-surface-overlay text-green-500 focus:ring-green-500"
                 />
                 Stop running agents
               </label>
             </div>
 
-            <p className="text-gray-400 text-xs mb-4">
+            <p className="text-content-subtle text-xs mb-4">
               Sync status change to {trackerName}?
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => onSync(false, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 text-gray-400 hover:text-white transition-colors text-sm"
+                className="px-4 py-2 text-content-subtle hover:text-content transition-colors text-sm"
               >
                 Shadow Only
               </button>
               <button
                 onClick={() => onSync(true, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm"
+                className="px-4 py-2 bg-green-600 hover:bg-green-500 text-content rounded-lg transition-colors text-sm"
               >
                 Sync to {trackerName}
               </button>
@@ -947,8 +947,8 @@ function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
-        <span className="text-sm text-gray-300">Issue moved</span>
+      <div className="bg-surface-raised border border-divider rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
+        <span className="text-sm text-content-body">Issue moved</span>
         <button
           onClick={onUndo}
           className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition-colors"
@@ -958,7 +958,7 @@ function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
         </button>
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-gray-400"
+          className="text-content-muted hover:text-content-subtle"
         >
           <X className="w-4 h-4" />
         </button>
@@ -981,16 +981,16 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] overflow-hidden flex flex-col">
+      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
           <div className="flex items-center gap-2">
             <List className="w-5 h-5 text-green-400" />
-            <h2 className="font-semibold text-white">Tasks: {issue.identifier}</h2>
+            <h2 className="font-semibold text-content">Tasks: {issue.identifier}</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+            className="p-1 text-content-subtle hover:text-content hover:bg-surface-overlay rounded transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -999,7 +999,7 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
           {isLoading && (
-            <div className="flex items-center justify-center py-8 text-gray-400">
+            <div className="flex items-center justify-center py-8 text-content-subtle">
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
               Loading tasks...
             </div>
@@ -1012,7 +1012,7 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
           )}
 
           {data && data.tasks?.length === 0 && (
-            <div className="text-gray-500 text-center py-8">
+            <div className="text-content-muted text-center py-8">
               No tasks created yet
             </div>
           )}
@@ -1025,13 +1025,13 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
                   className={`flex items-start gap-3 p-3 rounded-lg ${
                     task.status === 'closed' ? 'bg-green-900/20' :
                     task.status === 'in_progress' ? 'bg-blue-900/20' :
-                    'bg-gray-700/50'
+                    'bg-surface-overlay/50'
                   }`}
                 >
                   <div className={`mt-0.5 ${
                     task.status === 'closed' ? 'text-green-400' :
                     task.status === 'in_progress' ? 'text-blue-400' :
-                    'text-gray-400'
+                    'text-content-subtle'
                   }`}>
                     {task.status === 'closed' ? (
                       <CheckCircle className="w-4 h-4" />
@@ -1042,8 +1042,8 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-white">{task.title}</div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-sm text-content">{task.title}</div>
+                    <div className="text-xs text-content-muted mt-1">
                       {task.id} · {task.status}
                     </div>
                   </div>
@@ -1054,7 +1054,7 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-gray-700 text-xs text-gray-500">
+        <div className="px-4 py-3 border-t border-divider text-xs text-content-muted">
           {data?.count || 0} task{data?.count !== 1 ? 's' : ''} · Beads
         </div>
       </div>
@@ -1257,7 +1257,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
   return (
     <div
       onClick={onSelect}
-      className={`bg-gray-700 rounded-lg p-3 border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
+      className={`bg-surface-overlay rounded-lg p-3 border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
         isSelected
           ? 'ring-2 ring-blue-500 bg-gray-650'
           : 'hover:bg-gray-650'
@@ -1286,14 +1286,14 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-sm font-medium text-white hover:text-blue-400 flex items-center gap-1"
+              className="text-sm font-medium text-content hover:text-blue-400 flex items-center gap-1"
             >
               {issue.source === 'github' && (
                 <span title="GitHub Issue">
-                  <Github className="w-3 h-3 text-gray-400" />
+                  <Github className="w-3 h-3 text-content-subtle" />
                 </span>
               )}
-              <span className="text-gray-400">{issue.identifier}</span>
+              <span className="text-content-subtle">{issue.identifier}</span>
               <ExternalLink className="w-3 h-3 opacity-50" />
             </a>
             {/* Agent attribution badges */}
@@ -1328,7 +1328,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
             {/* Model badge - shows which model the active agent is using */}
             {activeAgent && activeAgent.model && (
               <span
-                className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-600 text-gray-300"
+                className="px-1.5 py-0.5 rounded text-xs font-medium bg-surface-emphasis text-content-body"
                 title={`Model: ${activeAgent.model}`}
               >
                 {activeAgent.model.replace('claude-', '').replace(/-4-5$/, '').replace(/-20[0-9]{6}$/, '')}
@@ -1340,7 +1340,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${
                   activeAgent.workspaceLocation === 'remote'
                     ? 'bg-cyan-900/50 text-cyan-400'
-                    : 'bg-gray-600 text-gray-300'
+                    : 'bg-surface-emphasis text-content-body'
                 }`}
                 title={activeAgent.workspaceLocation === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
               >
@@ -1355,7 +1355,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
             {/* Review Ready badge - prominent indicator that agent completed work */}
             {isReviewReady && (
               <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-600 text-white animate-pulse"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-600 text-content animate-pulse"
                 title="Agent completed work - ready for human review"
               >
                 <CheckCheck className="w-3 h-3" />
@@ -1374,7 +1374,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
                     onSelect();
                   }
                 }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-white animate-pulse cursor-pointer hover:bg-amber-500"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-content animate-pulse cursor-pointer hover:bg-amber-500"
                 title={`Agent is waiting for user input - click to respond (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
               >
                 <HelpCircle className="w-3 h-3" />
@@ -1397,13 +1397,13 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-300 mt-1 line-clamp-2">{issue.title}</p>
+          <p className="text-sm text-content-body mt-1 line-clamp-2">{issue.title}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         {issue.assignee && (
-          <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+          <span className="inline-flex items-center gap-1 text-xs text-content-subtle">
             <User className="w-3 h-3" />
             {issue.assignee.name.split(' ')[0]}
           </span>
@@ -1414,7 +1414,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
           .map((label) => (
             <span
               key={label}
-              className="inline-flex items-center gap-1 text-xs bg-gray-600 text-gray-300 px-2 py-0.5 rounded"
+              className="inline-flex items-center gap-1 text-xs bg-surface-emphasis text-content-body px-2 py-0.5 rounded"
             >
               <Tag className="w-3 h-3" />
               {label}
@@ -1424,13 +1424,13 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
 
       {/* Action buttons for running agents */}
       {isRunning && (
-        <div className={`flex items-center gap-3 mt-3 pt-3 border-t ${agent?.type === 'planning' ? 'border-purple-600/50' : 'border-gray-600'}`}>
+        <div className={`flex items-center gap-3 mt-3 pt-3 border-t ${agent?.type === 'planning' ? 'border-purple-600/50' : 'border-divider-strong'}`}>
           <button
             onClick={agent?.type === 'planning' ? handlePlan : handleWatch}
             className={`flex items-center gap-1 text-xs transition-colors ${
               agent?.type === 'planning'
                 ? 'text-purple-400 hover:text-purple-300'
-                : isSelected ? 'text-blue-400' : 'text-gray-400 hover:text-white'
+                : isSelected ? 'text-blue-400' : 'text-content-subtle hover:text-content'
             }`}
           >
             {agent?.type === 'planning' ? <Sparkles className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1447,7 +1447,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
-              showMessageInput ? 'text-blue-400' : 'text-gray-400 hover:text-white'
+              showMessageInput ? 'text-blue-400' : 'text-content-subtle hover:text-content'
             }`}
           >
             <MessageCircle className="w-3.5 h-3.5" />
@@ -1477,13 +1477,13 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 bg-gray-800 text-white text-sm px-3 py-1.5 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+              className="flex-1 bg-surface-raised text-content text-sm px-3 py-1.5 rounded border border-divider-strong focus:border-blue-500 focus:outline-none"
               autoFocus
             />
             <button
               type="submit"
               disabled={!messageInput.trim() || sendMessageMutation.isPending}
-              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 bg-blue-600 text-content text-sm rounded hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {sendMessageMutation.isPending ? '...' : 'Send'}
             </button>
@@ -1493,7 +1493,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
 
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-600 flex-wrap">
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
           <button
             onClick={handlePlan}
             className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
@@ -1504,7 +1504,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
           <button
             onClick={handleStartAgent}
             disabled={startAgentMutation.isPending}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-400 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1 text-xs text-content-muted hover:text-content-subtle transition-colors disabled:opacity-50"
             title="Plan first recommended"
           >
             {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
@@ -1568,27 +1568,27 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
       {showAbortConfirm && (
         <div className="mt-3 pt-3 border-t border-orange-600/50 bg-orange-950/30 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
           <p className="text-xs text-orange-300 mb-2">Abort planning and return to Backlog?</p>
-          <label className="flex items-center gap-2 text-xs text-gray-400 mb-3 cursor-pointer">
+          <label className="flex items-center gap-2 text-xs text-content-subtle mb-3 cursor-pointer">
             <input
               type="checkbox"
               checked={deleteWorkspace}
               onChange={(e) => setDeleteWorkspace(e.target.checked)}
               onClick={(e) => e.stopPropagation()}
-              className="rounded border-gray-600 bg-gray-700 text-orange-500 focus:ring-orange-500"
+              className="rounded border-divider-strong bg-surface-overlay text-orange-500 focus:ring-orange-500"
             />
             Also delete workspace (git worktree)
           </label>
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={handleAbortCancel}
-              className="px-2 py-1 text-xs text-gray-400 hover:text-white transition-colors"
+              className="px-2 py-1 text-xs text-content-subtle hover:text-content transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleAbortConfirm}
               disabled={abortPlanningMutation.isPending || deepWipeMutation.isPending}
-              className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-500 text-white rounded transition-colors disabled:opacity-50"
+              className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-500 text-content rounded transition-colors disabled:opacity-50"
             >
               {abortPlanningMutation.isPending ? 'Aborting...' : 'Abort'}
             </button>
@@ -1600,7 +1600,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
                 }
               }}
               disabled={abortPlanningMutation.isPending || deepWipeMutation.isPending}
-              className="px-2 py-1 text-xs bg-red-700 hover:bg-red-600 text-white rounded transition-colors disabled:opacity-50"
+              className="px-2 py-1 text-xs bg-red-700 hover:bg-red-600 text-content rounded transition-colors disabled:opacity-50"
               title="Complete reset - kills agents, deletes state, resets Linear"
             >
               {deepWipeMutation.isPending ? 'Wiping...' : '🔥 Deep Wipe'}
@@ -1611,7 +1611,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
 
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-600 flex-wrap">
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
           <button
             onClick={handlePlan}
             className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"

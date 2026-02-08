@@ -209,7 +209,7 @@ export function HealthHistoryChart({
 
   if (events.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8 text-gray-500">
+      <div className="flex items-center justify-center py-8 text-content-muted">
         No health data to display
       </div>
     );

@@ -36,7 +36,7 @@ function getModelStyle(model: ModelId) {
   if (provider.includes('gpt') || provider.includes('o1') || provider.includes('o3')) return MODEL_COLORS['gpt'];
   if (provider.includes('gemini')) return MODEL_COLORS['gemini'];
   if (provider.includes('glm')) return MODEL_COLORS['glm'];
-  return { bg: 'bg-gray-800', text: 'text-gray-300', border: 'border-gray-700' };
+  return { bg: 'bg-surface-raised', text: 'text-content-body', border: 'border-divider' };
 }
 
 function ModelBadge({ model, isOverride, size = 'md' }: { model: ModelId; isOverride: boolean; size?: 'sm' | 'md' }) {
@@ -71,7 +71,7 @@ export function AgentCard({
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-xl text-[#a078f7]">{icon}</span>
           <div>
-            <div className="font-medium text-white">{name}</div>
+            <div className="font-medium text-content">{name}</div>
             <div className="text-xs text-[#8b7aa0]">{description}</div>
           </div>
         </div>
@@ -94,7 +94,7 @@ export function AgentCard({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-white">{name}</h3>
+                <h3 className="font-semibold text-content">{name}</h3>
                 {hasPhases && (
                   <span className="text-xs text-[#8b7aa0] bg-[#2d2640] px-2 py-0.5 rounded-full">
                     {phases.length} phases
@@ -108,7 +108,7 @@ export function AgentCard({
           <div className="flex items-center gap-2">
             <ModelBadge model={primaryModel} isOverride={isOverride} />
             {hasPhases && (
-              <button className="p-1 text-[#8b7aa0] hover:text-white transition-colors">
+              <button className="p-1 text-[#8b7aa0] hover:text-content transition-colors">
                 {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
               </button>
             )}

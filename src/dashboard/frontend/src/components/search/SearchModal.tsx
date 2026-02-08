@@ -92,29 +92,29 @@ export function SearchModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[70vh] overflow-hidden flex flex-col border border-gray-700">
+      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[70vh] overflow-hidden flex flex-col border border-divider">
         <Command className="flex flex-col h-full" shouldFilter={false}>
           {/* Search Input */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-700">
-            <Search className="w-5 h-5 text-gray-400 shrink-0" />
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-divider">
+            <Search className="w-5 h-5 text-content-subtle shrink-0" />
             <Command.Input
               value={query}
               onValueChange={setQuery}
               placeholder="Search issues..."
-              className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none text-base"
+              className="flex-1 bg-transparent text-content placeholder-gray-400 focus:outline-none text-base"
               autoFocus
             />
             <button
               onClick={onClose}
-              className="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors shrink-0"
+              className="p-1 text-content-subtle hover:text-content hover:bg-surface-overlay rounded transition-colors shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-700 bg-gray-850 flex-wrap">
-            <span className="text-xs text-gray-400">Filters:</span>
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-divider bg-gray-850 flex-wrap">
+            <span className="text-xs text-content-subtle">Filters:</span>
 
             {/* Source toggles */}
             {(['linear', 'github', 'rally'] as IssueSource[]).map((source) => (
@@ -123,8 +123,8 @@ export function SearchModal({
                 onClick={() => toggleSource(source)}
                 className={`px-2 py-1 text-xs rounded transition-colors ${
                   filters.sources.size === 0 || filters.sources.has(source)
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-400 hover:text-white'
+                    ? 'bg-blue-600 text-content'
+                    : 'bg-surface-overlay text-content-subtle hover:text-content'
                 }`}
               >
                 {source === 'github' && <Github className="w-3 h-3 inline mr-1" />}
@@ -132,7 +132,7 @@ export function SearchModal({
               </button>
             ))}
 
-            <div className="w-px h-4 bg-gray-600" />
+            <div className="w-px h-4 bg-surface-emphasis" />
 
             {/* Include completed toggle */}
             <label className="flex items-center gap-2 cursor-pointer">
@@ -142,9 +142,9 @@ export function SearchModal({
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, includeCompleted: e.target.checked }))
                 }
-                className="w-3 h-3 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                className="w-3 h-3 rounded border-divider-strong bg-surface-overlay text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
               />
-              <span className="text-xs text-gray-400">Show completed</span>
+              <span className="text-xs text-content-subtle">Show completed</span>
             </label>
 
             {/* Deep search toggle */}
@@ -155,28 +155,28 @@ export function SearchModal({
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, deepSearch: e.target.checked }))
                 }
-                className="w-3 h-3 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                className="w-3 h-3 rounded border-divider-strong bg-surface-overlay text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
               />
-              <span className="text-xs text-gray-400">Deep search</span>
+              <span className="text-xs text-content-subtle">Deep search</span>
             </label>
           </div>
 
           {/* Results */}
           <Command.List className="flex-1 overflow-y-auto">
             {query.length > 0 && query.length < 2 && (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
+              <div className="px-4 py-8 text-center text-sm text-content-subtle">
                 Type at least 2 characters to search
               </div>
             )}
 
             {query.length >= 2 && isSearching && (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
+              <div className="px-4 py-8 text-center text-sm text-content-subtle">
                 Searching...
               </div>
             )}
 
             {query.length >= 2 && !isSearching && !hasResults && (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
+              <div className="px-4 py-8 text-center text-sm text-content-subtle">
                 No issues found
               </div>
             )}
@@ -192,20 +192,20 @@ export function SearchModal({
 
           {/* Footer */}
           {resultCount > 0 && (
-            <div className="px-4 py-2 border-t border-gray-700 bg-gray-850 text-xs text-gray-400 flex items-center justify-between">
+            <div className="px-4 py-2 border-t border-divider bg-gray-850 text-xs text-content-subtle flex items-center justify-between">
               <span>{resultCount} result{resultCount !== 1 ? 's' : ''}</span>
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">↑</kbd>
-                  <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">↓</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-surface-overlay rounded text-xs">↑</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-surface-overlay rounded text-xs">↓</kbd>
                   navigate
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">Enter</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-surface-overlay rounded text-xs">Enter</kbd>
                   select
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">Esc</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-surface-overlay rounded text-xs">Esc</kbd>
                   close
                 </span>
               </div>

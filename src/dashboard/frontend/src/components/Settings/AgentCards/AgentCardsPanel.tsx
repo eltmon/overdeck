@@ -214,7 +214,7 @@ export function AgentCardsPanel({
     <div className="space-y-8">
       {/* Section Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+        <h2 className="text-2xl font-bold text-content flex items-center gap-2">
           <span className="material-symbols-outlined text-[#a078f7]">group</span>
           Active Agents
         </h2>
@@ -291,7 +291,7 @@ export function AgentCardsPanel({
                   <span className="material-symbols-outlined text-2xl text-[#a078f7] mb-2">
                     {agent.icon}
                   </span>
-                  <span className="text-sm font-medium text-white text-center">{agent.name}</span>
+                  <span className="text-sm font-medium text-content text-center">{agent.name}</span>
                   <span className="text-xs text-[#8b7aa0] mt-1">{model}</span>
                   {isOverride && (
                     <span className="text-xs text-[#a078f7] mt-1">override</span>
@@ -396,12 +396,12 @@ export function AgentCardsPanel({
       {/* Summary */}
       <div className="bg-[#150f1d] rounded-lg border border-[#2d2640] p-4 flex items-center justify-between">
         <div className="text-sm text-[#8b7aa0]">
-          <span className="text-white font-medium">{Object.keys(overrides).length}</span> custom overrides active
+          <span className="text-content font-medium">{Object.keys(overrides).length}</span> custom overrides active
         </div>
         <button
           onClick={onResetAllOverrides}
           disabled={Object.keys(overrides).length === 0}
-          className="text-sm text-[#a078f7] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="text-sm text-[#a078f7] hover:text-content transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Reset all to smart selection
         </button>

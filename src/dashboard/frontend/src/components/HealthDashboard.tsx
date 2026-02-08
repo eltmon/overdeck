@@ -25,7 +25,7 @@ export function HealthDashboard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading health data...</div>
+        <div className="text-content-subtle">Loading health data...</div>
       </div>
     );
   }
@@ -40,10 +40,10 @@ export function HealthDashboard() {
 
   if (!health || health.length === 0) {
     return (
-      <div className="bg-gray-800 rounded-lg p-8 text-center">
+      <div className="bg-surface-raised rounded-lg p-8 text-center">
         <Activity className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-400">No agents to monitor</h3>
-        <p className="text-sm text-gray-500 mt-2">
+        <h3 className="text-lg font-medium text-content-subtle">No agents to monitor</h3>
+        <p className="text-sm text-content-muted mt-2">
           Health data will appear here when agents are running
         </p>
       </div>
@@ -69,13 +69,13 @@ export function HealthDashboard() {
           return (
             <div
               key={status}
-              className={`${config.bg} rounded-lg p-4 border border-gray-700`}
+              className={`${config.bg} rounded-lg p-4 border border-divider`}
             >
               <div className="flex items-center gap-3">
                 <Icon className={`w-8 h-8 ${config.color}`} />
                 <div>
-                  <div className="text-2xl font-bold text-white">{counts[status] || 0}</div>
-                  <div className="text-sm text-gray-400 capitalize">{status}</div>
+                  <div className="text-2xl font-bold text-content">{counts[status] || 0}</div>
+                  <div className="text-sm text-content-subtle capitalize">{status}</div>
                 </div>
               </div>
             </div>
@@ -91,11 +91,11 @@ export function HealthDashboard() {
           return (
             <div
               key={agent.agentId}
-              className={`${config.bg} rounded-lg p-4 border border-gray-700`}
+              className={`${config.bg} rounded-lg p-4 border border-divider`}
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="font-medium text-white">{agent.agentId}</div>
+                  <div className="font-medium text-content">{agent.agentId}</div>
                   <div className={`flex items-center gap-1 text-sm ${config.color} mt-1`}>
                     <Icon className="w-4 h-4" />
                     <span className="capitalize">{agent.status}</span>
@@ -104,25 +104,25 @@ export function HealthDashboard() {
               </div>
 
               {agent.reason && (
-                <div className="mt-2 text-sm text-gray-400 italic">
+                <div className="mt-2 text-sm text-content-subtle italic">
                   {agent.reason}
                 </div>
               )}
 
               <div className="mt-4 space-y-2 text-sm">
                 {agent.lastPing && (
-                  <div className="flex justify-between text-gray-400">
+                  <div className="flex justify-between text-content-subtle">
                     <span>Last ping:</span>
                     <span>{new Date(agent.lastPing).toLocaleTimeString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-content-subtle">
                   <span>Failures:</span>
                   <span className={agent.consecutiveFailures > 0 ? 'text-orange-400' : ''}>
                     {agent.consecutiveFailures}
                   </span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-content-subtle">
                   <span>Kill count:</span>
                   <span className={agent.killCount > 0 ? 'text-red-400' : ''}>
                     {agent.killCount}
