@@ -1648,13 +1648,43 @@ Workspace: ${task.workspace || 'unknown'}
 ${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
 
 Your task:
-1. Review all changes in the branch
+1. Review all changes in the branch compared to main
 2. Check for code quality issues, security concerns, and best practices
 3. Verify test FILES exist for new code (DO NOT run tests - test-agent does that)
 4. Provide specific, actionable feedback
 
 IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.
 The TEST agent will run tests in the next step.
+
+## How to Review Changes
+
+**Step 1:** Get the list of changed files:
+\`\`\`bash
+cd ${task.workspace || 'unknown'} && git diff --name-only main...HEAD
+\`\`\`
+
+**Step 2:** Read the CURRENT version of each changed file using the Read tool.
+Review the actual file contents — do NOT rely solely on diff output.
+
+**Step 3:** If you need to see what specifically changed, use:
+\`\`\`bash
+cd ${task.workspace || 'unknown'} && git diff main...HEAD -- <file>
+\`\`\`
+
+## Avoiding False Positives
+
+**CRITICAL:** When reviewing diffs, understand that:
+- Lines starting with \`+\` are ADDITIONS (new code)
+- Lines starting with \`-\` are DELETIONS (removed code)
+- Lines without prefix are CONTEXT (unchanged surrounding code)
+- The SAME content may appear in both \`-\` and \`+\` sections when code is moved or reformatted — this is NOT duplication
+- A section shown in diff context does NOT mean it appears twice in the actual file
+- **Always read the actual file** to verify before claiming duplicate or redundant content
+
+Do NOT flag:
+- Code that appears in both removed and added hunks (it was moved, not duplicated)
+- Diff context lines as "duplicate sections" — they exist once in the real file
+- Reformatted/restructured code as "duplicated"
 
 ## REQUIRED: Update Status via API
 
