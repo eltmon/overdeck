@@ -137,7 +137,7 @@ export function CloisterStatusBar() {
         {status.running ? (
           <Bell className="w-3.5 h-3.5 text-green-400" />
         ) : (
-          <BellOff className="w-3.5 h-3.5 text-gray-500" />
+          <BellOff className="w-3.5 h-3.5 text-content-muted" />
         )}
       </div>
 
@@ -158,7 +158,9 @@ export function CloisterStatusBar() {
 
       {/* Warning Indicator */}
       {hasWarnings && (
-        <AlertTriangle className="w-3.5 h-3.5 text-orange-400" title={`${needsAttention} agent${needsAttention !== 1 ? 's' : ''} need attention`} />
+        <span title={`${needsAttention} agent${needsAttention !== 1 ? 's' : ''} need attention`}>
+          <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
+        </span>
       )}
 
       {/* Control Buttons */}
@@ -169,10 +171,10 @@ export function CloisterStatusBar() {
           disabled={isToggling}
           className={`px-2 py-0.5 rounded text-xs transition-colors ${
             isToggling
-              ? 'bg-gray-600 text-gray-400 cursor-wait'
+              ? 'bg-surface-emphasis text-content-subtle cursor-wait'
               : status.running
-              ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
+              ? 'bg-surface-overlay text-content-body hover:bg-surface-emphasis'
+              : 'bg-blue-600 text-content hover:bg-blue-700'
           }`}
         >
           {isToggling
@@ -194,13 +196,13 @@ export function CloisterStatusBar() {
             <span className="text-xs text-red-300">Kill all?</span>
             <button
               onClick={handleEmergencyStop}
-              className="px-1.5 py-0.5 rounded text-xs bg-red-600 text-white hover:bg-red-700"
+              className="px-1.5 py-0.5 rounded text-xs bg-red-600 text-content hover:bg-red-700"
             >
               Yes
             </button>
             <button
               onClick={() => setShowEmergencyConfirm(false)}
-              className="px-1.5 py-0.5 rounded text-xs bg-gray-700 text-gray-300 hover:bg-gray-600"
+              className="px-1.5 py-0.5 rounded text-xs bg-surface-overlay text-content-body hover:bg-surface-emphasis"
             >
               No
             </button>
@@ -213,8 +215,8 @@ export function CloisterStatusBar() {
             onClick={() => setShowSettings(!showSettings)}
             className={`p-1 rounded text-xs transition-colors ${
               showSettings
-                ? 'bg-gray-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                ? 'bg-surface-emphasis text-content'
+                : 'bg-surface-overlay text-content-body hover:bg-surface-emphasis'
             }`}
             title="Cloister settings"
           >
@@ -223,20 +225,20 @@ export function CloisterStatusBar() {
 
           {/* Settings Dropdown */}
           {showSettings && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
+            <div className="absolute right-0 top-full mt-2 w-56 bg-surface-raised border border-divider rounded-lg shadow-lg z-50">
               <div className="p-3">
-                <div className="text-xs text-gray-400 font-medium mb-2">Settings</div>
+                <div className="text-xs text-content-subtle font-medium mb-2">Settings</div>
 
                 {/* Auto-start checkbox */}
-                <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/50 rounded px-2 py-1.5 -mx-2">
+                <label className="flex items-center gap-2 cursor-pointer hover:bg-surface-overlay/50 rounded px-2 py-1.5 -mx-2">
                   <input
                     type="checkbox"
                     checked={config?.startup.auto_start ?? true}
                     onChange={handleAutoStartToggle}
                     disabled={configMutation.isPending}
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                    className="w-4 h-4 rounded border-divider-strong bg-surface-overlay text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
                   />
-                  <span className="text-sm text-gray-300">
+                  <span className="text-sm text-content-body">
                     Auto-start on dashboard launch
                   </span>
                 </label>

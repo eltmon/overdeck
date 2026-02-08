@@ -17,8 +17,9 @@ import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
-import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings } from 'lucide-react';
+import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon } from 'lucide-react';
 import { Agent, Issue } from './types';
+import { useTheme } from './hooks/useTheme';
 
 type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
@@ -63,6 +64,14 @@ export default function App() {
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Theme management
+  const { theme, toggleTheme, initTheme } = useTheme();
+
+  // Initialize theme on mount
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
 
   // Fetch agents to find if selected issue has an agent
   const { data: agents = [] } = useQuery({
@@ -184,12 +193,12 @@ export default function App() {
   const actualPanelWidth = isExpanded ? 'calc(100% - 300px)' : `${panelWidth}px`;
 
   return (
-    <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-2 shrink-0">
+    <div className="h-screen bg-surface flex flex-col overflow-hidden transition-colors duration-150">
+      <header className="bg-surface-raised border-b border-divider px-4 py-2 shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 shrink-0">
             <Eye className="w-5 h-5 text-blue-400" />
-            <h1 className="text-lg font-bold text-white whitespace-nowrap">Panopticon</h1>
+            <h1 className="text-lg font-bold text-content whitespace-nowrap">Panopticon</h1>
           </div>
           <CloisterStatusBar />
           <nav className="flex gap-0.5 overflow-x-auto min-w-0 scrollbar-hide">
@@ -211,7 +220,7 @@ export default function App() {
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors ${
                   activeTab === id
                     ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                    : 'text-content-subtle hover:text-content hover:bg-surface-overlay'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -219,6 +228,13 @@ export default function App() {
               </button>
             ))}
           </nav>
+          <button
+            onClick={toggleTheme}
+            className="ml-auto px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors text-content-subtle hover:text-content hover:bg-surface-overlay"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
         </div>
       </header>
 

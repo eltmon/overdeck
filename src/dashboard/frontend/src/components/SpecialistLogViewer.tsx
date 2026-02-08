@@ -97,15 +97,15 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
     : log.split('\n').map((line, i) => <div key={i}>{line}</div>);
 
   return (
-    <div className="flex flex-col h-full bg-gray-900">
+    <div className="flex flex-col h-full bg-surface">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700">
+      <div className="flex items-center justify-between p-4 border-b border-divider">
         <div className="flex items-center gap-3">
           <div>
-            <div className="text-white font-medium">
+            <div className="text-content font-medium">
               {project}/{type}
             </div>
-            <div className="text-sm text-gray-400 font-mono">{runId}</div>
+            <div className="text-sm text-content-subtle font-mono">{runId}</div>
           </div>
           {isStreaming && (
             <div className="flex items-center gap-2 text-sm text-green-400">
@@ -121,9 +121,9 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
             placeholder="Search logs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-3 py-1 bg-gray-800 text-white text-sm rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+            className="px-3 py-1 bg-surface-raised text-content text-sm rounded border border-divider-strong focus:border-blue-500 focus:outline-none"
           />
-          <label className="flex items-center gap-2 text-sm text-gray-400">
+          <label className="flex items-center gap-2 text-sm text-content-subtle">
             <input
               type="checkbox"
               checked={autoScroll}
@@ -134,7 +134,7 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
           </label>
           <button
             onClick={handleDownload}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            className="p-2 text-content-subtle hover:text-content hover:bg-surface-overlay rounded"
             title="Download log"
           >
             <Download className="w-4 h-4" />
@@ -142,7 +142,7 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+              className="p-2 text-content-subtle hover:text-content hover:bg-surface-overlay rounded"
               title="Close"
             >
               <X className="w-4 h-4" />
@@ -156,7 +156,7 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
         {error ? (
           <div className="text-red-400">{error}</div>
         ) : (
-          <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
+          <pre className="text-sm text-content-body font-mono whitespace-pre-wrap">
             {highlightedLog}
             <div ref={logEndRef} />
           </pre>
@@ -164,7 +164,7 @@ export function SpecialistLogViewer({ project, type, runId, onClose }: LogViewer
       </div>
 
       {/* Footer */}
-      <div className="p-2 border-t border-gray-700 text-xs text-gray-500 flex items-center justify-between">
+      <div className="p-2 border-t border-divider text-xs text-content-muted flex items-center justify-between">
         <div>{log.split('\n').length} lines</div>
         <div>{(new Blob([log]).size / 1024).toFixed(2)} KB</div>
       </div>

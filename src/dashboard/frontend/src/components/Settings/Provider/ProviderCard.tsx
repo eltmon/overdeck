@@ -122,14 +122,14 @@ export function ProviderCard({
                 placeholder={`Enter ${provider === 'openai' ? 'sk-' : provider === 'google' ? 'AIza' : ''}...`}
                 disabled={locked}
                 className={cn(
-                  'w-full bg-[#161022] border-slate-700 rounded-lg text-sm text-white px-3 py-2 pr-10 focus:ring-[#a078f7] focus:border-[#a078f7]',
+                  'w-full bg-[#161022] border-slate-700 rounded-lg text-sm text-content px-3 py-2 pr-10 focus:ring-[#a078f7] focus:border-[#a078f7]',
                   locked && 'bg-[#161022]/50 text-slate-400 cursor-not-allowed'
                 )}
               />
               <button
                 type="button"
                 onClick={() => setShowKey(!showKey)}
-                className="absolute right-3 top-2 text-slate-400 hover:text-white"
+                className="absolute right-3 top-2 text-slate-400 hover:text-content"
                 disabled={locked}
               >
                 {locked ? (

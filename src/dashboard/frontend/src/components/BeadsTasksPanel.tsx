@@ -38,7 +38,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
 
   if (isLoading) {
     return (
-      <div className="py-3 text-center text-gray-500 text-xs">
+      <div className="py-3 text-center text-content-muted text-xs">
         <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
         Loading tasks...
       </div>
@@ -48,7 +48,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
   return (
     <div className="space-y-2">
       {/* Header with counts */}
-      <div className="flex items-center justify-between text-xs text-gray-400">
+      <div className="flex items-center justify-between text-xs text-content-subtle">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <Circle className="w-3 h-3 text-blue-400" />
@@ -62,7 +62,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
         <button
           onClick={() => refetch()}
           disabled={isRefetching}
-          className="p-1 hover:bg-gray-700 rounded transition-colors"
+          className="p-1 hover:bg-surface-overlay rounded transition-colors"
           title="Refresh"
         >
           <RefreshCw className={`w-3 h-3 ${isRefetching ? 'animate-spin' : ''}`} />
@@ -82,7 +82,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
           ))}
         </div>
       ) : (
-        <div className="text-center py-4 text-gray-500 text-xs">
+        <div className="text-center py-4 text-content-muted text-xs">
           <ListTodo className="w-5 h-5 mx-auto mb-1 opacity-50" />
           <p>No tasks yet</p>
         </div>
@@ -96,8 +96,8 @@ function TaskItem({ task }: { task: BeadTask }) {
     <div
       className={`p-2 rounded border text-xs ${
         task.status === 'open'
-          ? 'border-gray-700 bg-gray-800/50'
-          : 'border-gray-800 bg-gray-900/50 opacity-60'
+          ? 'border-divider bg-surface-raised/50'
+          : 'border-divider bg-surface/50 opacity-60'
       }`}
     >
       <div className="flex items-start gap-2">
@@ -107,7 +107,7 @@ function TaskItem({ task }: { task: BeadTask }) {
           <CheckCircle2 className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
         )}
         <div className="flex-1 min-w-0">
-          <div className="text-white break-words leading-tight">
+          <div className="text-content break-words leading-tight">
             {task.name}
           </div>
           {/* Labels */}
@@ -121,8 +121,8 @@ function TaskItem({ task }: { task: BeadTask }) {
                       ? label.includes('easy') ? 'bg-green-900/50 text-green-400' :
                         label.includes('medium') ? 'bg-yellow-900/50 text-yellow-400' :
                         label.includes('hard') ? 'bg-red-900/50 text-red-400' :
-                        'bg-gray-700 text-gray-300'
-                      : 'bg-gray-700 text-gray-300'
+                        'bg-surface-overlay text-content-body'
+                      : 'bg-surface-overlay text-content-body'
                   }`}
                 >
                   {label}
