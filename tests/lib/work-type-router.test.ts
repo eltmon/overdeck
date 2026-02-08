@@ -62,7 +62,7 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
+            'issue-agent:planning': 'claude-opus-4-5',
           },
           geminiThinkingLevel: 3,
         };
@@ -70,7 +70,7 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const result = router.getModel('issue-agent:planning');
 
-        expect(result.model).toBe('claude-opus-4-6');
+        expect(result.model).toBe('claude-opus-4-5');
         expect(result.source).toBe('override');
         expect(result.usedFallback).toBe(false);
       });
@@ -370,7 +370,7 @@ describe('work-type-router', () => {
         enabledProviders: new Set<ModelProvider>(['anthropic']),
         apiKeys: {},
         overrides: {
-          'issue-agent:planning': 'claude-opus-4-6',
+          'issue-agent:planning': 'claude-opus-4-5',
         },
         geminiThinkingLevel: 3,
       };
@@ -378,7 +378,7 @@ describe('work-type-router', () => {
       const router = new WorkTypeRouter(config);
       const result = router.getModel('issue-agent:planning');
 
-      expect(result.model).toBe('claude-opus-4-6');
+      expect(result.model).toBe('claude-opus-4-5');
       expect(result.source).toBe('override');
     });
 
