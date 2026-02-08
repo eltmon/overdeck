@@ -94,7 +94,7 @@ Create `.planning/PRD.md` with ALL sections filled in completely:
 # PRD: <Title>
 
 **Issue:** <issue-id>
-**Author:** Ed Becker (with Claude Opus 4.6)
+**Author:** Ed Becker (with Claude Opus 4.5)
 **Created:** <date>
 **Status:** Ready for Implementation
 
@@ -160,7 +160,7 @@ Create `.planning/STATE.md` with COMPLETE task breakdown:
 # <issue-id>: <Title>
 
 **Status:** Ready for Implementation
-**Planned by:** Claude Opus 4.6
+**Planned by:** Claude Opus 4.5
 **Date:** <date>
 
 ---
@@ -293,7 +293,7 @@ gh label create "opus-planned" --color "7057FF" 2>/dev/null || true
 gh issue edit <number> --add-label "planned,ready-for-implementation,opus-planned"
 
 gh issue comment <number> --body "## Planning Complete
-**Planned by:** Claude Opus 4.6
+**Planned by:** Claude Opus 4.5
 **Workspace:** workspaces/feature-<issue-id>/
 
 ### Beads Created: <N> tasks

@@ -7,4 +7,4 @@ export COLORTERM=truecolor
 
 cd /workspace
 prompt=$(cat "/workspace/.panopticon/prompts/planning-pan-79.txt")
-exec claude --dangerously-skip-permissions --model claude-opus-4-6 "$prompt"
+exec claude --dangerously-skip-permissions --model claude-opus-4-5 "$prompt"

@@ -273,7 +273,7 @@ describe('agent spawning with work types', () => {
             complexity: {
               low: 'claude-haiku-4',
               medium: 'claude-sonnet-4-5',
-              high: 'claude-opus-4-6',
+              high: 'claude-opus-4-5',
             },
           },
         }),

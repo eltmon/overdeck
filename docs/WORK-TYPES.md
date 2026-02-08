@@ -17,7 +17,7 @@ The main work agent progresses through distinct phases, each with different mode
 | Work Type ID | Phase | Description | Primary Model | Budget Alternative | Rationale |
 |--------------|-------|-------------|---------------|-------------------|-----------|
 | `issue-agent:exploration` | Exploration | Understanding codebase, reading files, initial research | `gemini-3-flash-preview` (thinking: low) | `gemini-3-flash-preview` (thinking: minimal) | Fast scanning/triage; minimal works for pure grep-like discovery |
-| `issue-agent:planning` | Planning | Architecture design, approach selection | `claude-opus-4-6` | `gemini-3-pro-preview` (thinking: high) | Strong architecture planning without burning Opus |
+| `issue-agent:planning` | Planning | Architecture design, approach selection | `claude-opus-4-5` | `gemini-3-pro-preview` (thinking: high) | Strong architecture planning without burning Opus |
 | `issue-agent:implementation` | Implementation | Writing code, making changes | `gpt-5.2-codex` | `gemini-3-pro-preview` (thinking: low) | Acceptable codegen when you want to keep everything Gemini-centric |
 | `issue-agent:testing` | Testing | Running tests, fixing failures, adding test coverage | `gpt-5.2-codex` | `gemini-3-flash-preview` (thinking: medium) | Fast test/fix loops; Flash medium is good for iterative retries |
 | `issue-agent:documentation` | Documentation | Writing docs, comments, README updates | `claude-sonnet-4-5` | `gemini-3-pro-preview` (thinking: low) | Solid technical writing with lower cost |
@@ -56,10 +56,10 @@ Convoy agents run in parallel for comprehensive code review.
 
 | Work Type ID | Member | Description | Primary Model | Budget Alternative | Rationale |
 |--------------|--------|-------------|---------------|-------------------|-----------|
-| `convoy:security-reviewer` | Security Reviewer | OWASP Top 10, vulnerabilities, auth issues | `claude-opus-4-6` | `gemini-3-pro-preview` (thinking: high) | Threat modeling + auth edge cases; Pro high is the Gemini pick |
+| `convoy:security-reviewer` | Security Reviewer | OWASP Top 10, vulnerabilities, auth issues | `claude-opus-4-5` | `gemini-3-pro-preview` (thinking: high) | Threat modeling + auth edge cases; Pro high is the Gemini pick |
 | `convoy:performance-reviewer` | Performance Reviewer | Algorithms, resource usage, optimization | `gemini-3-pro-preview` (thinking: high) | `gemini-3-flash-preview` (thinking: high) | Performance review can often run on Flash high cheaply |
 | `convoy:correctness-reviewer` | Correctness Reviewer | Logic errors, edge cases, type safety | `claude-sonnet-4-5` | `gemini-3-pro-preview` (thinking: high) | Correctness needs careful reasoning; Pro high is safer |
-| `convoy:synthesis-agent` | Synthesis Agent | Combines findings from parallel reviewers | `claude-opus-4-6` | `gemini-3-pro-preview` (thinking: high) | Best Gemini substitute for synthesis across reviewers |
+| `convoy:synthesis-agent` | Synthesis Agent | Combines findings from parallel reviewers | `claude-opus-4-5` | `gemini-3-pro-preview` (thinking: high) | Best Gemini substitute for synthesis across reviewers |
 
 ---
 
@@ -72,7 +72,7 @@ Agents that run before code work begins (PRD generation, planning, triage).
 | `prd-agent` | PRD Generation | Q&A-driven requirements gathering, PRD creation | `o3-deep-research` | `gemini-3-pro-preview` (thinking: high) | Good structured PRD generation without "research" premium |
 | `decomposition-agent` | Task Decomposition | PRD → Beads breakdown, story splitting, dependency mapping | `o3-deep-research` | `gemini-3-pro-preview` (thinking: high) | Task breakdown + dependency mapping works well on Pro high |
 | `triage-agent` | Triage Agent | Issue prioritization, complexity estimation | `gpt-4o` | `gemini-3-flash-preview` (thinking: medium) | Quick prioritization + estimation, Flash medium is enough |
-| `planning-agent` | Planning Agent | Initial feature planning, high-level architecture | `claude-opus-4-6` | `gemini-3-pro-preview` (thinking: high) | High-level planning substitute when Opus budget is red |
+| `planning-agent` | Planning Agent | Initial feature planning, high-level architecture | `claude-opus-4-5` | `gemini-3-pro-preview` (thinking: high) | High-level planning substitute when Opus budget is red |
 
 ---
 
@@ -112,12 +112,12 @@ Uses Gemini models and cheaper alternatives wherever possible.
 
 When API keys for non-Anthropic providers are not configured:
 
-1. **Primary fallback**: Use Anthropic models (claude-opus-4-6, claude-sonnet-4-5, claude-haiku-4-5)
+1. **Primary fallback**: Use Anthropic models (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5)
 2. **Model mapping**:
    - `gpt-*` models → `claude-sonnet-4-5`
    - `gemini-3-pro-preview` → `claude-sonnet-4-5`
    - `gemini-3-flash-preview` → `claude-haiku-4-5`
-   - `o3-deep-research` → `claude-opus-4-6`
+   - `o3-deep-research` → `claude-opus-4-5`
    - `glm-*` models → `claude-haiku-4-5`
 
 This ensures Panopticon works out-of-the-box with just Claude API access.
@@ -149,7 +149,7 @@ models:
   # Override specific work types
   overrides:
     issue-agent:implementation: gpt-5.2-codex
-    specialist-review-agent: claude-opus-4-6
+    specialist-review-agent: claude-opus-4-5
 
   # API keys for non-Anthropic providers
   api_keys:
@@ -166,7 +166,7 @@ models:
   preset: premium  # Use premium models for this critical project
 
   overrides:
-    convoy:security-reviewer: claude-opus-4-6  # Never compromise on security
+    convoy:security-reviewer: claude-opus-4-5  # Never compromise on security
 ```
 
 ---
@@ -190,7 +190,7 @@ See [PAN-78](https://github.com/eltmon/panopticon-cli/issues/78) for integration
 
 | Phase | Responsibility | Agent | Model |
 |-------|---------------|-------|-------|
-| **Planning** | High-level architecture, approach selection, technical design | `planning-agent` or `issue-agent:planning` | claude-opus-4-6 (premium) or gemini-3-pro-preview (budget) |
+| **Planning** | High-level architecture, approach selection, technical design | `planning-agent` or `issue-agent:planning` | claude-opus-4-5 (premium) or gemini-3-pro-preview (budget) |
 | **Decomposition** | Breaking PRD into beads, story splitting, dependency mapping | `decomposition-agent` | o3-deep-research (premium) or gemini-3-pro-preview (budget) |
 
 These are **decoupled phases**:

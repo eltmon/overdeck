@@ -5,14 +5,14 @@
     "https://livecodebench.github.io/",
     "https://chat.lmsys.org/?leaderboard",
     "https://artificialanalysis.ai/",
-    "https://www.anthropic.com/news/claude-opus-4-6",
+    "https://www.anthropic.com/news/claude-opus-4-5",
     "https://www.kimi.com/blog/kimi-k2-5.html",
     "https://z.ai/blog/glm-4.7",
     "https://pricepertoken.com/"
   ],
   "models": {
-    "claude-opus-4-6": {
-      "displayName": "Claude Opus 4.6",
+    "claude-opus-4-5": {
+      "displayName": "Claude Opus 4.5",
       "provider": "anthropic",
       "costPer1MTokens": 45.0,
       "contextWindow": 200000,
@@ -166,15 +166,15 @@
   },
   "methodology": "Scores based on: (1) Official benchmark results (SWE-bench, LiveCodeBench, AIME); (2) Community leaderboards (LMSYS, ArtificialAnalysis); (3) Pricing from provider APIs and aggregators; (4) User feedback on specific use cases. Scores normalized to 0-100 scale where 100 = best in class for that dimension.",
   "confidence_levels": {
-    "high": ["claude-opus-4-6", "claude-sonnet-4-5", "gpt-5.2-codex", "gemini-3-pro-preview"],
+    "high": ["claude-opus-4-5", "claude-sonnet-4-5", "gpt-5.2-codex", "gemini-3-pro-preview"],
     "medium": ["kimi-k2.5", "glm-4.7"],
     "low": ["claude-haiku-4-5", "gpt-4o-mini", "glm-4.7-flash", "gemini-3-flash-preview"]
   },
   "recommendations": {
-    "planning": "claude-opus-4-6 - User confirms 'Opus 4.6 planning for sure'. 99 score.",
-    "code-generation": "claude-opus-4-6 for quality (80.9% SWE-bench), kimi-k2.5 for value (76.8% at 5x lower cost)",
-    "debugging": "claude-opus-4-6 or o3-deep-research for complex issues, kimi-k2.5 for routine",
-    "security": "claude-opus-4-6 - Best security analysis, OWASP detection",
+    "planning": "claude-opus-4-5 - User confirms 'Opus 4.5 planning for sure'. 99 score.",
+    "code-generation": "claude-opus-4-5 for quality (80.9% SWE-bench), kimi-k2.5 for value (76.8% at 5x lower cost)",
+    "debugging": "claude-opus-4-5 or o3-deep-research for complex issues, kimi-k2.5 for routine",
+    "security": "claude-opus-4-5 - Best security analysis, OWASP detection",
     "large-codebase": "gemini-3-pro-preview - 1M context window",
     "frontend-dev": "kimi-k2.5 - Specifically noted for excellent frontend capabilities",
     "budget": "kimi-k2 ($1.4/M), glm-4.7-flash ($1.5/M), gemini-3-flash ($0.5/M)",

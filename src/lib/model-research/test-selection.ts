@@ -22,7 +22,7 @@ console.log('══════════════════════�
 // Test 1: All Anthropic only (default)
 console.log('Test 1: Anthropic Only (no external API keys)');
 console.log('─'.repeat(60));
-const anthropicOnly: ModelId[] = ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'];
+const anthropicOnly: ModelId[] = ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'];
 const anthropicResults = selectAllModels(anthropicOnly);
 
 for (const [workType, result] of Object.entries(anthropicResults)) {
@@ -63,7 +63,7 @@ console.log('\n');
 console.log('Test 4: Anthropic + Kimi (common affordable setup)');
 console.log('─'.repeat(60));
 const anthropicKimi: ModelId[] = [
-  'claude-opus-4-6',
+  'claude-opus-4-5',
   'claude-sonnet-4-5',
   'claude-haiku-4-5',
   'kimi-k2',
@@ -80,7 +80,7 @@ console.log('\n');
 console.log('Test 5: Anthropic + Google');
 console.log('─'.repeat(60));
 const anthropicGoogle: ModelId[] = [
-  'claude-opus-4-6',
+  'claude-opus-4-5',
   'claude-sonnet-4-5',
   'claude-haiku-4-5',
   'gemini-2.5-pro',

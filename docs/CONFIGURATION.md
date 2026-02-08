@@ -66,7 +66,7 @@ models:
   # Per-work-type overrides (optional)
   overrides:
     issue-agent:implementation: gpt-5.2-codex
-    convoy:security-reviewer: claude-opus-4-6
+    convoy:security-reviewer: claude-opus-4-5
     subagent:explore: glm-4.7-flashx
 
   # Gemini thinking levels (optional)
@@ -93,7 +93,7 @@ models:
   # Project-specific overrides
   overrides:
     # Never compromise on security, even in budget mode
-    convoy:security-reviewer: claude-opus-4-6
+    convoy:security-reviewer: claude-opus-4-5
 
     # Use Codex for implementation in this codebase
     issue-agent:implementation: gpt-5.2-codex
@@ -143,9 +143,9 @@ Presets provide curated model configurations optimized for different priorities.
 **Use case**: Critical production work, complex problems, quality-first projects
 
 **Model Selection**:
-- **Critical thinking**: claude-opus-4-6
+- **Critical thinking**: claude-opus-4-5
 - **Code generation**: gpt-5.2-codex
-- **Security**: claude-opus-4-6
+- **Security**: claude-opus-4-5
 - **Exploration**: gemini-3-flash-preview
 - **Documentation**: claude-sonnet-4-5
 
@@ -162,7 +162,7 @@ models:
 **Use case**: Daily development, most production work
 
 **Model Selection**:
-- **Critical thinking**: claude-opus-4-6 or gemini-3-pro-preview
+- **Critical thinking**: claude-opus-4-5 or gemini-3-pro-preview
 - **Code generation**: gpt-5.2-codex or gemini-3-pro-preview
 - **Security**: claude-sonnet-4-5
 - **Exploration**: gemini-3-flash-preview
@@ -218,7 +218,7 @@ models:
   preset: budget  # Use cheap models everywhere...
 
   overrides:
-    convoy:security-reviewer: claude-opus-4-6  # ...except security!
+    convoy:security-reviewer: claude-opus-4-5  # ...except security!
 ```
 
 **Example 2: Use Codex for implementation**
@@ -307,7 +307,7 @@ When API keys are missing or providers disabled, Panopticon falls back to Anthro
 | `gpt-5.2-codex` | `claude-sonnet-4-5` | Similar capability tier |
 | `gpt-4o` | `claude-sonnet-4-5` | Similar capability tier |
 | `gpt-4o-mini` | `claude-haiku-4-5` | Budget tier |
-| `o3-deep-research` | `claude-opus-4-6` | Premium tier |
+| `o3-deep-research` | `claude-opus-4-5` | Premium tier |
 | `gemini-3-pro-preview` | `claude-sonnet-4-5` | Similar capability tier |
 | `gemini-3-flash-preview` | `claude-haiku-4-5` | Budget tier |
 | `glm-4.7` | `claude-haiku-4-5` | Budget tier |
@@ -404,7 +404,7 @@ models:
 
   overrides:
     # Only use Claude for security
-    convoy:security-reviewer: claude-opus-4-6
+    convoy:security-reviewer: claude-opus-4-5
 
   thinking:
     # Dial up thinking for complex tasks
@@ -440,8 +440,8 @@ models:
 
   overrides:
     # Extra emphasis on quality
-    convoy:security-reviewer: claude-opus-4-6
-    convoy:correctness-reviewer: claude-opus-4-6
+    convoy:security-reviewer: claude-opus-4-5
+    convoy:correctness-reviewer: claude-opus-4-5
     issue-agent:implementation: gpt-5.2-codex
 ```
 

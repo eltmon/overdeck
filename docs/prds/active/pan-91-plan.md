@@ -124,7 +124,7 @@ The cost data already has full model IDs from the cost tracking system. We just 
 
 ```typescript
 function getFriendlyModelName(fullModel: string): string {
-  if (fullModel.includes('opus-4-6') || fullModel.includes('opus-4.6')) return 'Opus 4.6';
+  if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
   if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
   if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus 4';
   if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';

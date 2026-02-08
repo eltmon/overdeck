@@ -27,7 +27,7 @@ describe('model-fallback', () => {
 
   describe('getModelProvider', () => {
     it('should return anthropic for Claude models', () => {
-      expect(getModelProvider('claude-opus-4-6')).toBe('anthropic');
+      expect(getModelProvider('claude-opus-4-5')).toBe('anthropic');
       expect(getModelProvider('claude-sonnet-4-5')).toBe('anthropic');
       expect(getModelProvider('claude-haiku-4-5')).toBe('anthropic');
     });
@@ -52,7 +52,7 @@ describe('model-fallback', () => {
 
   describe('requiresExternalKey', () => {
     it('should return false for Anthropic models', () => {
-      expect(requiresExternalKey('claude-opus-4-6')).toBe(false);
+      expect(requiresExternalKey('claude-opus-4-5')).toBe(false);
       expect(requiresExternalKey('claude-sonnet-4-5')).toBe(false);
       expect(requiresExternalKey('claude-haiku-4-5')).toBe(false);
     });
@@ -76,7 +76,7 @@ describe('model-fallback', () => {
   describe('getModelsByProvider', () => {
     it('should return all Anthropic models', () => {
       const models = getModelsByProvider('anthropic');
-      expect(models).toContain('claude-opus-4-6');
+      expect(models).toContain('claude-opus-4-5');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
       expect(models).toHaveLength(3);
@@ -130,7 +130,7 @@ describe('model-fallback', () => {
     it('should return original model if provider is enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
       expect(applyFallback('gpt-5.2-codex', enabled)).toBe('gpt-5.2-codex');
-      expect(applyFallback('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
+      expect(applyFallback('claude-opus-4-5', enabled)).toBe('claude-opus-4-5');
     });
 
     it('should fallback GPT-5.2 Codex to Sonnet', () => {
@@ -194,7 +194,7 @@ describe('model-fallback', () => {
 
     it('should always return Anthropic models unchanged', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
+      expect(applyFallback('claude-opus-4-5', enabled)).toBe('claude-opus-4-5');
       expect(applyFallback('claude-sonnet-4-5', enabled)).toBe('claude-sonnet-4-5');
       expect(applyFallback('claude-haiku-4-5', enabled)).toBe('claude-haiku-4-5');
     });
@@ -202,7 +202,7 @@ describe('model-fallback', () => {
 
   describe('getFallbackModel', () => {
     it('should return Anthropic models unchanged', () => {
-      expect(getFallbackModel('claude-opus-4-6')).toBe('claude-opus-4-6');
+      expect(getFallbackModel('claude-opus-4-5')).toBe('claude-opus-4-5');
       expect(getFallbackModel('claude-sonnet-4-5')).toBe('claude-sonnet-4-5');
       expect(getFallbackModel('claude-haiku-4-5')).toBe('claude-haiku-4-5');
     });
@@ -287,13 +287,13 @@ describe('model-fallback', () => {
     it('should include Anthropic models when only Anthropic enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       const models: ModelId[] = [
-        'claude-opus-4-6',
+        'claude-opus-4-5',
         'gpt-5.2-codex',
         'gemini-3-pro-preview',
       ];
 
       const filtered = filterAvailableModels(models, enabled);
-      expect(filtered).toContain('claude-opus-4-6');
+      expect(filtered).toContain('claude-opus-4-5');
       expect(filtered).not.toContain('gpt-5.2-codex');
       expect(filtered).not.toContain('gemini-3-pro-preview');
     });
@@ -301,7 +301,7 @@ describe('model-fallback', () => {
     it('should include all models when all providers enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai']);
       const models: ModelId[] = [
-        'claude-opus-4-6',
+        'claude-opus-4-5',
         'gpt-5.2-codex',
         'gemini-3-pro-preview',
         'glm-4.7',
@@ -314,13 +314,13 @@ describe('model-fallback', () => {
     it('should filter based on enabled providers', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
       const models: ModelId[] = [
-        'claude-opus-4-6',
+        'claude-opus-4-5',
         'gpt-5.2-codex',
         'gemini-3-pro-preview',
       ];
 
       const filtered = filterAvailableModels(models, enabled);
-      expect(filtered).toContain('claude-opus-4-6');
+      expect(filtered).toContain('claude-opus-4-5');
       expect(filtered).toContain('gpt-5.2-codex');
       expect(filtered).not.toContain('gemini-3-pro-preview');
     });
@@ -331,7 +331,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       const models = getAvailableModels(enabled);
 
-      expect(models).toContain('claude-opus-4-6');
+      expect(models).toContain('claude-opus-4-5');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
       expect(models).toHaveLength(3);
@@ -395,7 +395,7 @@ describe('model-fallback', () => {
 
       allModels.forEach((model) => {
         const fallback = applyFallback(model, enabled);
-        expect(fallback).not.toBe('claude-opus-4-6');
+        expect(fallback).not.toBe('claude-opus-4-5');
       });
     });
   });

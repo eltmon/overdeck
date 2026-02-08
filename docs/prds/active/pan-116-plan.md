@@ -31,13 +31,13 @@ Replace session-level costing with per-message costing:
    ```typescript
    modelBreakdown: {
      'claude-sonnet-4-5-20250929': { cost, inputTokens, outputTokens, messageCount },
-     'claude-opus-4-6-20251101': { cost, inputTokens, outputTokens, messageCount }
+     'claude-opus-4-5-20251101': { cost, inputTokens, outputTokens, messageCount }
    }
    ```
 
 3. **Display model progression** - For `model` field:
    - Single model: "claude-sonnet-4.5" (normalized)
-   - Multiple models: "claude-sonnet-4.5 → claude-opus-4.6" (normalized)
+   - Multiple models: "claude-sonnet-4.5 → claude-opus-4.5" (normalized)
 
 ### Migration Strategy: Version Flag
 
@@ -68,7 +68,7 @@ export interface SessionUsage {
 **Decision:** Normalized names for readability, full IDs for precision.
 
 - **`model` field** (display): Normalized names joined with →
-  - Example: "claude-sonnet-4.5 → claude-opus-4.6"
+  - Example: "claude-sonnet-4.5 → claude-opus-4.5"
   - Easy to read, matches pricing keys
 
 - **`modelBreakdown` keys** (data): Exact model IDs
@@ -183,7 +183,7 @@ Add new test suite for `parseClaudeSession()` multi-model handling:
    - `cost_v2` > `cost` (per-message vs first-model)
    - `modelBreakdown` has both models
    - Opus messages cost ~5x more per message than Sonnet
-   - Model display shows "claude-sonnet-4.5 → claude-opus-4.6"
+   - Model display shows "claude-sonnet-4.5 → claude-opus-4.5"
 3. Multiple model switches - Verify breakdown tracks all models
 4. Session with no usage - Returns null
 5. All messages same model - Verify `cost` ≈ `cost_v2`
@@ -206,7 +206,7 @@ Update docstrings in `parseClaudeSession()`:
 - [ ] `parseClaudeSession()` calculates cost per-message using each message's model
 - [ ] Returns `cost_v2` with accurate pricing
 - [ ] Returns `modelBreakdown` showing cost/tokens/count per exact model ID
-- [ ] `model` field shows normalized progression (e.g., "claude-sonnet-4.5 → claude-opus-4.6")
+- [ ] `model` field shows normalized progression (e.g., "claude-sonnet-4.5 → claude-opus-4.5")
 - [ ] Old `cost` field preserved for backward compatibility
 - [ ] Test case validates correct multi-model costing (Sonnet → Opus)
 - [ ] Test case verifies `cost_v2` > `cost` for upgraded sessions

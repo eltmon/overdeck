@@ -94,7 +94,7 @@ describe('getActiveSessionModel', () => {
     const sessionContent = JSON.stringify({
       sessionId: 'test-session-2',
       timestamp: new Date().toISOString(),
-      model: 'claude-opus-4-6-20251101',
+      model: 'claude-opus-4-5-20251101',
       usage: {
         input_tokens: 200,
         output_tokens: 100
@@ -104,7 +104,7 @@ describe('getActiveSessionModel', () => {
 
     try {
       const result = getActiveSessionModel(testWorkspacePath);
-      expect(result).toBe('claude-opus-4-6-20251101');
+      expect(result).toBe('claude-opus-4-5-20251101');
     } finally {
       rmSync(claudeProjectDir, { recursive: true, force: true });
     }
@@ -210,14 +210,14 @@ describe('getActiveSessionModel', () => {
     // 5th line has the model
     content += JSON.stringify({
       sessionId: 'test',
-      model: 'claude-opus-4-6-20251101'
+      model: 'claude-opus-4-5-20251101'
     }) + '\n';
 
     writeFileSync(sessionFile, content);
 
     try {
       const result = getActiveSessionModel(testWorkspacePath);
-      expect(result).toBe('claude-opus-4-6-20251101');
+      expect(result).toBe('claude-opus-4-5-20251101');
     } finally {
       rmSync(claudeProjectDir, { recursive: true, force: true });
     }
@@ -340,8 +340,8 @@ describe('parseClaudeSession', () => {
       { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
       { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
       // Opus messages (more expensive)
-      { model: 'claude-opus-4-6-20251101', inputTokens: 1000, outputTokens: 500 },
-      { model: 'claude-opus-4-6-20251101', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-opus-4-5-20251101', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-opus-4-5-20251101', inputTokens: 1000, outputTokens: 500 },
     ]);
 
     const result = parseClaudeSession(sessionFile);
@@ -349,13 +349,13 @@ describe('parseClaudeSession', () => {
     expect(result).not.toBeNull();
 
     // Model display should show progression
-    expect(result!.model).toBe('claude-sonnet-4.5 → claude-opus-4.6');
+    expect(result!.model).toBe('claude-sonnet-4.5 → claude-opus-4.5');
 
     // Should have breakdown for both models
     expect(result!.modelBreakdown).toBeDefined();
     expect(Object.keys(result!.modelBreakdown!).length).toBe(2);
     expect(result!.modelBreakdown!['claude-sonnet-4-5-20250929']).toBeDefined();
-    expect(result!.modelBreakdown!['claude-opus-4-6-20251101']).toBeDefined();
+    expect(result!.modelBreakdown!['claude-opus-4-5-20251101']).toBeDefined();
 
     // Verify Sonnet breakdown
     const sonnetBreakdown = result!.modelBreakdown!['claude-sonnet-4-5-20250929'];
@@ -364,7 +364,7 @@ describe('parseClaudeSession', () => {
     expect(sonnetBreakdown.outputTokens).toBe(2500);
 
     // Verify Opus breakdown
-    const opusBreakdown = result!.modelBreakdown!['claude-opus-4-6-20251101'];
+    const opusBreakdown = result!.modelBreakdown!['claude-opus-4-5-20251101'];
     expect(opusBreakdown.messageCount).toBe(2);
     expect(opusBreakdown.inputTokens).toBe(2000);
     expect(opusBreakdown.outputTokens).toBe(1000);
@@ -394,7 +394,7 @@ describe('parseClaudeSession', () => {
     // Sonnet → Opus → Sonnet
     const sessionFile = createTestSession([
       { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
-      { model: 'claude-opus-4-6-20251101', inputTokens: 1000, outputTokens: 500 },
+      { model: 'claude-opus-4-5-20251101', inputTokens: 1000, outputTokens: 500 },
       { model: 'claude-sonnet-4-5-20250929', inputTokens: 1000, outputTokens: 500 },
     ]);
 
@@ -410,7 +410,7 @@ describe('parseClaudeSession', () => {
     expect(sonnetBreakdown.inputTokens).toBe(2000);
 
     // Opus should have 1 message
-    const opusBreakdown = result!.modelBreakdown!['claude-opus-4-6-20251101'];
+    const opusBreakdown = result!.modelBreakdown!['claude-opus-4-5-20251101'];
     expect(opusBreakdown.messageCount).toBe(1);
   });
 
@@ -447,7 +447,7 @@ describe('parseClaudeSession', () => {
     const content = JSON.stringify({
       sessionId: 'top-level-test',
       timestamp: new Date().toISOString(),
-      model: 'claude-opus-4-6-20251101',
+      model: 'claude-opus-4-5-20251101',
       usage: {
         input_tokens: 1000,
         output_tokens: 500,
@@ -458,7 +458,7 @@ describe('parseClaudeSession', () => {
     const result = parseClaudeSession(sessionFile);
 
     expect(result).not.toBeNull();
-    expect(result!.model).toBe('claude-opus-4.6');
+    expect(result!.model).toBe('claude-opus-4.5');
     expect(result!.usage.inputTokens).toBe(1000);
     expect(result!.usage.outputTokens).toBe(500);
     expect(result!.cost_v2).toBeDefined();
