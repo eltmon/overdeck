@@ -248,7 +248,7 @@ export default function App() {
                 onSelectIssue={setSelectedIssue}
               />
             </div>
-            {selectedIssue && selectedIssueAgent && (
+            {selectedIssue && (selectedIssueAgent || selectedIssueData) && (
               <>
                 {/* Resize handle */}
                 <div
@@ -266,22 +266,22 @@ export default function App() {
                   >
                     {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </button>
-                  <WorkspacePanel
-                    agent={selectedIssueAgent}
-                    issueId={selectedIssue}
-                    issueUrl={selectedIssueData?.url}
-                    onClose={() => setSelectedIssue(null)}
-                  />
+                  {selectedIssueAgent ? (
+                    <WorkspacePanel
+                      agent={selectedIssueAgent}
+                      issueId={selectedIssue}
+                      issueUrl={selectedIssueData?.url}
+                      issue={selectedIssueData ?? undefined}
+                      onClose={() => setSelectedIssue(null)}
+                    />
+                  ) : selectedIssueData ? (
+                    <IssueDetailPanel
+                      issue={selectedIssueData}
+                      onClose={() => setSelectedIssue(null)}
+                    />
+                  ) : null}
                 </div>
               </>
-            )}
-            {selectedIssue && !selectedIssueAgent && selectedIssueData && (
-              <div className="w-[400px] shrink-0 h-full">
-                <IssueDetailPanel
-                  issue={selectedIssueData}
-                  onClose={() => setSelectedIssue(null)}
-                />
-              </div>
             )}
           </>
         )}
