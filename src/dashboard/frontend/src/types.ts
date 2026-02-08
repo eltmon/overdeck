@@ -42,7 +42,7 @@ export interface Agent {
   issueId?: string;
   runtime: string;
   model: string;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped';
+  status: 'healthy' | 'warning' | 'stuck' | 'dead';
   pid?: number;
   startedAt: string;
   lastActivity?: string;

@@ -62,13 +62,13 @@ Integrate [claude-code-router](https://github.com/musistudio/claude-code-router)
       "test_agent": "claude-haiku-4-5",
       "merge_agent": "claude-sonnet-4-5"
     },
-    "planning_agent": "claude-opus-4-6",
+    "planning_agent": "claude-opus-4-5",
     "complexity": {
       "trivial": "claude-haiku-4-5",
       "simple": "claude-haiku-4-5",
       "medium": "claude-sonnet-4-5",
       "complex": "claude-sonnet-4-5",
-      "expert": "claude-opus-4-6"
+      "expert": "claude-opus-4-5"
     }
   },
   "api_keys": {
@@ -82,7 +82,7 @@ Integrate [claude-code-router](https://github.com/musistudio/claude-code-router)
 ### Supported Models (Initial Release)
 
 **Anthropic (via Claude Code / Claude API)**
-- `claude-opus-4-6` - Most capable model
+- `claude-opus-4-5` - Most capable model
 - `claude-sonnet-4-5` - Balanced model (default)
 - `claude-haiku-4-5` - Fast, efficient model
 
@@ -115,7 +115,7 @@ Example generated config structure:
       "name": "anthropic",
       "baseURL": "https://api.anthropic.com/v1",
       "apiKey": "$ANTHROPIC_API_KEY",
-      "models": ["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"]
+      "models": ["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]
     },
     {
       "name": "openai",
@@ -128,7 +128,7 @@ Example generated config structure:
     "specialist-review-agent": { "model": "claude-sonnet-4-5" },
     "specialist-test-agent": { "model": "claude-haiku-4-5" },
     "specialist-merge-agent": { "model": "claude-sonnet-4-5" },
-    "planning-agent": { "model": "claude-opus-4-6" }
+    "planning-agent": { "model": "claude-opus-4-5" }
   }
 }
 ```

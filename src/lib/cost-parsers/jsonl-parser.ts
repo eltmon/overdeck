@@ -42,7 +42,7 @@ export interface SessionUsage {
   sessionFile: string;
   startTime: string;
   endTime: string;
-  model: string;  // Display name (normalized). Shows "sonnet-4.5 → opus-4.6" for upgrades
+  model: string;  // Display name (normalized). Shows "sonnet-4.5 → opus-4.5" for upgrades
   usage: TokenUsage;  // Total tokens across all models
   cost: number;  // DEPRECATED: Uses first-model pricing (kept for backward compatibility)
   cost_v2?: number;  // NEW: Accurate per-message pricing
@@ -128,8 +128,8 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
     // Order matters - check more specific patterns first
 
     // Opus models
-    if (model.includes('opus-4-6') || model.includes('opus-4.6')) {
-      normalizedModel = 'claude-opus-4.6';
+    if (model.includes('opus-4-5') || model.includes('opus-4.5')) {
+      normalizedModel = 'claude-opus-4.5';
     } else if (model.includes('opus-4-1') || model.includes('opus-4.1')) {
       normalizedModel = 'claude-opus-4-1';
     } else if (model.includes('opus-4') || model.includes('opus')) {
@@ -181,7 +181,7 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
  *
  * Model Display:
  * - Single model: "claude-sonnet-4.5" (normalized name)
- * - Multiple models: "claude-sonnet-4.5 → claude-opus-4.6" (progression of normalized names)
+ * - Multiple models: "claude-sonnet-4.5 → claude-opus-4.5" (progression of normalized names)
  *
  * Model Breakdown:
  * - Keys are exact model IDs (e.g., "claude-sonnet-4-5-20250929")
@@ -312,7 +312,7 @@ export function parseClaudeSession(sessionFile: string): SessionUsage | null {
   }
 
   // Generate model display string (normalized names)
-  // For multi-model sessions: "claude-sonnet-4.5 → claude-opus-4.6"
+  // For multi-model sessions: "claude-sonnet-4.5 → claude-opus-4.5"
   // For single-model sessions: "claude-sonnet-4.5"
   const normalizedModels = Object.keys(modelBreakdown)
     .map(id => normalizeModelName(id).model);

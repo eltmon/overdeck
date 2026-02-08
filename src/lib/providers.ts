@@ -38,7 +38,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'anthropic',
     displayName: 'Anthropic',
     compatibility: 'direct',
-    models: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
@@ -87,7 +87,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
  */
 export function getProviderForModel(modelId: ModelId): ProviderConfig {
   // Check Anthropic models
-  if (['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
+  if (['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
   }
 

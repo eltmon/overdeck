@@ -44,7 +44,7 @@ cat > ~/.panopticon/settings.json << 'EOF'
       "simple": "claude-haiku-4-5",
       "medium": "claude-sonnet-4-5",
       "complex": "claude-sonnet-4-5",
-      "expert": "claude-opus-4-6"
+      "expert": "claude-opus-4-5"
     }
   },
   "api_keys": {
@@ -132,7 +132,7 @@ cat > ~/.claude-code-router/config.json << 'EOF'
       "name": "anthropic",
       "baseURL": "https://api.anthropic.com/v1",
       "apiKey": "$ANTHROPIC_API_KEY",
-      "models": ["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"]
+      "models": ["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]
     },
     {
       "name": "openai",
@@ -178,7 +178,7 @@ cat > ~/.claude-code-router/config.json << 'EOF'
       "name": "anthropic",
       "baseURL": "https://api.anthropic.com/v1",
       "apiKey": "$ANTHROPIC_API_KEY",
-      "models": ["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"]
+      "models": ["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]
     },
     {
       "name": "google",

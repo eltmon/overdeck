@@ -99,7 +99,7 @@ Claude Code stores session data at:
   "sessionId": "037ae6b1-826d-4b2f-ae80-9b467abb7e43",
   "timestamp": "2026-01-17T10:30:00.000Z",
   "message": {
-    "model": "claude-opus-4-6-20251101",
+    "model": "claude-opus-4-5-20251101",
     "usage": {
       "input_tokens": 1500,
       "output_tokens": 500,

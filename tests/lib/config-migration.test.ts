@@ -13,13 +13,13 @@ vi.mock('../../src/lib/settings.js', () => ({
         test_agent: 'claude-haiku-4-5',
         merge_agent: 'claude-sonnet-4-5',
       },
-      planning_agent: 'claude-opus-4-6',
+      planning_agent: 'claude-opus-4-5',
       complexity: {
         trivial: 'claude-haiku-4-5',
         simple: 'claude-haiku-4-5',
         medium: 'claude-sonnet-4-5',
         complex: 'claude-sonnet-4-5',
-        expert: 'claude-opus-4-6',
+        expert: 'claude-opus-4-5',
       },
     },
     api_keys: {
@@ -75,13 +75,13 @@ describe('config-migration', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -104,13 +104,13 @@ describe('config-migration', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -159,17 +159,17 @@ describe('config-migration', () => {
       const legacySettings: SettingsConfig = {
         models: {
           specialists: {
-            review_agent: 'claude-opus-4-6',
+            review_agent: 'claude-opus-4-5',
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {},
@@ -190,13 +190,13 @@ describe('config-migration', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {

@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-opus-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-opus-4-5' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel = 'gpt-5.2-codex' | 'o3-deep-research' | 'gpt-4o' | 'gpt-4o-mini';
 export type GoogleModel = 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
 export type ZAIModel = 'glm-4.7' | 'glm-4.7-flash';
@@ -209,7 +209,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   kimi: KimiModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
-    'claude-opus-4-6',
+    'claude-opus-4-5',
     'claude-sonnet-4-5',
     'claude-haiku-4-5',
   ];
@@ -253,7 +253,7 @@ export function isAnthropicModel(modelId: ModelId | string): boolean {
  */
 export function getClaudeModelFlag(modelId: ModelId | string): string {
   const modelMap: Record<string, string> = {
-    'claude-opus-4-6': 'opus',
+    'claude-opus-4-5': 'opus',
     'claude-sonnet-4-5': 'sonnet',
     'claude-haiku-4-5': 'haiku',
   };

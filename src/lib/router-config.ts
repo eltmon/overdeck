@@ -54,7 +54,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
     name: 'anthropic',
     baseURL: 'https://api.anthropic.com/v1',
     apiKey: '$ANTHROPIC_API_KEY',
-    models: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
   });
 
   // OpenAI provider (only if API key configured)
@@ -144,7 +144,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
     name: 'anthropic',
     baseURL: 'https://api.anthropic.com/v1',
     apiKey: '$ANTHROPIC_API_KEY',
-    models: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+    models: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
   });
 
   // OpenAI provider (only if enabled)

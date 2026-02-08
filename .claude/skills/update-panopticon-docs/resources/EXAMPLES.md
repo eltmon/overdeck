@@ -110,7 +110,7 @@ Real-world examples of common documentation tasks in Panopticon.
 **Use case**: Mission-critical deployments
 
 **Model Selection**:
-- **All work**: claude-opus-4-6
+- **All work**: claude-opus-4-5
 - **No fallbacks**: Requires ANTHROPIC_API_KEY
 
 **Example**:

@@ -136,7 +136,7 @@ export const PRESETS: Record<string, PresetConfig> = {
     description: 'Best quality - uses top-tier models',
     models: {
       'issue-agent:exploration': 'gemini-3-flash-preview',
-      'issue-agent:planning': 'claude-opus-4-6',
+      'issue-agent:planning': 'claude-opus-4-5',
       // ... all 20 work types
     }
   },
@@ -162,7 +162,7 @@ export function applyFallback(modelId: ModelId, enabledProviders: Set<string>): 
     'gpt-5.2-codex': 'claude-sonnet-4-5',
     'gpt-4o': 'claude-sonnet-4-5',
     'gpt-4o-mini': 'claude-haiku-4-5',
-    'o3-deep-research': 'claude-opus-4-6',
+    'o3-deep-research': 'claude-opus-4-5',
     'gemini-3-pro-preview': 'claude-sonnet-4-5',
     'gemini-3-flash-preview': 'claude-haiku-4-5',
     'glm-4.7': 'claude-haiku-4-5',
@@ -236,7 +236,7 @@ models:
   # Per-work-type overrides
   overrides:
     issue-agent:implementation: gpt-5.2-codex
-    convoy:security-reviewer: claude-opus-4-6
+    convoy:security-reviewer: claude-opus-4-5
 
   # API keys
   api_keys:
@@ -251,7 +251,7 @@ models:
 
   overrides:
     # Never compromise on security, even in budget mode
-    convoy:security-reviewer: claude-opus-4-6
+    convoy:security-reviewer: claude-opus-4-5
 ```
 
 ---

@@ -52,13 +52,13 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {},
@@ -71,7 +71,7 @@ describe('router-config', () => {
       expect(config.providers[0].baseURL).toBe('https://api.anthropic.com/v1');
       expect(config.providers[0].apiKey).toBe('$ANTHROPIC_API_KEY');
       expect(config.providers[0].models).toEqual([
-        'claude-opus-4-6',
+        'claude-opus-4-5',
         'claude-sonnet-4-5',
         'claude-haiku-4-5',
       ]);
@@ -87,13 +87,13 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -127,13 +127,13 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -165,13 +165,13 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -196,13 +196,13 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -232,13 +232,13 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -266,13 +266,13 @@ describe('router-config', () => {
             test_agent: 'gpt-4o-mini',
             merge_agent: 'gemini-3-flash-preview',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -304,7 +304,7 @@ describe('router-config', () => {
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {
@@ -327,7 +327,7 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'gpt-4o-mini',
             simple: 'claude-haiku-4-5',
@@ -360,13 +360,13 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
+          planning_agent: 'claude-opus-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
             medium: 'claude-sonnet-4-5',
             complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
+            expert: 'claude-opus-4-5',
           },
         },
         api_keys: {},
@@ -398,11 +398,11 @@ describe('router-config', () => {
             name: 'anthropic',
             baseURL: 'https://api.anthropic.com/v1',
             apiKey: '$ANTHROPIC_API_KEY',
-            models: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+            models: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
           },
         ],
         router: {
-          'planning-agent': { model: 'claude-opus-4-6' },
+          'planning-agent': { model: 'claude-opus-4-5' },
         },
       };
 
@@ -446,11 +446,11 @@ describe('router-config', () => {
             name: 'anthropic',
             baseURL: 'https://api.anthropic.com/v1',
             apiKey: '$ANTHROPIC_API_KEY',
-            models: ['claude-opus-4-6'],
+            models: ['claude-opus-4-5'],
           },
         ],
         router: {
-          'planning-agent': { model: 'claude-opus-4-6' },
+          'planning-agent': { model: 'claude-opus-4-5' },
         },
       };
 
