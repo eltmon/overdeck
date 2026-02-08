@@ -54,6 +54,9 @@ export function isPanopticonSymlink(targetPath: string): boolean {
  */
 export function planSync(runtime: Runtime): SyncPlan {
   const targets = SYNC_TARGETS[runtime];
+  if (!targets) {
+    throw new Error(`Unknown sync target "${runtime}". Valid targets: ${Object.keys(SYNC_TARGETS).join(', ')}`);
+  }
   const plan: SyncPlan = {
     runtime,
     skills: [],
@@ -172,14 +175,16 @@ export interface SyncResult {
  * Execute sync for a runtime
  */
 export function executeSync(runtime: Runtime, options: SyncOptions = {}): SyncResult {
+  const targets = SYNC_TARGETS[runtime];
+  if (!targets) {
+    throw new Error(`Unknown sync target "${runtime}". Valid targets: ${Object.keys(SYNC_TARGETS).join(', ')}`);
+  }
   const plan = planSync(runtime);
   const result: SyncResult = {
     created: [],
     skipped: [],
     conflicts: [],
   };
-
-  const targets = SYNC_TARGETS[runtime];
 
   // Ensure target directories exist
   mkdirSync(targets.skills, { recursive: true });
