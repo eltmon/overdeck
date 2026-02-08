@@ -5781,11 +5781,12 @@ app.get('/api/workspaces/:issueId/review-status', (req, res) => {
 // Update review status (called by specialists via CLI)
 app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
   const { issueId } = req.params;
-  const { reviewStatus, testStatus, reviewNotes, testNotes } = req.body;
+  const { reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes } = req.body;
 
   const update: Partial<ReviewStatus> = {};
   if (reviewStatus) update.reviewStatus = reviewStatus;
   if (testStatus) update.testStatus = testStatus;
+  if (mergeStatus) update.mergeStatus = mergeStatus;
   if (reviewNotes) update.reviewNotes = reviewNotes;
   if (testNotes) update.testNotes = testNotes;
 
