@@ -141,7 +141,7 @@ function getModelDisplay(modelId?: string): string {
   if (modelId.includes('claude')) return modelId.includes('opus') ? 'Opus 4.5' : modelId.includes('haiku') ? 'Haiku' : 'Sonnet 4.5';
   if (modelId.includes('gpt')) return 'GPT-4o';
   if (modelId.includes('gemini')) return modelId.includes('flash') ? 'Gemini Flash' : 'Gemini Pro';
-  if (modelId.includes('kimi')) return 'Kimi K2';
+  if (modelId.includes('kimi')) return modelId.includes('k2.5') || modelId.includes('2.5') ? 'Kimi K2.5' : 'Kimi K2';
   if (modelId.includes('glm')) return 'GLM-4';
   return modelId;
 }
