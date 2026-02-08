@@ -453,14 +453,15 @@ describe('work-type-router', () => {
 
       const router = new WorkTypeRouter(config);
 
-      // All should use Anthropic models
+      // All should use Anthropic models (smart selector picks best from enabled providers)
       const impl = router.getModel('issue-agent:implementation');
       expect(impl.model).toMatch(/^claude-/);
       expect(impl.source).toBe('smart');
 
       const explore = router.getModel('issue-agent:exploration');
       expect(explore.model).toMatch(/^claude-/);
-      expect(explore.usedFallback).toBe(true);
+      // Smart selector finds Claude models for exploration, no fallback needed
+      expect(explore.usedFallback).toBe(false);
     });
 
     it('should work with selective providers', () => {

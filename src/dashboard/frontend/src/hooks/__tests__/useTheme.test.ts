@@ -62,6 +62,8 @@ describe('useTheme', () => {
   afterEach(() => {
     vi.clearAllMocks();
     mockClassList.clear();
+    // Reset Zustand store to avoid cross-test state leakage
+    useTheme.setState({ theme: 'dark' });
   });
 
   describe('initTheme', () => {
@@ -158,6 +160,7 @@ describe('useTheme', () => {
 
   describe('toggleTheme', () => {
     it('should toggle from dark to light', () => {
+      mockMatchMedia.matches = true; // OS prefers dark
       const { result } = renderHook(() => useTheme());
 
       // Initialize with dark theme
@@ -192,6 +195,7 @@ describe('useTheme', () => {
     });
 
     it('should update localStorage when toggling to light', () => {
+      mockMatchMedia.matches = true; // OS prefers dark so init → dark
       const { result } = renderHook(() => useTheme());
 
       act(() => {
@@ -216,6 +220,7 @@ describe('useTheme', () => {
     });
 
     it('should add light class to DOM when toggling to light', () => {
+      mockMatchMedia.matches = true; // OS prefers dark so init → dark
       const { result } = renderHook(() => useTheme());
 
       act(() => {
@@ -241,6 +246,7 @@ describe('useTheme', () => {
     });
 
     it('should toggle multiple times correctly', () => {
+      mockMatchMedia.matches = true; // OS prefers dark so init → dark
       const { result } = renderHook(() => useTheme());
 
       act(() => {
