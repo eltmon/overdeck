@@ -455,3 +455,36 @@ pan work request-review PAN-129 -m "Reverted all out-of-scope changes"
 ```
 
 **Note:** The theme toggle code is fine. The issue is branch pollution from rebasing.
+
+---
+
+## Review Feedback (2026-02-08T07:44Z)
+
+**Status:** BLOCKED - Still has out-of-scope model version changes
+
+### Issue: MODEL VERSION CHANGES [BLOCKING]
+
+The branch still has out-of-scope changes that rename Opus 4.6 to 4.5:
+
+**Files with Opus version changes:**
+1. `src/dashboard/frontend/src/components/IssueDetailPanel.tsx`
+   - `getFriendlyModelName()` changed `opus-4-6` to `opus-4-5`
+   - Also changed fallback from `Opus 4.6` to `Opus 4.5`
+
+2. `src/dashboard/frontend/src/components/Settings/SmartSelection/SmartSelectionExplainer.tsx`
+   - Changed display text from "Claude Opus 4.6" to "Claude Opus 4.5"
+
+These model version renames are NOT related to the dark/light mode toggle feature.
+
+### Required Fix:
+
+```bash
+git checkout main -- src/dashboard/frontend/src/components/IssueDetailPanel.tsx
+git checkout main -- src/dashboard/frontend/src/components/Settings/SmartSelection/SmartSelectionExplainer.tsx
+git add -A
+git commit -m "revert: remove model version changes from IssueDetailPanel and SmartSelectionExplainer"
+git push
+pan work request-review PAN-129 -m "Reverted model version changes"
+```
+
+**Note:** The theme toggle code is fine. Just need to remove these stray model version changes.
