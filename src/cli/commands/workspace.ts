@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import ora from 'ora';
+import ora, { type Ora } from 'ora';
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'fs';
 import { join, basename } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
@@ -736,7 +736,7 @@ async function createRemoteWorkspace(
   issueId: string,
   normalizedId: string,
   branchName: string,
-  spinner: ora.Ora,
+  spinner: Ora,
   options: CreateOptions
 ): Promise<void> {
   const config = loadConfig();
@@ -1319,7 +1319,7 @@ async function destroyRemoteWorkspace(
   issueId: string,
   normalizedId: string,
   metadata: RemoteWorkspaceMetadata,
-  spinner: ora.Ora,
+  spinner: Ora,
   options: DestroyOptions
 ): Promise<void> {
   const config = loadConfig();

@@ -210,7 +210,7 @@ export async function logsCommand(
   // Handle view mode: pan specialists logs <project> <type> <runId>
   const runId = runIdOrOptions as string;
   const options = maybeOptions || {};
-  await viewLogCommand(project, type, runId, options);
+  await viewLogCommand(project, type!, runId, options);
 }
 
 /**
@@ -268,9 +268,9 @@ export async function cleanupLogsCommand(
 
     const retention = getSpecialistRetention(projectOrAll);
     console.log(`🧹 Cleaning up old logs for ${projectOrAll}/${type}...`);
-    console.log(`   Retention: ${retention.maxDays} days or ${retention.maxRuns} runs\n`);
+    console.log(`   Retention: ${retention.max_days} days or ${retention.max_runs} runs\n`);
 
-    const deleted = cleanupOldLogs(projectOrAll, type, retention);
+    const deleted = cleanupOldLogs(projectOrAll, type, { maxDays: retention.max_days, maxRuns: retention.max_runs });
 
     console.log(`✅ Deleted ${deleted} old logs\n`);
   } catch (error: any) {

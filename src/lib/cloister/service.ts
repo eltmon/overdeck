@@ -55,8 +55,9 @@ import {
   type PatrolResult,
 } from './deacon.js';
 import { PANOPTICON_HOME } from '../paths.js';
-import { existsSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync } from 'fs';
 import { join } from 'path';
+import { AGENTS_DIR } from '../paths.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
@@ -181,6 +182,8 @@ export class CloisterService {
   private previousRunningAgents: Set<string> = new Set();
   private deathTimestamps: Date[] = []; // Rolling window of agent death times
   private spawnsPaused: boolean = false;
+  private processedCompletions: Set<string> = new Set(); // Track already-processed completion markers
+  private healthCheckCount: number = 0;
 
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfig();
@@ -401,6 +404,13 @@ export class CloisterService {
       // Check cost limits (Phase 6)
       this.checkCostAlerts(agentIds);
 
+      // Check for agent completion markers (fallback for failed HTTP triggers)
+      // Check every 5th health cycle to avoid excess I/O
+      this.healthCheckCount++;
+      if (this.healthCheckCount % 5 === 0) {
+        void this.checkCompletionMarkers();
+      }
+
       // Check for specialist session rotation needs (Phase 6)
       // Only check periodically (every ~10 checks)
       if (Math.random() < 0.1) {
@@ -415,6 +425,75 @@ export class CloisterService {
     } catch (error) {
       console.error('Cloister health check failed:', error);
       this.emit({ type: 'error', error: error as Error });
+    }
+  }
+
+  /**
+   * Scan for agent completion markers and auto-trigger review.
+   * This is the fallback for when `pan work done` fails to reach the dashboard via HTTP.
+   */
+  private async checkCompletionMarkers(): Promise<void> {
+    try {
+      if (!existsSync(AGENTS_DIR)) return;
+
+      const agentDirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
+        .filter(d => d.isDirectory() && d.name.startsWith('agent-'));
+
+      for (const dir of agentDirs) {
+        const completedFile = join(AGENTS_DIR, dir.name, 'completed');
+        const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
+
+        // Skip if no completion marker or already processed
+        if (!existsSync(completedFile) || existsSync(processedFile)) continue;
+        if (this.processedCompletions.has(dir.name)) continue;
+
+        // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
+        const issueId = dir.name.replace('agent-', '').toUpperCase();
+
+        console.log(`🔔 Cloister: Found completion marker for ${issueId}, triggering review...`);
+
+        try {
+          // Trigger review via dashboard API (same process, localhost)
+          const http = await import('http');
+          const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+            const postData = JSON.stringify({});
+            const req = http.request(
+              `http://localhost:3011/api/workspaces/${issueId}/review`,
+              { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
+              (res) => {
+                let data = '';
+                res.on('data', (chunk: string) => data += chunk);
+                res.on('end', () => {
+                  try {
+                    resolve(JSON.parse(data));
+                  } catch {
+                    resolve({ success: false, error: 'Invalid response' });
+                  }
+                });
+              }
+            );
+            req.on('error', (e: Error) => resolve({ success: false, error: e.message }));
+            req.on('timeout', () => { req.destroy(); resolve({ success: false, error: 'Timeout' }); });
+            req.write(postData);
+            req.end();
+          });
+
+          if (result.success) {
+            console.log(`  ✓ Review triggered for ${issueId}`);
+            // Mark as processed so we don't re-trigger
+            renameSync(completedFile, processedFile);
+          } else {
+            console.log(`  ⚠ Review trigger failed for ${issueId}: ${result.error || 'unknown'}`);
+          }
+        } catch (err: any) {
+          console.error(`  Failed to trigger review for ${issueId}: ${err.message}`);
+        }
+
+        // Track in memory regardless of outcome to avoid hammering
+        this.processedCompletions.add(dir.name);
+      }
+    } catch (error) {
+      // Non-fatal - just skip this check
     }
   }
 
