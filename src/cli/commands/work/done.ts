@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
-import { getAgentState, saveAgentState, saveAgentRuntimeState } from '../../../lib/agents.js';
-import { existsSync, writeFileSync, readFileSync } from 'fs';
+import { saveAgentRuntimeState } from '../../../lib/agents.js';
+import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../../lib/paths.js';
@@ -102,6 +102,65 @@ async function updateLinearToInReview(apiKey: string, issueIdentifier: string, c
   }
 }
 
+function getGitHubConfig(): { token: string; repos: { owner: string; repo: string; prefix: string }[] } | null {
+  const envFile = join(homedir(), '.panopticon.env');
+  if (!existsSync(envFile)) return null;
+  const content = readFileSync(envFile, 'utf-8');
+  const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);
+  if (!tokenMatch) return null;
+  const token = tokenMatch[1].trim();
+  const reposMatch = content.match(/GITHUB_REPOS=(.+)/);
+  if (!reposMatch) return null;
+  const repos = reposMatch[1].trim().split(',').map(r => {
+    const [repoPath, prefix] = r.trim().split(':');
+    const [owner, repo] = repoPath.split('/');
+    return { owner, repo, prefix };
+  }).filter(r => r.owner && r.repo);
+  if (repos.length === 0) return null;
+  return { token, repos };
+}
+
+async function updateGitHubToInReview(issueId: string, comment?: string): Promise<boolean> {
+  try {
+    const ghConfig = getGitHubConfig();
+    if (!ghConfig) return false;
+
+    const number = parseInt(issueId.split('-')[1], 10);
+    const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
+    const { owner, repo } = repoConfig;
+    const token = ghConfig.token;
+    const headers = {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    };
+
+    // Remove "in-progress" label
+    await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/in-progress`, {
+      method: 'DELETE', headers,
+    }).catch(() => {});
+
+    // Add "in-review" label
+    await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ labels: ['in-review'] }),
+    });
+
+    // Add completion comment
+    if (comment) {
+      await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ body: `🤖 **Agent completed work:**\n\n${comment}` }),
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('GitHub API error:', error);
+    return false;
+  }
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan work done MIN-123" and "pan work done agent-min-123"
   const issueId = id.replace(/^agent-/i, '').toUpperCase();
@@ -110,8 +169,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   const spinner = ora('Marking work as done...').start();
 
   try {
-    let linearUpdated = false;
+    let trackerUpdated = false;
     let shadowModeActive = false;
+    const isGitHubIssue = issueId.startsWith('PAN-');
 
     // Step 1: Update status (either tracker or shadow)
     const skipTrackerUpdate = shouldSkipTrackerUpdate(issueId, options.shadow);
@@ -121,12 +181,21 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       spinner.text = 'Updating shadow state...';
       updateShadowState(issueId, 'closed', 'pan work done');
       console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
+    } else if (isGitHubIssue) {
+      // GitHub issue - update labels
+      spinner.text = 'Updating GitHub labels...';
+      trackerUpdated = await updateGitHubToInReview(issueId, options.comment);
+      if (trackerUpdated) {
+        console.log(chalk.green(`  ✓ Updated ${issueId} to In Review (GitHub)`));
+      } else {
+        console.log(chalk.yellow(`  ⚠ Failed to update GitHub labels`));
+      }
     } else if (options.noLinear !== true) {
       const apiKey = getLinearApiKey();
       if (apiKey) {
         spinner.text = 'Updating Linear to In Review...';
-        linearUpdated = await updateLinearToInReview(apiKey, issueId, options.comment);
-        if (linearUpdated) {
+        trackerUpdated = await updateLinearToInReview(apiKey, issueId, options.comment);
+        if (trackerUpdated) {
           console.log(chalk.green(`  ✓ Updated ${issueId} to In Review`));
         } else {
           console.log(chalk.yellow(`  ⚠ Failed to update Linear status`));
@@ -136,24 +205,18 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
     }
 
-    // Step 2: Update agent state if it exists
-    const state = getAgentState(agentId);
-    if (state) {
-      state.lastActivity = new Date().toISOString();
-      saveAgentState(state);
-
-      // Update runtime state to idle
-      saveAgentRuntimeState(agentId, {
-        state: 'idle',
-        lastActivity: new Date().toISOString(),
-      });
-    }
+    // Step 2: Update agent runtime state to idle
+    saveAgentRuntimeState(agentId, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
 
     // Step 3: Write completion marker
+    mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
     const completedFile = join(AGENTS_DIR, agentId, 'completed');
     writeFileSync(completedFile, JSON.stringify({
       timestamp: new Date().toISOString(),
-      linearUpdated,
+      trackerUpdated,
       comment: options.comment,
     }));
 
@@ -166,7 +229,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (shadowModeActive) {
       console.log(`  Status:  ${chalk.cyan('👻 Shadow mode - pending sync to tracker')}`);
     } else {
-      console.log(`  Linear:  ${linearUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
+      console.log(`  Tracker: ${trackerUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
     }
     if (options.comment) {
       console.log(`  Comment: ${chalk.dim(options.comment.slice(0, 50))}${options.comment.length > 50 ? '...' : ''}`);
