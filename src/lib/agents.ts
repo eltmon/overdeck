@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, killSession, sendKeys, sessionExists, getAgentSessions } from './tmux.js';
+import { createSession, killSession, sendKeys, sessionExists, getAgentSessions, capturePane } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -13,6 +13,24 @@ import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, requiresRouter } from './providers.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for a model.
+ * Reads the current API key from settings so resumed/recovered agents
+ * always use the latest key.
+ */
+function getProviderEnvForModel(model: string): Record<string, string> {
+  const provider = getProviderForModel(model as ModelId);
+  if (provider.name === 'anthropic') return {};
+
+  const settings = loadSettings();
+  const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
+  if (apiKey) {
+    return getProviderEnv(provider, apiKey);
+  }
+  console.warn(`Warning: No API key configured for ${provider.displayName}, falling back to Anthropic`);
+  return {};
+}
 
 // ============================================================================
 // Ready Signal Management (PAN-87)
@@ -391,22 +409,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Clear ready signal before spawning (clean slate for PAN-87 fix)
   clearReadySignal(agentId);
 
-  // Get provider configuration for this model
-  // Note: selectedModel is string for flexibility, but we trust it's a valid ModelId
-  const provider = getProviderForModel(selectedModel as ModelId);
-  const settings = loadSettings();
-
-  // Get provider-specific environment variables
-  let providerEnv: Record<string, string> = {};
-  if (provider.name !== 'anthropic') {
-    // Get API key for this provider
-    const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
-    if (apiKey) {
-      providerEnv = getProviderEnv(provider, apiKey);
-    } else {
-      console.warn(`Warning: No API key configured for ${provider.displayName}, falling back to Anthropic`);
-    }
-  }
+  // Get provider-specific environment variables (BASE_URL, AUTH_TOKEN)
+  const providerEnv = getProviderEnvForModel(selectedModel);
 
   // Create tmux session and start claude
   // For prompts with special shell characters, use a launcher script to safely pass the prompt
@@ -471,6 +475,18 @@ export function stopAgent(agentId: string): void {
   const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
 
   if (sessionExists(normalizedId)) {
+    // Capture tmux output before killing so logs remain viewable after stop
+    try {
+      const output = capturePane(normalizedId, 5000);
+      if (output) {
+        const agentDir = getAgentDir(normalizedId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'output.log'), output);
+      }
+    } catch {
+      // Non-fatal — best effort log capture
+    }
+
     killSession(normalizedId);
   }
 
@@ -584,11 +600,15 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
+    // Get provider env for the agent's model (reads latest API key from settings)
+    const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
+
     // Create new tmux session with resume command
     const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
     createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
-        PANOPTICON_AGENT_ID: normalizedId
+        PANOPTICON_AGENT_ID: normalizedId,
+        ...providerEnv
       }
     });
 
@@ -668,9 +688,17 @@ export function recoverAgent(agentId: string): AgentState | null {
   // Build recovery prompt
   const recoveryPrompt = generateRecoveryPrompt(state);
 
+  // Get provider env for the agent's model (reads latest API key from settings)
+  const providerEnv = state.model ? getProviderEnvForModel(state.model) : {};
+
   // Restart the agent with recovery context (YOLO mode - skip permissions)
   const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
-  createSession(normalizedId, state.workspace, claudeCmd);
+  createSession(normalizedId, state.workspace, claudeCmd, {
+    env: {
+      PANOPTICON_AGENT_ID: normalizedId,
+      ...providerEnv
+    }
+  });
 
   // Update state
   state.status = 'running';

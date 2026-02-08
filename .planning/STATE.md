@@ -407,3 +407,51 @@ The error message shows "Model claude-opus-4-6 requires undefined API key - fall
 3. Fallback conditions - should NOT fallback when override is explicitly configured
 
 **Status:** readyForMerge = false (test gate blocked by 2 NEW regressions)
+
+---
+
+## Review Feedback (2026-02-08T07:40Z)
+
+**Status:** BLOCKED - Branch has accumulated out-of-scope changes
+
+### Issue: OUT-OF-SCOPE CHANGES [BLOCKING]
+
+PAN-129 is about dark/light mode toggle, but your branch now includes changes to many unrelated files:
+
+**Non-theme files modified:**
+1. `src/lib/agents.ts` - Removed getProviderEnvForModel function and capturePane import
+2. `src/dashboard/server/index.ts` - Removed stopped agents handling (48 lines deleted)
+3. `src/dashboard/frontend/src/types.ts` - Removed 'stopped' from Agent status type
+4. `src/lib/cloister/service.ts` - Unknown changes
+5. `.beads/issues.jsonl` - Issue tracking data
+6. `.github/assets/*.png` - GitHub assets
+7. `skills/opus-plan/SKILL.md` - Skill definition
+8. `.panopticon/prompts/planning-pan-79-launcher.sh` - Different issue (PAN-79)
+
+These changes are NOT related to the dark/light mode toggle feature.
+
+### Required Fix:
+
+Revert ALL out-of-scope changes:
+
+```bash
+git checkout main -- src/lib/agents.ts
+git checkout main -- src/dashboard/server/index.ts
+git checkout main -- src/dashboard/frontend/src/types.ts
+git checkout main -- src/lib/cloister/service.ts
+git checkout main -- .beads/issues.jsonl
+git checkout main -- .github/assets/
+git checkout main -- skills/opus-plan/SKILL.md
+git checkout main -- .panopticon/prompts/
+
+git add -A
+git commit -m "revert: remove all out-of-scope changes from PAN-129 branch"
+git push
+```
+
+Then request re-review:
+```bash
+pan work request-review PAN-129 -m "Reverted all out-of-scope changes"
+```
+
+**Note:** The theme toggle code is fine. The issue is branch pollution from rebasing.
