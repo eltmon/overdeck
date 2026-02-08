@@ -75,6 +75,34 @@ Comprehensive index of all documentation files in the Panopticon project.
 
 ## Docs Directory (`/home/eltmon/projects/panopticon/docs/`)
 
+### INDEX.md
+**Path**: `/home/eltmon/projects/panopticon/docs/INDEX.md`
+
+**Purpose**: Master documentation index organized by category with Topic Quick-Find section
+
+**Update When**:
+- New documentation files added
+- Files renamed or moved
+- Files deleted
+- New topic coverage added to existing files
+
+**Sections**:
+- Getting Started
+- Architecture & Design
+- Configuration
+- Infrastructure
+- Testing
+- Agent Guidance
+- UI/UX Design
+- Planning (PRDs)
+- Topic Quick-Find (keyword → document mappings)
+- Documentation Maintenance
+
+**Maintenance**:
+This file MUST be kept in sync with actual documentation. See "Index Maintenance" section in update-panopticon-docs skill.
+
+---
+
 ### CONFIGURATION.md
 **Path**: `/home/eltmon/projects/panopticon/docs/CONFIGURATION.md`
 
