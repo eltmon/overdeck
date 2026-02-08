@@ -23,7 +23,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
-      { id: 'claude-opus-4-5' as ModelId, name: 'Claude Opus 4.5', icon: 'diamond', tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable, best for complex tasks' },
+      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: 'diamond', tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable, best for complex tasks' },
       { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', icon: 'auto_awesome', tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Great balance of speed and capability' },
       { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
@@ -46,8 +46,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
-      { id: 'kimi-k2' as ModelId, name: 'Kimi K2', icon: 'token', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Top-tier coding, 128K context' },
-      { id: 'kimi-k2-turbo' as ModelId, name: 'Kimi K2 Turbo', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'code', 'efficiency'], description: 'Fast coding assistant' },
+      { id: 'kimi-k2' as ModelId, name: 'Kimi K2', icon: 'token', tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Strong coding, 128K context' },
+      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding model, 256K context' },
     ],
   },
   zai: {
@@ -145,7 +145,7 @@ export function getModelById(id: ModelId): ModelDef | undefined {
   const idLower = id.toLowerCase();
 
   // Anthropic models
-  if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-5');
+  if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-6');
   if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-5');
   if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
   if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-5');
@@ -161,7 +161,7 @@ export function getModelById(id: ModelId): ModelDef | undefined {
 
   // Kimi models
   if (idLower.includes('kimi') || idLower.includes('moonshot')) {
-    if (idLower.includes('turbo') || idLower.includes('fast')) return models.find(m => m.id === 'kimi-k2-turbo');
+    if (idLower.includes('k2.5') || idLower.includes('2.5')) return models.find(m => m.id === 'kimi-k2.5');
     return models.find(m => m.id === 'kimi-k2');
   }
 
@@ -258,7 +258,7 @@ export function ModelOverrideModal({
         <div className="p-6 border-b border-slate-800">
           <div className="flex justify-between items-start gap-3">
             <div className="flex flex-col gap-2">
-              <h1 className="text-content tracking-tight text-2xl font-bold">Select Model</h1>
+              <h1 className="text-white tracking-tight text-2xl font-bold">Select Model</h1>
               <div className="flex items-center gap-3">
                 <span className="text-slate-400 text-sm">Task:</span>
                 <span className="text-blue-400 font-medium">{workTypeName}</span>
@@ -272,7 +272,7 @@ export function ModelOverrideModal({
                 ))}
               </div>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-content transition-colors p-1">
+            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1">
               <span className="material-symbols-outlined">close</span>
             </button>
           </div>
@@ -316,11 +316,11 @@ export function ModelOverrideModal({
 
                     <div className="flex flex-1 flex-col justify-center min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className={`text-content text-sm ${isSelected ? 'font-bold' : 'font-medium'} truncate`}>
+                        <p className={`text-white text-sm ${isSelected ? 'font-bold' : 'font-medium'} truncate`}>
                           {model.name}
                         </p>
                         {isRecommended && (
-                          <span className="px-2 py-0.5 rounded-full bg-blue-500 text-[9px] text-content font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-500 text-[9px] text-white font-bold uppercase tracking-tight shrink-0">
                             Best Fit
                           </span>
                         )}
@@ -391,14 +391,14 @@ export function ModelOverrideModal({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-lg text-slate-400 font-medium hover:text-content hover:bg-slate-800 transition-all text-sm"
+              className="px-5 py-2 rounded-lg text-slate-400 font-medium hover:text-white hover:bg-slate-800 transition-all text-sm"
             >
               Cancel
             </button>
             <button
               onClick={handleApply}
               disabled={!hasChanges && isOverride}
-              className="px-6 py-2 rounded-lg bg-blue-500 text-content font-bold hover:bg-blue-400 active:scale-95 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="px-6 py-2 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-400 active:scale-95 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Apply Selection
             </button>

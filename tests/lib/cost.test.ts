@@ -16,8 +16,8 @@ import { normalizeModelName } from '../../src/lib/cost-parsers/jsonl-parser.js';
 
 describe('cost module', () => {
   describe('DEFAULT_PRICING - Pricing Accuracy', () => {
-    it('should have correct pricing for claude-opus-4.5', () => {
-      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-opus-4.5');
+    it('should have correct pricing for claude-opus-4.6', () => {
+      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-opus-4.6');
       expect(pricing).toBeDefined();
       expect(pricing?.inputPer1k).toBe(0.005);
       expect(pricing?.outputPer1k).toBe(0.025);
@@ -116,10 +116,10 @@ describe('cost module', () => {
       expect(pricing?.model).toBe('claude-sonnet-4');
     });
 
-    it('should get pricing for 4.5 models with date suffix', () => {
-      const pricing = getPricing('anthropic', 'claude-opus-4.5-20250929');
+    it('should get pricing for 4.6 models with date suffix', () => {
+      const pricing = getPricing('anthropic', 'claude-opus-4.6-20250929');
       expect(pricing).toBeDefined();
-      expect(pricing?.model).toBe('claude-opus-4.5');
+      expect(pricing?.model).toBe('claude-opus-4.6');
     });
 
     it('should fallback claude-haiku-3.5 to claude-haiku-3 via partial match', () => {
@@ -401,16 +401,16 @@ describe('cost module', () => {
   });
 
   describe('normalizeModelName', () => {
-    it('should normalize opus-4.5 to claude-opus-4.5', () => {
-      const result = normalizeModelName('claude-opus-4.5-20250929');
+    it('should normalize opus-4.6 to claude-opus-4.6', () => {
+      const result = normalizeModelName('claude-opus-4.6-20250929');
       expect(result.provider).toBe('anthropic');
-      expect(result.model).toBe('claude-opus-4.5');
+      expect(result.model).toBe('claude-opus-4.6');
     });
 
-    it('should normalize opus-4-5 to claude-opus-4.5', () => {
-      const result = normalizeModelName('claude-opus-4-5-20250929');
+    it('should normalize opus-4-6 to claude-opus-4.6', () => {
+      const result = normalizeModelName('claude-opus-4-6-20250929');
       expect(result.provider).toBe('anthropic');
-      expect(result.model).toBe('claude-opus-4.5');
+      expect(result.model).toBe('claude-opus-4.6');
     });
 
     it('should normalize opus-4.1 to claude-opus-4-1', () => {
