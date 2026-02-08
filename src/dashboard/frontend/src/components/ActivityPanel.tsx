@@ -43,14 +43,14 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
   });
 
   return (
-    <div className="flex flex-col h-full bg-gray-800 border-l border-gray-700">
+    <div className="flex flex-col h-full bg-surface-raised border-l border-divider">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Terminal className="w-5 h-5 text-blue-400" />
-          <h2 className="font-medium text-white">Activity Log</h2>
+          <h2 className="font-medium text-content">Activity Log</h2>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+        <button onClick={onClose} className="text-content-subtle hover:text-content p-1">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -58,11 +58,11 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center h-32 text-gray-400">
+          <div className="flex items-center justify-center h-32 text-content-subtle">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : !activities || activities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+          <div className="flex flex-col items-center justify-center h-32 text-content-muted">
             <Terminal className="w-8 h-8 mb-2 opacity-50" />
             <p className="text-sm">No activity yet</p>
             <p className="text-xs mt-1">Start an agent or create a workspace to see output here</p>
@@ -74,14 +74,14 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
                 {/* Activity header */}
                 <div className="flex items-center gap-2 mb-2">
                   <StatusIcon status={activity.status} />
-                  <code className="text-sm text-white font-mono flex-1 truncate">
+                  <code className="text-sm text-content font-mono flex-1 truncate">
                     {activity.command}
                   </code>
-                  <span className="text-xs text-gray-500">{formatTime(activity.timestamp)}</span>
+                  <span className="text-xs text-content-muted">{formatTime(activity.timestamp)}</span>
                 </div>
 
                 {/* Output */}
-                <pre className="bg-gray-900 rounded p-2 text-xs text-gray-300 font-mono overflow-x-auto max-h-96 overflow-y-auto">
+                <pre className="bg-surface rounded p-2 text-xs text-content-body font-mono overflow-x-auto max-h-96 overflow-y-auto">
                   {activity.output.length > 0
                     ? activity.output.join('\n')
                     : activity.status === 'running'

@@ -62,7 +62,7 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
+            'issue-agent:planning': 'claude-opus-4-5',
           },
           geminiThinkingLevel: 3,
         };
@@ -70,7 +70,7 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const result = router.getModel('issue-agent:planning');
 
-        expect(result.model).toBe('claude-opus-4-6');
+        expect(result.model).toBe('claude-opus-4-5');
         expect(result.source).toBe('override');
         expect(result.usedFallback).toBe(false);
       });
@@ -370,7 +370,7 @@ describe('work-type-router', () => {
         enabledProviders: new Set<ModelProvider>(['anthropic']),
         apiKeys: {},
         overrides: {
-          'issue-agent:planning': 'claude-opus-4-6',
+          'issue-agent:planning': 'claude-opus-4-5',
         },
         geminiThinkingLevel: 3,
       };
@@ -378,7 +378,7 @@ describe('work-type-router', () => {
       const router = new WorkTypeRouter(config);
       const result = router.getModel('issue-agent:planning');
 
-      expect(result.model).toBe('claude-opus-4-6');
+      expect(result.model).toBe('claude-opus-4-5');
       expect(result.source).toBe('override');
     });
 
@@ -453,14 +453,15 @@ describe('work-type-router', () => {
 
       const router = new WorkTypeRouter(config);
 
-      // All should use Anthropic models
+      // All should use Anthropic models (smart selector picks best from enabled providers)
       const impl = router.getModel('issue-agent:implementation');
       expect(impl.model).toMatch(/^claude-/);
       expect(impl.source).toBe('smart');
 
       const explore = router.getModel('issue-agent:exploration');
       expect(explore.model).toMatch(/^claude-/);
-      expect(explore.usedFallback).toBe(true);
+      // Smart selector finds Claude models for exploration, no fallback needed
+      expect(explore.usedFallback).toBe(false);
     });
 
     it('should work with selective providers', () => {

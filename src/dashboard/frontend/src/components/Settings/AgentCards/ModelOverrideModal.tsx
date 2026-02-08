@@ -253,18 +253,18 @@ export function ModelOverrideModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-[680px] bg-[#0f172a] border border-slate-800 rounded-xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-[680px] bg-surface border border-divider rounded-xl shadow-2xl flex flex-col overflow-hidden">
         {/* Modal Header */}
-        <div className="p-6 border-b border-slate-800">
+        <div className="p-6 border-b border-divider">
           <div className="flex justify-between items-start gap-3">
             <div className="flex flex-col gap-2">
-              <h1 className="text-white tracking-tight text-2xl font-bold">Select Model</h1>
+              <h1 className="text-content tracking-tight text-2xl font-bold">Select Model</h1>
               <div className="flex items-center gap-3">
-                <span className="text-slate-400 text-sm">Task:</span>
+                <span className="text-content-muted text-sm">Task:</span>
                 <span className="text-blue-400 font-medium">{workTypeName}</span>
               </div>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-slate-500 text-xs">Needs:</span>
+                <span className="text-content-muted text-xs">Needs:</span>
                 {requiredCapabilities.map(cap => (
                   <span key={cap} className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium">
                     {CAPABILITY_INFO[cap].name}
@@ -272,7 +272,7 @@ export function ModelOverrideModal({
                 ))}
               </div>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1">
+            <button onClick={onClose} className="text-content-muted hover:text-content transition-colors p-1">
               <span className="material-symbols-outlined">close</span>
             </button>
           </div>
@@ -282,8 +282,8 @@ export function ModelOverrideModal({
         <div className="flex-1 overflow-y-auto custom-scrollbar max-h-[450px]">
           {availableProviders.map(([providerKey, provider], providerIndex) => (
             <div key={providerKey} className="flex flex-col">
-              {providerIndex > 0 && <div className="h-px bg-slate-800 mx-6 my-2" />}
-              <h3 className="text-slate-500 text-xs font-bold uppercase tracking-widest px-6 pb-2 pt-5">
+              {providerIndex > 0 && <div className="h-px bg-divider mx-6 my-2" />}
+              <h3 className="text-content-muted text-xs font-bold uppercase tracking-widest px-6 pb-2 pt-5">
                 {provider.name}
               </h3>
 
@@ -303,24 +303,24 @@ export function ModelOverrideModal({
                         ? 'bg-blue-500/10 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
                         : isRecommended
                           ? 'bg-blue-500/5 border-blue-400/50 hover:bg-blue-500/10'
-                          : 'border-transparent hover:bg-slate-800/50'
+                          : 'border-transparent hover:bg-surface-overlay'
                     }`}
                   >
                     <div className={`flex items-center justify-center rounded-lg shrink-0 size-10 transition-colors ${
-                      isSelected || isRecommended ? 'bg-blue-500/20' : 'bg-slate-800 group-hover:bg-slate-700'
+                      isSelected || isRecommended ? 'bg-blue-500/20' : 'bg-surface-emphasis group-hover:bg-divider'
                     }`}>
-                      <span className={`material-symbols-outlined text-xl ${isSelected || isRecommended ? 'text-blue-400' : 'text-slate-400'}`}>
+                      <span className={`material-symbols-outlined text-xl ${isSelected || isRecommended ? 'text-blue-400' : 'text-content-muted'}`}>
                         {model.icon}
                       </span>
                     </div>
 
                     <div className="flex flex-1 flex-col justify-center min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className={`text-white text-sm ${isSelected ? 'font-bold' : 'font-medium'} truncate`}>
+                        <p className={`text-content text-sm ${isSelected ? 'font-bold' : 'font-medium'} truncate`}>
                           {model.name}
                         </p>
                         {isRecommended && (
-                          <span className="px-2 py-0.5 rounded-full bg-blue-500 text-[9px] text-white font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-500 text-[9px] text-content font-bold uppercase tracking-tight shrink-0">
                             Best Fit
                           </span>
                         )}
@@ -346,7 +346,7 @@ export function ModelOverrideModal({
                               className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                 isMatching
                                   ? 'bg-blue-500/20 text-blue-300'
-                                  : 'bg-slate-800 text-slate-500'
+                                  : 'bg-surface-emphasis text-content-subtle border border-divider'
                               }`}
                             >
                               {CAPABILITY_INFO[cap].name}
@@ -363,7 +363,7 @@ export function ModelOverrideModal({
                       ) : matchScore >= 0.5 ? (
                         <span className="text-amber-400 text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       ) : (
-                        <span className="text-slate-500 text-xs font-bold">{Math.round(matchScore * 100)}%</span>
+                        <span className="text-content-muted text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       )}
                       {isSelected && (
                         <span className="material-symbols-outlined text-blue-400">check_circle</span>
@@ -377,7 +377,7 @@ export function ModelOverrideModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-5 border-t border-slate-800 bg-slate-900/50 flex justify-between items-center">
+        <div className="p-5 border-t border-divider bg-surface flex justify-between items-center">
           <div>
             {isOverride && (
               <button
@@ -391,14 +391,14 @@ export function ModelOverrideModal({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-lg text-slate-400 font-medium hover:text-white hover:bg-slate-800 transition-all text-sm"
+              className="px-5 py-2 rounded-lg text-content-muted font-medium hover:text-content hover:bg-surface-overlay transition-all text-sm"
             >
               Cancel
             </button>
             <button
               onClick={handleApply}
               disabled={!hasChanges && isOverride}
-              className="px-6 py-2 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-400 active:scale-95 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="px-6 py-2 rounded-lg bg-blue-500 text-content font-bold hover:bg-blue-400 active:scale-95 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Apply Selection
             </button>
@@ -414,7 +414,7 @@ export function ModelOverrideModal({
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #1e293b;
+          background: var(--color-overlay);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {

@@ -202,15 +202,15 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
 
   if (agentsLoading || specialistsLoading) {
     return (
-      <div className="bg-gray-800 rounded-lg p-6">
-        <div className="text-gray-400">Loading agents...</div>
+      <div className="bg-surface-raised rounded-lg p-6">
+        <div className="text-content-subtle">Loading agents...</div>
       </div>
     );
   }
 
   if (agentsError) {
     return (
-      <div className="bg-gray-800 rounded-lg p-6">
+      <div className="bg-surface-raised rounded-lg p-6">
         <div className="text-red-400">Error: {(agentsError as Error).message}</div>
       </div>
     );
@@ -222,9 +222,9 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   return (
     <div className="space-y-4">
       {/* Cloister Deacon Section */}
-      <div className="bg-gray-800 rounded-lg">
-        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-          <h2 className="font-semibold text-white flex items-center gap-2">
+      <div className="bg-surface-raised rounded-lg">
+        <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
+          <h2 className="font-semibold text-content flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-400" />
             Cloister Deacon
           </h2>
@@ -232,7 +232,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
             <span className={`text-xs px-2 py-1 rounded ${
               anySpecialistActive
                 ? 'bg-green-900/50 text-green-400'
-                : 'bg-gray-700 text-gray-400'
+                : 'bg-surface-overlay text-content-subtle'
             }`}>
               {anySpecialistActive ? '● Specialists Active' : '○ Specialists Idle'}
             </span>
@@ -240,7 +240,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
               <button
                 onClick={() => stopCloisterMutation.mutate()}
                 disabled={stopCloisterMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
                 title="Stop patrol loop"
               >
                 <Square className="w-3 h-3" />
@@ -250,7 +250,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
               <button
                 onClick={() => startCloisterMutation.mutate()}
                 disabled={startCloisterMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-green-400 hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-1 text-xs text-green-400 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
                 title="Start patrol loop (health monitoring)"
               >
                 <Play className="w-3 h-3" />
@@ -262,14 +262,14 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
         <div className="p-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-gray-400">Patrol Status:</span>{' '}
-              <span className={patrolRunning ? 'text-green-400' : 'text-gray-500'}>
+              <span className="text-content-subtle">Patrol Status:</span>{' '}
+              <span className={patrolRunning ? 'text-green-400' : 'text-content-muted'}>
                 {patrolRunning ? '● Running' : '○ Stopped'}
               </span>
             </div>
             <div>
-              <span className="text-gray-400">Last Check:</span>{' '}
-              <span className="text-gray-300">
+              <span className="text-content-subtle">Last Check:</span>{' '}
+              <span className="text-content-body">
                 {formatTimeAgo(cloisterStatus?.lastCheck || null)}
               </span>
             </div>
@@ -277,15 +277,15 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
               <>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-400" />
-                  <span className="text-gray-300">{cloisterStatus.summary.active} active</span>
+                  <span className="text-content-body">{cloisterStatus.summary.active} active</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {cloisterStatus.summary.stuck > 0 ? (
                     <AlertCircle className="w-4 h-4 text-red-400" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-gray-500" />
+                    <AlertCircle className="w-4 h-4 text-content-muted" />
                   )}
-                  <span className={cloisterStatus.summary.stuck > 0 ? 'text-red-400' : 'text-gray-400'}>
+                  <span className={cloisterStatus.summary.stuck > 0 ? 'text-red-400' : 'text-content-subtle'}>
                     {cloisterStatus.summary.stuck} stuck
                   </span>
                 </div>
@@ -297,9 +297,9 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
 
       {/* Recent Activity Section */}
       {recentActivity.length > 0 && (
-        <div className="bg-gray-800 rounded-lg">
-          <div className="px-4 py-3 border-b border-gray-700">
-            <h2 className="font-semibold text-white flex items-center gap-2">
+        <div className="bg-surface-raised rounded-lg">
+          <div className="px-4 py-3 border-b border-divider">
+            <h2 className="font-semibold text-content flex items-center gap-2">
               <Activity className="w-5 h-5 text-cyan-400" />
               Recent Activity
             </h2>
@@ -307,7 +307,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
           <div className="divide-y divide-gray-700">
             {recentActivity.map((entry) => (
               <div key={entry.id} className="px-4 py-2 flex items-center gap-3 text-sm">
-                <span className="text-gray-500 text-xs w-16">
+                <span className="text-content-muted text-xs w-16">
                   {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <span className={`px-1.5 py-0.5 rounded text-xs ${
@@ -315,11 +315,11 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                   entry.type === 'complete' ? 'bg-blue-900/50 text-blue-400' :
                   entry.type === 'error' ? 'bg-red-900/50 text-red-400' :
                   entry.type === 'deacon' ? 'bg-purple-900/50 text-purple-400' :
-                  'bg-gray-700 text-gray-300'
+                  'bg-surface-overlay text-content-body'
                 }`}>
                   {entry.type}
                 </span>
-                <span className="text-gray-300 truncate flex-1">
+                <span className="text-content-body truncate flex-1">
                   {entry.type === 'deacon' ? entry.command : entry.source}
                   {entry.issueId && entry.type !== 'deacon' && (
                     <span className="text-cyan-400 ml-1">({entry.issueId})</span>
@@ -332,16 +332,16 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
       )}
 
       {/* Specialist Agents Section */}
-      <div className="bg-gray-800 rounded-lg">
-        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-          <h2 className="font-semibold text-white flex items-center gap-2">
+      <div className="bg-surface-raised rounded-lg">
+        <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
+          <h2 className="font-semibold text-content flex items-center gap-2">
             <Brain className="w-5 h-5 text-purple-400" />
             Specialist Agents ({enabledSpecialists.length})
           </h2>
           <button
             onClick={handleResetAll}
             disabled={resetAllMutation.isPending}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-400 hover:text-yellow-400 hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-content-subtle hover:text-yellow-400 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
             title="Reset all specialists (kill & clear sessions)"
           >
             {resetAllMutation.isPending ? (
@@ -355,7 +355,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
 
         <div className="divide-y divide-gray-700">
           {enabledSpecialists.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-content-muted">
               No specialist agents configured.
             </div>
           ) : (
@@ -377,9 +377,9 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
       </div>
 
       {/* Issue Agents Section */}
-      <div className="bg-gray-800 rounded-lg">
-        <div className="px-4 py-3 border-b border-gray-700">
-          <h2 className="font-semibold text-white flex items-center gap-2">
+      <div className="bg-surface-raised rounded-lg">
+        <div className="px-4 py-3 border-b border-divider">
+          <h2 className="font-semibold text-content flex items-center gap-2">
             <Cpu className="w-5 h-5" />
             Issue Agents ({runningAgents.length})
           </h2>
@@ -387,9 +387,9 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
 
         <div className="divide-y divide-gray-700">
           {runningAgents.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-content-muted">
               No agents running. Use{' '}
-              <code className="bg-gray-700 px-2 py-1 rounded">/work-issue</code> to spawn one.
+              <code className="bg-surface-overlay px-2 py-1 rounded">/work-issue</code> to spawn one.
             </div>
           ) : (
             runningAgents.map((agent) => {
