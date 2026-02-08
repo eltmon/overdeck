@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, cpSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, cpSync, rmSync, lstatSync } from 'fs';
 import { join, basename } from 'path';
 import { BACKUPS_DIR } from './paths.js';
 
@@ -26,7 +26,13 @@ export function createBackup(sourceDirs: string[]): BackupInfo {
     const targetName = basename(sourceDir);
     const targetPath = join(backupPath, targetName);
 
-    cpSync(sourceDir, targetPath, { recursive: true });
+    // Use filter to skip symlinks — sync targets (e.g. ~/.claude/skills/)
+    // contain symlinks back into ~/.panopticon/skills/ which causes cpSync
+    // to fail with "cannot copy to a subdirectory of self".
+    cpSync(sourceDir, targetPath, {
+      recursive: true,
+      filter: (src) => !lstatSync(src).isSymbolicLink(),
+    });
     targets.push(targetName);
   }
 
