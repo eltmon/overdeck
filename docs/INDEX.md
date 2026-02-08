@@ -104,6 +104,10 @@
 - **"cloister"** → AGENTS.md, PRD-CLOISTER.md
 - **"handoff"** / **"handoffs"** → SPECIALIST_WORKFLOW.md
 - **"stuck detection"** → AGENTS.md, SPECIALIST_WORKFLOW.md
+- **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
+- **"rollback"** / **"revert"** / **"ORIG_HEAD"** → PRD-CLOISTER.md
+- **"baseline"** / **"test baseline"** → PRD-CLOISTER.md
+- **"review pipeline"** / **"specialist pipeline"** → PRD-CLOISTER.md, SPECIALIST_WORKFLOW.md
 
 ### Infrastructure
 - **"workspace"** / **"workspaces"** → README.md, PRD-REMOTE-WORKSPACES.md

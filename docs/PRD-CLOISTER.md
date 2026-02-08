@@ -52,6 +52,173 @@ Short-lived agents spawned for specific Linear issues. Die when work is complete
 - Workspace in `workspaces/feature-<issue-id>/`
 - Terminated after PR merged or manually killed
 
+## Merge Validation Pipeline
+
+The merge-agent handles all merges through a multi-layered validation pipeline. This section documents the architecture discovered and hardened during PAN-148/PAN-154 oversight.
+
+### Pipeline Overview
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    Merge Validation Pipeline                       │
+│                                                                    │
+│  Dashboard "Merge" click                                          │
+│       │                                                            │
+│       ▼                                                            │
+│  TypeScript Orchestration Layer (merge-agent.ts)                  │
+│       │                                                            │
+│       ├── 1. Stash uncommitted work (git stash -u)                │
+│       ├── 2. Capture baseline test failures (pre-merge)           │
+│       ├── 3. Spawn merge-agent (Claude in tmux)                   │
+│       │       │                                                    │
+│       │       ├── Pull latest main                                │
+│       │       ├── Merge feature branch                            │
+│       │       ├── Run build                                       │
+│       │       ├── Run tests with BASELINE_FAILURES env var        │
+│       │       ├── Compare: post-merge failures vs baseline        │
+│       │       │                                                    │
+│       │       ├── If NEW failures: git reset --hard ORIG_HEAD     │
+│       │       └── If no new failures: push to remote              │
+│       │                                                            │
+│       ├── 4. Report status via /api/specialists/done              │
+│       └── 5. Restore stash (git stash pop)                        │
+│                                                                    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Baseline-Aware Test Validation
+
+The merge-agent compares post-merge test failures against a pre-merge baseline. This prevents rollback due to pre-existing failures unrelated to the merged code.
+
+**Flow:**
+1. Before merge: run tests on main → record failure count as `BASELINE_FAILURES`
+2. After merge: run tests → record new failure count
+3. Compare: `delta = post_merge_failures - BASELINE_FAILURES`
+4. If `delta > 0`: new regressions introduced → rollback
+5. If `delta <= 0`: no new regressions → proceed
+
+**Implementation:**
+The `BASELINE_FAILURES` count is passed as an environment variable to `validate-merge.sh`, which performs the comparison:
+
+```bash
+# In validate-merge.sh
+if [ "$CURRENT_FAILURES" -gt "$BASELINE_FAILURES" ]; then
+  DELTA=$((CURRENT_FAILURES - BASELINE_FAILURES))
+  echo "ERROR: $DELTA new test failure(s) introduced by merge"
+  exit 1
+fi
+```
+
+### ORIG_HEAD Rollback Strategy
+
+When validation fails, the merge-agent rolls back using `git reset --hard ORIG_HEAD`.
+
+**Why ORIG_HEAD:**
+- Git sets `ORIG_HEAD` automatically at merge time to the commit HEAD pointed to before the merge
+- Always reflects the true pre-merge state, even if other commits landed between agent spawn and merge execution
+- Superior to pre-capturing HEAD (which can go stale) or `HEAD~1` (which assumes a single merge commit)
+
+**Two-layer safety:**
+1. **Agent-level (Claude in tmux):** Rolls back before pushing — changes never reach the remote
+2. **TypeScript-level (validation.ts):** `autoRevertMerge()` as a backup safety net after push
+
+```typescript
+// validation.ts — autoRevertMerge always uses ORIG_HEAD
+export async function autoRevertMerge(projectPath: string): Promise<boolean> {
+  await execAsync('git reset --hard ORIG_HEAD', { cwd: projectPath });
+  return true;
+}
+```
+
+### Stash Management
+
+The TypeScript orchestration layer handles stashing uncommitted work around merge operations, preventing lost work when merges succeed or fail.
+
+**Before merge:**
+```typescript
+const { stdout: statusOut } = await execAsync('git status --porcelain', { cwd: projectPath });
+if (statusOut.trim()) {
+  await execAsync('git stash push -u -m "Pre-merge stash for ' + issueId + '"', { cwd: projectPath });
+  stashCreated = true;
+}
+```
+
+**After merge (success or rollback):**
+```typescript
+if (stashCreated) {
+  await execAsync('git stash pop', { cwd: projectPath });
+}
+```
+
+**Key design decision:** The TypeScript layer manages stash, not the agent. The agent task template explicitly instructs: "DO NOT run `git stash` — the TypeScript layer handles stash/restore automatically."
+
+### Review → Test → Merge Pipeline
+
+Status transitions drive the specialist pipeline:
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│  Agent   │────▶│  Review  │────▶│   Test   │────▶│  Merge   │
+│ completes│     │  Agent   │     │  Agent   │     │  Agent   │
+│ work     │     │          │     │          │     │          │
+└──────────┘     └──────────┘     └──────────┘     └──────────┘
+     │                │                │                │
+     ▼                ▼                ▼                ▼
+ reviewStatus:    reviewStatus:    testStatus:     mergeStatus:
+   "pending"       "passed"        "passed"      "completed"
+```
+
+**Status fields** (stored per-workspace in `review-status.json`):
+- `reviewStatus`: "pending" | "reviewing" | "passed" | "failed"
+- `testStatus`: "pending" | "testing" | "passed" | "failed"
+- `mergeStatus`: "pending" | "merging" | "completed" | "failed"
+- `autoRequeueCount`: number (circuit breaker, max 3 auto-requeues)
+
+**API endpoints:**
+- `GET /api/workspaces/:issueId/review-status` — Read all status fields
+- `POST /api/workspaces/:issueId/review-status` — Update status fields (accepts reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes)
+- `POST /api/specialists/done` — Specialist reports completion with result
+
+### Specialist Done Endpoint
+
+When a specialist (review-agent, test-agent, merge-agent) finishes work, it reports results via:
+
+```typescript
+POST /api/specialists/done
+{
+  "specialist": "merge-agent",
+  "issueId": "PAN-154",
+  "result": "passed" | "failed",
+  "notes": "Build passed. Tests: 1031 passed, 17 failed (0 new regressions)"
+}
+```
+
+This updates the corresponding status field and can trigger the next specialist in the pipeline.
+
+### Task Template
+
+The merge-agent receives a structured task file with explicit instructions:
+
+```markdown
+# Merge Task: PAN-XXX
+
+## Variables
+- BRANCH: feature/pan-xxx
+- BASELINE_FAILURES: 17
+
+## Steps
+1. git pull origin main
+2. git merge feature/pan-xxx --no-ff
+3. npm run build (all targets)
+4. npm test -- compare against BASELINE_FAILURES
+5-9. [validation and reporting steps]
+10. If build OR tests show NEW failures: git reset --hard ORIG_HEAD
+
+## DO NOT
+- Run git stash — the TypeScript layer handles stash/restore automatically
+- Use HEAD~1 for rollback — use ORIG_HEAD which git sets automatically at merge time
+```
+
 ## Model Selection & Task Handoff
 
 Cloister intelligently routes tasks to the most cost-effective model based on task complexity. As work progresses through beads, tasks can be handed off between models.
