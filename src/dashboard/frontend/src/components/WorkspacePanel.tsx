@@ -22,7 +22,7 @@ import {
   Cloud,
   Monitor,
 } from 'lucide-react';
-import { Agent } from '../types';
+import { Agent, Issue } from '../types';
 
 interface ContainerStatus {
   running: boolean;
@@ -89,10 +89,68 @@ function copyToClipboard(text: string): boolean {
   }
 }
 
+// Cost data types
+interface SessionCost {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  type: string;
+  model: string;
+  cost?: number;
+  tokenCount?: number;
+}
+
+interface ModelCostInfo {
+  cost: number;
+  tokens: number;
+}
+
+interface StageCostInfo {
+  cost: number;
+  tokens: number;
+}
+
+interface IssueCostData {
+  issueId: string;
+  totalCost: number;
+  totalTokens: number;
+  sessions: SessionCost[];
+  byModel: Record<string, ModelCostInfo>;
+  byStage?: Record<string, StageCostInfo>;
+}
+
+// Cost formatting helpers
+function formatCost(cost: number): string {
+  if (cost >= 100) return `$${cost.toFixed(0)}`;
+  if (cost >= 10) return `$${cost.toFixed(1)}`;
+  if (cost >= 1) return `$${cost.toFixed(2)}`;
+  if (cost > 0) return `$${cost.toFixed(3)}`;
+  return '$0.00';
+}
+
+function formatTokens(tokens: number): string {
+  if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(2)}M`;
+  if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
+  return tokens.toString();
+}
+
+function getFriendlyModelName(fullModel: string): string {
+  if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
+  if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
+  if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus 4';
+  if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
+  if (fullModel.includes('sonnet-4') || fullModel.includes('sonnet')) return 'Sonnet 4';
+  if (fullModel.includes('haiku-4-5') || fullModel.includes('haiku-4.5')) return 'Haiku 4.5';
+  if (fullModel.includes('haiku-3')) return 'Haiku 3';
+  if (fullModel.includes('haiku')) return 'Haiku 4.5';
+  return fullModel;
+}
+
 interface WorkspacePanelProps {
   agent: Agent;
   issueId: string;
   issueUrl?: string;
+  issue?: Issue;
   onClose: () => void;
 }
 
@@ -103,7 +161,7 @@ async function fetchOutput(agentId: string): Promise<string> {
   return data.output || '';
 }
 
-export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspacePanelProps) {
+export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: WorkspacePanelProps) {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
@@ -140,6 +198,18 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
       return res.json();
     },
     refetchInterval: 3000, // Check frequently during review
+  });
+
+  // Fetch cost data
+  const { data: costData } = useQuery<IssueCostData>({
+    queryKey: ['issueCosts', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/issues/${issueId}/costs`);
+      if (!res.ok) throw new Error('Failed to fetch costs');
+      return res.json();
+    },
+    refetchInterval: 30000,
+    staleTime: 10000,
   });
 
   const startContainersMutation = useMutation({
@@ -449,7 +519,40 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             <h2 className="font-mono text-sm text-content font-medium mt-1">
               {agent.issueId}
             </h2>
+            {issue && (
+              <p className="text-xs text-content-subtle mt-1 line-clamp-2" title={issue.title}>
+                {issue.title}
+              </p>
+            )}
         </div>
+
+        {/* Issue metadata */}
+        {issue && (
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="px-1.5 py-0.5 bg-surface-overlay text-content rounded text-[10px]">
+                {issue.status}
+              </span>
+              {issue.priority > 0 && (
+                <span className={`text-[10px] ${
+                  issue.priority === 1 ? 'text-red-400' :
+                  issue.priority === 2 ? 'text-orange-400' :
+                  issue.priority === 3 ? 'text-yellow-400' :
+                  'text-blue-400'
+                }`}>
+                  {issue.priority === 1 ? 'Urgent' :
+                   issue.priority === 2 ? 'High' :
+                   issue.priority === 3 ? 'Medium' : 'Low'}
+                </span>
+              )}
+              {issue.labels.slice(0, 3).map((label) => (
+                <span key={label} className="px-1.5 py-0.5 bg-surface-overlay text-content-muted rounded text-[10px]">
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Agent info */}
         <div className="px-3 py-2 border-b border-divider text-xs">
@@ -524,6 +627,39 @@ export function WorkspacePanel({ agent, issueId, issueUrl, onClose }: WorkspaceP
             )}
           </div>
         </div>
+
+        {/* Cost Summary */}
+        {costData && (costData.totalCost > 0 || (costData.sessions?.length ?? 0) > 0) && (
+          <div className="px-3 py-2 border-b border-divider text-xs">
+            <div className="text-content-muted uppercase tracking-wider mb-2">Cost</div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-content-subtle">Total</span>
+                <span className="text-green-400 font-medium">{formatCost(costData.totalCost)}</span>
+              </div>
+              {costData.totalTokens > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-content-subtle">Tokens</span>
+                  <span className="text-content">{formatTokens(costData.totalTokens)}</span>
+                </div>
+              )}
+              {Object.keys(costData.byModel).length > 0 && (
+                <div className="border-t border-divider pt-1.5 mt-1.5">
+                  {Object.entries(costData.byModel)
+                    .sort(([, a], [, b]) => b.cost - a.cost)
+                    .map(([model, info]) => (
+                      <div key={model} className="flex items-center justify-between text-[10px]">
+                        <span className="text-content-subtle truncate" title={model}>
+                          {getFriendlyModelName(model)}
+                        </span>
+                        <span className="text-content-body">{formatCost(info.cost)}</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Corrupted Workspace Warning */}
         {workspace?.corrupted && (

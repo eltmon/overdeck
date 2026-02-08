@@ -107,8 +107,8 @@ describe('useTheme', () => {
       expect(localStorage.setItem).toHaveBeenCalledWith('panopticon.ui.theme', 'dark');
     });
 
-    it('should fall back to OS preference (light) when localStorage is empty', () => {
-      mockMatchMedia.matches = false; // OS prefers light
+    it('should default to dark when localStorage is empty regardless of OS preference', () => {
+      mockMatchMedia.matches = false; // OS prefers light, but we default to dark
 
       const { result } = renderHook(() => useTheme());
 
@@ -116,9 +116,8 @@ describe('useTheme', () => {
         result.current.initTheme();
       });
 
-      expect(result.current.theme).toBe('light');
-      expect(localStorage.setItem).toHaveBeenCalledWith('panopticon.ui.theme', 'light');
-      expect(document.documentElement.classList.add).toHaveBeenCalledWith('light');
+      expect(result.current.theme).toBe('dark');
+      expect(localStorage.setItem).toHaveBeenCalledWith('panopticon.ui.theme', 'dark');
     });
 
     it('should add light class to DOM when theme is light', () => {
@@ -296,7 +295,7 @@ describe('useTheme', () => {
         result.current.initTheme();
       });
 
-      expect(result.current.theme).toBe('light'); // Actually defaults to light when OS prefers light
+      expect(result.current.theme).toBe('dark'); // Always defaults to dark when no stored preference
     });
 
     it('should maintain state consistency between multiple toggles', () => {

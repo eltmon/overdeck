@@ -314,32 +314,32 @@ export function SettingsPage() {
             <span className="material-symbols-outlined text-blue-400 text-2xl">settings</span>
             <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
           </div>
-          <p className="text-slate-400 text-base">Configure AI model orchestration and agent permissions.</p>
+          <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
         </div>
       </div>
 
       {/* Smart Model Selection Hero */}
       <section className="mb-10">
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+        <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
           <div className="flex flex-col lg:flex-row">
             {/* Visualization */}
-            <div className="lg:w-2/5 bg-slate-900/50 p-8 flex flex-col justify-center items-center border-b lg:border-b-0 lg:border-r border-slate-700 relative overflow-hidden">
+            <div className="lg:w-2/5 bg-surface p-8 flex flex-col justify-center items-center border-b lg:border-b-0 lg:border-r border-divider relative overflow-hidden">
               <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_50%_50%,#3b82f6_0%,transparent_70%)]" />
               <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-xs">
                 <div className="flex items-center justify-between w-full">
-                  <div className="size-12 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-slate-400">terminal</span>
+                  <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
+                    <span className="material-symbols-outlined text-content-subtle">terminal</span>
                   </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-slate-700 via-blue-500 to-slate-700 mx-2" />
-                  <div className="size-12 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-blue-500 to-divider-strong mx-2" />
+                  <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
                     <span className="material-symbols-outlined text-blue-400">account_tree</span>
                   </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-slate-700 via-blue-500 to-slate-700 mx-2" />
+                  <div className="flex-1 h-px bg-gradient-to-r from-divider via-blue-500 to-divider mx-2" />
                   <div className="size-12 rounded-lg bg-blue-500 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)]">
                     <span className="material-symbols-outlined text-content">bolt</span>
                   </div>
                 </div>
-                <div className="flex justify-between w-full px-2 text-[10px] uppercase tracking-widest font-bold text-slate-500">
+                <div className="flex justify-between w-full px-2 text-[10px] uppercase tracking-widest font-bold text-content-muted">
                   <span>Task</span>
                   <span>Capability</span>
                   <span>Model</span>
@@ -352,22 +352,22 @@ export function SettingsPage() {
                 <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-wider rounded border border-blue-500/20">Active</span>
                 <h3 className="text-content text-xl font-bold">Smart Model Selection</h3>
               </div>
-              <p className="text-slate-400 mb-6 leading-relaxed">
+              <p className="text-content-muted mb-6 leading-relaxed">
                 Panopticon automatically routes tasks to the optimal model based on capabilities, token budget, and latency requirements.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-blue-400 text-sm mt-1">check_circle</span>
                   <div>
-                    <p className="text-sm font-semibold text-slate-200">Capability Matching</p>
-                    <p className="text-xs text-slate-500">Best model for each task type</p>
+                    <p className="text-sm font-semibold text-content">Capability Matching</p>
+                    <p className="text-xs text-content-muted">Best model for each task type</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-blue-400 text-sm mt-1">check_circle</span>
                   <div>
-                    <p className="text-sm font-semibold text-slate-200">Cost Optimization</p>
-                    <p className="text-xs text-slate-500">Balance performance vs spend</p>
+                    <p className="text-sm font-semibold text-content">Cost Optimization</p>
+                    <p className="text-xs text-content-muted">Balance performance vs spend</p>
                   </div>
                 </div>
               </div>
@@ -380,7 +380,7 @@ export function SettingsPage() {
       <section className="mb-12">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Provider Configuration
-          <div className="h-px flex-1 bg-slate-700" />
+          <div className="h-px flex-1 bg-divider-strong" />
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {PROVIDERS.map((provider) => {
@@ -391,10 +391,10 @@ export function SettingsPage() {
             return (
               <div
                 key={provider.id}
-                className={`bg-slate-800/50 border rounded-xl p-5 relative transition-colors ${
+                className={`bg-surface-raised border rounded-xl p-5 relative transition-colors shadow-sm ${
                   isDefault
                     ? 'border-blue-500/50 shadow-lg shadow-blue-500/5'
-                    : 'border-slate-700 hover:border-slate-600'
+                    : 'border-divider hover:border-divider-strong'
                 }`}
               >
                 {isDefault && (
@@ -405,8 +405,8 @@ export function SettingsPage() {
                   </div>
                 )}
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="size-10 rounded-lg bg-slate-800 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-slate-400">{provider.icon}</span>
+                  <div className="size-10 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
+                    <span className="material-symbols-outlined text-content-subtle">{provider.icon}</span>
                   </div>
                   <span className="font-bold text-content">{provider.name}</span>
                   <div className="ml-auto">
@@ -414,7 +414,7 @@ export function SettingsPage() {
                       onClick={() => handleProviderToggle(provider.id)}
                       disabled={isDefault}
                       className={`w-10 h-5 rounded-full relative transition-colors ${
-                        isEnabled ? 'bg-blue-500' : 'bg-slate-700'
+                        isEnabled ? 'bg-blue-500' : 'bg-surface-emphasis'
                       } ${isDefault ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <div
@@ -427,13 +427,13 @@ export function SettingsPage() {
                 </div>
                 <div className="space-y-3">
                   <div className="relative">
-                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">API Key</label>
+                    <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
                     {/* Check if it's an unresolved env var reference */}
                     {apiKey.startsWith('$') ? (
                       <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2 text-amber-400 text-xs">
                           <span className="material-symbols-outlined text-[14px]">info</span>
-                          <span>Configured via <code className="font-mono bg-slate-800 px-1 rounded">{apiKey}</code></span>
+                          <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
                         </div>
                         <p className="text-[10px] text-amber-400/70 mt-1">
                           Set this environment variable or enter the key directly below
@@ -443,7 +443,7 @@ export function SettingsPage() {
                           placeholder={provider.placeholder}
                           onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
                           autoComplete="off"
-                          className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-slate-300"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
                         />
                       </div>
                     ) : (
@@ -461,14 +461,14 @@ export function SettingsPage() {
                           data-lpignore="true"
                           data-1p-ignore="true"
                           data-form-type="other"
-                          className={`w-full bg-slate-900/50 border border-slate-700 rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                            isDefault ? 'cursor-not-allowed text-slate-500' : 'text-slate-300'
+                          className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-16 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                            isDefault ? 'cursor-not-allowed text-content-muted' : 'text-content-body'
                           }`}
                         />
                         {!isDefault && (
                           <button
                             onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                            className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
+                            className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
                           >
                             <span className="material-symbols-outlined text-[16px]">
                               {showApiKey[provider.id] ? 'visibility_off' : 'visibility'}
@@ -497,7 +497,7 @@ export function SettingsPage() {
                           <button
                             onClick={() => handleTestApiKey(provider.id)}
                             disabled={testingProvider === provider.id}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600 rounded-lg text-xs text-slate-300 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-emphasis hover:bg-divider-strong border border-divider-strong rounded-lg text-xs text-content-body transition-colors disabled:opacity-50"
                           >
                             {testingProvider === provider.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -531,16 +531,16 @@ export function SettingsPage() {
       <section className="mb-12">
         <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
           Model Assignments
-          <div className="h-px flex-1 bg-slate-700" />
+          <div className="h-px flex-1 bg-divider-strong" />
         </h2>
 
         <div className="space-y-8">
           {AGENT_CATEGORIES.map((category) => (
             <div key={category.name}>
               <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-slate-500 text-lg">{category.icon}</span>
-                <h3 className="text-slate-300 font-semibold text-sm uppercase tracking-wider">{category.name}</h3>
-                <div className="h-px flex-1 bg-slate-800" />
+                <span className="material-symbols-outlined text-content-muted text-lg">{category.icon}</span>
+                <h3 className="text-content-body font-semibold text-sm uppercase tracking-wider">{category.name}</h3>
+                <div className="h-px flex-1 bg-divider" />
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -589,7 +589,7 @@ export function SettingsPage() {
                         </span>
                       </div>
                       <p className="text-xs font-semibold text-content truncate">{agent.name}</p>
-                      <p className="text-[10px] text-slate-400 truncate mb-2">{modelDisplay}</p>
+                      <p className="text-[10px] text-content-muted truncate mb-2">{modelDisplay}</p>
 
                       {/* Capability indicators */}
                       <div className="flex gap-1 flex-wrap">
@@ -620,9 +620,9 @@ export function SettingsPage() {
       </section>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-700 px-6 py-4 z-40">
+      <footer className="fixed bottom-0 left-0 right-0 bg-surface backdrop-blur-md border-t border-divider-strong shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-6 py-4 z-40">
         <div className="max-w-[1200px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-400 text-sm">
+          <div className="flex items-center gap-2 text-content-muted text-sm">
             {saveMutation.isSuccess && (
               <>
                 <span className="material-symbols-outlined text-green-400">check_circle</span>
@@ -648,7 +648,7 @@ export function SettingsPage() {
             <button
               onClick={handleReset}
               disabled={!hasChanges}
-              className="px-6 py-2 text-slate-400 hover:text-content font-semibold text-sm transition-colors disabled:opacity-50"
+              className="px-6 py-2 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-50"
             >
               Undo Changes
             </button>
@@ -682,9 +682,9 @@ export function SettingsPage() {
       {/* Provider Models Modal */}
       {modelsModalProvider && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+          <div className="bg-surface-raised border border-divider-strong rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+            <div className="flex items-center justify-between p-4 border-b border-divider">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-blue-400">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.icon}
@@ -695,7 +695,7 @@ export function SettingsPage() {
               </div>
               <button
                 onClick={() => setModelsModalProvider(null)}
-                className="text-slate-400 hover:text-content transition-colors"
+                className="text-content-muted hover:text-content transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -710,8 +710,8 @@ export function SettingsPage() {
                 if (!providerApiKey) {
                   return (
                     <div className="text-center py-8">
-                      <span className="material-symbols-outlined text-4xl text-slate-500 mb-2">key_off</span>
-                      <p className="text-slate-400">Enter an API key to test models</p>
+                      <span className="material-symbols-outlined text-4xl text-content-muted mb-2">key_off</span>
+                      <p className="text-content-muted">Enter an API key to test models</p>
                     </div>
                   );
                 }
@@ -721,10 +721,10 @@ export function SettingsPage() {
                     <div className="text-center py-8">
                       <span className="material-symbols-outlined text-4xl text-amber-500 mb-2">warning</span>
                       <p className="text-amber-400">API key configured via environment variable</p>
-                      <p className="text-slate-500 text-sm mt-1">
-                        <code className="font-mono bg-slate-800 px-1 rounded">{providerApiKey}</code> is not set
+                      <p className="text-content-muted text-sm mt-1">
+                        <code className="font-mono bg-surface-overlay px-1 rounded">{providerApiKey}</code> is not set
                       </p>
-                      <p className="text-slate-500 text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
+                      <p className="text-content-muted text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
                     </div>
                   );
                 }
@@ -739,12 +739,12 @@ export function SettingsPage() {
                     return (
                       <div
                         key={model.id}
-                        className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 hover:border-slate-600 transition-colors"
+                        className="bg-surface border border-divider rounded-lg p-4 hover:border-divider-strong transition-colors"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="material-symbols-outlined text-slate-400 text-sm">{model.icon}</span>
+                              <span className="material-symbols-outlined text-content-muted text-sm">{model.icon}</span>
                               <h4 className="text-content font-semibold">{model.name}</h4>
                               {model.tier && (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
@@ -757,13 +757,13 @@ export function SettingsPage() {
                               )}
                             </div>
                             {model.description && (
-                              <p className="text-xs text-slate-400 mb-2">{model.description}</p>
+                              <p className="text-xs text-content-muted mb-2">{model.description}</p>
                             )}
                             <div className="flex flex-wrap gap-1">
                               {model.capabilities.map((cap) => (
                                 <span
                                   key={cap}
-                                  className="text-[9px] px-1.5 py-0.5 bg-slate-700/50 text-slate-400 rounded"
+                                  className="text-[9px] px-1.5 py-0.5 bg-surface-emphasis text-content-subtle rounded border border-divider"
                                 >
                                   {cap}
                                 </span>
@@ -804,8 +804,8 @@ export function SettingsPage() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-700 bg-slate-900/50">
-              <p className="text-xs text-slate-500 text-center">
+            <div className="p-4 border-t border-divider bg-surface">
+              <p className="text-xs text-content-muted text-center">
                 Test verifies API key and model availability by asking "What is 2+3?"
               </p>
             </div>
