@@ -6,6 +6,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { loadCloisterConfig } from '../../lib/cloister/config.js';
 
 const execAsync = promisify(exec);
 
@@ -71,9 +72,11 @@ export async function determineHealthStatusAsync(
     }
 
     // Status is "running" or "in_progress" but no tmux — check staleness
-    // Only report as "dead" if the agent was active recently (within 24h)
+    // Only report as "dead" if the agent was active recently
     // Older stale state files are hidden to avoid cluttering the health view
-    const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const cloisterConfig = loadCloisterConfig();
+    const stalenessHours = cloisterConfig.retention?.health_staleness_hours ?? 24;
+    const STALE_THRESHOLD_MS = stalenessHours * 60 * 60 * 1000;
     if (lastActivity) {
       const ageMs = Date.now() - lastActivity.getTime();
       if (ageMs > STALE_THRESHOLD_MS) {

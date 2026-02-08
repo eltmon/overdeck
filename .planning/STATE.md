@@ -1,132 +1,54 @@
-# PAN-124: Deduplicate docs, create master index, add documentation skills
+# PAN-154: Deacon agent state cleanup + fix idle detection (PAN-133)
 
 ## Issue Summary
 
-Two issues with Panopticon documentation:
-1. **Duplicate Content**: README.md (3054 lines) contains detailed configuration that overlaps with docs/*.md
-2. **No Navigation**: No master index to navigate 11+ documentation files
+Consolidates Deacon maintenance improvements: agent state cleanup, health API staleness filtering, and fixing the idle/lazy detection false positives from PAN-133.
 
-**Issue URL:** https://github.com/eltmon/panopticon-cli/issues/124
-**Branch:** feature/pan-124
-
----
-
-## Deliverables
-
-### Part 1: docs/INDEX.md - Documentation Master Index
-Create scannable table-of-contents for ALL documentation, organized by category with "Topic Quick-Find" section.
-
-### Part 2: README.md Deduplication
-Transform README into marketing + quickstart page (<500 lines). Move detailed content to docs/.
-
-### Part 3: pan-docs Skill - Documentation Finder
-Help agents find information by reading INDEX.md first, then identified documents.
-
-### Part 4: Update update-panopticon-docs Skill
-Add "Index Maintenance" section to remind agents to update INDEX.md when docs change.
-
----
-
-## Current Documentation Files
-
-**Root:**
-- README.md — 3054 lines (needs deduplication)
-- CLAUDE.md — Agent guidance
-- AGENTS.md — Agent system architecture
-- CONTRIBUTING.md — Contribution guidelines
-
-**docs/:**
-- CONFIGURATION.md — Multi-model routing, API keys, presets
-- WORK-TYPES.md — 23 work type definitions
-- MODEL_RECOMMENDATIONS.md — Optimal model assignments
-- SPECIALIST_WORKFLOW.md — Worker/specialist interaction
-- cost-tracking.md — Event-sourced cost tracking
-- DNS_SETUP.md — Local DNS resolution
-- E2E_TEST_PLAN.md — End-to-end test plan
-- TESTING-PROVIDERS.md — Provider testing guide
-- SETTINGS-UI-DESIGN.md — Settings UI design
-- PRD.md, PRD-CLOISTER.md, PRD-REMOTE-WORKSPACES.md — Product requirements
-
----
-
-## Implementation Plan
-
-### Phase 1: Create docs/INDEX.md (IN PROGRESS)
-1. [ ] Create comprehensive documentation index
-2. [ ] Organize by category (Getting Started, Architecture, Configuration, etc.)
-3. [ ] Add "Topic Quick-Find" section with keyword mappings
-4. [ ] Include all documentation files with brief descriptions
-
-### Phase 2: Create pan-docs Skill
-1. [ ] Create skills/pan-docs/SKILL.md
-2. [ ] Add instructions to read INDEX.md first
-3. [ ] Use Topic Quick-Find for keyword matching
-4. [ ] Return answers with source file references
-
-### Phase 3: Update update-panopticon-docs Skill
-1. [ ] Add "Index Maintenance" section
-2. [ ] Remind agents to update INDEX.md when docs change
-3. [ ] Update DOC_LOCATIONS.md reference
-
-### Phase 4: README.md Deduplication
-1. [ ] Create new concise README (~400 lines)
-2. [ ] Keep: elevator pitch, features, quickstart, installation
-3. [ ] Move detailed content to docs/USAGE.md
-4. [ ] Ensure all links point to correct locations
-5. [ ] Verify no information lost
-
-### Phase 5: Testing
-1. [ ] Run test suite (npx vitest run)
-2. [ ] Verify all paths in INDEX.md exist
-3. [ ] Verify README links work
-4. [ ] Run pan sync to distribute pan-docs skill
+**Issue URL:** https://github.com/eltmon/panopticon-cli/issues/154
+**Branch:** feature/pan-154
 
 ---
 
 ## Current Status
 
-### Phase 1: docs/INDEX.md ✅ COMPLETE
-Created comprehensive documentation index with:
-- 7 categories: Getting Started, Architecture, Configuration, Infrastructure, Testing, Agent Guidance, UI/UX, Planning
-- Topic Quick-Find section with 40+ keyword mappings
-- All documentation files listed with descriptions
+### Implementation: COMPLETE
 
-### Phase 2: pan-docs Skill ✅ COMPLETE
-Created skills/pan-docs/SKILL.md with:
-- Workflow: Read INDEX.md → Use Topic Quick-Find → Read identified docs
-- Clear instructions for agents to provide source references
-- Common questions mapping table
+All three requirements implemented and tested:
 
-### Phase 3: update-panopticon-docs Skill ✅ COMPLETE
-Updated .claude/skills/update-panopticon-docs/SKILL.md with:
-- New "Index Maintenance" section
-- Instructions for updating INDEX.md when docs change
-- Verification checklist
-- Updated DOC_LOCATIONS.md to include INDEX.md
+### 1. Deacon Agent State Cleanup ✅
+- Added `cleanupStaleAgentState()` to `src/lib/cloister/deacon.ts`
+- Scans `~/.panopticon/agents/` for directories with no active tmux session
+- Purges agent state dirs older than configurable threshold (default: 30 days)
+- Respects `completed` markers (keeps recently completed agents for 7 days minimum)
+- Runs at ~daily frequency via `Math.random() < 0.003` in patrol cycle
+- Added `RetentionConfig` interface with `agent_state_days` to `src/lib/cloister/config.ts`
 
-### Phase 4: README.md Deduplication ✅ COMPLETE
-Replaced README.md with concise version (335 lines) including:
-- Marketing content for Legacy Codebase Support feature
-- Screenshots section
-- Quick start and key concepts
-- Links to detailed USAGE.md
+### 2. Fix Idle/Lazy Detection (PAN-133) ✅
+- Added `isAgentActiveInTmux()` function that checks tmux output for Claude Code status indicators
+- Status indicators detected: Computing, Fermenting, Thinking, Reading, Writing, Editing, Searching, Running, Executing, tool names (Bash, Read, Write, Edit, Grep, Glob, Task)
+- `checkAndSuspendIdleAgents()` now calls `isAgentActiveInTmux()` before suspending — agents showing active status are skipped
+- `checkLazyAgent()` now checks for active status patterns before checking lazy patterns
+- Both features RE-ENABLED in `runPatrol()` (were disabled due to PAN-133)
+- 5-minute cooldown on lazy detection messages preserved
 
-Created comprehensive docs/USAGE.md with:
-- Complete installation guide
-- Detailed configuration instructions
-- Commands reference
-- Troubleshooting section
+### 3. Health API Staleness ✅
+- `health-filtering.ts` now reads staleness threshold from Cloister config (`retention.health_staleness_hours`)
+- Default: 24 hours (same as previous hardcoded value)
+- Configurable via `cloister.toml` `[retention]` section
 
----
+### Files Changed
+- `src/lib/cloister/deacon.ts` — Added cleanup function, active status detection, re-enabled idle/lazy features
+- `src/lib/cloister/config.ts` — Added `RetentionConfig` interface and defaults
+- `src/dashboard/lib/health-filtering.ts` — Made staleness threshold configurable
+- `tests/lib/cloister/deacon-cleanup.test.ts` — 24 new tests (all passing)
 
-### Phase 5: Testing and Verification ✅ COMPLETE
-- Verified all file paths in INDEX.md exist
-- Verified README links point to correct locations
-- Test suite run completed (16 pre-existing failures unrelated to documentation changes)
-- All documentation files created successfully
+### Test Results
+- 24 new tests: ALL PASSING
+- Full suite: 17 pre-existing failures (18 on main — improved by 1)
+- TypeScript: clean compilation (no errors)
 
 ---
 
 ## Remaining Work
 
-None - All phases complete!
+None - All requirements implemented and tested.
