@@ -6,7 +6,7 @@ import { HandoffPanel } from './HandoffPanel';
 
 export interface IssueAgent {
   id: string;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead';
+  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped';
   runtime: string;
   model: string;
   startedAt: string;
@@ -28,11 +28,12 @@ interface IssueAgentCardProps {
   isSelected?: boolean;
 }
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
   healthy: 'bg-status-healthy',
   warning: 'bg-status-warning',
   stuck: 'bg-status-stuck',
   dead: 'bg-status-dead',
+  stopped: 'bg-gray-500',
 };
 
 const HEALTH_STATE_EMOJI = {
@@ -277,16 +278,18 @@ export function IssueAgentCard({
               </button>
             )}
 
-            {/* Handoff button */}
-            <button
-              onClick={toggleHandoffPanel}
-              className={`p-2 hover:bg-gray-600 rounded ${
-                showHandoffPanel ? 'text-blue-400' : 'text-gray-400 hover:text-blue-400'
-              }`}
-              title="Model handoff controls"
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-            </button>
+            {/* Handoff button - not for stopped agents */}
+            {agent.status !== 'stopped' && (
+              <button
+                onClick={toggleHandoffPanel}
+                className={`p-2 hover:bg-gray-600 rounded ${
+                  showHandoffPanel ? 'text-blue-400' : 'text-gray-400 hover:text-blue-400'
+                }`}
+                title="Model handoff controls"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Resume button - only for suspended */}
             {health?.state === 'suspended' && (
@@ -312,8 +315,8 @@ export function IssueAgentCard({
               </button>
             )}
 
-            {/* Kill button - not for suspended */}
-            {health?.state !== 'suspended' && (
+            {/* Kill button - not for suspended or already stopped */}
+            {health?.state !== 'suspended' && agent.status !== 'stopped' && (
               <button
                 onClick={handleKill}
                 disabled={killMutation.isPending}
