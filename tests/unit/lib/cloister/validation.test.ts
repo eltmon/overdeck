@@ -239,12 +239,12 @@ exit 0
 
   describe('autoRevertMerge', () => {
     it('should revert last commit when successful', async () => {
-      // Initialize git repo
+      // Initialize git repo with a real merge so ORIG_HEAD is set
       await execAsync('git init', { cwd: testDir });
       await execAsync('git config user.name "Test"', { cwd: testDir });
       await execAsync('git config user.email "test@test.com"', { cwd: testDir });
 
-      // Create initial commit
+      // Create initial commit on main
       writeFileSync(join(testDir, 'file1.txt'), 'initial content');
       await execAsync('git add .', { cwd: testDir });
       await execAsync('git commit -m "Initial commit"', { cwd: testDir });
@@ -252,17 +252,22 @@ exit 0
       const { stdout: commit1 } = await execAsync('git rev-parse HEAD', { cwd: testDir });
       const beforeCommit = commit1.trim();
 
-      // Create second commit (simulating merge)
+      // Create a feature branch with a commit
+      await execAsync('git checkout -b feature-test', { cwd: testDir });
       writeFileSync(join(testDir, 'file2.txt'), 'merged content');
       await execAsync('git add .', { cwd: testDir });
-      await execAsync('git commit -m "Merge commit"', { cwd: testDir });
+      await execAsync('git commit -m "Feature commit"', { cwd: testDir });
 
-      // Verify we have 2 commits
+      // Merge feature branch back to main (sets ORIG_HEAD)
+      await execAsync('git checkout -', { cwd: testDir });
+      await execAsync('git merge feature-test --no-ff -m "Merge feature-test"', { cwd: testDir });
+
+      // Verify we advanced past the initial commit
       const { stdout: commit2 } = await execAsync('git rev-parse HEAD', { cwd: testDir });
       const afterCommit = commit2.trim();
       expect(afterCommit).not.toBe(beforeCommit);
 
-      // Revert
+      // Revert using ORIG_HEAD
       const success = await autoRevertMerge(testDir);
 
       expect(success).toBe(true);

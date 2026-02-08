@@ -189,7 +189,7 @@ exit 1
 
   describe('auto-revert workflow', () => {
     it('should revert merge when validation fails', async () => {
-      // Setup: Create initial commit
+      // Setup: Create initial commit on main
       writeFileSync(join(testRepo, 'file1.txt'), 'initial content');
       await execAsync('git add .', { cwd: testRepo });
       await execAsync('git commit -m "Initial commit"', { cwd: testRepo });
@@ -197,10 +197,15 @@ exit 1
       const { stdout: beforeMerge } = await execAsync('git rev-parse HEAD', { cwd: testRepo });
       const initialCommit = beforeMerge.trim();
 
-      // Simulate merge by creating another commit
+      // Create a feature branch with a commit
+      await execAsync('git checkout -b feature-test', { cwd: testRepo });
       writeFileSync(join(testRepo, 'merged.txt'), 'merged content');
       await execAsync('git add .', { cwd: testRepo });
-      await execAsync('git commit -m "Merge branch feature"', { cwd: testRepo });
+      await execAsync('git commit -m "Feature commit"', { cwd: testRepo });
+
+      // Merge back to main (sets ORIG_HEAD)
+      await execAsync('git checkout -', { cwd: testRepo });
+      await execAsync('git merge feature-test --no-ff -m "Merge branch feature-test"', { cwd: testRepo });
 
       const { stdout: afterMerge } = await execAsync('git rev-parse HEAD', { cwd: testRepo });
       const mergeCommit = afterMerge.trim();
@@ -208,7 +213,7 @@ exit 1
       // Verify merge happened
       expect(mergeCommit).not.toBe(initialCommit);
 
-      // Execute auto-revert
+      // Execute auto-revert (uses ORIG_HEAD)
       const revertSuccess = await autoRevertMerge(testRepo);
 
       // Verify

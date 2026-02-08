@@ -247,12 +247,14 @@ export async function runMergeValidation(
 /**
  * Auto-revert a merge if validation fails
  *
- * Reverts the most recent commit (assumed to be the merge commit)
+ * Uses ORIG_HEAD which git sets automatically at merge time to the commit
+ * HEAD pointed to right before the merge. This is always correct regardless
+ * of commits added between task start and merge execution.
  *
  * @param projectPath - Project root path
  * @returns Promise resolving to success status
  */
-export async function autoRevertMerge(projectPath: string, targetCommit?: string): Promise<boolean> {
+export async function autoRevertMerge(projectPath: string): Promise<boolean> {
   console.log(`[validation] Auto-reverting merge in ${projectPath}`);
 
   try {
@@ -261,10 +263,10 @@ export async function autoRevertMerge(projectPath: string, targetCommit?: string
       cwd: projectPath,
     });
 
-    // Revert to specific commit (handles multi-commit fast-forward merges)
-    // Falls back to HEAD~1 only if no target was provided
-    const resetTarget = targetCommit || 'HEAD~1';
-    await execAsync(`git reset --hard ${resetTarget}`, {
+    // Use ORIG_HEAD — git sets this to pre-merge HEAD at merge time.
+    // Handles fast-forwards, multi-commit merges, and any commits
+    // added to main between task start and merge execution.
+    await execAsync('git reset --hard ORIG_HEAD', {
       cwd: projectPath,
     });
 
@@ -274,7 +276,7 @@ export async function autoRevertMerge(projectPath: string, targetCommit?: string
     });
 
     console.log(
-      `[validation] ✓ Auto-revert successful: ${beforeCommit.trim()} -> ${afterCommit.trim()} (target: ${resetTarget})`
+      `[validation] ✓ Auto-revert successful: ${beforeCommit.trim()} -> ${afterCommit.trim()} (via ORIG_HEAD)`
     );
 
     return true;
