@@ -8,6 +8,7 @@ import { createSession, killSession, sendKeys, sessionExists, getAgentSessions, 
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
+import { loadCloisterConfig } from './cloister/config.js';
 import { loadSettings, type ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, requiresRouter } from './providers.js';
@@ -337,13 +338,23 @@ function determineModel(options: SpawnOptions): string {
       }
     }
 
-    // Fall back to default model (use kimi-k2.5 if available)
-    return 'kimi-k2.5';
+    // Fall back to default model from Cloister config or claude-sonnet-4-5
+    try {
+      const cloisterConfig = loadCloisterConfig();
+      const defaultModel = cloisterConfig.model_selection?.default_model || 'sonnet';
+      const modelMap: Record<string, string> = {
+        'opus': 'claude-opus-4-6',
+        'sonnet': 'claude-sonnet-4-5',
+        'haiku': 'claude-haiku-4-5',
+      };
+      return modelMap[defaultModel] || 'claude-sonnet-4-5';
+    } catch {
+      return 'claude-sonnet-4-5';
+    }
   } catch (error) {
     // If work type router fails, fall back to default
     console.warn('Warning: Could not resolve model using work type router, using default');
-    console.log(`[DEBUG] Catch block, options.model: ${options.model}, fallback: kimi-k2.5`);
-    return options.model || 'kimi-k2.5';
+    return options.model || 'claude-sonnet-4-5';
   }
 }
 
