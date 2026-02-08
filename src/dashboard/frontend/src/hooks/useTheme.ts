@@ -30,9 +30,15 @@ export const useTheme = create<ThemeState>((set, get) => ({
 
   initTheme: () => {
     // Read from localStorage, fall back to OS preference
-    const stored = localStorage.getItem('panopticon.ui.theme') as Theme | null;
-    const osPreference = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    const theme = stored || osPreference;
+    const stored = localStorage.getItem('panopticon.ui.theme');
+    const validStored: Theme | null = stored === 'light' || stored === 'dark' ? stored : null;
+    const osPreference: Theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const theme = validStored || osPreference;
+
+    // Persist to localStorage if not already valid (first visit or invalid value)
+    if (!validStored) {
+      localStorage.setItem('panopticon.ui.theme', theme);
+    }
 
     // Update DOM
     if (theme === 'light') {
