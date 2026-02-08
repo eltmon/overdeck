@@ -182,7 +182,7 @@ export class CloisterService {
   private previousRunningAgents: Set<string> = new Set();
   private deathTimestamps: Date[] = []; // Rolling window of agent death times
   private spawnsPaused: boolean = false;
-  private processedCompletions: Set<string> = new Set(); // Track already-processed completion markers
+  private processedCompletions: Map<string, number> = new Map(); // Track completion marker retry counts (Infinity = done)
   private healthCheckCount: number = 0;
 
   constructor(config?: CloisterConfig) {
@@ -443,30 +443,37 @@ export class CloisterService {
         const completedFile = join(AGENTS_DIR, dir.name, 'completed');
         const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
 
-        // Skip if no completion marker or already processed
+        // Skip if no completion marker or already processed on disk
         if (!existsSync(completedFile) || existsSync(processedFile)) continue;
-        if (this.processedCompletions.has(dir.name)) continue;
 
         // Skip stale completion markers (older than 24h) — just mark as processed
         try {
           const content = JSON.parse(readFileSync(completedFile, 'utf-8'));
           const ageMs = Date.now() - new Date(content.timestamp).getTime();
           if (ageMs > 24 * 60 * 60 * 1000) {
-            this.processedCompletions.add(dir.name);
+            console.log(`🔔 Cloister: Skipping stale completion marker for ${dir.name} (${Math.floor(ageMs / 3600000)}h old)`);
+            this.processedCompletions.set(dir.name, Infinity);
             try { renameSync(completedFile, processedFile); } catch {}
             continue;
           }
-        } catch {}
+        } catch (parseErr) {
+          console.warn(`  ⚠ Cloister: Could not parse completion marker for ${dir.name}, skipping`);
+          continue;
+        }
+
+        // Check retry count — give up after 3 failed attempts
+        const retryCount = this.processedCompletions.get(dir.name) || 0;
+        if (retryCount >= 3) continue;
 
         // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
         const issueId = dir.name.replace('agent-', '').toUpperCase();
 
-        console.log(`🔔 Cloister: Found completion marker for ${issueId}, triggering review...`);
+        console.log(`🔔 Cloister: Found completion marker for ${issueId}, triggering review...${retryCount > 0 ? ` (retry ${retryCount}/3)` : ''}`);
 
         try {
           // Trigger review via dashboard API (same process, localhost)
           const http = await import('http');
-          const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+          const result = await new Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }>((resolve) => {
             const postData = JSON.stringify({});
             const req = http.request(
               `http://localhost:3011/api/workspaces/${issueId}/review`,
@@ -478,30 +485,35 @@ export class CloisterService {
                   try {
                     resolve(JSON.parse(data));
                   } catch {
-                    resolve({ success: false, error: 'Invalid response' });
+                    resolve({ success: false, error: `Invalid response (HTTP ${res.statusCode})` });
                   }
                 });
               }
             );
             req.on('error', (e: Error) => resolve({ success: false, error: e.message }));
-            req.on('timeout', () => { req.destroy(); resolve({ success: false, error: 'Timeout' }); });
+            req.on('timeout', () => { req.destroy(); resolve({ success: false, error: 'Timeout (5s)' }); });
             req.write(postData);
             req.end();
           });
 
           if (result.success) {
             console.log(`  ✓ Review triggered for ${issueId}`);
-            // Mark as processed so we don't re-trigger
             renameSync(completedFile, processedFile);
+            this.processedCompletions.set(dir.name, Infinity);
+          } else if (result.alreadyReviewed || result.alreadyMerged) {
+            // Terminal state — already handled, mark as processed
+            console.log(`  ✓ ${issueId} already ${result.alreadyMerged ? 'merged' : 'reviewed'}, marking processed`);
+            renameSync(completedFile, processedFile);
+            this.processedCompletions.set(dir.name, Infinity);
           } else {
-            console.log(`  ⚠ Review trigger failed for ${issueId}: ${result.error || 'unknown'}`);
+            // Transient failure — increment retry count, will retry on next cycle
+            this.processedCompletions.set(dir.name, retryCount + 1);
+            console.log(`  ⚠ Review trigger failed for ${issueId}: ${result.error || 'unknown'} (will retry, ${2 - retryCount} attempts left)`);
           }
         } catch (err: any) {
-          console.error(`  Failed to trigger review for ${issueId}: ${err.message}`);
+          this.processedCompletions.set(dir.name, retryCount + 1);
+          console.error(`  ✗ Failed to trigger review for ${issueId}: ${err.message} (will retry, ${2 - retryCount} attempts left)`);
         }
-
-        // Track in memory regardless of outcome to avoid hammering
-        this.processedCompletions.add(dir.name);
       }
     } catch (error) {
       // Non-fatal - just skip this check

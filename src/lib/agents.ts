@@ -503,6 +503,8 @@ export function stopAgent(agentId: string): void {
 
   const state = getAgentState(normalizedId);
   if (state) {
+    // Ensure id is set — runtime state files may lack it (PAN-150)
+    if (!state.id) state.id = normalizedId;
     state.status = 'stopped';
     saveAgentState(state);
   }
@@ -677,6 +679,13 @@ export function recoverAgent(agentId: string): AgentState | null {
   const state = getAgentState(normalizedId);
 
   if (!state) {
+    return null;
+  }
+
+  // Runtime state files may lack required fields (PAN-150)
+  if (!state.id) state.id = normalizedId;
+  if (!state.workspace || !state.model) {
+    console.error(`[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`);
     return null;
   }
 
