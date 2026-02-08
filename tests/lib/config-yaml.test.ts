@@ -73,14 +73,14 @@ models:
 models:
   preset: premium
   overrides:
-    issue-agent:planning: claude-opus-4-5
+    issue-agent:planning: claude-opus-4-6
 `;
       writeFileSync(testProjectConfig, projectYaml, 'utf-8');
 
       const config = loadConfig();
 
       expect(config.preset).toBe('premium');
-      expect(config.overrides['issue-agent:planning']).toBe('claude-opus-4-5');
+      expect(config.overrides['issue-agent:planning']).toBe('claude-opus-4-6');
     });
 
     it.skip('should handle legacy api_keys format', () => {

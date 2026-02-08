@@ -11,7 +11,7 @@ Research conducted across official benchmarks (SWE-bench, LiveCodeBench, LMSYS A
 
 | Model | SWE-bench | Cost/1M | Best For |
 |-------|-----------|---------|----------|
-| Claude Opus 4.5 | 80.9% ⭐ | $45 | Planning, Security, Complex reasoning |
+| Claude Opus 4.6 | 80.9% ⭐ | $45 | Planning, Security, Complex reasoning |
 | Claude Sonnet 4.5 | 77.2% | $9 | Best overall value |
 | Kimi K2.5 | 76.8% | $8 | Frontend dev, Multi-agent orchestration |
 | GPT-5.2 Codex | 80.0% | $75 | Raw reasoning (ARC-AGI) |
@@ -21,25 +21,25 @@ Research conducted across official benchmarks (SWE-bench, LiveCodeBench, LMSYS A
 ## Model Recommendations by Task
 
 ### Planning & Architecture
-**Winner: Claude Opus 4.5** (score: 99)
-- User confirmed: "Opus 4.5 planning for sure"
+**Winner: Claude Opus 4.6** (score: 99)
+- User confirmed: "Opus 4.6 planning for sure"
 - Best synthesis and architectural reasoning
 - Worth the premium for critical design decisions
 
 ### Implementation / Code Generation
-**Quality: Claude Opus 4.5** (80.9% SWE-bench, first >80%)
+**Quality: Claude Opus 4.6** (80.9% SWE-bench, first >80%)
 **Value: Kimi K2.5** (76.8% SWE-bench at 5.6x lower cost)
 - For critical features: Opus
 - For routine implementation: Kimi K2.5 or Sonnet
 
 ### Code Review & Security
-**Winner: Claude Opus 4.5** (score: 98)
+**Winner: Claude Opus 4.6** (score: 98)
 - Best OWASP vulnerability detection
 - Most thorough security analysis
 - Use for PRs touching auth, payments, data handling
 
 ### Debugging
-**Complex issues: Claude Opus 4.5 or O3 Deep Research**
+**Complex issues: Claude Opus 4.6 or O3 Deep Research**
 **Routine debugging: Kimi K2.5 or Sonnet 4.5**
 - O3 has best deep reasoning but very slow/expensive
 - Kimi K2.5 handles most debugging well at lower cost
@@ -73,7 +73,7 @@ Research conducted across official benchmarks (SWE-bench, LiveCodeBench, LMSYS A
 ### Best Value by Tier
 
 **Premium Tier ($40+/M):**
-- Claude Opus 4.5: Best quality/price for critical tasks
+- Claude Opus 4.6: Best quality/price for critical tasks
 
 **Mid Tier ($5-15/M):**
 - Claude Sonnet 4.5: 77.2% SWE-bench at $9/M ⭐
@@ -91,12 +91,12 @@ Research conducted across official benchmarks (SWE-bench, LiveCodeBench, LMSYS A
 | Kimi K2.5 code-gen | 90 | 92 | +2 (76.8% SWE-bench confirmed) |
 | GLM 4.7 code-gen | 78 | 88 | +10 (73.8% SWE-bench, SOTA open-source) |
 | GLM 4.7 testing | 70 | 82 | +12 (87.4 τ²-Bench SOTA) |
-| Opus 4.5 planning | 98 | 99 | +1 (user confirmed best for planning) |
+| Opus 4.6 planning | 98 | 99 | +1 (user confirmed best for planning) |
 
 ## Conclusion
 
 The smart selection system should:
-1. **Default to Opus 4.5** for planning, security, and synthesis tasks
+1. **Default to Opus 4.6** for planning, security, and synthesis tasks
 2. **Use Kimi K2.5** for frontend, routine coding, and multi-agent work (best value)
 3. **Use Sonnet 4.5** for balanced quality/cost general tasks
 4. **Use Gemini 3 Pro** when analyzing large codebases

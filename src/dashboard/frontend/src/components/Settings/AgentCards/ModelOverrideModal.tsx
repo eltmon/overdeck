@@ -23,7 +23,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
-      { id: 'claude-opus-4-5' as ModelId, name: 'Claude Opus 4.5', icon: 'diamond', tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable, best for complex tasks' },
+      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: 'diamond', tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable, best for complex tasks' },
       { id: 'claude-sonnet-4-5' as ModelId, name: 'Claude Sonnet 4.5', icon: 'auto_awesome', tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Great balance of speed and capability' },
       { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
@@ -145,7 +145,7 @@ export function getModelById(id: ModelId): ModelDef | undefined {
   const idLower = id.toLowerCase();
 
   // Anthropic models
-  if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-5');
+  if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-6');
   if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-5');
   if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
   if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-5');

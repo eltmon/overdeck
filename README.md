@@ -278,7 +278,7 @@ Panopticon integrates with [claude-code-router](https://github.com/musistudio/cl
 #### Supported Providers and Models
 
 **Anthropic** (via Claude Code / Claude API)
-- `claude-opus-4-5` - Most capable, best for planning and complex tasks
+- `claude-opus-4-6` - Most capable, best for planning and complex tasks
 - `claude-sonnet-4-5` - Balanced performance and cost
 - `claude-haiku-4-5` - Fast and cost-effective for simple tasks
 
@@ -310,7 +310,7 @@ Panopticon integrates with [claude-code-router](https://github.com/musistudio/cl
    - Planning Agent - Model for autonomous planning
 4. Configure **models by task complexity** (for PAN-75):
    - Trivial tasks → Cost-effective models (e.g., `claude-haiku-4-5`)
-   - Expert tasks → Most capable models (e.g., `claude-opus-4-5`)
+   - Expert tasks → Most capable models (e.g., `claude-opus-4-6`)
 
 **Configuration Files:**
 
@@ -354,7 +354,7 @@ models:
 **Cost optimization:**
 ```
 Specialist agents → claude-sonnet-4-5 (balanced)
-Planning agent → claude-opus-4-5 (most capable)
+Planning agent → claude-opus-4-6 (most capable)
 Simple tasks → claude-haiku-4-5 (cost-effective)
 ```
 
@@ -362,7 +362,7 @@ Simple tasks → claude-haiku-4-5 (cost-effective)
 ```
 Code review → gpt-4o (OpenAI's code understanding)
 Testing → claude-sonnet-4-5 (Anthropic's reliability)
-Planning → claude-opus-4-5 (Anthropic's reasoning)
+Planning → claude-opus-4-6 (Anthropic's reasoning)
 ```
 
 **Research-heavy workflows:**

@@ -56,7 +56,7 @@ export function SmartSelectionExplainer() {
                 <span className="material-symbols-outlined text-amber-400 text-base">architecture</span>
                 <span className="font-medium">Planning & Architecture</span>
               </div>
-              <p className="text-[#6a6a8a]">Claude Opus 4.5 - Best for complex reasoning</p>
+              <p className="text-[#6a6a8a]">Claude Opus 4.6 - Best for complex reasoning</p>
             </div>
             <div className="bg-[#0d0d1a] rounded-lg p-3 border border-[#2a2a3e]">
               <div className="flex items-center gap-2 mb-1">

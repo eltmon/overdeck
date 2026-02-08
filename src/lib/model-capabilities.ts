@@ -70,17 +70,17 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
   // ANTHROPIC MODELS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'claude-opus-4-5': {
-    model: 'claude-opus-4-5',
+  'claude-opus-4-6': {
+    model: 'claude-opus-4-6',
     provider: 'anthropic',
-    displayName: 'Claude Opus 4.5',
-    costPer1MTokens: 45.0, // $15 in / $75 out → avg ~$45
-    contextWindow: 200000,
+    displayName: 'Claude Opus 4.6',
+    costPer1MTokens: 45.0, // $5 in / $25 out → same pricing as 4.5
+    contextWindow: 200000, // 1M available via opt-in beta, but we use 200K
     skills: {
       'code-generation': 96, // 80.9% SWE-bench (first >80%), 89.4% Aider Polyglot
       'code-review': 98,
       debugging: 97,
-      planning: 99, // User confirms: "Opus 4.5 planning for sure"
+      planning: 99, // User confirms: "Opus 4.6 planning for sure"
       documentation: 95,
       testing: 92,
       security: 98, // Best for security review
@@ -89,7 +89,7 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       speed: 40, // Slower but 76% more token efficient
       'context-length': 95,
     },
-    notes: 'First to exceed 80% SWE-bench. Best for planning, security, complex reasoning. Leads 7/8 languages.',
+    notes: 'Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning.',
   },
 
   'claude-sonnet-4-5': {

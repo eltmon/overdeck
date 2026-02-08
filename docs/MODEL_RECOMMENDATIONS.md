@@ -6,16 +6,16 @@ Optimal AI model assignments for each agent task based on research from January 
 
 | Task Category | Speed | Quality | Cost | Recommended Model |
 |--------------|-------|---------|------|-------------------|
-| Exploration/Planning | Slow | Critical | High | **Claude Opus 4.5** |
+| Exploration/Planning | Slow | Critical | High | **Claude Opus 4.6** |
 | Implementation/Testing | Medium | Critical | Medium | **Claude Sonnet 4.5** |
-| Code Review (Security) | Slow | Critical | High | **Claude Opus 4.5** |
+| Code Review (Security) | Slow | Critical | High | **Claude Opus 4.6** |
 | Subagent (Explore/Bash) | Fast | Medium | Low | **Claude Haiku 4.5** |
 | Triage/Quick CLI | Very Fast | Medium | Low | **Claude Haiku 4.5** |
 
 ## Performance Benchmarks (2025-2026)
 
 ### SWE-Bench Verified (Bug Fixing)
-- Claude Opus 4.5: **80.9%**
+- Claude Opus 4.6: **80.9%**
 - Claude Sonnet 4.5: **82%** (with parallel attempts)
 - Claude Haiku 4.5: **73.3%**
 - GLM-4.7: 73.8%
@@ -30,7 +30,7 @@ Optimal AI model assignments for each agent task based on research from January 
 
 ## Detailed Recommendations
 
-### High-Complexity Tasks (Opus 4.5)
+### High-Complexity Tasks (Opus 4.6)
 
 **Exploration Phase** (`issue-agent:exploration`)
 - Deep codebase understanding required
@@ -141,12 +141,12 @@ Optimal AI model assignments for each agent task based on research from January 
 |-------|-------|--------|----------------|
 | Haiku 4.5 | $1 | $5 | 50% |
 | Sonnet 4.5 | $3 | $15 | 50% |
-| Opus 4.5 | $5 | $25 | 50% |
+| Opus 4.6 | $5 | $25 | 50% |
 
 ### Recommended Cost Distribution
 - **60%** of operations: Haiku 4.5 (exploration, planning subagents, triage)
 - **35%** of operations: Sonnet 4.5 (implementation, testing, documentation)
-- **5%** of operations: Opus 4.5 (security review, architecture, critical planning)
+- **5%** of operations: Opus 4.6 (security review, architecture, critical planning)
 
 ### Monthly Cost Estimate (100 agent-hours)
 - Budget approach (all Haiku): ~$500/month
@@ -185,7 +185,7 @@ Run multiple models simultaneously for critical decisions:
 ## Sources
 
 - [Claude AI Models 2025: Opus vs Sonnet vs Haiku Guide - DEV Community](https://dev.to/dr_hernani_costa/claude-ai-models-2025-opus-vs-sonnet-vs-haiku-guide-24mn)
-- [Claude Opus 4.5: Benchmarks, Agents, Tools, and More - DataCamp](https://www.datacamp.com/blog/claude-opus-4-5)
+- [Claude Opus 4.6: Benchmarks, Agents, Tools, and More - DataCamp](https://www.datacamp.com/blog/claude-opus-4-6)
 - [Claude Haiku 4.5 Deep Dive - Caylent](https://caylent.com/blog/claude-haiku-4-5-deep-dive-cost-capabilities-and-the-multi-agent-opportunity)
 - [Claude API Pricing Guide 2026 - AI Free API](https://www.aifreeapi.com/en/posts/claude-api-pricing-per-million-tokens)
 - [Kimi K2 vs Qwen 3 vs GLM 4.5 - Clarifai](https://www.clarifai.com/blog/kimi-k2-vs-qwen-3-vs-glm-4-5)

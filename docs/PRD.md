@@ -4018,7 +4018,7 @@ All major AI coding tools log token usage to local files:
   "sessionId": "037ae6b1-826d-4b2f-ae80-9b467abb7e43",
   "timestamp": "2026-01-17T10:30:00.000Z",
   "message": {
-    "model": "claude-opus-4-5-20251101",
+    "model": "claude-opus-4-6-20251101",
     "usage": {
       "input_tokens": 1500,
       "output_tokens": 500,
@@ -4045,7 +4045,7 @@ Pricing per 1M tokens (January 2026):
 
 | Model | Input | Output | Cache Create | Cache Read |
 |-------|-------|--------|--------------|------------|
-| Claude Opus 4.5 | $15.00 | $75.00 | $18.75 | $1.50 |
+| Claude Opus 4.6 | $15.00 | $75.00 | $18.75 | $1.50 |
 | Claude Sonnet 4 | $3.00 | $15.00 | $3.75 | $0.30 |
 | Claude Haiku 4 | $0.80 | $4.00 | $1.00 | $0.08 |
 | GPT-5 | $5.00 | $15.00 | - | - |
