@@ -195,12 +195,6 @@ The AI adapts to your org structure, not the other way around.
 
 ---
 
-## Quick Start
-
-```bash
-
----
-
 ## 🚀 Quick Start
 
 ```bash
