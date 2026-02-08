@@ -610,9 +610,18 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
             console.log(`[merge-agent] Agent reported success, running post-merge validation...`);
             logActivity('merge_validation_start', `Running validation for ${context.issueId}`);
 
+            // Extract baseline failure count from agent output for baseline comparison
+            // Agent output contains a table like: │ Failed │ 18 │ 18 │ 0 ✅ │
+            const baselineMatch = output.match(/Failed\s*│\s*(\d+)\s*│/);
+            const baselineTestFailures = baselineMatch ? parseInt(baselineMatch[1], 10) : undefined;
+            if (baselineTestFailures !== undefined) {
+              console.log(`[merge-agent] Extracted baseline failure count from agent: ${baselineTestFailures}`);
+            }
+
             const validationResult = await runMergeValidation({
               projectPath: context.projectPath,
               issueId: context.issueId,
+              baselineTestFailures,
             });
 
             if (validationResult.valid) {
@@ -920,10 +929,22 @@ Report any issues or conflicts you encountered.`;
               console.log(`[merge-agent] Merge completed and pushed, running validation...`);
               logActivity('merge_validation_start', `Running post-merge validation for ${issueId}`);
 
+              // Extract baseline from specialist output if available
+              let specialistBaseline: number | undefined;
+              try {
+                const specialistOutput = await captureTmuxOutput(getTmuxSessionName('merge-agent'));
+                const baselineMatch = specialistOutput.match(/Failed\s*│\s*(\d+)\s*│/);
+                specialistBaseline = baselineMatch ? parseInt(baselineMatch[1], 10) : undefined;
+                if (specialistBaseline !== undefined) {
+                  console.log(`[merge-agent] Extracted baseline from specialist: ${specialistBaseline}`);
+                }
+              } catch { /* ignore */ }
+
               // Run validation
               const validationResult = await runMergeValidation({
                 projectPath,
                 issueId,
+                baselineTestFailures: specialistBaseline,
               });
 
               if (validationResult.valid) {
