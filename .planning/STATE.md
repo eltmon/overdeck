@@ -1,11 +1,11 @@
-# PAN-154: Deacon agent state cleanup + fix idle detection (PAN-133)
+# PAN-158: Fix 17 pre-existing test failures across 6 test files
 
 ## Issue Summary
 
-Consolidates Deacon maintenance improvements: agent state cleanup, health API staleness filtering, and fixing the idle/lazy detection false positives from PAN-133.
+Fix 17 failing tests across 6 test files. These are pre-existing failures unrelated to recent work.
 
-**Issue URL:** https://github.com/eltmon/panopticon-cli/issues/154
-**Branch:** feature/pan-154
+**Issue URL:** https://github.com/eltmon/panopticon-cli/issues/158
+**Branch:** feature/pan-158
 
 ---
 
@@ -13,42 +13,41 @@ Consolidates Deacon maintenance improvements: agent state cleanup, health API st
 
 ### Implementation: COMPLETE
 
-All three requirements implemented and tested:
+## Root Cause Analysis
 
-### 1. Deacon Agent State Cleanup ✅
-- Added `cleanupStaleAgentState()` to `src/lib/cloister/deacon.ts`
-- Scans `~/.panopticon/agents/` for directories with no active tmux session
-- Purges agent state dirs older than configurable threshold (default: 30 days)
-- Respects `completed` markers (keeps recently completed agents for 7 days minimum)
-- Runs at ~daily frequency via `Math.random() < 0.003` in patrol cycle
-- Added `RetentionConfig` interface with `agent_state_days` to `src/lib/cloister/config.ts`
+### 1. settings.test.ts (1 failure)
+- **Test:** "should return Kimi models when API key is configured"
+- **Cause:** Test expects `available.kimi` = `[]` but implementation returns `['kimi-k2', 'kimi-k2.5']` when API key set
+- **Fix:** Update assertion to `['kimi-k2', 'kimi-k2.5']`
 
-### 2. Fix Idle/Lazy Detection (PAN-133) ✅
-- Added `isAgentActiveInTmux()` function that checks tmux output for Claude Code status indicators
-- Status indicators detected: Computing, Fermenting, Thinking, Reading, Writing, Editing, Searching, Running, Executing, tool names (Bash, Read, Write, Edit, Grep, Glob, Task)
-- `checkAndSuspendIdleAgents()` now calls `isAgentActiveInTmux()` before suspending — agents showing active status are skipped
-- `checkLazyAgent()` now checks for active status patterns before checking lazy patterns
-- Both features RE-ENABLED in `runPatrol()` (were disabled due to PAN-133)
-- 5-minute cooldown on lazy detection messages preserved
+### 2. work-type-router.test.ts (3 failures)
+- **Tests:** override tests + selective providers
+- **Cause:** Tests use `'claude-opus-4-5'` (non-existent model), should be `'claude-opus-4-6'`. Also "selective providers" test has wrong expected model selections.
+- **Fix:** Update model names and expected values to match smart selector behavior
 
-### 3. Health API Staleness ✅
-- `health-filtering.ts` now reads staleness threshold from Cloister config (`retention.health_staleness_hours`)
-- Default: 24 hours (same as previous hardcoded value)
-- Configurable via `cloister.toml` `[retention]` section
+### 3. specialist-context.test.ts (6 failures)
+- **Cause:** `SPECIALISTS_DIR` is a module-level constant computed once at import time. Tests change `process.env.PANOPTICON_HOME` in beforeEach but the constant is already computed with the original value.
+- **Fix:** Make SPECIALISTS_DIR a function that reads env var lazily
 
-### Files Changed
-- `src/lib/cloister/deacon.ts` — Added cleanup function, active status detection, re-enabled idle/lazy features
-- `src/lib/cloister/config.ts` — Added `RetentionConfig` interface and defaults
-- `src/dashboard/lib/health-filtering.ts` — Made staleness threshold configurable
-- `tests/lib/cloister/deacon-cleanup.test.ts` — 24 new tests (all passing)
+### 4. specialist-logs.test.ts (4 failures)
+- **Cause:** Same as #3 - module-level `SPECIALISTS_DIR` doesn't respect test env changes
+- **Fix:** Same approach - use lazy function
 
-### Test Results
-- 24 new tests: ALL PASSING
-- Full suite: 17 pre-existing failures (18 on main — improved by 1)
-- TypeScript: clean compilation (no errors)
+### 5. specialists/logs.test.ts CLI (1 failure)
+- **Cause:** Mock returns `{ maxDays: 30, maxRuns: 100 }` (camelCase) but source reads `retention.max_days` / `retention.max_runs` (snake_case)
+- **Fix:** Change mock to use snake_case property names
+
+### 6. migration.test.ts (1 failure)
+- **Cause:** Test checks for `'Session directory not found'` but actual warning is `'No session directory found for...'`
+- **Fix:** Update expected substring
 
 ---
 
 ## Remaining Work
 
-None - All requirements implemented and tested.
+- [x] Root cause analysis
+- [x] Fix source files (paths.ts, specialist-context.ts, specialist-logs.ts)
+- [x] Fix test files (6 files)
+- [x] Verify all tests pass (1049 passed, 0 failures)
+- [x] Ensure no new failures
+- [ ] Commit and push

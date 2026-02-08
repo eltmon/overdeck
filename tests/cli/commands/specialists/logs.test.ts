@@ -47,7 +47,7 @@ vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
 
 // Mock projects module
 vi.mock('../../../../src/lib/projects.js', () => ({
-  getSpecialistRetention: vi.fn(() => ({ maxDays: 30, maxRuns: 100 })),
+  getSpecialistRetention: vi.fn(() => ({ max_days: 30, max_runs: 100 })),
 }));
 
 describe('specialist logs CLI commands', () => {

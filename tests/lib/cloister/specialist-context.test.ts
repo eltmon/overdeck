@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'fs';
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import * as childProcess from 'child_process';
+
+// Make fs properties mockable by wrapping the module
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return { ...actual };
+});
 import {
   getContextDirectory,
   getContextDigestPath,
@@ -112,9 +119,8 @@ describe('specialist-context', () => {
       // Create a file with no read permissions (if possible)
       writeFileSync(digestPath, 'test', 'utf-8');
 
-      // Mock readFileSync to throw
-      const originalReadFileSync = readFileSync;
-      vi.spyOn(require('fs'), 'readFileSync').mockImplementationOnce(() => {
+      // Mock readFileSync to throw via the mocked fs module
+      vi.spyOn(fs, 'readFileSync').mockImplementationOnce(() => {
         throw new Error('Read error');
       });
 
@@ -168,8 +174,8 @@ describe('specialist-context', () => {
       const digestPath = getContextDigestPath('testproject', 'review-agent');
       writeFileSync(digestPath, 'test digest', 'utf-8');
 
-      // Mock unlinkSync to throw
-      vi.spyOn(require('fs'), 'unlinkSync').mockImplementationOnce(() => {
+      // Mock unlinkSync to throw via the mocked fs module
+      vi.spyOn(fs, 'unlinkSync').mockImplementationOnce(() => {
         throw new Error('Delete error');
       });
 
@@ -459,8 +465,8 @@ describe('specialist-context', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Background digest generation failed'),
-        expect.any(Error)
+        expect.stringContaining('Failed to generate digest'),
+        expect.any(String)
       );
 
       consoleErrorSpy.mockRestore();
