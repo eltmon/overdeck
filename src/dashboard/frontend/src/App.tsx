@@ -253,7 +253,7 @@ export default function App() {
                 {/* Resize handle */}
                 <div
                   onMouseDown={handleMouseDown}
-                  className={`w-1 hover:w-1.5 bg-gray-700 hover:bg-blue-500 cursor-col-resize transition-colors shrink-0 ${
+                  className={`w-1 hover:w-1.5 bg-surface-overlay hover:bg-blue-500 cursor-col-resize transition-colors shrink-0 ${
                     isResizing ? 'bg-blue-500' : ''
                   }`}
                 />
@@ -261,7 +261,7 @@ export default function App() {
                   {/* Expand/collapse button */}
                   <button
                     onClick={toggleExpand}
-                    className="absolute top-2 left-2 z-10 p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-white"
+                    className="absolute top-2 left-2 z-10 p-1.5 bg-surface-overlay hover:bg-surface-emphasis rounded text-content-subtle hover:text-content"
                     title={isExpanded ? 'Collapse panel' : 'Expand panel'}
                   >
                     {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
