@@ -207,6 +207,12 @@ export function loadRegistry(): SpecialistRegistry {
     // Return default registry
     return {
       version: '1.0',
+      defaults: {
+        contextRuns: 5,
+        digestModel: null,
+        retention: { maxDays: 30, maxRuns: 50 },
+      },
+      projects: {},
       specialists: DEFAULT_SPECIALISTS,
       lastUpdated: new Date().toISOString(),
     };
@@ -315,7 +321,7 @@ export function clearSessionId(name: SpecialistType): boolean {
  */
 export function getSpecialistMetadata(name: SpecialistType): SpecialistMetadata | null {
   const registry = loadRegistry();
-  return registry.specialists.find((s) => s.name === name) || null;
+  return (registry.specialists ?? []).find((s) => s.name === name) || null;
 }
 
 /**
@@ -330,17 +336,19 @@ export function updateSpecialistMetadata(
 ): void {
   const registry = loadRegistry();
 
-  const index = registry.specialists.findIndex((s) => s.name === name);
+  const specialists = registry.specialists ?? [];
+  const index = specialists.findIndex((s) => s.name === name);
 
   if (index === -1) {
     throw new Error(`Specialist ${name} not found in registry`);
   }
 
-  registry.specialists[index] = {
-    ...registry.specialists[index],
+  specialists[index] = {
+    ...specialists[index],
     ...updates,
     name, // Ensure name doesn't change
   };
+  registry.specialists = specialists;
 
   saveRegistry(registry);
 }
@@ -352,7 +360,7 @@ export function updateSpecialistMetadata(
  */
 export function getAllSpecialists(): SpecialistMetadata[] {
   const registry = loadRegistry();
-  return registry.specialists;
+  return registry.specialists ?? [];
 }
 
 /**
@@ -862,7 +870,7 @@ function scheduleLogCleanup(projectKey: string, specialistType: SpecialistType):
       const { getSpecialistRetention } = await import('../projects.js');
 
       const retention = getSpecialistRetention(projectKey);
-      const deleted = cleanupOldLogs(projectKey, specialistType, retention);
+      const deleted = cleanupOldLogs(projectKey, specialistType, { maxDays: retention.max_days, maxRuns: retention.max_runs });
 
       if (deleted > 0) {
         console.log(`[specialist] Cleaned up ${deleted} old logs for ${projectKey}/${specialistType}`);

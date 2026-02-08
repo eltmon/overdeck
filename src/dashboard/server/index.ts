@@ -7312,8 +7312,9 @@ app.post('/api/agents', async (req, res) => {
     }
 
     // NOW spawn the agent (after containers are ready)
+    const phase = req.body.phase || 'exploration';
     const activityId = spawnPanCommand(
-      ['work', 'issue', issueId],
+      ['work', 'issue', issueId, '--phase', phase],
       `Start agent for ${issueId}`,
       projectPath
     );

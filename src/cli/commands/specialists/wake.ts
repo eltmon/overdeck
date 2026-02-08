@@ -7,6 +7,7 @@
 import chalk from 'chalk';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { setTimeout as sleep } from 'timers/promises';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import {

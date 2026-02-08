@@ -1,9 +1,9 @@
 import chalk from 'chalk';
-import ora from 'ora';
+import ora, { type Ora } from 'ora';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { spawnAgent } from '../../../lib/agents.js';
+import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../../lib/projects.js';
 
 /**
@@ -85,6 +85,7 @@ interface IssueOptions {
   shadow?: boolean;
   remote?: boolean;
   local?: boolean;
+  phase?: string;
 }
 
 /**
@@ -143,7 +144,7 @@ function findWorkspaceWithLocation(
   }
 
   // If no local workspace found and no explicit local preference, check remote
-  if (location === null || location === 'remote') {
+  if (location === null) {
     const remoteMetadata = findRemoteWorkspaceMetadata(issueId);
     if (remoteMetadata) {
       return { workspacePath: remoteMetadata.id, isRemote: true };
@@ -215,7 +216,7 @@ function findWorkspace(issueId: string, labels: string[] = []): string | null {
 async function handleRemoteWorkspace(
   issueId: string,
   options: IssueOptions,
-  spinner: ora.Ora
+  spinner: Ora
 ): Promise<void> {
   const config = loadConfig();
 
@@ -368,7 +369,7 @@ async function handleRemoteWorkspace(
  */
 async function ensureRemoteWorkspace(
   issueId: string,
-  spinner: ora.Ora
+  spinner: Ora
 ): Promise<RemoteWorkspaceMetadata | null> {
   // Check if remote workspace already exists
   const existing = findRemoteWorkspaceMetadata(issueId);
@@ -587,6 +588,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       workspace,
       runtime: options.runtime,
       model: options.model,
+      phase: options.phase as SpawnOptions['phase'],
       prompt,
     });
 

@@ -667,10 +667,11 @@ export async function migrateLocalToRemote(
     }
 
     // 11.55. Sync env files (if configured in project)
-    if (projectConfig?.workspace?.env?.files && projectConfig.workspace.env.files.length > 0) {
+    const envFiles = (projectConfig?.workspace?.env as any)?.files;
+    if (envFiles && envFiles.length > 0) {
       spinner.text = 'Syncing environment files...';
       try {
-        const envResult = await provider.syncEnvFiles(vmName, projectConfig.workspace.env.files);
+        const envResult = await (provider as any).syncEnvFiles(vmName, envFiles);
         if (envResult.synced.length > 0) {
           result.steps.push(`Synced ${envResult.synced.length} env file(s)`);
         }
@@ -685,7 +686,7 @@ export async function migrateLocalToRemote(
     // 11.6. Setup nginx reverse proxy (exe.dev only exposes one port)
     spinner.text = 'Setting up nginx reverse proxy...';
     try {
-      const nginxSuccess = await provider.setupStandardWorkspaceProxy(vmName);
+      const nginxSuccess = await (provider as any).setupStandardWorkspaceProxy(vmName);
       if (nginxSuccess) {
         result.steps.push('Configured nginx reverse proxy on port 8080');
         result.steps.push('Set exe.dev share to port 8080 (public)');
@@ -699,7 +700,7 @@ export async function migrateLocalToRemote(
     // 11.7. Setup runtime environment (Phase 1: install Java/Node)
     spinner.text = 'Installing runtime dependencies...';
     try {
-      const runtimeResult = await provider.setupRuntimeEnvironment(vmName);
+      const runtimeResult = await (provider as any).setupRuntimeEnvironment(vmName);
       if (runtimeResult.java) result.steps.push(`Installed Java ${runtimeResult.projectTypes.java?.version || '21'}`);
       if (runtimeResult.node) result.steps.push(`Installed Node.js ${runtimeResult.projectTypes.node?.version || '20'}`);
       if (runtimeResult.pnpm) result.steps.push('Installed pnpm');
@@ -708,10 +709,10 @@ export async function migrateLocalToRemote(
     }
 
     // 11.8. Build applications (Phase 2)
-    const shareUrl = provider.getShareUrl(vmName);
+    const shareUrl = (provider as any).getShareUrl(vmName);
     spinner.text = 'Building applications...';
     try {
-      const buildResult = await provider.buildAllProjects(vmName, shareUrl);
+      const buildResult = await (provider as any).buildAllProjects(vmName, shareUrl);
       if (buildResult.java) result.steps.push('Built Java/Maven project');
       if (buildResult.node) result.steps.push('Built Node.js/frontend project');
     } catch (error: any) {
@@ -721,7 +722,7 @@ export async function migrateLocalToRemote(
     // 11.9. Start services (Phase 3)
     spinner.text = 'Starting services...';
     try {
-      const serviceResult = await provider.startAllServices(vmName);
+      const serviceResult = await (provider as any).startAllServices(vmName);
       if (serviceResult.docker) result.steps.push('Started Docker Compose services');
       if (serviceResult.frontend) result.steps.push('Started frontend preview server');
     } catch (error: any) {

@@ -788,31 +788,53 @@ export async function spawnMergeAgentForBranches(
 PROJECT: ${projectPath}
 SOURCE BRANCH: ${sourceBranch}
 TARGET BRANCH: ${targetBranch}
-CURRENT HEAD: ${headBefore}
+PRE_MERGE_HEAD: ${headBefore}
 
 INSTRUCTIONS:
+
+PHASE 1 — BASELINE (before merge):
 1. cd ${projectPath}
 2. git checkout ${targetBranch}
 3. git pull origin ${targetBranch} --ff-only
-4. git merge ${sourceBranch}
-5. If conflicts: resolve them intelligently, then git add and git commit
-6. If clean merge: the merge commit is auto-created
-7. Build the project to verify no compile errors:
+4. Run tests on the CURRENT ${targetBranch} to establish a baseline:
+   - Use the Task tool with subagent_type="Bash" to run: npm test 2>&1 || true
+   - Record the number of passing and failing tests as BASELINE_PASS and BASELINE_FAIL
+   - This baseline is critical — you will compare post-merge results against it
+
+PHASE 2 — MERGE:
+5. git merge ${sourceBranch}
+6. If conflicts: resolve them intelligently, then git add and git commit
+7. If clean merge: the merge commit is auto-created (or fast-forward)
+
+PHASE 3 — VERIFY:
+8. Build the project to verify no compile errors:
    - Use the Task tool with subagent_type="Bash" to run the build command
    - For Node.js: npm run build
-   - For Java/Maven: mvn compile
-   - For Rust: cargo build
-   - Check package.json, pom.xml, or Cargo.toml to determine the right command
-8. Run tests using the Task tool with subagent_type="Bash":
+   - Check package.json to determine the right command
+9. Run tests using the Task tool with subagent_type="Bash":
    - For Node.js: npm test
-   - For Java/Maven: mvn test
-   - For Rust: cargo test
-   - Use the appropriate command based on project type
-9. If build AND tests pass: git push origin ${targetBranch}
-10. If build OR tests fail: git reset --hard HEAD~1 and report failure with details
+   - Record the number of passing and failing tests as MERGE_PASS and MERGE_FAIL
+
+PHASE 4 — DECIDE:
+10. Compare results:
+    - If build failed: ROLLBACK (go to step 11)
+    - If MERGE_FAIL > BASELINE_FAIL (NEW test failures introduced): ROLLBACK (go to step 11)
+    - If MERGE_FAIL <= BASELINE_FAIL (no new failures): PUSH (go to step 12)
+    - Pre-existing failures on ${targetBranch} are NOT a reason to rollback
+11. ROLLBACK: git reset --hard ${headBefore}
+    Then report failure by calling the Panopticon API:
+    curl -s -X POST http://localhost:3011/api/specialists/done \\
+      -H "Content-Type: application/json" \\
+      -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"<reason for rollback>"}'
+    Then STOP.
+12. PUSH: git push origin ${targetBranch}
+    Then report success by calling the Panopticon API:
+    curl -s -X POST http://localhost:3011/api/specialists/done \\
+      -H "Content-Type: application/json" \\
+      -d '{"specialist":"merge","issueId":"${issueId}","status":"passed"}'
 
 CRITICAL: You MUST complete this merge. The approve operation is waiting.
-When done, the merge commit should be pushed to origin/${targetBranch}.
+CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.
 
 WHY USE SUBAGENTS FOR BUILD/TEST:
 - Subagents have isolated context and won't pollute your working memory
@@ -823,6 +845,8 @@ DO NOT:
 - Delete the feature branch (locally or remotely)
 - Clean up workspaces
 - Skip the build step - compile errors after merge are common
+- Skip the baseline test run — without it you cannot distinguish new failures from pre-existing ones
+- Use HEAD~1 for rollback — use PRE_MERGE_HEAD (${headBefore}) which handles fast-forward merges correctly
 - Do anything beyond the merge, build, test, and push steps above
 
 Report any issues or conflicts you encountered.`;
