@@ -65,6 +65,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [size, setSize] = useState({ width: 900, height: 600 });
   const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
+  const [shadowMode, setShadowMode] = useState(false);
   const [showBeadsDialog, setShowBeadsDialog] = useState(false);
 
   // Track if we've actually connected to a planning session in THIS dialog instance
@@ -78,7 +79,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDocker, workspaceLocation }),
+        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -534,6 +535,20 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                           </label>
                         </div>
                       </div>
+
+                      {/* Shadow Engineering option */}
+                      <label className="flex items-center gap-3 mb-4 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={shadowMode}
+                          onChange={(e) => setShadowMode(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                        />
+                        <span className="text-sm text-content-body">
+                          Shadow Engineering
+                          <span className="text-content-muted ml-1">(AI observes your workflow, doesn&apos;t modify code)</span>
+                        </span>
+                      </label>
 
                       {/* Docker option */}
                       <label className="flex items-center gap-3 mb-6 cursor-pointer">

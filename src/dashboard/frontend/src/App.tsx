@@ -17,15 +17,17 @@ import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
-import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon } from 'lucide-react';
+import { MissionControl } from './components/MissionControl';
+import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useTheme } from './hooks/useTheme';
 import { useSocketIssues } from './hooks/useSocketIssues';
 
-type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
+type Tab = 'mission-control' | 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
 const TAB_PATHS: Record<Tab, string> = {
-  kanban: '/',
+  'mission-control': '/',
+  kanban: '/kanban',
   agents: '/agents',
   convoys: '/convoys',
   handoffs: '/handoffs',
@@ -43,7 +45,7 @@ const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
 
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
-  return PATH_TO_TAB[path] || 'kanban';
+  return PATH_TO_TAB[path] || 'mission-control';
 }
 
 const MIN_PANEL_WIDTH = 400;
@@ -230,7 +232,7 @@ export default function App() {
 
   const handleSelectIssueFromSearch = useCallback((issueId: string) => {
     setSelectedIssue(issueId);
-    setActiveTab('kanban'); // Switch to kanban tab if not already there
+    setActiveTab('kanban'); // Switch to kanban tab for detail view
   }, []);
 
   // Calculate actual panel width (expanded = full width minus a small margin for kanban)
@@ -241,9 +243,9 @@ export default function App() {
       <header className="bg-surface-raised border-b border-divider px-4 py-2 shrink-0">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setActiveTab('kanban')}
+            onClick={() => setActiveTab('mission-control')}
             className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
-            title="Go to Board"
+            title="Go to Mission Control"
           >
             <Eye className="w-5 h-5 text-blue-400" />
             <h1 className="text-lg font-bold text-content whitespace-nowrap">Panopticon</h1>
@@ -251,6 +253,7 @@ export default function App() {
           <CloisterStatusBar />
           <nav className="flex gap-0.5 overflow-x-auto min-w-0 scrollbar-hide">
             {([
+              { id: 'mission-control', label: 'Mission Control', icon: Compass },
               { id: 'kanban', label: 'Board', icon: LayoutGrid },
               { id: 'agents', label: 'Agents', icon: Users },
               { id: 'convoys', label: 'Convoys', icon: Users },
@@ -287,6 +290,11 @@ export default function App() {
       </header>
 
       <main ref={containerRef} className="flex-1 flex overflow-hidden">
+        {activeTab === 'mission-control' && (
+          <div className="w-full h-full">
+            <MissionControl issues={issues} />
+          </div>
+        )}
         {activeTab === 'kanban' && (
           <>
             <div className={`flex-1 overflow-auto p-6 ${selectedIssue ? '' : 'w-full'}`}>

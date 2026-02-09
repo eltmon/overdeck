@@ -7426,8 +7426,8 @@ async function addGitHubPlanningLabel(owner: string, repo: string, number: numbe
 // Start planning for an issue - moves to "In Planning", creates workspace, spawns planning agent
 app.post('/api/issues/:id/start-planning', async (req, res) => {
   const { id } = req.params;
-  const { skipWorkspace = false, startDocker = false, workspaceLocation = 'local' } = req.body;
-  console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}`);
+  const { skipWorkspace = false, startDocker = false, workspaceLocation = 'local', shadowMode = false } = req.body;
+  console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
   try {
     // Check if a work agent is already running for this issue
@@ -7766,6 +7766,23 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         : join(projectPath, '.planning', issueLower);
       if (!existsSync(planningDir)) {
         await execAsync(`mkdir -p "${planningDir}"`, { encoding: 'utf-8' });
+      }
+
+      // Initialize .planning subdirectories for Mission Control
+      for (const subdir of ['transcripts', 'discussions', 'notes']) {
+        const subdirPath = join(planningDir, subdir);
+        if (!existsSync(subdirPath)) {
+          mkdirSync(subdirPath, { recursive: true });
+        }
+      }
+
+      // Initialize Shadow Engineering if enabled
+      if (shadowMode) {
+        const inferencePath = join(planningDir, 'INFERENCE.md');
+        if (!existsSync(inferencePath)) {
+          writeFileSync(inferencePath, `# Inference Document - ${id.toUpperCase()}\n\n*This document is maintained by the Shadow Engineering Monitoring Agent.*\n\n## Status\n\nAwaiting initial artifact analysis.\n`, 'utf-8');
+          console.log(`[start-planning] Shadow Engineering: Initialized INFERENCE.md`);
+        }
       }
 
       // Clear stale STATE.md from previous planning session (start fresh)
@@ -11282,6 +11299,556 @@ app.post('/api/remote/workspaces/:issueId/agent/tell', async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// Mission Control API - Activity & Planning Artifacts
+// ============================================================================
+
+// GET /api/mission-control/activity/:issueId - Aggregate all agent activity for a feature
+app.get('/api/mission-control/activity/:issueId', async (req, res) => {
+  const { issueId } = req.params;
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = issueId.split('-')[0];
+
+  try {
+    const sections: Array<{
+      type: string;
+      sessionId: string;
+      model: string;
+      startedAt: string;
+      duration: number | null;
+      status: string;
+      transcript: string;
+    }> = [];
+
+    // 1. Check for planning agent sessions
+    const agentId = `agent-${issueLower}`;
+    const planningAgentId = `planning-${issueLower}`;
+    const agentsDir = join(homedir(), '.panopticon', 'agents');
+
+    for (const checkId of [planningAgentId, agentId]) {
+      const agentDir = join(agentsDir, checkId);
+      if (existsSync(agentDir)) {
+        const stateFile = join(agentDir, 'state.json');
+        if (existsSync(stateFile)) {
+          try {
+            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+            const isPlanning = checkId.startsWith('planning-');
+            const sectionType = isPlanning ? 'planning' : 'work';
+
+            // Try to read agent output from tmux
+            let transcript = '';
+            try {
+              const { stdout } = await execAsync(
+                `tmux capture-pane -t ${checkId} -p -S -500 2>/dev/null || echo ""`,
+                { encoding: 'utf-8', timeout: 5000 }
+              );
+              transcript = stdout.trim();
+            } catch { /* agent may not be running */ }
+
+            sections.push({
+              type: sectionType,
+              sessionId: checkId,
+              model: state.model || state.runtime || 'unknown',
+              startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
+              duration: state.startedAt ? Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000) : null,
+              status: state.state === 'active' ? 'running' : state.state === 'suspended' ? 'completed' : (state.status || 'completed'),
+              transcript,
+            });
+          } catch { /* skip malformed state */ }
+        }
+      }
+    }
+
+    // 2. Check for specialist runs (review, test, merge)
+    const specialistsDir = join(homedir(), '.panopticon', 'specialists');
+    if (existsSync(specialistsDir)) {
+      // Check all project directories for runs related to this issue
+      const projectPath = getProjectPath(undefined, issuePrefix);
+      const projectName = projectPath ? projectPath.split('/').pop() || '' : '';
+
+      // Try common project key patterns
+      const projectKeys = [projectName, issuePrefix.toLowerCase()].filter(Boolean);
+
+      for (const projectKey of projectKeys) {
+        for (const specialistType of ['review-agent', 'test-agent', 'merge-agent']) {
+          const runsDir = join(specialistsDir, projectKey, specialistType, 'runs');
+          if (!existsSync(runsDir)) continue;
+
+          try {
+            const runFiles = readdirSync(runsDir)
+              .filter(f => f.includes(issueLower) && f.endsWith('.log'))
+              .sort()
+              .reverse()
+              .slice(0, 3); // Last 3 runs per type
+
+            for (const runFile of runFiles) {
+              const content = readFileSync(join(runsDir, runFile), 'utf-8');
+
+              // Parse run metadata from log header
+              const startedMatch = content.match(/Started: (.+)/);
+              const statusMatch = content.match(/Status: (.+)/);
+              const finishedMatch = content.match(/Finished: (.+)/);
+
+              const startedAt = startedMatch ? startedMatch[1].trim() : '';
+              const finishedAt = finishedMatch ? finishedMatch[1].trim() : '';
+              const runStatus = statusMatch ? statusMatch[1].trim() : 'completed';
+
+              const typeMap: Record<string, string> = {
+                'review-agent': 'review',
+                'test-agent': 'test',
+                'merge-agent': 'merge',
+              };
+
+              sections.push({
+                type: typeMap[specialistType] || specialistType,
+                sessionId: runFile.replace('.log', ''),
+                model: 'specialist',
+                startedAt,
+                duration: startedAt && finishedAt
+                  ? Math.floor((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000)
+                  : null,
+                status: runStatus === 'passed' ? 'completed' : runStatus === 'failed' ? 'failed' : 'completed',
+                transcript: content,
+              });
+            }
+          } catch { /* skip unreadable runs */ }
+        }
+      }
+    }
+
+    // Sort sections by startedAt
+    sections.sort((a, b) => {
+      if (!a.startedAt) return 1;
+      if (!b.startedAt) return -1;
+      return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+    });
+
+    res.json({ issueId, sections });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch activity: ' + error.message });
+  }
+});
+
+// GET /api/mission-control/planning/:issueId - Get planning artifacts
+app.get('/api/mission-control/planning/:issueId', async (req, res) => {
+  const { issueId } = req.params;
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = issueId.split('-')[0];
+
+  try {
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const planningDir = join(workspacePath, '.planning');
+
+    const result: {
+      prd?: string;
+      state?: string;
+      inference?: string;
+      transcripts: Array<{ filename: string; content: string; uploadedAt: string }>;
+      discussions: Array<{ filename: string; content: string; syncedAt: string }>;
+      notes: Array<{ filename: string; content: string; uploadedAt: string }>;
+    } = {
+      transcripts: [],
+      discussions: [],
+      notes: [],
+    };
+
+    if (!existsSync(planningDir)) {
+      return res.json(result);
+    }
+
+    // Read core planning docs
+    const prdPath = join(planningDir, 'PRD.md');
+    const statePath = join(planningDir, 'STATE.md');
+    const inferencePath = join(planningDir, 'INFERENCE.md');
+
+    if (existsSync(prdPath)) result.prd = readFileSync(prdPath, 'utf-8');
+    if (existsSync(statePath)) result.state = readFileSync(statePath, 'utf-8');
+    if (existsSync(inferencePath)) result.inference = readFileSync(inferencePath, 'utf-8');
+
+    // Also check PLANNING_PROMPT.md as fallback for PRD
+    if (!result.prd) {
+      const promptPath = join(planningDir, 'PLANNING_PROMPT.md');
+      if (existsSync(promptPath)) result.prd = readFileSync(promptPath, 'utf-8');
+    }
+
+    // Read subdirectory artifacts
+    const readArtifactDir = (subdir: string, dateField: string) => {
+      const dirPath = join(planningDir, subdir);
+      if (!existsSync(dirPath)) return [];
+      return readdirSync(dirPath)
+        .filter(f => f.endsWith('.md') || f.endsWith('.txt'))
+        .map(filename => {
+          const filePath = join(dirPath, filename);
+          const stat = statSync(filePath);
+          return {
+            filename,
+            content: readFileSync(filePath, 'utf-8'),
+            [dateField]: stat.mtime.toISOString(),
+          };
+        })
+        .sort((a: any, b: any) => new Date(b[dateField]).getTime() - new Date(a[dateField]).getTime());
+    };
+
+    result.transcripts = readArtifactDir('transcripts', 'uploadedAt') as any;
+    result.discussions = readArtifactDir('discussions', 'syncedAt') as any;
+    result.notes = readArtifactDir('notes', 'uploadedAt') as any;
+
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch planning artifacts: ' + error.message });
+  }
+});
+
+// POST /api/mission-control/planning/:issueId/upload - Upload transcript or note
+app.post('/api/mission-control/planning/:issueId/upload', async (req, res) => {
+  const { issueId } = req.params;
+  const { type, filename, content } = req.body;
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = issueId.split('-')[0];
+
+  if (!type || !filename || !content) {
+    return res.status(400).json({ error: 'type, filename, and content are required' });
+  }
+
+  if (!['transcript', 'note'].includes(type)) {
+    return res.status(400).json({ error: 'type must be transcript or note' });
+  }
+
+  // Sanitize filename
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const ext = safeName.endsWith('.md') || safeName.endsWith('.txt') ? '' : '.md';
+
+  try {
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const subdir = type === 'transcript' ? 'transcripts' : 'notes';
+    const dirPath = join(workspacePath, '.planning', subdir);
+
+    mkdirSync(dirPath, { recursive: true });
+    const filePath = join(dirPath, safeName + ext);
+    writeFileSync(filePath, content, 'utf-8');
+
+    // Emit socket event
+    if (socketIo) {
+      socketIo.emit('planning:sync', {
+        issueId,
+        artifactType: type,
+        filename: safeName + ext,
+      });
+    }
+
+    res.json({ success: true, path: filePath });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to upload artifact: ' + error.message });
+  }
+});
+
+// POST /api/mission-control/planning/:issueId/sync-discussions - Sync tracker discussions
+app.post('/api/mission-control/planning/:issueId/sync-discussions', async (req, res) => {
+  const { issueId } = req.params;
+  const { tracker } = req.body;
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = issueId.split('-')[0];
+
+  if (!tracker || !['github', 'linear'].includes(tracker)) {
+    return res.status(400).json({ error: 'tracker must be github or linear' });
+  }
+
+  try {
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const discussionsDir = join(workspacePath, '.planning', 'discussions');
+    mkdirSync(discussionsDir, { recursive: true });
+
+    const syncedFiles: string[] = [];
+
+    if (tracker === 'github') {
+      const ghConfig = getGitHubConfigShared();
+      if (!ghConfig) {
+        return res.status(400).json({ error: 'GitHub not configured' });
+      }
+
+      // Use gh CLI to fetch issue comments
+      try {
+        const issueNum = issueId.replace(/^[A-Z]+-/, '');
+        const { stdout } = await execAsync(
+          `gh issue view ${issueNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
+          { encoding: 'utf-8', timeout: 30000 }
+        );
+
+        if (stdout.trim()) {
+          const filename = `github-${issueId}-comments.md`;
+          const header = `# GitHub Comments for ${issueId}\n\nSynced: ${new Date().toISOString()}\n\n---\n\n`;
+          writeFileSync(join(discussionsDir, filename), header + stdout, 'utf-8');
+          syncedFiles.push(filename);
+        }
+      } catch (ghErr: any) {
+        console.warn(`Failed to sync GitHub comments for ${issueId}:`, ghErr.message);
+      }
+
+      // Also sync PR discussions if any
+      try {
+        const { stdout: prList } = await execAsync(
+          `gh pr list --repo ${ghConfig.owner}/${ghConfig.repos[0]} --head feature/${issueLower} --json number,title --jq '.[].number'`,
+          { encoding: 'utf-8', timeout: 15000 }
+        );
+
+        for (const prNum of prList.trim().split('\n').filter(Boolean)) {
+          const { stdout: prComments } = await execAsync(
+            `gh pr view ${prNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
+            { encoding: 'utf-8', timeout: 15000 }
+          );
+
+          if (prComments.trim()) {
+            const filename = `pr-${prNum}-discussion.md`;
+            const header = `# PR #${prNum} Discussion\n\nSynced: ${new Date().toISOString()}\n\n---\n\n`;
+            writeFileSync(join(discussionsDir, filename), header + prComments, 'utf-8');
+            syncedFiles.push(filename);
+          }
+        }
+      } catch { /* no PR found */ }
+    } else if (tracker === 'linear') {
+      const linearApiKey = getLinearApiKeyShared();
+      if (!linearApiKey) {
+        return res.status(400).json({ error: 'Linear not configured' });
+      }
+
+      // Fetch Linear issue comments via API
+      try {
+        const response = await fetch('https://api.linear.app/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': linearApiKey,
+          },
+          body: JSON.stringify({
+            query: `query { issueSearch(filter: { identifier: { eq: "${issueId}" } }) { nodes { comments { nodes { body createdAt user { name } } } } } }`,
+          }),
+        });
+
+        const data = await response.json() as any;
+        const comments = data?.data?.issueSearch?.nodes?.[0]?.comments?.nodes || [];
+
+        if (comments.length > 0) {
+          const filename = `linear-${issueId}-comments.md`;
+          const header = `# Linear Comments for ${issueId}\n\nSynced: ${new Date().toISOString()}\n\n---\n\n`;
+          const body = comments.map((c: any) =>
+            `## ${c.user?.name || 'Unknown'} (${c.createdAt})\n\n${c.body}\n\n---\n`
+          ).join('\n');
+          writeFileSync(join(discussionsDir, filename), header + body, 'utf-8');
+          syncedFiles.push(filename);
+        }
+      } catch (linearErr: any) {
+        console.warn(`Failed to sync Linear comments for ${issueId}:`, linearErr.message);
+      }
+    }
+
+    // Emit socket event
+    if (socketIo) {
+      for (const file of syncedFiles) {
+        socketIo.emit('planning:sync', {
+          issueId,
+          artifactType: 'discussion',
+          filename: file,
+        });
+      }
+    }
+
+    res.json({ synced: syncedFiles.length, files: syncedFiles });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to sync discussions: ' + error.message });
+  }
+});
+
+// POST /api/mission-control/planning/:issueId/init - Initialize .planning directory
+app.post('/api/mission-control/planning/:issueId/init', async (req, res) => {
+  const { issueId } = req.params;
+  const { shadow } = req.body; // Whether this is a shadow engineering workspace
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = issueId.split('-')[0];
+
+  try {
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const planningDir = join(workspacePath, '.planning');
+
+    // Create all subdirectories
+    for (const subdir of ['transcripts', 'discussions', 'notes']) {
+      mkdirSync(join(planningDir, subdir), { recursive: true });
+    }
+
+    // Initialize INFERENCE.md for shadow engineering
+    if (shadow) {
+      const inferencePath = join(planningDir, 'INFERENCE.md');
+      if (!existsSync(inferencePath)) {
+        writeFileSync(inferencePath, `# Inference Document - ${issueId}\n\n*This document is maintained by the Shadow Engineering Monitoring Agent.*\n\n## Status\n\nAwaiting initial artifact analysis.\n\n## Understanding\n\n(pending)\n\n## Gaps & Risks\n\n(pending)\n`, 'utf-8');
+      }
+    }
+
+    res.json({ success: true, path: planningDir });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to initialize planning directory: ' + error.message });
+  }
+});
+
+// GET /api/mission-control/projects - Get project tree with active features
+app.get('/api/mission-control/projects', async (_req, res) => {
+  try {
+    const projects = listProjects();
+    const projectTree: Array<{
+      name: string;
+      path: string;
+      features: Array<{
+        issueId: string;
+        title: string;
+        branch: string;
+        status: string;
+        agentStatus: string | null;
+        hasPlanning: boolean;
+        hasPrd: boolean;
+        hasState: boolean;
+        isShadow: boolean;
+      }>;
+    }> = [];
+
+    for (const project of projects) {
+      const workspacesDir = join(project.projectPath, 'workspaces');
+      const features: typeof projectTree[0]['features'] = [];
+
+      if (existsSync(workspacesDir)) {
+        const entries = readdirSync(workspacesDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory() || !entry.name.startsWith('feature-')) continue;
+
+          const featurePath = join(workspacesDir, entry.name);
+          const issueLower = entry.name.replace('feature-', '');
+          const issueId = issueLower.toUpperCase();
+          const planningDir = join(featurePath, '.planning');
+
+          // Check for planning artifacts
+          const hasPlanning = existsSync(planningDir);
+          const hasPrd = hasPlanning && (existsSync(join(planningDir, 'PRD.md')) || existsSync(join(planningDir, 'PLANNING_PROMPT.md')));
+          const hasState = hasPlanning && existsSync(join(planningDir, 'STATE.md'));
+          const isShadow = hasPlanning && existsSync(join(planningDir, 'INFERENCE.md'));
+
+          // Check agent status
+          const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+          let agentStatus: string | null = null;
+          if (existsSync(join(agentDir, 'state.json'))) {
+            try {
+              const state = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf-8'));
+              agentStatus = state.state || state.status || null;
+            } catch { /* skip */ }
+          }
+
+          // Try to get title from issue tracker data
+          let title = issueId;
+
+          features.push({
+            issueId,
+            title,
+            branch: `feature/${issueLower}`,
+            status: agentStatus === 'active' ? 'running' : hasState ? 'has_state' : 'idle',
+            agentStatus,
+            hasPlanning,
+            hasPrd,
+            hasState,
+            isShadow,
+          });
+        }
+      }
+
+      projectTree.push({
+        name: project.name || project.projectPath.split('/').pop() || 'Unknown',
+        path: project.projectPath,
+        features,
+      });
+    }
+
+    res.json(projectTree);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch project tree: ' + error.message });
+  }
+});
+
+// ============================================================================
+// Shadow Engineering API
+// ============================================================================
+
+// POST /api/shadow/:issueId/monitor - Run monitoring agent to generate/update INFERENCE.md
+app.post('/api/shadow/:issueId/monitor', async (req, res) => {
+  const { issueId } = req.params;
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = issueId.split('-')[0];
+
+  try {
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+    if (!existsSync(workspacePath)) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    // Dynamically import shadow engineering module
+    const { gatherArtifacts, generateBasicInference, updateInferenceDocument, readInferenceDocument } = await import('../../lib/shadow-engineering/index.js');
+
+    const config = { issueId, workspacePath, projectPath };
+    const artifacts = await gatherArtifacts(config);
+    const existingInference = readInferenceDocument(workspacePath);
+
+    // Generate basic inference document (without LLM for now)
+    const inference = generateBasicInference(config, artifacts);
+    updateInferenceDocument(workspacePath, inference);
+
+    // Emit socket event
+    if (socketIo) {
+      socketIo.emit('shadow:inference-update', { issueId, content: inference });
+    }
+
+    res.json({ success: true, inference });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to run monitoring agent: ' + error.message });
+  }
+});
+
+// POST /api/shadow/:issueId/observe - Run observer cycle (poll PRs and comment)
+app.post('/api/shadow/:issueId/observe', async (req, res) => {
+  const { issueId } = req.params;
+  const { mode } = req.body; // 'watch' or 'propose'
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = issueId.split('-')[0];
+
+  try {
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+    if (!existsSync(workspacePath)) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    const ghConfig = getGitHubConfigShared();
+    if (!ghConfig) {
+      return res.status(400).json({ error: 'GitHub not configured - Observer requires GitHub' });
+    }
+
+    const { runObserverCycle } = await import('../../lib/shadow-engineering/index.js');
+
+    const config = {
+      issueId,
+      workspacePath,
+      projectPath,
+      repo: `${ghConfig.owner}/${ghConfig.repos[0]}`,
+      mode: (mode || 'watch') as 'watch' | 'propose',
+    };
+
+    const commentsPosted = await runObserverCycle(config);
+    res.json({ success: true, commentsPosted });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to run observer: ' + error.message });
   }
 });
 
