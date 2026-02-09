@@ -949,8 +949,8 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ includeClosed: false });
       const query = getPassedQuery();
-      // The entire expression must be wrapped in outer parens
-      expect(query).toBe('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted") AND (State != "Closed")))');
+      // Binary-nested: Rally WSAPI only supports (expr AND expr), never 3-way
+      expect(query).toBe('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted")) AND (State != "Closed"))');
     });
 
     it('should generate correct query for state filter (always paired with exclude-closed)', async () => {
@@ -971,7 +971,7 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ assignee: 'John Doe', includeClosed: true });
       const query = getPassedQuery();
-      expect(query).toBe('((Owner.Name contains "John Doe"))');
+      expect(query).toBe('(Owner.Name contains "John Doe")');
     });
 
     it('should generate correct query for labels filter', async () => {
@@ -979,7 +979,7 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ labels: ['bug', 'urgent'], includeClosed: true });
       const query = getPassedQuery();
-      expect(query).toBe('(((Tags.Name contains "bug") AND (Tags.Name contains "urgent")))');
+      expect(query).toBe('((Tags.Name contains "bug") AND (Tags.Name contains "urgent"))');
     });
 
     it('should generate correct query for search query filter', async () => {
@@ -987,7 +987,7 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ query: 'login error', includeClosed: true });
       const query = getPassedQuery();
-      expect(query).toBe('(((Name contains "login error") OR (Description contains "login error")))');
+      expect(query).toBe('((Name contains "login error") OR (Description contains "login error"))');
     });
 
     it('should generate correct compound query with multiple conditions', async () => {
@@ -1003,8 +1003,8 @@ describe('RallyTracker', () => {
       // Must contain both conditions joined by AND
       expect(query).toContain('ScheduleState != "Completed"');
       expect(query).toContain('Owner.Name contains "John Doe"');
-      // Verify the outer parentheses wrap the AND join
-      expect(query).toBe('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted") AND (State != "Closed")) AND (Owner.Name contains "John Doe"))');
+      // Binary-nested: reduce wraps each pair
+      expect(query).toBe('((((ScheduleState != "Completed") AND (ScheduleState != "Accepted")) AND (State != "Closed")) AND (Owner.Name contains "John Doe"))');
     });
 
     it('should generate correct query with all filters combined', async () => {
@@ -1033,7 +1033,7 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ labels: ['enhancement'], includeClosed: true });
       const query = getPassedQuery();
-      expect(query).toBe('(((Tags.Name contains "enhancement")))');
+      expect(query).toBe('(Tags.Name contains "enhancement")');
     });
   });
 

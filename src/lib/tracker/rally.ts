@@ -379,7 +379,8 @@ export class RallyTracker implements IssueTracker {
 
     if (!filters?.includeClosed) {
       // Exclude completed/accepted items by default
-      conditions.push('((ScheduleState != "Completed") AND (ScheduleState != "Accepted") AND (State != "Closed"))');
+      // Rally WSAPI only supports binary AND/OR — nest into pairs
+      conditions.push('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted")) AND (State != "Closed"))');
     }
 
     if (filters?.assignee) {
@@ -390,15 +391,17 @@ export class RallyTracker implements IssueTracker {
       const labelConditions = filters.labels.map(
         (label) => `(Tags.Name contains "${label}")`
       );
-      conditions.push(`(${labelConditions.join(' AND ')})`);
+      // Rally WSAPI only supports binary AND — nest into pairs
+      const labelExpr = labelConditions.reduce((acc, cond) => acc ? `(${acc} AND ${cond})` : cond, '');
+      conditions.push(labelExpr);
     }
 
     if (filters?.query) {
       conditions.push(`((Name contains "${filters.query}") OR (Description contains "${filters.query}"))`);
     }
 
-    // Rally WSAPI requires outer parentheses around compound expressions
-    return conditions.length > 0 ? `(${conditions.join(' AND ')})` : '';
+    // Rally WSAPI only supports binary (expr AND expr) — reduce into nested pairs
+    return conditions.reduce((acc, cond) => acc ? `(${acc} AND ${cond})` : cond, '');
   }
 
   private normalizeIssue(rallyArtifact: any): Issue {
