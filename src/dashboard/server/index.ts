@@ -5958,7 +5958,15 @@ app.post('/api/specialists/done', async (req, res) => {
     }
   }
 
-  // Note: readyForMerge is automatically set to false when mergeStatus='merged' in setReviewStatus()
+  // When merge specialist reports success, also close the issue/PR
+  if (specialist === 'merge' && status === 'passed') {
+    try {
+      await closeIssueAfterMerge(normalizedIssueId);
+      console.log(`[specialists/done] Closed issue/PR for ${normalizedIssueId} after merge`);
+    } catch (err) {
+      console.warn(`[specialists/done] Failed to close issue after merge: ${err}`);
+    }
+  }
 
   res.json({
     success: true,
@@ -6479,10 +6487,34 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
   }
 });
 
-// DEPRECATED: Old approve endpoint - redirects to review flow
-// TODO: Remove after frontend is updated
+// Approve endpoint - if review+test already passed, redirects to merge
 app.post('/api/workspaces/:issueId/approve', async (req, res) => {
   const { issueId } = req.params;
+
+  // If review+test already passed and ready for merge, forward to the merge endpoint
+  const existingStatus = getReviewStatus(issueId);
+  if (existingStatus?.readyForMerge && existingStatus.reviewStatus === 'passed' && existingStatus.testStatus === 'passed') {
+    console.log(`[approve] Review+test already passed for ${issueId}, forwarding to merge endpoint...`);
+
+    // Forward the request to the merge endpoint
+    try {
+      const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+      const mergeRes = await fetch(`http://localhost:${apiPort}/api/workspaces/${issueId}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const mergeData = await mergeRes.json() as any;
+
+      if (mergeRes.ok) {
+        return res.json(mergeData);
+      } else {
+        return res.status(mergeRes.status).json(mergeData);
+      }
+    } catch (err: any) {
+      return res.status(500).json({ error: `Failed to forward to merge: ${err.message}` });
+    }
+  }
+
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
