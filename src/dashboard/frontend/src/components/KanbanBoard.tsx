@@ -1089,9 +1089,9 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
   const [deleteWorkspace, setDeleteWorkspace] = useState(false);
 
   // Check if issue has "Review Ready" label (agent completed work)
-  const isReviewReady = issue.labels.some(
-    (label) => label.toLowerCase() === 'review ready'
-  );
+  const isReviewReady = issue.labels?.some(
+    (label) => typeof label === 'string' && label.toLowerCase() === 'review ready'
+  ) ?? false;
 
   const priorityColors: Record<number, string> = {
     0: 'border-l-gray-500',
@@ -1408,8 +1408,8 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
             {issue.assignee.name.split(' ')[0]}
           </span>
         )}
-        {issue.labels
-          .filter((label) => label.toLowerCase() !== 'review ready') // Hide Review Ready (has prominent badge)
+        {(issue.labels || [])
+          .filter((label) => typeof label === 'string' && label.toLowerCase() !== 'review ready') // Hide Review Ready (has prominent badge)
           .slice(0, 2)
           .map((label) => (
             <span
