@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { X } from 'lucide-react';
 import styles from '../styles/mission-control.module.css';
 
@@ -30,7 +31,7 @@ export function MarkdownModal({ title, content, onClose }: MarkdownModalProps) {
         </div>
         <div className={styles.modalBody}>
           <div className={styles.markdownContent}>
-            <ReactMarkdown>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
           </div>
         </div>
       </div>

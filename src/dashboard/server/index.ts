@@ -2406,6 +2406,96 @@ app.get('/api/settings/optimal-defaults', (_req, res) => {
   }
 });
 
+// Helper: determine provider from model ID
+function getProviderForModel(modelId: string): 'anthropic' | 'openai' | 'google' | 'kimi' | 'zai' {
+  if (modelId.startsWith('claude-')) return 'anthropic';
+  if (modelId.startsWith('gpt-') || modelId.startsWith('o3-') || modelId.startsWith('o1')) return 'openai';
+  if (modelId.startsWith('gemini-')) return 'google';
+  if (modelId.startsWith('kimi-')) return 'kimi';
+  if (modelId.startsWith('glm-')) return 'zai';
+  return 'kimi'; // default
+}
+
+// Helper: call LLM for text generation (used by status review, etc.)
+async function callLLM(prompt: string, maxTokens: number = 4096): Promise<string> {
+  const settings = loadSettingsApi();
+  const modelId = (settings.models?.overrides as Record<string, string>)?.['planning-agent'] || 'kimi-k2.5';
+  const provider = getProviderForModel(modelId);
+  const apiKeys = settings.api_keys || {};
+
+  // For Anthropic models, use ANTHROPIC_API_KEY env var
+  const apiKey = provider === 'anthropic'
+    ? process.env.ANTHROPIC_API_KEY || ''
+    : apiKeys[provider] || '';
+
+  if (!apiKey) {
+    throw new Error(`No API key configured for provider "${provider}" (model: ${modelId}). Set it in Settings.`);
+  }
+
+  const apiModel = MODEL_API_IDS[modelId]?.apiModel || modelId;
+
+  switch (provider) {
+    case 'anthropic': {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: apiModel,
+          max_tokens: maxTokens,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      if (!resp.ok) throw new Error(`Anthropic API error: ${resp.status}`);
+      const data = await resp.json() as any;
+      return data.content?.[0]?.text || '';
+    }
+    case 'openai': {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens }),
+      });
+      if (!resp.ok) throw new Error(`OpenAI API error: ${resp.status}`);
+      const data = await resp.json() as any;
+      return data.choices?.[0]?.message?.content || '';
+    }
+    case 'google': {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }),
+      });
+      if (!resp.ok) throw new Error(`Google API error: ${resp.status}`);
+      const data = await resp.json() as any;
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    }
+    case 'kimi': {
+      const resp = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens }),
+      });
+      if (!resp.ok) throw new Error(`Kimi API error: ${resp.status}`);
+      const data = await resp.json() as any;
+      return data.choices?.[0]?.message?.content || '';
+    }
+    case 'zai': {
+      const resp = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens }),
+      });
+      if (!resp.ok) throw new Error(`Z.AI API error: ${resp.status}`);
+      const data = await resp.json() as any;
+      return data.choices?.[0]?.message?.content || '';
+    }
+  }
+}
+
 // Model ID to API model ID mapping
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // OpenAI models
@@ -11328,6 +11418,9 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
     const planningAgentId = `planning-${issueLower}`;
     const agentsDir = join(homedir(), '.panopticon', 'agents');
 
+    // Track whether we found a planning agent
+    let hasPlanningSection = false;
+
     for (const checkId of [planningAgentId, agentId]) {
       const agentDir = join(agentsDir, checkId);
       if (existsSync(agentDir)) {
@@ -11337,6 +11430,7 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
             const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
             const isPlanning = checkId.startsWith('planning-');
             const sectionType = isPlanning ? 'planning' : 'work';
+            if (isPlanning) hasPlanningSection = true;
 
             // Try to read agent output from tmux
             let transcript = '';
@@ -11347,6 +11441,17 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
               );
               transcript = stdout.trim();
             } catch { /* agent may not be running */ }
+
+            // If planning agent has no live tmux, use STATE.md as transcript
+            if (isPlanning && !transcript) {
+              try {
+                const projectPath = getProjectPath(undefined, issuePrefix);
+                const stateMdPath = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'STATE.md');
+                if (existsSync(stateMdPath)) {
+                  transcript = `PLANNING COMPLETE\n\n${readFileSync(stateMdPath, 'utf-8')}`;
+                }
+              } catch { /* skip */ }
+            }
 
             sections.push({
               type: sectionType,
@@ -11362,60 +11467,80 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
       }
     }
 
-    // 2. Check for specialist runs (review, test, merge)
-    const specialistsDir = join(homedir(), '.panopticon', 'specialists');
-    if (existsSync(specialistsDir)) {
-      // Check all project directories for runs related to this issue
-      const projectPath = getProjectPath(undefined, issuePrefix);
-      const projectName = projectPath ? projectPath.split('/').pop() || '' : '';
-
-      // Try common project key patterns
-      const projectKeys = [projectName, issuePrefix.toLowerCase()].filter(Boolean);
-
-      for (const projectKey of projectKeys) {
-        for (const specialistType of ['review-agent', 'test-agent', 'merge-agent']) {
-          const runsDir = join(specialistsDir, projectKey, specialistType, 'runs');
-          if (!existsSync(runsDir)) continue;
-
-          try {
-            const runFiles = readdirSync(runsDir)
-              .filter(f => f.includes(issueLower) && f.endsWith('.log'))
-              .sort()
-              .reverse()
-              .slice(0, 3); // Last 3 runs per type
-
-            for (const runFile of runFiles) {
-              const content = readFileSync(join(runsDir, runFile), 'utf-8');
-
-              // Parse run metadata from log header
-              const startedMatch = content.match(/Started: (.+)/);
-              const statusMatch = content.match(/Status: (.+)/);
-              const finishedMatch = content.match(/Finished: (.+)/);
-
-              const startedAt = startedMatch ? startedMatch[1].trim() : '';
-              const finishedAt = finishedMatch ? finishedMatch[1].trim() : '';
-              const runStatus = statusMatch ? statusMatch[1].trim() : 'completed';
-
-              const typeMap: Record<string, string> = {
-                'review-agent': 'review',
-                'test-agent': 'test',
-                'merge-agent': 'merge',
-              };
-
-              sections.push({
-                type: typeMap[specialistType] || specialistType,
-                sessionId: runFile.replace('.log', ''),
-                model: 'specialist',
-                startedAt,
-                duration: startedAt && finishedAt
-                  ? Math.floor((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-                  : null,
-                status: runStatus === 'passed' ? 'completed' : runStatus === 'failed' ? 'failed' : 'completed',
-                transcript: content,
-              });
-            }
-          } catch { /* skip unreadable runs */ }
+    // If no planning agent but STATE.md exists, create synthetic planning section
+    if (!hasPlanningSection) {
+      try {
+        const projectPath = getProjectPath(undefined, issuePrefix);
+        const planningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
+        const stateMdPath = join(planningDir, 'STATE.md');
+        if (existsSync(stateMdPath)) {
+          const stateMd = readFileSync(stateMdPath, 'utf-8');
+          const statStat = statSync(stateMdPath);
+          sections.push({
+            type: 'planning',
+            sessionId: `planning-${issueLower}-state`,
+            model: 'unknown',
+            startedAt: statStat.birthtime?.toISOString() || statStat.mtime.toISOString(),
+            duration: null,
+            status: 'completed',
+            transcript: `PLANNING COMPLETE\n\n${stateMd}`,
+          });
         }
+      } catch { /* no workspace or planning dir */ }
+    }
+
+    // 2. Build specialist sections from review-status history
+    // Persistent specialists (review-agent, test-agent) don't write per-run .log files
+    // so we build activity sections from the central review-status.json history
+    const centralStatus = getReviewStatus(issueId.toUpperCase());
+    if (centralStatus?.history && centralStatus.history.length > 0) {
+      // Group history entries into review/test/merge sections
+      const typeMap: Record<string, string> = { review: 'review', test: 'test', merge: 'merge' };
+      let currentSection: { type: string; startedAt: string; endedAt?: string; status: string; notes?: string } | null = null;
+      const specialistSections: Array<typeof currentSection & {}> = [];
+
+      for (const entry of centralStatus.history) {
+        const sectionType = typeMap[entry.type] || entry.type;
+        if (entry.status === 'reviewing' || entry.status === 'testing' || entry.status === 'merging') {
+          // Start of a specialist phase
+          currentSection = { type: sectionType, startedAt: entry.timestamp, status: 'running' };
+        } else if (currentSection && currentSection.type === sectionType) {
+          // End of a specialist phase
+          currentSection.endedAt = entry.timestamp;
+          currentSection.status = entry.status === 'passed' ? 'completed' : entry.status === 'failed' ? 'failed' : 'completed';
+          currentSection.notes = (entry as any).notes;
+          specialistSections.push(currentSection);
+          currentSection = null;
+        } else {
+          // Standalone event (e.g., test passed without explicit "testing" start)
+          specialistSections.push({
+            type: sectionType,
+            startedAt: entry.timestamp,
+            status: entry.status === 'passed' ? 'completed' : entry.status === 'failed' ? 'failed' : 'completed',
+            notes: (entry as any).notes,
+          });
+        }
+      }
+      // If there's an ongoing specialist phase
+      if (currentSection) specialistSections.push(currentSection);
+
+      for (const ss of specialistSections) {
+        const duration = ss.startedAt && ss.endedAt
+          ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
+          : null;
+        const transcript = ss.notes
+          ? `${ss.type.toUpperCase()} ${ss.status === 'completed' ? 'PASSED' : ss.status.toUpperCase()}\n\n${ss.notes}`
+          : `${ss.type.toUpperCase()} ${ss.status === 'completed' ? 'PASSED' : ss.status === 'running' ? 'IN PROGRESS...' : ss.status.toUpperCase()}`;
+
+        sections.push({
+          type: ss.type,
+          sessionId: `specialist-${ss.type}-${ss.startedAt}`,
+          model: 'specialist',
+          startedAt: ss.startedAt,
+          duration,
+          status: ss.status,
+          transcript,
+        });
       }
     }
 
@@ -11547,7 +11672,7 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
         `cd "${workspacePath}" && git diff --stat main 2>/dev/null || git diff --stat HEAD~5 2>/dev/null || echo "No git diff available"`,
         { encoding: 'utf-8', timeout: 10000 }
       );
-      gitDiff = diff.slice(0, 3000); // Limit size
+      gitDiff = diff.slice(0, 3000);
     } catch { /* skip */ }
 
     try {
@@ -11568,24 +11693,59 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
       filesChanged = stdout.slice(0, 2000);
     } catch { /* skip */ }
 
-    // Check review/test status
-    const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
-    let reviewStatus = 'unknown';
-    let testStatus = 'unknown';
-    const reviewStatusFile = join(agentDir, 'review-status.json');
-    if (existsSync(reviewStatusFile)) {
-      try {
-        const rs = JSON.parse(readFileSync(reviewStatusFile, 'utf-8'));
-        reviewStatus = rs.reviewStatus || 'unknown';
-        testStatus = rs.testStatus || 'unknown';
-      } catch { /* skip */ }
-    }
+    // Check review/test status from central review-status.json
+    const centralReviewStatus = getReviewStatus(issueId.toUpperCase());
+    const reviewStatus = centralReviewStatus?.reviewStatus || 'unknown';
+    const testStatus = centralReviewStatus?.testStatus || 'unknown';
 
-    // Generate the status review markdown
     const now = new Date().toISOString();
-    const review = `# Status Review - ${issueId}
+    let review: string;
+
+    // Try AI-powered analysis
+    try {
+      const analysisPrompt = `You are a technical project manager reviewing the implementation progress of a software feature.
+
+## Issue: ${issueId}
+
+## Pipeline Status
+- Review: ${reviewStatus}
+- Tests: ${testStatus}
+
+## PRD (Product Requirements Document)
+${prd ? prd.slice(0, 4000) : '(No PRD available)'}
+
+## STATE.md (Agent Progress Notes)
+${state ? state.slice(0, 3000) : '(No STATE.md available)'}
+
+## Files Changed
+${filesChanged || 'No changes detected'}
+
+## Git Diff Summary
+${gitDiff || 'No diff available'}
+
+## Recent Commits
+${gitLog || 'No commits yet'}
+
+---
+
+Based on the above, produce a concise status review in markdown format with these sections:
+
+1. **Summary** (2-3 sentences: overall progress, what's done, what's remaining)
+2. **PRD Coverage** (which requirements are met, partially met, or not yet started — use a table)
+3. **Risk Assessment** (any concerns about code quality, missing tests, incomplete features)
+4. **Recommendation** (next steps, whether it's ready for review/merge, or what needs attention)
+
+Be specific and reference actual file names and requirements. Keep it under 500 words.`;
+
+      const aiReview = await callLLM(analysisPrompt);
+      review = `# Status Review - ${issueId}\n\n*AI-Generated: ${now}*\n\n${aiReview}\n\n---\n*Generated by Panopticon Mission Control AI*`;
+    } catch (llmError: any) {
+      // Fallback to static template if LLM call fails
+      console.warn(`AI status review failed for ${issueId}, using static template:`, llmError.message);
+      review = `# Status Review - ${issueId}
 
 *Generated: ${now}*
+*Note: AI analysis unavailable (${llmError.message}). Showing raw data.*
 
 ## Pipeline Status
 
@@ -11597,32 +11757,22 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
 
 ## PRD Requirements
 
-${prd ? prd.split('\n').filter(l => l.match(/^[-*]\s|^#{1,3}\s|acceptance|criteria|requirement/i)).slice(0, 50).join('\n') : '(No PRD available)'}
+${prd ? prd.split('\n').filter((l: string) => l.match(/^[-*]\s|^#{1,3}\s|acceptance|criteria|requirement/i)).slice(0, 50).join('\n') : '(No PRD available)'}
 
-## Code Changes
-
-### Files Modified
+## Files Changed
 \`\`\`
 ${filesChanged || 'No changes detected'}
 \`\`\`
 
-### Diff Summary
-\`\`\`
-${gitDiff || 'No diff available'}
-\`\`\`
-
-### Recent Commits
+## Recent Commits
 \`\`\`
 ${gitLog || 'No commits yet'}
 \`\`\`
 
-## STATE.md Summary
-
-${state ? state.split('\n').slice(0, 30).join('\n') : '(No STATE.md available)'}
-
 ---
-*Review by Panopticon Mission Control*
+*Review by Panopticon Mission Control (static fallback)*
 `;
+    }
 
     // Write to disk
     const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
@@ -11909,25 +12059,34 @@ app.get('/api/mission-control/projects', async (_req, res) => {
           const hasState = hasPlanning && existsSync(join(planningDir, 'STATE.md'));
           const isShadow = hasPlanning && existsSync(join(planningDir, 'INFERENCE.md'));
 
-          // Check review status for lifecycle state
-          const reviewStatusFile = join(agentDir, 'review-status.json');
-          let reviewStatus: string | null = null;
-          let testStatus: string | null = null;
-          if (existsSync(reviewStatusFile)) {
+          // Check review status from central review-status.json (NOT per-agent file)
+          const centralReviewStatus = getReviewStatus(issueId);
+          const reviewStatus = centralReviewStatus?.reviewStatus || null;
+          const testStatus = centralReviewStatus?.testStatus || null;
+          const mergeStatus = centralReviewStatus?.mergeStatus || null;
+
+          // Check if agent is truly alive (stale state detection)
+          const heartbeatFile = join(homedir(), '.panopticon', 'heartbeats', `agent-${issueLower}.json`);
+          let isHeartbeatFresh = false;
+          if (existsSync(heartbeatFile)) {
             try {
-              const rs = JSON.parse(readFileSync(reviewStatusFile, 'utf-8'));
-              reviewStatus = rs.reviewStatus || null;
-              testStatus = rs.testStatus || null;
+              const hb = JSON.parse(readFileSync(heartbeatFile, 'utf-8'));
+              const hbTime = new Date(hb.timestamp).getTime();
+              isHeartbeatFresh = (now - hbTime) < 10 * 60 * 1000; // 10 min
             } catch { /* skip */ }
           }
+          const isAgentTrulyActive = hasTmux && (isHeartbeatFresh || agentStatus === 'active');
 
-          // Determine lifecycle state label (tmux = most reliable active indicator)
+          // Determine lifecycle state label
           let stateLabel = 'Idle';
-          if (hasTmux) stateLabel = 'In Progress';
+          if (mergeStatus === 'merged') stateLabel = 'Done';
           else if (reviewStatus === 'passed' && testStatus === 'passed') stateLabel = 'Done';
-          else if (reviewStatus === 'reviewing' || reviewStatus === 'pending') stateLabel = 'In Review';
+          else if (reviewStatus === 'reviewing' || testStatus === 'testing') stateLabel = 'In Review';
+          else if (reviewStatus === 'passed' && testStatus === 'pending') stateLabel = 'In Review';
+          else if (isAgentTrulyActive) stateLabel = 'In Progress';
+          else if (hasTmux && !isHeartbeatFresh && agentStatus === 'active') stateLabel = 'Has Context'; // stale tmux
           else if (agentStatus === 'suspended') stateLabel = 'Suspended';
-          else if (hasRecentAgentActivity && agentStatus === 'active') stateLabel = 'In Progress';
+          else if (hasRecentAgentActivity && agentStatus === 'active' && isHeartbeatFresh) stateLabel = 'In Progress';
           else if (hasPrd && !hasState) stateLabel = 'Planning';
           else if (hasState) stateLabel = 'Has Context';
 
@@ -11937,7 +12096,7 @@ app.get('/api/mission-control/projects', async (_req, res) => {
             issueId,
             title,
             branch: `feature/${issueLower}`,
-            status: (agentStatus === 'active' && hasRecentAgentActivity) ? 'running' : (hasTmux && agentStatus !== 'idle') ? 'running' : hasState ? 'has_state' : 'idle',
+            status: isAgentTrulyActive ? 'running' : hasState ? 'has_state' : 'idle',
             stateLabel,
             agentStatus,
             hasPlanning,
