@@ -32,6 +32,7 @@ import { checkAllTriggers } from '../../lib/cloister/triggers.js';
 import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent } from '../../lib/agents.js';
 import { sendKeys } from '../../lib/tmux.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
+import { buildAgentSections, buildSpecialistSections, sortSections, readPlanningArtifacts, uploadPlanningArtifact, initPlanningDirectory, determineStateLabel, determineFeatureStatus } from '../lib/mission-control.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig, findProjectByTeam, extractTeamPrefix } from '../../lib/projects.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
@@ -11313,118 +11314,31 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
   const issuePrefix = issueId.split('-')[0];
 
   try {
-    const sections: Array<{
-      type: string;
-      sessionId: string;
-      model: string;
-      startedAt: string;
-      duration: number | null;
-      status: string;
-      transcript: string;
-    }> = [];
-
-    // 1. Check for planning agent sessions
-    const agentId = `agent-${issueLower}`;
-    const planningAgentId = `planning-${issueLower}`;
     const agentsDir = join(homedir(), '.panopticon', 'agents');
-
-    for (const checkId of [planningAgentId, agentId]) {
-      const agentDir = join(agentsDir, checkId);
-      if (existsSync(agentDir)) {
-        const stateFile = join(agentDir, 'state.json');
-        if (existsSync(stateFile)) {
-          try {
-            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-            const isPlanning = checkId.startsWith('planning-');
-            const sectionType = isPlanning ? 'planning' : 'work';
-
-            // Try to read agent output from tmux
-            let transcript = '';
-            try {
-              const { stdout } = await execAsync(
-                `tmux capture-pane -t ${checkId} -p -S -500 2>/dev/null || echo ""`,
-                { encoding: 'utf-8', timeout: 5000 }
-              );
-              transcript = stdout.trim();
-            } catch { /* agent may not be running */ }
-
-            sections.push({
-              type: sectionType,
-              sessionId: checkId,
-              model: state.model || state.runtime || 'unknown',
-              startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
-              duration: state.startedAt ? Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000) : null,
-              status: state.state === 'active' ? 'running' : state.state === 'suspended' ? 'completed' : (state.status || 'completed'),
-              transcript,
-            });
-          } catch { /* skip malformed state */ }
-        }
-      }
-    }
-
-    // 2. Check for specialist runs (review, test, merge)
     const specialistsDir = join(homedir(), '.panopticon', 'specialists');
-    if (existsSync(specialistsDir)) {
-      // Check all project directories for runs related to this issue
-      const projectPath = getProjectPath(undefined, issuePrefix);
-      const projectName = projectPath ? projectPath.split('/').pop() || '' : '';
 
-      // Try common project key patterns
-      const projectKeys = [projectName, issuePrefix.toLowerCase()].filter(Boolean);
+    // 1. Build agent sections (planning + work)
+    const agentSections = buildAgentSections(agentsDir, issueLower);
 
-      for (const projectKey of projectKeys) {
-        for (const specialistType of ['review-agent', 'test-agent', 'merge-agent']) {
-          const runsDir = join(specialistsDir, projectKey, specialistType, 'runs');
-          if (!existsSync(runsDir)) continue;
-
-          try {
-            const runFiles = readdirSync(runsDir)
-              .filter(f => f.includes(issueLower) && f.endsWith('.log'))
-              .sort()
-              .reverse()
-              .slice(0, 3); // Last 3 runs per type
-
-            for (const runFile of runFiles) {
-              const content = readFileSync(join(runsDir, runFile), 'utf-8');
-
-              // Parse run metadata from log header
-              const startedMatch = content.match(/Started: (.+)/);
-              const statusMatch = content.match(/Status: (.+)/);
-              const finishedMatch = content.match(/Finished: (.+)/);
-
-              const startedAt = startedMatch ? startedMatch[1].trim() : '';
-              const finishedAt = finishedMatch ? finishedMatch[1].trim() : '';
-              const runStatus = statusMatch ? statusMatch[1].trim() : 'completed';
-
-              const typeMap: Record<string, string> = {
-                'review-agent': 'review',
-                'test-agent': 'test',
-                'merge-agent': 'merge',
-              };
-
-              sections.push({
-                type: typeMap[specialistType] || specialistType,
-                sessionId: runFile.replace('.log', ''),
-                model: 'specialist',
-                startedAt,
-                duration: startedAt && finishedAt
-                  ? Math.floor((new Date(finishedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-                  : null,
-                status: runStatus === 'passed' ? 'completed' : runStatus === 'failed' ? 'failed' : 'completed',
-                transcript: content,
-              });
-            }
-          } catch { /* skip unreadable runs */ }
-        }
-      }
+    // Inject tmux transcripts for running agents
+    for (const section of agentSections) {
+      try {
+        const { stdout } = await execAsync(
+          `tmux capture-pane -t ${section.sessionId} -p -S -500 2>/dev/null || echo ""`,
+          { encoding: 'utf-8', timeout: 5000 }
+        );
+        section.transcript = stdout.trim();
+      } catch { /* agent may not be running */ }
     }
 
-    // Sort sections by startedAt
-    sections.sort((a, b) => {
-      if (!a.startedAt) return 1;
-      if (!b.startedAt) return -1;
-      return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
-    });
+    // 2. Build specialist sections (review, test, merge)
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const projectName = projectPath ? projectPath.split('/').pop() || '' : '';
+    const projectKeys = [projectName, issuePrefix.toLowerCase()].filter(Boolean);
+    const specialistSections = buildSpecialistSections(specialistsDir, issueLower, projectKeys);
+
+    // 3. Combine and sort
+    const sections = sortSections([...agentSections, ...specialistSections]);
 
     res.json({ issueId, sections });
   } catch (error: any) {
@@ -11441,63 +11355,9 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
   try {
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planningDir = join(workspacePath, '.planning');
+    const planningDirPath = join(workspacePath, '.planning');
 
-    const result: {
-      prd?: string;
-      state?: string;
-      inference?: string;
-      transcripts: Array<{ filename: string; content: string; uploadedAt: string }>;
-      discussions: Array<{ filename: string; content: string; syncedAt: string }>;
-      notes: Array<{ filename: string; content: string; uploadedAt: string }>;
-    } = {
-      transcripts: [],
-      discussions: [],
-      notes: [],
-    };
-
-    if (!existsSync(planningDir)) {
-      return res.json(result);
-    }
-
-    // Read core planning docs
-    const prdPath = join(planningDir, 'PRD.md');
-    const statePath = join(planningDir, 'STATE.md');
-    const inferencePath = join(planningDir, 'INFERENCE.md');
-
-    if (existsSync(prdPath)) result.prd = readFileSync(prdPath, 'utf-8');
-    if (existsSync(statePath)) result.state = readFileSync(statePath, 'utf-8');
-    if (existsSync(inferencePath)) result.inference = readFileSync(inferencePath, 'utf-8');
-
-    // Also check PLANNING_PROMPT.md as fallback for PRD
-    if (!result.prd) {
-      const promptPath = join(planningDir, 'PLANNING_PROMPT.md');
-      if (existsSync(promptPath)) result.prd = readFileSync(promptPath, 'utf-8');
-    }
-
-    // Read subdirectory artifacts
-    const readArtifactDir = (subdir: string, dateField: string) => {
-      const dirPath = join(planningDir, subdir);
-      if (!existsSync(dirPath)) return [];
-      return readdirSync(dirPath)
-        .filter(f => f.endsWith('.md') || f.endsWith('.txt'))
-        .map(filename => {
-          const filePath = join(dirPath, filename);
-          const stat = statSync(filePath);
-          return {
-            filename,
-            content: readFileSync(filePath, 'utf-8'),
-            [dateField]: stat.mtime.toISOString(),
-          };
-        })
-        .sort((a: any, b: any) => new Date(b[dateField]).getTime() - new Date(a[dateField]).getTime());
-    };
-
-    result.transcripts = readArtifactDir('transcripts', 'uploadedAt') as any;
-    result.discussions = readArtifactDir('discussions', 'syncedAt') as any;
-    result.notes = readArtifactDir('notes', 'uploadedAt') as any;
-
-    res.json(result);
+    res.json(readPlanningArtifacts(planningDirPath));
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch planning artifacts: ' + error.message });
   }
@@ -11518,22 +11378,17 @@ app.post('/api/mission-control/planning/:issueId/upload', async (req, res) => {
     return res.status(400).json({ error: 'type must be transcript or note' });
   }
 
-  // Sanitize filename
-  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
-  const ext = safeName.endsWith('.md') || safeName.endsWith('.txt') ? '' : '.md';
-
   try {
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const subdir = type === 'transcript' ? 'transcripts' : 'notes';
-    const dirPath = join(workspacePath, '.planning', subdir);
+    const planningDirPath = join(workspacePath, '.planning');
 
-    mkdirSync(dirPath, { recursive: true });
-    const filePath = join(dirPath, safeName + ext);
-    writeFileSync(filePath, content, 'utf-8');
+    const result = uploadPlanningArtifact(planningDirPath, type as 'transcript' | 'note', filename, content);
 
     // Emit socket event
     if (socketIo) {
+      const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
+      const ext = safeName.endsWith('.md') || safeName.endsWith('.txt') ? '' : '.md';
       socketIo.emit('planning:sync', {
         issueId,
         artifactType: type,
@@ -11541,7 +11396,7 @@ app.post('/api/mission-control/planning/:issueId/upload', async (req, res) => {
       });
     }
 
-    res.json({ success: true, path: filePath });
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to upload artifact: ' + error.message });
   }
@@ -11667,29 +11522,18 @@ app.post('/api/mission-control/planning/:issueId/sync-discussions', async (req, 
 // POST /api/mission-control/planning/:issueId/init - Initialize .planning directory
 app.post('/api/mission-control/planning/:issueId/init', async (req, res) => {
   const { issueId } = req.params;
-  const { shadow } = req.body; // Whether this is a shadow engineering workspace
+  const { shadow } = req.body;
   const issueLower = issueId.toLowerCase();
   const issuePrefix = issueId.split('-')[0];
 
   try {
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planningDir = join(workspacePath, '.planning');
+    const planningDirPath = join(workspacePath, '.planning');
 
-    // Create all subdirectories
-    for (const subdir of ['transcripts', 'discussions', 'notes']) {
-      mkdirSync(join(planningDir, subdir), { recursive: true });
-    }
+    initPlanningDirectory(planningDirPath, issueId, !!shadow);
 
-    // Initialize INFERENCE.md for shadow engineering
-    if (shadow) {
-      const inferencePath = join(planningDir, 'INFERENCE.md');
-      if (!existsSync(inferencePath)) {
-        writeFileSync(inferencePath, `# Inference Document - ${issueId}\n\n*This document is maintained by the Shadow Engineering Monitoring Agent.*\n\n## Status\n\nAwaiting initial artifact analysis.\n\n## Understanding\n\n(pending)\n\n## Gaps & Risks\n\n(pending)\n`, 'utf-8');
-      }
-    }
-
-    res.json({ success: true, path: planningDir });
+    res.json({ success: true, path: planningDirPath });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to initialize planning directory: ' + error.message });
   }
@@ -11790,15 +11634,22 @@ app.get('/api/mission-control/projects', async (_req, res) => {
             } catch { /* skip */ }
           }
 
-          // Determine lifecycle state label (tmux = most reliable active indicator)
-          let stateLabel = 'Idle';
-          if (hasTmux) stateLabel = 'In Progress';
-          else if (reviewStatus === 'passed' && testStatus === 'passed') stateLabel = 'Done';
-          else if (reviewStatus === 'reviewing' || reviewStatus === 'pending') stateLabel = 'In Review';
-          else if (agentStatus === 'suspended') stateLabel = 'Suspended';
-          else if (hasRecentAgentActivity && agentStatus === 'active') stateLabel = 'In Progress';
-          else if (hasPrd && !hasState) stateLabel = 'Planning';
-          else if (hasState) stateLabel = 'Has Context';
+          const stateLabel = determineStateLabel({
+            hasTmux,
+            reviewStatus,
+            testStatus,
+            agentStatus,
+            hasRecentAgentActivity,
+            hasPrd,
+            hasState,
+          });
+
+          const status = determineFeatureStatus({
+            agentStatus,
+            hasRecentAgentActivity,
+            hasTmux,
+            hasState,
+          });
 
           let title = issueId;
 
@@ -11806,7 +11657,7 @@ app.get('/api/mission-control/projects', async (_req, res) => {
             issueId,
             title,
             branch: `feature/${issueLower}`,
-            status: (agentStatus === 'active' && hasRecentAgentActivity) ? 'running' : (hasTmux && agentStatus !== 'idle') ? 'running' : hasState ? 'has_state' : 'idle',
+            status,
             stateLabel,
             agentStatus,
             hasPlanning,
