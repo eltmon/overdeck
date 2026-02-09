@@ -11447,6 +11447,8 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
       prd?: string;
       state?: string;
       inference?: string;
+      statusReview?: string;
+      statusReviewedAt?: string;
       transcripts: Array<{ filename: string; content: string; uploadedAt: string }>;
       discussions: Array<{ filename: string; content: string; syncedAt: string }>;
       notes: Array<{ filename: string; content: string; uploadedAt: string }>;
@@ -11468,6 +11470,15 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
     if (existsSync(prdPath)) result.prd = readFileSync(prdPath, 'utf-8');
     if (existsSync(statePath)) result.state = readFileSync(statePath, 'utf-8');
     if (existsSync(inferencePath)) result.inference = readFileSync(inferencePath, 'utf-8');
+
+    // Read STATUS_REVIEW.md (AI-generated progress review)
+    const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
+    if (existsSync(statusReviewPath)) {
+      result.statusReview = readFileSync(statusReviewPath, 'utf-8');
+      try {
+        result.statusReviewedAt = statSync(statusReviewPath).mtime.toISOString();
+      } catch { /* skip */ }
+    }
 
     // Also check PLANNING_PROMPT.md as fallback for PRD
     if (!result.prd) {
@@ -11500,6 +11511,126 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch planning artifacts: ' + error.message });
+  }
+});
+
+// POST /api/mission-control/planning/:issueId/status-review - Generate AI status review
+app.post('/api/mission-control/planning/:issueId/status-review', async (req, res) => {
+  const { issueId } = req.params;
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = issueId.split('-')[0];
+
+  try {
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const planningDir = join(workspacePath, '.planning');
+
+    if (!existsSync(planningDir)) {
+      return res.status(404).json({ error: 'No planning directory found' });
+    }
+
+    // Gather context: PRD, STATE, git diff, file list
+    const prdPath = join(planningDir, 'PRD.md');
+    const statePath = join(planningDir, 'STATE.md');
+    const prd = existsSync(prdPath) ? readFileSync(prdPath, 'utf-8') : null;
+    const state = existsSync(statePath) ? readFileSync(statePath, 'utf-8') : null;
+
+    if (!prd && !state) {
+      return res.status(400).json({ error: 'No PRD or STATE.md to review against' });
+    }
+
+    // Get git diff summary from workspace
+    let gitDiff = '';
+    let gitLog = '';
+    try {
+      const { stdout: diff } = await execAsync(
+        `cd "${workspacePath}" && git diff --stat main 2>/dev/null || git diff --stat HEAD~5 2>/dev/null || echo "No git diff available"`,
+        { encoding: 'utf-8', timeout: 10000 }
+      );
+      gitDiff = diff.slice(0, 3000); // Limit size
+    } catch { /* skip */ }
+
+    try {
+      const { stdout: log } = await execAsync(
+        `cd "${workspacePath}" && git log --oneline -20 2>/dev/null || echo "No git log available"`,
+        { encoding: 'utf-8', timeout: 10000 }
+      );
+      gitLog = log.slice(0, 2000);
+    } catch { /* skip */ }
+
+    // Get list of files changed
+    let filesChanged = '';
+    try {
+      const { stdout } = await execAsync(
+        `cd "${workspacePath}" && git diff --name-only main 2>/dev/null || git diff --name-only HEAD~5 2>/dev/null || echo "No files changed"`,
+        { encoding: 'utf-8', timeout: 10000 }
+      );
+      filesChanged = stdout.slice(0, 2000);
+    } catch { /* skip */ }
+
+    // Check review/test status
+    const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+    let reviewStatus = 'unknown';
+    let testStatus = 'unknown';
+    const reviewStatusFile = join(agentDir, 'review-status.json');
+    if (existsSync(reviewStatusFile)) {
+      try {
+        const rs = JSON.parse(readFileSync(reviewStatusFile, 'utf-8'));
+        reviewStatus = rs.reviewStatus || 'unknown';
+        testStatus = rs.testStatus || 'unknown';
+      } catch { /* skip */ }
+    }
+
+    // Generate the status review markdown
+    const now = new Date().toISOString();
+    const review = `# Status Review - ${issueId}
+
+*Generated: ${now}*
+
+## Pipeline Status
+
+| Stage | Status |
+|-------|--------|
+| Work | ${reviewStatus === 'unknown' ? 'In Progress' : 'Complete'} |
+| Review | ${reviewStatus} |
+| Tests | ${testStatus} |
+
+## PRD Requirements
+
+${prd ? prd.split('\n').filter(l => l.match(/^[-*]\s|^#{1,3}\s|acceptance|criteria|requirement/i)).slice(0, 50).join('\n') : '(No PRD available)'}
+
+## Code Changes
+
+### Files Modified
+\`\`\`
+${filesChanged || 'No changes detected'}
+\`\`\`
+
+### Diff Summary
+\`\`\`
+${gitDiff || 'No diff available'}
+\`\`\`
+
+### Recent Commits
+\`\`\`
+${gitLog || 'No commits yet'}
+\`\`\`
+
+## STATE.md Summary
+
+${state ? state.split('\n').slice(0, 30).join('\n') : '(No STATE.md available)'}
+
+---
+*Review by Panopticon Mission Control*
+`;
+
+    // Write to disk
+    const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
+    writeFileSync(statusReviewPath, review, 'utf-8');
+
+    res.json({ success: true, statusReview: review, reviewedAt: now });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to generate status review: ' + error.message });
   }
 });
 

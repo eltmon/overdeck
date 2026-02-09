@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, ListTodo, Brain, Upload, RefreshCw } from 'lucide-react';
+import { FileText, ListTodo, Brain, Upload, RefreshCw, ClipboardCheck } from 'lucide-react';
 import { MarkdownModal } from './MarkdownModal';
 import { TranscriptUpload } from './TranscriptUpload';
 import styles from '../styles/mission-control.module.css';
@@ -9,6 +9,8 @@ interface PlanningData {
   prd?: string;
   state?: string;
   inference?: string;
+  statusReview?: string;
+  statusReviewedAt?: string;
   transcripts: Array<{ filename: string; content: string; uploadedAt: string }>;
   discussions: Array<{ filename: string; content: string; syncedAt: string }>;
   notes: Array<{ filename: string; content: string; uploadedAt: string }>;
@@ -29,6 +31,7 @@ export function BadgeBar({ issueId, onOpenBeads }: BadgeBarProps) {
   const [showModal, setShowModal] = useState<{ title: string; content: string } | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [generatingStatus, setGeneratingStatus] = useState(false);
 
   const { data: planning, refetch } = useQuery({
     queryKey: ['mission-control-planning', issueId],
@@ -86,6 +89,35 @@ export function BadgeBar({ issueId, onOpenBeads }: BadgeBarProps) {
         >
           <FileText size={12} />
           PRD
+        </button>
+
+        {/* Status Review badge */}
+        <button
+          className={`${styles.badge} ${!planning?.statusReview && !generatingStatus ? styles.badgeDisabled : ''}`}
+          onClick={async () => {
+            if (planning?.statusReview) {
+              setShowModal({ title: `Status Review${planning.statusReviewedAt ? ` (${new Date(planning.statusReviewedAt).toLocaleString()})` : ''}`, content: planning.statusReview });
+            } else {
+              // Generate a new status review
+              setGeneratingStatus(true);
+              try {
+                const res = await fetch(`/api/mission-control/planning/${issueId}/status-review`, { method: 'POST' });
+                if (res.ok) {
+                  const data = await res.json();
+                  setShowModal({ title: 'Status Review', content: data.statusReview });
+                  refetch();
+                }
+              } catch (e) {
+                console.error('Failed to generate status review:', e);
+              } finally {
+                setGeneratingStatus(false);
+              }
+            }
+          }}
+          title={planning?.statusReview ? 'View status review (click to refresh)' : 'Generate status review'}
+        >
+          <ClipboardCheck size={12} className={generatingStatus ? styles.spinning : ''} />
+          {generatingStatus ? 'Reviewing...' : 'Status'}
         </button>
 
         {/* Inference badge (Shadow Engineering only) */}
