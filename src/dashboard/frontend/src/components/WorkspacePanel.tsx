@@ -44,6 +44,13 @@ interface PendingOperation {
   error?: string;
 }
 
+interface StatusHistoryEntry {
+  type: 'review' | 'test' | 'merge';
+  status: string;
+  timestamp: string;
+  notes?: string;
+}
+
 interface ReviewStatus {
   issueId: string;
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
@@ -53,6 +60,26 @@ interface ReviewStatus {
   testNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
+  history?: StatusHistoryEntry[];
+}
+
+function formatRelativeTime(isoString: string): string {
+  const now = Date.now();
+  const then = new Date(isoString).getTime();
+  const diffMs = now - then;
+  if (diffMs < 0) return 'just now';
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function isStale(isoString: string, thresholdMinutes = 30): boolean {
+  return Date.now() - new Date(isoString).getTime() > thresholdMinutes * 60 * 1000;
 }
 
 interface WorkspaceInfo {
@@ -167,6 +194,48 @@ async function fetchOutput(agentId: string): Promise<string> {
   if (!res.ok) throw new Error('Failed to fetch output');
   const data = await res.json();
   return data.output || '';
+}
+
+function StatusHistory({ history }: { history: StatusHistoryEntry[] }) {
+  const [expanded, setExpanded] = useState(false);
+  // Show most recent first
+  const sorted = [...history].reverse();
+  return (
+    <div className="mt-2 border-t border-border/30 pt-1.5">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1 text-[10px] text-content-muted hover:text-content-subtle"
+      >
+        <span>{expanded ? '▾' : '▸'}</span>
+        <span>History ({history.length})</span>
+      </button>
+      {expanded && (
+        <div className="mt-1 space-y-0.5">
+          {sorted.map((entry, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-[10px]">
+              <span className="text-content-muted w-12 shrink-0">{formatRelativeTime(entry.timestamp)}</span>
+              <span className={
+                entry.type === 'review' ? 'text-blue-400' :
+                entry.type === 'test' ? 'text-purple-400' :
+                'text-green-400'
+              }>{entry.type}</span>
+              <span className={
+                entry.status === 'passed' ? 'text-green-400' :
+                entry.status === 'failed' || entry.status === 'blocked' ? 'text-red-400' :
+                ['reviewing', 'testing', 'merging'].includes(entry.status) ? 'text-yellow-400' :
+                'text-content-muted'
+              }>{entry.status}</span>
+              {entry.notes && (
+                <span className="text-content-muted truncate" title={entry.notes}>
+                  — {entry.notes.slice(0, 60)}{entry.notes.length > 60 ? '...' : ''}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: WorkspacePanelProps) {
@@ -1006,7 +1075,17 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
           )}
           {/* Review Status Display */}
           {reviewStatus && (reviewStatus.reviewStatus !== 'pending' || reviewStatus.testStatus !== 'pending') && (
-            <div className="mb-2 p-2 bg-surface/50 rounded text-xs">
+            <div className={`mb-2 p-2 rounded text-xs ${
+              reviewStatus.updatedAt && isStale(reviewStatus.updatedAt)
+                ? 'bg-amber-900/20 border border-amber-700/30'
+                : 'bg-surface/50'
+            }`}>
+              {reviewStatus.updatedAt && isStale(reviewStatus.updatedAt) && (
+                <div className="flex items-center gap-1 mb-1.5 text-amber-400 text-[10px]">
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>Status may be stale ({formatRelativeTime(reviewStatus.updatedAt)})</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-content-subtle">Review:</span>
                 <span className={
@@ -1021,6 +1100,9 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                    reviewStatus.reviewStatus === 'reviewing' ? '⟳ Reviewing...' :
                    'Pending'}
                 </span>
+                {reviewStatus.updatedAt && reviewStatus.reviewStatus !== 'pending' && !isStale(reviewStatus.updatedAt) && (
+                  <span className="text-content-muted text-[10px]">{formatRelativeTime(reviewStatus.updatedAt)}</span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-content-subtle">Tests:</span>
@@ -1036,12 +1118,19 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                    reviewStatus.testStatus === 'skipped' ? '⊘ Skipped' :
                    'Pending'}
                 </span>
+                {reviewStatus.updatedAt && reviewStatus.testStatus !== 'pending' && !isStale(reviewStatus.updatedAt) && (
+                  <span className="text-content-muted text-[10px]">{formatRelativeTime(reviewStatus.updatedAt)}</span>
+                )}
               </div>
               {reviewStatus.reviewNotes && (
                 <div className="mt-1 text-content-subtle text-xs">{reviewStatus.reviewNotes}</div>
               )}
               {reviewStatus.testNotes && (
                 <div className="mt-1 text-content-subtle text-xs">{reviewStatus.testNotes}</div>
+              )}
+              {/* Status History */}
+              {reviewStatus.history && reviewStatus.history.length > 0 && (
+                <StatusHistory history={reviewStatus.history} />
               )}
             </div>
           )}

@@ -1,0 +1,167 @@
+/**
+ * Tests for review status history tracking (PAN-128)
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import {
+  setReviewStatus,
+  getReviewStatus,
+  clearReviewStatus,
+  loadReviewStatuses,
+} from '../../src/dashboard/server/review-status.js';
+
+let testDir: string;
+let statusFile: string;
+
+beforeEach(() => {
+  testDir = mkdtempSync(join(tmpdir(), 'review-status-test-'));
+  mkdirSync(testDir, { recursive: true });
+  statusFile = join(testDir, 'review-status.json');
+});
+
+afterEach(() => {
+  rmSync(testDir, { recursive: true, force: true });
+});
+
+describe('setReviewStatus', () => {
+  it('creates a new status with default values', () => {
+    const result = setReviewStatus('PAN-100', { reviewStatus: 'reviewing' }, statusFile);
+    expect(result.issueId).toBe('PAN-100');
+    expect(result.reviewStatus).toBe('reviewing');
+    expect(result.testStatus).toBe('pending');
+    expect(result.readyForMerge).toBe(false);
+    expect(result.updatedAt).toBeTruthy();
+  });
+
+  it('tracks review status changes in history', () => {
+    setReviewStatus('PAN-101', { reviewStatus: 'reviewing' }, statusFile);
+    const result = setReviewStatus('PAN-101', { reviewStatus: 'passed' }, statusFile);
+
+    expect(result.history).toHaveLength(2);
+    expect(result.history![0].type).toBe('review');
+    expect(result.history![0].status).toBe('reviewing');
+    expect(result.history![1].type).toBe('review');
+    expect(result.history![1].status).toBe('passed');
+  });
+
+  it('tracks test status changes in history', () => {
+    setReviewStatus('PAN-102', { testStatus: 'testing' }, statusFile);
+    const result = setReviewStatus('PAN-102', { testStatus: 'passed' }, statusFile);
+
+    expect(result.history).toHaveLength(2);
+    expect(result.history![0].type).toBe('test');
+    expect(result.history![0].status).toBe('testing');
+    expect(result.history![1].type).toBe('test');
+    expect(result.history![1].status).toBe('passed');
+  });
+
+  it('tracks merge status changes in history', () => {
+    setReviewStatus('PAN-103', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+    }, statusFile);
+    const result = setReviewStatus('PAN-103', { mergeStatus: 'merged' }, statusFile);
+
+    expect(result.history!.some(h => h.type === 'merge' && h.status === 'merged')).toBe(true);
+  });
+
+  it('does not add history entry when status is unchanged', () => {
+    setReviewStatus('PAN-104', { reviewStatus: 'reviewing' }, statusFile);
+    const result = setReviewStatus('PAN-104', { reviewStatus: 'reviewing' }, statusFile);
+
+    expect(result.history).toHaveLength(1);
+  });
+
+  it('includes notes in history entries', () => {
+    const result = setReviewStatus('PAN-105', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'Missing error handling',
+    }, statusFile);
+
+    expect(result.history).toHaveLength(1);
+    expect(result.history![0].notes).toBe('Missing error handling');
+  });
+
+  it('limits history to 10 entries', () => {
+    // Create 12 status changes
+    for (let i = 0; i < 6; i++) {
+      setReviewStatus('PAN-106', { reviewStatus: 'reviewing' }, statusFile);
+      setReviewStatus('PAN-106', { reviewStatus: 'failed', reviewNotes: `Attempt ${i + 1}` }, statusFile);
+    }
+
+    const result = getReviewStatus('PAN-106', statusFile);
+    expect(result!.history).toHaveLength(10);
+    // 12 entries total, oldest 2 removed → starts at 3rd entry (reviewing, attempt 2)
+    expect(result!.history![0].type).toBe('review');
+    // Last entry should be the final failed
+    expect(result!.history![9].status).toBe('failed');
+    expect(result!.history![9].notes).toBe('Attempt 6');
+  });
+
+  it('records timestamps in history entries', () => {
+    const before = new Date().toISOString();
+    setReviewStatus('PAN-107', { reviewStatus: 'reviewing' }, statusFile);
+    const after = new Date().toISOString();
+
+    const result = getReviewStatus('PAN-107', statusFile);
+    const timestamp = result!.history![0].timestamp;
+    expect(timestamp >= before).toBe(true);
+    expect(timestamp <= after).toBe(true);
+  });
+
+  it('tracks mixed review and test transitions', () => {
+    setReviewStatus('PAN-108', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatus('PAN-108', { reviewStatus: 'passed' }, statusFile);
+    setReviewStatus('PAN-108', { testStatus: 'testing' }, statusFile);
+    const result = setReviewStatus('PAN-108', { testStatus: 'passed' }, statusFile);
+
+    expect(result.history).toHaveLength(4);
+    expect(result.history![0]).toMatchObject({ type: 'review', status: 'reviewing' });
+    expect(result.history![1]).toMatchObject({ type: 'review', status: 'passed' });
+    expect(result.history![2]).toMatchObject({ type: 'test', status: 'testing' });
+    expect(result.history![3]).toMatchObject({ type: 'test', status: 'passed' });
+  });
+
+  it('computes readyForMerge correctly', () => {
+    setReviewStatus('PAN-109', { reviewStatus: 'passed' }, statusFile);
+    const result = setReviewStatus('PAN-109', { testStatus: 'passed' }, statusFile);
+    expect(result.readyForMerge).toBe(true);
+  });
+
+  it('readyForMerge is false when test fails', () => {
+    setReviewStatus('PAN-110', { reviewStatus: 'passed' }, statusFile);
+    const result = setReviewStatus('PAN-110', { testStatus: 'failed' }, statusFile);
+    expect(result.readyForMerge).toBe(false);
+  });
+});
+
+describe('getReviewStatus', () => {
+  it('returns null for non-existent issue', () => {
+    expect(getReviewStatus('PAN-999', statusFile)).toBeNull();
+  });
+
+  it('returns saved status', () => {
+    setReviewStatus('PAN-200', { reviewStatus: 'passed' }, statusFile);
+    const result = getReviewStatus('PAN-200', statusFile);
+    expect(result!.reviewStatus).toBe('passed');
+    expect(result!.history).toHaveLength(1);
+  });
+});
+
+describe('clearReviewStatus', () => {
+  it('removes a status entry', () => {
+    setReviewStatus('PAN-300', { reviewStatus: 'reviewing' }, statusFile);
+    expect(getReviewStatus('PAN-300', statusFile)).not.toBeNull();
+    clearReviewStatus('PAN-300', statusFile);
+    expect(getReviewStatus('PAN-300', statusFile)).toBeNull();
+  });
+});
+
+describe('loadReviewStatuses', () => {
+  it('returns empty object for non-existent file', () => {
+    const result = loadReviewStatuses(join(testDir, 'nonexistent.json'));
+    expect(result).toEqual({});
+  });
+});

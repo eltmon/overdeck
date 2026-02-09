@@ -139,84 +139,29 @@ interface PendingOperation {
 // Review Status Tracking - Tracks review/test pipeline progress
 // ============================================================================
 
-interface ReviewStatus {
-  issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
-  mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
-  reviewNotes?: string;
-  testNotes?: string;
-  updatedAt: string;
-  readyForMerge: boolean;
-  autoRequeueCount?: number; // Circuit breaker: max 3 auto-requeues before human intervention required
-  prUrl?: string; // URL of the PR created for this issue
-}
+import {
+  type ReviewStatus,
+  type StatusHistoryEntry,
+  loadReviewStatuses,
+  saveReviewStatuses,
+  setReviewStatus as setReviewStatusBase,
+  getReviewStatus,
+  clearReviewStatus,
+} from './review-status.js';
 
-const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
-
-function loadReviewStatuses(): Record<string, ReviewStatus> {
-  try {
-    if (existsSync(REVIEW_STATUS_FILE)) {
-      return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-    }
-  } catch (err) {
-    console.error('Failed to load review statuses:', err);
-  }
-  return {};
-}
-
-function saveReviewStatuses(statuses: Record<string, ReviewStatus>): void {
-  try {
-    const dir = dirname(REVIEW_STATUS_FILE);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-    writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2));
-  } catch (err) {
-    console.error('Failed to save review statuses:', err);
-  }
-}
-
+// Wrapper that adds auto-PR creation logic on top of the base setReviewStatus
 function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): ReviewStatus {
-  const statuses = loadReviewStatuses();
-  const existing = statuses[issueId] || {
-    issueId,
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    updatedAt: new Date().toISOString(),
-    readyForMerge: false,
-  };
+  const existing = getReviewStatus(issueId);
+  const wasReadyForMerge = existing?.readyForMerge ?? false;
 
-  // Merge existing with update
-  const merged = { ...existing, ...update };
+  const updated = setReviewStatusBase(issueId, update);
 
-  // readyForMerge logic:
-  // - True if review passed AND test passed AND not yet merged
-  // - False if explicitly set in update (e.g., after merge completion)
-  // - False if merge is complete
-  const readyForMerge = update.readyForMerge !== undefined
-    ? update.readyForMerge
-    : (merged.reviewStatus === 'passed' && merged.testStatus === 'passed' && merged.mergeStatus !== 'merged');
-
-  // Check if readyForMerge is transitioning from false to true
-  const becameReadyForMerge = readyForMerge && !existing.readyForMerge;
-
-  const updated: ReviewStatus = {
-    ...merged,
-    issueId,
-    updatedAt: new Date().toISOString(),
-    readyForMerge,
-  };
-
-  statuses[issueId] = updated;
-  saveReviewStatuses(statuses);
-
-  // Auto-create PR when ready for merge (fire-and-forget)
+  // Auto-create PR when ready for merge transitions from false to true
+  const becameReadyForMerge = updated.readyForMerge && !wasReadyForMerge;
   if (becameReadyForMerge && !updated.prUrl) {
     console.log(`[pr] Issue ${issueId} is ready for merge, auto-creating PR...`);
     ensurePRExists(issueId).then(result => {
       if (result.prUrl) {
-        // Update status with PR URL
         const freshStatuses = loadReviewStatuses();
         if (freshStatuses[issueId]) {
           freshStatuses[issueId].prUrl = result.prUrl;
@@ -232,17 +177,6 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
   }
 
   return updated;
-}
-
-function getReviewStatus(issueId: string): ReviewStatus | null {
-  const statuses = loadReviewStatuses();
-  return statuses[issueId] || null;
-}
-
-function clearReviewStatus(issueId: string): void {
-  const statuses = loadReviewStatuses();
-  delete statuses[issueId];
-  saveReviewStatuses(statuses);
 }
 
 /**
@@ -3136,22 +3070,20 @@ app.post('/api/specialists/reset-all', async (_req, res) => {
 
     // Reset any "reviewing" statuses to "pending"
     let reviewStatusesReset = 0;
-    if (existsSync(REVIEW_STATUS_FILE)) {
-      try {
-        const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-        for (const key of Object.keys(statuses)) {
-          if (statuses[key].reviewStatus === 'reviewing') {
-            statuses[key].reviewStatus = 'pending';
-            statuses[key].updatedAt = new Date().toISOString();
-            reviewStatusesReset++;
-          }
+    try {
+      const statuses = loadReviewStatuses();
+      for (const key of Object.keys(statuses)) {
+        if (statuses[key].reviewStatus === 'reviewing') {
+          statuses[key].reviewStatus = 'pending';
+          statuses[key].updatedAt = new Date().toISOString();
+          reviewStatusesReset++;
         }
-        if (reviewStatusesReset > 0) {
-          writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2));
-        }
-      } catch (e) {
-        console.error('Failed to reset review statuses:', e);
       }
+      if (reviewStatusesReset > 0) {
+        saveReviewStatuses(statuses);
+      }
+    } catch (e) {
+      console.error('Failed to reset review statuses:', e);
     }
 
     res.json({

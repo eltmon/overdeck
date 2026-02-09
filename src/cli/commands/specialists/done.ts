@@ -17,6 +17,13 @@ import { homedir } from 'os';
 
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
+interface StatusHistoryEntry {
+  type: 'review' | 'test' | 'merge';
+  status: string;
+  timestamp: string;
+  notes?: string;
+}
+
 interface ReviewStatus {
   issueId: string;
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
@@ -27,6 +34,7 @@ interface ReviewStatus {
   updatedAt: string;
   readyForMerge: boolean;
   autoRequeueCount?: number;
+  history?: StatusHistoryEntry[];
 }
 
 function loadReviewStatuses(): Record<string, ReviewStatus> {
