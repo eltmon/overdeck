@@ -64,6 +64,19 @@ export function ActivityView({ issueId }: ActivityViewProps) {
     setIsolatedSection(null);
   };
 
+  // Scroll to bottom on initial load and issueId change
+  const hasScrolledRef = useRef(false);
+  useEffect(() => {
+    hasScrolledRef.current = false;
+  }, [issueId]);
+
+  useEffect(() => {
+    if (sections.length > 0 && containerRef.current && !hasScrolledRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      hasScrolledRef.current = true;
+    }
+  }, [sections]);
+
   // Escape key to close isolation
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

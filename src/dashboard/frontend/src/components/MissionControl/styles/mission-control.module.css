@@ -42,23 +42,12 @@
   font-family: var(--mc-font-family);
   color: var(--mc-text-primary);
   line-height: var(--mc-line-height);
+  height: 100%;
 }
 
-/* Dark mode overrides */
-:global(.dark) .missionControl,
-:global(html:not(.light)) .missionControl {
-  --mc-bg-main: #111111;
-  --mc-bg-sidebar: #161616;
-  --mc-bg-hover: #1E1E1E;
-  --mc-bg-selected: #262626;
-  --mc-text-primary: #F5F5F5;
-  --mc-text-secondary: #A1A1AA;
-  --mc-text-muted: #71717A;
-  --mc-border: #27272A;
-  --mc-border-strong: #3F3F46;
-  --mc-accent: #3B82F6;
-  --mc-accent-hover: #2563EB;
-}
+/* Mission Control always uses its own Codex light theme — no dark mode overrides.
+   This is intentional: the Codex design language uses warm cream/white regardless
+   of the surrounding dashboard theme. */
 
 /* Layout */
 .layout {
@@ -69,13 +58,26 @@
 }
 
 .sidebar {
-  width: 280px;
-  min-width: 280px;
   background: var(--mc-bg-sidebar);
   border-right: 1px solid var(--mc-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex-shrink: 0;
+}
+
+.resizeHandle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.resizeHandle:hover,
+.resizeHandle:active {
+  background: var(--mc-accent);
 }
 
 .sidebarHeader {
@@ -186,6 +188,24 @@
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.featureId_sidebar {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  font-family: var(--mc-font-mono);
+  flex-shrink: 0;
+  min-width: 56px;
+}
+
+.featureState {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--mc-bg-hover);
   white-space: nowrap;
 }
 
@@ -347,35 +367,7 @@
   color: #9D174D;
 }
 
-:global(.dark) .typePlanning,
-:global(html:not(.light)) .typePlanning {
-  background: #1E3A5F;
-  color: #93C5FD;
-}
-
-:global(.dark) .typeWork,
-:global(html:not(.light)) .typeWork {
-  background: #064E3B;
-  color: #6EE7B7;
-}
-
-:global(.dark) .typeReview,
-:global(html:not(.light)) .typeReview {
-  background: #451A03;
-  color: #FCD34D;
-}
-
-:global(.dark) .typeTest,
-:global(html:not(.light)) .typeTest {
-  background: #312E81;
-  color: #A5B4FC;
-}
-
-:global(.dark) .typeMerge,
-:global(html:not(.light)) .typeMerge {
-  background: #4C1D4F;
-  color: #F9A8D4;
-}
+/* Section type badges always use light mode colors — see comment above */
 
 .sectionModel {
   font-size: var(--mc-font-size-xs);
