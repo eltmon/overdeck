@@ -182,6 +182,7 @@ export function SettingsPage() {
     mutationFn: saveSettings,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
+      queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
     },
   });
 
