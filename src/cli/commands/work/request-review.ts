@@ -6,8 +6,9 @@
  */
 
 import chalk from 'chalk';
+import { getDashboardApiUrl } from '../../../lib/config.js';
 
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://localhost:3011';
+const DASHBOARD_URL = getDashboardApiUrl();
 
 interface RequestReviewOptions {
   message?: string;

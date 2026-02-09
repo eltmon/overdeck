@@ -95,7 +95,8 @@ function buildMergePrompt(context: MergeConflictContext): string {
       /\{\{conflictFiles\}\}/g,
       context.conflictFiles.map((f) => `  - ${f}`).join('\n')
     )
-    .replace(/\{\{testCommand\}\}/g, context.testCommand || 'skip');
+    .replace(/\{\{testCommand\}\}/g, context.testCommand || 'skip')
+    .replace(/\{\{apiUrl\}\}/g, process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`);
 
   return prompt;
 }
@@ -812,6 +813,8 @@ export async function spawnMergeAgentForBranches(
   }
 
   // Build the task prompt for the merge-agent specialist
+  const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
   const taskPrompt = `MERGE TASK for ${issueId}:
 
 PROJECT: ${projectPath}
@@ -852,13 +855,13 @@ PHASE 4 — DECIDE:
 11. ROLLBACK: git reset --hard ORIG_HEAD
     (ORIG_HEAD is set by git at merge time — always points to pre-merge state)
     Then report failure by calling the Panopticon API:
-    curl -s -X POST http://localhost:3011/api/specialists/done \\
+    curl -s -X POST ${apiUrl}/api/specialists/done \\
       -H "Content-Type: application/json" \\
       -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"<reason for rollback>"}'
     Then STOP.
 12. PUSH: git push origin ${targetBranch}
     Then report success by calling the Panopticon API:
-    curl -s -X POST http://localhost:3011/api/specialists/done \\
+    curl -s -X POST ${apiUrl}/api/specialists/done \\
       -H "Content-Type: application/json" \\
       -d '{"specialist":"merge","issueId":"${issueId}","status":"passed"}'
 

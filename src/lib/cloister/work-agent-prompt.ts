@@ -76,11 +76,13 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
   }
 
   // Build variables map
+  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
   const vars: Record<string, string | undefined> = {
     ISSUE_ID: ctx.issueId,
     ISSUE_ID_LOWER: ctx.issueId.toLowerCase(),
     WORKSPACE_PATH: ctx.workspacePath,
     PROJECT_ROOT: ctx.projectRoot || '',
+    API_URL: apiUrl,
     BEADS_TASKS: beadsTasksStr,
     STITCH_DESIGNS: stitchDesignsStr,
     POLYREPO_CONTEXT: polyrepoContextStr,

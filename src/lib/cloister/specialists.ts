@@ -1614,6 +1614,8 @@ export async function wakeSpecialistWithTask(
   }
 ): Promise<ReturnType<typeof wakeSpecialist>> {
   // Build context-aware prompt based on specialist type and task
+  const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
   let prompt: string;
 
   switch (name) {
@@ -1693,17 +1695,17 @@ You MUST execute these curl commands and verify they succeed. Do NOT just descri
 If issues found:
 \`\`\`bash
 # EXECUTE THIS - verify you see JSON response with reviewStatus
-curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[describe issues]"}' | jq .
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[describe issues]"}' | jq .
 \`\`\`
 Then use send-feedback-to-agent skill to notify issue agent.
 
 If review passes:
 \`\`\`bash
 # EXECUTE THIS FIRST - verify you see JSON response with reviewStatus:"passed"
-curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}' | jq .
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}' | jq .
 
 # THEN EXECUTE THIS - verify you see JSON response with queued task
-curl -s -X POST http://localhost:3011/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${task.issueId}","workspace":"${task.workspace}","branch":"${task.branch}"}' | jq .
+curl -s -X POST ${apiUrl}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${task.issueId}","workspace":"${task.workspace}","branch":"${task.branch}"}' | jq .
 \`\`\`
 
 ⚠️ VERIFICATION: After running each curl, confirm you see valid JSON output. If you get an error, report it.`;
@@ -1758,13 +1760,13 @@ You MUST execute the appropriate curl command and verify it succeeds. Do NOT jus
 If NO new regressions (tests PASS):
 \`\`\`bash
 # EXECUTE THIS - verify you see JSON response with testStatus:"passed"
-curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any]"}' | jq .
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any]"}' | jq .
 \`\`\`
 
 If NEW regressions found (tests FAIL):
 \`\`\`bash
 # EXECUTE THIS - verify you see JSON response with testStatus:"failed"
-curl -s -X POST http://localhost:3011/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures only]"}' | jq .
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures only]"}' | jq .
 \`\`\`
 Then use send-feedback-to-agent skill to notify issue agent of NEW failures only.
 

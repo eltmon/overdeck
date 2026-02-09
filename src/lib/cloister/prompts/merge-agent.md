@@ -139,14 +139,14 @@ When you're done, you MUST call the API to update status:
 
 **If merge succeeded:**
 ```bash
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"merge","issueId":"{{issueId}}","status":"passed","notes":"All conflicts resolved, build and tests pass"}'
 ```
 
 **If merge failed:**
 ```bash
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"merge","issueId":"{{issueId}}","status":"failed","notes":"Brief description of what failed"}'
 ```
@@ -184,7 +184,7 @@ npm run build
 npm test
 
 # 5. Signal completion (REQUIRED)
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"merge","issueId":"MIN-665","status":"passed","notes":"Conflicts resolved, all tests passing"}'
 ```
@@ -192,7 +192,7 @@ curl -X POST http://localhost:3010/api/specialists/done \
 Or if merge failed:
 ```bash
 # Could not resolve - signal failure
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"merge","issueId":"MIN-665","status":"failed","notes":"Incompatible type changes in core module, needs manual review"}'
 ```
@@ -210,7 +210,7 @@ curl -X POST http://localhost:3010/api/specialists/done \
 2. Build passes (ran via Task tool with subagent_type="Bash")
 3. Tests pass (ran via Task tool with subagent_type="Bash")
 4. Merge commit is completed
-5. Completion signaled via API: `curl -X POST http://localhost:3010/api/specialists/done ...`
+5. Completion signaled via API: `curl -X POST {{apiUrl}}/api/specialists/done ...`
 
 **Remember:** Both build AND tests must pass before committing. If either fails, the merge is NOT complete. Use subagents to run these commands to keep your context clean.
 

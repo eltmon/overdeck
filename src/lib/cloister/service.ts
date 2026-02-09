@@ -189,6 +189,11 @@ export class CloisterService {
     this.config = config || loadCloisterConfig();
   }
 
+  private getDashboardApiUrl(): string {
+    if (process.env.DASHBOARD_URL) return process.env.DASHBOARD_URL;
+    return `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+  }
+
   /**
    * Start the Cloister service
    */
@@ -476,7 +481,7 @@ export class CloisterService {
           const result = await new Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }>((resolve) => {
             const postData = JSON.stringify({});
             const req = http.request(
-              `http://localhost:3011/api/workspaces/${issueId}/review`,
+              `${this.getDashboardApiUrl()}/api/workspaces/${issueId}/review`,
               { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
               (res) => {
                 let data = '';
