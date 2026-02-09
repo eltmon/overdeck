@@ -1014,14 +1014,13 @@ async function fetchGitHubIssues(): Promise<any[]> {
 }
 
 // Map Rally ScheduleState to canonical dashboard state
-function mapRallyStateToCanonical(scheduleState: string): string {
-  if (!scheduleState) return 'todo';
-  const stateLower = scheduleState.toLowerCase();
-
-  if (stateLower === 'defined') return 'todo';
-  if (stateLower === 'in-progress') return 'in_progress';
-  if (stateLower === 'completed' || stateLower === 'accepted') return 'done';
-
+// Maps normalized IssueState (open/in_progress/closed) to canonical dashboard status.
+// The Rally tracker already normalizes raw Rally states to IssueState in rally.ts.
+function mapRallyStateToCanonical(issueState: string): string {
+  if (!issueState) return 'todo';
+  const stateLower = issueState.toLowerCase();
+  if (stateLower === 'in_progress') return 'in_progress';
+  if (stateLower === 'closed') return 'done';
   return 'todo';
 }
 
@@ -12192,15 +12191,41 @@ app.get('/api/mission-control/projects', async (_req, res) => {
   try {
     const projects = listProjects();
 
-    // Get active tmux sessions once (async, non-blocking)
-    let tmuxSessions: Set<string> = new Set();
+    // Build title lookup from cached issues (open issues from all trackers)
+    const issueTitleMap = new Map<string, string>();
     try {
-      const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
-      for (const line of stdout.split('\n')) {
+      const allIssues = issueDataService.getIssues();
+      for (const issue of allIssues) {
+        if (issue.identifier && issue.title) {
+          issueTitleMap.set(issue.identifier.toUpperCase(), issue.title);
+        }
+      }
+    } catch { /* non-fatal */ }
+
+    // Get active tmux sessions and closed issue titles in parallel (async, non-blocking)
+    let tmuxSessions: Set<string> = new Set();
+    const [tmuxResult, closedIssuesResult] = await Promise.allSettled([
+      execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true'),
+      execAsync('gh issue list --repo eltmon/panopticon-cli --state closed --limit 200 --json number,title 2>/dev/null || echo "[]"'),
+    ]);
+    if (tmuxResult.status === 'fulfilled') {
+      for (const line of tmuxResult.value.stdout.split('\n')) {
         const trimmed = line.trim();
         if (trimmed) tmuxSessions.add(trimmed);
       }
-    } catch { /* tmux not running */ }
+    }
+    if (closedIssuesResult.status === 'fulfilled') {
+      try {
+        const closedIssues = JSON.parse(closedIssuesResult.value.stdout.trim());
+        for (const ci of closedIssues) {
+          const key = `PAN-${ci.number}`;
+          if (!issueTitleMap.has(key) && ci.title) {
+            // Strip "PAN-XXX: " prefix from title if present
+            issueTitleMap.set(key, ci.title.replace(/^PAN-\d+:\s*/i, ''));
+          }
+        }
+      } catch { /* non-fatal */ }
+    }
 
     const projectTree: Array<{
       name: string;
@@ -12301,7 +12326,20 @@ app.get('/api/mission-control/projects', async (_req, res) => {
           else if (hasPrd && !hasState) stateLabel = 'Planning';
           else if (hasState) stateLabel = 'Has Context';
 
-          let title = issueId;
+          // Look up title from cached issues, then PRD.md, then fall back to issueId
+          let title = issueTitleMap.get(issueId) || '';
+          if (!title && hasPrd) {
+            try {
+              const prdPath = existsSync(join(planningDir, 'PRD.md'))
+                ? join(planningDir, 'PRD.md')
+                : join(planningDir, 'PLANNING_PROMPT.md');
+              const prdContent = readFileSync(prdPath, 'utf-8');
+              // Extract title from first heading (# Title) or first non-empty line
+              const firstLine = prdContent.split('\n').find(l => l.trim().length > 0) || '';
+              title = firstLine.replace(/^#+\s*/, '').trim();
+            } catch { /* skip */ }
+          }
+          if (!title) title = issueId;
 
           features.push({
             issueId,

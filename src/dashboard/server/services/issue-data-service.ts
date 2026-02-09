@@ -57,14 +57,15 @@ function mapGitHubStateToCanonical(state: string, labels: string[]): string {
 }
 
 /**
- * Map Rally ScheduleState to canonical dashboard status.
+ * Map normalized IssueState (open/in_progress/closed) to canonical dashboard status.
+ * The Rally tracker already normalizes raw Rally states to IssueState in rally.ts.
  */
-function mapRallyStateToCanonical(scheduleState: string): string {
-  if (!scheduleState) return 'todo';
-  const stateLower = scheduleState.toLowerCase();
-  if (stateLower === 'defined') return 'todo';
-  if (stateLower === 'in-progress') return 'in_progress';
-  if (stateLower === 'completed' || stateLower === 'accepted') return 'done';
+function mapRallyStateToCanonical(issueState: string): string {
+  if (!issueState) return 'todo';
+  const stateLower = issueState.toLowerCase();
+  if (stateLower === 'in_progress') return 'in_progress';
+  if (stateLower === 'closed') return 'done';
+  // 'open' and anything unrecognized → 'todo'
   return 'todo';
 }
 
