@@ -39,7 +39,7 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
   const { data: activities, isLoading } = useQuery({
     queryKey: ['activity'],
     queryFn: fetchActivity,
-    refetchInterval: 1000, // Poll every second for live updates
+    refetchInterval: 2000, // Poll every 2 seconds for live updates
   });
 
   return (

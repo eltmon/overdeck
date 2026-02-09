@@ -12,6 +12,10 @@ import { readFile, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
+import { Server as SocketIOServer } from 'socket.io';
+import { CacheService } from './services/cache-service.js';
+import { IssueDataService } from './services/issue-data-service.js';
+import { getLinearApiKey as getLinearApiKeyShared, getGitHubConfig as getGitHubConfigShared, getRallyConfig as getRallyConfigShared } from './services/tracker-config.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 
 const execAsync = promisify(exec);
@@ -1146,258 +1150,14 @@ async function fetchRallyIssues(): Promise<any[]> {
   }
 }
 
-// Get Linear issues using raw GraphQL for efficiency (single query with all data)
-// Query params:
-//   - cycle: 'current' (default) | 'all' | 'backlog' - filter by cycle
-//   - includeCompleted: 'true' | 'false' (default) - include completed issues
-app.get('/api/issues', async (req, res) => {
+// Get issues from cache (IssueDataService handles background polling + push)
+app.get('/api/issues', (req, res) => {
   try {
-    const apiKey = getLinearApiKey();
-    if (!apiKey) {
-      return res.status(500).json({ error: 'LINEAR_API_KEY not configured' });
-    }
-
-    const cycleFilter = (req.query.cycle as string) || 'current';
-    const includeCompleted = req.query.includeCompleted === 'true';
-
-    // Build filter conditions as array
-    const filterConditions: string[] = [];
-
-    if (cycleFilter === 'current') {
-      // Filter to current active cycle only
-      filterConditions.push('cycle: { isActive: { eq: true } }');
-    } else if (cycleFilter === 'backlog') {
-      // Issues not in any cycle
-      filterConditions.push('cycle: { null: true }');
-    }
-    // 'all' = no cycle filter
-
-    // Optionally exclude completed issues
-    if (!includeCompleted) {
-      filterConditions.push('state: { type: { nin: ["completed", "canceled"] } }');
-    }
-
-    // Build final filter clause
-    let filterClause = '';
-    if (filterConditions.length === 1) {
-      filterClause = `filter: { ${filterConditions[0]} }`;
-    } else if (filterConditions.length > 1) {
-      filterClause = `filter: { and: [${filterConditions.map(c => `{ ${c} }`).join(', ')}] }`;
-    }
-
-    // Use raw GraphQL to fetch all data in one query per page (no lazy loading)
-    const allIssues: any[] = [];
-    let hasMore = true;
-    let cursor: string | undefined;
-
-    while (hasMore) {
-      const query = `
-        query GetIssues($after: String) {
-          issues(first: 100, after: $after, ${filterClause ? filterClause + ', ' : ''}orderBy: updatedAt) {
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            nodes {
-              id
-              identifier
-              title
-              description
-              priority
-              url
-              createdAt
-              updatedAt
-              completedAt
-              state {
-                name
-                type
-              }
-              assignee {
-                name
-                email
-              }
-              labels {
-                nodes {
-                  name
-                }
-              }
-              project {
-                id
-                name
-                color
-                icon
-              }
-              team {
-                id
-                name
-                color
-                icon
-              }
-              cycle {
-                id
-                name
-                number
-              }
-            }
-          }
-        }
-      `;
-
-      const response = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({ query, variables: { after: cursor } }),
-      });
-
-      const json = await response.json();
-
-      if (json.errors) {
-        console.error('GraphQL errors:', json.errors);
-        throw new Error(json.errors[0]?.message || 'GraphQL error');
-      }
-
-      const issues = json.data?.issues;
-      if (!issues) break;
-
-      allIssues.push(...issues.nodes);
-      hasMore = issues.pageInfo.hasNextPage;
-      cursor = issues.pageInfo.endCursor;
-
-      // Safety limit
-      if (allIssues.length > 1000) break;
-    }
-
-    console.log(`Fetched ${allIssues.length} Linear issues (cycle=${cycleFilter}, includeCompleted=${includeCompleted})`);
-
-    // Build a lookup of project data by name from issues that have real projects.
-    // This prevents duplicates when falling back to team data for unassigned issues
-    // (team and project can share a name but have different IDs).
-    const projectByName = new Map<string, { id: string; name: string; color?: string; icon?: string }>();
-    for (const issue of allIssues) {
-      if (issue.project && !projectByName.has(issue.project.name)) {
-        projectByName.set(issue.project.name, {
-          id: issue.project.id,
-          name: issue.project.name,
-          color: issue.project.color,
-          icon: issue.project.icon,
-        });
-      }
-    }
-
-    // Format Linear issues (data is already resolved, no extra API calls)
-    const linearFormatted = allIssues.map((issue: any) => {
-      let project;
-      if (issue.project) {
-        project = {
-          id: issue.project.id,
-          name: issue.project.name,
-          color: issue.project.color,
-          icon: issue.project.icon,
-        };
-      } else if (issue.team) {
-        // Fall back to team, but reuse existing project data if a project
-        // with the same name exists to avoid duplicate filter entries
-        const existing = projectByName.get(issue.team.name);
-        project = existing || {
-          id: issue.team.id,
-          name: issue.team.name,
-          color: issue.team.color,
-          icon: issue.team.icon,
-        };
-      }
-
-      return {
-      id: issue.id,
-      identifier: issue.identifier,
-      title: issue.title,
-      description: issue.description,
-      status: issue.state?.name || 'Backlog',
-      stateType: issue.state?.type,
-      priority: issue.priority,
-      assignee: issue.assignee ? { name: issue.assignee.name, email: issue.assignee.email } : undefined,
-      labels: issue.labels?.nodes?.map((l: any) => l.name) || [],
-      url: issue.url,
-      createdAt: issue.createdAt,
-      updatedAt: issue.updatedAt,
-      completedAt: issue.completedAt,
-      project,
-      // Include cycle info
-      cycle: issue.cycle ? {
-        id: issue.cycle.id,
-        name: issue.cycle.name,
-        number: issue.cycle.number,
-      } : undefined,
-      // Mark source as Linear
-      source: 'linear',
-    };
+    const issues = issueDataService.getIssues({
+      cycle: req.query.cycle as string,
+      includeCompleted: req.query.includeCompleted === 'true',
     });
-
-    // Fetch GitHub and Rally issues in parallel
-    const [githubIssues, rallyIssues] = await Promise.all([
-      fetchGitHubIssues(),
-      fetchRallyIssues(),
-    ]);
-
-    // Merge all issues
-    let allFormatted = [...linearFormatted, ...githubIssues, ...rallyIssues];
-
-    // Merge shadow state into issues (don't modify status - let frontend handle column placement)
-    try {
-      const { listShadowedIssues } = await import('../../lib/shadow-state.js');
-      const shadowStates = listShadowedIssues();
-
-      // Build lookup map by issue ID (case-insensitive)
-      const shadowMap = new Map<string, typeof shadowStates[0]>();
-      for (const state of shadowStates) {
-        shadowMap.set(state.issueId.toLowerCase(), state);
-      }
-
-      allFormatted = allFormatted.map(issue => {
-        const shadowState = shadowMap.get(issue.identifier.toLowerCase());
-        if (shadowState) {
-          return {
-            ...issue,
-            shadowStatus: shadowState.shadowStatus,
-            targetCanonicalState: shadowState.targetCanonicalState,
-            shadowedAt: shadowState.shadowedAt,
-          };
-        }
-        return { ...issue, shadowStatus: null, targetCanonicalState: null };
-      });
-    } catch (e) {
-      console.error('Error loading shadow states:', e);
-      // Continue without shadow state if there's an error
-      allFormatted = allFormatted.map(issue => ({ ...issue, shadowStatus: null }));
-    }
-
-    const oneDayAgoTime = getOneDayAgo().getTime();
-
-    allFormatted = allFormatted.filter((issue: Issue) => {
-      const isDone = issue.status === 'Done' || issue.status === 'Completed' || issue.status === 'Closed';
-      const isCanceled = issue.status === 'Canceled' || issue.status === 'Cancelled';
-
-      // Keep all non-done/canceled issues
-      if (!isDone && !isCanceled) return true;
-
-      // For done/canceled issues, only keep if completed in last 24 hours
-      if (issue.completedAt) {
-        const completedTime = new Date(issue.completedAt).getTime();
-        return completedTime >= oneDayAgoTime;
-      }
-
-      // If no completedAt, exclude done/canceled items (shouldn't happen with new data)
-      return false;
-    });
-
-    // Sort by updatedAt
-    allFormatted.sort((a, b) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
-
-    res.json(allFormatted);
+    res.json(issues);
   } catch (error: any) {
     console.error('Error fetching issues:', error);
     res.status(500).json({ error: 'Failed to fetch issues: ' + error.message });
@@ -7138,6 +6898,13 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
       success: true,
       message: `Closed ${issueId}${reason ? ': ' + reason : ''}`,
     });
+
+    // Invalidate cache for affected tracker
+    if (isGitHubIssue) {
+      issueDataService.invalidateTracker('github').catch(() => {});
+    } else {
+      issueDataService.invalidateTracker('linear').catch(() => {});
+    }
   } catch (error: any) {
     console.error('Error closing issue:', error);
     res.status(500).json({ error: 'Failed to close: ' + error.message });
@@ -9568,6 +9335,10 @@ app.post('/api/issues/:id/reset', async (req, res) => {
     }
 
     res.json({ success: true, cleanupLog });
+
+    // Invalidate all tracker caches after reset
+    issueDataService.invalidateTracker('github').catch(() => {});
+    issueDataService.invalidateTracker('linear').catch(() => {});
   } catch (error) {
     console.error('Reset failed:', error);
     res.status(500).json({
@@ -9632,6 +9403,9 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
       issueId: issue.identifier,
       newState: 'Backlog',
     });
+
+    // Invalidate Linear cache after reopen
+    issueDataService.invalidateTracker('linear').catch(() => {});
   } catch (error: any) {
     console.error('Error reopening issue:', error);
     res.status(500).json({ error: 'Failed to reopen issue: ' + error.message });
@@ -9733,6 +9507,14 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
       syncToTracker,
       shadowState: shadowResult,
     });
+
+    // Invalidate cache and push updated issues to all clients
+    const githubMoveCheck = isGitHubIssue(id);
+    if (githubMoveCheck.isGitHub) {
+      issueDataService.invalidateTracker('github').catch(() => {});
+    } else {
+      issueDataService.invalidateTracker('linear').catch(() => {});
+    }
   } catch (error: any) {
     console.error('Error moving issue status:', error);
     res.status(500).json({ error: 'Failed to move issue status: ' + error.message });
@@ -10785,6 +10567,16 @@ if (process.env.NODE_ENV === 'production') {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws/terminal' });
 
+// Socket.io for real-time issue push (coexists with WS terminal on different path)
+const socketIo = new SocketIOServer(server, {
+  path: '/socket.io',
+  cors: { origin: '*' },
+});
+
+// Initialize cache and issue data service
+const cacheService = new CacheService();
+const issueDataService = new IssueDataService(socketIo, cacheService);
+
 // Track active PTY sessions
 const activePtys = new Map<string, pty.IPty>();
 
@@ -10795,9 +10587,15 @@ app.get('/api/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     connections: {
       websockets: wss.clients.size,
-      activePtys: activePtys.size
+      activePtys: activePtys.size,
+      socketIoClients: socketIo.engine?.clientsCount ?? 0,
     }
   });
+});
+
+// Cache status diagnostics endpoint
+app.get('/api/cache-status', (_req, res) => {
+  res.json(issueDataService.getDiagnostics());
 });
 
 wss.on('connection', (ws: WebSocket, req) => {
@@ -11572,6 +11370,15 @@ if (existsSync(publicDir)) {
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Panopticon API server running on http://0.0.0.0:${PORT}`);
   console.log(`WebSocket terminal available at ws://0.0.0.0:${PORT}/ws/terminal`);
+  console.log(`Socket.io available at ws://0.0.0.0:${PORT}/socket.io`);
+
+  // Start IssueDataService for background polling + real-time push
+  try {
+    await issueDataService.start();
+    console.log('IssueDataService started (background polling + socket.io push)');
+  } catch (error: any) {
+    console.error('Failed to start IssueDataService:', error.message);
+  }
 
   // Auto-start Cloister if configured
   try {

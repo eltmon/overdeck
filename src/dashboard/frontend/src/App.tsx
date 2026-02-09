@@ -20,6 +20,7 @@ import { SearchModal } from './components/search/SearchModal';
 import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useTheme } from './hooks/useTheme';
+import { useSocketIssues } from './hooks/useSocketIssues';
 
 type Tab = 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
@@ -89,6 +90,9 @@ export default function App() {
 
   // Theme management
   const { theme, toggleTheme, initTheme } = useTheme();
+
+  // Real-time issue updates via socket.io
+  useSocketIssues();
 
   // Initialize theme on mount
   useEffect(() => {

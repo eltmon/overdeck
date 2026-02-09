@@ -39,6 +39,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [ARCHITECTURE-CACHING.md](./ARCHITECTURE-CACHING.md) | Dashboard API caching, real-time push, and rate limit management |
 | [DNS_SETUP.md](./DNS_SETUP.md) | Local DNS resolution for development |
 | [cost-tracking.md](./cost-tracking.md) | Event-sourced cost tracking system |
 
@@ -120,6 +121,9 @@
 - **"cost"** / **"billing"** / **"tracking"** → cost-tracking.md, CONFIGURATION.md
 - **"monitoring"** / **"heartbeat"** → AGENTS.md
 - **"metrics"** → cost-tracking.md
+- **"caching"** / **"cache"** / **"rate limit"** → ARCHITECTURE-CACHING.md
+- **"socket.io"** / **"real-time"** / **"push"** → ARCHITECTURE-CACHING.md
+- **"ETag"** / **"304"** / **"backoff"** → ARCHITECTURE-CACHING.md
 
 ### Testing
 - **"test"** / **"testing"** → E2E_TEST_PLAN.md, TESTING-PROVIDERS.md
