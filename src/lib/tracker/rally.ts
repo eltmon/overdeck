@@ -18,12 +18,27 @@ import type {
 } from './interface.js';
 import { IssueNotFoundError, TrackerAuthError, NotImplementedError } from './interface.js';
 
-// Map Rally ScheduleState to normalized IssueState
+// Map Rally ScheduleState/State to normalized IssueState.
+// Covers all standard states for User Stories, Defects, Tasks, and Features.
 const STATE_MAP: Record<string, IssueState> = {
-  Defined: 'open',
+  // User Stories (ScheduleState)
+  'New': 'open',
+  'Idea': 'open',
+  'Defined': 'open',
   'In-Progress': 'in_progress',
-  Completed: 'closed',
-  Accepted: 'closed',
+  'Completed': 'closed',
+  'Accepted': 'closed',
+
+  // Defects (State)
+  'Submitted': 'open',
+  'Open': 'in_progress',       // "Open" defects are actively being worked
+  'Fixed': 'closed',
+  'Closed': 'closed',
+
+  // Features / PortfolioItems (State)
+  'Discovering': 'open',
+  'Developing': 'in_progress',
+  'Done': 'closed',
 };
 
 // Rally artifact types we support
