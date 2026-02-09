@@ -2,7 +2,7 @@
  * Tracker Configuration Readers
  *
  * Extracted from server/index.ts for reuse by IssueDataService.
- * Reads GitHub, Linear, and Rally configuration from ~/.panopticon.env.
+ * Priority: config.yaml (Settings page) > ~/.panopticon.env > environment variables
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -25,37 +25,52 @@ export interface RallyConfig {
 }
 
 /**
- * Load Linear API key from ~/.panopticon.env, environment, or config.yaml.
+ * Load Linear API key.
+ * Priority: config.yaml > ~/.panopticon.env > env var
  */
 export function getLinearApiKey(): string | null {
+  // 1. Check config.yaml (Settings page)
+  try {
+    const yamlConfig = loadYamlConfig();
+    if (yamlConfig.trackerKeys.linear) return yamlConfig.trackerKeys.linear;
+  } catch { /* ignore */ }
+
+  // 2. Check ~/.panopticon.env
   const envFile = join(homedir(), '.panopticon.env');
   if (existsSync(envFile)) {
     const content = readFileSync(envFile, 'utf-8');
     const match = content.match(/LINEAR_API_KEY=(.+)/);
     if (match) return match[1].trim();
   }
-  if (process.env.LINEAR_API_KEY) return process.env.LINEAR_API_KEY;
-  try {
-    const yamlConfig = loadYamlConfig();
-    if (yamlConfig.trackerKeys.linear) return yamlConfig.trackerKeys.linear;
-  } catch { /* ignore */ }
-  return null;
+
+  // 3. Check environment variable
+  return process.env.LINEAR_API_KEY || null;
 }
 
 /**
- * Load Rally configuration from ~/.panopticon.env, environment, or config.yaml.
+ * Load Rally configuration.
+ * Priority: config.yaml > ~/.panopticon.env > env var
  */
 export function getRallyConfig(): RallyConfig | null {
-  const envFile = join(homedir(), '.panopticon.env');
   let apiKey: string | undefined;
   let server: string | undefined;
   let workspace: string | undefined;
   let project: string | undefined;
 
+  // 1. Check config.yaml (Settings page)
+  try {
+    const yamlConfig = loadYamlConfig();
+    if (yamlConfig.trackerKeys.rally) apiKey = yamlConfig.trackerKeys.rally;
+  } catch { /* ignore */ }
+
+  // 2. Check ~/.panopticon.env (also get server/workspace/project from here)
+  const envFile = join(homedir(), '.panopticon.env');
   if (existsSync(envFile)) {
     const content = readFileSync(envFile, 'utf-8');
-    const apiKeyMatch = content.match(/RALLY_API_KEY=(.+)/);
-    if (apiKeyMatch) apiKey = apiKeyMatch[1].trim();
+    if (!apiKey) {
+      const apiKeyMatch = content.match(/RALLY_API_KEY=(.+)/);
+      if (apiKeyMatch) apiKey = apiKeyMatch[1].trim();
+    }
     const serverMatch = content.match(/RALLY_SERVER=(.+)/);
     server = serverMatch?.[1].trim();
     const workspaceMatch = content.match(/RALLY_WORKSPACE=(.+)/);
@@ -64,33 +79,35 @@ export function getRallyConfig(): RallyConfig | null {
     project = projectMatch?.[1].trim();
   }
 
-  // Fall back to env var
+  // 3. Check environment variable
   if (!apiKey) apiKey = process.env.RALLY_API_KEY;
-
-  // Fall back to config.yaml
-  if (!apiKey) {
-    try {
-      const yamlConfig = loadYamlConfig();
-      if (yamlConfig.trackerKeys.rally) apiKey = yamlConfig.trackerKeys.rally;
-    } catch { /* ignore */ }
-  }
 
   if (!apiKey) return null;
   return { apiKey, server, workspace, project };
 }
 
 /**
- * Load GitHub configuration from ~/.panopticon.env, environment, or config.yaml.
+ * Load GitHub configuration.
+ * Priority: config.yaml > ~/.panopticon.env > env var
  */
 export function getGitHubConfig(): GitHubConfig | null {
-  const envFile = join(homedir(), '.panopticon.env');
   let token: string | undefined;
   let repos: Array<{ owner: string; repo: string; prefix?: string }> = [];
 
+  // 1. Check config.yaml (Settings page)
+  try {
+    const yamlConfig = loadYamlConfig();
+    if (yamlConfig.trackerKeys.github) token = yamlConfig.trackerKeys.github;
+  } catch { /* ignore */ }
+
+  // 2. Check ~/.panopticon.env (also get repos from here)
+  const envFile = join(homedir(), '.panopticon.env');
   if (existsSync(envFile)) {
     const content = readFileSync(envFile, 'utf-8');
-    const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);
-    if (tokenMatch) token = tokenMatch[1].trim();
+    if (!token) {
+      const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);
+      if (tokenMatch) token = tokenMatch[1].trim();
+    }
 
     const reposMatch = content.match(/GITHUB_REPOS=(.+)/);
     if (reposMatch) {
@@ -102,16 +119,8 @@ export function getGitHubConfig(): GitHubConfig | null {
     }
   }
 
-  // Fall back to env var
+  // 3. Check environment variable
   if (!token) token = process.env.GITHUB_TOKEN;
-
-  // Fall back to config.yaml
-  if (!token) {
-    try {
-      const yamlConfig = loadYamlConfig();
-      if (yamlConfig.trackerKeys.github) token = yamlConfig.trackerKeys.github;
-    } catch { /* ignore */ }
-  }
 
   if (!token || repos.length === 0) return null;
   return { token, repos };
