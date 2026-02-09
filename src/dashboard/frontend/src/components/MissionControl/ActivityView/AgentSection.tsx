@@ -15,6 +15,7 @@ interface AgentSectionProps {
   section: ActivitySection;
   isUnread: boolean;
   onClick: () => void;
+  cost?: number;
 }
 
 const TYPE_STYLES: Record<string, string> = {
@@ -59,7 +60,12 @@ function formatModel(model: string): string {
     .replace('specialist', '');
 }
 
-export function AgentSection({ section, isUnread, onClick }: AgentSectionProps) {
+function formatCost(cost: number): string {
+  if (cost < 0.01) return '<$0.01';
+  return `$${cost.toFixed(2)}`;
+}
+
+export function AgentSection({ section, isUnread, onClick, cost }: AgentSectionProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Tail-anchored scrolling: always scroll to bottom on initial render and for running sections
@@ -91,6 +97,9 @@ export function AgentSection({ section, isUnread, onClick }: AgentSectionProps) 
           {formatTime(section.startedAt)}
           {section.duration !== null && ` (${formatDuration(section.duration)})`}
         </span>
+        {cost !== undefined && cost > 0 && (
+          <span className={styles.sectionCost}>{formatCost(cost)}</span>
+        )}
         {isUnread && <div className={styles.unreadDot} />}
       </div>
       <div ref={contentRef} className={styles.sectionContent}>

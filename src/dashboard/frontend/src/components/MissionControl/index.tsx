@@ -6,7 +6,6 @@ import { ActivityView } from './ActivityView';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { BeadsDialog } from '../BeadsDialog';
 import type { Issue } from '../../types';
-import { useCostStream } from '../../hooks/useCostStream';
 import styles from './styles/mission-control.module.css';
 
 interface ProjectData {
@@ -18,6 +17,17 @@ interface ProjectData {
 async function fetchProjects(): Promise<ProjectData[]> {
   const res = await fetch('/api/mission-control/projects');
   if (!res.ok) throw new Error('Failed to fetch projects');
+  return res.json();
+}
+
+interface IssueCostEntry {
+  issueId: string;
+  totalCost: number;
+}
+
+async function fetchCostsByIssue(): Promise<{ issues: IssueCostEntry[] }> {
+  const res = await fetch('/api/costs/by-issue');
+  if (!res.ok) throw new Error('Failed to fetch costs');
   return res.json();
 }
 
@@ -39,8 +49,12 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
     refetchInterval: 10000,
   });
 
-  // Get cost data for features
-  const { eventsByIssue } = useCostStream({ pollInterval: 10000 });
+  // Get aggregated cost data for all issues
+  const { data: costData } = useQuery({
+    queryKey: ['costs-by-issue'],
+    queryFn: fetchCostsByIssue,
+    refetchInterval: 15000,
+  });
 
   // Build title map from issues
   const issueTitles: Record<string, string> = {};
@@ -51,9 +65,10 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
     issueTitles[issue.identifier] = issue.title;
   }
 
-  // Calculate costs per issue
-  for (const [issueId, events] of Object.entries(eventsByIssue)) {
-    issueCosts[issueId] = events.reduce((sum, e) => sum + e.cost, 0);
+  // Map aggregated costs per issue (supports both upper and lower case keys)
+  for (const entry of costData?.issues || []) {
+    issueCosts[entry.issueId] = entry.totalCost;
+    issueCosts[entry.issueId.toLowerCase()] = entry.totalCost;
   }
 
   const handleSelectFeature = useCallback((issueId: string) => {
