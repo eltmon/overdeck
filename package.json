@@ -39,7 +39,7 @@
     "dist",
     "templates",
     "skills",
-    "scripts/git-hooks",
+    "scripts",
     "README.md",
     "LICENSE"
   ],
