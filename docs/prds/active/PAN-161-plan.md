@@ -460,78 +460,9 @@ socket.on('shadow:inference-update', (data: {
 
 None - all clarifying questions have been answered.
 
-## Implementation Status
+## Next Steps
 
-All 5 phases have been implemented:
-
-### Phase 1: Foundation - COMPLETE
-- Created `mission-control.module.css` with Codex-inspired design tokens (dark mode support)
-- Created `vite-env.d.ts` for CSS module type declarations
-- Implemented 7 backend API endpoints in `server/index.ts`:
-  - `GET /api/mission-control/activity/:issueId`
-  - `GET /api/mission-control/planning/:issueId`
-  - `POST /api/mission-control/planning/:issueId/upload`
-  - `POST /api/mission-control/planning/:issueId/sync-discussions`
-  - `POST /api/mission-control/planning/:issueId/init`
-  - `GET /api/mission-control/projects`
-  - Shadow Engineering endpoints (`POST /api/shadow/:issueId/monitor`, `POST /api/shadow/:issueId/observe`)
-
-### Phase 2-3: Core Mission Control + Planning Artifacts - COMPLETE
-- Created 9 frontend components:
-  - `MissionControl/index.tsx` - Main layout with sidebar + content
-  - `ProjectTree/ProjectNode.tsx` - Collapsible project folders
-  - `ProjectTree/FeatureItem.tsx` - Feature items with status/cost
-  - `ActivityView/index.tsx` - Unified activity container
-  - `ActivityView/AgentSection.tsx` - Agent sessions with tail-anchored scrolling
-  - `ActivityView/IsolationMode.tsx` - Fullscreen section focus
-  - `FeatureMetadata/BadgeBar.tsx` - Planning artifact badges
-  - `FeatureMetadata/MarkdownModal.tsx` - Markdown rendering modal
-  - `FeatureMetadata/TranscriptUpload.tsx` - Drag-and-drop upload
-
-### Phase 4: Shadow Engineering - COMPLETE
-- Created `src/lib/shadow-engineering/monitoring-agent.ts` (artifact gathering, inference generation)
-- Created `src/lib/shadow-engineering/observer-agent.ts` (PR polling, observation comments)
-- Created `src/lib/shadow-engineering/index.ts` (module exports)
-- Added Shadow Engineering toggle to PlanDialog.tsx
-- Updated workspace creation to support shadow mode
-
-### Phase 5: Integration & Polish - COMPLETE
-- Mission Control set as default route at `/`
-- Kanban moved to `/kanban`
-- Updated App.tsx navigation with Compass icon
-- Per-feature cost display via useCostStream hook
-- Model display in agent section headers
-- 21 unit tests (all passing) for Shadow Engineering agents
-- TypeScript compiles cleanly (frontend + backend)
-
-## Test Results
-
-- Shadow Engineering tests: 21 tests, all passing
-- Full test suite: 63 passed, 5 skipped, 6 pre-existing failures (not related to PAN-161)
-
-## Files Created/Modified
-
-### Created (14 files)
-- `src/dashboard/frontend/src/components/MissionControl/index.tsx`
-- `src/dashboard/frontend/src/components/MissionControl/styles/mission-control.module.css`
-- `src/dashboard/frontend/src/components/MissionControl/ProjectTree/ProjectNode.tsx`
-- `src/dashboard/frontend/src/components/MissionControl/ProjectTree/FeatureItem.tsx`
-- `src/dashboard/frontend/src/components/MissionControl/ActivityView/index.tsx`
-- `src/dashboard/frontend/src/components/MissionControl/ActivityView/AgentSection.tsx`
-- `src/dashboard/frontend/src/components/MissionControl/ActivityView/IsolationMode.tsx`
-- `src/dashboard/frontend/src/components/MissionControl/FeatureMetadata/BadgeBar.tsx`
-- `src/dashboard/frontend/src/components/MissionControl/FeatureMetadata/MarkdownModal.tsx`
-- `src/dashboard/frontend/src/components/MissionControl/FeatureMetadata/TranscriptUpload.tsx`
-- `src/dashboard/frontend/src/vite-env.d.ts`
-- `src/lib/shadow-engineering/monitoring-agent.ts`
-- `src/lib/shadow-engineering/observer-agent.ts`
-- `src/lib/shadow-engineering/index.ts`
-
-### Created (2 test files)
-- `src/lib/shadow-engineering/__tests__/monitoring-agent.test.ts`
-- `src/lib/shadow-engineering/__tests__/observer-agent.test.ts`
-
-### Modified (3 files)
-- `src/dashboard/server/index.ts` (added ~300 lines of API endpoints)
-- `src/dashboard/frontend/src/App.tsx` (routing, navigation updates)
-- `src/dashboard/frontend/src/components/PlanDialog.tsx` (shadow mode toggle)
+1. ✅ Planning session complete
+2. ⏭️ Create PRD at `docs/prds/active/PAN-161-plan.md` (copy of this STATE.md)
+3. ⏭️ Create beads tasks with dependencies
+4. ⏭️ Hand off to implementation agent
