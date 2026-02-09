@@ -10,19 +10,20 @@ interface FeatureItemProps {
   cost?: number;
 }
 
-function StatusIcon({ status, agentStatus }: { status: string; agentStatus: string | null }) {
-  if (agentStatus === 'active') {
-    return <Loader2 size={14} className={styles.spinning} style={{ color: 'var(--mc-success)' }} />;
-  }
-  if (agentStatus === 'suspended') {
-    return <AlertTriangle size={14} style={{ color: 'var(--mc-warning)' }} />;
-  }
+function StatusIcon({ status, agentStatus, stateLabel }: { status: string; agentStatus: string | null; stateLabel: string }) {
+  // Green spinner: only when agent is truly actively running
   if (status === 'running') {
     return <Loader2 size={14} className={styles.spinning} style={{ color: 'var(--mc-success)' }} />;
   }
+  // Yellow triangle: agent exists but not actively working (suspended, idle with session, needs attention)
+  if (agentStatus === 'suspended' || stateLabel === 'In Progress' || stateLabel === 'Suspended') {
+    return <AlertTriangle size={14} style={{ color: 'var(--mc-warning)' }} />;
+  }
+  // Check: has planning context
   if (status === 'has_state') {
     return <CheckCircle2 size={14} style={{ color: 'var(--mc-text-muted)' }} />;
   }
+  // Default: empty circle
   return <Circle size={14} style={{ color: 'var(--mc-text-muted)' }} />;
 }
 
@@ -42,12 +43,14 @@ export function FeatureItem({ feature, isSelected, onSelect, title, cost }: Feat
         {feature.isShadow ? (
           <Eye size={14} style={{ color: 'var(--mc-accent)' }} />
         ) : (
-          <StatusIcon status={feature.status} agentStatus={feature.agentStatus} />
+          <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} />
         )}
       </span>
+      <span className={styles.featureId_sidebar}>{feature.issueId}</span>
       <span className={styles.featureLabel}>
         {title || feature.issueId}
       </span>
+      <span className={styles.featureState}>{feature.stateLabel}</span>
       {cost !== undefined && cost > 0 && (
         <span className={styles.featureCost}>{formatCost(cost)}</span>
       )}

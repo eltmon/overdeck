@@ -8,6 +8,7 @@ export interface ProjectFeature {
   title: string;
   branch: string;
   status: string;
+  stateLabel: string;
   agentStatus: string | null;
   hasPlanning: boolean;
   hasPrd: boolean;

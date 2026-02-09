@@ -257,5 +257,13 @@ curl -X POST http://localhost:3010/api/specialists/done \
 - Maven downloads dependencies automatically
 - Use `mvn test` for Maven projects
 - Use `gradle test` for Gradle projects (check for build.gradle)
+- **Root-owned build artifacts:** If `target/` (Maven) or `build/` (Gradle) exists and is owned by root (from Docker builds), clean it before running tests:
+  ```bash
+  # Check if target dir is root-owned
+  if [ -d target ] && [ "$(stat -c '%u' target)" = "0" ]; then
+    docker run --rm -v "$(pwd):/app" alpine rm -rf /app/target
+  fi
+  ```
+  Do NOT routinely `rm -rf target/` — Maven's incremental compilation is much faster than a full rebuild.
 
 Begin test execution now.

@@ -11699,6 +11699,17 @@ app.post('/api/mission-control/planning/:issueId/init', async (req, res) => {
 app.get('/api/mission-control/projects', async (_req, res) => {
   try {
     const projects = listProjects();
+
+    // Get active tmux sessions once (async, non-blocking)
+    let tmuxSessions: Set<string> = new Set();
+    try {
+      const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
+      for (const line of stdout.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed) tmuxSessions.add(trimmed);
+      }
+    } catch { /* tmux not running */ }
+
     const projectTree: Array<{
       name: string;
       path: string;
@@ -11707,6 +11718,7 @@ app.get('/api/mission-control/projects', async (_req, res) => {
         title: string;
         branch: string;
         status: string;
+        stateLabel: string;
         agentStatus: string | null;
         hasPlanning: boolean;
         hasPrd: boolean;
@@ -11715,8 +11727,12 @@ app.get('/api/mission-control/projects', async (_req, res) => {
       }>;
     }> = [];
 
+    const now = Date.now();
+    const RECENT_DAYS = 7;
+
     for (const project of projects) {
-      const workspacesDir = join(project.projectPath, 'workspaces');
+      const projectPath = project.config.path;
+      const workspacesDir = join(projectPath, project.config.workspace?.workspaces_dir || 'workspaces');
       const features: typeof projectTree[0]['features'] = [];
 
       if (existsSync(workspacesDir)) {
@@ -11729,30 +11745,69 @@ app.get('/api/mission-control/projects', async (_req, res) => {
           const issueId = issueLower.toUpperCase();
           const planningDir = join(featurePath, '.planning');
 
+          // Check agent status and last activity
+          const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+          let agentStatus: string | null = null;
+          let lastActivity: number | null = null;
+          if (existsSync(join(agentDir, 'state.json'))) {
+            try {
+              const state = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf-8'));
+              agentStatus = state.state || null;
+              if (state.lastActivity) {
+                lastActivity = new Date(state.lastActivity).getTime();
+              }
+            } catch { /* skip */ }
+          }
+
+          // Filter: only show workspaces with active tmux, recent activity, or recent modification
+          const hasTmux = tmuxSessions.has(`agent-${issueLower}`);
+          const recentMs = RECENT_DAYS * 24 * 60 * 60 * 1000;
+          const hasRecentAgentActivity = lastActivity != null && (now - lastActivity) < recentMs;
+          const isAgentLive = (agentStatus === 'active' || agentStatus === 'suspended') && (hasTmux || hasRecentAgentActivity);
+          let isRecentWorkspace = false;
+          try {
+            const mtime = statSync(featurePath).mtimeMs;
+            isRecentWorkspace = (now - mtime) < recentMs;
+          } catch { /* skip */ }
+
+          if (!hasTmux && !isAgentLive && !isRecentWorkspace) continue;
+
           // Check for planning artifacts
           const hasPlanning = existsSync(planningDir);
           const hasPrd = hasPlanning && (existsSync(join(planningDir, 'PRD.md')) || existsSync(join(planningDir, 'PLANNING_PROMPT.md')));
           const hasState = hasPlanning && existsSync(join(planningDir, 'STATE.md'));
           const isShadow = hasPlanning && existsSync(join(planningDir, 'INFERENCE.md'));
 
-          // Check agent status
-          const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
-          let agentStatus: string | null = null;
-          if (existsSync(join(agentDir, 'state.json'))) {
+          // Check review status for lifecycle state
+          const reviewStatusFile = join(agentDir, 'review-status.json');
+          let reviewStatus: string | null = null;
+          let testStatus: string | null = null;
+          if (existsSync(reviewStatusFile)) {
             try {
-              const state = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf-8'));
-              agentStatus = state.state || state.status || null;
+              const rs = JSON.parse(readFileSync(reviewStatusFile, 'utf-8'));
+              reviewStatus = rs.reviewStatus || null;
+              testStatus = rs.testStatus || null;
             } catch { /* skip */ }
           }
 
-          // Try to get title from issue tracker data
+          // Determine lifecycle state label (tmux = most reliable active indicator)
+          let stateLabel = 'Idle';
+          if (hasTmux) stateLabel = 'In Progress';
+          else if (reviewStatus === 'passed' && testStatus === 'passed') stateLabel = 'Done';
+          else if (reviewStatus === 'reviewing' || reviewStatus === 'pending') stateLabel = 'In Review';
+          else if (agentStatus === 'suspended') stateLabel = 'Suspended';
+          else if (hasRecentAgentActivity && agentStatus === 'active') stateLabel = 'In Progress';
+          else if (hasPrd && !hasState) stateLabel = 'Planning';
+          else if (hasState) stateLabel = 'Has Context';
+
           let title = issueId;
 
           features.push({
             issueId,
             title,
             branch: `feature/${issueLower}`,
-            status: agentStatus === 'active' ? 'running' : hasState ? 'has_state' : 'idle',
+            status: (agentStatus === 'active' && hasRecentAgentActivity) ? 'running' : (hasTmux && agentStatus !== 'idle') ? 'running' : hasState ? 'has_state' : 'idle',
+            stateLabel,
             agentStatus,
             hasPlanning,
             hasPrd,
@@ -11763,8 +11818,8 @@ app.get('/api/mission-control/projects', async (_req, res) => {
       }
 
       projectTree.push({
-        name: project.name || project.projectPath.split('/').pop() || 'Unknown',
-        path: project.projectPath,
+        name: project.config.name || projectPath.split('/').pop() || 'Unknown',
+        path: projectPath,
         features,
       });
     }
