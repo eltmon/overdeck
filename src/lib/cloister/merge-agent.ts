@@ -233,21 +233,47 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
     // Non-fatal, continue with cleanup
   }
 
-  // 2. Update issue status (GitHub or Linear)
+  // 2. Close the PR on GitHub (the merge was already done locally via git)
   const isGitHub = issueId.toUpperCase().startsWith('PAN-');
 
   if (isGitHub) {
-    // GitHub: remove in-progress label, add done label, close issue
+    const issueNum = issueId.replace(/^PAN-/i, '');
+
+    // Close the open PR for this branch (if one exists)
     try {
-      const issueNum = issueId.replace(/^PAN-/i, '');
+      const branchName = `feature/${issueId.toLowerCase()}`;
+      const { stdout: prListRaw } = await execAsync(
+        `gh pr list --repo eltmon/panopticon-cli --head "${branchName}" --state open --json number --jq '.[0].number'`,
+        { cwd: projectPath, encoding: 'utf-8' }
+      );
+      const prNumber = prListRaw.trim();
+      if (prNumber) {
+        // Close the PR with a comment (the merge was already pushed via git)
+        await execAsync(
+          `gh pr close ${prNumber} --repo eltmon/panopticon-cli --comment "Merged to main via Panopticon merge-agent"`,
+          { cwd: projectPath, encoding: 'utf-8' }
+        );
+        console.log(`[merge-agent] ✓ Closed PR #${prNumber} for ${issueId}`);
+        logActivity('pr_closed', `Closed PR #${prNumber} for ${issueId}`);
+      }
+    } catch (err) {
+      console.warn(`[merge-agent] Could not close PR: ${err}`);
+    }
+
+    // Update issue labels and close the issue
+    try {
       await execAsync(`gh issue edit ${issueNum} --remove-label "in-progress" --add-label "done" 2>/dev/null || true`, {
         cwd: projectPath,
         encoding: 'utf-8',
       });
-      console.log(`[merge-agent] ✓ Updated GitHub issue ${issueId} labels`);
-      logActivity('issue_updated', `Updated ${issueId} labels: removed in-progress, added done`);
+      await execAsync(`gh issue close ${issueNum} --repo eltmon/panopticon-cli --comment "Merged to main" 2>/dev/null || true`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+      console.log(`[merge-agent] ✓ Updated and closed GitHub issue #${issueNum}`);
+      logActivity('issue_closed', `Closed GitHub issue #${issueNum} after merge`);
     } catch (err) {
-      console.warn(`[merge-agent] Could not update GitHub issue labels: ${err}`);
+      console.warn(`[merge-agent] Could not close GitHub issue: ${err}`);
     }
   } else {
     // Linear: use pan CLI to mark as done (if available)
@@ -262,7 +288,22 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
     }
   }
 
-  // 3. Conditionally compact old beads (non-blocking cleanup)
+  // 3. Update review status to 'merged' via the dashboard API
+  // This ensures the dashboard shows the correct status regardless of how the merge was triggered
+  try {
+    const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+    const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
+    await fetch(`${apiUrl}/api/specialists/done`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ specialist: 'merge', issueId, status: 'passed', notes: 'Merge and validation completed' }),
+    });
+    console.log(`[merge-agent] ✓ Reported merge success to dashboard API`);
+  } catch (err) {
+    console.warn(`[merge-agent] Could not report to dashboard API: ${err}`);
+  }
+
+  // 4. Conditionally compact old beads (non-blocking cleanup)
   await conditionalBeadsCompaction(projectPath);
 
   console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}`);
@@ -933,14 +974,11 @@ Report any issues or conflicts you encountered.`;
       const currentHead = currentHeadRaw.trim();
 
       if (currentHead !== headBefore) {
-        // HEAD changed - check if it's a merge commit
-        const { stdout: commitMessageRaw } = await execAsync('git log -1 --pretty=%s', {
-          cwd: projectPath,
-          encoding: 'utf-8',
-        });
-        const commitMessage = commitMessageRaw.trim().toLowerCase();
-
-        if (commitMessage.includes('merge') || commitMessage.includes(sourceBranch.toLowerCase())) {
+        // HEAD changed — the merge happened (could be merge commit OR fast-forward)
+        // For merge commits: message contains "merge" or branch name
+        // For fast-forward: message is the original commit message (no "merge" keyword)
+        // In BOTH cases, HEAD changing means the merge is done — verify it's pushed
+        {
           // Verify it's pushed
           try {
             const { stdout: remoteHeadRaw } = await execAsync(`git rev-parse origin/${targetBranch}`, {
