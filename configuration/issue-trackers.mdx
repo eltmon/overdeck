@@ -139,6 +139,46 @@ projects:
     rally_project: YOUR_PROJECT_OID
 ```
 
+### Rally Troubleshooting
+
+#### WSAPI Query Parse Errors
+
+If you see errors like `Could not parse: Error parsing expression`, check:
+
+1. **Workspace and Project Configuration**
+   ```bash
+   # In ~/.panopticon.env
+   RALLY_WORKSPACE=/workspace/12345
+   RALLY_PROJECT=/project/67890
+   ```
+
+2. **API Key Permissions**
+   - Ensure API key has read access to the workspace
+   - Verify key is not expired
+
+3. **Debug Logging**
+   ```bash
+   DEBUG=rally pan up
+   ```
+   This will log the actual WSAPI queries being sent to Rally, which helps diagnose parse errors.
+
+4. **Test Configuration**
+   Use the Settings page "Test Connection" button to validate Rally setup, or call the API directly:
+   ```bash
+   curl -X POST http://localhost:3011/api/rally/validate \
+     -H 'Content-Type: application/json' \
+     -d '{"apiKey": "YOUR_KEY", "workspace": "/workspace/12345", "project": "/project/67890"}'
+   ```
+
+#### Finding Workspace and Project IDs
+
+Rally workspace and project IDs are numeric strings prefixed with `/workspace/` or `/project/`:
+
+1. Log into Rally web UI
+2. Navigate to desired workspace/project
+3. Check URL: `https://rally1.rallydev.com/#/workspace/12345/project/67890`
+4. Use: `RALLY_WORKSPACE=/workspace/12345` and `RALLY_PROJECT=/project/67890`
+
 ## Unified Dashboard
 
 The dashboard shows issues from all configured trackers:

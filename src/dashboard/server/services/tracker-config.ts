@@ -87,6 +87,33 @@ export function getRallyConfig(): RallyConfig | null {
 }
 
 /**
+ * Validate Rally configuration and return warnings/errors.
+ * Does not block functionality — only provides diagnostic info.
+ */
+export function validateRallyConfig(config: RallyConfig): {
+  valid: boolean;
+  warnings: string[];
+  errors: string[];
+} {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  if (!config.apiKey) {
+    errors.push('RALLY_API_KEY is required');
+  }
+
+  if (!config.workspace) {
+    warnings.push('RALLY_WORKSPACE not configured - queries may return unexpected results');
+  }
+
+  if (!config.project) {
+    warnings.push('RALLY_PROJECT not configured - queries will search all projects');
+  }
+
+  return { valid: errors.length === 0, warnings, errors };
+}
+
+/**
  * Load GitHub configuration.
  * Priority: config.yaml > ~/.panopticon.env > env var
  */
