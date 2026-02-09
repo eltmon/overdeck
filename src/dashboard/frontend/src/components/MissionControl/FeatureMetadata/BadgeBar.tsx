@@ -124,7 +124,10 @@ export function BadgeBar({ issueId, onOpenBeads }: BadgeBarProps) {
         {planning?.inference && (
           <button
             className={styles.badge}
-            onClick={() => setShowModal({ title: 'INFERENCE.md', content: planning.inference! })}
+            onClick={() => setShowModal({
+              title: 'INFERENCE.md',
+              content: `*The Inference Document is a Shadow Engineering artifact. It analyzes how AI would approach this work — identifying gaps in requirements, risks, and potential implementation strategies — without making any changes. Use it to evaluate readiness before transitioning to AI-driven development.*\n\n---\n\n${planning.inference!}`
+            })}
             title="View Inference Document (Shadow Engineering)"
           >
             <Brain size={12} />

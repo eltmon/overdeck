@@ -691,3 +691,41 @@
   padding: 0;
   background: none;
 }
+
+/* Markdown tables (remark-gfm) */
+.markdownContent table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 var(--mc-space-3);
+  font-size: var(--mc-font-size-xs);
+}
+.markdownContent th,
+.markdownContent td {
+  padding: var(--mc-space-2) var(--mc-space-3);
+  border: 1px solid var(--mc-border);
+  text-align: left;
+}
+.markdownContent th {
+  background: var(--mc-bg-sidebar);
+  font-weight: 600;
+}
+.markdownContent tr:nth-child(even) {
+  background: var(--mc-bg-hover);
+}
+
+/* Kbd hint for Isolation mode */
+.kbdHint {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-family: var(--mc-font-mono);
+  background: var(--mc-bg-sidebar);
+  border: 1px solid var(--mc-border-strong);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 var(--mc-border);
+  margin-right: 4px;
+}
+
+.isolationClose:hover .kbdHint {
+  border-color: var(--mc-text-secondary);
+}
