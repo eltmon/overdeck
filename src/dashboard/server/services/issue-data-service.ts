@@ -60,6 +60,7 @@ function mapGitHubStateToCanonical(state: string, labels: string[]): string {
  * Map Rally ScheduleState to canonical dashboard status.
  */
 function mapRallyStateToCanonical(scheduleState: string): string {
+  if (!scheduleState) return 'todo';
   const stateLower = scheduleState.toLowerCase();
   if (stateLower === 'defined') return 'todo';
   if (stateLower === 'in-progress') return 'in_progress';
@@ -747,10 +748,11 @@ export class IssueDataService {
 
       const formatted = issues.map((issue: any) => {
         const canonicalStatus = mapRallyStateToCanonical(issue.state);
+        const identifier = issue.ref || issue.id || 'unknown';
         return {
-          id: `rally-${issue.id}`,
-          identifier: issue.ref,
-          title: issue.title,
+          id: `rally-${issue.id || identifier}`,
+          identifier,
+          title: issue.title || '',
           description: issue.description || '',
           status: canonicalStatus === 'todo' ? 'Todo' :
                   canonicalStatus === 'in_progress' ? 'In Progress' :
@@ -760,8 +762,8 @@ export class IssueDataService {
             name: issue.assignee,
             email: `${issue.assignee.replace(/\s+/g, '.').toLowerCase()}@rally`,
           } : undefined,
-          labels: issue.labels || [],
-          url: issue.url,
+          labels: Array.isArray(issue.labels) ? issue.labels.filter((l: any) => typeof l === 'string') : [],
+          url: issue.url || '',
           createdAt: issue.createdAt,
           updatedAt: issue.updatedAt,
           project: {

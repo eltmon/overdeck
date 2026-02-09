@@ -52,6 +52,7 @@ const QUERYABLE_TYPES: ArtifactTypeQuery[] = [
 ];
 
 const FETCH_FIELDS = [
+  'ObjectID',
   'FormattedID',
   'Name',
   'Description',
@@ -471,10 +472,16 @@ export class RallyTracker implements IssueTracker {
     const stateValue = rallyArtifact.ScheduleState || rallyArtifact.State || 'Defined';
     const state = this.mapState(stateValue);
 
-    // Extract tags
+    // Extract tags — ensure all entries are strings
     const labels: string[] = [];
     if (rallyArtifact.Tags && rallyArtifact.Tags._tagsNameArray) {
-      labels.push(...rallyArtifact.Tags._tagsNameArray);
+      for (const tag of rallyArtifact.Tags._tagsNameArray) {
+        if (typeof tag === 'string') {
+          labels.push(tag);
+        } else if (tag?.Name) {
+          labels.push(tag.Name);
+        }
+      }
     }
 
     // Map priority
@@ -482,12 +489,16 @@ export class RallyTracker implements IssueTracker {
       ? PRIORITY_MAP[rallyArtifact.Priority] ?? 2
       : undefined;
 
-    // Build URL - Rally's web UI uses FormattedID
+    // Use ObjectID if available, fall back to FormattedID
+    const objectId = rallyArtifact.ObjectID || rallyArtifact.FormattedID;
+    const artifactType = rallyArtifact._type || 'artifact';
+
+    // Build URL - Rally's web UI detail path
     const baseUrl = this.restApi.server.replace('/slm/webservice/', '');
-    const url = `${baseUrl}/#/detail/${rallyArtifact._type.toLowerCase()}/${rallyArtifact.ObjectID}`;
+    const url = `${baseUrl}/#/detail/${artifactType.toLowerCase()}/${objectId}`;
 
     return {
-      id: rallyArtifact.ObjectID,
+      id: String(objectId),
       ref: rallyArtifact.FormattedID,
       title: rallyArtifact.Name || '',
       description: rallyArtifact.Description || '',
