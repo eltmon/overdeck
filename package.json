@@ -38,6 +38,7 @@
   "files": [
     "dist",
     "templates",
+    "skills",
     "scripts/git-hooks",
     "README.md",
     "LICENSE"
