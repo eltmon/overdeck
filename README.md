@@ -55,6 +55,8 @@
 | **Convoys** | Run parallel agents on related issues with auto-synthesis |
 | **Specialists** | Dedicated review, test, and merge agents for quality control |
 | **Heartbeat Monitoring** | Real-time agent activity tracking via Claude Code hooks |
+| **Mission Control** | Unified monitoring view — see all active features, agent activity, and planning artifacts at a glance |
+| **Shadow Engineering** | Monitor existing workflows before transitioning to AI-driven development |
 | **Real-Time Dashboard** | Socket.io push with multi-layer caching (in-memory + SQLite) for instant loads |
 | **Legacy Codebase Support** | AI self-monitoring skills that learn from your codebase |
 
@@ -252,6 +254,23 @@ pan project add /path/to/your/project --name myproject
 
 ## 🎯 Key Concepts
 
+### Mission Control
+The default landing view. A two-panel layout with a resizable sidebar showing your project tree (grouped by project, filtered to active features) and a main area displaying agent activity, planning artifacts (PRD, STATE.md, transcripts, discussions), and status reviews.
+
+- **Project Tree**: Features grouped by project with live state labels (In Progress, Suspended, In Review, Done, Planning, Idle)
+- **Activity View**: Chronological agent sessions with tail-anchored scrolling — click a feature and see what the agent is doing right now
+- **Badge Bar**: Quick access to PRD, STATE.md, discussions, transcripts, status reviews, and file uploads
+- **Status Reviews**: On-demand AI-generated progress reports comparing code changes against the PRD
+
+### Shadow Engineering
+A mode for teams adopting AI incrementally. Register existing projects as "shadow" workspaces to monitor ongoing development without AI agents making changes.
+
+- Create shadow features with `pan workspace create --shadow PAN-XXX`
+- Upload meeting transcripts and notes via the Badge Bar
+- Sync issue tracker discussions automatically
+- Generate inference documents (INFERENCE.md) analyzing how AI would approach the work
+- Transition from monitoring to AI-driven development when ready
+
 ### Multi-Agent Orchestration
 Spawn and manage AI agents in tmux sessions, monitored by the Cloister lifecycle manager.
 
@@ -303,6 +322,7 @@ pan down
 | [docs/ARCHITECTURE-CACHING.md](docs/ARCHITECTURE-CACHING.md) | Dashboard caching and real-time push |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [CLAUDE.md](CLAUDE.md) | Agent development guidance |
+| [docs/MISSION-CONTROL.md](docs/MISSION-CONTROL.md) | Mission Control and Shadow Engineering guide |
 
 ---
 
