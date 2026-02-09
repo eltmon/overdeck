@@ -62,10 +62,18 @@ function formatModel(model: string): string {
 export function AgentSection({ section, isUnread, onClick }: AgentSectionProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Tail-anchored scrolling: auto-scroll to bottom for running sections
+  // Tail-anchored scrolling: always scroll to bottom on initial render and for running sections
+  const hasInitialScrolled = useRef(false);
   useEffect(() => {
-    if (section.status === 'running' && contentRef.current) {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    if (contentRef.current) {
+      if (!hasInitialScrolled.current || section.status === 'running') {
+        requestAnimationFrame(() => {
+          if (contentRef.current) {
+            contentRef.current.scrollTop = contentRef.current.scrollHeight;
+          }
+        });
+        hasInitialScrolled.current = true;
+      }
     }
   }, [section.transcript, section.status]);
 

@@ -64,18 +64,25 @@ export function ActivityView({ issueId }: ActivityViewProps) {
     setIsolatedSection(null);
   };
 
-  // Scroll to bottom on initial load and issueId change
-  const hasScrolledRef = useRef(false);
+  // Scroll to bottom on issueId change and on every data refresh
+  const prevIssueRef = useRef<string | null>(null);
   useEffect(() => {
-    hasScrolledRef.current = false;
-  }, [issueId]);
-
-  useEffect(() => {
-    if (sections.length > 0 && containerRef.current && !hasScrolledRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-      hasScrolledRef.current = true;
+    if (sections.length > 0 && containerRef.current) {
+      // Always scroll to bottom when issueId changes, or on first load
+      const isNewIssue = prevIssueRef.current !== issueId;
+      if (isNewIssue) {
+        prevIssueRef.current = issueId;
+      }
+      // Use rAF to ensure DOM has rendered the content before measuring scroll height
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            containerRef.current.scrollTop = containerRef.current.scrollHeight;
+          }
+        });
+      });
     }
-  }, [sections]);
+  }, [issueId, sections]);
 
   // Escape key to close isolation
   useEffect(() => {
