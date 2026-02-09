@@ -82,6 +82,13 @@ export class RallyTracker implements IssueTracker {
   }
 
   async listIssues(filters?: IssueFilters): Promise<Issue[]> {
+    const queryString = this.buildQueryString(filters);
+
+    if (process.env.DEBUG?.includes('rally')) {
+      console.debug('[Rally] Query filters:', JSON.stringify(filters));
+      console.debug('[Rally] Generated query:', queryString);
+    }
+
     const query: any = {
       type: 'artifact', // Query all artifact types
       fetch: [
@@ -100,7 +107,7 @@ export class RallyTracker implements IssueTracker {
         '_type',
       ],
       limit: filters?.limit ?? 50,
-      query: this.buildQueryString(filters),
+      query: queryString,
     };
 
     if (this.workspace) {
@@ -351,6 +358,17 @@ export class RallyTracker implements IssueTracker {
 
   // Private helper methods
 
+  /**
+   * Build a Rally WSAPI query string from issue filters.
+   *
+   * Rally WSAPI v2.0 requires the entire compound query expression to be wrapped
+   * in outer parentheses when multiple conditions are joined with AND/OR.
+   * Without the outer parens, the WSAPI parser fails with:
+   *   "Could not parse: Error parsing expression -- expected ")" but saw "AND" instead."
+   *
+   * Valid:   (((ScheduleState != "Completed") AND (State != "Closed")) AND (Owner.Name contains "John"))
+   * Invalid: ((ScheduleState != "Completed") AND (State != "Closed")) AND (Owner.Name contains "John")
+   */
   private buildQueryString(filters?: IssueFilters): string {
     const conditions: string[] = [];
 
@@ -379,7 +397,8 @@ export class RallyTracker implements IssueTracker {
       conditions.push(`((Name contains "${filters.query}") OR (Description contains "${filters.query}"))`);
     }
 
-    return conditions.length > 0 ? conditions.join(' AND ') : '';
+    // Rally WSAPI requires outer parentheses around compound expressions
+    return conditions.length > 0 ? `(${conditions.join(' AND ')})` : '';
   }
 
   private normalizeIssue(rallyArtifact: any): Issue {
