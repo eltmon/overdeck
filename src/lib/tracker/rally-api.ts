@@ -127,7 +127,12 @@ export class RallyRestApi {
     const result = await response.json() as RallyQueryResult;
 
     if (result.QueryResult.Errors && result.QueryResult.Errors.length > 0) {
-      throw new Error(`Rally API query failed: ${result.QueryResult.Errors.join(', ')}`);
+      const errorDetail = result.QueryResult.Errors.join(', ');
+      const queryDetail = config.query ? ` (Query: ${config.query})` : '';
+      if (process.env.DEBUG?.includes('rally')) {
+        console.error('[Rally WSAPI] Query failed:', { query: config.query, errors: result.QueryResult.Errors });
+      }
+      throw new Error(`Rally API query failed: ${errorDetail}${queryDetail}`);
     }
 
     return result;

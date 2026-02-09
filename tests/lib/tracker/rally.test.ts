@@ -907,6 +907,136 @@ describe('RallyTracker', () => {
     });
   });
 
+  describe('buildQueryString (via listIssues)', () => {
+    // Helper: set up mockQuery to return empty results and capture the query
+    function setupEmptyResult() {
+      mockQuery.mockResolvedValue({
+        QueryResult: {
+          Results: [],
+          TotalResultCount: 0,
+          Errors: [],
+          Warnings: [],
+        },
+      });
+    }
+
+    function getPassedQuery(): string {
+      return mockQuery.mock.calls[0][0].query;
+    }
+
+    it('should return empty string when includeClosed is true and no other filters', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ includeClosed: true });
+      expect(getPassedQuery()).toBe('');
+    });
+
+    it('should wrap single condition in outer parentheses', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      // Default: includeClosed is falsy, so "exclude closed" condition is added
+      await tracker.listIssues({});
+      const query = getPassedQuery();
+      // Must start and end with parentheses (outer wrap)
+      expect(query).toMatch(/^\(.+\)$/);
+      expect(query).toContain('ScheduleState != "Completed"');
+      expect(query).toContain('ScheduleState != "Accepted"');
+      expect(query).toContain('State != "Closed"');
+    });
+
+    it('should generate correct query for includeClosed: false (the failing case)', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ includeClosed: false });
+      const query = getPassedQuery();
+      // The entire expression must be wrapped in outer parens
+      expect(query).toBe('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted") AND (State != "Closed")))');
+    });
+
+    it('should generate correct query for state filter (always paired with exclude-closed)', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      // Note: state filter only activates when includeClosed is falsy,
+      // and the exclude-closed condition also activates in that case
+      await tracker.listIssues({ state: 'in_progress' });
+      const query = getPassedQuery();
+      expect(query).toMatch(/^\(.+\)$/); // outer parens
+      expect(query).toContain('ScheduleState = "In-Progress"');
+      expect(query).toContain('State = "In-Progress"');
+      expect(query).toContain('ScheduleState != "Completed"');
+    });
+
+    it('should generate correct query for assignee filter', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ assignee: 'John Doe', includeClosed: true });
+      const query = getPassedQuery();
+      expect(query).toBe('((Owner.Name contains "John Doe"))');
+    });
+
+    it('should generate correct query for labels filter', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ labels: ['bug', 'urgent'], includeClosed: true });
+      const query = getPassedQuery();
+      expect(query).toBe('(((Tags.Name contains "bug") AND (Tags.Name contains "urgent")))');
+    });
+
+    it('should generate correct query for search query filter', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ query: 'login error', includeClosed: true });
+      const query = getPassedQuery();
+      expect(query).toBe('(((Name contains "login error") OR (Description contains "login error")))');
+    });
+
+    it('should generate correct compound query with multiple conditions', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({
+        includeClosed: false,
+        assignee: 'John Doe',
+      });
+      const query = getPassedQuery();
+      // Must have outer wrapping parens
+      expect(query).toMatch(/^\(.+\)$/);
+      // Must contain both conditions joined by AND
+      expect(query).toContain('ScheduleState != "Completed"');
+      expect(query).toContain('Owner.Name contains "John Doe"');
+      // Verify the outer parentheses wrap the AND join
+      expect(query).toBe('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted") AND (State != "Closed")) AND (Owner.Name contains "John Doe"))');
+    });
+
+    it('should generate correct query with all filters combined', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({
+        state: 'in_progress',
+        includeClosed: false,
+        assignee: 'Jane Smith',
+        labels: ['feature'],
+        query: 'dashboard',
+      });
+      const query = getPassedQuery();
+      // Outer parens required
+      expect(query).toMatch(/^\(.+\)$/);
+      // All conditions present
+      expect(query).toContain('ScheduleState = "In-Progress"');
+      expect(query).toContain('ScheduleState != "Completed"');
+      expect(query).toContain('Owner.Name contains "Jane Smith"');
+      expect(query).toContain('Tags.Name contains "feature"');
+      expect(query).toContain('Name contains "dashboard"');
+    });
+
+    it('should handle single label filter', async () => {
+      setupEmptyResult();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ labels: ['enhancement'], includeClosed: true });
+      const query = getPassedQuery();
+      expect(query).toBe('(((Tags.Name contains "enhancement")))');
+    });
+  });
+
   describe('state mapping', () => {
     it('should map Rally states correctly', async () => {
       const stateTests = [

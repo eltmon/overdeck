@@ -14,7 +14,7 @@
 import { Octokit } from '@octokit/rest';
 import type { Server as SocketIOServer } from 'socket.io';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
-import { getGitHubConfig, getLinearApiKey, getRallyConfig } from './tracker-config.js';
+import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 
 // Poll intervals (ms)
@@ -717,6 +717,14 @@ export class IssueDataService {
       return;
     }
 
+    // Validate config on first poll and log warnings
+    if (!this.trackers.rally.lastFetchedAt) {
+      const validation = validateRallyConfig(config);
+      if (validation.warnings.length > 0) {
+        console.warn('[Rally] Configuration warnings:', validation.warnings.join('; '));
+      }
+    }
+
     // Only fetch if cache is stale
     if (!this.cache.isStale('rally', 'issues') && this.trackers.rally.lastFetchedIssues.length > 0) {
       return;
@@ -781,8 +789,11 @@ export class IssueDataService {
         this.pushMeta();
       }
     } catch (err: any) {
-      console.error('[IssueDataService] Rally poll error:', err.message);
-      this.trackers.rally.lastError = err.message;
+      const errorMsg = err.message?.includes('Could not parse')
+        ? `${err.message} - Check Rally workspace/project configuration. Enable DEBUG=rally for query details.`
+        : err.message;
+      console.error('[IssueDataService] Rally poll error:', errorMsg);
+      this.trackers.rally.lastError = errorMsg;
     }
   }
 }

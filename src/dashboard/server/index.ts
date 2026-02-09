@@ -2902,6 +2902,48 @@ app.get('/api/tracker-status', (_req, res) => {
   }
 });
 
+// POST /api/rally/validate - Test Rally connection and config
+app.post('/api/rally/validate', async (req, res) => {
+  try {
+    const { apiKey, server, workspace, project } = req.body;
+
+    if (!apiKey) {
+      res.status(400).json({ valid: false, error: 'API key is required' });
+      return;
+    }
+
+    const { RallyRestApi } = await import('../../lib/tracker/rally-api.js');
+    const api = new RallyRestApi({
+      apiKey,
+      server: server || 'https://rally1.rallydev.com',
+    });
+
+    // Try a simple query to validate connectivity
+    const result = await api.query({
+      type: 'artifact',
+      fetch: ['FormattedID'],
+      query: '((State = "Open"))',
+      limit: 1,
+      workspace,
+      project,
+    });
+
+    res.json({
+      valid: true,
+      message: 'Rally connection successful',
+      testQueryResult: `Found ${result.QueryResult.TotalResultCount} artifacts`,
+    });
+  } catch (err: any) {
+    const isAuthError = err.message?.includes('Unauthorized') || err.message?.includes('401');
+    const isParseError = err.message?.includes('Could not parse');
+    res.status(400).json({
+      valid: false,
+      error: err.message,
+      errorType: isAuthError ? 'auth' : isParseError ? 'query' : 'network',
+    });
+  }
+});
+
 // Get Cloister configuration
 app.get('/api/cloister/config', (_req, res) => {
   try {
