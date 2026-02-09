@@ -16,6 +16,89 @@ vi.mock('../../../src/lib/tracker/rally-api.js', () => ({
   })),
 }));
 
+/** Helper: build a WSAPI response wrapping the given results. */
+function wsapiResponse(results: any[], totalCount?: number) {
+  return {
+    QueryResult: {
+      Results: results,
+      TotalResultCount: totalCount ?? results.length,
+      Errors: [],
+      Warnings: [],
+    },
+  };
+}
+
+/** Helper: return an empty WSAPI result for every call. */
+function setupEmptyResults() {
+  mockQuery.mockResolvedValue(wsapiResponse([]));
+}
+
+/**
+ * Helper: set up mockQuery to return specific results for each artifact type
+ * in the order: hierarchicalrequirement, defect, task (matching QUERYABLE_TYPES).
+ */
+function setupTypeResults(
+  stories: any[] = [],
+  defects: any[] = [],
+  tasks: any[] = [],
+) {
+  mockQuery
+    .mockResolvedValueOnce(wsapiResponse(stories))
+    .mockResolvedValueOnce(wsapiResponse(defects))
+    .mockResolvedValueOnce(wsapiResponse(tasks));
+}
+
+const sampleStory = {
+  ObjectID: '12345',
+  FormattedID: 'US123',
+  Name: 'User Story Title',
+  Description: 'Story description',
+  ScheduleState: 'In-Progress',
+  State: null,
+  Tags: { _tagsNameArray: ['tag1', 'tag2'] },
+  Owner: { _refObjectName: 'John Doe' },
+  Priority: 'High',
+  DueDate: '2024-12-31',
+  CreationDate: '2024-01-01T00:00:00Z',
+  LastUpdateDate: '2024-01-15T00:00:00Z',
+  Parent: null,
+  _type: 'HierarchicalRequirement',
+};
+
+const sampleDefect = {
+  ObjectID: '67890',
+  FormattedID: 'DE456',
+  Name: 'Defect Title',
+  Description: 'Bug description',
+  ScheduleState: null,
+  State: 'Defined',
+  Tags: { _tagsNameArray: [] },
+  Owner: null,
+  Priority: 'Normal',
+  DueDate: null,
+  CreationDate: '2024-01-02T00:00:00Z',
+  LastUpdateDate: '2024-01-16T00:00:00Z',
+  Parent: null,
+  _type: 'Defect',
+};
+
+const sampleTask = {
+  ObjectID: '11111',
+  FormattedID: 'TA111',
+  Name: 'Task Title',
+  Description: 'Task description',
+  ScheduleState: null,
+  State: 'In-Progress',
+  Tags: { _tagsNameArray: ['backend'] },
+  Owner: { _refObjectName: 'Jane Smith' },
+  Priority: 'Low',
+  DueDate: null,
+  CreationDate: '2024-01-03T00:00:00Z',
+  LastUpdateDate: '2024-01-17T00:00:00Z',
+  Parent: null,
+  _type: 'Task',
+};
+
 describe('RallyTracker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -44,108 +127,105 @@ describe('RallyTracker', () => {
   });
 
   describe('listIssues', () => {
-    it('should return normalized issues from Rally', async () => {
-      const mockResults = [
-        {
-          ObjectID: '12345',
-          FormattedID: 'US123',
-          Name: 'User Story Title',
-          Description: 'Story description',
-          ScheduleState: 'In-Progress',
-          State: null,
-          Tags: { _tagsNameArray: ['tag1', 'tag2'] },
-          Owner: { _refObjectName: 'John Doe' },
-          Priority: 'High',
-          DueDate: '2024-12-31',
-          CreationDate: '2024-01-01T00:00:00Z',
-          LastUpdateDate: '2024-01-15T00:00:00Z',
-          Parent: null,
-          _type: 'HierarchicalRequirement',
-        },
-        {
-          ObjectID: '67890',
-          FormattedID: 'DE456',
-          Name: 'Defect Title',
-          Description: 'Bug description',
-          ScheduleState: null,
-          State: 'Defined',
-          Tags: { _tagsNameArray: [] },
-          Owner: null,
-          Priority: 'Normal',
-          DueDate: null,
-          CreationDate: '2024-01-02T00:00:00Z',
-          LastUpdateDate: '2024-01-16T00:00:00Z',
-          Parent: null,
-          _type: 'Defect',
-        },
-      ];
-
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: mockResults,
-          TotalResultCount: 2,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+    it('should query each artifact type separately and merge results (PAN-168)', async () => {
+      setupTypeResults([sampleStory], [sampleDefect], [sampleTask]);
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       const issues = await tracker.listIssues();
 
+      // Should make 3 separate queries (one per type)
+      expect(mockQuery).toHaveBeenCalledTimes(3);
+
+      // Verify query types
+      expect(mockQuery.mock.calls[0][0].type).toBe('hierarchicalrequirement');
+      expect(mockQuery.mock.calls[1][0].type).toBe('defect');
+      expect(mockQuery.mock.calls[2][0].type).toBe('task');
+
+      // Should return all 3 merged results
+      expect(issues).toHaveLength(3);
+    });
+
+    it('should normalize issues from all types correctly', async () => {
+      setupTypeResults([sampleStory], [sampleDefect], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      // Issues sorted by updatedAt descending: defect (Jan 16) then story (Jan 15)
       expect(issues).toHaveLength(2);
       expect(issues[0]).toMatchObject({
-        id: '12345',
-        ref: 'US123',
-        title: 'User Story Title',
-        description: 'Story description',
-        state: 'in_progress',
-        labels: ['tag1', 'tag2'],
-        assignee: 'John Doe',
-        tracker: 'rally',
-        priority: 1, // High priority maps to 1
-      });
-
-      expect(issues[1]).toMatchObject({
         id: '67890',
         ref: 'DE456',
         title: 'Defect Title',
         state: 'open', // Defined maps to open
-        priority: 2, // Normal priority maps to 2
+        priority: 2,   // Normal
+      });
+      expect(issues[1]).toMatchObject({
+        id: '12345',
+        ref: 'US123',
+        title: 'User Story Title',
+        state: 'in_progress',
+        labels: ['tag1', 'tag2'],
+        assignee: 'John Doe',
+        tracker: 'rally',
+        priority: 1, // High
       });
     });
 
-    it('should apply limit filter', async () => {
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test Issue',
-            Description: 'Test description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+    it('should sort results by updatedAt descending', async () => {
+      setupTypeResults([sampleStory], [sampleDefect], [sampleTask]);
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
-      await tracker.listIssues({ limit: 25 });
+      const issues = await tracker.listIssues();
 
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: 25 })
-      );
+      // Task (Jan 17) > Defect (Jan 16) > Story (Jan 15)
+      expect(issues[0].ref).toBe('TA111');
+      expect(issues[1].ref).toBe('DE456');
+      expect(issues[2].ref).toBe('US123');
+    });
+
+    it('should apply limit across merged results', async () => {
+      setupTypeResults([sampleStory], [sampleDefect], [sampleTask]);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues({ limit: 2 });
+
+      // Should pass limit to each individual query
+      expect(mockQuery.mock.calls[0][0].limit).toBe(2);
+
+      // But only return top 2 after merging
+      expect(issues).toHaveLength(2);
+    });
+
+    it('should pass workspace and project to each type query', async () => {
+      setupTypeResults([], [], []);
+
+      const tracker = new RallyTracker({
+        apiKey: 'test_key',
+        workspace: '/workspace/12345',
+        project: '/project/67890',
+      });
+      await tracker.listIssues();
+
+      for (const call of mockQuery.mock.calls) {
+        expect(call[0].workspace).toBe('/workspace/12345');
+        expect(call[0].project).toBe('/project/67890');
+        expect(call[0].projectScopeDown).toBe(true);
+      }
+    });
+
+    it('should continue if one type query fails (non-auth)', async () => {
+      mockQuery
+        .mockResolvedValueOnce(wsapiResponse([sampleStory])) // stories succeed
+        .mockRejectedValueOnce(new Error('Some query error'))  // defects fail
+        .mockResolvedValueOnce(wsapiResponse([sampleTask]));   // tasks succeed
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      // Should still return stories + tasks
+      expect(issues).toHaveLength(2);
+      expect(issues.map(i => i.ref).sort()).toEqual(['TA111', 'US123']);
     });
 
     it('should throw TrackerAuthError on 401 error', async () => {
@@ -155,43 +235,45 @@ describe('RallyTracker', () => {
 
       await expect(tracker.listIssues()).rejects.toThrow(TrackerAuthError);
     });
+
+    it('should return empty array when all types have no results', async () => {
+      setupTypeResults([], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues).toHaveLength(0);
+    });
   });
 
   describe('getIssue', () => {
     it('should get issue by FormattedID', async () => {
-      const mockResults = [
-        {
-          ObjectID: '99999',
-          FormattedID: 'US999',
-          Name: 'Feature Request',
-          Description: 'Add this feature',
-          ScheduleState: 'Defined',
-          State: null,
-          Tags: { _tagsNameArray: [] },
-          Owner: null,
-          Priority: 'Low',
-          DueDate: null,
-          CreationDate: '2024-01-01T00:00:00Z',
-          LastUpdateDate: '2024-01-01T00:00:00Z',
-          Parent: null,
-          _type: 'HierarchicalRequirement',
-        },
-      ];
+      const mockResults = [{
+        ObjectID: '99999',
+        FormattedID: 'US999',
+        Name: 'Feature Request',
+        Description: 'Add this feature',
+        ScheduleState: 'Defined',
+        State: null,
+        Tags: { _tagsNameArray: [] },
+        Owner: null,
+        Priority: 'Low',
+        DueDate: null,
+        CreationDate: '2024-01-01T00:00:00Z',
+        LastUpdateDate: '2024-01-01T00:00:00Z',
+        Parent: null,
+        _type: 'HierarchicalRequirement',
+      }];
 
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: mockResults,
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValue(wsapiResponse(mockResults));
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       const issue = await tracker.getIssue('US999');
 
+      // getIssue still uses generic artifact endpoint (no state filter)
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
+          type: 'artifact',
           query: '(FormattedID = "US999")',
         })
       );
@@ -199,14 +281,7 @@ describe('RallyTracker', () => {
     });
 
     it('should throw IssueNotFoundError when issue not found', async () => {
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [],
-          TotalResultCount: 0,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValue(wsapiResponse([]));
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
 
@@ -217,77 +292,28 @@ describe('RallyTracker', () => {
   describe('updateIssue', () => {
     it('should update issue title and description', async () => {
       // Mock getIssue call (first query)
-      mockQuery.mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Original Title',
-            Description: 'Original description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValueOnce(wsapiResponse([{
+        ...sampleStory,
+        _ref: '/hierarchicalrequirement/12345',
+      }]));
 
       // Mock query for ref (second query)
-      mockQuery.mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            _ref: '/hierarchicalrequirement/12345',
-            _type: 'HierarchicalRequirement',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValueOnce(wsapiResponse([{
+        ObjectID: '12345',
+        _ref: '/hierarchicalrequirement/12345',
+        _type: 'HierarchicalRequirement',
+      }]));
 
       // Mock final getIssue call
-      mockQuery.mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Updated Title',
-            Description: 'Updated description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValueOnce(wsapiResponse([{
+        ...sampleStory,
+        Name: 'Updated Title',
+        Description: 'Updated description',
+        _ref: '/hierarchicalrequirement/12345',
+      }]));
 
       mockUpdate.mockResolvedValue({
-        OperationResult: {
-          Object: {},
-          Errors: [],
-          Warnings: [],
-        },
+        OperationResult: { Object: {}, Errors: [], Warnings: [] },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -306,72 +332,25 @@ describe('RallyTracker', () => {
       );
     });
 
-    it('should update state for User Story', async () => {
-      mockQuery.mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test Story',
-            Description: '',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      }).mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            _ref: '/hierarchicalrequirement/12345',
-            _type: 'HierarchicalRequirement',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      }).mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test Story',
-            Description: '',
-            ScheduleState: 'In-Progress',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+    it('should update state for User Story using ScheduleState', async () => {
+      mockQuery
+        .mockResolvedValueOnce(wsapiResponse([{
+          ...sampleStory,
+          _ref: '/hierarchicalrequirement/12345',
+        }]))
+        .mockResolvedValueOnce(wsapiResponse([{
+          ObjectID: '12345',
+          _ref: '/hierarchicalrequirement/12345',
+          _type: 'HierarchicalRequirement',
+        }]))
+        .mockResolvedValueOnce(wsapiResponse([{
+          ...sampleStory,
+          ScheduleState: 'In-Progress',
+          _ref: '/hierarchicalrequirement/12345',
+        }]));
 
       mockUpdate.mockResolvedValue({
-        OperationResult: {
-          Object: {},
-          Errors: [],
-          Warnings: [],
-        },
+        OperationResult: { Object: {}, Errors: [], Warnings: [] },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -387,71 +366,24 @@ describe('RallyTracker', () => {
     });
 
     it('should update state for Defect using State field', async () => {
-      mockQuery.mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '67890',
-            FormattedID: 'DE456',
-            Name: 'Test Defect',
-            Description: '',
-            ScheduleState: null,
-            State: 'Defined',
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'High',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'Defect',
-            _ref: '/defect/67890',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      }).mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '67890',
-            _ref: '/defect/67890',
-            _type: 'Defect',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      }).mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '67890',
-            FormattedID: 'DE456',
-            Name: 'Test Defect',
-            Description: '',
-            ScheduleState: null,
-            State: 'Completed',
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'High',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'Defect',
-            _ref: '/defect/67890',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery
+        .mockResolvedValueOnce(wsapiResponse([{
+          ...sampleDefect,
+          _ref: '/defect/67890',
+        }]))
+        .mockResolvedValueOnce(wsapiResponse([{
+          ObjectID: '67890',
+          _ref: '/defect/67890',
+          _type: 'Defect',
+        }]))
+        .mockResolvedValueOnce(wsapiResponse([{
+          ...sampleDefect,
+          State: 'Completed',
+          _ref: '/defect/67890',
+        }]));
 
       mockUpdate.mockResolvedValue({
-        OperationResult: {
-          Object: {},
-          Errors: [],
-          Warnings: [],
-        },
+        OperationResult: { Object: {}, Errors: [], Warnings: [] },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -467,37 +399,13 @@ describe('RallyTracker', () => {
     });
 
     it('should update priority', async () => {
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test Issue',
-            Description: 'Test description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValue(wsapiResponse([{
+        ...sampleStory,
+        _ref: '/hierarchicalrequirement/12345',
+      }]));
 
       mockUpdate.mockResolvedValue({
-        OperationResult: {
-          Object: {},
-          Errors: [],
-          Warnings: [],
-        },
+        OperationResult: { Object: {}, Errors: [], Warnings: [] },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -517,40 +425,29 @@ describe('RallyTracker', () => {
     it('should create issue with all fields', async () => {
       mockCreate.mockResolvedValue({
         CreateResult: {
-          Object: {
-            FormattedID: 'US200',
-            ObjectID: '200',
-            _ref: '/hierarchicalrequirement/200',
-          },
+          Object: { FormattedID: 'US200', ObjectID: '200', _ref: '/hierarchicalrequirement/200' },
           Errors: [],
           Warnings: [],
         },
       });
 
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [{
-            ObjectID: '200',
-            FormattedID: 'US200',
-            Name: 'New Story',
-            Description: 'Story description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'High',
-            DueDate: '2024-12-31',
-            CreationDate: '2024-01-15T00:00:00Z',
-            LastUpdateDate: '2024-01-15T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/200',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValue(wsapiResponse([{
+        ObjectID: '200',
+        FormattedID: 'US200',
+        Name: 'New Story',
+        Description: 'Story description',
+        ScheduleState: 'Defined',
+        State: null,
+        Tags: { _tagsNameArray: [] },
+        Owner: null,
+        Priority: 'High',
+        DueDate: '2024-12-31',
+        CreationDate: '2024-01-15T00:00:00Z',
+        LastUpdateDate: '2024-01-15T00:00:00Z',
+        Parent: null,
+        _type: 'HierarchicalRequirement',
+        _ref: '/hierarchicalrequirement/200',
+      }]));
 
       const tracker = new RallyTracker({
         apiKey: 'test_key',
@@ -591,67 +488,33 @@ describe('RallyTracker', () => {
   describe('getComments', () => {
     it('should return comments for issue', async () => {
       // First query: getIssue
-      mockQuery.mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test',
-            Description: '',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      })
+      mockQuery.mockResolvedValueOnce(wsapiResponse([{
+        ...sampleStory,
+        _ref: '/hierarchicalrequirement/12345',
+      }]))
       // Second query: get artifact with Discussion
-      .mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            _ref: '/hierarchicalrequirement/12345',
-            Discussion: { _ref: '/discussion/111' },
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      })
+      .mockResolvedValueOnce(wsapiResponse([{
+        ObjectID: '12345',
+        _ref: '/hierarchicalrequirement/12345',
+        Discussion: { _ref: '/discussion/111' },
+      }]))
       // Third query: get conversation posts
-      .mockResolvedValueOnce({
-        QueryResult: {
-          Results: [
-            {
-              ObjectID: '1001',
-              Text: 'First comment',
-              User: { _refObjectName: 'John Doe' },
-              CreationDate: '2024-01-10T00:00:00Z',
-              PostNumber: 1,
-            },
-            {
-              ObjectID: '1002',
-              Text: 'Second comment',
-              User: { _refObjectName: 'Jane Smith' },
-              CreationDate: '2024-01-11T00:00:00Z',
-              PostNumber: 2,
-            },
-          ],
-          TotalResultCount: 2,
-          Errors: [],
-          Warnings: [],
+      .mockResolvedValueOnce(wsapiResponse([
+        {
+          ObjectID: '1001',
+          Text: 'First comment',
+          User: { _refObjectName: 'John Doe' },
+          CreationDate: '2024-01-10T00:00:00Z',
+          PostNumber: 1,
         },
-      });
+        {
+          ObjectID: '1002',
+          Text: 'Second comment',
+          User: { _refObjectName: 'Jane Smith' },
+          CreationDate: '2024-01-11T00:00:00Z',
+          PostNumber: 2,
+        },
+      ]));
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       const comments = await tracker.getComments('US123');
@@ -668,43 +531,16 @@ describe('RallyTracker', () => {
 
     it('should return empty array if no discussion', async () => {
       // First query: getIssue
-      mockQuery.mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test',
-            Description: '',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      })
+      mockQuery.mockResolvedValueOnce(wsapiResponse([{
+        ...sampleStory,
+        _ref: '/hierarchicalrequirement/12345',
+      }]))
       // Second query: get artifact with no Discussion
-      .mockResolvedValueOnce({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            _ref: '/hierarchicalrequirement/12345',
-            Discussion: null,
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      .mockResolvedValueOnce(wsapiResponse([{
+        ObjectID: '12345',
+        _ref: '/hierarchicalrequirement/12345',
+        Discussion: null,
+      }]));
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       const comments = await tracker.getComments('US123');
@@ -715,39 +551,13 @@ describe('RallyTracker', () => {
 
   describe('addComment', () => {
     it('should add comment to issue with existing discussion', async () => {
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test Issue',
-            Description: 'Test description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValue(wsapiResponse([{
+        ...sampleStory,
+        _ref: '/hierarchicalrequirement/12345',
+      }]));
 
       mockCreate.mockResolvedValue({
-        CreateResult: {
-          Object: {
-            ObjectID: '2001',
-          },
-          Errors: [],
-          Warnings: [],
-        },
+        CreateResult: { Object: { ObjectID: '2001' }, Errors: [], Warnings: [] },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -756,49 +566,20 @@ describe('RallyTracker', () => {
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'conversationpost',
-          data: expect.objectContaining({
-            Text: 'New comment',
-          }),
+          data: expect.objectContaining({ Text: 'New comment' }),
         })
       );
-
       expect(comment.body).toBe('New comment');
     });
 
     it('should create discussion if none exists', async () => {
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test Issue',
-            Description: 'Test description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValue(wsapiResponse([{
+        ...sampleStory,
+        _ref: '/hierarchicalrequirement/12345',
+      }]));
 
       mockCreate.mockResolvedValue({
-        CreateResult: {
-          Object: {
-            ObjectID: '2001',
-          },
-          Errors: [],
-          Warnings: [],
-        },
+        CreateResult: { Object: { ObjectID: '2001' }, Errors: [], Warnings: [] },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -811,37 +592,13 @@ describe('RallyTracker', () => {
 
   describe('transitionIssue', () => {
     it('should transition issue state', async () => {
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test Issue',
-            Description: 'Test description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValue(wsapiResponse([{
+        ...sampleStory,
+        _ref: '/hierarchicalrequirement/12345',
+      }]));
 
       mockUpdate.mockResolvedValue({
-        OperationResult: {
-          Object: {},
-          Errors: [],
-          Warnings: [],
-        },
+        OperationResult: { Object: {}, Errors: [], Warnings: [] },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -849,9 +606,7 @@ describe('RallyTracker', () => {
 
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            ScheduleState: 'Completed',
-          }),
+          data: expect.objectContaining({ ScheduleState: 'Completed' }),
         })
       );
     });
@@ -859,39 +614,13 @@ describe('RallyTracker', () => {
 
   describe('linkPR', () => {
     it('should add comment with PR link', async () => {
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [{
-            ObjectID: '12345',
-            FormattedID: 'US123',
-            Name: 'Test Issue',
-            Description: 'Test description',
-            ScheduleState: 'Defined',
-            State: null,
-            Tags: { _tagsNameArray: [] },
-            Owner: null,
-            Priority: 'Normal',
-            DueDate: null,
-            CreationDate: '2024-01-01T00:00:00Z',
-            LastUpdateDate: '2024-01-01T00:00:00Z',
-            Parent: null,
-            _type: 'HierarchicalRequirement',
-            _ref: '/hierarchicalrequirement/12345',
-          }],
-          TotalResultCount: 1,
-          Errors: [],
-          Warnings: [],
-        },
-      });
+      mockQuery.mockResolvedValue(wsapiResponse([{
+        ...sampleStory,
+        _ref: '/hierarchicalrequirement/12345',
+      }]));
 
       mockCreate.mockResolvedValue({
-        CreateResult: {
-          Object: {
-            ObjectID: '3001',
-          },
-          Errors: [],
-          Warnings: [],
-        },
+        CreateResult: { Object: { ObjectID: '3001' }, Errors: [], Warnings: [] },
       });
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -907,108 +636,120 @@ describe('RallyTracker', () => {
     });
   });
 
-  describe('buildQueryString (via listIssues)', () => {
-    // Helper: set up mockQuery to return empty results and capture the query
-    function setupEmptyResult() {
-      mockQuery.mockResolvedValue({
-        QueryResult: {
-          Results: [],
-          TotalResultCount: 0,
-          Errors: [],
-          Warnings: [],
-        },
-      });
-    }
-
-    function getPassedQuery(): string {
-      return mockQuery.mock.calls[0][0].query;
+  describe('buildQueryStringForType (via listIssues)', () => {
+    // Helper to get the query passed to mockQuery for a specific type index
+    // 0 = hierarchicalrequirement, 1 = defect, 2 = task
+    function getQueryForType(typeIndex: number): string {
+      return mockQuery.mock.calls[typeIndex][0].query;
     }
 
     it('should return empty string when includeClosed is true and no other filters', async () => {
-      setupEmptyResult();
+      setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ includeClosed: true });
-      expect(getPassedQuery()).toBe('');
+
+      for (let i = 0; i < 3; i++) {
+        expect(getQueryForType(i)).toBe('');
+      }
     });
 
-    it('should wrap single condition in outer parentheses', async () => {
-      setupEmptyResult();
-      const tracker = new RallyTracker({ apiKey: 'test_key' });
-      // Default: includeClosed is falsy, so "exclude closed" condition is added
-      await tracker.listIssues({});
-      const query = getPassedQuery();
-      // Must start and end with parentheses (outer wrap)
-      expect(query).toMatch(/^\(.+\)$/);
-      expect(query).toContain('ScheduleState != "Completed"');
-      expect(query).toContain('ScheduleState != "Accepted"');
-      expect(query).toContain('State != "Closed"');
-    });
-
-    it('should generate correct query for includeClosed: false (the failing case)', async () => {
-      setupEmptyResult();
+    it('should use ScheduleState for stories and State for defects/tasks (PAN-168)', async () => {
+      setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ includeClosed: false });
-      const query = getPassedQuery();
-      // Binary-nested: Rally WSAPI only supports (expr AND expr), never 3-way
-      expect(query).toBe('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted")) AND (State != "Closed"))');
+
+      // Stories: exclude by ScheduleState
+      const storyQuery = getQueryForType(0);
+      expect(storyQuery).toBe('((ScheduleState != "Completed") AND (ScheduleState != "Accepted"))');
+
+      // Defects: exclude by State
+      const defectQuery = getQueryForType(1);
+      expect(defectQuery).toBe('(State != "Closed")');
+
+      // Tasks: exclude by State
+      const taskQuery = getQueryForType(2);
+      expect(taskQuery).toBe('(State != "Completed")');
     });
 
-    it('should generate correct query for state filter (always paired with exclude-closed)', async () => {
-      setupEmptyResult();
+    it('should use type-specific state field for state filter', async () => {
+      setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
-      // Note: state filter only activates when includeClosed is falsy,
-      // and the exclude-closed condition also activates in that case
       await tracker.listIssues({ state: 'in_progress' });
-      const query = getPassedQuery();
-      expect(query).toMatch(/^\(.+\)$/); // outer parens
-      expect(query).toContain('ScheduleState = "In-Progress"');
-      expect(query).toContain('State = "In-Progress"');
-      expect(query).toContain('ScheduleState != "Completed"');
+
+      // Stories: ScheduleState
+      const storyQuery = getQueryForType(0);
+      expect(storyQuery).toContain('(ScheduleState = "In-Progress")');
+
+      // Defects: State
+      const defectQuery = getQueryForType(1);
+      expect(defectQuery).toContain('(State = "In-Progress")');
+
+      // Tasks: State
+      const taskQuery = getQueryForType(2);
+      expect(taskQuery).toContain('(State = "In-Progress")');
     });
 
     it('should generate correct query for assignee filter', async () => {
-      setupEmptyResult();
+      setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ assignee: 'John Doe', includeClosed: true });
-      const query = getPassedQuery();
-      expect(query).toBe('(Owner.Name contains "John Doe")');
+
+      // All types should have same assignee filter
+      for (let i = 0; i < 3; i++) {
+        expect(getQueryForType(i)).toBe('(Owner.Name contains "John Doe")');
+      }
     });
 
     it('should generate correct query for labels filter', async () => {
-      setupEmptyResult();
+      setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ labels: ['bug', 'urgent'], includeClosed: true });
-      const query = getPassedQuery();
-      expect(query).toBe('((Tags.Name contains "bug") AND (Tags.Name contains "urgent"))');
+
+      for (let i = 0; i < 3; i++) {
+        expect(getQueryForType(i)).toBe('((Tags.Name contains "bug") AND (Tags.Name contains "urgent"))');
+      }
     });
 
     it('should generate correct query for search query filter', async () => {
-      setupEmptyResult();
+      setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ query: 'login error', includeClosed: true });
-      const query = getPassedQuery();
-      expect(query).toBe('((Name contains "login error") OR (Description contains "login error"))');
+
+      for (let i = 0; i < 3; i++) {
+        expect(getQueryForType(i)).toBe('((Name contains "login error") OR (Description contains "login error"))');
+      }
     });
 
-    it('should generate correct compound query with multiple conditions', async () => {
-      setupEmptyResult();
+    it('should generate correct compound query for stories (multiple closed states)', async () => {
+      setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
-      await tracker.listIssues({
-        includeClosed: false,
-        assignee: 'John Doe',
-      });
-      const query = getPassedQuery();
-      // Must have outer wrapping parens
-      expect(query).toMatch(/^\(.+\)$/);
-      // Must contain both conditions joined by AND
-      expect(query).toContain('ScheduleState != "Completed"');
-      expect(query).toContain('Owner.Name contains "John Doe"');
-      // Binary-nested: reduce wraps each pair
-      expect(query).toBe('((((ScheduleState != "Completed") AND (ScheduleState != "Accepted")) AND (State != "Closed")) AND (Owner.Name contains "John Doe"))');
+      await tracker.listIssues({ includeClosed: false, assignee: 'John Doe' });
+
+      const storyQuery = getQueryForType(0);
+      expect(storyQuery).toBe('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted")) AND (Owner.Name contains "John Doe"))');
+    });
+
+    it('should generate correct compound query for defects (single closed state)', async () => {
+      setupEmptyResults();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ includeClosed: false, assignee: 'Jane Smith' });
+
+      const defectQuery = getQueryForType(1);
+      expect(defectQuery).toBe('((State != "Closed") AND (Owner.Name contains "Jane Smith"))');
+    });
+
+    it('should handle single label filter', async () => {
+      setupEmptyResults();
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ labels: ['enhancement'], includeClosed: true });
+
+      for (let i = 0; i < 3; i++) {
+        expect(getQueryForType(i)).toBe('(Tags.Name contains "enhancement")');
+      }
     });
 
     it('should generate correct query with all filters combined', async () => {
-      setupEmptyResult();
+      setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({
         state: 'in_progress',
@@ -1017,23 +758,20 @@ describe('RallyTracker', () => {
         labels: ['feature'],
         query: 'dashboard',
       });
-      const query = getPassedQuery();
-      // Outer parens required
-      expect(query).toMatch(/^\(.+\)$/);
-      // All conditions present
-      expect(query).toContain('ScheduleState = "In-Progress"');
-      expect(query).toContain('ScheduleState != "Completed"');
-      expect(query).toContain('Owner.Name contains "Jane Smith"');
-      expect(query).toContain('Tags.Name contains "feature"');
-      expect(query).toContain('Name contains "dashboard"');
-    });
 
-    it('should handle single label filter', async () => {
-      setupEmptyResult();
-      const tracker = new RallyTracker({ apiKey: 'test_key' });
-      await tracker.listIssues({ labels: ['enhancement'], includeClosed: true });
-      const query = getPassedQuery();
-      expect(query).toBe('(Tags.Name contains "enhancement")');
+      const storyQuery = getQueryForType(0);
+      // stories: state + exclude-closed + assignee + labels + search
+      expect(storyQuery).toContain('ScheduleState = "In-Progress"');
+      expect(storyQuery).toContain('ScheduleState != "Completed"');
+      expect(storyQuery).toContain('Owner.Name contains "Jane Smith"');
+      expect(storyQuery).toContain('Tags.Name contains "feature"');
+      expect(storyQuery).toContain('Name contains "dashboard"');
+
+      const defectQuery = getQueryForType(1);
+      // defects: state + exclude-closed + assignee + labels + search
+      expect(defectQuery).toContain('State = "In-Progress"');
+      expect(defectQuery).toContain('State != "Closed"');
+      expect(defectQuery).toContain('Owner.Name contains "Jane Smith"');
     });
   });
 
@@ -1049,30 +787,23 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
 
       for (const test of stateTests) {
-        mockQuery.mockResolvedValueOnce({
-          QueryResult: {
-            Results: [{
-              ObjectID: '1',
-              FormattedID: 'US1',
-              Name: 'Test',
-              Description: '',
-              ScheduleState: test.rallyState,
-              State: null,
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: 'Normal',
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'HierarchicalRequirement',
-              _ref: '/hierarchicalrequirement/1',
-            }],
-            TotalResultCount: 1,
-            Errors: [],
-            Warnings: [],
-          },
-        });
+        mockQuery.mockResolvedValueOnce(wsapiResponse([{
+          ObjectID: '1',
+          FormattedID: 'US1',
+          Name: 'Test',
+          Description: '',
+          ScheduleState: test.rallyState,
+          State: null,
+          Tags: { _tagsNameArray: [] },
+          Owner: null,
+          Priority: 'Normal',
+          DueDate: null,
+          CreationDate: '2024-01-01T00:00:00Z',
+          LastUpdateDate: '2024-01-01T00:00:00Z',
+          Parent: null,
+          _type: 'HierarchicalRequirement',
+          _ref: '/hierarchicalrequirement/1',
+        }]));
 
         const issue = await tracker.getIssue('US1');
         expect(issue.state).toBe(test.expected);
@@ -1092,30 +823,23 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
 
       for (const test of priorityTests) {
-        mockQuery.mockResolvedValueOnce({
-          QueryResult: {
-            Results: [{
-              ObjectID: '1',
-              FormattedID: 'US1',
-              Name: 'Test',
-              Description: '',
-              ScheduleState: 'Defined',
-              State: null,
-              Tags: { _tagsNameArray: [] },
-              Owner: null,
-              Priority: test.rallyPriority,
-              DueDate: null,
-              CreationDate: '2024-01-01T00:00:00Z',
-              LastUpdateDate: '2024-01-01T00:00:00Z',
-              Parent: null,
-              _type: 'HierarchicalRequirement',
-              _ref: '/hierarchicalrequirement/1',
-            }],
-            TotalResultCount: 1,
-            Errors: [],
-            Warnings: [],
-          },
-        });
+        mockQuery.mockResolvedValueOnce(wsapiResponse([{
+          ObjectID: '1',
+          FormattedID: 'US1',
+          Name: 'Test',
+          Description: '',
+          ScheduleState: 'Defined',
+          State: null,
+          Tags: { _tagsNameArray: [] },
+          Owner: null,
+          Priority: test.rallyPriority,
+          DueDate: null,
+          CreationDate: '2024-01-01T00:00:00Z',
+          LastUpdateDate: '2024-01-01T00:00:00Z',
+          Parent: null,
+          _type: 'HierarchicalRequirement',
+          _ref: '/hierarchicalrequirement/1',
+        }]));
 
         const issue = await tracker.getIssue('US1');
         expect(issue.priority).toBe(test.expected);

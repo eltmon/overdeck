@@ -29,6 +29,44 @@ const STATE_MAP: Record<string, IssueState> = {
 // Rally artifact types we support
 type RallyArtifactType = 'HierarchicalRequirement' | 'Defect' | 'Task' | 'PortfolioItem/Feature';
 
+/**
+ * Type-specific query configuration.
+ *
+ * Rally WSAPI cannot filter generic Artifact by ScheduleState because not all
+ * subtypes have that field. Instead, we query each type separately with its
+ * own state field and merge the results. (PAN-168)
+ */
+interface ArtifactTypeQuery {
+  /** WSAPI endpoint type (lowercase) */
+  type: string;
+  /** The state field used for filtering on this artifact type */
+  stateField: 'ScheduleState' | 'State';
+  /** State values that represent "closed" for this type */
+  closedStates: string[];
+}
+
+const QUERYABLE_TYPES: ArtifactTypeQuery[] = [
+  { type: 'hierarchicalrequirement', stateField: 'ScheduleState', closedStates: ['Completed', 'Accepted'] },
+  { type: 'defect', stateField: 'State', closedStates: ['Closed'] },
+  { type: 'task', stateField: 'State', closedStates: ['Completed'] },
+];
+
+const FETCH_FIELDS = [
+  'FormattedID',
+  'Name',
+  'Description',
+  'ScheduleState',
+  'State',
+  'Tags',
+  'Owner',
+  'Priority',
+  'DueDate',
+  'CreationDate',
+  'LastUpdateDate',
+  'Parent',
+  '_type',
+];
+
 // Rally priority strings to numbers
 const PRIORITY_MAP: Record<string, number> = {
   'Resolve Immediately': 0,
@@ -81,52 +119,66 @@ export class RallyTracker implements IssueTracker {
     this.project = config.project;
   }
 
+  /**
+   * List issues by querying each artifact type separately and merging results.
+   *
+   * Rally WSAPI cannot apply ScheduleState filters across the generic Artifact
+   * endpoint because not all subtypes have that field. We query each type with
+   * its own state field, then merge and sort. (PAN-168)
+   */
   async listIssues(filters?: IssueFilters): Promise<Issue[]> {
-    const queryString = this.buildQueryString(filters);
-
     if (process.env.DEBUG?.includes('rally')) {
       console.debug('[Rally] Query filters:', JSON.stringify(filters));
-      console.debug('[Rally] Generated query:', queryString);
     }
 
-    const query: any = {
-      type: 'artifact', // Query all artifact types
-      fetch: [
-        'FormattedID',
-        'Name',
-        'Description',
-        'ScheduleState',
-        'State', // For Defects
-        'Tags',
-        'Owner',
-        'Priority',
-        'DueDate',
-        'CreationDate',
-        'LastUpdateDate',
-        'Parent',
-        '_type',
-      ],
-      limit: filters?.limit ?? 50,
-      query: queryString,
-    };
+    const limit = filters?.limit ?? 50;
 
-    if (this.workspace) {
-      query.workspace = this.workspace;
-    }
-    if (this.project) {
-      query.project = this.project;
-      query.projectScopeDown = true;
-    }
+    const queries = QUERYABLE_TYPES.map(async (artifactType) => {
+      const queryString = this.buildQueryStringForType(filters, artifactType);
 
-    try {
-      const result = await this.queryRally(query);
-      return result.Results.map((artifact: any) => this.normalizeIssue(artifact));
-    } catch (error: any) {
-      if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-        throw new TrackerAuthError('rally' as TrackerType, 'Invalid API key or insufficient permissions');
+      if (process.env.DEBUG?.includes('rally')) {
+        console.debug(`[Rally] ${artifactType.type} query:`, queryString);
       }
-      throw error;
-    }
+
+      const query: any = {
+        type: artifactType.type,
+        fetch: FETCH_FIELDS,
+        limit,
+        query: queryString,
+      };
+
+      if (this.workspace) {
+        query.workspace = this.workspace;
+      }
+      if (this.project) {
+        query.project = this.project;
+        query.projectScopeDown = true;
+      }
+
+      try {
+        const result = await this.queryRally(query);
+        return result.Results.map((artifact: any) => this.normalizeIssue(artifact));
+      } catch (error: any) {
+        if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+          throw new TrackerAuthError('rally' as TrackerType, 'Invalid API key or insufficient permissions');
+        }
+        // Log and skip individual type failures so other types still return
+        if (process.env.DEBUG?.includes('rally')) {
+          console.debug(`[Rally] Failed to query ${artifactType.type}:`, error.message);
+        }
+        return [];
+      }
+    });
+
+    const results = await Promise.all(queries);
+    const allIssues = results.flat();
+
+    // Sort by most recently updated first, then apply overall limit
+    allIssues.sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+
+    return allIssues.slice(0, limit);
   }
 
   async getIssue(id: string): Promise<Issue> {
@@ -359,28 +411,38 @@ export class RallyTracker implements IssueTracker {
   // Private helper methods
 
   /**
-   * Build a Rally WSAPI query string from issue filters.
+   * Build a Rally WSAPI query string for a specific artifact type.
    *
-   * Rally WSAPI v2.0 requires the entire compound query expression to be wrapped
-   * in outer parentheses when multiple conditions are joined with AND/OR.
-   * Without the outer parens, the WSAPI parser fails with:
-   *   "Could not parse: Error parsing expression -- expected ")" but saw "AND" instead."
+   * Each artifact type has its own state field:
+   *   - HierarchicalRequirement: ScheduleState (Defined, In-Progress, Completed, Accepted)
+   *   - Defect: State (Submitted, Open, Fixed, Closed)
+   *   - Task: State (Defined, In-Progress, Completed)
    *
-   * Valid:   (((ScheduleState != "Completed") AND (State != "Closed")) AND (Owner.Name contains "John"))
-   * Invalid: ((ScheduleState != "Completed") AND (State != "Closed")) AND (Owner.Name contains "John")
+   * Rally WSAPI v2.0 requires binary-nested AND/OR with outer parentheses.
+   * (PAN-166, PAN-168)
    */
-  private buildQueryString(filters?: IssueFilters): string {
+  private buildQueryStringForType(
+    filters: IssueFilters | undefined,
+    artifactType: ArtifactTypeQuery,
+  ): string {
     const conditions: string[] = [];
 
     if (filters?.state && !filters.includeClosed) {
       const rallyState = this.reverseMapState(filters.state);
-      conditions.push(`((ScheduleState = "${rallyState}") OR (State = "${rallyState}"))`);
+      conditions.push(`(${artifactType.stateField} = "${rallyState}")`);
     }
 
     if (!filters?.includeClosed) {
-      // Exclude completed/accepted items by default
-      // Rally WSAPI only supports binary AND/OR — nest into pairs
-      conditions.push('(((ScheduleState != "Completed") AND (ScheduleState != "Accepted")) AND (State != "Closed"))');
+      // Exclude closed states for this specific artifact type
+      const closedConditions = artifactType.closedStates.map(
+        (state) => `(${artifactType.stateField} != "${state}")`
+      );
+      // Rally WSAPI only supports binary AND — nest into pairs
+      const closedExpr = closedConditions.reduce(
+        (acc, cond) => (acc ? `(${acc} AND ${cond})` : cond),
+        '',
+      );
+      conditions.push(closedExpr);
     }
 
     if (filters?.assignee) {

@@ -1,50 +1,65 @@
-# PAN-166: Rally WSAPI Query Parse Error Fix
+# PAN-168: Rally WSAPI Cannot Query Generic Artifact with ScheduleState
 
 **Status:** Implementation Complete
-**Issue:** https://github.com/eltmon/panopticon-cli/issues/166
-**Severity:** High - Rally tracker completely non-functional
+**Issue:** https://github.com/eltmon/panopticon-cli/issues/168
+**Severity:** High - Rally tracker completely non-functional when filtering by state
 
-## Changes Made
+## Problem
 
-### 1. Core Fix - Query String Builder (`src/lib/tracker/rally.ts`)
-- Fixed `buildQueryString()` to wrap compound conditions in outer parentheses
-- Before: `conditions.join(' AND ')` → generates invalid WSAPI query
-- After: `(${conditions.join(' AND ')})` → generates valid WSAPI query
-- Added JSDoc comment explaining Rally WSAPI requirement
-- Added debug logging (`DEBUG=rally`) for query filters and generated queries
+After PAN-166 fixed query syntax, the Rally query was syntactically valid but
+semantically broken: querying the generic `Artifact` endpoint with `ScheduleState`
+filters fails because not all artifact subtypes have that field.
 
-### 2. Error Context Improvements
-- **`src/lib/tracker/rally-api.ts`**: Error messages now include the failing query string, plus debug logging
-- **`src/dashboard/server/services/issue-data-service.ts`**: Parse errors include actionable guidance about checking config and enabling debug mode
+Error: `Could not read: could not read all instances of class com.f4tech.slm.domain.Artifact`
 
-### 3. Configuration Validation (`src/dashboard/server/services/tracker-config.ts`)
-- Added `validateRallyConfig()` function that checks for missing workspace/project config
-- Called on first poll in issue-data-service.ts to log warnings at startup
+## Root Cause
 
-### 4. Rally Validation Endpoint (`src/dashboard/server/index.ts`)
-- Added `POST /api/rally/validate` endpoint
-- Tests Rally API connectivity with a simple query
-- Returns specific error types (auth, query, network)
+- `ScheduleState` applies to HierarchicalRequirement (stories) and Tasks
+- `State` applies to Defects
+- The generic `Artifact` endpoint cannot filter by fields that don't exist on all subtypes
 
-### 5. Comprehensive Tests
-- **Unit tests**: Added `buildQueryString` test suite in `tests/lib/tracker/rally.test.ts`
-  - Tests all filter types: state, includeClosed, assignee, labels, query
-  - Tests compound queries with multiple conditions
-  - Tests edge cases: empty query, single condition
-- **Mock Rally API**: Created `tests/fixtures/rally-api-mock.ts`
-  - Validates WSAPI query syntax (parentheses matching)
-  - Supports forced errors for testing error paths
-- **Integration tests**: Created `tests/integration/rally-tracker.test.ts`
-  - Tests that fixed query builder output passes WSAPI syntax validation
-  - Tests error handling scenarios
+## Solution
 
-### 6. Documentation (`configuration/issue-trackers.mdx`)
-- Added Rally Troubleshooting section
-- WSAPI query parse error debugging guide
-- How to find workspace/project IDs
-- Debug logging instructions
-- API validation endpoint usage
+**Approach:** Query specific types separately and merge results (Option 1 from issue).
+
+### Changes Made
+
+### 1. Type-Specific Queries (`src/lib/tracker/rally.ts`)
+- Added `QUERYABLE_TYPES` configuration array with type-specific state fields:
+  - `hierarchicalrequirement` → `ScheduleState` (closed: Completed, Accepted)
+  - `defect` → `State` (closed: Closed)
+  - `task` → `State` (closed: Completed)
+- `listIssues()` now queries each type in parallel via `Promise.all()`
+- Results are merged, sorted by `updatedAt` descending, and limited
+- Individual type query failures are caught and logged (non-auth errors) so
+  other types still return data
+
+### 2. Type-Aware Query Builder (`src/lib/tracker/rally.ts`)
+- Replaced `buildQueryString()` with `buildQueryStringForType()` that accepts
+  an `ArtifactTypeQuery` parameter
+- Each type gets its own state field in the exclude-closed and state-filter conditions
+- Other filters (assignee, labels, search) remain the same across all types
+
+### 3. Updated Unit Tests (`tests/lib/tracker/rally.test.ts`)
+- Updated `listIssues` tests to expect 3 separate queries (one per type)
+- Added tests for: type-specific query types, result merging, sorting, limit
+  handling, partial failure resilience, workspace/project propagation
+- Updated `buildQueryStringForType` tests to verify type-specific state fields
+- Added sample data for all 3 artifact types (story, defect, task)
+
+### 4. Updated Integration Tests (`tests/integration/rally-tracker.test.ts`)
+- Added PAN-168 test suite for type-specific query validation
+- Tests that each type generates valid WSAPI queries
+- Tests that new queries don't mix ScheduleState/State in the same filter
+- Regression test documenting the old problematic mixed-field query
+
+### Preserved Behavior
+- `getIssue()` still uses generic `artifact` endpoint (OK because it filters
+  by FormattedID, not state fields)
+- `updateIssue()` still correctly routes state updates to ScheduleState or State
+  based on artifact `_type`
+- All other methods (createIssue, getComments, addComment, etc.) unchanged
 
 ## Remaining Work
 
-None - implementation complete. Pending: test run, commit, push.
+None - implementation complete. All 49 Rally tests pass.
