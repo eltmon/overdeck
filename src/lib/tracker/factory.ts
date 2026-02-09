@@ -11,6 +11,7 @@ import { GitHubTracker } from './github.js';
 import { GitLabTracker } from './gitlab.js';
 import { RallyTracker } from './rally.js';
 import type { TrackersConfig } from '../config.js';
+import { loadConfig as loadYamlConfig } from '../config-yaml.js';
 
 // Configuration for a single tracker
 export interface TrackerConfig {
@@ -38,19 +39,32 @@ export interface TrackerConfig {
 // Note: Use TrackersConfig from config.ts for full type with nested configs
 
 /**
+ * Get tracker API key from config.yaml as fallback when env var is not set.
+ */
+function getTrackerKeyFromConfig(trackerType: TrackerType): string | undefined {
+  try {
+    const yamlConfig = loadYamlConfig();
+    return yamlConfig.trackerKeys[trackerType];
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Create a tracker instance from configuration
  */
 export function createTracker(config: TrackerConfig): IssueTracker {
   switch (config.type) {
     case 'linear': {
-      const apiKey = config.apiKeyEnv
+      const envKey = config.apiKeyEnv
         ? process.env[config.apiKeyEnv]
         : process.env.LINEAR_API_KEY;
+      const apiKey = envKey || getTrackerKeyFromConfig('linear');
 
       if (!apiKey) {
         throw new TrackerAuthError(
           'linear',
-          `API key not found. Set ${config.apiKeyEnv ?? 'LINEAR_API_KEY'} environment variable.`
+          `API key not found. Set ${config.apiKeyEnv ?? 'LINEAR_API_KEY'} environment variable or configure in Settings.`
         );
       }
 
@@ -58,14 +72,15 @@ export function createTracker(config: TrackerConfig): IssueTracker {
     }
 
     case 'github': {
-      const token = config.tokenEnv
+      const envToken = config.tokenEnv
         ? process.env[config.tokenEnv]
         : process.env.GITHUB_TOKEN;
+      const token = envToken || getTrackerKeyFromConfig('github');
 
       if (!token) {
         throw new TrackerAuthError(
           'github',
-          `Token not found. Set ${config.tokenEnv ?? 'GITHUB_TOKEN'} environment variable.`
+          `Token not found. Set ${config.tokenEnv ?? 'GITHUB_TOKEN'} environment variable or configure in Settings.`
         );
       }
 
@@ -79,14 +94,15 @@ export function createTracker(config: TrackerConfig): IssueTracker {
     }
 
     case 'gitlab': {
-      const token = config.tokenEnv
+      const envToken = config.tokenEnv
         ? process.env[config.tokenEnv]
         : process.env.GITLAB_TOKEN;
+      const token = envToken || getTrackerKeyFromConfig('gitlab');
 
       if (!token) {
         throw new TrackerAuthError(
           'gitlab',
-          `Token not found. Set ${config.tokenEnv ?? 'GITLAB_TOKEN'} environment variable.`
+          `Token not found. Set ${config.tokenEnv ?? 'GITLAB_TOKEN'} environment variable or configure in Settings.`
         );
       }
 
@@ -98,14 +114,15 @@ export function createTracker(config: TrackerConfig): IssueTracker {
     }
 
     case 'rally': {
-      const apiKey = config.apiKeyEnv
+      const envKey = config.apiKeyEnv
         ? process.env[config.apiKeyEnv]
         : process.env.RALLY_API_KEY;
+      const apiKey = envKey || getTrackerKeyFromConfig('rally');
 
       if (!apiKey) {
         throw new TrackerAuthError(
           'rally',
-          `API key not found. Set ${config.apiKeyEnv ?? 'RALLY_API_KEY'} environment variable.`
+          `API key not found. Set ${config.apiKeyEnv ?? 'RALLY_API_KEY'} environment variable or configure in Settings.`
         );
       }
 

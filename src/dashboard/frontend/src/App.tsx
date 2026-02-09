@@ -18,10 +18,24 @@ import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
 import { MissionControl } from './components/MissionControl';
-import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass } from 'lucide-react';
+import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, AlertTriangle } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useTheme } from './hooks/useTheme';
 import { useSocketIssues } from './hooks/useSocketIssues';
+
+interface TrackerStatusItem {
+  type: string;
+  name: string;
+  hasKey: boolean;
+  envVar: string;
+  isPrimary: boolean;
+}
+
+interface TrackerStatus {
+  primary: string;
+  secondary?: string;
+  configured: TrackerStatusItem[];
+}
 
 type Tab = 'mission-control' | 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
@@ -64,6 +78,12 @@ async function fetchIssues(): Promise<Issue[]> {
   return res.json();
 }
 
+async function fetchTrackerStatus(): Promise<TrackerStatus> {
+  const res = await fetch('/api/tracker-status');
+  if (!res.ok) throw new Error('Failed to fetch tracker status');
+  return res.json();
+}
+
 async function fetchConfirmations(): Promise<ConfirmationRequest[]> {
   const res = await fetch('/api/confirmations');
   if (!res.ok) throw new Error('Failed to fetch confirmations');
@@ -88,6 +108,7 @@ export default function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Theme management
@@ -95,6 +116,16 @@ export default function App() {
 
   // Real-time issue updates via socket.io
   useSocketIssues();
+
+  // Check tracker status for missing API keys
+  const { data: trackerStatus } = useQuery({
+    queryKey: ['tracker-status'],
+    queryFn: fetchTrackerStatus,
+    refetchInterval: 60000, // Check every minute
+    retry: false,
+  });
+
+  const missingKeyTrackers = trackerStatus?.configured.filter(t => !t.hasKey) || [];
 
   // Initialize theme on mount
   useEffect(() => {
@@ -288,6 +319,34 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Missing Tracker API Key Banner */}
+      {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
+        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex items-center gap-3 shrink-0">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <p className="text-amber-400 text-sm flex-1">
+            <span className="font-semibold">Missing API key{missingKeyTrackers.length > 1 ? 's' : ''}:</span>{' '}
+            {missingKeyTrackers.map(t => (
+              <span key={t.type}>
+                {t.name} (<code className="font-mono text-xs bg-amber-500/20 px-1 rounded">{t.envVar}</code>)
+              </span>
+            )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, ', ', curr], [] as React.ReactNode[])}.{' '}
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="underline hover:text-amber-300 font-semibold"
+            >
+              Configure in Settings
+            </button>
+          </p>
+          <button
+            onClick={() => setTrackerBannerDismissed(true)}
+            className="text-amber-400/60 hover:text-amber-400 shrink-0"
+            title="Dismiss"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+      )}
 
       <main ref={containerRef} className="flex-1 flex overflow-hidden">
         {activeTab === 'mission-control' && (

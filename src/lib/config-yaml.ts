@@ -72,6 +72,14 @@ export interface YamlConfig {
     kimi?: string;
   };
 
+  /** Tracker API keys (override environment variables) */
+  tracker_keys?: {
+    linear?: string;
+    github?: string;
+    gitlab?: string;
+    rally?: string;
+  };
+
   /** Shadow mode configuration */
   shadow?: ShadowConfig;
 }
@@ -113,6 +121,14 @@ export interface NormalizedConfig {
   /** Gemini thinking level */
   geminiThinkingLevel: 1 | 2 | 3 | 4;
 
+  /** Tracker API keys */
+  trackerKeys: {
+    linear?: string;
+    github?: string;
+    gitlab?: string;
+    rally?: string;
+  };
+
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
 }
@@ -125,6 +141,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   apiKeys: {},
   overrides: {},
   geminiThinkingLevel: 3,
+  trackerKeys: {},
   shadow: {
     enabled: false,
     trackers: {
@@ -359,6 +376,22 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
       result.geminiThinkingLevel = config.models.gemini_thinking_level;
     }
 
+    // Merge tracker keys
+    if (config.tracker_keys) {
+      if (config.tracker_keys.linear) {
+        result.trackerKeys.linear = resolveEnvVar(config.tracker_keys.linear);
+      }
+      if (config.tracker_keys.github) {
+        result.trackerKeys.github = resolveEnvVar(config.tracker_keys.github);
+      }
+      if (config.tracker_keys.gitlab) {
+        result.trackerKeys.gitlab = resolveEnvVar(config.tracker_keys.gitlab);
+      }
+      if (config.tracker_keys.rally) {
+        result.trackerKeys.rally = resolveEnvVar(config.tracker_keys.rally);
+      }
+    }
+
     // Merge shadow configuration
     mergeShadowConfig(result.shadow, config);
   }
@@ -392,6 +425,20 @@ export function loadConfig(): NormalizedConfig {
   if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
     config.apiKeys.kimi = process.env.KIMI_API_KEY;
     config.enabledProviders.add('kimi');
+  }
+
+  // Load tracker API keys from environment variables as fallback
+  if (process.env.LINEAR_API_KEY && !config.trackerKeys.linear) {
+    config.trackerKeys.linear = process.env.LINEAR_API_KEY;
+  }
+  if (process.env.GITHUB_TOKEN && !config.trackerKeys.github) {
+    config.trackerKeys.github = process.env.GITHUB_TOKEN;
+  }
+  if (process.env.GITLAB_TOKEN && !config.trackerKeys.gitlab) {
+    config.trackerKeys.gitlab = process.env.GITLAB_TOKEN;
+  }
+  if (process.env.RALLY_API_KEY && !config.trackerKeys.rally) {
+    config.trackerKeys.rally = process.env.RALLY_API_KEY;
   }
 
   // Load shadow mode from environment as fallback

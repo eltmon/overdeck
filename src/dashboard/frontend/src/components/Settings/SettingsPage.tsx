@@ -64,6 +64,15 @@ const PROVIDERS: { id: Provider; name: string; icon: string; placeholder: string
   { id: 'zai', name: 'Zhipu (GLM)', icon: 'hub', placeholder: 'sk-zai-...' },
 ];
 
+// Tracker definitions
+type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
+const TRACKERS: { id: TrackerType; name: string; icon: string; envVar: string; placeholder: string }[] = [
+  { id: 'linear', name: 'Linear', icon: 'view_kanban', envVar: 'LINEAR_API_KEY', placeholder: 'lin_api_...' },
+  { id: 'github', name: 'GitHub', icon: 'code', envVar: 'GITHUB_TOKEN', placeholder: 'ghp_...' },
+  { id: 'gitlab', name: 'GitLab', icon: 'commit', envVar: 'GITLAB_TOKEN', placeholder: 'glpat-...' },
+  { id: 'rally', name: 'Rally', icon: 'flag', envVar: 'RALLY_API_KEY', placeholder: '_abc123...' },
+];
+
 // Agent definitions organized by category
 interface AgentDef { id: WorkTypeId; name: string; icon: string; description: string }
 interface AgentCategory { name: string; icon: string; agents: AgentDef[] }
@@ -155,6 +164,7 @@ export function SettingsPage() {
 
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+  const [showTrackerKey, setShowTrackerKey] = useState<Record<string, boolean>>({});
   const [modalWorkType, setModalWorkType] = useState<WorkTypeId | null>(null);
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
@@ -218,6 +228,16 @@ export function SettingsPage() {
     });
   };
 
+  const handleTrackerKeyChange = (tracker: TrackerType, key: string) => {
+    setFormData({
+      ...formData,
+      tracker_keys: {
+        ...formData.tracker_keys,
+        [tracker]: key || undefined,
+      },
+    });
+  };
+
   const handleSetOverride = (workType: WorkTypeId, model: ModelId) => {
     setFormData({
       ...formData,
@@ -256,6 +276,7 @@ export function SettingsPage() {
           gemini_thinking_level: optimalDefaults.models.gemini_thinking_level,
         },
         api_keys: { ...(formData?.api_keys || {}) },
+        tracker_keys: { ...(formData?.tracker_keys || {}) },
       };
       setFormData(newFormData);
     } catch (error) {
@@ -520,6 +541,84 @@ export function SettingsPage() {
                       )}
                     </div>
                   )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Tracker API Keys */}
+      <section className="mb-12">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          Tracker API Keys
+          <div className="h-px flex-1 bg-divider-strong" />
+        </h2>
+        <p className="text-content-muted text-sm mb-6">
+          Configure API keys for your issue trackers. These override environment variables ({TRACKERS.map(t => t.envVar).join(', ')}).
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {TRACKERS.map((tracker) => {
+            const trackerKey = formData.tracker_keys?.[tracker.id] || '';
+
+            return (
+              <div
+                key={tracker.id}
+                className="bg-surface-raised border border-divider rounded-xl p-5 relative transition-colors shadow-sm hover:border-divider-strong"
+              >
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="size-10 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
+                    <span className="material-symbols-outlined text-content-subtle">{tracker.icon}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-content">{tracker.name}</span>
+                    <p className="text-[10px] text-content-muted font-mono">{tracker.envVar}</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key / Token</label>
+                    {trackerKey.startsWith('$') ? (
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 text-amber-400 text-xs">
+                          <span className="material-symbols-outlined text-[14px]">info</span>
+                          <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{trackerKey}</code></span>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder={tracker.placeholder}
+                          onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
+                          autoComplete="off"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                        />
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type={showTrackerKey[tracker.id] ? 'text' : 'password'}
+                          value={trackerKey}
+                          onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
+                          placeholder={tracker.placeholder}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck={false}
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          data-form-type="other"
+                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-content-body"
+                        />
+                        <button
+                          onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">
+                            {showTrackerKey[tracker.id] ? 'visibility_off' : 'visibility'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
