@@ -55,6 +55,7 @@
 | **Convoys** | Run parallel agents on related issues with auto-synthesis |
 | **Specialists** | Dedicated review, test, and merge agents for quality control |
 | **Heartbeat Monitoring** | Real-time agent activity tracking via Claude Code hooks |
+| **Real-Time Dashboard** | Socket.io push with multi-layer caching (in-memory + SQLite) for instant loads |
 | **Legacy Codebase Support** | AI self-monitoring skills that learn from your codebase |
 
 ## Supported Tools
@@ -299,6 +300,7 @@ pan down
 | [docs/USAGE.md](docs/USAGE.md) | Detailed usage guide, examples, troubleshooting |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Model routing, API setup, presets |
 | [AGENTS.md](AGENTS.md) | Agent architecture |
+| [docs/ARCHITECTURE-CACHING.md](docs/ARCHITECTURE-CACHING.md) | Dashboard caching and real-time push |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [CLAUDE.md](CLAUDE.md) | Agent development guidance |
 

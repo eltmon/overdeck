@@ -7,8 +7,9 @@ import './index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchInterval: 5000,
-      staleTime: 2000,
+      refetchInterval: 60_000,      // 60s fallback poll (socket.io handles real-time)
+      staleTime: 30_000,            // Data considered fresh for 30s
+      refetchIntervalInBackground: false, // Don't poll when tab is hidden
     },
   },
 });
