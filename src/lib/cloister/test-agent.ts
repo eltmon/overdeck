@@ -173,8 +173,11 @@ function buildTestPrompt(context: TestContext): string {
   // Detect test command if not provided
   const testCommand = context.testCommand || detectTestCommand(context.projectPath);
 
+  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+
   // Replace template variables
   const prompt = template
+    .replace(/\{\{apiUrl\}\}/g, apiUrl)
     .replace(/\{\{projectPath\}\}/g, context.projectPath)
     .replace(/\{\{issueId\}\}/g, context.issueId)
     .replace(/\{\{branch\}\}/g, context.branch)

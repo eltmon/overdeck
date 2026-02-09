@@ -198,3 +198,14 @@ export function saveConfig(config: PanopticonConfig): void {
 export function getDefaultConfig(): PanopticonConfig {
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
+
+/**
+ * Get the dashboard API base URL from config.
+ * Reads from DASHBOARD_URL env var first, then config file, then defaults.
+ */
+export function getDashboardApiUrl(): string {
+  if (process.env.DASHBOARD_URL) return process.env.DASHBOARD_URL;
+  const config = loadConfig();
+  const port = config.dashboard?.api_port || 3011;
+  return `http://localhost:${port}`;
+}

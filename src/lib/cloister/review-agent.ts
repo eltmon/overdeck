@@ -87,8 +87,11 @@ async function buildReviewPrompt(context: ReviewContext): Promise<string> {
     filesChanged = await getFilesChangedFromPR(context.prUrl, context.projectPath);
   }
 
+  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+
   // Replace template variables
   const prompt = template
+    .replace(/\{\{apiUrl\}\}/g, apiUrl)
     .replace(/\{\{projectPath\}\}/g, context.projectPath)
     .replace(/\{\{prUrl\}\}/g, context.prUrl)
     .replace(/\{\{issueId\}\}/g, context.issueId)

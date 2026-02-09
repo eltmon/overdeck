@@ -246,14 +246,14 @@ After completing your review and sending feedback to the issue agent, you MUST c
 
 **If issues found (request changes):**
 ```bash
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"review","issueId":"{{issueId}}","status":"failed","notes":"Brief summary of issues"}'
 ```
 
 **If approved (rare - only for excellent code):**
 ```bash
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"review","issueId":"{{issueId}}","status":"passed","notes":"Clean code, full test coverage"}'
 ```
@@ -286,7 +286,7 @@ gh pr review https://github.com/org/repo/pull/123 --request-changes --body "Your
 pan work tell min-665 "CODE REVIEW BLOCKED: Missing tests for new functions. Fix and reply when done."
 
 # 3. Signal completion (REQUIRED)
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"review","issueId":"MIN-665","status":"failed","notes":"Missing tests, type safety issues"}'
 ```
@@ -297,7 +297,7 @@ Or for approval:
 gh pr review https://github.com/org/repo/pull/123 --approve --body "Excellent work"
 
 # 2. Signal completion - test agent can now proceed
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"review","issueId":"MIN-665","status":"passed","notes":"Clean code, full test coverage"}'
 ```
@@ -363,12 +363,12 @@ Only AFTER sending feedback to the agent, signal completion:
 
 ```bash
 # If issues found:
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"review","issueId":"{{issueId}}","status":"failed","notes":"brief summary of issues"}'
 
 # If approved:
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"review","issueId":"{{issueId}}","status":"passed","notes":"Clean code, ready for testing"}'
 ```

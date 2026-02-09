@@ -175,14 +175,14 @@ When you're done, you MUST call the API to update status:
 
 **If tests passed:**
 ```bash
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"{{issueId}}","status":"passed","notes":"All X tests passed"}'
 ```
 
 **If tests failed:**
 ```bash
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"{{issueId}}","status":"failed","notes":"X tests failing: brief description"}'
 ```
@@ -212,12 +212,12 @@ curl -X POST http://localhost:3010/api/specialists/done \
 npm test
 
 # 2. If all pass:
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"MIN-665","status":"passed","notes":"42 tests passed, 0 failed"}'
 
 # 2. If some fail:
-curl -X POST http://localhost:3010/api/specialists/done \
+curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"MIN-665","status":"failed","notes":"40 passed, 2 failed: auth.test.ts timeout, user.test.ts assertion"}'
 ```

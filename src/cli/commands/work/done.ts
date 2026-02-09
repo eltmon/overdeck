@@ -242,7 +242,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
     // Auto-trigger review & test (respecting circuit breaker)
     try {
-      const dashboardUrl = 'http://localhost:3011';
+      const { getDashboardApiUrl } = await import('../../../lib/config.js');
+      const dashboardUrl = getDashboardApiUrl();
 
       // Check if dashboard is running
       const http = await import('http');

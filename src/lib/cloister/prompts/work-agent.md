@@ -58,7 +58,7 @@ The planning agent created UI designs using Google Stitch. Use these assets:
 {{#env LOCAL}}
 3. If done, check if a specialist is already processing this issue:
    ```bash
-   curl -s http://localhost:3011/api/specialists | jq .
+   curl -s {{API_URL}}/api/specialists | jq .
    ```
 4. If NO specialist is working on this issue, signal completion immediately:
    ```bash

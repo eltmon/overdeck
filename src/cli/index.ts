@@ -297,7 +297,7 @@ program
         ? spawn('node', [bundledServer], {
             detached: true,
             stdio: 'ignore',
-            env: { ...process.env, DASHBOARD_PORT: '3010' },
+            env: { ...process.env, DASHBOARD_PORT: String(dashboardPort) },
           })
         : spawn('npm', ['run', 'dev'], {
             cwd: srcDashboard,
@@ -342,7 +342,7 @@ program
       const child = isProduction
         ? spawn('node', [bundledServer], {
             stdio: 'inherit',
-            env: { ...process.env, DASHBOARD_PORT: '3010' },
+            env: { ...process.env, DASHBOARD_PORT: String(dashboardPort) },
           })
         : spawn('npm', ['run', 'dev'], {
             cwd: srcDashboard,
@@ -369,29 +369,33 @@ program
 
     console.log(chalk.bold('Stopping Panopticon...\n'));
 
-    // Stop dashboard
-    console.log(chalk.dim('Stopping dashboard...'));
-    try {
-      // Kill processes on dashboard ports
-      execSync('lsof -ti:3010 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
-      execSync('lsof -ti:3011 | xargs kill -9 2>/dev/null || true', { stdio: 'pipe' });
-      console.log(chalk.green('✓ Dashboard stopped'));
-    } catch {
-      console.log(chalk.dim('  No dashboard processes found'));
-    }
-
-    // Check if Traefik is enabled
+    // Read config for ports and Traefik settings
     const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
     let traefikEnabled = false;
+    let dashboardPort = 3010;
+    let dashboardApiPort = 3011;
 
     if (existsSync(configFile)) {
       try {
         const configContent = readFileSync(configFile, 'utf-8');
         const config = parse(configContent) as any;
         traefikEnabled = config.traefik?.enabled === true;
+        dashboardPort = config.dashboard?.port || 3010;
+        dashboardApiPort = config.dashboard?.api_port || 3011;
       } catch (error) {
         // Ignore config read errors
       }
+    }
+
+    // Stop dashboard
+    console.log(chalk.dim('Stopping dashboard...'));
+    try {
+      // Kill processes on dashboard ports
+      execSync(`lsof -ti:${dashboardPort} | xargs kill -9 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`lsof -ti:${dashboardApiPort} | xargs kill -9 2>/dev/null || true`, { stdio: 'pipe' });
+      console.log(chalk.green('✓ Dashboard stopped'));
+    } catch {
+      console.log(chalk.dim('  No dashboard processes found'));
     }
 
     // Stop Traefik if enabled
