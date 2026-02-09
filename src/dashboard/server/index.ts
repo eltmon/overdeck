@@ -147,7 +147,7 @@ import {
   saveReviewStatuses,
   setReviewStatus as setReviewStatusBase,
   getReviewStatus,
-  clearReviewStatus,
+  // clearReviewStatus removed — we keep status after merge so frontend can show "MERGED"
 } from './review-status.js';
 
 // Wrapper that adds auto-PR creation logic on top of the base setReviewStatus
@@ -6386,9 +6386,8 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       );
       console.log(`[merge] PR merge output: ${mergeOutput}`);
 
-      // Mark as merged
+      // Mark as merged (keep status so frontend shows "MERGED" instead of clearing)
       setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
-      clearReviewStatus(issueId);
       completePendingOperation(issueId, null);
 
       // Close the issue
@@ -6440,7 +6439,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
 
     if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
       console.log(`[merge] Successfully merged ${issueId}`);
-      clearReviewStatus(issueId); // Clear review status after successful merge
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
       completePendingOperation(issueId, null);
 
       // Close the issue after successful merge
@@ -6453,7 +6452,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       });
     } else if (mergeResult.success) {
       console.log(`[merge] Merged ${issueId} (tests: ${mergeResult.testsStatus})`);
-      clearReviewStatus(issueId);
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
       completePendingOperation(issueId, null);
 
       // Close the issue after successful merge (even if tests skipped)
@@ -11591,11 +11590,30 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
       } catch { /* no workspace or planning dir */ }
     }
 
-    // 2. Build specialist sections from review-status history
-    // Persistent specialists (review-agent, test-agent) don't write per-run .log files
-    // so we build activity sections from the central review-status.json history
+    // 2. Build specialist sections from review-status history + task files + tmux output
     const centralStatus = getReviewStatus(issueId.toUpperCase());
     if (centralStatus?.history && centralStatus.history.length > 0) {
+      // Find matching specialist task files for this issue
+      const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
+      const taskFilesByType: Record<string, string[]> = { review: [], test: [], merge: [] };
+      try {
+        if (existsSync(tasksDir)) {
+          const taskFiles = readdirSync(tasksDir).filter(f => f.endsWith('.md'));
+          for (const f of taskFiles) {
+            const content = readFileSync(join(tasksDir, f), 'utf-8');
+            if (content.includes(issueId.toUpperCase()) || content.includes(issueId)) {
+              if (f.startsWith('review-agent')) taskFilesByType.review.push(f);
+              else if (f.startsWith('test-agent')) taskFilesByType.test.push(f);
+              else if (f.startsWith('merge-agent')) taskFilesByType.merge.push(f);
+            }
+          }
+          // Sort by timestamp in filename (most recent last)
+          for (const type of Object.keys(taskFilesByType)) {
+            taskFilesByType[type].sort();
+          }
+        }
+      } catch { /* ignore task file errors */ }
+
       // Group history entries into review/test/merge sections
       const typeMap: Record<string, string> = { review: 'review', test: 'test', merge: 'merge' };
       let currentSection: { type: string; startedAt: string; endedAt?: string; status: string; notes?: string } | null = null;
@@ -11626,13 +11644,53 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
       // If there's an ongoing specialist phase
       if (currentSection) specialistSections.push(currentSection);
 
+      // Track task file usage to match sections with task files
+      const taskFileIndex: Record<string, number> = { review: 0, test: 0, merge: 0 };
+
       for (const ss of specialistSections) {
         const duration = ss.startedAt && ss.endedAt
           ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
           : null;
-        const transcript = ss.notes
-          ? `${ss.type.toUpperCase()} ${ss.status === 'completed' ? 'PASSED' : ss.status.toUpperCase()}\n\n${ss.notes}`
-          : `${ss.type.toUpperCase()} ${ss.status === 'completed' ? 'PASSED' : ss.status === 'running' ? 'IN PROGRESS...' : ss.status.toUpperCase()}`;
+
+        // Build rich transcript
+        const transcriptParts: string[] = [];
+        const statusLabel = ss.status === 'completed' ? 'PASSED' : ss.status === 'running' ? 'IN PROGRESS...' : ss.status.toUpperCase();
+        transcriptParts.push(`${ss.type.toUpperCase()} ${statusLabel}`);
+
+        // Include task file content if available
+        const taskFiles = taskFilesByType[ss.type] || [];
+        const taskIdx = taskFileIndex[ss.type] || 0;
+        if (taskIdx < taskFiles.length) {
+          try {
+            const taskContent = readFileSync(join(tasksDir, taskFiles[taskIdx]), 'utf-8');
+            // Extract just the task description, skip boilerplate
+            const taskLines = taskContent.split('\n');
+            const meaningfulLines = taskLines.filter(l =>
+              !l.startsWith('```') && !l.startsWith('# EXECUTE') && !l.startsWith('⚠️')
+            );
+            transcriptParts.push(`\n--- Task ---\n${meaningfulLines.slice(0, 5).join('\n')}`);
+          } catch { /* skip */ }
+          taskFileIndex[ss.type] = taskIdx + 1;
+        }
+
+        // For running specialist phases, try to get live tmux output
+        if (ss.status === 'running') {
+          const tmuxName = `specialist-${ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
+          try {
+            const { stdout } = await execAsync(
+              `tmux capture-pane -t ${tmuxName} -p -S -100 2>/dev/null || echo ""`,
+              { encoding: 'utf-8', timeout: 5000 }
+            );
+            if (stdout.trim()) {
+              transcriptParts.push(`\n--- Live Output ---\n${stdout.trim()}`);
+            }
+          } catch { /* specialist may not be running */ }
+        }
+
+        // Include notes (review findings, test results)
+        if (ss.notes) {
+          transcriptParts.push(`\n--- Results ---\n${ss.notes}`);
+        }
 
         sections.push({
           type: ss.type,
@@ -11641,7 +11699,7 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
           startedAt: ss.startedAt,
           duration,
           status: ss.status,
-          transcript,
+          transcript: transcriptParts.join('\n'),
         });
       }
     }
@@ -11653,7 +11711,24 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
       return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
     });
 
-    res.json({ issueId, sections });
+    // 3. Include cost breakdown per stage
+    let costByStage: Record<string, { cost: number; tokens: number }> = {};
+    let totalCost = 0;
+    try {
+      syncCache();
+      const issueData = getCostsForIssue(issueId.toUpperCase());
+      if (issueData) {
+        totalCost = issueData.totalCost;
+        costByStage = Object.fromEntries(
+          Object.entries(issueData.stages || {}).map(([stage, stats]) => [
+            stage,
+            { cost: stats.cost, tokens: stats.tokens }
+          ])
+        );
+      }
+    } catch { /* cost data optional */ }
+
+    res.json({ issueId, sections, costByStage, totalCost });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch activity: ' + error.message });
   }

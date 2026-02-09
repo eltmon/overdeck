@@ -381,6 +381,21 @@
   margin-left: auto;
 }
 
+.sectionCost {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-success);
+  font-weight: 500;
+  padding: 0 var(--mc-space-1);
+}
+
+.costSummary {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  text-align: right;
+  padding: var(--mc-space-1) var(--mc-space-2);
+  font-weight: 500;
+}
+
 .sectionStatus {
   width: 8px;
   height: 8px;

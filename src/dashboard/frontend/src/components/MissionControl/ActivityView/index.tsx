@@ -14,11 +14,15 @@ interface ActivitySection {
   transcript: string;
 }
 
+interface CostByStage {
+  [stage: string]: { cost: number; tokens: number };
+}
+
 interface ActivityViewProps {
   issueId: string;
 }
 
-async function fetchActivity(issueId: string): Promise<{ issueId: string; sections: ActivitySection[] }> {
+async function fetchActivity(issueId: string): Promise<{ issueId: string; sections: ActivitySection[]; costByStage?: CostByStage; totalCost?: number }> {
   const res = await fetch(`/api/mission-control/activity/${issueId}`);
   if (!res.ok) throw new Error('Failed to fetch activity');
   return res.json();
@@ -37,6 +41,8 @@ export function ActivityView({ issueId }: ActivityViewProps) {
   });
 
   const sections = data?.sections || [];
+  const costByStage = data?.costByStage || {};
+  const totalCost = data?.totalCost || 0;
 
   // Track new/unread sections
   useEffect(() => {
@@ -118,14 +124,33 @@ export function ActivityView({ issueId }: ActivityViewProps) {
   return (
     <>
       <div ref={containerRef} className={styles.activityContainer}>
-        {sections.map((section) => (
-          <AgentSection
-            key={section.sessionId}
-            section={section}
-            isUnread={!readSections.has(section.sessionId) && prevSectionsRef.current.length > 0}
-            onClick={() => handleSectionClick(section)}
-          />
-        ))}
+        {totalCost > 0 && (
+          <div className={styles.costSummary}>
+            Total: ${totalCost < 0.01 ? '<0.01' : totalCost.toFixed(2)}
+          </div>
+        )}
+        {sections.map((section) => {
+          // Map section type to cost stage key
+          const stageMap: Record<string, string> = {
+            work: 'implementation',
+            planning: 'planning',
+            review: 'review',
+            test: 'test',
+            merge: 'merge',
+          };
+          const stageKey = stageMap[section.type] || section.type;
+          const sectionCost = costByStage[stageKey]?.cost;
+
+          return (
+            <AgentSection
+              key={section.sessionId}
+              section={section}
+              isUnread={!readSections.has(section.sessionId) && prevSectionsRef.current.length > 0}
+              onClick={() => handleSectionClick(section)}
+              cost={sectionCost}
+            />
+          );
+        })}
       </div>
 
       {isolatedSection && (
