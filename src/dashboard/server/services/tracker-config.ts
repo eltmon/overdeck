@@ -8,6 +8,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
 
 // GitHub configuration
 export interface GitHubConfig {
@@ -24,7 +25,7 @@ export interface RallyConfig {
 }
 
 /**
- * Load Linear API key from ~/.panopticon.env or environment.
+ * Load Linear API key from ~/.panopticon.env, environment, or config.yaml.
  */
 export function getLinearApiKey(): string | null {
   const envFile = join(homedir(), '.panopticon.env');
@@ -33,59 +34,85 @@ export function getLinearApiKey(): string | null {
     const match = content.match(/LINEAR_API_KEY=(.+)/);
     if (match) return match[1].trim();
   }
-  return process.env.LINEAR_API_KEY || null;
+  if (process.env.LINEAR_API_KEY) return process.env.LINEAR_API_KEY;
+  try {
+    const yamlConfig = loadYamlConfig();
+    if (yamlConfig.trackerKeys.linear) return yamlConfig.trackerKeys.linear;
+  } catch { /* ignore */ }
+  return null;
 }
 
 /**
- * Load Rally configuration from ~/.panopticon.env.
+ * Load Rally configuration from ~/.panopticon.env, environment, or config.yaml.
  */
 export function getRallyConfig(): RallyConfig | null {
   const envFile = join(homedir(), '.panopticon.env');
-  if (!existsSync(envFile)) return null;
+  let apiKey: string | undefined;
+  let server: string | undefined;
+  let workspace: string | undefined;
+  let project: string | undefined;
 
-  const content = readFileSync(envFile, 'utf-8');
+  if (existsSync(envFile)) {
+    const content = readFileSync(envFile, 'utf-8');
+    const apiKeyMatch = content.match(/RALLY_API_KEY=(.+)/);
+    if (apiKeyMatch) apiKey = apiKeyMatch[1].trim();
+    const serverMatch = content.match(/RALLY_SERVER=(.+)/);
+    server = serverMatch?.[1].trim();
+    const workspaceMatch = content.match(/RALLY_WORKSPACE=(.+)/);
+    workspace = workspaceMatch?.[1].trim();
+    const projectMatch = content.match(/RALLY_PROJECT=(.+)/);
+    project = projectMatch?.[1].trim();
+  }
 
-  const apiKeyMatch = content.match(/RALLY_API_KEY=(.+)/);
-  if (!apiKeyMatch) return null;
+  // Fall back to env var
+  if (!apiKey) apiKey = process.env.RALLY_API_KEY;
 
-  const apiKey = apiKeyMatch[1].trim();
+  // Fall back to config.yaml
+  if (!apiKey) {
+    try {
+      const yamlConfig = loadYamlConfig();
+      if (yamlConfig.trackerKeys.rally) apiKey = yamlConfig.trackerKeys.rally;
+    } catch { /* ignore */ }
+  }
 
-  const serverMatch = content.match(/RALLY_SERVER=(.+)/);
-  const server = serverMatch?.[1].trim();
-
-  const workspaceMatch = content.match(/RALLY_WORKSPACE=(.+)/);
-  const workspace = workspaceMatch?.[1].trim();
-
-  const projectMatch = content.match(/RALLY_PROJECT=(.+)/);
-  const project = projectMatch?.[1].trim();
-
+  if (!apiKey) return null;
   return { apiKey, server, workspace, project };
 }
 
 /**
- * Load GitHub configuration from ~/.panopticon.env.
+ * Load GitHub configuration from ~/.panopticon.env, environment, or config.yaml.
  */
 export function getGitHubConfig(): GitHubConfig | null {
   const envFile = join(homedir(), '.panopticon.env');
-  if (!existsSync(envFile)) return null;
+  let token: string | undefined;
+  let repos: Array<{ owner: string; repo: string; prefix?: string }> = [];
 
-  const content = readFileSync(envFile, 'utf-8');
+  if (existsSync(envFile)) {
+    const content = readFileSync(envFile, 'utf-8');
+    const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);
+    if (tokenMatch) token = tokenMatch[1].trim();
 
-  const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);
-  if (!tokenMatch) return null;
+    const reposMatch = content.match(/GITHUB_REPOS=(.+)/);
+    if (reposMatch) {
+      repos = reposMatch[1].trim().split(',').map(r => {
+        const [repoPath, prefix] = r.trim().split(':');
+        const [owner, repo] = repoPath.split('/');
+        return { owner, repo, prefix };
+      }).filter(r => r.owner && r.repo);
+    }
+  }
 
-  const token = tokenMatch[1].trim();
+  // Fall back to env var
+  if (!token) token = process.env.GITHUB_TOKEN;
 
-  const reposMatch = content.match(/GITHUB_REPOS=(.+)/);
-  if (!reposMatch) return null;
+  // Fall back to config.yaml
+  if (!token) {
+    try {
+      const yamlConfig = loadYamlConfig();
+      if (yamlConfig.trackerKeys.github) token = yamlConfig.trackerKeys.github;
+    } catch { /* ignore */ }
+  }
 
-  const repos = reposMatch[1].trim().split(',').map(r => {
-    const [repoPath, prefix] = r.trim().split(':');
-    const [owner, repo] = repoPath.split('/');
-    return { owner, repo, prefix };
-  }).filter(r => r.owner && r.repo);
-
-  if (repos.length === 0) return null;
-
+  if (!token || repos.length === 0) return null;
   return { token, repos };
 }

@@ -80,6 +80,12 @@ export interface ApiSettingsConfig {
     zai?: string;
     kimi?: string;
   };
+  tracker_keys?: {
+    linear?: string;
+    github?: string;
+    gitlab?: string;
+    rally?: string;
+  };
 }
 
 /**
@@ -101,6 +107,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       gemini_thinking_level: config.geminiThinkingLevel,
     },
     api_keys: config.apiKeys,
+    tracker_keys: config.trackerKeys,
   };
 }
 
@@ -122,6 +129,7 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
     },
     api_keys: settings.api_keys,
+    tracker_keys: settings.tracker_keys,
   };
 
   // Write to YAML file
@@ -157,6 +165,10 @@ export function updateSettingsApi(updates: Partial<ApiSettingsConfig>): ApiSetti
     api_keys: {
       ...current.api_keys,
       ...updates.api_keys,
+    },
+    tracker_keys: {
+      ...current.tracker_keys,
+      ...updates.tracker_keys,
     },
   };
 
@@ -270,5 +282,6 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
       gemini_thinking_level: 3,
     },
     api_keys: {},
+    tracker_keys: {},
   };
 }

@@ -57,9 +57,17 @@ export interface ApiKeysConfig {
   kimi?: string;
 }
 
+export interface TrackerKeysConfig {
+  linear?: string;
+  github?: string;
+  gitlab?: string;
+  rally?: string;
+}
+
 export interface SettingsConfig {
   models: ModelsConfig;
   api_keys: ApiKeysConfig;
+  tracker_keys?: TrackerKeysConfig;
 }
 
 export interface AvailableModels {
