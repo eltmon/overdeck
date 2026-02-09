@@ -106,7 +106,17 @@ Execute the detected test command:
 
 **Capture both stdout and stderr** - test output may contain important diagnostics.
 
-**Set a reasonable timeout** - If tests take longer than 10 minutes, consider them hung and report failure.
+**CRITICAL: Use a 5-minute (300000ms) timeout for test commands.** Test suites commonly take 2-5 minutes to run. The default 2-minute bash timeout WILL cause premature failures. Always specify the timeout parameter when running tests:
+
+```bash
+# WRONG - will timeout after 2 minutes
+npm test
+
+# CORRECT - allows 5 minutes for test suite
+npm test  # with timeout: 300000
+```
+
+If tests take longer than 10 minutes, consider them hung and report failure.
 
 ### 3. Establish Baseline (Main Branch)
 
@@ -215,6 +225,7 @@ curl -X POST http://localhost:3010/api/specialists/done \
 ## Important Constraints
 
 - **Timeout:** You have 15 minutes to complete test execution and analysis
+- **Bash Timeout:** ALWAYS use timeout: 300000 (5 minutes) for test commands. The default 2-minute timeout is too short for most test suites.
 - **Scope:** Only run tests - do not modify production code unless fixing obvious test issues
 - **Focus:** Report clear, actionable failure information
 - **Communication:** Report results in the structured format above so the system can parse them

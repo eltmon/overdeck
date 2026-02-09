@@ -247,7 +247,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       // Check if dashboard is running
       const http = await import('http');
       const checkDashboard = () => new Promise<boolean>((resolve) => {
-        const req = http.request(`${dashboardUrl}/health`, { method: 'GET', timeout: 1000 }, (res) => {
+        const req = http.request(`${dashboardUrl}/api/health`, { method: 'GET', timeout: 2000 }, (res) => {
           resolve(res.statusCode === 200);
         });
         req.on('error', () => resolve(false));

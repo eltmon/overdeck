@@ -354,7 +354,7 @@ export class CloisterService {
       // Completion marker check runs regardless of active agents —
       // completed agents won't have tmux sessions anymore
       this.healthCheckCount++;
-      if (this.healthCheckCount % 5 === 0) {
+      if (this.healthCheckCount % 2 === 0) {
         void this.checkCompletionMarkers();
       }
 

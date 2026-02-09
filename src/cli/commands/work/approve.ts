@@ -110,6 +110,19 @@ async function updateLinearStatus(apiKey: string, issueIdentifier: string): Prom
 
 export async function approveCommand(id: string, options: ApproveOptions = {}): Promise<void> {
   const agentId = id.startsWith('agent-') ? id : `agent-${id.toLowerCase()}`;
+
+  // Self-approval guard: agents cannot approve their own work
+  const callingAgentId = process.env.PANOPTICON_AGENT_ID;
+  if (callingAgentId) {
+    const callingIssueId = callingAgentId.replace(/^agent-/i, '').toLowerCase();
+    const targetIssueId = agentId.replace(/^agent-/i, '').toLowerCase();
+    if (callingIssueId === targetIssueId) {
+      console.log(chalk.red('Error: Agents cannot approve their own work.'));
+      console.log(chalk.dim('Approval must come from a human or a different specialist agent.'));
+      return;
+    }
+  }
+
   const state = getAgentState(agentId);
 
   if (!state) {

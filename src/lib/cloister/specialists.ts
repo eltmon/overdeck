@@ -1722,6 +1722,18 @@ Your task:
 4. Only fail the feature branch for NEW regressions
 5. Update status via API when done
 
+## CRITICAL: Bash Timeout for Test Commands
+
+**ALWAYS use timeout: 300000 (5 minutes) when running test commands.**
+Test suites commonly take 2-5 minutes. The default bash timeout is only 2 minutes and WILL cause premature failures.
+Do NOT run test commands in background mode — run them directly with a 5-minute timeout.
+
+Example:
+\`\`\`bash
+cd ${task.workspace || 'unknown'} && npm test 2>&1 | tail -30
+# Use timeout: 300000 for this command
+\`\`\`
+
 ## CRITICAL: Baseline Comparison
 
 **You MUST compare test results against the main branch baseline.**
@@ -1729,8 +1741,8 @@ Your task:
 Pre-existing failures that also occur on main branch should NOT block the feature branch.
 
 Steps:
-1. Run \`npm test\` (or detected command) on the feature branch - record results
-2. Run \`git stash && git checkout main && npm test 2>&1 | tail -30 && git checkout ${task.branch || 'feature-branch'} && git stash pop\` to get baseline
+1. Run \`npm test\` (or detected command) on the feature branch - record results (timeout: 300000)
+2. Run tests on main branch baseline (timeout: 300000): \`cd ${task.context?.workspace ? task.context.workspace.replace(/workspaces\/feature-[^/]+/, '') : 'unknown'} && npm test 2>&1 | tail -30\`
 3. Compare: any test that fails on BOTH branches is pre-existing
 4. Only NEW failures (pass on main, fail on feature) should block
 
