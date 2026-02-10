@@ -502,8 +502,12 @@ export class RallyTracker implements IssueTracker {
   }
 
   private normalizeIssue(rallyArtifact: any): Issue {
-    // Determine state from ScheduleState (User Stories, Tasks) or State (Defects)
-    const stateValue = rallyArtifact.ScheduleState || rallyArtifact.State || 'Defined';
+    // Determine state from ScheduleState (User Stories, Tasks) or State (Defects, Features)
+    // For PortfolioItem/Feature, State is a Rally ref object with Name/_refObjectName, not a string
+    const rawStateValue = rallyArtifact.ScheduleState || rallyArtifact.State || 'Defined';
+    const stateValue = typeof rawStateValue === 'object' && rawStateValue !== null
+      ? (rawStateValue.Name || rawStateValue._refObjectName || 'Defined')
+      : rawStateValue;
     const state = this.mapState(stateValue);
 
     // Extract tags — ensure all entries are strings

@@ -983,6 +983,59 @@ describe('RallyTracker', () => {
 
       expect(issues[0].rawState).toBe('Defined');
     });
+
+    it('should extract Name from object State on features (PAN-201)', async () => {
+      const featureWithObjectState = {
+        ...sampleFeature,
+        State: {
+          _ref: 'https://rally1.rallydev.com/slm/webservice/v2.0/state/12345',
+          _refObjectName: 'Developing',
+          Name: 'Developing',
+          ObjectID: 12345,
+        },
+      };
+      setupTypeResults([], [], [], [featureWithObjectState]);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].rawState).toBe('Developing');
+      expect(issues[0].state).toBe('in_progress');
+    });
+
+    it('should fall back to _refObjectName when object State has no Name (PAN-201)', async () => {
+      const featureWithPartialState = {
+        ...sampleFeature,
+        State: {
+          _ref: 'https://rally1.rallydev.com/slm/webservice/v2.0/state/99999',
+          _refObjectName: 'Done',
+        },
+      };
+      setupTypeResults([], [], [], [featureWithPartialState]);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].rawState).toBe('Done');
+      expect(issues[0].state).toBe('closed');
+    });
+
+    it('should default to Defined when object State has no Name or _refObjectName (PAN-201)', async () => {
+      const featureWithEmptyState = {
+        ...sampleFeature,
+        State: {
+          _ref: 'https://rally1.rallydev.com/slm/webservice/v2.0/state/0',
+          ObjectID: 0,
+        },
+      };
+      setupTypeResults([], [], [], [featureWithEmptyState]);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].rawState).toBe('Defined');
+      expect(issues[0].state).toBe('open');
+    });
   });
 
   describe('project scoping (PAN-192)', () => {
