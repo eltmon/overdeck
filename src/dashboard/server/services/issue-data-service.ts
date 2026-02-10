@@ -322,8 +322,10 @@ export class IssueDataService {
       if (cached?.data) {
         // Sanitize stale Rally cache: rawTrackerState may be an object from pre-PAN-201 data
         if (tracker === 'rally') {
+          let sanitizedCount = 0;
           cached.data = cached.data.map((issue: any) => {
             if (typeof issue.rawTrackerState === 'object' && issue.rawTrackerState !== null) {
+              sanitizedCount++;
               return {
                 ...issue,
                 rawTrackerState: issue.rawTrackerState.Name || issue.rawTrackerState._refObjectName || 'Defined',
@@ -331,6 +333,9 @@ export class IssueDataService {
             }
             return issue;
           });
+          if (sanitizedCount > 0) {
+            console.warn(`[IssueDataService] Rally cache: sanitized ${sanitizedCount} issues with object rawTrackerState (PAN-201)`);
+          }
         }
         this.trackers[tracker].lastFetchedIssues = cached.data;
         this.trackers[tracker].lastFetchedAt = cached.lastFetchedAt;
@@ -747,6 +752,9 @@ export class IssueDataService {
   private formatRallyIssue(issue: any, projectInfo: { id: string; name: string; color: string; icon: string }): any {
     const canonicalStatus = mapRallyStateToCanonical(issue.state);
     const identifier = issue.ref || issue.id || 'unknown';
+    if (typeof issue.rawState === 'object' && issue.rawState !== null) {
+      console.warn(`[IssueDataService] Rally ${identifier}: rawState is object, normalizing (PAN-201)`);
+    }
     return {
       id: `rally-${issue.id || identifier}`,
       identifier,
