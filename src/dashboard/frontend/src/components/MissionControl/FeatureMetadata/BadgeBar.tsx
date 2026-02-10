@@ -78,23 +78,35 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
         setSyncResult({ message: 'No new discussions', isError: false });
       }
 
-      // Auto-generate status review after sync (regardless of whether new content was found)
+      // Auto-generate status review after sync
+      // The backend checks a content hash — if nothing changed, it returns the cached review instantly
       setGeneratingStatus(true);
       try {
         const statusRes = await fetch(`/api/mission-control/planning/${issueId}/status-review`, { method: 'POST' });
         if (statusRes.ok) {
           const statusData = await statusRes.json();
-          if (totalSynced > 0) {
+          const wasCached = statusData.cached;
+          if (wasCached) {
+            setSyncResult({ message: totalSynced > 0 ? `Synced ${totalSynced} (status unchanged)` : 'No changes detected', isError: false });
+          } else if (totalSynced > 0) {
             setSyncResult({ message: `Synced ${totalSynced} + status updated`, isError: false });
           } else {
             setSyncResult({ message: 'Status updated', isError: false });
           }
-          // Show the status review immediately
-          setShowModal({ title: `Status Review (${new Date().toLocaleString()})`, content: statusData.statusReview });
+          // Show the status review
+          setShowModal({
+            title: `Status Review${wasCached ? ' (cached)' : ''} — ${new Date(statusData.reviewedAt).toLocaleString()}`,
+            content: statusData.statusReview,
+          });
+        } else {
+          // Status review failed (e.g., no planning dir) — still show sync result
+          const errData = await statusRes.json().catch(() => ({ error: 'Status review failed' }));
+          if (totalSynced > 0) {
+            setSyncResult({ message: `Synced ${totalSynced} (status: ${errData.error})`, isError: false });
+          }
         }
       } catch (e) {
         console.error('Status review generation failed:', e);
-        // Don't override sync success message with status failure
       } finally {
         setGeneratingStatus(false);
       }
