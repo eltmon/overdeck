@@ -608,6 +608,8 @@ async function buildTaskPrompt(
   switch (specialistType) {
     case 'review-agent':
       prompt += `Your task:
+0. FIRST: Check if branch has any changes vs main (git diff --name-only main...HEAD)
+   - If 0 files changed: mark as passed with note "branch identical to main" and STOP
 1. Review all changes in the branch
 2. Check for code quality issues, security concerns, and best practices
 3. Verify test FILES exist for new code (DO NOT run tests)
@@ -617,6 +619,7 @@ async function buildTaskPrompt(
 IMPORTANT: DO NOT run tests. You are the REVIEW agent.
 
 Update status via API:
+- If no changes (stale branch): POST to /api/workspaces/${task.issueId}/review-status with {"reviewStatus":"passed","reviewNotes":"No changes — branch identical to main"}
 - If issues found: POST to /api/workspaces/${task.issueId}/review-status with {"reviewStatus":"blocked","reviewNotes":"..."}
 - If review passes: POST with {"reviewStatus":"passed"} then queue test-agent`;
       break;
@@ -1642,11 +1645,49 @@ When done, provide feedback on:
 Use the send-feedback-to-agent skill to report findings back to the issue agent.`;
       break;
 
-    case 'review-agent':
+    case 'review-agent': {
+      // Pre-check: detect stale branch (0 diff from main) before waking the agent
+      const workspace = task.workspace || 'unknown';
+      let staleBranch = false;
+      if (workspace !== 'unknown') {
+        try {
+          const { stdout: diffOutput } = await execAsync(
+            `cd "${workspace}" && git fetch origin main 2>/dev/null; git diff --name-only main...HEAD 2>/dev/null`,
+            { encoding: 'utf-8', timeout: 15000 }
+          );
+          const changedFiles = diffOutput.trim().split('\n').filter((f: string) => f.length > 0);
+          if (changedFiles.length === 0) {
+            staleBranch = true;
+            console.log(`[specialist] review-agent: stale branch detected for ${task.issueId} — 0 files changed vs main`);
+
+            // Auto-complete the review: set reviewStatus to passed
+            const { setReviewStatus } = await import('../../dashboard/server/review-status.js');
+            setReviewStatus(task.issueId.toUpperCase(), {
+              reviewStatus: 'passed',
+              reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',
+            });
+            console.log(`[specialist] review-agent: auto-passed ${task.issueId} (stale branch)`);
+
+            // Also try to signal via the specialists/done path for idle state management
+            const tmuxSession = getTmuxSessionName('review-agent');
+            const { saveAgentRuntimeState } = await import('../agents.js');
+            saveAgentRuntimeState(tmuxSession, {
+              state: 'idle',
+              lastActivity: new Date().toISOString(),
+            });
+
+            return { success: true, message: `Stale branch auto-passed for ${task.issueId}`, wasAlreadyRunning: false, error: undefined };
+          }
+        } catch (err) {
+          // If pre-check fails, fall through to normal wake — agent will handle it
+          console.warn(`[specialist] review-agent: stale branch pre-check failed for ${task.issueId}:`, err);
+        }
+      }
+
       prompt = `New review task for ${task.issueId}:
 
 Branch: ${task.branch || 'unknown'}
-Workspace: ${task.workspace || 'unknown'}
+Workspace: ${workspace}
 ${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
 
 Your task:
@@ -1660,9 +1701,26 @@ The TEST agent will run tests in the next step.
 
 ## How to Review Changes
 
+**Step 0 (CRITICAL):** First check if there are ANY changes to review:
+\`\`\`bash
+cd ${workspace} && git diff --name-only main...HEAD
+\`\`\`
+
+**If the diff is EMPTY (0 files changed):** The branch is stale or already merged into main. In this case:
+1. Do NOT attempt a full review
+2. Update status as passed immediately:
+\`\`\`bash
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed","reviewNotes":"No changes to review — branch identical to main (already merged or stale)"}' | jq .
+\`\`\`
+3. Tell the issue agent:
+\`\`\`bash
+pan work tell ${task.issueId} "Review complete: branch has 0 diff from main — already merged or stale. Marking as passed."
+\`\`\`
+4. Stop here — you are done.
+
 **Step 1:** Get the list of changed files:
 \`\`\`bash
-cd ${task.workspace || 'unknown'} && git diff --name-only main...HEAD
+cd ${workspace} && git diff --name-only main...HEAD
 \`\`\`
 
 **Step 2:** Read the CURRENT version of each changed file using the Read tool.
@@ -1670,7 +1728,7 @@ Review the actual file contents — do NOT rely solely on diff output.
 
 **Step 3:** If you need to see what specifically changed, use:
 \`\`\`bash
-cd ${task.workspace || 'unknown'} && git diff main...HEAD -- <file>
+cd ${workspace} && git diff main...HEAD -- <file>
 \`\`\`
 
 ## Avoiding False Positives
@@ -1710,6 +1768,7 @@ curl -s -X POST ${apiUrl}/api/specialists/test-agent/queue -H "Content-Type: app
 
 ⚠️ VERIFICATION: After running each curl, confirm you see valid JSON output. If you get an error, report it.`;
       break;
+    }
 
     case 'test-agent':
       prompt = `New test task for ${task.issueId}:

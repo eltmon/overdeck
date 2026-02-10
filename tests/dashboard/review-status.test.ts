@@ -159,6 +159,32 @@ describe('clearReviewStatus', () => {
   });
 });
 
+describe('stale branch auto-pass', () => {
+  it('sets reviewStatus to passed with stale branch notes', () => {
+    // Simulates what the stale branch pre-check in wakeSpecialistWithTask does
+    const result = setReviewStatus('PAN-STALE', {
+      reviewStatus: 'passed',
+      reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',
+    }, statusFile);
+
+    expect(result.reviewStatus).toBe('passed');
+    expect(result.reviewNotes).toContain('branch identical to main');
+    expect(result.history).toHaveLength(1);
+    expect(result.history![0]).toMatchObject({ type: 'review', status: 'passed' });
+  });
+
+  it('stale branch auto-pass does not set readyForMerge without test pass', () => {
+    const result = setReviewStatus('PAN-STALE2', {
+      reviewStatus: 'passed',
+      reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',
+    }, statusFile);
+
+    // readyForMerge requires BOTH review and test to be passed
+    expect(result.readyForMerge).toBe(false);
+    expect(result.testStatus).toBe('pending');
+  });
+});
+
 describe('loadReviewStatuses', () => {
   it('returns empty object for non-existent file', () => {
     const result = loadReviewStatuses(join(testDir, 'nonexistent.json'));
