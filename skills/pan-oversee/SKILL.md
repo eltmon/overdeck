@@ -35,25 +35,77 @@ and fix the underlying Panopticon infrastructure code when something fails.
 
 The argument is an issue ID (e.g. PAN-129). The skill handles the rest.
 
+## Phase Detection (CRITICAL — Always Run First)
+
+Before doing anything, detect what phase the issue is currently in. **Do NOT assume the issue is at the beginning.** Run all checks and jump to the correct phase.
+
+```bash
+ISSUE_ID="PAN-{ID}"
+ISSUE_LOWER=$(echo "$ISSUE_ID" | tr '[:upper:]' '[:lower:]')
+
+echo "=== Phase Detection for $ISSUE_ID ==="
+
+# 1. Dashboard running?
+DASHBOARD=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3011/api/health 2>/dev/null)
+echo "Dashboard: $DASHBOARD"
+
+# 2. Workspace exists?
+WS_PATH=""
+for dir in ~/.panopticon/workspaces/feature-$ISSUE_LOWER /home/eltmon/projects/*/workspaces/feature-$ISSUE_LOWER; do
+  if [ -d "$dir" ]; then WS_PATH="$dir"; break; fi
+done
+echo "Workspace: ${WS_PATH:-NONE}"
+
+# 3. Agent state?
+AGENT_STATE=$(cat ~/.panopticon/agents/agent-$ISSUE_LOWER/state.json 2>/dev/null)
+echo "Agent state: ${AGENT_STATE:-NONE}"
+
+# 4. Tmux session?
+TMUX_SESSION=$(tmux list-sessions 2>/dev/null | grep -i "$ISSUE_LOWER" | head -1)
+echo "Tmux: ${TMUX_SESSION:-NONE}"
+
+# 5. Completion marker?
+COMPLETED=$(ls ~/.panopticon/agents/agent-$ISSUE_LOWER/completed 2>/dev/null)
+echo "Completed: ${COMPLETED:-NO}"
+
+# 6. Review/test/merge status?
+REVIEW_STATUS=$(curl -s http://localhost:3011/api/workspaces/$ISSUE_ID/review-status 2>/dev/null)
+echo "Review status: $REVIEW_STATUS"
+
+# 7. Specialist activity?
+SPECIALISTS=$(curl -s http://localhost:3011/api/specialists 2>/dev/null)
+echo "Specialists: $SPECIALISTS"
+```
+
+### Phase Decision Matrix
+
+Based on the checks above, determine the current phase:
+
+| Condition | Current Phase | Jump To |
+|-----------|--------------|---------|
+| No workspace, no agent state | Not started | Phase 0 → Phase 1 |
+| Workspace exists, agent active + tmux running | Agent working | Phase 2 |
+| Workspace exists, agent active, no tmux | Agent crashed/stuck | Phase 2 (recovery) |
+| Workspace exists, agent stopped, no completion | Agent gave up or crashed | Phase 1 (resume) |
+| Completion marker exists, reviewStatus = "pending" or "reviewing" | Awaiting review | Phase 4 |
+| reviewStatus = "failed", work agent has feedback | Feedback loop | Phase 5 |
+| reviewStatus = "passed", testStatus = "pending" or "testing" | Awaiting tests | Phase 6 |
+| reviewStatus = "passed", testStatus = "passed" | Merge ready | Phase 7 |
+| reviewStatus = "passed", testStatus = "failed" | Test failed | Phase 5 (test feedback) |
+| mergeStatus = "merged" | Done | Report success |
+
+**Print which phase you're entering and why**, e.g.:
+> "Issue PAN-129 is in Phase 4 (review pending) — reviewStatus is 'reviewing', skipping to monitor review agent."
+
 ## Supervision Workflow
 
 ### Phase 0: Pre-flight Check
 
-Before starting, verify the environment is ready:
+Only needed if dashboard isn't running or Cloister isn't active.
 
 ```bash
 # Dashboard running?
 curl -s http://localhost:3011/api/health | jq .
-
-# Workspace exists?
-ls ~/.panopticon/workspaces/feature-pan-{ID}/ 2>/dev/null || \
-  ls /home/eltmon/projects/panopticon/workspaces/feature-pan-{ID}/ 2>/dev/null
-
-# Agent state?
-cat ~/.panopticon/agents/agent-pan-{ID}/state.json 2>/dev/null || echo "No agent state"
-
-# Tmux session?
-tmux list-sessions 2>/dev/null | grep -i pan-{ID}
 
 # Cloister running? (needed for specialist handoffs)
 curl -s http://localhost:3011/api/cloister/status | jq '{running, lastCheck}'
