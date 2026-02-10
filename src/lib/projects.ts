@@ -87,6 +87,8 @@ export interface ProjectConfig {
   workspace_command?: string;
   /** Custom command to remove workspaces */
   workspace_remove_command?: string;
+  /** Rally project OID (e.g., "/project/822404704163") for per-project Rally scoping */
+  rally_project?: string;
   /** Specialist agent configuration */
   specialists?: SpecialistConfig;
 }
@@ -395,6 +397,17 @@ export function getSpecialistConfig(projectKey: string): Required<SpecialistConf
 export function getSpecialistRetention(projectKey: string): { max_days: number; max_runs: number } {
   const config = getSpecialistConfig(projectKey);
   return config.retention;
+}
+
+/**
+ * Find all projects that have a rally_project configured.
+ * Returns array of { key, config } for projects with Rally project OIDs.
+ */
+export function findProjectsByRallyProject(): Array<{ key: string; config: ProjectConfig }> {
+  const config = loadProjectsConfig();
+  return Object.entries(config.projects)
+    .filter(([, projectConfig]) => !!projectConfig.rally_project)
+    .map(([key, projectConfig]) => ({ key, config: projectConfig }));
 }
 
 /**

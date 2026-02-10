@@ -150,8 +150,16 @@ export class RallyTracker implements IssueTracker {
 
     const limit = filters?.limit ?? 50;
 
+    // Extract ObjectID from project ref for explicit query scoping
+    // e.g., "/project/822404704163" → "822404704163"
+    let projectObjectId: string | undefined;
+    if (this.project) {
+      const match = this.project.match(/\/project\/(\d+)/);
+      if (match) projectObjectId = match[1];
+    }
+
     const queries = QUERYABLE_TYPES.map(async (artifactType) => {
-      const queryString = this.buildQueryStringForType(filters, artifactType);
+      const queryString = this.buildQueryStringForType(filters, artifactType, projectObjectId);
 
       if (process.env.DEBUG?.includes('rally')) {
         console.debug(`[Rally] ${artifactType.type} query:`, queryString);
@@ -443,8 +451,14 @@ export class RallyTracker implements IssueTracker {
   private buildQueryStringForType(
     filters: IssueFilters | undefined,
     artifactType: ArtifactTypeQuery,
+    projectObjectId?: string,
   ): string {
     const conditions: string[] = [];
+
+    // Explicit project scoping — more reliable than WSAPI project param alone
+    if (projectObjectId) {
+      conditions.push(`(Project.ObjectID = "${projectObjectId}")`);
+    }
 
     if (filters?.state && !filters.includeClosed) {
       const kind = artifactType.type.startsWith('portfolioitem') ? 'feature'
@@ -517,6 +531,16 @@ export class RallyTracker implements IssueTracker {
     const baseUrl = this.restApi.server.replace('/slm/webservice/', '');
     const url = `${baseUrl}/#/detail/${artifactType.toLowerCase()}/${objectId}`;
 
+    // Resolve parent reference — try FormattedID first, fall back to _refObjectName
+    let parentRef: string | undefined;
+    if (rallyArtifact.Parent) {
+      if (rallyArtifact.Parent.FormattedID) {
+        parentRef = rallyArtifact.Parent.FormattedID;
+      } else if (rallyArtifact.Parent._refObjectName) {
+        parentRef = rallyArtifact.Parent._refObjectName;
+      }
+    }
+
     return {
       id: String(objectId),
       ref: rallyArtifact.FormattedID,
@@ -531,6 +555,8 @@ export class RallyTracker implements IssueTracker {
       dueDate: rallyArtifact.DueDate,
       createdAt: rallyArtifact.CreationDate,
       updatedAt: rallyArtifact.LastUpdateDate,
+      parentRef,
+      artifactType,
     };
   }
 

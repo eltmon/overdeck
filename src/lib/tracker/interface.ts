@@ -54,6 +54,12 @@ export interface Issue {
 
   /** Last update timestamp (ISO string) */
   updatedAt: string;
+
+  /** Parent issue FormattedID (e.g., "F1234") for Rally hierarchy */
+  parentRef?: string;
+
+  /** Rally artifact type (e.g., "HierarchicalRequirement", "PortfolioItem/Feature") */
+  artifactType?: string;
 }
 
 // Comment on an issue

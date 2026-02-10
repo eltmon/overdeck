@@ -101,6 +101,35 @@ const sampleTask = {
   _type: 'Task',
 };
 
+const sampleFeature = {
+  ObjectID: '50000',
+  FormattedID: 'F100',
+  Name: 'Feature Title',
+  Description: 'Feature description',
+  ScheduleState: null,
+  State: 'Developing',
+  Tags: { _tagsNameArray: [] },
+  Owner: { _refObjectName: 'Bob Builder' },
+  Priority: 'High',
+  DueDate: null,
+  CreationDate: '2024-01-01T00:00:00Z',
+  LastUpdateDate: '2024-01-20T00:00:00Z',
+  Parent: null,
+  _type: 'PortfolioItem/Feature',
+};
+
+const sampleStoryWithParent = {
+  ...sampleStory,
+  ObjectID: '12346',
+  FormattedID: 'US124',
+  Name: 'Child Story',
+  Parent: {
+    _ref: '/portfolioitem/feature/50000',
+    _refObjectName: 'Feature Title',
+    FormattedID: 'F100',
+  },
+};
+
 describe('RallyTracker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -855,6 +884,103 @@ describe('RallyTracker', () => {
 
         const issue = await tracker.getIssue('US1');
         expect(issue.priority).toBe(test.expected);
+      }
+    });
+  });
+
+  describe('parentRef and artifactType (PAN-192)', () => {
+    it('should return parentRef from Parent.FormattedID', async () => {
+      setupTypeResults([sampleStoryWithParent], [], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].parentRef).toBe('F100');
+    });
+
+    it('should fall back to Parent._refObjectName when FormattedID is absent', async () => {
+      const storyWithPartialParent = {
+        ...sampleStory,
+        Parent: {
+          _ref: '/portfolioitem/feature/50000',
+          _refObjectName: 'Feature Title',
+          // No FormattedID
+        },
+      };
+
+      setupTypeResults([storyWithPartialParent], [], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].parentRef).toBe('Feature Title');
+    });
+
+    it('should return undefined parentRef when no parent', async () => {
+      setupTypeResults([sampleStory], [], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].parentRef).toBeUndefined();
+    });
+
+    it('should return artifactType from _type field', async () => {
+      setupTypeResults([sampleStory], [sampleDefect], [], [sampleFeature]);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      const story = issues.find(i => i.ref === 'US123');
+      const defect = issues.find(i => i.ref === 'DE456');
+      const feature = issues.find(i => i.ref === 'F100');
+
+      expect(story?.artifactType).toBe('HierarchicalRequirement');
+      expect(defect?.artifactType).toBe('Defect');
+      expect(feature?.artifactType).toBe('PortfolioItem/Feature');
+    });
+  });
+
+  describe('project scoping (PAN-192)', () => {
+    it('should add Project.ObjectID condition to query when project is set', async () => {
+      setupEmptyResults();
+
+      const tracker = new RallyTracker({
+        apiKey: 'test_key',
+        project: '/project/822404704163',
+      });
+      await tracker.listIssues({ includeClosed: true });
+
+      for (let i = 0; i < 4; i++) {
+        const query = mockQuery.mock.calls[i][0].query;
+        expect(query).toContain('(Project.ObjectID = "822404704163")');
+      }
+    });
+
+    it('should combine project scoping with other filters', async () => {
+      setupEmptyResults();
+
+      const tracker = new RallyTracker({
+        apiKey: 'test_key',
+        project: '/project/12345',
+      });
+      await tracker.listIssues({ assignee: 'John', includeClosed: true });
+
+      const storyQuery = mockQuery.mock.calls[0][0].query;
+      expect(storyQuery).toContain('(Project.ObjectID = "12345")');
+      expect(storyQuery).toContain('(Owner.Name contains "John")');
+    });
+
+    it('should not add project scoping when no project is set', async () => {
+      setupEmptyResults();
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      await tracker.listIssues({ includeClosed: true });
+
+      for (let i = 0; i < 4; i++) {
+        const query = mockQuery.mock.calls[i][0].query;
+        expect(query).not.toContain('Project.ObjectID');
       }
     });
   });
