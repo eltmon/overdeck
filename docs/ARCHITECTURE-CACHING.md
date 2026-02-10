@@ -110,6 +110,9 @@ Switched from `gh` CLI (GraphQL) to `@octokit/rest` (REST API). GitHub REST supp
 Rally has no conditional request or incremental fetch support:
 - Wraps existing `RallyTracker.listIssues()` call with TTL check (120s default)
 - Only fetches when cache entry is stale
+- After fetch, `computeDerivedFeatureStatus()` derives Feature status from child stories (any in-progress → Feature in-progress, all done → Feature done)
+- Raw Rally state (`rawState`) is preserved through the pipeline as `rawTrackerState` for UI display
+- Shadow state merging adds `shadowTrackerStatus` when shadow state diverges from tracker state
 
 ### Socket.io Push (`useSocketIssues` hook)
 
