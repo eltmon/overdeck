@@ -43,6 +43,9 @@ pan project add /path/to/your/project
 # With explicit name
 pan project add /path/to/your/project --name myproject
 
+# With Rally project mapping (for per-project Rally scoping)
+pan project add /path/to/hsv3 --name "HSv3" --rally-project "/project/822404704163"
+
 # Example
 pan project add /home/user/projects/my-app --name myapp
 ```
