@@ -31,6 +31,12 @@ export interface Issue {
   shadowedAt?: string;  // When shadow state was created
   parentRef?: string;  // Parent issue FormattedID (e.g., "F1234") for Rally hierarchy
   artifactType?: string;  // Rally artifact type (e.g., "HierarchicalRequirement", "PortfolioItem/Feature")
+  rawTrackerState?: string;  // Original Rally state name (e.g., "Discovering", "In-Progress")
+  derivedStatus?: string;  // Computed from children: 'in_progress' | 'closed'
+  shadowTrackerStatus?: string;  // What the tracker actually says (from shadow state cache)
+  totalChildCount?: number;  // Total children across all columns
+  completedChildCount?: number;  // Children in Done state
+  inProgressChildCount?: number;  // Children in active work
 }
 
 export interface GitStatus {

@@ -164,6 +164,11 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
       status = issue.shadowStatus === 'closed' ? 'done' :
                issue.shadowStatus === 'in_progress' ? (STATUS_LABELS[issue.status] || 'in_progress') :
                STATUS_LABELS[issue.status] || 'backlog';
+    } else if (issue.derivedStatus) {
+      // Derived status from child stories (Rally Features)
+      status = issue.derivedStatus === 'closed' ? 'done' :
+               issue.derivedStatus === 'in_progress' ? 'in_progress' :
+               STATUS_LABELS[issue.status] || 'backlog';
     } else {
       status = STATUS_LABELS[issue.status] || 'backlog';
     }
@@ -244,49 +249,171 @@ function buildHierarchy(issues: Issue[]): HierarchyGroup[] {
   return groups;
 }
 
-// Collapsible Feature group header
-function FeatureGroupHeader({
+// Tracker vs Shadow state badges — shows when Rally state differs from Panopticon shadow state
+function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact?: boolean }) {
+  const trackerState = issue.rawTrackerState || issue.shadowTrackerStatus;
+  const shadowState = issue.shadowStatus || issue.targetCanonicalState;
+
+  // Only show when states diverge
+  if (!trackerState || !shadowState) return null;
+
+  // Map shadow canonical states to display names
+  const shadowLabel = shadowState === 'in_progress' ? 'In Progress' :
+                      shadowState === 'closed' ? 'Done' :
+                      shadowState === 'done' ? 'Done' :
+                      shadowState === 'in_review' ? 'In Review' :
+                      shadowState === 'planning' ? 'Planning' :
+                      shadowState;
+
+  // Check if they're actually different
+  const trackerLower = trackerState.toLowerCase().replace(/[-_\s]/g, '');
+  const shadowLower = shadowLabel.toLowerCase().replace(/[-_\s]/g, '');
+  if (trackerLower === shadowLower) return null;
+
+  if (compact) {
+    return (
+      <span
+        className="w-2 h-2 rounded-full bg-purple-500 shrink-0"
+        title={`Rally: ${trackerState} → Pan: ${shadowLabel}`}
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 text-xs">
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-700/50 text-gray-300">
+        <ExternalLink className="w-2.5 h-2.5" />
+        {trackerState}
+      </span>
+      <span className="text-content-muted">→</span>
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">
+        <Eye className="w-2.5 h-2.5" />
+        {shadowLabel}
+      </span>
+    </div>
+  );
+}
+
+// Feature card — rich card for Rally Features with progress and expand/collapse
+function FeatureCard({
   feature,
   childCount,
-  totalChildren,
   isExpanded,
   onToggle,
 }: {
   feature: Issue;
   childCount: number;
-  totalChildren: number;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const completed = feature.completedChildCount ?? 0;
+  const inProgress = feature.inProgressChildCount ?? 0;
+  const total = feature.totalChildCount ?? childCount;
+  const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  // Check if derived status differs from raw Rally state
+  const hasDerivedDiff = feature.derivedStatus && feature.rawTrackerState &&
+    ((feature.derivedStatus === 'in_progress' && feature.rawTrackerState !== 'Developing') ||
+     (feature.derivedStatus === 'closed' && feature.rawTrackerState !== 'Done'));
+
   return (
-    <div
-      onClick={onToggle}
-      className="flex items-center gap-2 px-2 py-1.5 bg-indigo-900/30 rounded-lg cursor-pointer hover:bg-indigo-900/50 transition-colors border border-indigo-700/30"
-    >
-      {isExpanded ? (
-        <ChevronDown className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-      ) : (
-        <ChevronRight className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-      )}
-      {feature.project && (
-        <span
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ backgroundColor: feature.project.color || '#6b7280' }}
-        />
-      )}
+    <div className="bg-surface-overlay rounded-lg border-l-4 border-l-indigo-500 overflow-hidden">
+      <div
+        onClick={onToggle}
+        className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-indigo-900/20 transition-colors"
+      >
+        {isExpanded ? (
+          <ChevronDown className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {feature.project && (
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: feature.project.color || '#6b7280' }}
+              />
+            )}
+            <a
+              href={feature.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs font-medium text-indigo-300 hover:text-indigo-200 flex items-center gap-1"
+            >
+              <span>{feature.identifier}</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+            </a>
+            {hasDerivedDiff && (
+              <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-900/50 text-amber-400">
+                derived
+              </span>
+            )}
+            <TrackerShadowBadges issue={feature} />
+          </div>
+          <p className="text-sm text-content-body mt-1 line-clamp-1">{feature.title}</p>
+
+          {/* Progress bar and summary */}
+          {total > 0 && (
+            <div className="mt-2">
+              <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-xs text-content-muted">
+                  {completed}/{total} done{inProgress > 0 ? `, ${inProgress} active` : ''}
+                </span>
+                <span className="text-xs text-indigo-400">
+                  {childCount} in column
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Compact child card — slim inline card for stories under a Feature
+function CompactChildCard({
+  issue,
+  agents,
+}: {
+  issue: Issue;
+  agents: Agent[];
+}) {
+  const canonical = STATUS_LABELS[issue.status] || 'backlog';
+  const dotColor = canonical === 'done' ? 'bg-green-400' :
+                   canonical === 'in_progress' ? 'bg-yellow-400' :
+                   canonical === 'in_review' ? 'bg-pink-400' :
+                   'bg-gray-500';
+
+  const issueIdLower = issue.identifier.toLowerCase();
+  const hasAgent = agents.some(
+    a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead'
+  );
+
+  return (
+    <div className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-overlay/50 transition-colors group">
+      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
       <a
-        href={feature.url}
+        href={issue.url}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="text-xs font-medium text-indigo-300 hover:text-indigo-200"
+        className="text-xs text-content-subtle hover:text-blue-400 shrink-0"
       >
-        {feature.identifier}
+        {issue.identifier}
       </a>
-      <span className="text-xs text-content-body truncate flex-1">{feature.title}</span>
-      <span className="text-xs text-indigo-400 shrink-0">
-        {childCount}/{totalChildren}
-      </span>
+      <span className="text-xs text-content-body truncate flex-1">{issue.title}</span>
+      <TrackerShadowBadges issue={issue} compact />
+      {hasAgent && (
+        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" title="Agent running" />
+      )}
     </div>
   );
 }
@@ -924,23 +1051,24 @@ function ColumnContent({
         // Feature group
         const feature = group.feature!;
         const isExpanded = !collapsedFeatures.has(feature.identifier);
-        const doneCount = group.children.filter(c => {
-          const canonical = STATUS_LABELS[c.status];
-          return canonical === 'done';
-        }).length;
 
         return (
           <div key={`feature-${feature.id}`} className="space-y-1">
-            <FeatureGroupHeader
+            <FeatureCard
               feature={feature}
-              childCount={doneCount}
-              totalChildren={group.children.length}
+              childCount={group.children.length}
               isExpanded={isExpanded}
               onToggle={() => toggleFeature(feature.identifier)}
             />
             {isExpanded && (
-              <div className="ml-3 space-y-2 border-l-2 border-indigo-700/30 pl-2">
-                {group.children.map(renderIssueCard)}
+              <div className="ml-3 border-l-2 border-indigo-700/30 pl-1">
+                {group.children.map(child => (
+                  <CompactChildCard
+                    key={child.id}
+                    issue={child}
+                    agents={agents}
+                  />
+                ))}
                 {group.children.length === 0 && (
                   <div className="text-xs text-content-muted py-2 pl-2">
                     No stories in this column
@@ -1594,6 +1722,8 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
                 Input
               </span>
             )}
+            {/* Tracker vs Shadow state badges */}
+            {issue.source === 'rally' && <TrackerShadowBadges issue={issue} />}
             {/* Difficulty badge */}
             {(() => {
               const difficulty = parseDifficultyLabel(issue.labels);

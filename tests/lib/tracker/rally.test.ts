@@ -942,6 +942,49 @@ describe('RallyTracker', () => {
     });
   });
 
+  describe('rawState preservation (PAN-192 Phase 2)', () => {
+    it('should preserve raw ScheduleState on user stories', async () => {
+      setupTypeResults([sampleStory], [], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].rawState).toBe('In-Progress');
+    });
+
+    it('should preserve raw State on defects', async () => {
+      setupTypeResults([], [sampleDefect], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].rawState).toBe('Defined');
+    });
+
+    it('should preserve raw State on features', async () => {
+      setupTypeResults([], [], [], [sampleFeature]);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].rawState).toBe('Developing');
+    });
+
+    it('should default rawState to Defined when neither ScheduleState nor State is set', async () => {
+      const storyNoState = {
+        ...sampleStory,
+        ScheduleState: null,
+        State: null,
+      };
+      setupTypeResults([storyNoState], [], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].rawState).toBe('Defined');
+    });
+  });
+
   describe('project scoping (PAN-192)', () => {
     it('should add Project.ObjectID condition to query when project is set', async () => {
       setupEmptyResults();

@@ -175,7 +175,11 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
               />
 
               {/* Activity View */}
-              <ActivityView issueId={selectedFeature} />
+              <ActivityView
+                issueId={selectedFeature}
+                issues={issues}
+                featureData={selectedFeatureData}
+              />
             </>
           ) : (
             <div className={styles.contentEmpty}>

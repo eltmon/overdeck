@@ -12102,8 +12102,8 @@ app.post('/api/mission-control/planning/:issueId/sync-discussions', async (req, 
   const issueLower = issueId.toLowerCase();
   const issuePrefix = issueId.split('-')[0];
 
-  if (!tracker || !['github', 'linear'].includes(tracker)) {
-    return res.status(400).json({ error: 'tracker must be github or linear' });
+  if (!tracker || !['github', 'linear', 'rally'].includes(tracker)) {
+    return res.status(400).json({ error: 'tracker must be github, linear, or rally' });
   }
 
   try {
@@ -12192,6 +12192,55 @@ app.post('/api/mission-control/planning/:issueId/sync-discussions', async (req, 
         }
       } catch (linearErr: any) {
         console.warn(`Failed to sync Linear comments for ${issueId}:`, linearErr.message);
+      }
+    } else if (tracker === 'rally') {
+      // Sync Rally child story statuses from cached issues
+      try {
+        const allIssues = issueDataService.getIssues();
+        const parentFeature = allIssues.find((i: any) =>
+          i.source === 'rally' && i.identifier === issueId
+        );
+        const childStories = allIssues.filter((i: any) =>
+          i.source === 'rally' && i.parentRef === issueId
+        );
+
+        if (childStories.length > 0 || parentFeature) {
+          const filename = `rally-${issueId}-stories.md`;
+          const lines: string[] = [
+            `# Rally Stories for ${issueId}`,
+            '',
+            `Synced: ${new Date().toISOString()}`,
+            '',
+          ];
+
+          if (parentFeature) {
+            lines.push(`**Feature**: ${parentFeature.title}`);
+            lines.push(`**Rally State**: ${parentFeature.rawTrackerState || parentFeature.status}`);
+            if (parentFeature.derivedStatus) {
+              lines.push(`**Derived Status**: ${parentFeature.derivedStatus}`);
+            }
+            lines.push(`**Stories**: ${parentFeature.totalChildCount || childStories.length} total, ${parentFeature.completedChildCount || 0} done, ${parentFeature.inProgressChildCount || 0} active`);
+            lines.push('');
+          }
+
+          lines.push('---', '', '## Child Stories', '');
+
+          for (const story of childStories) {
+            const statusEmoji = story.status === 'Done' ? '\u2705'
+              : story.status === 'In Progress' ? '\uD83D\uDD04'
+              : story.status === 'In Review' ? '\uD83D\uDC40'
+              : '\u2B1C';
+            lines.push(`- ${statusEmoji} **${story.identifier}**: ${story.title}`);
+            lines.push(`  - Status: ${story.rawTrackerState || story.status}`);
+            if (story.assignee?.name) lines.push(`  - Assignee: ${story.assignee.name}`);
+            lines.push('');
+          }
+
+          writeFileSync(join(discussionsDir, filename), lines.join('\n'), 'utf-8');
+          syncedFiles.push(filename);
+        }
+      } catch (rallyErr: any) {
+        console.warn(`Failed to sync Rally stories for ${issueId}:`, rallyErr.message);
       }
     }
 
@@ -12298,6 +12347,11 @@ app.get('/api/mission-control/projects', async (_req, res) => {
         hasPrd: boolean;
         hasState: boolean;
         isShadow: boolean;
+        isRally?: boolean;
+        childCount?: number;
+        completedCount?: number;
+        inProgressCount?: number;
+        rawTrackerState?: string;
       }>;
     }> = [];
 
@@ -12413,8 +12467,44 @@ app.get('/api/mission-control/projects', async (_req, res) => {
         }
       }
 
+      // Add Rally Features from cached issues (not already in workspace features)
+      const existingIds = new Set(features.map(f => f.issueId));
+      const allIssues = issueDataService.getIssues();
+      const projectName = project.config.name || projectPath.split('/').pop() || 'Unknown';
+
+      for (const issue of allIssues) {
+        if (issue.source !== 'rally') continue;
+        if (!issue.artifactType?.includes('PortfolioItem')) continue;
+        // Match to this project by project name
+        if (issue.project?.name !== projectName) continue;
+        if (existingIds.has(issue.identifier)) continue;
+
+        // Determine state label from derived status
+        let stateLabel = issue.rawTrackerState || issue.status || 'Unknown';
+        if (issue.derivedStatus === 'closed') stateLabel = 'Done';
+        else if (issue.derivedStatus === 'in_progress') stateLabel = 'In Progress';
+
+        features.push({
+          issueId: issue.identifier,
+          title: issue.title,
+          branch: '',
+          status: 'idle',
+          stateLabel,
+          agentStatus: null,
+          hasPlanning: false,
+          hasPrd: false,
+          hasState: false,
+          isShadow: false,
+          isRally: true,
+          childCount: issue.totalChildCount,
+          completedCount: issue.completedChildCount,
+          inProgressCount: issue.inProgressChildCount,
+          rawTrackerState: issue.rawTrackerState,
+        });
+      }
+
       projectTree.push({
-        name: project.config.name || projectPath.split('/').pop() || 'Unknown',
+        name: projectName,
         path: projectPath,
         features,
       });

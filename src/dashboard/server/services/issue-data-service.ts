@@ -195,6 +195,7 @@ export class IssueDataService {
               shadowStatus: shadowState.shadowStatus,
               targetCanonicalState: shadowState.targetCanonicalState,
               shadowedAt: shadowState.shadowedAt,
+              shadowTrackerStatus: shadowState.trackerStatus,
             };
           }
           return { ...issue, shadowStatus: null, targetCanonicalState: null };
@@ -753,9 +754,60 @@ export class IssueDataService {
       updatedAt: issue.updatedAt,
       parentRef: issue.parentRef,
       artifactType: issue.artifactType,
+      rawTrackerState: issue.rawState,
       project: projectInfo,
       source: 'rally',
     };
+  }
+
+  /**
+   * Compute derived feature status from child stories.
+   * If ANY child is in progress, the feature is derived as 'in_progress'.
+   * If ALL children are done, the feature is derived as 'closed'.
+   * Attaches child counts for progress display.
+   */
+  private computeDerivedFeatureStatus(issues: any[]): any[] {
+    // Build children-by-parent map (key: parent identifier, value: child issues)
+    const childrenByParent = new Map<string, any[]>();
+    for (const issue of issues) {
+      if (issue.parentRef) {
+        const existing = childrenByParent.get(issue.parentRef) || [];
+        existing.push(issue);
+        childrenByParent.set(issue.parentRef, existing);
+      }
+    }
+
+    // For each Feature, compute derived status
+    return issues.map(issue => {
+      const isFeature = issue.artifactType?.includes('PortfolioItem');
+      if (!isFeature) return issue;
+
+      const children = childrenByParent.get(issue.identifier) || [];
+      if (children.length === 0) return issue;
+
+      const completedChildCount = children.filter(
+        (c: any) => c.status === 'Done'
+      ).length;
+      const inProgressChildCount = children.filter(
+        (c: any) => c.status === 'In Progress'
+      ).length;
+      const totalChildCount = children.length;
+
+      let derivedStatus: string | undefined;
+      if (completedChildCount === totalChildCount) {
+        derivedStatus = 'closed';
+      } else if (inProgressChildCount > 0) {
+        derivedStatus = 'in_progress';
+      }
+
+      return {
+        ...issue,
+        derivedStatus,
+        totalChildCount,
+        completedChildCount,
+        inProgressChildCount,
+      };
+    });
   }
 
   private async pollRally(): Promise<void> {
@@ -840,6 +892,9 @@ export class IssueDataService {
 
         allFormatted = issues.map((issue: any) => this.formatRallyIssue(issue, projectInfo));
       }
+
+      // Compute derived feature status from child stories
+      allFormatted = this.computeDerivedFeatureStatus(allFormatted);
 
       const oldData = this.trackers.rally.lastFetchedIssues;
       const changed = JSON.stringify(allFormatted) !== JSON.stringify(oldData);
