@@ -1,65 +1,53 @@
-# PAN-168: Rally WSAPI Cannot Query Generic Artifact with ScheduleState
+# PAN-158: Fix 17 pre-existing test failures across 6 test files
 
-**Status:** Implementation Complete
-**Issue:** https://github.com/eltmon/panopticon-cli/issues/168
-**Severity:** High - Rally tracker completely non-functional when filtering by state
+## Issue Summary
 
-## Problem
+Fix 17 failing tests across 6 test files. These are pre-existing failures unrelated to recent work.
 
-After PAN-166 fixed query syntax, the Rally query was syntactically valid but
-semantically broken: querying the generic `Artifact` endpoint with `ScheduleState`
-filters fails because not all artifact subtypes have that field.
+**Issue URL:** https://github.com/eltmon/panopticon-cli/issues/158
+**Branch:** feature/pan-158
 
-Error: `Could not read: could not read all instances of class com.f4tech.slm.domain.Artifact`
+---
 
-## Root Cause
+## Current Status
 
-- `ScheduleState` applies to HierarchicalRequirement (stories) and Tasks
-- `State` applies to Defects
-- The generic `Artifact` endpoint cannot filter by fields that don't exist on all subtypes
+### Implementation: COMPLETE
 
-## Solution
+## Root Cause Analysis
 
-**Approach:** Query specific types separately and merge results (Option 1 from issue).
+### 1. settings.test.ts (1 failure)
+- **Test:** "should return Kimi models when API key is configured"
+- **Cause:** Test expects `available.kimi` = `[]` but implementation returns `['kimi-k2', 'kimi-k2.5']` when API key set
+- **Fix:** Update assertion to `['kimi-k2', 'kimi-k2.5']`
 
-### Changes Made
+### 2. work-type-router.test.ts (3 failures)
+- **Tests:** override tests + selective providers
+- **Cause:** Tests use `'claude-opus-4-5'` (non-existent model), should be `'claude-opus-4-6'`. Also "selective providers" test has wrong expected model selections.
+- **Fix:** Update model names and expected values to match smart selector behavior
 
-### 1. Type-Specific Queries (`src/lib/tracker/rally.ts`)
-- Added `QUERYABLE_TYPES` configuration array with type-specific state fields:
-  - `hierarchicalrequirement` → `ScheduleState` (closed: Completed, Accepted)
-  - `defect` → `State` (closed: Closed)
-  - `task` → `State` (closed: Completed)
-- `listIssues()` now queries each type in parallel via `Promise.all()`
-- Results are merged, sorted by `updatedAt` descending, and limited
-- Individual type query failures are caught and logged (non-auth errors) so
-  other types still return data
+### 3. specialist-context.test.ts (6 failures)
+- **Cause:** `SPECIALISTS_DIR` is a module-level constant computed once at import time. Tests change `process.env.PANOPTICON_HOME` in beforeEach but the constant is already computed with the original value.
+- **Fix:** Make SPECIALISTS_DIR a function that reads env var lazily
 
-### 2. Type-Aware Query Builder (`src/lib/tracker/rally.ts`)
-- Replaced `buildQueryString()` with `buildQueryStringForType()` that accepts
-  an `ArtifactTypeQuery` parameter
-- Each type gets its own state field in the exclude-closed and state-filter conditions
-- Other filters (assignee, labels, search) remain the same across all types
+### 4. specialist-logs.test.ts (4 failures)
+- **Cause:** Same as #3 - module-level `SPECIALISTS_DIR` doesn't respect test env changes
+- **Fix:** Same approach - use lazy function
 
-### 3. Updated Unit Tests (`tests/lib/tracker/rally.test.ts`)
-- Updated `listIssues` tests to expect 3 separate queries (one per type)
-- Added tests for: type-specific query types, result merging, sorting, limit
-  handling, partial failure resilience, workspace/project propagation
-- Updated `buildQueryStringForType` tests to verify type-specific state fields
-- Added sample data for all 3 artifact types (story, defect, task)
+### 5. specialists/logs.test.ts CLI (1 failure)
+- **Cause:** Mock returns `{ maxDays: 30, maxRuns: 100 }` (camelCase) but source reads `retention.max_days` / `retention.max_runs` (snake_case)
+- **Fix:** Change mock to use snake_case property names
 
-### 4. Updated Integration Tests (`tests/integration/rally-tracker.test.ts`)
-- Added PAN-168 test suite for type-specific query validation
-- Tests that each type generates valid WSAPI queries
-- Tests that new queries don't mix ScheduleState/State in the same filter
-- Regression test documenting the old problematic mixed-field query
+### 6. migration.test.ts (1 failure)
+- **Cause:** Test checks for `'Session directory not found'` but actual warning is `'No session directory found for...'`
+- **Fix:** Update expected substring
 
-### Preserved Behavior
-- `getIssue()` still uses generic `artifact` endpoint (OK because it filters
-  by FormattedID, not state fields)
-- `updateIssue()` still correctly routes state updates to ScheduleState or State
-  based on artifact `_type`
-- All other methods (createIssue, getComments, addComment, etc.) unchanged
+---
 
 ## Remaining Work
 
-None - implementation complete. All 49 Rally tests pass.
+- [x] Root cause analysis
+- [x] Fix source files (paths.ts, specialist-context.ts, specialist-logs.ts)
+- [x] Fix test files (6 files)
+- [x] Verify all tests pass (1049 passed, 0 failures)
+- [x] Ensure no new failures
+- [ ] Commit and push
