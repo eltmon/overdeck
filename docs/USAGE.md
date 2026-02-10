@@ -205,6 +205,9 @@ Register your local project directories:
 # Register a project
 pan project add /path/to/your/project --name myproject
 
+# Register with Rally project mapping
+pan project add /path/to/hsv3 --name "HSv3" --rally-project "/project/822404704163"
+
 # List registered projects
 pan project list
 ```
@@ -290,6 +293,9 @@ pan kill agent-pan-123
 ```bash
 # Add project
 pan project add /path/to/project --name myproject
+
+# Add project with Rally project mapping
+pan project add /path/to/project --name myproject --rally-project "/project/822404704163"
 
 # List projects
 pan project list
