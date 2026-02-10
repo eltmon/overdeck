@@ -6426,6 +6426,148 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       return res.status(400).json({ error: 'Workspace does not exist' });
     }
 
+    // 2. Check if this is a polyrepo project
+    const projectConfig = findProjectByTeam(issuePrefix);
+    const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
+
+    if (isPolyrepo && projectConfig?.workspace?.repos) {
+      // POLYREPO MERGE: Merge each repo that has changes individually
+      console.log(`[merge] Polyrepo detected for ${issueId}, merging repos individually...`);
+      const repos = projectConfig.workspace.repos;
+      const defaultBranch = projectConfig.workspace.default_branch || 'main';
+      const mergeResults: Array<{ repo: string; success: boolean; message: string }> = [];
+
+      for (const repo of repos) {
+        const repoMainPath = join(projectPath, repo.path);
+        const repoWorkspacePath = join(workspacePath, repo.name);
+
+        // Skip if workspace repo doesn't exist (e.g., docs repo not created)
+        if (!existsSync(repoWorkspacePath) || !existsSync(join(repoWorkspacePath, '.git'))) {
+          console.log(`[merge] Skipping ${repo.name}: workspace repo not found`);
+          continue;
+        }
+
+        // Check if feature branch has changes vs default branch
+        try {
+          const { stdout: diffStat } = await execAsync(
+            `git diff ${defaultBranch}..${branchName} --stat`,
+            { cwd: repoMainPath, encoding: 'utf-8' }
+          );
+
+          if (!diffStat.trim()) {
+            console.log(`[merge] Skipping ${repo.name}: no changes on ${branchName}`);
+            mergeResults.push({ repo: repo.name, success: true, message: 'No changes, skipped' });
+            continue;
+          }
+
+          console.log(`[merge] ${repo.name}: found changes on ${branchName}`);
+        } catch {
+          // Branch might not exist in this repo
+          console.log(`[merge] Skipping ${repo.name}: branch ${branchName} not found`);
+          mergeResults.push({ repo: repo.name, success: true, message: 'Branch not found, skipped' });
+          continue;
+        }
+
+        // Push feature branch from workspace worktree
+        try {
+          await execAsync(`git push origin ${branchName}`, { cwd: repoWorkspacePath, encoding: 'utf-8' });
+          console.log(`[merge] Pushed ${branchName} from ${repo.name} workspace`);
+        } catch (pushErr: any) {
+          console.log(`[merge] Push note for ${repo.name}: ${pushErr.message}`);
+        }
+
+        // Merge in the main repo directory
+        try {
+          // Fetch latest from remote
+          await execAsync('git fetch origin', { cwd: repoMainPath, encoding: 'utf-8' });
+
+          // Stash any uncommitted changes
+          let stashed = false;
+          try {
+            const { stdout: statusOut } = await execAsync('git status --porcelain', {
+              cwd: repoMainPath,
+              encoding: 'utf-8',
+            });
+            if (statusOut.trim()) {
+              await execAsync(`git stash push -u -m "Pre-merge stash for ${issueId}"`, {
+                cwd: repoMainPath,
+                encoding: 'utf-8',
+              });
+              stashed = true;
+              console.log(`[merge] Stashed uncommitted changes in ${repo.name}`);
+            }
+          } catch (stashErr: any) {
+            console.warn(`[merge] Stash note for ${repo.name}: ${stashErr.message}`);
+          }
+
+          // Ensure we're on the default branch
+          await execAsync(`git checkout ${defaultBranch}`, { cwd: repoMainPath, encoding: 'utf-8' });
+
+          // Pull latest
+          await execAsync(`git pull origin ${defaultBranch} --ff-only`, {
+            cwd: repoMainPath,
+            encoding: 'utf-8',
+          });
+
+          // Merge the feature branch (use origin/ to ensure we merge pushed code)
+          await execAsync(`git merge origin/${branchName} --no-edit`, {
+            cwd: repoMainPath,
+            encoding: 'utf-8',
+          });
+
+          // Push merged default branch
+          await execAsync(`git push origin ${defaultBranch}`, {
+            cwd: repoMainPath,
+            encoding: 'utf-8',
+          });
+
+          console.log(`[merge] Successfully merged ${branchName} into ${defaultBranch} for ${repo.name}`);
+          mergeResults.push({ repo: repo.name, success: true, message: 'Merged successfully' });
+
+          // Restore stash if we created one
+          if (stashed) {
+            try {
+              await execAsync('git stash pop', { cwd: repoMainPath, encoding: 'utf-8' });
+            } catch {
+              console.warn(`[merge] Could not pop stash in ${repo.name}, it remains stashed`);
+            }
+          }
+        } catch (mergeErr: any) {
+          console.error(`[merge] Merge failed for ${repo.name}:`, mergeErr.message);
+          // Abort merge if in progress
+          try {
+            await execAsync('git merge --abort', { cwd: repoMainPath, encoding: 'utf-8' });
+          } catch { /* not in merge state */ }
+          mergeResults.push({ repo: repo.name, success: false, message: mergeErr.message });
+        }
+      }
+
+      // Evaluate overall result
+      const reposWithChanges = mergeResults.filter(r => !r.message.includes('skipped'));
+      const failedRepos = mergeResults.filter(r => !r.success);
+
+      if (failedRepos.length > 0) {
+        const error = `Polyrepo merge failed for: ${failedRepos.map(r => `${r.repo} (${r.message})`).join(', ')}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        completePendingOperation(issueId, error);
+        return res.status(500).json({ error, repos: mergeResults });
+      }
+
+      console.log(`[merge] Polyrepo merge complete for ${issueId}: ${reposWithChanges.length} repo(s) merged`);
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      completePendingOperation(issueId, null);
+
+      // Close the issue after successful merge
+      await closeIssueAfterMerge(issueId);
+
+      return res.json({
+        success: true,
+        message: `Polyrepo merge complete for ${issueId}`,
+        repos: mergeResults,
+      });
+    }
+
+    // MONOREPO / SINGLE-REPO: Use merge-agent for local git merge
     // 2. Push the feature branch to remote BEFORE merging (preserve work)
     try {
       await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
