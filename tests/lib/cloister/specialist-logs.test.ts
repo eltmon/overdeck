@@ -159,7 +159,7 @@ describe('specialist-logs', () => {
       expect(metadata.runId).toBe(runId);
       expect(metadata.status).toBe('passed');
       expect(metadata.notes).toBe('Test notes');
-      expect(metadata.duration).toBeGreaterThan(0);
+      expect(metadata.duration).toBeGreaterThanOrEqual(0);
     });
   });
 

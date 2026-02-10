@@ -62,7 +62,7 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5',
+            'issue-agent:planning': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -70,7 +70,7 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const result = router.getModel('issue-agent:planning');
 
-        expect(result.model).toBe('claude-opus-4-5');
+        expect(result.model).toBe('claude-opus-4-6');
         expect(result.source).toBe('override');
         expect(result.usedFallback).toBe(false);
       });
@@ -370,7 +370,7 @@ describe('work-type-router', () => {
         enabledProviders: new Set<ModelProvider>(['anthropic']),
         apiKeys: {},
         overrides: {
-          'issue-agent:planning': 'claude-opus-4-5',
+          'issue-agent:planning': 'claude-opus-4-6',
         },
         geminiThinkingLevel: 3,
       };
@@ -378,7 +378,7 @@ describe('work-type-router', () => {
       const router = new WorkTypeRouter(config);
       const result = router.getModel('issue-agent:planning');
 
-      expect(result.model).toBe('claude-opus-4-5');
+      expect(result.model).toBe('claude-opus-4-6');
       expect(result.source).toBe('override');
     });
 
@@ -466,7 +466,6 @@ describe('work-type-router', () => {
 
     it('should work with selective providers', () => {
       const config: NormalizedConfig = {
-        preset: 'balanced',
         enabledProviders: new Set<ModelProvider>(['anthropic', 'google']),
         apiKeys: { google: 'test' },
         overrides: {},
@@ -475,14 +474,14 @@ describe('work-type-router', () => {
 
       const router = new WorkTypeRouter(config);
 
-      // Gemini models should work
+      // Smart selector picks best model from enabled providers
       const explore = router.getModel('issue-agent:exploration');
       expect(explore.model).toBe('gemini-3-flash-preview');
       expect(explore.usedFallback).toBe(false);
 
-      // Balanced preset uses Gemini Pro for implementation, which is available
+      // Smart selector picks best implementation model from anthropic+google
       const impl = router.getModel('issue-agent:implementation');
-      expect(impl.model).toBe('gemini-3-pro-preview'); // Gemini Pro is enabled
+      expect(impl.model).toBe('claude-opus-4-6'); // Opus scores highest for implementation
       expect(impl.usedFallback).toBe(false);
     });
   });

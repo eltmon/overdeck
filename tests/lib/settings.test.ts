@@ -497,8 +497,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      // Kimi uses Anthropic-compatible model names
-      expect(available.kimi).toEqual([]);
+      expect(available.kimi).toEqual(['kimi-k2', 'kimi-k2.5']);
     });
 
     it('should return multiple providers when multiple API keys configured', async () => {
