@@ -427,6 +427,7 @@ project
   .option('--name <name>', 'Project name')
   .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
   .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
+  .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
   .action(projectAddCommand);
 
 project
