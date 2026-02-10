@@ -81,6 +81,7 @@ const FETCH_FIELDS = [
   'CreationDate',
   'LastUpdateDate',
   'Parent',
+  'PortfolioItem',
   '_type',
 ];
 
@@ -535,9 +536,18 @@ export class RallyTracker implements IssueTracker {
     const baseUrl = this.restApi.server.replace('/slm/webservice/', '');
     const url = `${baseUrl}/#/detail/${artifactType.toLowerCase()}/${objectId}`;
 
-    // Resolve parent reference — try FormattedID first, fall back to _refObjectName
+    // Resolve parent reference.
+    // For User Stories, PortfolioItem links to the parent Feature (F-prefixed),
+    // while Parent links to a parent Story in the hierarchy. Prefer PortfolioItem
+    // so that stories are correctly grouped under their Feature. (PAN-202)
     let parentRef: string | undefined;
-    if (rallyArtifact.Parent) {
+    if (rallyArtifact.PortfolioItem) {
+      if (rallyArtifact.PortfolioItem.FormattedID) {
+        parentRef = rallyArtifact.PortfolioItem.FormattedID;
+      } else if (rallyArtifact.PortfolioItem._refObjectName) {
+        parentRef = rallyArtifact.PortfolioItem._refObjectName;
+      }
+    } else if (rallyArtifact.Parent) {
       if (rallyArtifact.Parent.FormattedID) {
         parentRef = rallyArtifact.Parent.FormattedID;
       } else if (rallyArtifact.Parent._refObjectName) {
