@@ -80,6 +80,7 @@ interface AddOptions {
   name?: string;
   type?: 'standalone' | 'monorepo';
   linearTeam?: string;
+  rallyProject?: string;
 }
 
 export async function projectAddCommand(
@@ -126,6 +127,10 @@ export async function projectAddCommand(
     projectConfig.linear_team = linearTeam.toUpperCase();
   }
 
+  if (options.rallyProject) {
+    projectConfig.rally_project = options.rallyProject;
+  }
+
   registerProject(key, projectConfig);
 
   console.log(chalk.green(`✓ Added project: ${name}`));
@@ -133,6 +138,9 @@ export async function projectAddCommand(
   console.log(chalk.dim(`  Path: ${fullPath}`));
   if (linearTeam) {
     console.log(chalk.dim(`  Linear team: ${linearTeam}`));
+  }
+  if (options.rallyProject) {
+    console.log(chalk.dim(`  Rally project: ${options.rallyProject}`));
   }
   console.log('');
 
@@ -280,6 +288,9 @@ export async function projectListCommand(options: ListOptions = {}): Promise<voi
     if (config.linear_team) {
       console.log(`  ${chalk.cyan(`Linear: ${config.linear_team}`)}`);
     }
+    if (config.rally_project) {
+      console.log(`  ${chalk.cyan(`Rally: ${config.rally_project}`)}`);
+    }
     if (config.issue_routing && config.issue_routing.length > 0) {
       console.log(`  ${chalk.dim(`Routes: ${config.issue_routing.length} rules`)}`);
     }
@@ -363,6 +374,9 @@ export async function projectShowCommand(keyOrName: string): Promise<void> {
   console.log(`  Path:   ${pathStatus} ${found.path}`);
   if (found.linear_team) {
     console.log(`  Team:   ${found.linear_team}`);
+  }
+  if (found.rally_project) {
+    console.log(`  Rally:  ${found.rally_project}`);
   }
 
   if (found.issue_routing && found.issue_routing.length > 0) {

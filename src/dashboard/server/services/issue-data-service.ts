@@ -725,19 +725,49 @@ export class IssueDataService {
   }
 
   // ---------------------------------------------------------------
-  // Rally polling — TTL-based caching only
+  // Rally polling — TTL-based caching, per-project config support
   // ---------------------------------------------------------------
 
+  /**
+   * Format a raw Rally issue into the dashboard schema.
+   */
+  private formatRallyIssue(issue: any, projectInfo: { id: string; name: string; color: string; icon: string }): any {
+    const canonicalStatus = mapRallyStateToCanonical(issue.state);
+    const identifier = issue.ref || issue.id || 'unknown';
+    return {
+      id: `rally-${issue.id || identifier}`,
+      identifier,
+      title: issue.title || '',
+      description: issue.description || '',
+      status: canonicalStatus === 'todo' ? 'Todo' :
+              canonicalStatus === 'in_progress' ? 'In Progress' :
+              canonicalStatus === 'done' ? 'Done' : 'Todo',
+      priority: issue.priority ?? 3,
+      assignee: issue.assignee ? {
+        name: issue.assignee,
+        email: `${issue.assignee.replace(/\s+/g, '.').toLowerCase()}@rally`,
+      } : undefined,
+      labels: Array.isArray(issue.labels) ? issue.labels.filter((l: any) => typeof l === 'string') : [],
+      url: issue.url || '',
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      parentRef: issue.parentRef,
+      artifactType: issue.artifactType,
+      project: projectInfo,
+      source: 'rally',
+    };
+  }
+
   private async pollRally(): Promise<void> {
-    const config = getRallyConfig();
-    if (!config) {
+    const globalConfig = getRallyConfig();
+    if (!globalConfig) {
       this.trackers.rally.lastFetchedIssues = [];
       return;
     }
 
     // Validate config on first poll and log warnings
     if (!this.trackers.rally.lastFetchedAt) {
-      const validation = validateRallyConfig(config);
+      const validation = validateRallyConfig(globalConfig);
       if (validation.warnings.length > 0) {
         console.warn('[Rally] Configuration warnings:', validation.warnings.join('; '));
       }
@@ -750,60 +780,78 @@ export class IssueDataService {
 
     try {
       const { RallyTracker } = await import('../../../lib/tracker/rally.js');
+      const { findProjectsByRallyProject } = await import('../../../lib/projects.js');
 
-      const tracker = new RallyTracker({
-        apiKey: config.apiKey,
-        server: config.server,
-        workspace: config.workspace,
-        project: config.project,
-      });
+      const rallyProjects = findProjectsByRallyProject();
+      let allFormatted: any[] = [];
 
-      const issues = await tracker.listIssues({
-        includeClosed: false,
-        limit: 100,
-      });
+      if (rallyProjects.length > 0) {
+        // Per-project mode: create separate tracker per Rally project OID
+        const projectQueries = rallyProjects.map(async ({ key, config: projConfig }) => {
+          try {
+            const tracker = new RallyTracker({
+              apiKey: globalConfig.apiKey,
+              server: globalConfig.server,
+              workspace: globalConfig.workspace,
+              project: projConfig.rally_project,
+            });
 
-      const formatted = issues.map((issue: any) => {
-        const canonicalStatus = mapRallyStateToCanonical(issue.state);
-        const identifier = issue.ref || issue.id || 'unknown';
-        return {
-          id: `rally-${issue.id || identifier}`,
-          identifier,
-          title: issue.title || '',
-          description: issue.description || '',
-          status: canonicalStatus === 'todo' ? 'Todo' :
-                  canonicalStatus === 'in_progress' ? 'In Progress' :
-                  canonicalStatus === 'done' ? 'Done' : 'Todo',
-          priority: issue.priority ?? 3,
-          assignee: issue.assignee ? {
-            name: issue.assignee,
-            email: `${issue.assignee.replace(/\s+/g, '.').toLowerCase()}@rally`,
-          } : undefined,
-          labels: Array.isArray(issue.labels) ? issue.labels.filter((l: any) => typeof l === 'string') : [],
-          url: issue.url || '',
-          createdAt: issue.createdAt,
-          updatedAt: issue.updatedAt,
-          project: {
-            id: 'rally-project',
-            name: 'Rally',
-            color: '#00C7B1',
-            icon: 'rally',
-          },
-          source: 'rally',
+            const issues = await tracker.listIssues({
+              includeClosed: false,
+              limit: 100,
+            });
+
+            const projectInfo = {
+              id: `rally-${key}`,
+              name: projConfig.name,
+              color: '#00C7B1',
+              icon: 'rally',
+            };
+
+            return issues.map((issue: any) => this.formatRallyIssue(issue, projectInfo));
+          } catch (err: any) {
+            console.error(`[IssueDataService] Rally poll error for project ${key}:`, err.message);
+            return [];
+          }
+        });
+
+        const results = await Promise.all(projectQueries);
+        allFormatted = results.flat();
+      } else {
+        // Fallback: use global RALLY_PROJECT env (backward compat)
+        const tracker = new RallyTracker({
+          apiKey: globalConfig.apiKey,
+          server: globalConfig.server,
+          workspace: globalConfig.workspace,
+          project: globalConfig.project,
+        });
+
+        const issues = await tracker.listIssues({
+          includeClosed: false,
+          limit: 100,
+        });
+
+        const projectInfo = {
+          id: 'rally-project',
+          name: 'Rally',
+          color: '#00C7B1',
+          icon: 'rally',
         };
-      });
+
+        allFormatted = issues.map((issue: any) => this.formatRallyIssue(issue, projectInfo));
+      }
 
       const oldData = this.trackers.rally.lastFetchedIssues;
-      const changed = JSON.stringify(formatted) !== JSON.stringify(oldData);
+      const changed = JSON.stringify(allFormatted) !== JSON.stringify(oldData);
 
-      this.trackers.rally.lastFetchedIssues = formatted;
+      this.trackers.rally.lastFetchedIssues = allFormatted;
       this.trackers.rally.lastFetchedAt = new Date().toISOString();
       this.trackers.rally.lastError = null;
 
-      this.cache.set('rally', 'issues', formatted, { ttlSeconds: DEFAULT_TTLS.rally });
+      this.cache.set('rally', 'issues', allFormatted, { ttlSeconds: DEFAULT_TTLS.rally });
 
       if (changed) {
-        console.log(`[IssueDataService] Rally: ${formatted.length} issues (changed)`);
+        console.log(`[IssueDataService] Rally: ${allFormatted.length} issues (changed)`);
         this.pushUpdated();
         this.pushMeta();
       }

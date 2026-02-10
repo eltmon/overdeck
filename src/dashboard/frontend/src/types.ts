@@ -29,6 +29,8 @@ export interface Issue {
   shadowStatus?: 'open' | 'in_progress' | 'closed';  // Shadow mode status tracking
   targetCanonicalState?: CanonicalState;  // Explicit column placement from drag-drop
   shadowedAt?: string;  // When shadow state was created
+  parentRef?: string;  // Parent issue FormattedID (e.g., "F1234") for Rally hierarchy
+  artifactType?: string;  // Rally artifact type (e.g., "HierarchicalRequirement", "PortfolioItem/Feature")
 }
 
 export interface GitStatus {

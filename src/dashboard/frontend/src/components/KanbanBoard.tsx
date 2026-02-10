@@ -18,7 +18,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
@@ -178,6 +178,117 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
   }
 
   return grouped;
+}
+
+/**
+ * Organize issues in a column into hierarchical groups.
+ * Features (PortfolioItem) become parent groups; Stories/Defects with
+ * a matching parentRef nest underneath. Orphans display normally.
+ */
+interface HierarchyGroup {
+  type: 'feature' | 'orphan';
+  feature?: Issue;       // The parent Feature issue (if type='feature')
+  children: Issue[];     // Child stories/defects (if type='feature'), or [single issue] for orphans
+}
+
+function buildHierarchy(issues: Issue[]): HierarchyGroup[] {
+  // Separate features from non-features
+  const features: Issue[] = [];
+  const nonFeatures: Issue[] = [];
+
+  for (const issue of issues) {
+    if (issue.artifactType?.includes('PortfolioItem')) {
+      features.push(issue);
+    } else {
+      nonFeatures.push(issue);
+    }
+  }
+
+  // If no features, return all as orphans (no grouping needed)
+  if (features.length === 0) {
+    return issues.map(issue => ({ type: 'orphan', children: [issue] }));
+  }
+
+  // Build a map from Feature identifier → Feature issue
+  const featureMap = new Map<string, Issue>();
+  for (const f of features) {
+    featureMap.set(f.identifier, f);
+  }
+
+  // Group children by their parentRef
+  const childrenByParent = new Map<string, Issue[]>();
+  const orphans: Issue[] = [];
+
+  for (const issue of nonFeatures) {
+    if (issue.parentRef && featureMap.has(issue.parentRef)) {
+      const group = childrenByParent.get(issue.parentRef) || [];
+      group.push(issue);
+      childrenByParent.set(issue.parentRef, group);
+    } else {
+      orphans.push(issue);
+    }
+  }
+
+  // Build the result: feature groups first, then orphans
+  const groups: HierarchyGroup[] = [];
+
+  for (const feature of features) {
+    const children = childrenByParent.get(feature.identifier) || [];
+    groups.push({ type: 'feature', feature, children });
+  }
+
+  for (const orphan of orphans) {
+    groups.push({ type: 'orphan', children: [orphan] });
+  }
+
+  return groups;
+}
+
+// Collapsible Feature group header
+function FeatureGroupHeader({
+  feature,
+  childCount,
+  totalChildren,
+  isExpanded,
+  onToggle,
+}: {
+  feature: Issue;
+  childCount: number;
+  totalChildren: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      onClick={onToggle}
+      className="flex items-center gap-2 px-2 py-1.5 bg-indigo-900/30 rounded-lg cursor-pointer hover:bg-indigo-900/50 transition-colors border border-indigo-700/30"
+    >
+      {isExpanded ? (
+        <ChevronDown className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+      ) : (
+        <ChevronRight className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+      )}
+      {feature.project && (
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ backgroundColor: feature.project.color || '#6b7280' }}
+        />
+      )}
+      <a
+        href={feature.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="text-xs font-medium text-indigo-300 hover:text-indigo-200"
+      >
+        {feature.identifier}
+      </a>
+      <span className="text-xs text-content-body truncate flex-1">{feature.title}</span>
+      <span className="text-xs text-indigo-400 shrink-0">
+        {childCount}/{totalChildren}
+      </span>
+    </div>
+  );
 }
 
 const COLUMN_COLORS: Record<string, string> = {
@@ -646,44 +757,16 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     <span className="text-sm text-content-subtle">{grouped[status].length}</span>
                   </div>
                 </div>
-                <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
-                  {grouped[status].map((issue) => {
-                    const issueIdLower = issue.identifier.toLowerCase();
-                    // Find both planning and work agents separately
-                    const planningAgent = agents.find(
-                      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'planning'
-                    );
-                    const workAgent = agents.find(
-                      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type !== 'planning'
-                    );
-                    // Find specialists working on this issue
-                    const issueSpecialists = specialists.filter(
-                      (s) => s.currentIssue?.toLowerCase() === issueIdLower
-                    );
-                    return (
-                      <DraggableCardWrapper key={issue.id} issue={issue}>
-                        <IssueCard
-                          issue={issue}
-                          planningAgent={planningAgent}
-                          workAgent={workAgent}
-                          specialists={issueSpecialists}
-                          cost={issueCosts[issue.identifier.toLowerCase()]}
-                          isSelected={selectedIssue === issue.identifier}
-                          onSelect={() => onSelectIssue(
-                            selectedIssue === issue.identifier ? null : issue.identifier
-                          )}
-                          onPlan={() => setPlanDialogIssue(issue)}
-                          onViewBeads={(i) => setBeadsDialogIssue(i)}
-                        />
-                      </DraggableCardWrapper>
-                    );
-                  })}
-                  {grouped[status].length === 0 && (
-                    <div className="text-center text-content-muted py-8 text-sm">
-                      No issues
-                    </div>
-                  )}
-                </div>
+                <ColumnContent
+                  issues={grouped[status]}
+                  agents={agents}
+                  specialists={specialists}
+                  issueCosts={issueCosts}
+                  selectedIssue={selectedIssue}
+                  onSelectIssue={onSelectIssue}
+                  onPlan={setPlanDialogIssue}
+                  onViewBeads={setBeadsDialogIssue}
+                />
               </div>
             </DroppableColumn>
           ))}
@@ -738,6 +821,136 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onClose={() => setBeadsDialogIssue(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ColumnContent — renders issues with Rally hierarchy grouping
+function ColumnContent({
+  issues,
+  agents,
+  specialists,
+  issueCosts,
+  selectedIssue,
+  onSelectIssue,
+  onPlan,
+  onViewBeads,
+}: {
+  issues: Issue[];
+  agents: Agent[];
+  specialists: SpecialistAgent[];
+  issueCosts: Record<string, IssueCost>;
+  selectedIssue: string | null | undefined;
+  onSelectIssue: (id: string | null) => void;
+  onPlan: (issue: Issue) => void;
+  onViewBeads: (issue: Issue) => void;
+}) {
+  const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
+
+  const toggleFeature = useCallback((featureId: string) => {
+    setCollapsedFeatures(prev => {
+      const next = new Set(prev);
+      if (next.has(featureId)) {
+        next.delete(featureId);
+      } else {
+        next.add(featureId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Check if any Rally issues with hierarchy exist
+  const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
+  const hierarchy = hasRallyHierarchy ? buildHierarchy(issues) : null;
+
+  const renderIssueCard = (issue: Issue) => {
+    const issueIdLower = issue.identifier.toLowerCase();
+    const planningAgent = agents.find(
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'planning'
+    );
+    const workAgent = agents.find(
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type !== 'planning'
+    );
+    const issueSpecialists = specialists.filter(
+      (s) => s.currentIssue?.toLowerCase() === issueIdLower
+    );
+
+    return (
+      <DraggableCardWrapper key={issue.id} issue={issue}>
+        <IssueCard
+          issue={issue}
+          planningAgent={planningAgent}
+          workAgent={workAgent}
+          specialists={issueSpecialists}
+          cost={issueCosts[issue.identifier.toLowerCase()]}
+          isSelected={selectedIssue === issue.identifier}
+          onSelect={() => onSelectIssue(
+            selectedIssue === issue.identifier ? null : issue.identifier
+          )}
+          onPlan={() => onPlan(issue)}
+          onViewBeads={(i) => onViewBeads(i)}
+        />
+      </DraggableCardWrapper>
+    );
+  };
+
+  if (issues.length === 0) {
+    return (
+      <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
+        <div className="text-center text-content-muted py-8 text-sm">
+          No issues
+        </div>
+      </div>
+    );
+  }
+
+  // Flat rendering (no hierarchy)
+  if (!hierarchy) {
+    return (
+      <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
+        {issues.map(renderIssueCard)}
+      </div>
+    );
+  }
+
+  // Hierarchical rendering with Feature groups
+  return (
+    <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
+      {hierarchy.map((group) => {
+        if (group.type === 'orphan') {
+          return renderIssueCard(group.children[0]);
+        }
+
+        // Feature group
+        const feature = group.feature!;
+        const isExpanded = !collapsedFeatures.has(feature.identifier);
+        const doneCount = group.children.filter(c => {
+          const canonical = STATUS_LABELS[c.status];
+          return canonical === 'done';
+        }).length;
+
+        return (
+          <div key={`feature-${feature.id}`} className="space-y-1">
+            <FeatureGroupHeader
+              feature={feature}
+              childCount={doneCount}
+              totalChildren={group.children.length}
+              isExpanded={isExpanded}
+              onToggle={() => toggleFeature(feature.identifier)}
+            />
+            {isExpanded && (
+              <div className="ml-3 space-y-2 border-l-2 border-indigo-700/30 pl-2">
+                {group.children.map(renderIssueCard)}
+                {group.children.length === 0 && (
+                  <div className="text-xs text-content-muted py-2 pl-2">
+                    No stories in this column
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
