@@ -6951,11 +6951,12 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
   const branchName = `feature/${issueLower}`;
 
   try {
-    const isGitHubIssue = issueId.toUpperCase().startsWith('PAN-');
+    const githubCheck = isGitHubIssue(issueId);
+    const issueSource = issueDataService.getIssueSource(issueId);
     const apiKey = getLinearApiKey();
 
-    // 1. Close the issue (GitHub via gh CLI, Linear via API)
-    if (isGitHubIssue) {
+    // 1. Close the issue (GitHub via gh CLI, Rally via tracker, Linear via API)
+    if (githubCheck.isGitHub) {
       const ghConfig = getGitHubConfig();
       const number = parseInt(issueId.split('-')[1], 10);
       const repoConfig = ghConfig?.repos.find(r => r.prefix === 'PAN') || ghConfig?.repos[0];
@@ -6977,6 +6978,24 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
             headers: { 'Authorization': `token ${ghConfig.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
             body: JSON.stringify({ state: 'closed' }),
           });
+        }
+      }
+    } else if (issueSource === 'rally') {
+      // Rally issue - transition to closed state
+      const rallyConfig = getRallyConfig();
+      if (rallyConfig) {
+        try {
+          const { RallyTracker } = await import('../../lib/tracker/rally.js');
+          const tracker = new RallyTracker({
+            apiKey: rallyConfig.apiKey,
+            server: rallyConfig.server,
+            workspace: rallyConfig.workspace,
+            project: rallyConfig.project,
+          });
+          await tracker.transitionIssue(issueId, 'closed');
+          console.log(`Closed Rally issue ${issueId}`);
+        } catch (rallyErr: any) {
+          console.error(`Rally close failed for ${issueId}:`, rallyErr.message);
         }
       }
     } else if (apiKey) {
@@ -7043,7 +7062,7 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
     // Users can manually delete branches if needed via: git branch -d <branch>
 
     // 5. Run pan sync for Panopticon issues
-    if (isGitHubIssue) {
+    if (githubCheck.isGitHub) {
       try {
         await execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 });
         console.log('pan sync completed');
@@ -7056,8 +7075,10 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
     });
 
     // Invalidate cache for affected tracker
-    if (isGitHubIssue) {
+    if (githubCheck.isGitHub) {
       issueDataService.invalidateTracker('github').catch(() => {});
+    } else if (issueSource === 'rally') {
+      issueDataService.invalidateTracker('rally').catch(() => {});
     } else {
       issueDataService.invalidateTracker('linear').catch(() => {});
     }
@@ -9512,6 +9533,7 @@ app.post('/api/issues/:id/reset', async (req, res) => {
     // Invalidate all tracker caches after reset
     issueDataService.invalidateTracker('github').catch(() => {});
     issueDataService.invalidateTracker('linear').catch(() => {});
+    issueDataService.invalidateTracker('rally').catch(() => {});
   } catch (error) {
     console.error('Reset failed:', error);
     res.status(500).json({
@@ -9528,57 +9550,77 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
   const { skipPlan = false } = req.body || {};
 
   try {
-    // Check if it's a Linear issue
-    const linearKey = process.env.LINEAR_API_KEY || '';
-    if (!linearKey) {
-      return res.status(400).json({ error: 'LINEAR_API_KEY not configured' });
+    const githubCheck = isGitHubIssue(id);
+    const issueSource = issueDataService.getIssueSource(id);
+
+    if (issueSource === 'rally') {
+      // Rally issue - transition back to open state
+      const rallyConfig = getRallyConfig();
+      if (!rallyConfig) {
+        return res.status(400).json({ error: 'Rally not configured' });
+      }
+      const { RallyTracker } = await import('../../lib/tracker/rally.js');
+      const tracker = new RallyTracker({
+        apiKey: rallyConfig.apiKey,
+        server: rallyConfig.server,
+        workspace: rallyConfig.workspace,
+        project: rallyConfig.project,
+      });
+      await tracker.transitionIssue(id, 'open');
+      console.log(`Reopened Rally issue ${id}`);
+
+      res.json({
+        success: true,
+        message: `Issue ${id} reopened`,
+        issueId: id,
+        newState: 'Backlog',
+      });
+
+      issueDataService.invalidateTracker('rally').catch(() => {});
+    } else {
+      // Linear issue (default)
+      const linearKey = process.env.LINEAR_API_KEY || '';
+      if (!linearKey) {
+        return res.status(400).json({ error: 'LINEAR_API_KEY not configured' });
+      }
+
+      const { LinearClient } = await import('@linear/sdk');
+      const client = new LinearClient({ apiKey: linearKey });
+
+      const issue = await client.issue(id);
+      if (!issue) {
+        return res.status(404).json({ error: `Issue ${id} not found` });
+      }
+
+      const team = await issue.team;
+      if (!team) {
+        return res.status(400).json({ error: 'Could not determine team for issue' });
+      }
+
+      const states = await team.states();
+      const backlogState = states.nodes.find(s => s.type === 'backlog');
+
+      if (!backlogState) {
+        return res.status(400).json({ error: 'Could not find Backlog state for team' });
+      }
+
+      await issue.update({ stateId: backlogState.id });
+      console.log(`Reopened issue ${id} - moved to Backlog`);
+
+      res.json({
+        success: true,
+        message: `Issue ${id} reopened and moved to Backlog`,
+        issueId: issue.identifier,
+        newState: 'Backlog',
+      });
+
+      // Invalidate correct tracker cache
+      if (githubCheck.isGitHub) {
+        issueDataService.invalidateTracker('github').catch(() => {});
+      } else {
+        issueDataService.invalidateTracker('linear').catch(() => {});
+      }
     }
-
-    // Import Linear SDK
-    const { LinearClient } = await import('@linear/sdk');
-    const client = new LinearClient({ apiKey: linearKey });
-
-    // Find the issue by identifier (e.g., "MIN-665")
-    // Linear SDK accepts both UUIDs and identifiers
-    const issue = await client.issue(id);
-
-    if (!issue) {
-      return res.status(404).json({ error: `Issue ${id} not found` });
-    }
-
-    // Get backlog state
-    const team = await issue.team;
-    if (!team) {
-      return res.status(400).json({ error: 'Could not determine team for issue' });
-    }
-
-    const states = await team.states();
-    const backlogState = states.nodes.find(s => s.type === 'backlog');
-
-    if (!backlogState) {
-      return res.status(400).json({ error: 'Could not find Backlog state for team' });
-    }
-
-    // Move issue to Backlog
-    await issue.update({ stateId: backlogState.id });
-
-    console.log(`Reopened issue ${id} - moved to Backlog`);
-
-    // Optionally start planning
-    if (!skipPlan) {
-      // We could trigger planning here, but for now just return success
-      // The user can click Plan from the dashboard
-    }
-
-    res.json({
-      success: true,
-      message: `Issue ${id} reopened and moved to Backlog`,
-      issueId: issue.identifier,
-      newState: 'Backlog',
-    });
-
-    // Invalidate Linear cache after reopen
-    issueDataService.invalidateTracker('linear').catch(() => {});
   } catch (error: any) {
     console.error('Error reopening issue:', error);
     res.status(500).json({ error: 'Failed to reopen issue: ' + error.message });
@@ -9615,31 +9657,49 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
     // Update shadow state first (always) - include targetCanonicalState for column placement
     const shadowResult = await updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus);
 
-    // If syncToTracker is true and it's a Linear issue, also update Linear
-    if (syncToTracker) {
-      const linearKey = process.env.LINEAR_API_KEY || '';
-      if (!linearKey) {
-        return res.status(400).json({ error: 'LINEAR_API_KEY not configured for sync' });
-      }
+    // Determine which tracker this issue belongs to
+    const issueSource = issueDataService.getIssueSource(id);
+    const githubCheck = isGitHubIssue(id);
 
-      // Check if it's a GitHub issue (skip Linear sync for those)
-      const githubCheck = isGitHubIssue(id);
+    // If syncToTracker is true, update the actual tracker
+    if (syncToTracker) {
       if (githubCheck.isGitHub) {
         // GitHub issues don't support sync to tracker in this implementation
         console.log(`GitHub issue ${id} - skipping tracker sync`);
+      } else if (issueSource === 'rally') {
+        // Sync to Rally tracker
+        const rallyConfig = getRallyConfig();
+        if (!rallyConfig) {
+          return res.status(400).json({ error: 'Rally not configured for sync' });
+        }
+        try {
+          const { RallyTracker } = await import('../../lib/tracker/rally.js');
+          const tracker = new RallyTracker({
+            apiKey: rallyConfig.apiKey,
+            server: rallyConfig.server,
+            workspace: rallyConfig.workspace,
+            project: rallyConfig.project,
+          });
+          await tracker.transitionIssue(id, issueState);
+          console.log(`Synced issue ${id} to Rally state: ${issueState}`);
+        } catch (rallyErr: any) {
+          console.error(`Rally sync failed for ${id}:`, rallyErr.message);
+          // Shadow state is already saved — don't fail the whole request
+        }
       } else {
-        // Import Linear SDK
+        // Default: Linear sync
+        const linearKey = process.env.LINEAR_API_KEY || '';
+        if (!linearKey) {
+          return res.status(400).json({ error: 'LINEAR_API_KEY not configured for sync' });
+        }
         const { LinearClient } = await import('@linear/sdk');
         const client = new LinearClient({ apiKey: linearKey });
 
-        // Find the issue by identifier
         const issue = await client.issue(id);
-
         if (!issue) {
           return res.status(404).json({ error: `Issue ${id} not found in Linear` });
         }
 
-        // Get team states to find the target state
         const team = await issue.team;
         if (!team) {
           return res.status(400).json({ error: 'Could not determine team for issue' });
@@ -9647,7 +9707,6 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
 
         const states = await team.states();
 
-        // Map canonical state to Linear state type
         const stateTypeMap: Record<string, string> = {
           backlog: 'backlog',
           todo: 'unstarted',
@@ -9658,15 +9717,12 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
         };
 
         const targetStateType = stateTypeMap[targetStatus];
-
-        // Find the first matching state for the target type
         const targetState = states.nodes.find(s => s.type === targetStateType);
 
         if (!targetState) {
           return res.status(400).json({ error: `Could not find state of type '${targetStateType}' for team` });
         }
 
-        // Update the issue state in Linear
         await issue.update({ stateId: targetState.id });
         console.log(`Synced issue ${id} to Linear state: ${targetState.name}`);
       }
@@ -9681,10 +9737,11 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
       shadowState: shadowResult,
     });
 
-    // Invalidate cache and push updated issues to all clients
-    const githubMoveCheck = isGitHubIssue(id);
-    if (githubMoveCheck.isGitHub) {
+    // Invalidate correct tracker cache and push updated issues to all clients
+    if (githubCheck.isGitHub) {
       issueDataService.invalidateTracker('github').catch(() => {});
+    } else if (issueSource === 'rally') {
+      issueDataService.invalidateTracker('rally').catch(() => {});
     } else {
       issueDataService.invalidateTracker('linear').catch(() => {});
     }

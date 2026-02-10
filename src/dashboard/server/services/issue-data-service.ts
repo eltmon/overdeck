@@ -152,6 +152,22 @@ export class IssueDataService {
   }
 
   /**
+   * Look up which tracker an issue belongs to by its identifier.
+   * Returns 'github' | 'linear' | 'rally' | null.
+   */
+  getIssueSource(identifier: string): 'github' | 'linear' | 'rally' | null {
+    const id = identifier.toLowerCase();
+    for (const [trackerName, state] of Object.entries(this.trackers)) {
+      for (const issue of state.lastFetchedIssues) {
+        if ((issue.identifier || '').toLowerCase() === id) {
+          return trackerName as 'github' | 'linear' | 'rally';
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Get all issues from cache. Applies shadow state and filtering.
    * This is the hot path — must be fast.
    */
