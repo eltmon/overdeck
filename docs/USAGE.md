@@ -126,6 +126,16 @@ Panopticon supports multiple issue trackers:
 
 Secondary trackers sync issues to the dashboard alongside Linear issues, allowing unified project management.
 
+#### Rally Features and Derived Status
+
+Rally Features (PortfolioItems) get special treatment in the dashboard:
+
+- **Derived Status**: Features automatically reflect their children's aggregate status. If any child User Story is "In Progress", the Feature shows as "In Progress" — even if Rally still says "Discovering". If all children are "Done", the Feature shows as "Done".
+- **Raw State Preservation**: The original Rally state name (e.g., "Discovering", "In-Progress") is always visible alongside Panopticon's canonical state, so you can see both what Rally says and what Panopticon derives.
+- **Shadow State Badges**: When shadow state differs from Rally's tracker state, cards show both states clearly: `🔗 Discovering → 👁 In Progress`.
+- **Kanban Board**: Features render as rich cards with progress bars (`3/5 done, 2 active`) and expandable child story folders.
+- **Mission Control**: Rally Features appear in the sidebar with child counts. Clicking a Feature shows its child stories with status indicators, assignees, and Rally state badges. The Sync button fetches Rally story statuses alongside GitHub/Linear discussions.
+
 ### Multi-Model Support
 
 Panopticon integrates with [claude-code-router](https://github.com/musistudio/claude-code-router) to enable using multiple AI model providers alongside Anthropic models.
