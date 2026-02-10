@@ -18,6 +18,7 @@ interface PlanningData {
 
 interface BadgeBarProps {
   issueId: string;
+  source?: string;
   onOpenBeads?: () => void;
 }
 
@@ -27,10 +28,11 @@ async function fetchPlanning(issueId: string): Promise<PlanningData> {
   return res.json();
 }
 
-export function BadgeBar({ issueId, onOpenBeads }: BadgeBarProps) {
+export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
   const [showModal, setShowModal] = useState<{ title: string; content: string } | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ message: string; isError: boolean } | null>(null);
   const [generatingStatus, setGeneratingStatus] = useState(false);
 
   const { data: planning, refetch } = useQuery({
@@ -41,20 +43,48 @@ export function BadgeBar({ issueId, onOpenBeads }: BadgeBarProps) {
 
   const handleSyncDiscussions = async () => {
     setSyncing(true);
+    setSyncResult(null);
     try {
-      // Try GitHub, Linear, and Rally
-      for (const tracker of ['github', 'linear', 'rally']) {
-        await fetch(`/api/mission-control/planning/${issueId}/sync-discussions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tracker }),
-        }).catch(() => {}); // Non-fatal per tracker
+      // Use the issue's source tracker if known, otherwise try all
+      const trackers = source ? [source] : ['github', 'linear', 'rally'];
+      let totalSynced = 0;
+      let lastError: string | null = null;
+
+      for (const tracker of trackers) {
+        try {
+          const res = await fetch(`/api/mission-control/planning/${issueId}/sync-discussions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tracker }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            totalSynced += data.synced || 0;
+          } else if (source) {
+            // Only show error if this was the targeted tracker
+            const errData = await res.json().catch(() => ({ error: 'Sync failed' }));
+            lastError = errData.error || `HTTP ${res.status}`;
+          }
+        } catch {
+          if (source) lastError = 'Network error';
+        }
       }
+
       refetch();
+
+      if (lastError && totalSynced === 0) {
+        setSyncResult({ message: lastError, isError: true });
+      } else if (totalSynced > 0) {
+        setSyncResult({ message: `Synced ${totalSynced} file${totalSynced > 1 ? 's' : ''}`, isError: false });
+      } else {
+        setSyncResult({ message: 'No new discussions', isError: false });
+      }
     } catch (e) {
       console.error('Sync failed:', e);
+      setSyncResult({ message: 'Sync failed', isError: true });
     } finally {
       setSyncing(false);
+      setTimeout(() => setSyncResult(null), 4000);
     }
   };
 
@@ -183,8 +213,20 @@ export function BadgeBar({ issueId, onOpenBeads }: BadgeBarProps) {
           title="Sync discussions from issue tracker"
         >
           <RefreshCw size={12} className={syncing ? styles.spinning : ''} />
-          Sync
+          {syncing ? 'Syncing...' : 'Sync'}
         </button>
+        {syncResult && (
+          <span
+            className={styles.badge}
+            style={{
+              color: syncResult.isError ? 'var(--mc-error, #ef4444)' : 'var(--mc-success, #22c55e)',
+              fontSize: '0.7rem',
+              opacity: 0.9,
+            }}
+          >
+            {syncResult.message}
+          </span>
+        )}
       </div>
 
       {showModal && (

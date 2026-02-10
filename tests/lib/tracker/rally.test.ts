@@ -123,7 +123,7 @@ const sampleStoryWithParent = {
   ObjectID: '12346',
   FormattedID: 'US124',
   Name: 'Child Story',
-  Parent: {
+  PortfolioItem: {
     _ref: '/portfolioitem/feature/50000',
     _refObjectName: 'Feature Title',
     FormattedID: 'F100',
@@ -888,8 +888,8 @@ describe('RallyTracker', () => {
     });
   });
 
-  describe('parentRef and artifactType (PAN-192)', () => {
-    it('should return parentRef from Parent.FormattedID', async () => {
+  describe('parentRef and artifactType (PAN-192, PAN-202)', () => {
+    it('should return parentRef from PortfolioItem.FormattedID (PAN-202)', async () => {
       setupTypeResults([sampleStoryWithParent], [], [], []);
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
@@ -899,12 +899,71 @@ describe('RallyTracker', () => {
       expect(issues[0].parentRef).toBe('F100');
     });
 
+    it('should prefer PortfolioItem over Parent for parentRef (PAN-202)', async () => {
+      const storyWithBothParents = {
+        ...sampleStory,
+        PortfolioItem: {
+          _ref: '/portfolioitem/feature/50000',
+          _refObjectName: 'Feature Title',
+          FormattedID: 'F100',
+        },
+        Parent: {
+          _ref: '/hierarchicalrequirement/99999',
+          _refObjectName: 'Parent Story',
+          FormattedID: 'US999',
+        },
+      };
+
+      setupTypeResults([storyWithBothParents], [], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].parentRef).toBe('F100');
+    });
+
+    it('should fall back to Parent when no PortfolioItem (PAN-202)', async () => {
+      const storyWithParentOnly = {
+        ...sampleStory,
+        Parent: {
+          _ref: '/hierarchicalrequirement/99999',
+          _refObjectName: 'Parent Story',
+          FormattedID: 'US999',
+        },
+      };
+
+      setupTypeResults([storyWithParentOnly], [], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].parentRef).toBe('US999');
+    });
+
+    it('should fall back to PortfolioItem._refObjectName when FormattedID is absent', async () => {
+      const storyWithPartialPortfolioItem = {
+        ...sampleStory,
+        PortfolioItem: {
+          _ref: '/portfolioitem/feature/50000',
+          _refObjectName: 'Feature Title',
+          // No FormattedID
+        },
+      };
+
+      setupTypeResults([storyWithPartialPortfolioItem], [], [], []);
+
+      const tracker = new RallyTracker({ apiKey: 'test_key' });
+      const issues = await tracker.listIssues();
+
+      expect(issues[0].parentRef).toBe('Feature Title');
+    });
+
     it('should fall back to Parent._refObjectName when FormattedID is absent', async () => {
       const storyWithPartialParent = {
         ...sampleStory,
         Parent: {
-          _ref: '/portfolioitem/feature/50000',
-          _refObjectName: 'Feature Title',
+          _ref: '/hierarchicalrequirement/99999',
+          _refObjectName: 'Parent Story',
           // No FormattedID
         },
       };
@@ -914,7 +973,7 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       const issues = await tracker.listIssues();
 
-      expect(issues[0].parentRef).toBe('Feature Title');
+      expect(issues[0].parentRef).toBe('Parent Story');
     });
 
     it('should return undefined parentRef when no parent', async () => {

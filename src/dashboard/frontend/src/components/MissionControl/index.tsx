@@ -171,6 +171,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
               {/* Badge Bar */}
               <BadgeBar
                 issueId={selectedFeature}
+                source={issues.find(i => i.identifier === selectedFeature)?.source}
                 onOpenBeads={() => setShowBeads(true)}
               />
 
