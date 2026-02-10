@@ -42,13 +42,13 @@ export function BadgeBar({ issueId, onOpenBeads }: BadgeBarProps) {
   const handleSyncDiscussions = async () => {
     setSyncing(true);
     try {
-      // Try GitHub first, then Linear
-      for (const tracker of ['github', 'linear']) {
+      // Try GitHub, Linear, and Rally
+      for (const tracker of ['github', 'linear', 'rally']) {
         await fetch(`/api/mission-control/planning/${issueId}/sync-discussions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tracker }),
-        });
+        }).catch(() => {}); // Non-fatal per tracker
       }
       refetch();
     } catch (e) {

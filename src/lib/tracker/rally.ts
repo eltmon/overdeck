@@ -557,6 +557,7 @@ export class RallyTracker implements IssueTracker {
       updatedAt: rallyArtifact.LastUpdateDate,
       parentRef,
       artifactType,
+      rawState: stateValue,
     };
   }
 

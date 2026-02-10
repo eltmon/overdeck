@@ -15,6 +15,11 @@ export interface ProjectFeature {
   hasState: boolean;
   isShadow: boolean;
   cost?: number;
+  isRally?: boolean;
+  childCount?: number;
+  completedCount?: number;
+  inProgressCount?: number;
+  rawTrackerState?: string;
 }
 
 interface ProjectNodeProps {

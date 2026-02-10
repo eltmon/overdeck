@@ -60,6 +60,9 @@ export interface Issue {
 
   /** Rally artifact type (e.g., "HierarchicalRequirement", "PortfolioItem/Feature") */
   artifactType?: string;
+
+  /** Raw tracker state name before normalization (e.g., "Discovering", "In-Progress") */
+  rawState?: string;
 }
 
 // Comment on an issue
