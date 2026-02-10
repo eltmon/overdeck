@@ -70,21 +70,42 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
         }
       }
 
-      refetch();
-
       if (lastError && totalSynced === 0) {
         setSyncResult({ message: lastError, isError: true });
       } else if (totalSynced > 0) {
-        setSyncResult({ message: `Synced ${totalSynced} file${totalSynced > 1 ? 's' : ''}`, isError: false });
+        setSyncResult({ message: `Synced ${totalSynced} — generating status...`, isError: false });
       } else {
         setSyncResult({ message: 'No new discussions', isError: false });
       }
+
+      // Auto-generate status review after sync (regardless of whether new content was found)
+      setGeneratingStatus(true);
+      try {
+        const statusRes = await fetch(`/api/mission-control/planning/${issueId}/status-review`, { method: 'POST' });
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (totalSynced > 0) {
+            setSyncResult({ message: `Synced ${totalSynced} + status updated`, isError: false });
+          } else {
+            setSyncResult({ message: 'Status updated', isError: false });
+          }
+          // Show the status review immediately
+          setShowModal({ title: `Status Review (${new Date().toLocaleString()})`, content: statusData.statusReview });
+        }
+      } catch (e) {
+        console.error('Status review generation failed:', e);
+        // Don't override sync success message with status failure
+      } finally {
+        setGeneratingStatus(false);
+      }
+
+      refetch();
     } catch (e) {
       console.error('Sync failed:', e);
       setSyncResult({ message: 'Sync failed', isError: true });
     } finally {
       setSyncing(false);
-      setTimeout(() => setSyncResult(null), 4000);
+      setTimeout(() => setSyncResult(null), 6000);
     }
   };
 
@@ -209,11 +230,11 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
         <button
           className={`${styles.syncButton} ${syncing ? '' : ''}`}
           onClick={handleSyncDiscussions}
-          disabled={syncing}
-          title="Sync discussions from issue tracker"
+          disabled={syncing || generatingStatus}
+          title="Sync discussions and generate AI status review"
         >
-          <RefreshCw size={12} className={syncing ? styles.spinning : ''} />
-          {syncing ? 'Syncing...' : 'Sync'}
+          <RefreshCw size={12} className={syncing || generatingStatus ? styles.spinning : ''} />
+          {generatingStatus ? 'Reviewing...' : syncing ? 'Syncing...' : 'Sync'}
         </button>
         {syncResult && (
           <span
