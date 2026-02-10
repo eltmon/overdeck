@@ -64,6 +64,7 @@ const QUERYABLE_TYPES: ArtifactTypeQuery[] = [
   { type: 'hierarchicalrequirement', stateField: 'ScheduleState', closedStates: ['Completed', 'Accepted'] },
   { type: 'defect', stateField: 'State', closedStates: ['Closed'] },
   { type: 'task', stateField: 'State', closedStates: ['Completed'] },
+  { type: 'portfolioitem/feature', stateField: 'State', closedStates: ['Done'] },
 ];
 
 const FETCH_FIELDS = [
@@ -266,12 +267,14 @@ export class RallyTracker implements IssueTracker {
       updatePayload.Description = update.description;
     }
     if (update.state !== undefined) {
-      const rallyState = this.reverseMapState(update.state);
-      // Use ScheduleState for User Stories and Tasks, State for Defects
-      if (artifact._type === 'Defect') {
-        updatePayload.State = rallyState;
-      } else {
+      const artifactType = (artifact._type || '').toLowerCase();
+      const kind = artifactType.startsWith('portfolioitem') ? 'feature'
+        : artifactType === 'defect' ? 'defect' : 'story';
+      const rallyState = this.reverseMapState(update.state, kind);
+      if (kind === 'story') {
         updatePayload.ScheduleState = rallyState;
+      } else {
+        updatePayload.State = rallyState;
       }
     }
     if (update.priority !== undefined) {
@@ -444,7 +447,9 @@ export class RallyTracker implements IssueTracker {
     const conditions: string[] = [];
 
     if (filters?.state && !filters.includeClosed) {
-      const rallyState = this.reverseMapState(filters.state);
+      const kind = artifactType.type.startsWith('portfolioitem') ? 'feature'
+        : artifactType.type === 'defect' ? 'defect' : 'story';
+      const rallyState = this.reverseMapState(filters.state, kind);
       conditions.push(`(${artifactType.stateField} = "${rallyState}")`);
     }
 
@@ -533,16 +538,31 @@ export class RallyTracker implements IssueTracker {
     return STATE_MAP[rallyState] ?? 'open';
   }
 
-  private reverseMapState(state: IssueState): string {
+  private reverseMapState(state: IssueState, kind: 'story' | 'defect' | 'feature' = 'story'): string {
+    if (kind === 'feature') {
+      // Features / PortfolioItems use State: Discovering, Developing, Done
+      switch (state) {
+        case 'open': return 'Discovering';
+        case 'in_progress': return 'Developing';
+        case 'closed': return 'Done';
+        default: return 'Discovering';
+      }
+    }
+    if (kind === 'defect') {
+      // Defects use State: Submitted, Open, Fixed, Closed
+      switch (state) {
+        case 'open': return 'Submitted';
+        case 'in_progress': return 'Open';
+        case 'closed': return 'Closed';
+        default: return 'Submitted';
+      }
+    }
+    // User Stories / Tasks use ScheduleState: Defined, In-Progress, Completed
     switch (state) {
-      case 'open':
-        return 'Defined';
-      case 'in_progress':
-        return 'In-Progress';
-      case 'closed':
-        return 'Completed';
-      default:
-        return 'Defined';
+      case 'open': return 'Defined';
+      case 'in_progress': return 'In-Progress';
+      case 'closed': return 'Completed';
+      default: return 'Defined';
     }
   }
 

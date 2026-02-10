@@ -35,17 +35,19 @@ function setupEmptyResults() {
 
 /**
  * Helper: set up mockQuery to return specific results for each artifact type
- * in the order: hierarchicalrequirement, defect, task (matching QUERYABLE_TYPES).
+ * in the order: hierarchicalrequirement, defect, task, portfolioitem/feature (matching QUERYABLE_TYPES).
  */
 function setupTypeResults(
   stories: any[] = [],
   defects: any[] = [],
   tasks: any[] = [],
+  features: any[] = [],
 ) {
   mockQuery
     .mockResolvedValueOnce(wsapiResponse(stories))
     .mockResolvedValueOnce(wsapiResponse(defects))
-    .mockResolvedValueOnce(wsapiResponse(tasks));
+    .mockResolvedValueOnce(wsapiResponse(tasks))
+    .mockResolvedValueOnce(wsapiResponse(features));
 }
 
 const sampleStory = {
@@ -133,15 +135,16 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       const issues = await tracker.listIssues();
 
-      // Should make 3 separate queries (one per type)
-      expect(mockQuery).toHaveBeenCalledTimes(3);
+      // Should make 4 separate queries (one per type)
+      expect(mockQuery).toHaveBeenCalledTimes(4);
 
       // Verify query types
       expect(mockQuery.mock.calls[0][0].type).toBe('hierarchicalrequirement');
       expect(mockQuery.mock.calls[1][0].type).toBe('defect');
       expect(mockQuery.mock.calls[2][0].type).toBe('task');
+      expect(mockQuery.mock.calls[3][0].type).toBe('portfolioitem/feature');
 
-      // Should return all 3 merged results
+      // Should return all 3 merged results (features returned empty)
       expect(issues).toHaveLength(3);
     });
 
@@ -218,7 +221,8 @@ describe('RallyTracker', () => {
       mockQuery
         .mockResolvedValueOnce(wsapiResponse([sampleStory])) // stories succeed
         .mockRejectedValueOnce(new Error('Some query error'))  // defects fail
-        .mockResolvedValueOnce(wsapiResponse([sampleTask]));   // tasks succeed
+        .mockResolvedValueOnce(wsapiResponse([sampleTask]))   // tasks succeed
+        .mockResolvedValueOnce(wsapiResponse([]));             // features empty
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       const issues = await tracker.listIssues();
@@ -237,7 +241,7 @@ describe('RallyTracker', () => {
     });
 
     it('should return empty array when all types have no results', async () => {
-      setupTypeResults([], [], []);
+      setupTypeResults([], [], [], []);
 
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       const issues = await tracker.listIssues();
@@ -392,7 +396,7 @@ describe('RallyTracker', () => {
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            State: 'Completed',
+            State: 'Closed',
           }),
         })
       );
@@ -648,12 +652,12 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ includeClosed: true });
 
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         expect(getQueryForType(i)).toBe('');
       }
     });
 
-    it('should use ScheduleState for stories and State for defects/tasks (PAN-168)', async () => {
+    it('should use ScheduleState for stories and State for defects/tasks/features (PAN-168)', async () => {
       setupEmptyResults();
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ includeClosed: false });
@@ -669,6 +673,10 @@ describe('RallyTracker', () => {
       // Tasks: exclude by State
       const taskQuery = getQueryForType(2);
       expect(taskQuery).toBe('(State != "Completed")');
+
+      // Features: exclude by State
+      const featureQuery = getQueryForType(3);
+      expect(featureQuery).toBe('(State != "Done")');
     });
 
     it('should use type-specific state field for state filter', async () => {
@@ -680,13 +688,17 @@ describe('RallyTracker', () => {
       const storyQuery = getQueryForType(0);
       expect(storyQuery).toContain('(ScheduleState = "In-Progress")');
 
-      // Defects: State
+      // Defects: State (defect "in_progress" maps to "Open")
       const defectQuery = getQueryForType(1);
-      expect(defectQuery).toContain('(State = "In-Progress")');
+      expect(defectQuery).toContain('(State = "Open")');
 
-      // Tasks: State
+      // Tasks: State (tasks use story vocabulary)
       const taskQuery = getQueryForType(2);
       expect(taskQuery).toContain('(State = "In-Progress")');
+
+      // Features: State (features "in_progress" maps to "Developing")
+      const featureQuery = getQueryForType(3);
+      expect(featureQuery).toContain('(State = "Developing")');
     });
 
     it('should generate correct query for assignee filter', async () => {
@@ -695,7 +707,7 @@ describe('RallyTracker', () => {
       await tracker.listIssues({ assignee: 'John Doe', includeClosed: true });
 
       // All types should have same assignee filter
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         expect(getQueryForType(i)).toBe('(Owner.Name contains "John Doe")');
       }
     });
@@ -705,7 +717,7 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ labels: ['bug', 'urgent'], includeClosed: true });
 
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         expect(getQueryForType(i)).toBe('((Tags.Name contains "bug") AND (Tags.Name contains "urgent"))');
       }
     });
@@ -715,7 +727,7 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ query: 'login error', includeClosed: true });
 
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         expect(getQueryForType(i)).toBe('((Name contains "login error") OR (Description contains "login error"))');
       }
     });
@@ -743,7 +755,7 @@ describe('RallyTracker', () => {
       const tracker = new RallyTracker({ apiKey: 'test_key' });
       await tracker.listIssues({ labels: ['enhancement'], includeClosed: true });
 
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         expect(getQueryForType(i)).toBe('(Tags.Name contains "enhancement")');
       }
     });
@@ -769,7 +781,7 @@ describe('RallyTracker', () => {
 
       const defectQuery = getQueryForType(1);
       // defects: state + exclude-closed + assignee + labels + search
-      expect(defectQuery).toContain('State = "In-Progress"');
+      expect(defectQuery).toContain('State = "Open"');
       expect(defectQuery).toContain('State != "Closed"');
       expect(defectQuery).toContain('Owner.Name contains "Jane Smith"');
     });
