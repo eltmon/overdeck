@@ -320,6 +320,18 @@ export class IssueDataService {
     for (const tracker of ['github', 'linear', 'rally']) {
       const cached = this.cache.getStale(tracker, 'issues');
       if (cached?.data) {
+        // Sanitize stale Rally cache: rawTrackerState may be an object from pre-PAN-201 data
+        if (tracker === 'rally') {
+          cached.data = cached.data.map((issue: any) => {
+            if (typeof issue.rawTrackerState === 'object' && issue.rawTrackerState !== null) {
+              return {
+                ...issue,
+                rawTrackerState: issue.rawTrackerState.Name || issue.rawTrackerState._refObjectName || 'Defined',
+              };
+            }
+            return issue;
+          });
+        }
         this.trackers[tracker].lastFetchedIssues = cached.data;
         this.trackers[tracker].lastFetchedAt = cached.lastFetchedAt;
       }
@@ -754,7 +766,9 @@ export class IssueDataService {
       updatedAt: issue.updatedAt,
       parentRef: issue.parentRef,
       artifactType: issue.artifactType,
-      rawTrackerState: issue.rawState,
+      rawTrackerState: typeof issue.rawState === 'object' && issue.rawState !== null
+        ? (issue.rawState.Name || issue.rawState._refObjectName || 'Defined')
+        : issue.rawState,
       project: projectInfo,
       source: 'rally',
     };
