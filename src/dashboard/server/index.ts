@@ -12069,19 +12069,49 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
     const prd = existsSync(prdPath) ? readFileSync(prdPath, 'utf-8') : null;
     const state = existsSync(statePath) ? readFileSync(statePath, 'utf-8') : null;
 
-    // Read synced discussions for additional context
-    const discussionsDir = join(planningDir, 'discussions');
-    let discussionsContent = '';
-    if (existsSync(discussionsDir)) {
-      const discussionFiles = readdirSync(discussionsDir).filter((f: string) => f.endsWith('.md') || f.endsWith('.txt'));
-      for (const file of discussionFiles.slice(0, 5)) {
-        const content = readFileSync(join(discussionsDir, file), 'utf-8');
-        discussionsContent += `\n### ${file}\n${content.slice(0, 2000)}\n`;
-      }
-    }
+    // Helper to read all files from a planning subdirectory
+    const readPlanningSubdir = (subdir: string, limit = 5, maxPerFile = 2000): string => {
+      const dirPath = join(planningDir, subdir);
+      if (!existsSync(dirPath)) return '';
+      const files = readdirSync(dirPath).filter((f: string) => f.endsWith('.md') || f.endsWith('.txt'));
+      return files.slice(0, limit).map(file => {
+        const content = readFileSync(join(dirPath, file), 'utf-8');
+        return `\n### ${file}\n${content.slice(0, maxPerFile)}\n`;
+      }).join('');
+    };
 
-    if (!prd && !state && !discussionsContent) {
-      return res.status(400).json({ error: 'No PRD, STATE.md, or discussions to review against' });
+    // Gather ALL planning artifacts
+    const discussionsContent = readPlanningSubdir('discussions');
+    const transcriptsContent = readPlanningSubdir('transcripts', 5, 3000);
+    const notesContent = readPlanningSubdir('notes');
+
+    // Get issue data from tracker cache (title, status, assignee, etc.)
+    let issueContext = '';
+    try {
+      const allIssues = issueDataService.getIssues();
+      const issue = allIssues.find((i: any) =>
+        i.identifier === issueId || i.identifier?.toLowerCase() === issueId.toLowerCase()
+      );
+      if (issue) {
+        issueContext = `- **Title**: ${issue.title}\n- **Status**: ${issue.rawTrackerState || issue.status}\n- **Assignee**: ${issue.assignee?.name || 'Unassigned'}\n- **Source**: ${issue.source}`;
+        if (issue.labels?.length) issueContext += `\n- **Labels**: ${issue.labels.join(', ')}`;
+        // For Rally features, include child story summary
+        const children = allIssues.filter((i: any) => i.parentRef === issueId);
+        if (children.length > 0) {
+          const done = children.filter((c: any) => c.status === 'Done').length;
+          const inProgress = children.filter((c: any) => c.status === 'In Progress').length;
+          issueContext += `\n- **Child Stories**: ${children.length} total, ${done} done, ${inProgress} in progress`;
+          issueContext += `\n\n**Story Breakdown:**\n`;
+          for (const child of children.slice(0, 20)) {
+            issueContext += `  - ${child.identifier}: ${child.title} [${child.rawTrackerState || child.status}]\n`;
+          }
+        }
+      }
+    } catch { /* skip if issue data unavailable */ }
+
+    const hasAnyContent = prd || state || discussionsContent || transcriptsContent || notesContent || issueContext;
+    if (!hasAnyContent) {
+      return res.status(400).json({ error: 'No planning artifacts, discussions, transcripts, or issue data to review against' });
     }
 
     // Get git diff summary from workspace
@@ -12118,6 +12148,24 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
     const reviewStatus = centralReviewStatus?.reviewStatus || 'unknown';
     const testStatus = centralReviewStatus?.testStatus || 'unknown';
 
+    // Build a content fingerprint from all inputs to detect changes
+    const { createHash } = await import('crypto');
+    const contentForHash = [prd, state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitLog, filesChanged, reviewStatus, testStatus].filter(Boolean).join('|');
+    const contentHash = createHash('md5').update(contentForHash).digest('hex');
+
+    // Check if we already have a review for this exact content
+    const hashPath = join(planningDir, '.status-review-hash');
+    const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
+    if (existsSync(hashPath) && existsSync(statusReviewPath)) {
+      const savedHash = readFileSync(hashPath, 'utf-8').trim();
+      if (savedHash === contentHash) {
+        const cachedReview = readFileSync(statusReviewPath, 'utf-8');
+        const reviewedAt = statSync(statusReviewPath).mtime.toISOString();
+        console.log(`[status-review] ${issueId}: no changes detected, returning cached review`);
+        return res.json({ success: true, statusReview: cachedReview, reviewedAt, cached: true });
+      }
+    }
+
     const now = new Date().toISOString();
     let review: string;
 
@@ -12126,6 +12174,7 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
       const analysisPrompt = `You are a technical project manager reviewing the implementation progress of a software feature.
 
 ## Issue: ${issueId}
+${issueContext ? `\n${issueContext}\n` : ''}
 
 ## Pipeline Status
 - Review: ${reviewStatus}
@@ -12149,16 +12198,23 @@ ${gitLog || 'No commits yet'}
 ## Discussions & Comments
 ${discussionsContent || '(No discussions synced)'}
 
+## Meeting Transcripts
+${transcriptsContent || '(No transcripts uploaded)'}
+
+## Notes
+${notesContent || '(No notes uploaded)'}
+
 ---
 
-Based on the above, produce a concise status review in markdown format with these sections:
+Based on ALL the above context, produce a concise status review in markdown format with these sections:
 
 1. **Summary** (2-3 sentences: overall progress, what's done, what's remaining)
-2. **PRD Coverage** (which requirements are met, partially met, or not yet started — use a table. If no PRD, summarize based on available context)
-3. **Risk Assessment** (any concerns about code quality, missing tests, incomplete features)
-4. **Recommendation** (next steps, whether it's ready for review/merge, or what needs attention)
+2. **Requirements Coverage** (which requirements are met, partially met, or not yet started — use a table. If no PRD, summarize from discussions/transcripts/issue tracker data)
+3. **Risk Assessment** (any concerns about code quality, missing tests, incomplete features, blockers mentioned in discussions)
+4. **Key Decisions & Context** (important points from discussions, transcripts, or notes that affect the work)
+5. **Recommendation** (next steps, whether it's ready for review/merge, or what needs attention)
 
-Be specific and reference actual file names, requirements, and discussion points. Keep it under 500 words.`;
+Be specific and reference actual file names, requirements, discussion points, and transcript highlights. Keep it under 600 words.`;
 
       const aiReview = await callLLM(analysisPrompt);
       review = `# Status Review - ${issueId}\n\n*AI-Generated: ${now}*\n\n${aiReview}\n\n---\n*Generated by Panopticon Mission Control AI*`;
@@ -12195,14 +12251,21 @@ ${gitLog || 'No commits yet'}
 ## Discussions
 ${discussionsContent || '(No discussions synced)'}
 
+## Transcripts
+${transcriptsContent || '(No transcripts uploaded)'}
+
+## Notes
+${notesContent || '(No notes uploaded)'}
+
+${issueContext ? `## Issue Tracker Data\n${issueContext}\n` : ''}
 ---
 *Review by Panopticon Mission Control (static fallback)*
 `;
     }
 
-    // Write to disk
-    const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
+    // Write review and content hash to disk
     writeFileSync(statusReviewPath, review, 'utf-8');
+    writeFileSync(hashPath, contentHash, 'utf-8');
 
     res.json({ success: true, statusReview: review, reviewedAt: now });
   } catch (error: any) {
