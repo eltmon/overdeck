@@ -12116,6 +12116,7 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
 
     // Get git diff summary from workspace
     let gitDiff = '';
+    let gitDiffFull = '';
     let gitLog = '';
     try {
       const { stdout: diff } = await execAsync(
@@ -12123,6 +12124,15 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
         { encoding: 'utf-8', timeout: 10000 }
       );
       gitDiff = diff.slice(0, 3000);
+    } catch { /* skip */ }
+
+    // Get actual code diff for thorough review against requirements
+    try {
+      const { stdout: fullDiff } = await execAsync(
+        `cd "${workspacePath}" && git diff main 2>/dev/null || git diff HEAD~5 2>/dev/null || echo ""`,
+        { encoding: 'utf-8', timeout: 15000, maxBuffer: 2 * 1024 * 1024 }
+      );
+      gitDiffFull = fullDiff.slice(0, 15000);
     } catch { /* skip */ }
 
     try {
@@ -12150,7 +12160,7 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
 
     // Build a content fingerprint from all inputs to detect changes
     const { createHash } = await import('crypto');
-    const contentForHash = [prd, state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitLog, filesChanged, reviewStatus, testStatus].filter(Boolean).join('|');
+    const contentForHash = [prd, state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitDiffFull, gitLog, filesChanged, reviewStatus, testStatus].filter(Boolean).join('|');
     const contentHash = createHash('md5').update(contentForHash).digest('hex');
 
     // Check if we already have a review for this exact content
@@ -12171,7 +12181,7 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
 
     // Try AI-powered analysis
     try {
-      const analysisPrompt = `You are a technical project manager reviewing the implementation progress of a software feature.
+      const analysisPrompt = `You are a senior technical project manager producing an executive-quality status review of a software feature. This review will be read by engineering leadership and executives to understand the current state of this work.
 
 ## Issue: ${issueId}
 ${issueContext ? `\n${issueContext}\n` : ''}
@@ -12181,16 +12191,19 @@ ${issueContext ? `\n${issueContext}\n` : ''}
 - Tests: ${testStatus}
 
 ## PRD (Product Requirements Document)
-${prd ? prd.slice(0, 4000) : '(No PRD available)'}
+${prd ? prd.slice(0, 5000) : '(No PRD available)'}
 
 ## STATE.md (Agent Progress Notes)
-${state ? state.slice(0, 3000) : '(No STATE.md available)'}
+${state ? state.slice(0, 4000) : '(No STATE.md available)'}
 
 ## Files Changed
 ${filesChanged || 'No changes detected'}
 
-## Git Diff Summary
+## Git Diff Summary (stats)
 ${gitDiff || 'No diff available'}
+
+## Actual Code Changes
+${gitDiffFull || '(No code diff available)'}
 
 ## Recent Commits
 ${gitLog || 'No commits yet'}
@@ -12206,22 +12219,33 @@ ${notesContent || '(No notes uploaded)'}
 
 ---
 
-Based on ALL the above context, produce a concise status review in markdown format with these sections:
+**IMPORTANT**: Perform a THOROUGH analysis. Cross-reference the actual code changes against the PRD requirements, discussions, and transcripts. Don't just summarize — evaluate whether the implementation correctly addresses each requirement.
 
-1. **Summary** (2-3 sentences: overall progress, what's done, what's remaining)
-2. **Requirements Coverage** (which requirements are met, partially met, or not yet started — use a table. If no PRD, summarize from discussions/transcripts/issue tracker data)
-3. **Risk Assessment** (any concerns about code quality, missing tests, incomplete features, blockers mentioned in discussions)
-4. **Key Decisions & Context** (important points from discussions, transcripts, or notes that affect the work)
-5. **Recommendation** (next steps, whether it's ready for review/merge, or what needs attention)
+Produce a comprehensive status review in markdown format with these sections:
 
-Be specific and reference actual file names, requirements, discussion points, and transcript highlights. Keep it under 600 words.`;
+1. **Summary** (2-3 sentences: overall progress, percentage complete estimate, what's done, what's remaining)
+2. **Requirements Coverage** (cross-reference EACH PRD requirement against the actual code changes — which requirements are fully implemented, partially implemented, or not yet started. Use a table with columns: Requirement | Status | Evidence. If no PRD, infer requirements from discussions/transcripts/issue tracker data)
+3. **Code Quality Assessment** (based on actual code changes: are there any concerns about implementation quality, error handling, test coverage, missing edge cases, security issues?)
+4. **Risk Assessment** (blockers, missing tests, incomplete features, concerns from discussions, timeline risks)
+5. **Key Decisions & Context** (important points from discussions, transcripts, or notes that affect the work — decisions made, open questions, stakeholder feedback)
+6. **Recommendation** (specific next steps, whether it's ready for review/merge, or exactly what needs attention before it can progress)
+
+Be specific: reference actual file names, function names, requirement text, discussion quotes, and transcript highlights. This review should give a reader who hasn't seen the code a clear picture of exactly where things stand.`;
 
       // Use claude CLI in print mode (uses user's configured auth)
+      // Check API settings overrides first (Settings UI), then fall back to settings.ts
+      const apiSettings = loadSettingsApi();
+      const statusModelId = (apiSettings.models?.overrides as Record<string, string>)?.['status-review']
+        || loadSettings().models.status_review
+        || 'claude-sonnet-4-5';
+      const { command: cliCmd, args: cliArgs } = getAgentCommand(statusModelId);
+      const modelFlag = cliArgs.length > 0 ? ` ${cliArgs.join(' ')}` : '';
       const promptFile = join(planningDir, '.status-review-prompt.tmp');
       writeFileSync(promptFile, analysisPrompt, 'utf-8');
+      console.log(`[status-review] ${issueId}: generating with ${cliCmd}${modelFlag}`);
       try {
         const { stdout: aiReview } = await execAsync(
-          `cat "${promptFile}" | claude -p --model haiku --no-session-persistence`,
+          `cat "${promptFile}" | ${cliCmd} -p${modelFlag} --no-session-persistence`,
           { encoding: 'utf-8', timeout: 120000, maxBuffer: 1024 * 1024 }
         );
         review = `# Status Review - ${issueId}\n\n*AI-Generated: ${now}*\n\n${aiReview.trim()}\n\n---\n*Generated by Panopticon Mission Control AI*`;
