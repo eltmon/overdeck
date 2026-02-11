@@ -28,6 +28,7 @@ export type ComplexityModels = {
 export interface ModelsConfig {
   specialists: SpecialistModels;
   planning_agent: ModelId;
+  status_review: ModelId;
   complexity: ComplexityModels;
 }
 
@@ -54,6 +55,7 @@ const DEFAULT_SETTINGS: SettingsConfig = {
       merge_agent: 'kimi-k2.5',
     },
     planning_agent: 'kimi-k2.5',
+    status_review: 'claude-sonnet-4-5',
     complexity: {
       trivial: 'kimi-k2.5',
       simple: 'kimi-k2.5',
