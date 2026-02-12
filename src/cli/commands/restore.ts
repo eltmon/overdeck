@@ -2,8 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { listBackups, restoreBackup } from '../../lib/backup.js';
-import { loadConfig } from '../../lib/config.js';
-import { SYNC_TARGETS, Runtime } from '../../lib/paths.js';
+import { SYNC_TARGET } from '../../lib/paths.js';
 
 export async function restoreCommand(timestamp?: string): Promise<void> {
   const backups = listBackups();
@@ -60,19 +59,13 @@ export async function restoreCommand(timestamp?: string): Promise<void> {
   const spinner = ora('Restoring backup...').start();
 
   try {
-    const config = loadConfig();
-    const targets = config.sync.targets as Runtime[];
-
-    // Build target dirs map
-    const targetDirs: Record<string, string> = {};
-
-    for (const runtime of targets) {
-      targetDirs[`${runtime}-skills`] = SYNC_TARGETS[runtime].skills;
-      targetDirs[`${runtime}-commands`] = SYNC_TARGETS[runtime].commands;
-      // Also try simple names for backwards compatibility
-      targetDirs['skills'] = SYNC_TARGETS[runtime].skills;
-      targetDirs['commands'] = SYNC_TARGETS[runtime].commands;
-    }
+    // Build target dirs map (Claude Code only)
+    const targetDirs: Record<string, string> = {
+      'claude-skills': SYNC_TARGET.skills,
+      'claude-commands': SYNC_TARGET.commands,
+      'skills': SYNC_TARGET.skills,
+      'commands': SYNC_TARGET.commands,
+    };
 
     restoreBackup(timestamp!, targetDirs);
 

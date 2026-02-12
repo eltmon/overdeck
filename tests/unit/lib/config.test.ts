@@ -36,7 +36,6 @@ describe.skip('config', () => {
     it('should have correct default values', () => {
       const config = getDefaultConfig();
 
-      expect(config.sync.targets).toContain('claude');
       expect(config.sync.backup_before_sync).toBe(true);
       expect(config.trackers.primary).toBe('linear');
       expect(config.dashboard.port).toBe(3001);
@@ -66,7 +65,6 @@ describe.skip('config', () => {
 version = "2.0.0"
 
 [sync]
-targets = ["claude", "codex"]
 backup_before_sync = false
 
 [trackers]
@@ -81,7 +79,6 @@ api_port = 4001
       const config = loadConfig();
 
       expect(config.panopticon.version).toBe('2.0.0');
-      expect(config.sync.targets).toEqual(['claude', 'codex']);
       expect(config.sync.backup_before_sync).toBe(false);
       expect(config.trackers.primary).toBe('github');
       expect(config.dashboard.port).toBe(4000);
@@ -98,7 +95,7 @@ port = 5000
 
       expect(config.dashboard.port).toBe(5000);
       // Default values should still be present
-      expect(config.sync.targets).toContain('claude');
+      expect(config.sync.backup_before_sync).toBe(true);
     });
 
     it('should return defaults on invalid TOML', () => {

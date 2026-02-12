@@ -83,7 +83,6 @@ export interface PanopticonConfig {
     version: string;
   };
   sync: {
-    targets: string[];  // 'claude', 'codex', 'cursor', 'gemini'
     backup_before_sync: boolean;
     auto_sync?: boolean;
     strategy?: 'symlink' | 'copy';
@@ -108,7 +107,6 @@ const DEFAULT_CONFIG: PanopticonConfig = {
     version: '1.0.0',
   },
   sync: {
-    targets: ['claude'],
     backup_before_sync: true,
     auto_sync: false,
     strategy: 'symlink',

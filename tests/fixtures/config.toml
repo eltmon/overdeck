@@ -4,7 +4,6 @@
 version = "1.0.0"
 
 [sync]
-targets = ["claude", "codex"]
 backup_before_sync = true
 auto_sync = false
 strategy = "symlink"
