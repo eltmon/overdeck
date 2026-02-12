@@ -23,7 +23,7 @@ describe('config', () => {
       const config = getDefaultConfig();
 
       expect(config.panopticon.version).toBe('1.0.0');
-      expect(config.sync.targets).toContain('claude');
+      expect(config.sync.backup_before_sync).toBe(true);
       expect(config.sync.backup_before_sync).toBe(true);
       expect(config.trackers.primary).toBe('linear');
       expect(config.dashboard.port).toBe(3010);

@@ -1,9 +1,7 @@
 /**
  * Cloister Runtime Abstraction
  *
- * Types for agent health monitoring across different AI coding assistants.
- * This is separate from the general RuntimeAdapter (src/lib/runtime/) which handles
- * skill syncing and general runtime management.
+ * Types for agent health monitoring for Claude Code.
  *
  * Cloister's runtime abstraction focuses on:
  * - Health monitoring (heartbeats, activity detection)
@@ -15,7 +13,7 @@
 /**
  * Supported runtime types for agent execution
  */
-export type RuntimeName = 'claude-code' | 'opencode' | 'codex';
+export type RuntimeName = 'claude-code';
 
 /**
  * Health state of an agent
@@ -107,7 +105,7 @@ export interface Agent {
 /**
  * Runtime abstraction for agent health monitoring
  *
- * Each runtime (Claude Code, OpenCode, Codex) implements this interface
+ * Claude Code implements this interface
  * to provide Cloister with health monitoring capabilities.
  */
 export interface AgentRuntime {
@@ -125,9 +123,6 @@ export interface AgentRuntime {
    * @example
    * // Claude Code
    * "/home/user/.claude/projects/workspace-123/sessions/abc123.jsonl"
-   *
-   * // OpenCode
-   * "/home/user/.local/share/opencode/sessions/xyz789/"
    */
   getSessionPath(agentId: string): string | null;
 
@@ -136,8 +131,7 @@ export interface AgentRuntime {
    *
    * This is used for passive heartbeat detection (no agent modification needed).
    * Common sources:
-   * - JSONL file modification time (Claude Code, Codex)
-   * - SQLite database last update (OpenCode)
+   * - JSONL file modification time
    * - Tmux window activity
    * - Git commits in workspace
    *

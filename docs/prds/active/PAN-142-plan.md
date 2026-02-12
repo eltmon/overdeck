@@ -1,22 +1,5 @@
 # PAN-142: Consolidate to Claude Code Only - Remove Multi-Runtime Support
 
-## Implementation Status: COMPLETE
-
-All planned work has been implemented:
-
-1. **paths.ts** - Removed CODEX_DIR/CURSOR_DIR/GEMINI_DIR/OPENCODE_DIR, replaced SYNC_TARGETS with SYNC_TARGET (single claude), added LEGACY_RUNTIME_DIRS for cleanup migration
-2. **sync.ts** - Removed Runtime parameter from planSync()/executeSync(), uses SYNC_TARGET directly
-3. **sync CLI command** - Removed runtime loop, syncs directly to Claude Code
-4. **Runtime adapters** - Deleted codex.ts, cursor.ts, gemini.ts; simplified runtime/interface.ts and runtime/index.ts to claude-only
-5. **Cloister RuntimeName** - Consolidated to 'claude-code' only in runtimes/types.ts and runtimes/index.ts
-6. **CLI flags** - Removed --runtime from work/index.ts, cleaned up issue.ts
-7. **Config** - Removed targets from PanopticonConfig sync interface, added cleanupLegacyRuntimeSymlinks() and migrateSyncTargets() to config-migration.ts
-8. **restore.ts** - Updated to use SYNC_TARGET instead of SYNC_TARGETS
-9. **Tests** - Updated paths, config, sync tests and fixtures; removed targets references
-10. **Documentation** - Updated PRD.md and PRD-CLOISTER.md to remove multi-runtime references
-
-TypeScript compilation passes cleanly. Test suite: 1126 passing, 2 pre-existing failures (unrelated tracker/factory tests).
-
 ## Context
 
 Panopticon was originally designed to support multiple AI coding tools (Claude Code, Codex, Cursor, Gemini, OpenCode) with a unified sync system. This added significant complexity:
@@ -250,16 +233,16 @@ export function cleanupLegacyRuntimeSymlinks(): CleanupResult {
 
 ## Acceptance Criteria
 
-- [x] Only `claude` sync target remains in codebase
-- [x] `CODEX_DIR`, `CURSOR_DIR`, `GEMINI_DIR`, `OPENCODE_DIR` removed from paths.ts
-- [x] Runtime adapter files (codex.ts, cursor.ts, gemini.ts) deleted
-- [x] `RuntimeName` type in Cloister only includes 'claude-code'
-- [x] `--runtime` flag removed from CLI commands
-- [x] Config migration strips `[sync].targets` field
-- [x] Symlink cleanup removes Panopticon-managed links in legacy runtime dirs
-- [x] All tests pass with updated fixtures (2 pre-existing failures unrelated to PAN-142)
-- [x] Documentation updated to reflect claude-only approach
-- [x] No references to codex/cursor/gemini/opencode as runtimes (model references intentionally preserved)
+- [ ] Only `claude` sync target remains in codebase
+- [ ] `CODEX_DIR`, `CURSOR_DIR`, `GEMINI_DIR`, `OPENCODE_DIR` removed from paths.ts
+- [ ] Runtime adapter files (codex.ts, cursor.ts, gemini.ts) deleted
+- [ ] `RuntimeName` type in Cloister only includes 'claude-code'
+- [ ] `--runtime` flag removed from CLI commands
+- [ ] Config migration strips `[sync].targets` field
+- [ ] Symlink cleanup removes Panopticon-managed links in legacy runtime dirs
+- [ ] All tests pass with updated fixtures
+- [ ] Documentation updated to reflect claude-only approach
+- [ ] No references to codex/cursor/gemini/opencode in codebase (except in comments explaining removal)
 
 ## Risks and Mitigations
 

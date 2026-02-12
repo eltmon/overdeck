@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync } from 'fs';
 import { join, basename } from 'path';
-import { SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SYNC_TARGETS, isDevMode, type Runtime } from './paths.js';
+import { SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SYNC_TARGET, isDevMode } from './paths.js';
 
 export interface SyncItem {
   name: string;
@@ -10,7 +10,6 @@ export interface SyncItem {
 }
 
 export interface SyncPlan {
-  runtime: Runtime;
   skills: SyncItem[];
   commands: SyncItem[];
   agents: SyncItem[];
@@ -52,13 +51,8 @@ export function isPanopticonSymlink(targetPath: string): boolean {
 /**
  * Plan what would be synced (dry run)
  */
-export function planSync(runtime: Runtime): SyncPlan {
-  const targets = SYNC_TARGETS[runtime];
-  if (!targets) {
-    throw new Error(`Unknown sync target "${runtime}". Valid targets: ${Object.keys(SYNC_TARGETS).join(', ')}`);
-  }
+export function planSync(): SyncPlan {
   const plan: SyncPlan = {
-    runtime,
     skills: [],
     commands: [],
     agents: [],
@@ -72,7 +66,7 @@ export function planSync(runtime: Runtime): SyncPlan {
 
     for (const skill of skills) {
       const sourcePath = join(SKILLS_DIR, skill.name);
-      const targetPath = join(targets.skills, skill.name);
+      const targetPath = join(SYNC_TARGET.skills, skill.name);
 
       let status: SyncItem['status'] = 'new';
 
@@ -95,7 +89,7 @@ export function planSync(runtime: Runtime): SyncPlan {
 
     for (const skill of devSkills) {
       const sourcePath = join(SOURCE_DEV_SKILLS_DIR, skill.name);
-      const targetPath = join(targets.skills, skill.name);
+      const targetPath = join(SYNC_TARGET.skills, skill.name);
 
       let status: SyncItem['status'] = 'new';
 
@@ -118,7 +112,7 @@ export function planSync(runtime: Runtime): SyncPlan {
 
     for (const cmd of commands) {
       const sourcePath = join(COMMANDS_DIR, cmd.name);
-      const targetPath = join(targets.commands, cmd.name);
+      const targetPath = join(SYNC_TARGET.commands, cmd.name);
 
       let status: SyncItem['status'] = 'new';
 
@@ -141,7 +135,7 @@ export function planSync(runtime: Runtime): SyncPlan {
 
     for (const agent of agents) {
       const sourcePath = join(AGENTS_DIR, agent.name);
-      const targetPath = join(targets.agents, agent.name);
+      const targetPath = join(SYNC_TARGET.agents, agent.name);
 
       let status: SyncItem['status'] = 'new';
 
@@ -172,14 +166,10 @@ export interface SyncResult {
 }
 
 /**
- * Execute sync for a runtime
+ * Execute sync to Claude Code
  */
-export function executeSync(runtime: Runtime, options: SyncOptions = {}): SyncResult {
-  const targets = SYNC_TARGETS[runtime];
-  if (!targets) {
-    throw new Error(`Unknown sync target "${runtime}". Valid targets: ${Object.keys(SYNC_TARGETS).join(', ')}`);
-  }
-  const plan = planSync(runtime);
+export function executeSync(options: SyncOptions = {}): SyncResult {
+  const plan = planSync();
   const result: SyncResult = {
     created: [],
     skipped: [],
@@ -187,9 +177,9 @@ export function executeSync(runtime: Runtime, options: SyncOptions = {}): SyncRe
   };
 
   // Ensure target directories exist
-  mkdirSync(targets.skills, { recursive: true });
-  mkdirSync(targets.commands, { recursive: true });
-  mkdirSync(targets.agents, { recursive: true });
+  mkdirSync(SYNC_TARGET.skills, { recursive: true });
+  mkdirSync(SYNC_TARGET.commands, { recursive: true });
+  mkdirSync(SYNC_TARGET.agents, { recursive: true });
 
   // Process skills
   for (const item of plan.skills) {

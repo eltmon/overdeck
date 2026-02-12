@@ -1,4 +1,4 @@
-# Planning Session: PAN-166
+# Planning Session: PAN-142
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,64 +22,36 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-166
-- **Title:** Rally tracker: WSAPI query parse error on IssueDataService poll
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/166
+- **ID:** PAN-142
+- **Title:** PAN-141: Remove opencode, codex, cursor, gemini sync targets - consolidate on Claude Code only
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/142
 
 ## Description
-## Bug Report
+## Summary
 
-**Version:** panopticon-cli v0.4.9  
-**Tracker:** Rally (WSAPI)
+We've decided to use Claude Code as the sole AI coding tool, with claude-code-router handling alternative models. The multi-runtime sync support (opencode, codex, cursor, gemini) is no longer needed and adds maintenance burden.
 
-## Description
+## What to remove
 
-When the Rally tracker is configured as the primary tracker, the `IssueDataService` background poller fails repeatedly with a WSAPI query parse error:
+- **`src/lib/paths.ts`**: Remove `CODEX_DIR`, `CURSOR_DIR`, `GEMINI_DIR`, `OPENCODE_DIR` and their `SYNC_TARGETS` entries. Keep only `claude`.
+- **`src/lib/sync.ts`**: Simplify — no longer need to handle multiple runtimes
+- **`src/cli/commands/sync.ts`**: Simplify runtime loop (or remove it entirely since there's only one target)
+- **`~/.panopticon/config.toml`**: `targets` field becomes unnecessary (always claude)
+- **Clean up `~/.opencode/skills/`** etc. — remove any synced symlinks
 
-```
-[IssueDataService] Rally poll error: Rally API query failed: Could not parse: Error parsing expression -- expected ")" but saw "AND" instead.
-```
+## Context
 
-This error repeats on every poll cycle, resulting in no issues being displayed in the dashboard.
+- Alternative models are accessed via [claude-code-router](https://github.com/musistudio/claude-code-router), not separate tools
+- opencode, codex, cursor, gemini targets were aspirational but we've standardized on Claude Code
+- Simplifying this reduces code surface and config confusion
+- The crash fixed in 843ad26 was caused by opencode being in config but not in SYNC_TARGETS — removing multi-target eliminates this class of bug entirely
 
-## Configuration
+## Acceptance Criteria
 
-```toml
-[trackers]
-primary = "rally"
-
-  [trackers.rally]
-  type = "rally"
-  api_key_env = "RALLY_API_KEY"
-  server = "https://rally1.rallydev.com"
-```
-
-- API key is valid and loaded (confirmed via `api/settings` endpoint showing `tracker_keys.rally`)
-- No `workspace` or `project` specified in config (may be contributing to malformed query)
-- Two projects registered in `projects.yaml` (HSv3, HS POS Integrations)
-
-## Root Cause (Suspected)
-
-The Rally WSAPI query filter is being constructed with incorrect parenthesization. Rally's WSAPI requires nested parentheses for compound AND/OR expressions, e.g.:
-
-```
-((State = "In-Progress") AND (Project.Name = "Foo"))
-```
-
-The query builder appears to be generating a flat expression that the WSAPI parser rejects.
-
-## Steps to Reproduce
-
-1. `pan install` (v0.4.9)
-2. Configure Rally as primary tracker in `config.toml`
-3. Set `RALLY_API_KEY` in `~/.panopticon.env`
-4. `pan up`
-5. Observe repeated error in server logs
-6. `curl http://localhost:3011/api/issues` returns `[]`
-
-## Expected Behavior
-
-Issues from the configured Rally workspace/project should be fetched and displayed in the dashboard.
+- [ ] Only `claude` sync target remains
+- [ ] Config `[sync].targets` is either removed or defaults to `["claude"]` 
+- [ ] Synced symlinks in `~/.opencode/`, `~/.codex/`, `~/.cursor/`, `~/.gemini/` are cleaned up
+- [ ] Tests updated
 
 ---
 
