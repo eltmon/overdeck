@@ -14,18 +14,19 @@ import { MODEL_CAPABILITIES, getModelCapability } from './model-capabilities.js'
 
 /**
  * Optimal model defaults based on research (see docs/MODEL_RECOMMENDATIONS.md)
- * - Opus 4.6: Critical thinking tasks (exploration, planning, security review)
- * - Sonnet 4.5: Quality implementation tasks (coding, testing, documentation)
+ * - Opus 4.6: Critical thinking tasks (planning, PRDs, security review, exploration)
+ * - Kimi K2.5: Implementation work agent (76.8% SWE-bench, excellent value)
+ * - Sonnet 4.5: Quality specialist tasks (review responses, testing, documentation)
  * - Haiku 4.5: Speed-critical tasks (subagents, triage, quick CLI)
  */
 export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
   return {
-    // High-complexity phases - Opus 4.6 for deep analysis
+    // High-complexity phases - Opus 4.6 for deep analysis and planning
     'issue-agent:exploration': 'claude-opus-4-6',
     'issue-agent:planning': 'claude-opus-4-6',
 
-    // Implementation phases - Sonnet 4.5 for best coding quality (82% SWE-bench)
-    'issue-agent:implementation': 'claude-sonnet-4-5',
+    // Implementation phases - Kimi K2.5 for excellent coding at great value
+    'issue-agent:implementation': 'kimi-k2.5',
     'issue-agent:testing': 'claude-sonnet-4-5',
     'issue-agent:documentation': 'claude-sonnet-4-5',
     'issue-agent:review-response': 'claude-sonnet-4-5',
@@ -47,11 +48,11 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'subagent:bash': 'claude-haiku-4-5',
     'subagent:general-purpose': 'claude-sonnet-4-5',
 
-    // Workflow agents - balanced choices
-    'prd-agent': 'claude-sonnet-4-5',
+    // Workflow agents - Opus for planning/PRDs, Haiku for speed tasks
+    'prd-agent': 'claude-opus-4-6',
     'decomposition-agent': 'claude-haiku-4-5',
     'triage-agent': 'claude-haiku-4-5',
-    'planning-agent': 'claude-sonnet-4-5',
+    'planning-agent': 'claude-opus-4-6',
 
     // CLI modes - speed for quick, quality for interactive
     'cli:interactive': 'claude-sonnet-4-5',
@@ -276,7 +277,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         openai: false,
         google: false,
         zai: false,
-        kimi: false,
+        kimi: true, // Kimi K2.5 used for implementation work agent
       },
       overrides: getOptimalModelDefaults(),
       gemini_thinking_level: 3,
