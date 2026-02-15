@@ -25,10 +25,12 @@ http:
       tls: {}
 
   services:
+    # Both frontend and API are served by the same Express server on the API port.
+    # The bundled dashboard serves static files alongside the API.
     panopticon-frontend:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:{{DASHBOARD_PORT}}"
+          - url: "http://host.docker.internal:{{DASHBOARD_API_PORT}}"
 
     panopticon-api:
       loadBalancer:

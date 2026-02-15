@@ -4,9 +4,9 @@ services:
     container_name: panopticon-traefik
     restart: unless-stopped
     ports:
-      - "8081:80"     # HTTP (redirects to HTTPS)
-      - "8443:443"    # HTTPS
-      - "8082:8080"   # Traefik Dashboard
+      - "80:80"       # HTTP (redirects to HTTPS)
+      - "443:443"     # HTTPS
+      - "8080:8080"   # Traefik Dashboard
     volumes:
       # Traefik configuration
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
