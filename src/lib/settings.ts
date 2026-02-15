@@ -46,22 +46,22 @@ export interface SettingsConfig {
   api_keys: ApiKeysConfig;
 }
 
-// Default settings (Kimi K2.5 for all work types)
+// Default settings - match optimal defaults from settings-api.ts
 const DEFAULT_SETTINGS: SettingsConfig = {
   models: {
     specialists: {
-      review_agent: 'kimi-k2.5',
-      test_agent: 'kimi-k2.5',
-      merge_agent: 'kimi-k2.5',
+      review_agent: 'claude-opus-4-6',
+      test_agent: 'claude-sonnet-4-5',
+      merge_agent: 'claude-sonnet-4-5',
     },
-    planning_agent: 'kimi-k2.5',
-    status_review: 'claude-sonnet-4-5',
+    planning_agent: 'claude-opus-4-6',
+    status_review: 'claude-opus-4-6',
     complexity: {
-      trivial: 'kimi-k2.5',
-      simple: 'kimi-k2.5',
+      trivial: 'claude-haiku-4-5',
+      simple: 'claude-haiku-4-5',
       medium: 'kimi-k2.5',
       complex: 'kimi-k2.5',
-      expert: 'kimi-k2.5',
+      expert: 'claude-opus-4-6',
     },
   },
   api_keys: {},
