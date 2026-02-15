@@ -272,15 +272,21 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     enabled: !!agent,
   });
 
+  // Track workspace creation in-flight state for faster polling
+  const [workspaceCreating, setWorkspaceCreating] = useState(false);
+
   // Fetch workspace info for container status
   const { data: workspace } = useQuery<WorkspaceInfo>({
     queryKey: ['workspace', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}`);
       if (!res.ok) throw new Error('Failed to fetch workspace info');
-      return res.json();
+      const data = await res.json();
+      // Clear creating state once workspace exists
+      if (data.exists && workspaceCreating) setWorkspaceCreating(false);
+      return data;
     },
-    refetchInterval: 5000, // Check for container changes
+    refetchInterval: workspaceCreating ? 2000 : 5000, // Poll faster during creation
   });
 
   // Fetch review status
@@ -343,6 +349,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
       return res.json();
     },
     onSuccess: () => {
+      setWorkspaceCreating(true);
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
     },
   });
@@ -1262,14 +1269,12 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                     disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
                     className="flex items-center gap-1 px-2 py-1 text-xs bg-surface-overlay text-content rounded hover:bg-surface-emphasis disabled:opacity-50 border border-divider-strong"
                   >
-                    {createWorkspaceMutation.isPending ? (
+                    {(createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess) ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : createWorkspaceMutation.isSuccess ? (
-                      <Check className="w-3 h-3" />
                     ) : (
                       <FolderPlus className="w-3 h-3" />
                     )}
-                    {createWorkspaceMutation.isPending ? 'Creating...' : createWorkspaceMutation.isSuccess ? 'Created!' : 'Create Workspace'}
+                    {createWorkspaceMutation.isPending ? 'Creating...' : createWorkspaceMutation.isSuccess ? 'Setting up...' : 'Create Workspace'}
                   </button>
                 )}
               </>
@@ -1586,15 +1591,12 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                     disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-surface-overlay text-content rounded-lg hover:bg-surface-emphasis transition-colors border border-divider-strong disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {createWorkspaceMutation.isPending ? (
+                    {(createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess) ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <span className="font-medium">Creating...</span>
-                      </>
-                    ) : createWorkspaceMutation.isSuccess ? (
-                      <>
-                        <Check className="w-5 h-5" />
-                        <span className="font-medium">Workspace Created!</span>
+                        <span className="font-medium">
+                          {createWorkspaceMutation.isPending ? 'Creating workspace...' : 'Setting up git worktree & skills...'}
+                        </span>
                       </>
                     ) : (
                       <>
