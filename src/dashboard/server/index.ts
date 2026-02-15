@@ -12043,6 +12043,9 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
     };
 
     if (!existsSync(planningDir)) {
+      // No workspace .planning dir - still check docs/prds/active/ for PRD
+      const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
+      if (existsSync(activePrdPath)) result.prd = readFileSync(activePrdPath, 'utf-8');
       return res.json(result);
     }
 
@@ -12068,6 +12071,12 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
     if (!result.prd) {
       const promptPath = join(planningDir, 'PLANNING_PROMPT.md');
       if (existsSync(promptPath)) result.prd = readFileSync(promptPath, 'utf-8');
+    }
+
+    // Check docs/prds/active/ as fallback for PRD (where plan endpoint writes them)
+    if (!result.prd) {
+      const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
+      if (existsSync(activePrdPath)) result.prd = readFileSync(activePrdPath, 'utf-8');
     }
 
     // Read subdirectory artifacts
