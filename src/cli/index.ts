@@ -58,7 +58,7 @@ const program = new Command();
 program
   .name('pan')
   .description('Multi-agent orchestration for AI coding assistants')
-  .version('0.1.3');
+  .version(JSON.parse(readFileSync(join(import.meta.dirname, '../../package.json'), 'utf-8')).version);
 
 program
   .command('init')
