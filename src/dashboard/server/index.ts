@@ -1369,13 +1369,41 @@ app.post('/api/issues/:id/plan', async (req, res) => {
     writeSync(statePath, stateContent.join('\n'));
     writeSync(workspacePath, workspaceContent.join('\n'));
 
-    // Copy to PRD directory
+    // Copy to PRD directory and commit+push to preserve the plan
     let prdPath: string | undefined;
+    let prdCommitted = false;
     try {
       const prdDir = join(projectPath, 'docs', 'prds', 'active');
       mkdirSync(prdDir, { recursive: true });
       prdPath = join(prdDir, `${issue.identifier.toLowerCase()}-plan.md`);
       writeSync(prdPath, stateContent.join('\n'));
+
+      // Commit and push PRD immediately so it's preserved in the repo (PAN-47)
+      try {
+        await execAsync(`git add docs/prds/active/${issue.identifier.toLowerCase()}-plan.md`, {
+          cwd: projectPath,
+          encoding: 'utf-8'
+        });
+        // Check if there are staged changes (file might already be committed)
+        try {
+          await execAsync(`git diff --cached --quiet`, { cwd: projectPath, encoding: 'utf-8' });
+          // No changes - PRD already committed
+          console.log(`[plan] PRD already committed for ${issue.identifier}`);
+        } catch {
+          // Changes exist, commit them
+          await execAsync(`git commit -m "docs: add ${issue.identifier} PRD to active"`, {
+            cwd: projectPath,
+            encoding: 'utf-8'
+          });
+          // Push in background (non-blocking)
+          const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
+          pushChild.unref();
+          prdCommitted = true;
+          console.log(`[plan] Committed and pushed PRD for ${issue.identifier}`);
+        }
+      } catch (gitErr: any) {
+        console.warn(`[plan] Could not commit PRD (non-fatal): ${gitErr.message}`);
+      }
     } catch {
       // PRD copy is optional
     }
@@ -1436,6 +1464,7 @@ app.post('/api/issues/:id/plan', async (req, res) => {
         workspace: workspacePath.replace(projectPath, '.'),
         prd: prdPath ? prdPath.replace(projectPath, '.') : undefined,
       },
+      prdCommitted,
       beads: beadsResult,
     });
   } catch (error: any) {
@@ -7295,6 +7324,27 @@ app.post('/api/agents', async (req, res) => {
     // Extract prefix from issue ID (e.g., "MIN" from "MIN-645")
     const issuePrefix = issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
+
+    // SAFEGUARD: Warn if no PRD exists for this issue (PAN-47)
+    // Issues should go through planning before work begins
+    const prdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
+    const hasPrd = existsSync(prdPath);
+    if (!hasPrd) {
+      console.warn(`[start-agent] WARNING: No PRD found for ${issueId} at ${prdPath}`);
+      // Check if there's a completed PRD (issue was already worked on before)
+      const completedPrdPath = join(projectPath, 'docs', 'prds', 'completed', `${issueLower}-plan.md`);
+      const hasCompletedPrd = existsSync(completedPrdPath);
+      if (!hasCompletedPrd) {
+        // No PRD at all - block agent start
+        return res.status(422).json({
+          error: `No PRD found for ${issueId}. Run planning first to create a PRD before starting work.`,
+          hint: 'Use "Start Planning" to create a plan/PRD, then "Complete Planning" before starting the work agent.',
+          issueId,
+        });
+      }
+      // Has completed PRD - allow (re-work scenario)
+      console.log(`[start-agent] Found completed PRD for ${issueId}, allowing agent start (re-work scenario)`);
+    }
 
     // Before starting agent, commit and push any planning artifacts
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
