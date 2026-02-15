@@ -37,6 +37,7 @@ import { BeadsDialog } from './BeadsDialog';
 interface ContainerStatus {
   running: boolean;
   uptime: string | null;
+  status?: string; // 'running' | 'exited(N)' | 'created' | undefined (not found)
 }
 
 interface PendingOperation {
@@ -275,6 +276,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
   // Track workspace creation and container starting in-flight states
   const [workspaceCreating, setWorkspaceCreating] = useState(false);
   const [containersStarting, setContainersStarting] = useState(false);
+  const [containersStartedAt, setContainersStartedAt] = useState(0);
 
   // Fetch workspace info for container status
   const { data: workspace } = useQuery<WorkspaceInfo>({
@@ -285,10 +287,14 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
       const data = await res.json();
       // Clear creating state once workspace exists
       if (data.exists && workspaceCreating) setWorkspaceCreating(false);
-      // Clear starting state once all containers are running
+      // Clear starting state once containers have settled (all running, or some failed after grace period)
       if (containersStarting && data.containers) {
-        const allRunning = Object.values(data.containers as Record<string, ContainerStatus>).every(c => c.running);
-        if (allRunning) setContainersStarting(false);
+        const statuses = Object.values(data.containers as Record<string, ContainerStatus>);
+        const allRunning = statuses.every(c => c.running);
+        const elapsed = Date.now() - containersStartedAt;
+        const gracePeriodPassed = elapsed > 20000; // 20s grace period for containers to restart
+        const anyFailed = statuses.some(c => c.status?.startsWith('exited'));
+        if (allRunning || (gracePeriodPassed && anyFailed)) setContainersStarting(false);
       }
       return data;
     },
@@ -374,9 +380,12 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     },
     onSuccess: () => {
       setContainersStarting(true);
+      setContainersStartedAt(Date.now());
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       }, 5000);
+      // Safety timeout: clear starting state after 90s even if containers haven't settled
+      setTimeout(() => setContainersStarting(false), 90000);
     },
   });
 
@@ -1041,8 +1050,9 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
             </div>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(workspace.containers).map(([name, status]) => {
-                const isStarting = (startContainersMutation.isPending || containersStarting) && !status.running;
+                const isStarting = (startContainersMutation.isPending || containersStarting) && !status.running && !status.status?.startsWith('exited');
                 const isControlling = containerControlMutation.isPending && containerMenu?.containerName === name;
+                const isFailed = status.status?.startsWith('exited') && !status.running;
                 return (
                   <span
                     key={name}
@@ -1050,11 +1060,13 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                     className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] cursor-context-menu select-none ${
                       status.running
                         ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50'
+                        : isFailed
+                        ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50'
                         : isStarting || isControlling
                         ? 'bg-yellow-900/30 text-yellow-400 animate-pulse'
                         : 'bg-surface-overlay text-content-muted hover:bg-surface-emphasis'
                     }`}
-                    title="Right-click for start/stop/restart options"
+                    title={isFailed ? `Container ${status.status} — right-click for options` : 'Right-click for start/stop/restart options'}
                   >
                     {isStarting || isControlling ? (
                       <Loader2 className="w-2.5 h-2.5 animate-spin" />
@@ -1066,6 +1078,9 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                     {name}
                     {status.running && status.uptime && (
                       <span className="text-content-subtle ml-1">{status.uptime}</span>
+                    )}
+                    {isFailed && (
+                      <span className="text-red-500 ml-1">{status.status}</span>
                     )}
                     {(isStarting || isControlling) && (
                       <span className="text-yellow-500 ml-1">...</span>

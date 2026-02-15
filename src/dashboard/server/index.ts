@@ -4638,7 +4638,7 @@ app.get('/api/costs/summary', (req, res) => {
 
 // Get container status for workspace
 // Get container status (ASYNC - non-blocking)
-async function getContainerStatusAsync(issueId: string): Promise<Record<string, { running: boolean; uptime: string | null }>> {
+async function getContainerStatusAsync(issueId: string): Promise<Record<string, { running: boolean; uptime: string | null; status?: string }>> {
   const issueLower = issueId.toLowerCase();
   const containerMap: Record<string, string[]> = {
     'frontend': ['frontend', 'fe'],
@@ -4664,14 +4664,13 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
     }
   }
 
-  // Run all docker checks in parallel
-  // Use 'docker ps' (not -a) to only show RUNNING containers
-  // This avoids matching stopped containers with old naming patterns
+  // Run all docker checks in parallel using docker ps -a to detect ALL states
+  // (running, exited, created, etc.)
   const results = await Promise.all(
     checks.map(async ({ displayName, containerName }) => {
       try {
         const { stdout } = await execAsync(
-          `docker ps --filter "name=${containerName}" --format "{{.Status}}" 2>/dev/null || echo ""`
+          `docker ps -a --filter "name=^${containerName}$" --format "{{.Status}}" 2>/dev/null || echo ""`
         );
         return { displayName, containerName, output: stdout.trim() };
       } catch {
@@ -4681,19 +4680,30 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
   );
 
   // Process results - first match wins for each display name
-  const status: Record<string, { running: boolean; uptime: string | null }> = {};
+  const containerStatus: Record<string, { running: boolean; uptime: string | null; status?: string }> = {};
   for (const displayName of Object.keys(containerMap)) {
     const match = results.find(r => r.displayName === displayName && r.output);
     if (match) {
-      // Since we use 'docker ps' (running only), any match is running
-      const uptime = match.output.replace(/^Up\s+/, '').split(/\s+/)[0] || null;
-      status[displayName] = { running: true, uptime };
+      const raw = match.output;
+      if (raw.startsWith('Up')) {
+        const uptime = raw.replace(/^Up\s+/, '').split(/\s+/)[0] || null;
+        containerStatus[displayName] = { running: true, uptime, status: 'running' };
+      } else if (raw.startsWith('Exited')) {
+        // e.g. "Exited (1) 5 minutes ago"
+        const exitCodeMatch = raw.match(/Exited \((\d+)\)/);
+        const exitCode = exitCodeMatch ? exitCodeMatch[1] : '?';
+        containerStatus[displayName] = { running: false, uptime: null, status: `exited(${exitCode})` };
+      } else if (raw === 'Created') {
+        containerStatus[displayName] = { running: false, uptime: null, status: 'created' };
+      } else {
+        containerStatus[displayName] = { running: false, uptime: null, status: raw.toLowerCase() };
+      }
     } else {
-      status[displayName] = { running: false, uptime: null };
+      containerStatus[displayName] = { running: false, uptime: null };
     }
   }
 
-  return status;
+  return containerStatus;
 }
 
 // Get MR URL for an issue from GitLab (ASYNC - non-blocking)
