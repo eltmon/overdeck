@@ -1684,11 +1684,12 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     {/* PRD Modal */}
     {showPrdModal && prdContent && (
       <div
-        className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+        className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
         onClick={() => setShowPrdModal(false)}
       >
         <div
-          className="bg-surface-secondary border border-divider rounded-lg shadow-xl w-[700px] max-h-[80vh] flex flex-col"
+          className="border border-divider rounded-lg shadow-xl w-[700px] max-h-[80vh] flex flex-col"
+          style={{ backgroundColor: '#1a1d23' }}
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
