@@ -272,8 +272,9 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     enabled: !!agent,
   });
 
-  // Track workspace creation in-flight state for faster polling
+  // Track workspace creation and container starting in-flight states
   const [workspaceCreating, setWorkspaceCreating] = useState(false);
+  const [containersStarting, setContainersStarting] = useState(false);
 
   // Fetch workspace info for container status
   const { data: workspace } = useQuery<WorkspaceInfo>({
@@ -284,9 +285,14 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
       const data = await res.json();
       // Clear creating state once workspace exists
       if (data.exists && workspaceCreating) setWorkspaceCreating(false);
+      // Clear starting state once all containers are running
+      if (containersStarting && data.containers) {
+        const allRunning = Object.values(data.containers as Record<string, ContainerStatus>).every(c => c.running);
+        if (allRunning) setContainersStarting(false);
+      }
       return data;
     },
-    refetchInterval: workspaceCreating ? 2000 : 5000, // Poll faster during creation
+    refetchInterval: (workspaceCreating || containersStarting) ? 2000 : 5000, // Poll faster during transitions
   });
 
   // Fetch review status
@@ -367,6 +373,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
       return res.json();
     },
     onSuccess: () => {
+      setContainersStarting(true);
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       }, 5000);
@@ -952,13 +959,15 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
         {workspace?.hasDocker && workspace.containers && Object.values(workspace.containers).some(c => !c.running) && (
           <div className="px-3 py-2 border-b border-divider">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-yellow-500">Some containers stopped</span>
+              <span className="text-xs text-yellow-500">
+                {containersStarting ? 'Starting containers...' : 'Some containers stopped'}
+              </span>
               <button
                 onClick={handleStartContainers}
-                disabled={startContainersMutation.isPending}
+                disabled={startContainersMutation.isPending || containersStarting}
                 className="flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-500 disabled:bg-green-800 text-content text-xs rounded transition-colors"
               >
-                {startContainersMutation.isPending ? (
+                {(startContainersMutation.isPending || containersStarting) ? (
                   <>
                     <Loader2 className="w-3 h-3 animate-spin" />
                     Starting...
@@ -1032,7 +1041,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
             </div>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(workspace.containers).map(([name, status]) => {
-                const isStarting = startContainersMutation.isPending && !status.running;
+                const isStarting = (startContainersMutation.isPending || containersStarting) && !status.running;
                 const isControlling = containerControlMutation.isPending && containerMenu?.containerName === name;
                 return (
                   <span
