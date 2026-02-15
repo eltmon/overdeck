@@ -27,6 +27,7 @@ import {
   User,
   Tag,
   Calendar,
+  FileText,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Agent, Issue } from '../types';
@@ -196,6 +197,17 @@ async function fetchOutput(agentId: string): Promise<string> {
   return data.output || '';
 }
 
+async function fetchPrd(issueId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/mission-control/planning/${issueId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.prd || null;
+  } catch {
+    return null;
+  }
+}
+
 function StatusHistory({ history }: { history: StatusHistoryEntry[] }) {
   const [expanded, setExpanded] = useState(false);
   // Show most recent first
@@ -248,6 +260,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
   const [autoScroll, setAutoScroll] = useState(true);
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
+  const [showPrdModal, setShowPrdModal] = useState(false);
 
   const { data: output, refetch } = useQuery({
     queryKey: ['agent-output', agent?.id],
@@ -276,6 +289,13 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
       return res.json();
     },
     refetchInterval: 3000, // Check frequently during review
+  });
+
+  // Fetch PRD content
+  const { data: prdContent } = useQuery({
+    queryKey: ['prd', issueId],
+    queryFn: () => fetchPrd(issueId),
+    staleTime: 60000,
   });
 
   // Fetch cost data
@@ -774,6 +794,15 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                 <ExternalLink className="w-3 h-3" />
                 <span>{issueId.toUpperCase().startsWith('PAN-') ? 'GitHub Issue' : 'Linear Issue'}</span>
               </a>
+            )}
+            {prdContent && (
+              <button
+                onClick={() => setShowPrdModal(true)}
+                className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300"
+              >
+                <FileText className="w-3 h-3" />
+                <span>PRD</span>
+              </button>
             )}
           </div>
         </div>
@@ -1636,6 +1665,31 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               : 'Action failed'}
           </div>
         )}
+      </div>
+    )}
+    {/* PRD Modal */}
+    {showPrdModal && prdContent && (
+      <div
+        className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+        onClick={() => setShowPrdModal(false)}
+      >
+        <div
+          className="bg-surface-secondary border border-divider rounded-lg shadow-xl w-[700px] max-h-[80vh] flex flex-col"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
+            <h2 className="text-sm font-medium text-content">PRD — {issueId.toUpperCase()}</h2>
+            <button
+              onClick={() => setShowPrdModal(false)}
+              className="text-content-muted hover:text-content"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="overflow-y-auto px-4 py-3 text-xs prose prose-invert prose-sm max-w-none">
+            <ReactMarkdown>{prdContent}</ReactMarkdown>
+          </div>
+        </div>
       </div>
     )}
     </>
