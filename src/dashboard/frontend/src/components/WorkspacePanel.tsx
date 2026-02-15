@@ -28,9 +28,11 @@ import {
   Tag,
   Calendar,
   FileText,
+  ListTodo,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Agent, Issue } from '../types';
+import { BeadsDialog } from './BeadsDialog';
 
 interface ContainerStatus {
   running: boolean;
@@ -261,6 +263,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
   const [showPrdModal, setShowPrdModal] = useState(false);
+  const [showBeads, setShowBeads] = useState(false);
 
   const { data: output, refetch } = useQuery({
     queryKey: ['agent-output', agent?.id],
@@ -804,6 +807,13 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                 <span>PRD</span>
               </button>
             )}
+            <button
+              onClick={() => setShowBeads(true)}
+              className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300"
+            >
+              <ListTodo className="w-3 h-3" />
+              <span>Beads Tasks</span>
+            </button>
           </div>
         </div>
 
@@ -1666,6 +1676,10 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
           </div>
         )}
       </div>
+    )}
+    {/* Beads Dialog */}
+    {showBeads && (
+      <BeadsDialog issueId={issueId} isOpen={showBeads} onClose={() => setShowBeads(false)} />
     )}
     {/* PRD Modal */}
     {showPrdModal && prdContent && (
