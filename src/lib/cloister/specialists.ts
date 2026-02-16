@@ -15,7 +15,7 @@ import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-pa
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import { loadSettings } from '../settings.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
-import { sendKeys } from '../tmux.js';
+import { sendKeysAsync } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -1447,7 +1447,7 @@ async function resetSpecialist(name: SpecialistType): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // 2. Reset working directory using centralized sendKeys
-    sendKeys(tmuxSession, 'cd ~');
+    await sendKeysAsync(tmuxSession, 'cd ~');
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // 3. Clear the prompt buffer with Ctrl+U
@@ -1559,11 +1559,11 @@ export async function wakeSpecialist(
       // Send a short message pointing to the task file
       // Use centralized sendKeys which handles Enter correctly
       const shortMessage = `Read and execute the task in: ${taskFile}`;
-      sendKeys(tmuxSession, shortMessage);
+      await sendKeysAsync(tmuxSession, shortMessage);
     } else {
       // For short prompts, send directly via tmux
       // Use centralized sendKeys which handles Enter correctly
-      sendKeys(tmuxSession, taskPrompt);
+      await sendKeysAsync(tmuxSession, taskPrompt);
     }
 
     // Record wake event

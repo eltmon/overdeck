@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, killSession, sendKeys, sessionExists, getAgentSessions, capturePane } from './tmux.js';
+import { createSession, killSession, sendKeys, sendKeysAsync, sessionExists, getAgentSessions, capturePane } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -548,7 +548,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     throw new Error(`Agent ${normalizedId} not running`);
   }
 
-  sendKeys(normalizedId, message);
+  await sendKeysAsync(normalizedId, message);
 
   // Also save to mail queue
   const mailDir = join(getAgentDir(normalizedId), 'mail');
@@ -632,7 +632,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
 
       if (ready) {
         // Send message
-        sendKeys(normalizedId, message);
+        await sendKeysAsync(normalizedId, message);
       } else {
         console.error('Claude SessionStart hook did not fire during resume, message not sent');
       }
