@@ -5801,6 +5801,10 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
             priority: 'normal',
             source: 'review-passed-auto',
           });
+          // Update testStatus based on whether the agent was woken or queued
+          if (testResult.action === 'woken') {
+            setReviewStatus(issueId, { testStatus: 'testing' });
+          }
           console.log(`[review-status] Auto-queued test-agent for ${issueId}: ${testResult.action}`);
         } else {
           console.log(`[review-status] Test-agent already has ${issueId} queued, skipping`);
@@ -5934,6 +5938,7 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
         const wakeResult = await wakeSpecialistWithTask('test-agent', taskDetails);
         if (wakeResult.success) {
           completeTask('test-agent', validTestTask.id);
+          setReviewStatus(validTestTask.payload.issueId, { testStatus: 'testing' });
           console.log(`[review-status] Test-agent woken for ${validTestTask.payload.issueId}`);
         } else {
           console.error(`[review-status] Failed to wake test-agent for next task: ${wakeResult.error}`);
