@@ -14,6 +14,7 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { PANOPTICON_HOME } from '../paths.js';
+import { writeFeedbackFile } from './feedback-writer.js';
 import {
   getSessionId,
   setSessionId,
@@ -209,43 +210,59 @@ function parseAgentOutput(output: string): ReviewResult {
 }
 
 /**
- * Send review feedback to the work agent via tmux
- * This ensures the agent knows what to fix
+ * Send review feedback to the work agent.
+ * Writes feedback to .planning/feedback/ in the workspace, updates STATE.md,
+ * and sends a short reference via tmux.
  */
 async function sendFeedbackToWorkAgent(
   context: ReviewContext,
   result: ReviewResult
 ): Promise<void> {
   const agentSession = `agent-${context.issueId.toLowerCase()}`;
+  const outcome = result.reviewResult.toLowerCase().replace(/_/g, '-');
 
-  // Build feedback message
-  let feedback = `**Review Feedback from review-agent**\n\n`;
-  feedback += `**Status:** ${result.reviewResult}\n\n`;
-
-  if (result.notes) {
-    feedback += `**Issues Found:**\n${result.notes}\n\n`;
-  }
+  // Build the full markdown body
+  let body = `# Review: ${result.reviewResult}\n\n`;
+  body += `## Summary\n\n${result.notes || 'No details provided.'}\n`;
 
   if (result.securityIssues && result.securityIssues.length > 0) {
-    feedback += `**Security Issues:**\n${result.securityIssues.map(i => `- ${i}`).join('\n')}\n\n`;
+    body += `\n## Security Issues\n\n${result.securityIssues.map(i => `- ${i}`).join('\n')}\n`;
   }
 
   if (result.performanceIssues && result.performanceIssues.length > 0) {
-    feedback += `**Performance Issues:**\n${result.performanceIssues.map(i => `- ${i}`).join('\n')}\n\n`;
+    body += `\n## Performance Issues\n\n${result.performanceIssues.map(i => `- ${i}`).join('\n')}\n`;
   }
 
   if (result.reviewResult === 'CHANGES_REQUESTED') {
-    feedback += `**Required Actions:**\nFix the issues above, commit and push, then RESUBMIT for review:\ncurl -X POST http://localhost:3011/api/review/queue -H "Content-Type: application/json" -d '{"issueId":"${context.issueId}"}'\nDo NOT stop until review passes.\n`;
+    const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+    body += `\n## Required Actions\n\nFix the issues above, commit and push, then resubmit for review:\n\`\`\`bash\ncurl -X POST ${apiUrl}/api/review/queue -H "Content-Type: application/json" -d '{"issueId":"${context.issueId}"}'\n\`\`\`\nDo NOT stop until review passes.\n`;
   } else if (result.reviewResult === 'APPROVED') {
-    feedback += `**Next Steps:**\nYour code has been approved! It will proceed to testing.\n`;
+    body += `\n## Next Steps\n\nCode approved. It will proceed to testing.\n`;
   }
 
-  // Use messageAgent which handles both local and remote agents
+  // Write feedback file to workspace
+  const fileResult = await writeFeedbackFile({
+    issueId: context.issueId,
+    workspacePath: context.projectPath,
+    specialist: 'review-agent',
+    outcome,
+    summary: `Review ${result.reviewResult}: ${(result.notes || '').slice(0, 80)}`,
+    markdownBody: body,
+  });
+
+  if (!fileResult.success) {
+    console.error(`[review-agent] Failed to write feedback file for ${context.issueId}: ${fileResult.error}`);
+    return;
+  }
+
+  // Send short reference pointing to the file
   try {
     const { messageAgent } = await import('../agents.js');
-    await messageAgent(agentSession, feedback);
+    const msg = `SPECIALIST FEEDBACK: review-agent reported ${result.reviewResult} for ${context.issueId}.\nRead and address: ${fileResult.relativePath}`;
+    await messageAgent(agentSession, msg);
     console.log(`[review-agent] Sent feedback to ${agentSession}`);
   } catch (error) {
+    // Agent may be gone — feedback file is still in the workspace for crash recovery
     console.error(`[review-agent] Failed to send feedback to ${agentSession}:`, error);
   }
 }

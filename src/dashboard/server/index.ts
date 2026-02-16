@@ -5787,12 +5787,27 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     // Auto-send feedback to work agent when blocked/failed (guarantees delivery)
     if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
+      const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+      const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nFix these issues, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/review/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}"}'\nDo NOT stop until review passes.`;
       try {
-        const feedback = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nFix these issues, commit and push, then RESUBMIT for review by running:\ncurl -X POST http://localhost:3011/api/review/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}"}'\nDo NOT stop until review passes.`;
-        await messageAgent(agentId, feedback);
-        console.log(`[review-status] Auto-sent feedback to ${agentId}`);
+        const { writeFeedbackFile } = await import('../../lib/cloister/feedback-writer.js');
+        const wsInfo = getWorkspaceInfoForIssue(issueId);
+        const fileResult = await writeFeedbackFile({
+          issueId,
+          workspacePath: wsInfo.localPath,
+          specialist: 'review-agent',
+          outcome: reviewStatus === 'blocked' ? 'changes-requested' : 'failed',
+          summary: `Review ${reviewStatus.toUpperCase()}: ${(reviewNotes || '').slice(0, 80)}`,
+          markdownBody: feedbackBody,
+        });
+        if (!fileResult.success) {
+          console.error(`[review-status] Failed to write feedback file for ${issueId}: ${fileResult.error}`);
+        } else {
+          const msg = `SPECIALIST FEEDBACK: review-agent reported ${reviewStatus.toUpperCase()} for ${issueId}.\nRead and address: ${fileResult.relativePath}`;
+          await messageAgent(agentId, msg);
+          console.log(`[review-status] Auto-sent feedback to ${agentId} (file: ${fileResult.relativePath})`);
+        }
       } catch (err) {
-        console.log(`[review-status] Work agent ${agentId} not running or suspended, feedback saved to mail queue`);
         console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
       }
     }
@@ -5911,12 +5926,26 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     // Auto-send test failure feedback to work agent
     if (testStatus === 'failed' && testNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
+      const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nPlease fix the failing tests and re-request review.`;
       try {
-        const feedback = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nPlease fix the failing tests and re-request review.`;
-        await messageAgent(agentId, feedback);
-        console.log(`[review-status] Auto-sent test failure to ${agentId}`);
+        const { writeFeedbackFile } = await import('../../lib/cloister/feedback-writer.js');
+        const wsInfo = getWorkspaceInfoForIssue(issueId);
+        const fileResult = await writeFeedbackFile({
+          issueId,
+          workspacePath: wsInfo.localPath,
+          specialist: 'test-agent',
+          outcome: 'failed',
+          summary: `Tests FAILED: ${(testNotes || '').slice(0, 80)}`,
+          markdownBody: feedbackBody,
+        });
+        if (!fileResult.success) {
+          console.error(`[review-status] Failed to write test feedback file for ${issueId}: ${fileResult.error}`);
+        } else {
+          const msg = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\nRead and address: ${fileResult.relativePath}`;
+          await messageAgent(agentId, msg);
+          console.log(`[review-status] Auto-sent test failure to ${agentId} (file: ${fileResult.relativePath})`);
+        }
       } catch (err) {
-        console.log(`[review-status] Work agent ${agentId} not running or suspended, feedback saved to mail queue`);
         console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
       }
     }

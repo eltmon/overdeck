@@ -807,7 +807,21 @@ export async function spawnMergeAgentForBranches(
         const message = `Branch ${sourceBranch} is not pushed to remote.`;
         console.error(`[merge-agent] ${message}`);
         logActivity('merge_blocked', message);
-        await sendMessageToAgent(issueId, `⚠️ MERGE BLOCKED: Branch "${sourceBranch}" is not pushed. Run: git push -u origin ${sourceBranch}`);
+        // Write feedback file and send short reference
+        const { writeFeedbackFile } = await import('./feedback-writer.js');
+        const blockMsg = `# Merge Blocked\n\nBranch "${sourceBranch}" is not pushed to remote.\n\n## Required Action\n\nRun: \`git push -u origin ${sourceBranch}\``;
+        const fileResult = await writeFeedbackFile({
+          issueId,
+          specialist: 'merge-agent',
+          outcome: 'blocked',
+          summary: `Branch ${sourceBranch} not pushed`,
+          markdownBody: blockMsg,
+        });
+        if (fileResult.success) {
+          await sendMessageToAgent(issueId, `SPECIALIST FEEDBACK: merge-agent reported BLOCKED for ${issueId}.\nRead and address: ${fileResult.relativePath}`);
+        } else {
+          console.error(`[merge-agent] Failed to write feedback file for ${issueId}: ${fileResult.error}`);
+        }
         return { success: false, reason: message };
       }
     } catch {
