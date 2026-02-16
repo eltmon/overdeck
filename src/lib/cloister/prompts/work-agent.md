@@ -14,6 +14,9 @@ Before starting any work, you MUST read these files to understand the full conte
 1. **Read `.planning/STATE.md`** - Contains the full planning context, decisions made, and current status for this issue.
 2. **Read `CLAUDE.md`** (in workspace) - Contains workspace-specific instructions and warnings.
 3. **Read `{{PROJECT_ROOT}}/CLAUDE.md`** - Contains project-wide development guidelines.
+4. **Check `.planning/feedback/`** - If this directory exists, read the latest file(s).
+   These contain specialist feedback (review issues, test failures, merge blocks) requiring action.
+   STATE.md's "Specialist Feedback" section lists all feedback received.
 
 These files contain critical context that may have been updated since the last session.
 {{/env}}
@@ -49,12 +52,21 @@ The planning agent created UI designs using Google Stitch. Use these assets:
 - Or check if DESIGN.md already exists for styling guidelines
 {{/if}}
 
+{{#if PENDING_FEEDBACK}}
+## Specialist Feedback (ACTION REQUIRED)
+
+Specialist agents have left feedback that you MUST address:
+
+{{PENDING_FEEDBACK}}
+{{/if}}
+
 ## CRITICAL: Check Completion Status FIRST
 
 **Before doing ANY work, check if this issue is already complete:**
 
 1. Read `.planning/STATE.md` and check the "Remaining Work" section
-2. If it says "None" or "Implementation complete" or similar → work is DONE
+2. Check the "Specialist Feedback" section — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
+3. If remaining work says "None" or "Implementation complete" AND no unaddressed feedback → work is DONE
 {{#env LOCAL}}
 3. If done, check if a specialist is already processing this issue:
    ```bash

@@ -2158,22 +2158,43 @@ export async function sendFeedbackToAgent(
   // Try to send feedback to the issue agent
   const agentSession = `agent-${toIssueId.toLowerCase()}`;
 
+  // Format feedback message for the agent
+  const feedbackMessage = formatFeedbackForAgent(fullFeedback);
+
+  // Write feedback to workspace file
+  const { writeFeedbackFile } = await import('./feedback-writer.js');
+  const specialistMap: Record<string, 'review-agent' | 'test-agent' | 'merge-agent'> = {
+    'review-agent': 'review-agent',
+    'test-agent': 'test-agent',
+    'merge-agent': 'merge-agent',
+  };
+  const specialist = specialistMap[fromSpecialist] || 'review-agent';
+  const outcome = feedback.feedbackType === 'success' ? 'approved' : feedback.feedbackType === 'failure' ? 'failed' : feedback.feedbackType;
+
+  const fileResult = await writeFeedbackFile({
+    issueId: toIssueId,
+    specialist,
+    outcome,
+    summary: summary.slice(0, 100),
+    markdownBody: feedbackMessage,
+  });
+
+  if (!fileResult.success) {
+    console.error(`[specialist] Failed to write feedback file for ${toIssueId}: ${fileResult.error}`);
+    return false;
+  }
+
+  // Send short reference pointing to the file
   try {
     const { messageAgent } = await import('../agents.js');
-
-    // Format feedback message for the agent
-    const feedbackMessage = formatFeedbackForAgent(fullFeedback);
-
-    // Send to agent (handles suspended agents, mail queue, etc.)
-    await messageAgent(agentSession, feedbackMessage);
-
-    console.log(`[specialist] Sent feedback from ${fromSpecialist} to ${agentSession}`);
+    const msg = `SPECIALIST FEEDBACK: ${fromSpecialist} reported ${feedback.feedbackType.toUpperCase()} for ${toIssueId}.\nRead and address: ${fileResult.relativePath}`;
+    await messageAgent(agentSession, msg);
+    console.log(`[specialist] Sent feedback from ${fromSpecialist} to ${agentSession} (file: ${fileResult.relativePath})`);
     return true;
   } catch (err) {
-    // Agent session doesn't exist or send failed
-    console.log(`[specialist] Could not send feedback to ${agentSession}:`, err);
-    // Feedback is still logged, can be retrieved later
-    return false;
+    // Agent may be gone — feedback file is still in the workspace for crash recovery
+    console.log(`[specialist] Could not send reference to ${agentSession} (file written): ${err}`);
+    return true; // File was written successfully, that's the important part
   }
 }
 

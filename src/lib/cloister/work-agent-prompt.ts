@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { processEnvBlocks, processIfBlocks, substituteVariables } from '../template.js';
@@ -58,6 +58,7 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
   let beadsTasksStr = '';
   let stitchDesignsStr = '';
   let polyrepoContextStr = '';
+  let pendingFeedbackStr = '';
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = readPlanningContext(ctx.workspacePath);
@@ -73,6 +74,9 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
     }
 
     polyrepoContextStr = buildPolyrepoContext(ctx.issueId, ctx.workspacePath);
+
+    // Check for pending specialist feedback
+    pendingFeedbackStr = readPendingFeedback(ctx.workspacePath);
   }
 
   // Build variables map
@@ -86,6 +90,7 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
     BEADS_TASKS: beadsTasksStr,
     STITCH_DESIGNS: stitchDesignsStr,
     POLYREPO_CONTEXT: polyrepoContextStr,
+    PENDING_FEEDBACK: pendingFeedbackStr,
   };
 
   // Processing pipeline: env blocks → if blocks → variable substitution
@@ -94,6 +99,43 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
   template = substituteVariables(template, vars as any);
 
   return template;
+}
+
+/**
+ * Read pending specialist feedback from .planning/feedback/.
+ * Returns a summary of the latest feedback file(s) for injection into the prompt.
+ */
+function readPendingFeedback(workspacePath: string): string {
+  const feedbackDir = join(workspacePath, '.planning', 'feedback');
+  if (!existsSync(feedbackDir)) return '';
+
+  try {
+    const files = readdirSync(feedbackDir)
+      .filter(f => f.endsWith('.md'))
+      .sort(); // NNN-prefixed, so sort gives chronological order
+
+    if (files.length === 0) return '';
+
+    // Show the latest feedback file path (agent will read it)
+    const latest = files[files.length - 1];
+    const lines: string[] = [
+      `**${files.length} feedback file(s) in \`.planning/feedback/\`:**`,
+      '',
+    ];
+
+    // List all files (most recent last)
+    for (const file of files) {
+      const marker = file === latest ? ' ← **latest, read this first**' : '';
+      lines.push(`- \`.planning/feedback/${file}\`${marker}`);
+    }
+
+    lines.push('');
+    lines.push('Read the latest feedback file and address any issues before continuing other work.');
+
+    return lines.join('\n');
+  } catch {
+    return '';
+  }
 }
 
 /**
