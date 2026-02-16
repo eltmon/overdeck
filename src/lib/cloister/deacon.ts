@@ -549,19 +549,15 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
 
     // Determine timeout based on agent type
     const isSpecialist = specialistNames.has(agent.id);
-    const timeoutMinutes = isSpecialist ? 5 : 10;
 
-    // Check if this is a completed work agent
-    // Work agents that have finished their work should remain available for merge
+    // NEVER auto-suspend work agents — they wait for review/test feedback
+    // and must stay alive to receive results. Only suspend specialists.
     const isWorkAgent = agent.id.startsWith('agent-') && !isSpecialist;
     if (isWorkAgent) {
-      const completedFile = join(getAgentDir(agent.id), 'completed');
-
-      if (existsSync(completedFile)) {
-        // Skip suspension - work agent completed and should stay available
-        continue;
-      }
+      continue;
     }
+
+    const timeoutMinutes = 5; // Specialists only
 
     // Check if idle timeout exceeded
     if (idleMinutes > timeoutMinutes) {
