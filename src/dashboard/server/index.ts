@@ -7569,10 +7569,190 @@ app.post('/api/agents', async (req, res) => {
     }
 
     // LOCAL workspace: start containers if workspace has ./dev script
-    // We must wait for containers to be ready BEFORE starting the agent
     const devScript = join(workspacePath, 'dev');
     let containerActivityId: string | null = null;
     let containersReady = false;
+    const phase = req.body.phase || 'exploration';
+
+    // Helper: spawn agent + update issue status (used after containers ready)
+    const spawnAgentAndUpdateStatus = async (containersOk: boolean) => {
+      const activityId = spawnPanCommand(
+        ['work', 'issue', issueId, '--phase', phase],
+        `Start agent for ${issueId}`,
+        projectPath
+      );
+      console.log(`[start-agent] Agent spawned for ${issueId} (containers ready: ${containersOk})`);
+
+      // Update issue status to "In Progress"
+      const apiKey = getLinearApiKey();
+      const isGitHubIssue = issueId.startsWith('PAN-');
+
+      if (isGitHubIssue) {
+        try {
+          const ghConfig = getGitHubConfig();
+          if (ghConfig) {
+            const number = parseInt(issueId.split('-')[1], 10);
+            const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
+            const { owner, repo } = repoConfig;
+            const token = ghConfig.token;
+
+            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
+            }).catch(() => {});
+
+            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+              method: 'POST',
+              headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ labels: ['in-progress'] }),
+            });
+            console.log(`Updated ${issueId} GitHub labels to in-progress`);
+          }
+        } catch (ghError) {
+          console.error('Failed to update GitHub labels:', ghError);
+        }
+      } else if (apiKey) {
+        try {
+          const getIssueQuery = `
+            query GetIssue($id: String!) {
+              issue(id: $id) {
+                id
+                team { states { nodes { id name type } } }
+              }
+            }
+          `;
+          const issueResponse = await fetch('https://api.linear.app/graphql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
+            body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
+          });
+          const issueJson = await issueResponse.json();
+          const states = issueJson.data?.issue?.team?.states?.nodes || [];
+          const inProgressState = states.find((s: any) => s.name.toLowerCase() === 'in progress')
+            || states.find((s: any) => s.type === 'started' && !['in planning', 'in review'].includes(s.name.toLowerCase()));
+
+          if (inProgressState && issueJson.data?.issue?.id) {
+            const updateMutation = `
+              mutation UpdateIssue($id: String!, $stateId: String!) {
+                issueUpdate(id: $id, input: { stateId: $stateId }) { success }
+              }
+            `;
+            await fetch('https://api.linear.app/graphql', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
+              body: JSON.stringify({ query: updateMutation, variables: { id: issueJson.data.issue.id, stateId: inProgressState.id } }),
+            });
+            console.log(`Updated ${issueId} status to In Progress`);
+          }
+        } catch (linearError) {
+          console.error('Failed to update Linear status:', linearError);
+        }
+      }
+
+      return activityId;
+    };
+
+    // Helper: start containers, wait for health, then spawn agent (runs in background)
+    const startContainersAndSpawnAgent = async (featureName: string, cActivityId: string) => {
+      logActivity({
+        id: cActivityId,
+        timestamp: new Date().toISOString(),
+        command: `./dev all (${issueId}) - waiting for containers`,
+        status: 'running',
+        output: [],
+      });
+
+      const containerUid = process.getuid?.() ?? 1000;
+      const containerGid = process.getgid?.() ?? 1000;
+
+      const containerPromise = new Promise<boolean>((resolve) => {
+        const containerChild = spawn('./dev', ['all'], {
+          cwd: workspacePath,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: { ...process.env, UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` },
+        });
+
+        containerChild.stdout?.on('data', (data) => {
+          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+            appendActivityOutput(cActivityId, line);
+          });
+        });
+        containerChild.stderr?.on('data', (data) => {
+          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+            appendActivityOutput(cActivityId, `[stderr] ${line}`);
+          });
+        });
+
+        containerChild.on('close', (code) => {
+          appendActivityOutput(cActivityId, `[${new Date().toISOString()}] ./dev all exited with code ${code}`);
+          updateActivity(cActivityId, { status: code === 0 ? 'completed' : 'failed' });
+          resolve(code === 0);
+        });
+
+        containerChild.on('error', (err) => {
+          appendActivityOutput(cActivityId, `[error] ${err.message}`);
+          updateActivity(cActivityId, { status: 'failed' });
+          resolve(false);
+        });
+
+        setTimeout(() => {
+          appendActivityOutput(cActivityId, '[timeout] Container startup exceeded 5 minutes');
+          containerChild.kill('SIGTERM');
+          resolve(false);
+        }, 5 * 60 * 1000);
+      });
+
+      console.log(`[start-agent] Starting containers for ${issueId}, waiting for ready...`);
+      appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Starting containers...`);
+
+      const devCompleted = await containerPromise;
+
+      if (devCompleted) {
+        // Poll for container health
+        const maxWaitMs = 60000;
+        const pollIntervalMs = 2000;
+        const startTime = Date.now();
+        let healthy = false;
+
+        appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Checking container health...`);
+
+        while (Date.now() - startTime < maxWaitMs) {
+          try {
+            const { stdout } = await execAsync(
+              `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+              { encoding: 'utf-8' }
+            );
+            const containers = stdout.trim().split('\n').filter(Boolean);
+            const allHealthy = containers.length > 0 && containers.every(line => {
+              const status = line.split('|')[1] || '';
+              return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
+            });
+
+            if (allHealthy) {
+              healthy = true;
+              appendActivityOutput(cActivityId, `[${new Date().toISOString()}] All ${containers.length} containers ready`);
+              console.log(`[start-agent] All ${containers.length} containers ready for ${issueId}`);
+              break;
+            }
+            await new Promise(r => setTimeout(r, pollIntervalMs));
+          } catch (healthErr) {
+            console.error('[start-agent] Error checking container health:', healthErr);
+            await new Promise(r => setTimeout(r, pollIntervalMs));
+          }
+        }
+
+        if (!healthy) {
+          appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Warning: Container health check timed out, proceeding anyway`);
+          console.warn(`[start-agent] Container health check timed out for ${issueId}`);
+        }
+
+        // Containers ready (or timed out) — spawn agent now
+        await spawnAgentAndUpdateStatus(healthy);
+      } else {
+        appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Container startup failed — not spawning agent`);
+        console.error(`[start-agent] Container startup failed for ${issueId}`);
+      }
+    };
 
     if (existsSync(workspacePath) && existsSync(devScript)) {
       // Check if Docker is running
@@ -7588,8 +7768,7 @@ app.post('/api/agents', async (req, res) => {
         containerActivityId = `containers-${Date.now()}`;
         const featureName = `myn-feature-${issueLower}`;
 
-        // Check if containers are already running and healthy before re-running ./dev all
-        // Re-running ./dev all when containers exist can restart infra and break connections
+        // Quick check: are containers already running and healthy?
         try {
           const { stdout: existing } = await execAsync(
             `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
@@ -7612,231 +7791,25 @@ app.post('/api/agents', async (req, res) => {
         }
 
         if (!containersReady) {
-        logActivity({
-          id: containerActivityId,
-          timestamp: new Date().toISOString(),
-          command: `./dev all (${issueId}) - waiting for containers`,
-          status: 'running',
-          output: [],
-        });
-
-        // Pass UID/GID for correct file ownership in containers
-        const containerUid = process.getuid?.() ?? 1000;
-        const containerGid = process.getgid?.() ?? 1000;
-
-        // Start containers (don't detach - we need to track completion)
-        const containerPromise = new Promise<boolean>((resolve) => {
-          const containerChild = spawn('./dev', ['all'], {
-            cwd: workspacePath,
-            stdio: ['ignore', 'pipe', 'pipe'],
-            env: { ...process.env, UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` },
+          // Containers need starting — do it in the background, return immediately
+          console.log(`[start-agent] Containers not ready for ${issueId}, starting in background...`);
+          startContainersAndSpawnAgent(featureName, containerActivityId).catch(err => {
+            console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
           });
 
-          containerChild.stdout?.on('data', (data) => {
-            data.toString().split('\n').filter(Boolean).forEach((line: string) => {
-              appendActivityOutput(containerActivityId!, line);
-            });
-          });
-          containerChild.stderr?.on('data', (data) => {
-            data.toString().split('\n').filter(Boolean).forEach((line: string) => {
-              appendActivityOutput(containerActivityId!, `[stderr] ${line}`);
-            });
-          });
-
-          containerChild.on('close', (code) => {
-            appendActivityOutput(containerActivityId!, `[${new Date().toISOString()}] ./dev all exited with code ${code}`);
-            updateActivity(containerActivityId!, { status: code === 0 ? 'completed' : 'failed' });
-            resolve(code === 0);
-          });
-
-          containerChild.on('error', (err) => {
-            appendActivityOutput(containerActivityId!, `[error] ${err.message}`);
-            updateActivity(containerActivityId!, { status: 'failed' });
-            resolve(false);
-          });
-
-          // Timeout after 5 minutes
-          setTimeout(() => {
-            appendActivityOutput(containerActivityId!, '[timeout] Container startup exceeded 5 minutes');
-            containerChild.kill('SIGTERM');
-            resolve(false);
-          }, 5 * 60 * 1000);
-        });
-
-        console.log(`[start-agent] Starting containers for ${issueId}, waiting for ready...`);
-        appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Starting containers...`);
-
-        // Wait for ./dev all to complete
-        const devCompleted = await containerPromise;
-
-        if (devCompleted) {
-          // Now poll for container health (some containers have healthchecks)
-          const maxWaitMs = 60000; // 60 seconds
-          const pollIntervalMs = 2000;
-          const startTime = Date.now();
-
-          appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Checking container health...`);
-
-          while (Date.now() - startTime < maxWaitMs) {
-            try {
-              const { stdout } = await execAsync(
-                `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
-                { encoding: 'utf-8' }
-              );
-
-              const containers = stdout.trim().split('\n').filter(Boolean);
-              const allHealthy = containers.length > 0 && containers.every(line => {
-                const status = line.split('|')[1] || '';
-                // Container is ready if it's "Up" and either has no healthcheck or is "(healthy)"
-                return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
-              });
-
-              if (allHealthy) {
-                containersReady = true;
-                appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] All ${containers.length} containers ready`);
-                console.log(`[start-agent] All ${containers.length} containers ready for ${issueId}`);
-                break;
-              }
-
-              await new Promise(r => setTimeout(r, pollIntervalMs));
-            } catch (healthErr) {
-              console.error('[start-agent] Error checking container health:', healthErr);
-              await new Promise(r => setTimeout(r, pollIntervalMs));
-            }
-          }
-
-          if (!containersReady) {
-            appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Warning: Container health check timed out, proceeding anyway`);
-            console.warn(`[start-agent] Container health check timed out for ${issueId}`);
-            containersReady = true; // Proceed anyway, agent can handle it
-          }
-        } else {
-          appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Container startup failed`);
-          console.error(`[start-agent] Container startup failed for ${issueId}`);
-          return res.status(500).json({
-            error: `Container startup failed for ${issueId}`,
-            hint: 'Check activity log for details',
-            activityId: containerActivityId,
+          return res.json({
+            success: true,
+            message: `Starting containers and agent for ${issueId} (this may take a few minutes)`,
+            startingContainers: true,
+            containerActivityId,
+            projectPath,
           });
         }
-        } // end if (!containersReady)
       }
     }
 
-    // NOW spawn the agent (after containers are ready)
-    const phase = req.body.phase || 'exploration';
-    const activityId = spawnPanCommand(
-      ['work', 'issue', issueId, '--phase', phase],
-      `Start agent for ${issueId}`,
-      projectPath
-    );
-
-    console.log(`[start-agent] Agent spawned for ${issueId} (containers ready: ${containersReady})`);
-
-    // Update issue status to "In Progress"
-    const apiKey = getLinearApiKey();
-    const isGitHubIssue = issueId.startsWith('PAN-');
-
-    if (isGitHubIssue) {
-      // GitHub issue - add "in-progress" label, remove "planned" label
-      try {
-        const ghConfig = getGitHubConfig();
-        if (ghConfig) {
-          const number = parseInt(issueId.split('-')[1], 10);
-          // Find the repo config that matches this issue prefix
-          const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
-          const { owner, repo } = repoConfig;
-          const token = ghConfig.token;
-
-          // Remove "planned" label if present
-          await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `token ${token}`,
-              'Accept': 'application/vnd.github.v3+json',
-            },
-          }).catch(() => {}); // Ignore if label doesn't exist
-
-          // Add "in-progress" label
-          await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `token ${token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ labels: ['in-progress'] }),
-          });
-
-          console.log(`Updated ${issueId} GitHub labels to in-progress`);
-        }
-      } catch (ghError) {
-        console.error('Failed to update GitHub labels:', ghError);
-      }
-    } else if (apiKey) {
-      // It's a Linear issue, update status
-      try {
-        // First get the issue to find the team's "In Progress" state
-        const getIssueQuery = `
-          query GetIssue($id: String!) {
-            issue(id: $id) {
-              id
-              team {
-                states {
-                  nodes {
-                    id
-                    name
-                    type
-                  }
-                }
-              }
-            }
-          }
-        `;
-
-        const issueResponse = await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': apiKey,
-          },
-          body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
-        });
-
-        const issueJson = await issueResponse.json();
-        const states = issueJson.data?.issue?.team?.states?.nodes || [];
-        const inProgressState = states.find((s: any) => s.name.toLowerCase() === 'in progress')
-          || states.find((s: any) => s.type === 'started' && !['in planning', 'in review'].includes(s.name.toLowerCase()));
-
-        if (inProgressState && issueJson.data?.issue?.id) {
-          // Update the issue state
-          const updateMutation = `
-            mutation UpdateIssue($id: String!, $stateId: String!) {
-              issueUpdate(id: $id, input: { stateId: $stateId }) {
-                success
-              }
-            }
-          `;
-
-          await fetch('https://api.linear.app/graphql', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': apiKey,
-            },
-            body: JSON.stringify({
-              query: updateMutation,
-              variables: { id: issueJson.data.issue.id, stateId: inProgressState.id },
-            }),
-          });
-
-          console.log(`Updated ${issueId} status to In Progress`);
-        }
-      } catch (linearError) {
-        console.error('Failed to update Linear status:', linearError);
-        // Don't fail the request, agent was still started
-      }
-    }
+    // Containers already ready (or no containers needed) — spawn agent immediately
+    const activityId = await spawnAgentAndUpdateStatus(containersReady);
 
     res.json({
       success: true,
