@@ -7380,16 +7380,19 @@ app.post('/api/agents', async (req, res) => {
     const projectPath = getProjectPath(projectId, issuePrefix);
 
     // SAFEGUARD: Warn if no PRD exists for this issue (PAN-47)
-    // Issues should go through planning before work begins
+    // Issues should go through planning before work begins.
+    // However, if a workspace already exists, the work is already underway —
+    // don't block restarts/resets on PRD checks.
+    const workspaceExists = existsSync(join(projectPath, 'workspaces', `feature-${issueLower}`));
     const prdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
     const hasPrd = existsSync(prdPath);
-    if (!hasPrd) {
+    if (!hasPrd && !workspaceExists) {
       console.warn(`[start-agent] WARNING: No PRD found for ${issueId} at ${prdPath}`);
       // Check if there's a completed PRD (issue was already worked on before)
       const completedPrdPath = join(projectPath, 'docs', 'prds', 'completed', `${issueLower}-plan.md`);
       const hasCompletedPrd = existsSync(completedPrdPath);
       if (!hasCompletedPrd) {
-        // No PRD at all - block agent start
+        // No PRD at all and no workspace - block agent start
         return res.status(422).json({
           error: `No PRD found for ${issueId}. Run planning first to create a PRD before starting work.`,
           hint: 'Use "Start Planning" to create a plan/PRD, then "Complete Planning" before starting the work agent.',
@@ -7398,6 +7401,8 @@ app.post('/api/agents', async (req, res) => {
       }
       // Has completed PRD - allow (re-work scenario)
       console.log(`[start-agent] Found completed PRD for ${issueId}, allowing agent start (re-work scenario)`);
+    } else if (!hasPrd && workspaceExists) {
+      console.log(`[start-agent] No PRD for ${issueId} but workspace exists — allowing restart`);
     }
 
     // Before starting agent, commit and push any planning artifacts
