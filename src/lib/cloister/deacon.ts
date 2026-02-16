@@ -970,7 +970,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     }
 
     const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, { reviewStatus?: string; testStatus?: string }> = JSON.parse(content);
+    const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
 
     // Check review-agent status
     const reviewAgentSession = getTmuxSessionName('review-agent');
@@ -987,8 +987,19 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     let modified = false;
 
     for (const [issueId, status] of Object.entries(statuses)) {
+      // Skip issues that already completed their pipeline — don't reset
+      // statuses that the specialist already reported results for.
+      // History contains the ground truth; the top-level status fields
+      // are just the latest snapshot.
+      const hasPassedReview = status.history?.some(
+        (h) => h.type === 'review' && h.status === 'passed'
+      );
+      const hasPassedTest = status.history?.some(
+        (h) => h.type === 'test' && (h.status === 'passed' || h.status === 'failed')
+      );
+
       // Check for orphaned reviewing status
-      if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
+      if (status.reviewStatus === 'reviewing' && !reviewAgentActive && !hasPassedReview) {
         console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but review-agent is not active`);
         status.reviewStatus = 'pending';
         modified = true;
@@ -996,7 +1007,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       }
 
       // Check for orphaned testing status
-      if (status.testStatus === 'testing' && !testAgentActive) {
+      if (status.testStatus === 'testing' && !testAgentActive && !hasPassedTest && !status.readyForMerge) {
         console.log(`[deacon] Orphaned test detected: ${issueId} shows 'testing' but test-agent is not active`);
         status.testStatus = 'pending';
         modified = true;
