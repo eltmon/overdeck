@@ -132,11 +132,19 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
   // Log the sendKeys operation for debugging
   logSendKeys(sessionName, keys, caller);
 
-  // CRITICAL: Send keys and Enter as separate commands
-  // This is the correct way - combining them doesn't work
-  const escapedKeys = keys.replace(/"/g, '\\"');
-  execSync(`tmux send-keys -t ${sessionName} "${escapedKeys}"`);
-  execSync(`tmux send-keys -t ${sessionName} C-m`);
+  // Use load-buffer + paste-buffer for reliable delivery.
+  // This avoids shell quoting issues and timing problems with send-keys.
+  // The 300ms delay before Enter ensures text is fully pasted before submission.
+  const tmpFile = `/tmp/pan-sendkeys-${process.pid}-${Date.now()}.txt`;
+  try {
+    writeFileSync(tmpFile, keys);
+    execSync(`tmux load-buffer ${tmpFile}`);
+    execSync(`tmux paste-buffer -t ${sessionName}`);
+    execSync(`sleep 0.3`);
+    execSync(`tmux send-keys -t ${sessionName} C-m`);
+  } finally {
+    try { execSync(`rm -f ${tmpFile}`); } catch {}
+  }
 }
 
 export function capturePane(sessionName: string, lines: number = 50): string {
