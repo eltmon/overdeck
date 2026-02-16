@@ -7450,15 +7450,30 @@ app.post('/api/agents', async (req, res) => {
       }
     }
 
-    // Before starting agent, commit and push any planning artifacts
+    // Before starting agent, find and transfer planning artifacts to workspace
     const workspacePlanningDir = join(workspacePath, '.planning');
     const legacyPlanningDir = join(projectPath, '.planning', issueLower);
+    const homePlanningDir = join(homedir(), '.planning', issueLower);
 
     let planningDir: string | null = null;
     if (existsSync(workspacePlanningDir)) {
       planningDir = workspacePlanningDir;
     } else if (existsSync(legacyPlanningDir)) {
       planningDir = legacyPlanningDir;
+    } else if (existsSync(homePlanningDir)) {
+      // Fallback: planning agent may have run from ~ due to project path resolution issues
+      planningDir = homePlanningDir;
+    }
+
+    // If planning artifacts are outside the workspace, copy them in
+    if (planningDir && planningDir !== workspacePlanningDir) {
+      try {
+        await execAsync(`cp -r "${planningDir}" "${workspacePlanningDir}"`, { encoding: 'utf-8' });
+        console.log(`[start-agent] Copied planning artifacts from ${planningDir} to workspace`);
+        planningDir = workspacePlanningDir;
+      } catch (copyErr) {
+        console.warn(`[start-agent] Could not copy planning artifacts: ${copyErr}`);
+      }
     }
 
     if (planningDir) {
