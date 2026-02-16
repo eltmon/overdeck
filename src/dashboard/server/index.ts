@@ -5788,7 +5788,7 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
       try {
-        const feedback = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nPlease address these issues and re-request review.`;
+        const feedback = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nFix these issues, commit and push, then RESUBMIT for review by running:\ncurl -X POST http://localhost:3011/api/review/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}"}'\nDo NOT stop until review passes.`;
         await messageAgent(agentId, feedback);
         console.log(`[review-status] Auto-sent feedback to ${agentId}`);
       } catch (err) {

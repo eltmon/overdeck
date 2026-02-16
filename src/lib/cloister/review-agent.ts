@@ -235,7 +235,7 @@ async function sendFeedbackToWorkAgent(
   }
 
   if (result.reviewResult === 'CHANGES_REQUESTED') {
-    feedback += `**Required Actions:**\nPlease address the issues above and push your changes. The review will re-run automatically.\n`;
+    feedback += `**Required Actions:**\nFix the issues above, commit and push, then RESUBMIT for review:\ncurl -X POST http://localhost:3011/api/review/queue -H "Content-Type: application/json" -d '{"issueId":"${context.issueId}"}'\nDo NOT stop until review passes.\n`;
   } else if (result.reviewResult === 'APPROVED') {
     feedback += `**Next Steps:**\nYour code has been approved! It will proceed to testing.\n`;
   }
