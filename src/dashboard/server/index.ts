@@ -30,7 +30,7 @@ import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
 import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../lib/cloister/specialist-handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
-import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent } from '../../lib/agents.js';
+import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent, messageAgent, stopAgent } from '../../lib/agents.js';
 import { sendKeys } from '../../lib/tmux.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
@@ -63,6 +63,9 @@ function getOneDayAgo(): Date {
 }
 
 // Ensure tmux server is running (starts one if not)
+// Also strips CLAUDECODE from tmux global env so Claude Code agents
+// don't reject startup with "nested session" error. This happens when
+// the tmux server was originally started from within a Claude Code session.
 async function ensureTmuxRunning(): Promise<void> {
   try {
     await execAsync('tmux list-sessions 2>/dev/null', { encoding: 'utf-8' });
@@ -73,6 +76,17 @@ async function ensureTmuxRunning(): Promise<void> {
       console.log('Started tmux server');
     } catch (startErr) {
       console.error('Failed to start tmux server:', startErr);
+    }
+  }
+  // Strip Claude Code env vars from tmux global environment so all new
+  // sessions (agents, specialists, convoys) can run Claude Code without
+  // hitting the "nested session" guard. This happens when the tmux server
+  // was started from within a Claude Code session. Idempotent.
+  for (const envVar of ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT']) {
+    try {
+      await execAsync(`tmux set-environment -g -u ${envVar} 2>/dev/null`, { encoding: 'utf-8' });
+    } catch {
+      // Variable wasn't set — that's fine
     }
   }
 }
@@ -393,14 +407,21 @@ function loadPendingOperations(): Record<string, PendingOperation> {
   try {
     if (existsSync(PENDING_OPS_FILE)) {
       const data = JSON.parse(readFileSync(PENDING_OPS_FILE, 'utf-8'));
-      // Clean up stale operations (older than 10 minutes with running status)
+      // Clean up stale operations
       const now = Date.now();
       const tenMinutes = 10 * 60 * 1000;
+      const thirtyMinutes = 30 * 60 * 1000;
       for (const key of Object.keys(data)) {
         const op = data[key];
-        if (op.status === 'running' && now - new Date(op.startedAt).getTime() > tenMinutes) {
+        const age = now - new Date(op.startedAt).getTime();
+        if (op.status === 'running' && age > tenMinutes) {
           op.status = 'failed';
           op.error = 'Operation timed out';
+        }
+        // Auto-clear failed operations after 30 minutes so stale errors
+        // don't persist in the UI indefinitely
+        if (op.status === 'failed' && age > thirtyMinutes) {
+          delete data[key];
         }
       }
       return data;
@@ -488,9 +509,13 @@ function spawnPanCommand(args: string[], description: string, cwd?: string): str
     output: [`[${timestamp}] Starting: ${command}`, `[cwd] ${workingDir}`],
   });
 
+  // Ensure child process uses the same Node version as the dashboard server.
+  // Without this, #!/usr/bin/env node in the pan shebang resolves to system Node 18
+  // which crashes with ERR_INVALID_ARG_TYPE on newer TypeScript output.
+  const nodeDir = dirname(process.execPath);
   const child = spawn('pan', args, {
     cwd: workingDir,
-    env: { ...process.env, FORCE_COLOR: '0' },
+    env: { ...process.env, FORCE_COLOR: '0', PATH: `${nodeDir}:${process.env.PATH}` },
   });
 
   child.stdout?.on('data', (data) => {
@@ -1993,7 +2018,6 @@ app.post('/api/agents/:id/message', async (req, res) => {
       );
       res.json({ success: true, remote: true });
     } else {
-      const { messageAgent } = await import('../lib/agents.js');
       await messageAgent(id, message);
       res.json({ success: true });
     }
@@ -2008,7 +2032,6 @@ app.delete('/api/agents/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const { stopAgent } = await import('../../lib/agents.js');
     stopAgent(id);
     res.json({ success: true });
   } catch (error) {
@@ -2058,7 +2081,6 @@ app.post('/api/agents/:id/poke', async (req, res) => {
   const pokeMsg = message || defaultPokeMessage;
 
   try {
-    const { messageAgent } = await import('../lib/agents.js');
     await messageAgent(id, pokeMsg);
     res.json({ success: true, message: 'Agent poked successfully' });
   } catch (error) {
@@ -4886,10 +4908,10 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     const entries = projectConfig.workspace.dns.entries;
     // First entry is typically frontend, second is API
     if (entries[0]) {
-      frontendUrl = `https://${entries[0].replace('{{FEATURE_FOLDER}}', featureFolder)}`;
+      frontendUrl = `https://${entries[0].replace('{{FEATURE_FOLDER}}', featureFolder).replace('{{DOMAIN}}', dnsDomain)}`;
     }
     if (entries[1]) {
-      apiUrl = `https://${entries[1].replace('{{FEATURE_FOLDER}}', featureFolder)}`;
+      apiUrl = `https://${entries[1].replace('{{FEATURE_FOLDER}}', featureFolder).replace('{{DOMAIN}}', dnsDomain)}`;
     }
   }
 
@@ -5742,7 +5764,6 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
       try {
-        const { messageAgent } = await import('../../lib/agents.js');
         const feedback = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nPlease address these issues and re-request review.`;
         await messageAgent(agentId, feedback);
         console.log(`[review-status] Auto-sent feedback to ${agentId}`);
@@ -5863,7 +5884,6 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     if (testStatus === 'failed' && testNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
       try {
-        const { messageAgent } = await import('../../lib/agents.js');
         const feedback = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nPlease fix the failing tests and re-request review.`;
         await messageAgent(agentId, feedback);
         console.log(`[review-status] Auto-sent test failure to ${agentId}`);
@@ -6035,16 +6055,36 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
 
   // Check if issue was already reviewed with feedback that needs addressing
   const existingStatus = getReviewStatus(issueId);
+  const forceReview = req.query.force === 'true' || req.body?.force === true;
   if (existingStatus?.reviewNotes && ['blocked', 'failed'].includes(existingStatus.reviewStatus)) {
-    // Issue has existing review feedback - don't reset to reviewing
-    // Return info about existing review so user knows to address feedback first
-    return res.json({
-      success: false,
-      alreadyReviewed: true,
-      message: `Review already completed with status: ${existingStatus.reviewStatus}`,
-      reviewNotes: existingStatus.reviewNotes,
-      hint: 'Address the review feedback before requesting another review',
-    });
+    // Distinguish infrastructure failures from actual code review feedback.
+    // Infrastructure failures (specialist crash, tmux not found) should be
+    // re-submittable without manual JSON editing. Actual review feedback
+    // (code issues found by reviewer) should require addressing first.
+    const infraFailurePatterns = [
+      'Failed to send task',
+      "can't find pane",
+      'Command failed: tmux',
+      'Operation timed out',
+      'specialist.*not running',
+    ];
+    const isInfraFailure = infraFailurePatterns.some(pattern =>
+      new RegExp(pattern, 'i').test(existingStatus.reviewNotes || '')
+    );
+
+    if (!isInfraFailure && !forceReview) {
+      // Actual code review feedback - require addressing first
+      return res.json({
+        success: false,
+        alreadyReviewed: true,
+        message: `Review already completed with status: ${existingStatus.reviewStatus}`,
+        reviewNotes: existingStatus.reviewNotes,
+        hint: 'Address the review feedback before requesting another review, or use force=true to override',
+      });
+    }
+
+    // Infrastructure failure or force — reset and allow re-review
+    console.log(`[review] Re-triggering review for ${issueId} (${isInfraFailure ? 'infrastructure failure' : 'forced'})`);
   }
 
   // Skip issues that already passed review (prevents re-reviewing stale completion markers)
@@ -6142,7 +6182,6 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     // 3. Start the review pipeline (review-agent → test-agent)
     // PAN-88: Check if review-agent is busy BEFORE waking
     const { wakeSpecialist, isRunning, getTmuxSessionName, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
-    const { getAgentRuntimeState, saveAgentRuntimeState } = await import('../../lib/agents.js');
 
     const reviewSession = getTmuxSessionName('review-agent');
     const reviewRunning = await isRunning('review-agent');
@@ -7495,6 +7534,30 @@ app.post('/api/agents', async (req, res) => {
         containerActivityId = `containers-${Date.now()}`;
         const featureName = `myn-feature-${issueLower}`;
 
+        // Check if containers are already running and healthy before re-running ./dev all
+        // Re-running ./dev all when containers exist can restart infra and break connections
+        try {
+          const { stdout: existing } = await execAsync(
+            `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+            { encoding: 'utf-8' }
+          );
+          const runningContainers = existing.trim().split('\n').filter(Boolean);
+          const allHealthy = runningContainers.length > 0 && runningContainers.every(line => {
+            const status = line.split('|')[1] || '';
+            return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
+          });
+
+          if (allHealthy) {
+            containersReady = true;
+            console.log(`[start-agent] ${runningContainers.length} containers already running and healthy for ${issueId}, skipping ./dev all`);
+            appendActivityOutput(containerActivityId, `[${new Date().toISOString()}] Containers already running (${runningContainers.length}), skipping startup`);
+            updateActivity(containerActivityId, { status: 'completed' });
+          }
+        } catch (checkErr) {
+          console.warn(`[start-agent] Could not check existing containers: ${checkErr}`);
+        }
+
+        if (!containersReady) {
         logActivity({
           id: containerActivityId,
           timestamp: new Date().toISOString(),
@@ -7602,6 +7665,7 @@ app.post('/api/agents', async (req, res) => {
             activityId: containerActivityId,
           });
         }
+        } // end if (!containersReady)
       }
     }
 
@@ -10995,14 +11059,28 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
-// Create HTTP server and attach WebSocket server for terminal
+// Create HTTP server with manual upgrade routing so both the raw WebSocket
+// terminal (/ws/terminal) and Socket.io (/socket.io) can coexist. Without
+// this, WebSocketServer intercepts all upgrade requests and rejects
+// Socket.io's WebSocket upgrade with a 400.
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws/terminal' });
+const wss = new WebSocketServer({ noServer: true });
 
-// Socket.io for real-time issue push (coexists with WS terminal on different path)
 const socketIo = new SocketIOServer(server, {
   path: '/socket.io',
   cors: { origin: '*' },
+});
+
+// Route upgrade requests: /ws/terminal → raw WSS, everything else → Socket.io
+server.on('upgrade', (request, socket, head) => {
+  const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+
+  if (pathname === '/ws/terminal') {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  }
+  // Socket.io handles its own upgrades via the server it's attached to
 });
 
 // Initialize cache and issue data service
