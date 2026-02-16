@@ -23,6 +23,26 @@ import { loadCloisterConfig } from './config.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
+
+/**
+ * Update testStatus to 'testing' when the test-agent starts working.
+ * Uses the shared review-status.json file (same as dashboard server).
+ */
+function updateTestStatusToTesting(issueId: string): void {
+  try {
+    if (!existsSync(REVIEW_STATUS_FILE)) return;
+    const data = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+    const upper = issueId.toUpperCase();
+    if (data[upper]) {
+      data[upper].testStatus = 'testing';
+      data[upper].updatedAt = new Date().toISOString();
+      writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      console.log(`[deacon] Updated testStatus to 'testing' for ${upper}`);
+    }
+  } catch (error) {
+    console.error(`[deacon] Failed to update testStatus for ${issueId}:`, error);
+  }
+}
 import {
   SpecialistType,
   getEnabledSpecialists,
@@ -1086,6 +1106,10 @@ export async function runPatrol(): Promise<PatrolResult> {
           const wakeResult = await wakeSpecialistWithTask(specialist.name, taskDetails);
           if (wakeResult.success) {
             completeSpecialistTask(specialist.name, nextTask.id);
+            // Update testStatus when deacon wakes the test-agent for a queued task
+            if (specialist.name === 'test-agent' && nextTask.payload.issueId) {
+              updateTestStatusToTesting(nextTask.payload.issueId);
+            }
             actions.push(`Processed queued task for ${specialist.name}: ${nextTask.payload.issueId}`);
           } else {
             console.error(`[deacon] Failed to wake ${specialist.name} for queued task: ${wakeResult.error}`);
