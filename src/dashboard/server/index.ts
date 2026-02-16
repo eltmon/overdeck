@@ -161,7 +161,7 @@ import {
   saveReviewStatuses,
   setReviewStatus as setReviewStatusBase,
   getReviewStatus,
-  // clearReviewStatus removed — we keep status after merge so frontend can show "MERGED"
+  clearReviewStatus,
 } from './review-status.js';
 
 // Wrapper that adds auto-PR creation logic on top of the base setReviewStatus
@@ -7405,8 +7405,27 @@ app.post('/api/agents', async (req, res) => {
       console.log(`[start-agent] No PRD for ${issueId} but workspace exists — allowing restart`);
     }
 
-    // Before starting agent, commit and push any planning artifacts
+    // Ensure workspace exists — create it if missing (e.g. after deep-wipe)
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    if (!existsSync(workspacePath)) {
+      console.log(`[start-agent] Workspace missing for ${issueId}, creating...`);
+      try {
+        const nodeDir = dirname(process.execPath);
+        await execAsync(
+          `pan workspace create ${issueId} --local`,
+          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
+        );
+        console.log(`[start-agent] Workspace created for ${issueId}`);
+      } catch (wsErr) {
+        console.error(`[start-agent] Workspace creation failed for ${issueId}:`, wsErr);
+        return res.status(500).json({
+          error: `Failed to create workspace for ${issueId}: ${(wsErr as Error).message}`,
+          hint: 'Try creating the workspace manually: pan workspace create ' + issueId + ' --local',
+        });
+      }
+    }
+
+    // Before starting agent, commit and push any planning artifacts
     const workspacePlanningDir = join(workspacePath, '.planning');
     const legacyPlanningDir = join(projectPath, '.planning', issueLower);
 
@@ -9751,6 +9770,14 @@ app.post('/api/issues/:id/reset', async (req, res) => {
       // Shadow state might not exist
     }
 
+    // 4b. Clear review/test pipeline status
+    try {
+      clearReviewStatus(id.toUpperCase());
+      cleanupLog.push(`Cleared review status for ${id.toUpperCase()}`);
+    } catch {
+      // Review status might not exist
+    }
+
     // 5. Reset issue status to Todo/Open
     const githubCheck = isGitHubIssue(id);
 
@@ -10187,6 +10214,14 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
         rmSync(legacyPlanningDir, { recursive: true, force: true });
         cleanupLog.push(`Deleted legacy planning dir: ${legacyPlanningDir}`);
       }
+    }
+
+    // 4b. Clear review/test pipeline status
+    try {
+      clearReviewStatus(id.toUpperCase());
+      cleanupLog.push(`Cleared review status for ${id.toUpperCase()}`);
+    } catch {
+      // Review status might not exist
     }
 
     // 5. Optionally delete workspace
