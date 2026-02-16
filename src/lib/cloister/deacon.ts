@@ -270,17 +270,27 @@ function checkHeartbeat(name: SpecialistType): {
 
 /**
  * Perform a health check on a specialist
+ *
+ * When called from runPatrol, pass the shared state object to avoid
+ * independent load/save cycles that clobber each other (the original
+ * bug that prevented consecutiveFailures from ever accumulating).
+ *
+ * When called standalone (no sharedState), loads and saves state itself.
  */
-export function checkSpecialistHealth(name: SpecialistType): HealthCheckResult {
-  const state = loadState();
+export async function checkSpecialistHealth(
+  name: SpecialistType,
+  sharedState?: DeaconState,
+): Promise<HealthCheckResult> {
+  const state = sharedState ?? loadState();
   const healthState = getSpecialistState(state, name);
-  const wasRunning = isRunning(name);
+  const wasRunning = await isRunning(name);
 
   // Update ping time
   healthState.lastPingTime = new Date().toISOString();
 
   // If not running, it's not responsive
   if (!wasRunning) {
+    if (!sharedState) saveState(state);
     return {
       specialistName: name,
       isResponsive: false,
@@ -300,7 +310,7 @@ export function checkSpecialistHealth(name: SpecialistType): HealthCheckResult {
     // Reset failure counter on successful response
     healthState.consecutiveFailures = 0;
     healthState.lastResponseTime = new Date().toISOString();
-    saveState(state);
+    if (!sharedState) saveState(state);
 
     return {
       specialistName: name,
@@ -315,7 +325,7 @@ export function checkSpecialistHealth(name: SpecialistType): HealthCheckResult {
 
   // Not responsive - increment failure counter
   healthState.consecutiveFailures++;
-  saveState(state);
+  if (!sharedState) saveState(state);
 
   const shouldForceKill =
     healthState.consecutiveFailures >= config.consecutiveFailures &&
@@ -334,13 +344,19 @@ export function checkSpecialistHealth(name: SpecialistType): HealthCheckResult {
 
 /**
  * Force-kill a stuck specialist
+ *
+ * When called from runPatrol, pass the shared state object.
+ * When called standalone, loads and saves state itself.
  */
-export async function forceKillSpecialist(name: SpecialistType): Promise<{
+export async function forceKillSpecialist(
+  name: SpecialistType,
+  sharedState?: DeaconState,
+): Promise<{
   success: boolean;
   message: string;
 }> {
   const tmuxSession = getTmuxSessionName(name);
-  const state = loadState();
+  const state = sharedState ?? loadState();
   const healthState = getSpecialistState(state, name);
 
   // Check cooldown
@@ -369,7 +385,7 @@ export async function forceKillSpecialist(name: SpecialistType): Promise<{
       (d) => new Date(d).getTime() > windowStart
     );
 
-    saveState(state);
+    if (!sharedState) saveState(state);
 
     console.log(`[deacon] Force-killed specialist ${name}`);
 
@@ -388,20 +404,22 @@ export async function forceKillSpecialist(name: SpecialistType): Promise<{
 
 /**
  * Check for mass death condition
+ *
+ * When called from runPatrol, pass the shared state object.
+ * When called standalone, loads and saves state itself.
  */
-export function checkMassDeath(): {
+export function checkMassDeath(sharedState?: DeaconState): {
   isMassDeath: boolean;
   deathCount: number;
   message?: string;
 } {
-  const state = loadState();
+  const state = sharedState ?? loadState();
 
   // Prune old deaths
   const windowStart = Date.now() - config.massDeathWindowMs;
   state.recentDeaths = state.recentDeaths.filter(
     (d) => new Date(d).getTime() > windowStart
   );
-  saveState(state);
 
   const deathCount = state.recentDeaths.length;
 
@@ -411,6 +429,7 @@ export function checkMassDeath(): {
       const lastAlert = new Date(state.lastMassDeathAlert).getTime();
       const alertCooldown = 5 * 60_000; // 5 minutes between alerts
       if (Date.now() - lastAlert < alertCooldown) {
+        if (!sharedState) saveState(state);
         return {
           isMassDeath: true,
           deathCount,
@@ -421,7 +440,7 @@ export function checkMassDeath(): {
 
     // Record alert
     state.lastMassDeathAlert = new Date().toISOString();
-    saveState(state);
+    if (!sharedState) saveState(state);
 
     return {
       isMassDeath: true,
@@ -429,6 +448,8 @@ export function checkMassDeath(): {
       message: `ALERT: ${deathCount} specialist deaths in ${config.massDeathWindowMs / 1000}s - possible infrastructure issue`,
     };
   }
+
+  if (!sharedState) saveState(state);
 
   return {
     isMassDeath: false,
@@ -990,13 +1011,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking ${enabled.length} specialists`);
 
   for (const specialist of enabled) {
-    const result = checkSpecialistHealth(specialist.name);
+    const result = await checkSpecialistHealth(specialist.name, state);
     results.push(result);
 
     // Handle stuck specialists
     if (result.shouldForceKill) {
       console.log(`[deacon] ${specialist.name} stuck (${result.consecutiveFailures} failures), force-killing`);
-      const killResult = await forceKillSpecialist(specialist.name);
+      const killResult = await forceKillSpecialist(specialist.name, state);
       actions.push(`Force-killed ${specialist.name}: ${killResult.message}`);
 
       // Auto-restart if specialist was initialized
@@ -1098,14 +1119,17 @@ export async function runPatrol(): Promise<PatrolResult> {
     actions.push(...cleanupActions);
   }
 
-  saveState(state);
-
-  // Check for mass death
-  const massDeathCheck = checkMassDeath();
+  // Check for mass death (uses shared state)
+  const massDeathCheck = checkMassDeath(state);
   if (massDeathCheck.isMassDeath && massDeathCheck.message) {
     console.error(`[deacon] ${massDeathCheck.message}`);
     actions.push(massDeathCheck.message);
   }
+
+  // Single save for the entire patrol cycle — all mutations from
+  // checkSpecialistHealth, forceKillSpecialist, and checkMassDeath
+  // accumulate in the shared state object and are persisted once here.
+  saveState(state);
 
   return {
     cycle: state.patrolCycle,
