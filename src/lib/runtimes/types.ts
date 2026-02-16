@@ -183,7 +183,7 @@ export interface AgentRuntime {
    * @param message - The message to send
    * @throws Error if agent is not running
    */
-  sendMessage(agentId: string, message: string): void;
+  sendMessage(agentId: string, message: string): void | Promise<void>;
 
   /**
    * Kill an agent (terminate the session)

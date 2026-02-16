@@ -1,5 +1,6 @@
-import { execSync } from 'child_process';
-import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync } from 'fs';
+import { execSync, exec } from 'child_process';
+import { promisify } from 'util';
+import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { PANOPTICON_HOME } from './paths.js';
 
@@ -128,13 +129,35 @@ export function killSession(name: string): void {
   execSync(`tmux kill-session -t ${name}`);
 }
 
-export function sendKeys(sessionName: string, keys: string, caller?: string): void {
-  // Log the sendKeys operation for debugging
+const execAsync = promisify(exec);
+
+/**
+ * Send keys to a tmux session (async, non-blocking).
+ * Uses load-buffer + paste-buffer for reliable delivery, with a delay before Enter.
+ * MUST be used from the dashboard server and any async context.
+ */
+export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  // Use load-buffer + paste-buffer for reliable delivery.
-  // This avoids shell quoting issues and timing problems with send-keys.
-  // The 300ms delay before Enter ensures text is fully pasted before submission.
+  const tmpFile = `/tmp/pan-sendkeys-${process.pid}-${Date.now()}.txt`;
+  try {
+    writeFileSync(tmpFile, keys);
+    await execAsync(`tmux load-buffer ${tmpFile}`);
+    await execAsync(`tmux paste-buffer -t ${sessionName}`);
+    await new Promise(r => setTimeout(r, 300));
+    await execAsync(`tmux send-keys -t ${sessionName} C-m`);
+  } finally {
+    try { unlinkSync(tmpFile); } catch {}
+  }
+}
+
+/**
+ * Send keys to a tmux session (sync, blocks event loop).
+ * Only use from CLI commands — NEVER from the dashboard server.
+ */
+export function sendKeys(sessionName: string, keys: string, caller?: string): void {
+  logSendKeys(sessionName, keys, caller);
+
   const tmpFile = `/tmp/pan-sendkeys-${process.pid}-${Date.now()}.txt`;
   try {
     writeFileSync(tmpFile, keys);
@@ -143,7 +166,7 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
     execSync(`sleep 0.3`);
     execSync(`tmux send-keys -t ${sessionName} C-m`);
   } finally {
-    try { execSync(`rm -f ${tmpFile}`); } catch {}
+    try { unlinkSync(tmpFile); } catch {}
   }
 }
 

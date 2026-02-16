@@ -7,7 +7,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
-import { sendKeys, sessionExists } from '../tmux.js';
+import { sendKeysAsync, sessionExists } from '../tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -564,7 +564,7 @@ async function sendMessageToAgent(issueId: string, message: string): Promise<boo
     }
 
     // Send the message using centralized sendKeys
-    sendKeys(sessionName, message);
+    await sendKeysAsync(sessionName, message);
 
     console.log(`[merge-agent] Sent message to ${sessionName}`);
     logActivity('agent_message', `Sent to ${sessionName}: ${message.slice(0, 100)}...`);
@@ -610,7 +610,7 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
   try {
     // Send prompt to tmux session using centralized sendKeys
     console.log(`[merge-agent] Sending task to ${tmuxSession}...`);
-    sendKeys(tmuxSession, prompt);
+    await sendKeysAsync(tmuxSession, prompt);
 
     // Record wake event
     recordWake('merge-agent');

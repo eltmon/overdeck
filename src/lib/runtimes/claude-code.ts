@@ -21,7 +21,7 @@ import type {
   ActivitySource,
 } from './types.js';
 import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentState } from '../agents.js';
-import { sessionExists, killSession, sendKeys, getAgentSessions } from '../tmux.js';
+import { sessionExists, killSession, sendKeys, sendKeysAsync, getAgentSessions } from '../tmux.js';
 import { parseClaudeSession, getSessionFiles, getProjectDirs } from '../cost-parsers/jsonl-parser.js';
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), '.claude', 'projects');
@@ -295,12 +295,12 @@ export class ClaudeCodeRuntime implements AgentRuntime {
   /**
    * Send a message to a running agent
    */
-  sendMessage(agentId: string, message: string): void {
+  async sendMessage(agentId: string, message: string): Promise<void> {
     if (!sessionExists(agentId)) {
       throw new Error(`Agent ${agentId} is not running`);
     }
 
-    sendKeys(agentId, message);
+    await sendKeysAsync(agentId, message);
 
     // Also save to mail queue for persistence
     const mailDir = join(getAgentDir(agentId), 'mail');
