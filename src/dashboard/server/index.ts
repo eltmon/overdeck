@@ -655,10 +655,31 @@ function getGitHubLocalPaths(): Record<string, string> {
  */
 function getAgentWorkspace(agentId: string): string | null {
   const stateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
-  if (!existsSync(stateFile)) return null;
+  if (existsSync(stateFile)) {
+    try {
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+      if (state.workspace) return state.workspace;
+    } catch {}
+  }
+
+  // Fallback: try tmux pane's actual working directory first (most accurate)
   try {
-    const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-    return state.workspace || null;
+    const { execSync } = require('child_process');
+    const paneCwd = execSync(`tmux display-message -t ${agentId} -p '#{pane_current_path}' 2>/dev/null`, { encoding: 'utf-8' }).trim();
+    if (paneCwd && existsSync(paneCwd)) return paneCwd;
+  } catch {}
+
+  // Fallback: derive workspace from agent ID (handles hook-based state overwrite)
+  // agent-min-681 or planning-min-681 -> MIN-681 -> workspace path
+  const issueId = agentId.replace(/^(agent-|planning-)/, '').toUpperCase();
+  const prefix = issueId.split('-')[0];
+  try {
+    const projectPath = getProjectPath(undefined, prefix);
+    // Try workspace first (feature branches live here)
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    if (existsSync(workspacePath)) return workspacePath;
+    // Planning agents may run in project root before workspace exists
+    return projectPath;
   } catch {
     return null;
   }
@@ -1788,6 +1809,9 @@ app.get('/api/agents', async (_req, res) => {
         // Check for pending AskUserQuestion (agent waiting for user input)
         const pendingQuestions = await getAgentPendingQuestions(name);
 
+        // Check runtime state - 'idle' means agent is at the prompt waiting for input
+        const isIdle = state.state === 'idle' || (state.currentTool === 'AskUserQuestion' && pendingQuestions.length === 0);
+
         // Check workspace location (local vs remote)
         const workspaceLocation = getWorkspaceLocation(issueId);
 
@@ -1804,7 +1828,7 @@ app.get('/api/agents', async (_req, res) => {
           workspaceLocation,
           git: gitStatus,
           type: isPlanning ? 'planning' : 'agent',
-          hasPendingQuestion: pendingQuestions.length > 0,
+          hasPendingQuestion: pendingQuestions.length > 0 || isIdle,
           pendingQuestionCount: pendingQuestions.length,
         };
       })
@@ -8148,20 +8172,16 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
     }
 
     // 4. Create workspace (git worktree) if not skipped
-    const mappings = getProjectMappings();
     const prefix = issue.identifier.split('-')[0];
-    const mapping = mappings.find(m => m.linearPrefix.toUpperCase() === prefix.toUpperCase());
 
-    // For GitHub issues, check if there's a mapping, otherwise use the GitHub config's local path
+    // Use the unified project registry (YAML + legacy JSON) to find the project path
     let projectPath: string;
-    if (mapping?.localPath) {
-      projectPath = mapping.localPath;
-    } else if (issue.source === 'github' && githubCheck.owner && githubCheck.repo) {
-      // Try to find local path from GitHub config
+    if (issue.source === 'github' && githubCheck.owner && githubCheck.repo) {
+      // For GitHub issues, check local path config
       const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || getDefaultProjectPath();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || getProjectPath(undefined, prefix);
     } else {
-      projectPath = getDefaultProjectPath();
+      projectPath = getProjectPath(undefined, prefix);
     }
     const issueLower = issue.identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
