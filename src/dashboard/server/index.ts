@@ -9777,30 +9777,46 @@ app.post('/api/issues/:id/reset', async (req, res) => {
     }
 
     // Handle Linear issues
-    if (!githubCheck.isGitHub && LINEAR_API_KEY) {
-      const linearClient = new LinearClient({ apiKey: LINEAR_API_KEY });
-      const [teamKey] = id.split('-');
+    const linearApiKeyForReset = process.env.LINEAR_API_KEY || '';
+    if (!githubCheck.isGitHub && linearApiKeyForReset) {
+      try {
+        const { LinearClient } = await import('@linear/sdk');
+        const linearClient = new LinearClient({ apiKey: linearApiKeyForReset });
+        const issue = await linearClient.issue(id.toUpperCase());
 
-      // Find the team and its Todo state
-      const teams = await linearClient.teams();
-      const team = teams.nodes.find(t => t.key.toLowerCase() === teamKey.toLowerCase());
+        if (issue) {
+          const team = await issue.team;
+          if (team) {
+            const states = await team.states();
+            const todoState = states.nodes.find(s =>
+              s.name.toLowerCase() === 'todo' ||
+              s.name.toLowerCase() === 'to do' ||
+              s.type === 'unstarted'
+            );
 
-      if (team) {
-        const states = await team.states();
-        const todoState = states.nodes.find(s => s.type === 'unstarted' && s.name.toLowerCase().includes('todo'));
+            if (todoState) {
+              await issue.update({ stateId: todoState.id });
+              cleanupLog.push(`Reset Linear status to: ${todoState.name}`);
+            }
+          }
 
-        if (todoState) {
-          // Find the issue
-          const issues = await linearClient.issues({
-            filter: { identifier: { eq: id.toUpperCase() } }
-          });
-          const issue = issues.nodes[0];
-
-          if (issue) {
-            await issue.update({ stateId: todoState.id });
-            cleanupLog.push(`Reset Linear status to: ${todoState.name}`);
+          // Remove stale labels
+          const labels = await issue.labels();
+          const labelsToRemove = labels.nodes.filter(l =>
+            l.name.toLowerCase() === 'review ready' ||
+            l.name.toLowerCase() === 'planning'
+          );
+          if (labelsToRemove.length > 0) {
+            const currentLabelIds = labels.nodes.map(l => l.id);
+            const newLabelIds = currentLabelIds.filter(
+              lid => !labelsToRemove.some(lr => lr.id === lid)
+            );
+            await issue.update({ labelIds: newLabelIds });
+            cleanupLog.push(`Removed labels: ${labelsToRemove.map(l => l.name).join(', ')}`);
           }
         }
+      } catch (linearErr) {
+        cleanupLog.push(`Linear reset warning: ${(linearErr as Error).message}`);
       }
     }
 
