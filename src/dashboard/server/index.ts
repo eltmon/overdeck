@@ -7078,7 +7078,8 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
         const linearId = issueJson.data?.issue?.id;
 
         // Find the states we need
-        const inProgressState = states.find((s: any) => s.type === 'started' || s.name.toLowerCase() === 'in progress');
+        const inProgressState = states.find((s: any) => s.name.toLowerCase() === 'in progress')
+          || states.find((s: any) => s.type === 'started' && !['in planning', 'in review'].includes(s.name.toLowerCase()));
         const inReviewState = states.find((s: any) => s.name.toLowerCase() === 'in review' || s.name.toLowerCase() === 'review');
         const doneState = states.find((s: any) => s.type === 'completed' || s.name.toLowerCase() === 'done');
 
@@ -7780,7 +7781,8 @@ app.post('/api/agents', async (req, res) => {
 
         const issueJson = await issueResponse.json();
         const states = issueJson.data?.issue?.team?.states?.nodes || [];
-        const inProgressState = states.find((s: any) => s.type === 'started' || s.name.toLowerCase() === 'in progress');
+        const inProgressState = states.find((s: any) => s.name.toLowerCase() === 'in progress')
+          || states.find((s: any) => s.type === 'started' && !['in planning', 'in review'].includes(s.name.toLowerCase()));
 
         if (inProgressState && issueJson.data?.issue?.id) {
           // Update the issue state
