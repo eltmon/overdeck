@@ -590,9 +590,12 @@ export class IssueDataService {
 
     // Build filter conditions
     const filterConditions: string[] = [];
-    // Default: current cycle, exclude completed
+    // Scope to active cycle only — completed/canceled filtering is handled
+    // by getIssues() post-filter, NOT here. The GraphQL query must fetch
+    // completed issues so that: (1) the "Include completed" toggle works,
+    // (2) incremental updates correctly reflect state transitions, and
+    // (3) internal getIssues() callers can look up recently-completed issues.
     filterConditions.push('cycle: { isActive: { eq: true } }');
-    filterConditions.push('state: { type: { nin: ["completed", "canceled"] } }');
 
     // Incremental: only issues updated after sinceUpdatedAt
     if (sinceUpdatedAt) {
