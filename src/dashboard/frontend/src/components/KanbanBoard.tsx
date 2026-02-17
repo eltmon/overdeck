@@ -23,6 +23,19 @@ import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
 
+// Model name formatting
+function getFriendlyModelName(fullModel: string): string {
+  if (fullModel.includes('opus-4-6') || fullModel.includes('opus-4.6')) return 'Opus 4.6';
+  if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
+  if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
+  if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus';
+  if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
+  if (fullModel.includes('sonnet-4') || fullModel.includes('sonnet')) return 'Sonnet';
+  if (fullModel.includes('haiku-4-5') || fullModel.includes('haiku-4.5')) return 'Haiku 4.5';
+  if (fullModel.includes('haiku')) return 'Haiku';
+  return fullModel;
+}
+
 // Difficulty badge colors
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
   trivial: 'bg-green-900/50 text-green-400',
@@ -1691,7 +1704,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
                 className="px-1.5 py-0.5 rounded text-xs font-medium bg-surface-emphasis text-content-body"
                 title={`Model: ${activeAgent.model}`}
               >
-                {activeAgent.model.replace('claude-', '').replace(/-4-5$/, '').replace(/-20[0-9]{6}$/, '')}
+                {getFriendlyModelName(activeAgent.model)}
               </span>
             )}
             {/* Workspace location badge - shows if running locally or on remote VM */}

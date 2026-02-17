@@ -730,7 +730,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-content-subtle">Model</span>
-                <span className="text-content">{agent.model}</span>
+                <span className="text-content">{getFriendlyModelName(agent.model)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-content-subtle">Runtime</span>
@@ -1417,7 +1417,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                     <div className="text-xs text-content-body space-y-1">
                       <p><strong>Issue:</strong> {agent.issueId}</p>
                       <p><strong>Session:</strong> <span className="font-mono text-[10px]">{agent.id}</span></p>
-                      <p><strong>Model:</strong> {agent.model}</p>
+                      <p><strong>Model:</strong> {getFriendlyModelName(agent.model)}</p>
                       <p><strong>Runtime:</strong> {agent.runtime}</p>
                       <p><strong>Started:</strong> {startedAt?.toLocaleString()}</p>
                       <p><strong>Uptime:</strong> {duration}</p>
