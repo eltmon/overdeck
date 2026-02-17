@@ -1437,7 +1437,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
   // Determine which agent is relevant based on issue status
   const isPlanning = STATUS_LABELS[issue.status] === 'planning';
   const activeAgent = isPlanning ? planningAgent : workAgent;
-  const isRunning = activeAgent && activeAgent.status !== 'dead';
+  const isRunning = activeAgent && activeAgent.status !== 'dead' && activeAgent.status !== 'stopped';
 
   // For display in terminal viewer, use the active agent
   const agent = activeAgent;
