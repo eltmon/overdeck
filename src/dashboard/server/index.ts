@@ -1767,23 +1767,37 @@ app.get('/api/agents', async (_req, res) => {
       .split('\n')
       .filter((line) => line.startsWith('agent-') || line.startsWith('planning-'));
 
-    // Also check for remote agents from state files
+    // Also check for remote agents and "starting" agents from state files
     const agentsDir = join(homedir(), '.panopticon', 'agents');
     const remoteAgentIds: string[] = [];
+    const startingAgentIds: string[] = [];
     if (existsSync(agentsDir)) {
       const dirs = readdirSync(agentsDir).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
       for (const dir of dirs) {
+        // Check if already in local tmux list
+        const inLocalList = agentLines.some(line => line.startsWith(dir + '|'));
+
         const remoteStateFile = join(agentsDir, dir, 'remote-state.json');
         if (existsSync(remoteStateFile)) {
           try {
             const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
-            if (state.location === 'remote' && state.status === 'running') {
-              // Check if not already in local list
-              if (!agentLines.some(line => line.startsWith(dir + '|'))) {
-                remoteAgentIds.push(dir);
-              }
+            if (state.location === 'remote' && state.status === 'running' && !inLocalList) {
+              remoteAgentIds.push(dir);
             }
           } catch {}
+        }
+
+        // Check for "starting" agents (containers starting, no tmux session yet)
+        if (!inLocalList && !remoteAgentIds.includes(dir)) {
+          const localStateFile = join(agentsDir, dir, 'state.json');
+          if (existsSync(localStateFile)) {
+            try {
+              const state = JSON.parse(readFileSync(localStateFile, 'utf-8'));
+              if (state.status === 'starting') {
+                startingAgentIds.push(dir);
+              }
+            } catch {}
+          }
         }
       }
     }
@@ -1934,8 +1948,36 @@ app.get('/api/agents', async (_req, res) => {
       }
     }
 
-    // Combine local, remote, and recently-stopped agents
-    const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...stoppedAgents];
+    // Process "starting" agents (containers starting, no tmux session yet)
+    const startingAgents = startingAgentIds.map(dir => {
+      const stateFile = join(agentsDir, dir, 'state.json');
+      try {
+        const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+        const isPlanning = dir.startsWith('planning-');
+        const issueId = state.issueId?.toUpperCase() ||
+          (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
+        return {
+          id: dir,
+          issueId,
+          runtime: state.runtime || 'claude',
+          model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+          status: 'starting' as const,
+          startedAt: state.startedAt || new Date().toISOString(),
+          consecutiveFailures: 0,
+          killCount: 0,
+          workspace: state.workspace || null,
+          workspaceLocation: 'local',
+          git: null,
+          type: isPlanning ? 'planning' : ('agent' as const),
+          hasPendingQuestion: false,
+          pendingQuestionCount: 0,
+          message: state.message || 'Starting...',
+        };
+      } catch { return null; }
+    }).filter(Boolean);
+
+    // Combine local, remote, starting, and recently-stopped agents
+    const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...startingAgents, ...stoppedAgents];
 
     // Cache the result
     agentsCache = { data: allAgents, timestamp: now };
@@ -7873,6 +7915,20 @@ app.post('/api/agents', async (req, res) => {
         if (!containersReady) {
           // Containers need starting — do it in the background, return immediately
           console.log(`[start-agent] Containers not ready for ${issueId}, starting in background...`);
+
+          // Write early agent state so the UI knows the agent is starting (prevents "Session not found")
+          const earlyAgentId = `agent-${issueLower}`;
+          const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
+          mkdirSync(earlyStateDir, { recursive: true });
+          writeFileSync(join(earlyStateDir, 'state.json'), JSON.stringify({
+            id: earlyAgentId,
+            issueId,
+            status: 'starting',
+            startedAt: new Date().toISOString(),
+            workspace: workspacePath,
+            message: 'Waiting for containers to start...',
+          }, null, 2));
+
           startContainersAndSpawnAgent(featureName, containerActivityId).catch(err => {
             console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
           });
@@ -7882,6 +7938,7 @@ app.post('/api/agents', async (req, res) => {
             message: `Starting containers and agent for ${issueId} (this may take a few minutes)`,
             startingContainers: true,
             containerActivityId,
+            agentId: earlyAgentId,
             projectPath,
           });
         }
@@ -10444,15 +10501,12 @@ app.get('/api/issues/:id/beads', async (req, res) => {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
     } else {
-      const possiblePaths = [
-        join(homedir(), 'projects', 'panopticon'),
-        join(homedir(), 'projects', 'myn'),
-      ];
-      for (const p of possiblePaths) {
-        if (existsSync(join(p, 'workspaces', `feature-${issueLower}`)) || existsSync(join(p, '.beads'))) {
-          projectPath = p;
-          break;
-        }
+      // Use getProjectPath for consistent path resolution (respects project config)
+      const issuePrefix = id.split('-')[0];
+      try {
+        projectPath = getProjectPath(undefined, issuePrefix);
+      } catch {
+        projectPath = '';
       }
     }
 
@@ -10536,8 +10590,10 @@ app.get('/api/issues/:id/beads', async (req, res) => {
     // If no remote results, try local query
     if (beads.length === 0) {
       try {
+        // Search from workspace dir first (where .beads/ lives), fall back to project root
+        const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
         const { stdout } = await execAsync(`bd search "${id}" --json`, {
-          cwd: projectPath || homedir(),
+          cwd: bdSearchDir,
           encoding: 'utf-8',
           timeout: 10000,
         });
@@ -12297,16 +12353,25 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
       } catch { /* skip */ }
     }
 
-    // Also check PLANNING_PROMPT.md as fallback for PRD
+    // Check docs/prds/ subdirectories for PRD files matching the issue (higher priority than STATE.md)
     if (!result.prd) {
-      const promptPath = join(planningDir, 'PLANNING_PROMPT.md');
-      if (existsSync(promptPath)) result.prd = readFileSync(promptPath, 'utf-8');
+      const prdsDir = join(projectPath, 'docs', 'prds');
+      if (existsSync(prdsDir)) {
+        for (const subdir of ['active', 'planned', 'completed']) {
+          const subdirPath = join(prdsDir, subdir);
+          if (!existsSync(subdirPath)) continue;
+          const files = readdirSync(subdirPath).filter(f => f.toLowerCase().includes(issueLower) && f.endsWith('.md'));
+          if (files.length > 0) {
+            result.prd = readFileSync(join(subdirPath, files[0]), 'utf-8');
+            break;
+          }
+        }
+      }
     }
 
-    // Check docs/prds/active/ as fallback for PRD (where plan endpoint writes them)
-    if (!result.prd) {
-      const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
-      if (existsSync(activePrdPath)) result.prd = readFileSync(activePrdPath, 'utf-8');
+    // Use STATE.md as final PRD fallback (it's the actual planning output)
+    if (!result.prd && result.state) {
+      result.prd = result.state;
     }
 
     // Read subdirectory artifacts
