@@ -13,11 +13,41 @@ import { promisify } from 'util';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
-import { loadSettings } from '../settings.js';
+import { loadSettings, type ModelId } from '../settings.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
+import { getProviderForModel, getProviderEnv } from '../providers.js';
 import { sendKeysAsync } from '../tmux.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for a model.
+ * For non-Anthropic providers (Kimi, Z.AI, etc.), returns env vars needed
+ * to redirect Claude Code API calls to the correct endpoint.
+ */
+function getProviderEnvForModel(model: string): Record<string, string> {
+  const provider = getProviderForModel(model as ModelId);
+  if (provider.name === 'anthropic') return {};
+
+  const settings = loadSettings();
+  const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
+  if (apiKey) {
+    return getProviderEnv(provider, apiKey);
+  }
+  console.warn(`[specialist] No API key for ${provider.displayName}, falling back to Anthropic`);
+  return {};
+}
+
+/**
+ * Build tmux -e flags for environment variables
+ */
+function buildTmuxEnvFlags(env: Record<string, string>): string {
+  let flags = '';
+  for (const [key, value] of Object.entries(env)) {
+    flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
+  }
+  return flags;
+}
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
@@ -504,6 +534,10 @@ export async function spawnEphemeralSpecialist(
       console.warn(`Warning: Could not resolve model for ${specialistType}, using default`);
     }
 
+    // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
+    const providerEnv = getProviderEnvForModel(model);
+    const envFlags = buildTmuxEnvFlags(providerEnv);
+
     // Permission flags based on specialist type
     const permissionFlags = specialistType === 'merge-agent'
       ? '--dangerously-skip-permissions --permission-mode bypassPermissions'
@@ -530,9 +564,9 @@ echo ""
 echo "## Specialist completed task"
 `, { mode: 0o755 });
 
-    // Spawn Claude Code via launcher script
+    // Spawn Claude Code via launcher script (with provider env vars)
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}" "bash '${launcherScript}'"`,
+      `tmux new-session -d -s "${tmuxSession}"${envFlags} "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
     );
 
@@ -1346,6 +1380,10 @@ You will be woken up when your services are needed. For now, acknowledge your in
 Say: "I am the ${name} specialist, ready and waiting for tasks."`;
 
   try {
+    // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
+    const providerEnv = getProviderEnvForModel(model);
+    const envFlags = buildTmuxEnvFlags(providerEnv);
+
     // Write identity prompt and launcher script to avoid shell escaping issues
     const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
     await execAsync(`mkdir -p "${agentDir}"`, { encoding: 'utf-8' });
@@ -1360,9 +1398,9 @@ prompt=$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --model ${model} "$prompt"
 `, { mode: 0o755 });
 
-    // Spawn Claude Code via launcher script (safely passes prompt with any characters)
+    // Spawn Claude Code via launcher script (with provider env vars)
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}" "bash '${launcherScript}'"`,
+      `tmux new-session -d -s "${tmuxSession}"${envFlags} "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
     );
 
@@ -1504,8 +1542,19 @@ export async function wakeSpecialist(
     const cwd = process.env.HOME || '/home/eltmon';
 
     try {
-      // Use Opus for merge-agent (complex conflict resolution), default for others
-      const modelFlag = name === 'merge-agent' ? '--model opus' : '';
+      // Resolve model from work type router (respects config.yaml overrides)
+      let model = 'claude-sonnet-4-5'; // default fallback
+      try {
+        const workTypeId: WorkTypeId = `specialist-${name}` as WorkTypeId;
+        model = getModelId(workTypeId);
+      } catch (error) {
+        console.warn(`[specialist] Could not resolve model for ${name}, using default`);
+      }
+      const modelFlag = `--model ${model}`;
+
+      // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
+      const providerEnv = getProviderEnvForModel(model);
+      const envFlags = buildTmuxEnvFlags(providerEnv);
 
       // merge-agent needs full bypass to handle git stash drop, reset, etc.
       const permissionFlags = name === 'merge-agent'
@@ -1518,7 +1567,7 @@ export async function wakeSpecialist(
         : `claude ${modelFlag} ${permissionFlags}`;
 
       await execAsync(
-        `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${claudeCmd}"`,
+        `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "${claudeCmd}"`,
         { encoding: 'utf-8' }
       );
 
