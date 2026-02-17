@@ -1146,6 +1146,21 @@ app.get('/api/issues', (req, res) => {
   }
 });
 
+// Force refresh all trackers (full re-fetch, not incremental)
+app.post('/api/trackers/refresh', async (_req, res) => {
+  try {
+    await Promise.all([
+      issueDataService.invalidateTracker('linear'),
+      issueDataService.invalidateTracker('github'),
+      issueDataService.invalidateTracker('rally'),
+    ]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error refreshing trackers:', error);
+    res.status(500).json({ error: 'Failed to refresh: ' + error.message });
+  }
+});
+
 // Analyze issue complexity
 app.get('/api/issues/:id/analyze', async (req, res) => {
   try {

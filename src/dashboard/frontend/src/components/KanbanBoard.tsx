@@ -828,6 +828,22 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           <span className="text-sm text-content-subtle">Include completed</span>
         </label>
 
+        {/* Refresh button */}
+        <button
+          onClick={async () => {
+            try {
+              await fetch('/api/trackers/refresh', { method: 'POST' });
+              queryClient.invalidateQueries({ queryKey: ['issues'] });
+            } catch (e) {
+              console.error('Refresh failed:', e);
+            }
+          }}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-content-subtle hover:text-content bg-surface-raised hover:bg-surface-overlay rounded transition-colors"
+          title="Force refresh all trackers"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+        </button>
+
         {/* Issue count */}
         <span className="text-sm text-content-muted">
           {issues?.length || 0} issues
