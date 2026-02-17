@@ -237,6 +237,12 @@ export class IssueDataService {
   async invalidateTracker(tracker: string): Promise<void> {
     this.cache.invalidate(tracker);
 
+    // Force full refresh on next poll (not incremental) so new issues
+    // added to the cycle externally are discovered immediately
+    if (tracker === 'linear') {
+      this.linearLastFullRefresh = 0;
+    }
+
     // Cancel current timer and fetch immediately
     const state = this.trackers[tracker];
     if (state?.timer) {
