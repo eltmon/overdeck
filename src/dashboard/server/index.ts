@@ -7694,7 +7694,10 @@ app.post('/api/agents', async (req, res) => {
     const devScript = join(workspacePath, 'dev');
     let containerActivityId: string | null = null;
     let containersReady = false;
-    const phase = req.body.phase || 'exploration';
+    // Default to 'implementation' if planning was completed (workspace + .planning/ exists),
+    // otherwise 'exploration' for fresh starts
+    const hasPlanning = existsSync(join(workspacePath, '.planning'));
+    const phase = req.body.phase || (hasPlanning ? 'implementation' : 'exploration');
 
     // Helper: spawn agent + update issue status (used after containers ready)
     const spawnAgentAndUpdateStatus = async (containersOk: boolean) => {

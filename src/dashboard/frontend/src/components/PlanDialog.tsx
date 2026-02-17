@@ -175,7 +175,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: issue.identifier }),
+        body: JSON.stringify({ issueId: issue.identifier, phase: 'implementation' }),
       });
       if (!res.ok) {
         const data = await res.json();
