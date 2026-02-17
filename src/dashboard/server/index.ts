@@ -3101,20 +3101,41 @@ app.post('/api/deacon/patrol', async (_req, res) => {
 app.get('/api/metrics/summary', (_req, res) => {
   try {
     const service = getCloisterService();
-    const costSummary = service.getCostSummary();
     const status = service.getStatus();
+
+    // Read today's costs from event-sourced events.jsonl (canonical source)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayEvents = readEvents({ startDate: todayStr });
+    const dailyTotal = todayEvents.reduce((sum, e) => sum + (e.cost || 0), 0);
+
+    // Aggregate top spenders from today's events
+    const agentCosts = new Map<string, number>();
+    const issueCosts = new Map<string, number>();
+    for (const e of todayEvents) {
+      agentCosts.set(e.agentId, (agentCosts.get(e.agentId) || 0) + e.cost);
+      issueCosts.set(e.issueId, (issueCosts.get(e.issueId) || 0) + e.cost);
+    }
+
+    const topAgents = Array.from(agentCosts.entries())
+      .map(([agentId, cost]) => ({ agentId, cost }))
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, 5);
+    const topIssues = Array.from(issueCosts.entries())
+      .map(([issueId, cost]) => ({ issueId, cost }))
+      .sort((a, b) => b.cost - a.cost)
+      .slice(0, 5);
 
     res.json({
       today: {
-        totalCost: costSummary.dailyTotal,
+        totalCost: Math.round(dailyTotal * 100) / 100,
         agentCount: status.summary.total,
         activeCount: status.summary.active,
         stuckCount: status.summary.stuck,
         warningCount: status.summary.warning,
       },
       topSpenders: {
-        agents: costSummary.topAgents.slice(0, 5),
-        issues: costSummary.topIssues.slice(0, 5),
+        agents: topAgents,
+        issues: topIssues,
       },
     });
   } catch (error: any) {
@@ -10854,22 +10875,22 @@ async function recordApprovedTask(issueId: string, workspacePath: string, outcom
   }
 }
 
-// GET /api/costs/summary - Overall cost summary
+// GET /api/costs/summary - Overall cost summary (reads from event-sourced events.jsonl)
 app.get('/api/costs/summary', (_req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const todayEntries = readCostFiles(today, today);
-    const weekEntries = readCostFiles(weekAgo, today);
-    const monthEntries = readCostFiles(monthAgo, today);
+    const todayEntries = readEvents({ startDate: today });
+    const weekEntries = readEvents({ startDate: weekAgo });
+    const monthEntries = readEvents({ startDate: monthAgo });
 
     const summarize = (entries: any[]) => ({
-      totalCost: entries.reduce((sum, e) => sum + (e.cost || 0), 0),
-      totalTokens: entries.reduce((sum, e) => sum + ((e.usage?.inputTokens || 0) + (e.usage?.outputTokens || 0)), 0),
+      totalCost: entries.reduce((sum: number, e: any) => sum + (e.cost || 0), 0),
+      totalTokens: entries.reduce((sum: number, e: any) => sum + ((e.input || 0) + (e.output || 0)), 0),
       entryCount: entries.length,
-      byModel: entries.reduce((acc, e) => {
+      byModel: entries.reduce((acc: Record<string, number>, e: any) => {
         acc[e.model] = (acc[e.model] || 0) + (e.cost || 0);
         return acc;
       }, {} as Record<string, number>),

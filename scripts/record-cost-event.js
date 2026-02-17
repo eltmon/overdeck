@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 // scripts/record-cost-event.ts
-import { readFileSync as readFileSync2 } from "fs";
+import { readFileSync as readFileSync2, existsSync as existsSync2, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, openSync, readSync, fstatSync, closeSync } from "fs";
+import { join as join4 } from "path";
+import { homedir as homedir3 } from "os";
 
 // src/lib/cost.ts
 import { join as join2 } from "path";
@@ -97,39 +99,39 @@ var DEFAULT_PRICING = [
   { provider: "custom", model: "kimi-for-coding", inputPer1k: 6e-4, outputPer1k: 2e-3, cacheReadPer1k: 6e-5, cacheWrite5mPer1k: 75e-5, currency: "USD" },
   { provider: "custom", model: "kimi-k2.5", inputPer1k: 6e-4, outputPer1k: 2e-3, cacheReadPer1k: 6e-5, cacheWrite5mPer1k: 75e-5, currency: "USD" }
 ];
-function calculateCost(usage2, pricing2) {
-  let cost2 = 0;
+function calculateCost(usage, pricing) {
+  let cost = 0;
   let inputMultiplier = 1;
   let outputMultiplier = 1;
-  const totalInputTokens = usage2.inputTokens + (usage2.cacheReadTokens || 0) + (usage2.cacheWriteTokens || 0);
-  if ((pricing2.model === "claude-sonnet-4" || pricing2.model === "claude-sonnet-4.5") && totalInputTokens > 2e5) {
+  const totalInputTokens = usage.inputTokens + (usage.cacheReadTokens || 0) + (usage.cacheWriteTokens || 0);
+  if ((pricing.model === "claude-sonnet-4" || pricing.model === "claude-sonnet-4.5") && totalInputTokens > 2e5) {
     inputMultiplier = 2;
     outputMultiplier = 1.5;
   }
-  cost2 += usage2.inputTokens / 1e3 * pricing2.inputPer1k * inputMultiplier;
-  cost2 += usage2.outputTokens / 1e3 * pricing2.outputPer1k * outputMultiplier;
-  if (usage2.cacheReadTokens && pricing2.cacheReadPer1k) {
-    cost2 += usage2.cacheReadTokens / 1e3 * pricing2.cacheReadPer1k;
+  cost += usage.inputTokens / 1e3 * pricing.inputPer1k * inputMultiplier;
+  cost += usage.outputTokens / 1e3 * pricing.outputPer1k * outputMultiplier;
+  if (usage.cacheReadTokens && pricing.cacheReadPer1k) {
+    cost += usage.cacheReadTokens / 1e3 * pricing.cacheReadPer1k;
   }
-  if (usage2.cacheWriteTokens) {
-    const ttl = usage2.cacheTTL || "5m";
-    const cacheWritePrice = ttl === "1h" ? pricing2.cacheWrite1hPer1k : pricing2.cacheWrite5mPer1k;
+  if (usage.cacheWriteTokens) {
+    const ttl = usage.cacheTTL || "5m";
+    const cacheWritePrice = ttl === "1h" ? pricing.cacheWrite1hPer1k : pricing.cacheWrite5mPer1k;
     if (cacheWritePrice) {
-      cost2 += usage2.cacheWriteTokens / 1e3 * cacheWritePrice;
+      cost += usage.cacheWriteTokens / 1e3 * cacheWritePrice;
     }
   }
-  return Math.round(cost2 * 1e6) / 1e6;
+  return Math.round(cost * 1e6) / 1e6;
 }
-function getPricing(provider2, model2) {
-  let pricing2 = DEFAULT_PRICING.find(
-    (p) => p.provider === provider2 && p.model === model2
+function getPricing(provider, model) {
+  let pricing = DEFAULT_PRICING.find(
+    (p) => p.provider === provider && p.model === model
   );
-  if (!pricing2) {
-    pricing2 = DEFAULT_PRICING.find(
-      (p) => p.provider === provider2 && model2.startsWith(p.model)
+  if (!pricing) {
+    pricing = DEFAULT_PRICING.find(
+      (p) => p.provider === provider && model.startsWith(p.model)
     );
   }
-  return pricing2 || null;
+  return pricing || null;
 }
 var BUDGETS_FILE = join2(COSTS_DIR, "budgets.json");
 
@@ -151,72 +153,106 @@ function ensureEventsFile() {
     writeFileSync(eventsFile, "", "utf-8");
   }
 }
-function appendCostEvent(event) {
+function appendCostEvent(event2) {
   ensureEventsFile();
-  if (!event.ts || !event.agentId || !event.issueId || !event.model) {
+  if (!event2.ts || !event2.agentId || !event2.issueId || !event2.model) {
     throw new Error("Missing required event fields: ts, agentId, issueId, model");
   }
-  const line = JSON.stringify(event) + "\n";
+  const line = JSON.stringify(event2) + "\n";
   appendFileSync(getEventsFile(), line, "utf-8");
 }
 
 // scripts/record-cost-event.ts
-var toolInfo;
+var event;
 try {
   const input = readFileSync2(0, "utf-8");
-  toolInfo = JSON.parse(input);
-} catch (err) {
+  event = JSON.parse(input);
+} catch {
   process.exit(0);
 }
-var usage = toolInfo?.usage || toolInfo?.message?.usage;
-if (!usage) {
+var transcriptPath = event?.transcript_path;
+if (!transcriptPath || !existsSync2(transcriptPath)) {
   process.exit(0);
 }
-var inputTokens = usage.input_tokens || 0;
-var outputTokens = usage.output_tokens || 0;
-var cacheReadTokens = usage.cache_read_input_tokens || 0;
-var cacheWriteTokens = usage.cache_creation_input_tokens || 0;
-if (inputTokens === 0 && outputTokens === 0 && cacheReadTokens === 0 && cacheWriteTokens === 0) {
+var sessionId = event?.session_id || "unknown";
+var stateDir = join4(process.env.HOME || homedir3(), ".panopticon", "costs", "state");
+mkdirSync2(stateDir, { recursive: true });
+var stateFile = join4(stateDir, `${sessionId}.offset`);
+var lastOffset = 0;
+if (existsSync2(stateFile)) {
+  try {
+    lastOffset = parseInt(readFileSync2(stateFile, "utf-8").trim(), 10) || 0;
+  } catch {
+  }
+}
+var fd;
+try {
+  fd = openSync(transcriptPath, "r");
+} catch {
   process.exit(0);
 }
-var model = toolInfo?.model || toolInfo?.message?.model || "claude-sonnet-4";
-var provider = "anthropic";
-if (model.includes("gpt")) {
-  provider = "openai";
-} else if (model.includes("gemini")) {
-  provider = "google";
-}
-var pricing = getPricing(provider, model);
-if (!pricing) {
-  console.warn(`No pricing found for ${provider}/${model}`);
+var stat = fstatSync(fd);
+if (stat.size <= lastOffset) {
+  closeSync(fd);
+  writeFileSync2(stateFile, String(stat.size), "utf-8");
   process.exit(0);
 }
-var cost = calculateCost({
-  inputTokens,
-  outputTokens,
-  cacheReadTokens,
-  cacheWriteTokens,
-  cacheTTL: "5m"
-}, pricing);
+var bytesToRead = stat.size - lastOffset;
+var buffer = Buffer.alloc(bytesToRead);
+readSync(fd, buffer, 0, bytesToRead, lastOffset);
+closeSync(fd);
+var newContent = buffer.toString("utf-8");
+var lines = newContent.split("\n");
 var agentId = process.env.PANOPTICON_AGENT_ID || "unattributed";
 var issueId = process.env.PANOPTICON_ISSUE_ID || "UNKNOWN";
 var sessionType = process.env.PANOPTICON_SESSION_TYPE || "implementation";
-try {
-  appendCostEvent({
-    ts: (/* @__PURE__ */ new Date()).toISOString(),
-    type: "cost",
-    agentId,
-    issueId,
-    sessionType,
-    provider,
-    model,
-    input: inputTokens,
-    output: outputTokens,
-    cacheRead: cacheReadTokens,
-    cacheWrite: cacheWriteTokens,
-    cost
-  });
-} catch (err) {
-  console.error("Failed to record cost event:", err);
+for (const line of lines) {
+  if (!line.trim()) continue;
+  try {
+    const entry = JSON.parse(line);
+    if (entry.type !== "assistant" || !entry.message?.usage) {
+      continue;
+    }
+    const usage = entry.message.usage;
+    const model = entry.message.model || "claude-sonnet-4";
+    const inputTokens = usage.input_tokens || 0;
+    const outputTokens = usage.output_tokens || 0;
+    const cacheReadTokens = usage.cache_read_input_tokens || 0;
+    const cacheWriteTokens = usage.cache_creation_input_tokens || 0;
+    if (inputTokens === 0 && outputTokens === 0 && cacheReadTokens === 0 && cacheWriteTokens === 0) {
+      continue;
+    }
+    let provider = "anthropic";
+    if (model.includes("gpt")) {
+      provider = "openai";
+    } else if (model.includes("gemini")) {
+      provider = "google";
+    }
+    const pricing = getPricing(provider, model);
+    if (!pricing) continue;
+    const cost = calculateCost({
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
+      cacheTTL: "5m"
+    }, pricing);
+    appendCostEvent({
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      type: "cost",
+      agentId,
+      issueId,
+      sessionType,
+      provider,
+      model,
+      input: inputTokens,
+      output: outputTokens,
+      cacheRead: cacheReadTokens,
+      cacheWrite: cacheWriteTokens,
+      cost
+    });
+  } catch {
+  }
 }
+writeFileSync2(stateFile, String(stat.size), "utf-8");
 process.exit(0);
