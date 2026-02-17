@@ -1430,9 +1430,12 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
   const [deleteWorkspace, setDeleteWorkspace] = useState(false);
 
   // Check if issue has "Review Ready" label (agent completed work)
-  const isReviewReady = issue.labels?.some(
+  // Don't show on terminal states — "ready for review" is meaningless once done/canceled
+  const canonical = STATUS_LABELS[issue.status] || 'backlog';
+  const isTerminal = canonical === 'done' || canonical === 'canceled';
+  const isReviewReady = !isTerminal && (issue.labels?.some(
     (label) => typeof label === 'string' && label.toLowerCase() === 'review ready'
-  ) ?? false;
+  ) ?? false);
 
   const priorityColors: Record<number, string> = {
     0: 'border-l-gray-500',
@@ -1704,7 +1707,7 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
               </span>
             )}
             {/* Awaiting Input badge - agent is waiting for user response */}
-            {agent?.hasPendingQuestion && (
+            {!isTerminal && agent?.hasPendingQuestion && (
               <span
                 onClick={(e) => {
                   e.stopPropagation();
