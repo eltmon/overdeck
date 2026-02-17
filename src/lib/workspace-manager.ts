@@ -507,8 +507,14 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
         try {
           await execAsync(`docker compose -f "${traefikPath}" up -d`, { cwd: projectConfig.path });
           result.steps.push('Started Traefik');
-        } catch (error) {
-          result.errors.push(`Failed to start Traefik: ${error}`);
+        } catch (error: any) {
+          const msg = error?.message || String(error);
+          if (msg.includes('port is already allocated') || msg.includes('address already in use')) {
+            // Traefik (or another reverse proxy) is already running — not an error
+            result.steps.push('Traefik already running (port in use)');
+          } else {
+            result.errors.push(`Failed to start Traefik: ${error}`);
+          }
         }
       }
     }
