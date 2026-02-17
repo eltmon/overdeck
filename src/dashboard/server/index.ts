@@ -8594,6 +8594,9 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 export COLORTERM=truecolor
 export PATH="/usr/local/bin:\$PATH"
+export PANOPTICON_AGENT_ID="${sessionName}"
+export PANOPTICON_ISSUE_ID="${issue.identifier}"
+export PANOPTICON_SESSION_TYPE="planning"
 
 cd /workspace
 prompt=$(cat "${remotePromptFile}")
@@ -8678,6 +8681,9 @@ set -s escape-time 0
           : `${agentCmd.command} --dangerously-skip-permissions`;
 
         writeFileSync(launcherScript, `#!/bin/bash
+export PANOPTICON_AGENT_ID="${sessionName}"
+export PANOPTICON_ISSUE_ID="${issue.identifier}"
+export PANOPTICON_SESSION_TYPE="planning"
 cd "${agentCwd}"
 prompt=$(cat "${promptFile}")
 exec ${cmdWithArgs} "$prompt"
