@@ -312,9 +312,11 @@ export function planHooksSync(): HookItem[] {
     return hooks;
   }
 
-  // Only sync hook scripts (no extension) - skip helper scripts like .mjs, .sh
+  // Sync hook scripts (no extension) and bundled JS scripts (.js)
+  // Skip source files (.ts), shell helpers (.sh), and other non-hook files (.mjs)
   const scripts = readdirSync(SOURCE_SCRIPTS_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && !entry.name.startsWith('.') && !entry.name.includes('.'));
+    .filter((entry) => entry.isFile() && !entry.name.startsWith('.')
+      && (!entry.name.includes('.') || entry.name.endsWith('.js')));
 
   for (const script of scripts) {
     const sourcePath = join(SOURCE_SCRIPTS_DIR, script.name);
