@@ -18,6 +18,17 @@ import type { TrackerType } from './tracker/interface.js';
 
 const execAsync = promisify(exec);
 
+/** Known agent ID prefixes — IDs with these prefixes are already normalized */
+const AGENT_PREFIXES = ['agent-', 'planning-'];
+
+/** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
+function normalizeAgentId(agentId: string): string {
+  if (AGENT_PREFIXES.some(p => agentId.startsWith(p))) {
+    return agentId;
+  }
+  return `agent-${agentId.toLowerCase()}`;
+}
+
 /**
  * Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for a model.
  * Reads the current API key from settings so resumed/recovered agents
@@ -521,8 +532,7 @@ export function listRunningAgents(): (AgentState & { tmuxActive: boolean })[] {
 }
 
 export function stopAgent(agentId: string): void {
-  // Normalize agent ID
-  const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
+  const normalizedId = normalizeAgentId(agentId);
 
   if (sessionExists(normalizedId)) {
     // Capture tmux output before killing so logs remain viewable after stop
@@ -550,8 +560,7 @@ export function stopAgent(agentId: string): void {
 }
 
 export async function messageAgent(agentId: string, message: string): Promise<void> {
-  // Normalize agent ID
-  const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
+  const normalizedId = normalizeAgentId(agentId);
 
   // Check if agent is suspended - auto-resume if so (PAN-80)
   const runtimeState = getAgentRuntimeState(normalizedId);
@@ -611,7 +620,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
  * - Work agents: When message is sent via /work-tell
  */
 export async function resumeAgent(agentId: string, message?: string): Promise<{ success: boolean; error?: string }> {
-  const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
+  const normalizedId = normalizeAgentId(agentId);
 
   // Check runtime state
   const runtimeState = getAgentRuntimeState(normalizedId);
@@ -714,7 +723,7 @@ export function detectCrashedAgents(): AgentState[] {
  * Recover a crashed agent by restarting it with context
  */
 export function recoverAgent(agentId: string): AgentState | null {
-  const normalizedId = agentId.startsWith('agent-') ? agentId : `agent-${agentId.toLowerCase()}`;
+  const normalizedId = normalizeAgentId(agentId);
   const state = getAgentState(normalizedId);
 
   if (!state) {
