@@ -442,6 +442,8 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
   createSession(agentId, options.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: agentId,
+      PANOPTICON_ISSUE_ID: options.issueId,
+      PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
       ...providerEnv // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   });
