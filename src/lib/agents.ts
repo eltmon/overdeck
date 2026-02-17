@@ -12,6 +12,9 @@ import { loadCloisterConfig } from './cloister/config.js';
 import { loadSettings, type ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, requiresRouter } from './providers.js';
+import { loadConfig } from './config.js';
+import { createTrackerFromConfig } from './tracker/factory.js';
+import type { TrackerType } from './tracker/interface.js';
 
 const execAsync = promisify(exec);
 
@@ -358,6 +361,32 @@ function determineModel(options: SpawnOptions): string {
   }
 }
 
+/**
+ * Transition an issue to "in_progress" in its tracker.
+ * Tries each configured tracker until one succeeds.
+ */
+async function transitionIssueToInProgress(issueId: string): Promise<void> {
+  const config = loadConfig();
+  const trackersConfig = config.trackers;
+
+  // Try primary tracker first, then secondary
+  const trackerTypes: TrackerType[] = [trackersConfig.primary];
+  if (trackersConfig.secondary) {
+    trackerTypes.push(trackersConfig.secondary);
+  }
+
+  for (const trackerType of trackerTypes) {
+    try {
+      const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+      await tracker.transitionIssue(issueId, 'in_progress');
+      console.log(`[agents] Transitioned ${issueId} to in_progress via ${trackerType}`);
+      return;
+    } catch {
+      // Issue not found in this tracker or transition failed, try next
+    }
+  }
+}
+
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = `agent-${options.issueId.toLowerCase()}`;
 
@@ -454,6 +483,14 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
 
   // Track work in CV
   startWork(agentId, options.issueId);
+
+  // Transition issue tracker to "in progress" (best-effort, don't block agent spawn)
+  // Only for work agents, not planning/specialist agents
+  if (!options.agentType || options.agentType === 'work-agent') {
+    transitionIssueToInProgress(options.issueId).catch((err) => {
+      console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
+    });
+  }
 
   return state;
 }

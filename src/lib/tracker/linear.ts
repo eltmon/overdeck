@@ -202,10 +202,21 @@ export class LinearTracker implements IssueTracker {
   }
 
   async transitionIssue(id: string, state: IssueState): Promise<void> {
-    const issue = await this.getIssue(id);
+    // Resolve the Linear issue directly (avoid normalizeIssue which may fail on SDK edge cases)
+    let linearIssue: any;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) {
+      linearIssue = await this.client.issue(id);
+    } else {
+      const results = await this.client.searchIssues(id, { first: 1 });
+      if (results.nodes.length > 0) {
+        linearIssue = results.nodes[0];
+      } else {
+        throw new IssueNotFoundError(id, 'linear');
+      }
+    }
 
     // Get workflow states for the issue's team
-    const linearIssue = await this.client.issue(issue.id);
     const team = await linearIssue.team;
     if (!team) {
       throw new Error('Could not determine issue team');
@@ -214,13 +225,19 @@ export class LinearTracker implements IssueTracker {
     const states = await team.states();
     const targetStateType = this.reverseMapState(state);
 
-    // Find a state matching the target type
-    const targetState = states.nodes.find((s) => s.type === targetStateType);
+    // Find a state matching the target type.
+    // Multiple states can share the same type (e.g., "In Planning", "In Progress", "In Review"
+    // are all type "started"). Prefer the one with the lowest position (most basic/default state
+    // for that type), which matches Linear's convention.
+    const matchingStates = states.nodes
+      .filter((s: any) => s.type === targetStateType)
+      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+    const targetState = matchingStates[0];
     if (!targetState) {
       throw new Error(`No state found matching type: ${targetStateType}`);
     }
 
-    await this.client.updateIssue(issue.id, {
+    await this.client.updateIssue(linearIssue.id, {
       stateId: targetState.id,
     });
   }
