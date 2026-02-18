@@ -137,6 +137,21 @@ elif [ -f "$(dirname "$0")/record-cost-event.js" ]; then
 fi
 
 if [ -n "$COST_SCRIPT" ] && [ -f "$COST_SCRIPT" ]; then
+  # Infer issue ID from git branch if not set by Panopticon agent launcher
+  # Matches branches like: feature/pan-208, feature-min-665, pan-142
+  if [ -z "$PANOPTICON_ISSUE_ID" ]; then
+    if [[ "$GIT_BRANCH" =~ (pan|min|aud|PAN|MIN|AUD)[-]([0-9]+) ]]; then
+      PANOPTICON_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
+    fi
+  fi
+
+  # Fallback: infer from workspace path (e.g., /workspaces/feature-pan-208/)
+  if [ -z "$PANOPTICON_ISSUE_ID" ]; then
+    if [[ "$WORKSPACE" =~ (pan|min|aud|PAN|MIN|AUD)[-]([0-9]+) ]]; then
+      PANOPTICON_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
+    fi
+  fi
+
   # Export issue context for the cost recording script
   export PANOPTICON_ISSUE_ID="${PANOPTICON_ISSUE_ID:-UNKNOWN}"
   export PANOPTICON_SESSION_TYPE="${PANOPTICON_SESSION_TYPE:-implementation}"

@@ -2,6 +2,7 @@
 
 // scripts/record-cost-event.ts
 import { readFileSync as readFileSync2, existsSync as existsSync2, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, openSync, readSync, fstatSync, closeSync } from "fs";
+import { execFileSync } from "child_process";
 import { join as join4 } from "path";
 import { homedir as homedir3 } from "os";
 
@@ -204,8 +205,25 @@ closeSync(fd);
 var newContent = buffer.toString("utf-8");
 var lines = newContent.split("\n");
 var agentId = process.env.PANOPTICON_AGENT_ID || "unattributed";
-var issueId = process.env.PANOPTICON_ISSUE_ID || "UNKNOWN";
+var issueId = process.env.PANOPTICON_ISSUE_ID || "";
 var sessionType = process.env.PANOPTICON_SESSION_TYPE || "implementation";
+if (!issueId || issueId === "UNKNOWN") {
+  try {
+    const branch = execFileSync("git", ["branch", "--show-current"], {
+      encoding: "utf-8",
+      timeout: 2e3,
+      stdio: ["pipe", "pipe", "pipe"]
+    }).trim();
+    const branchMatch = branch.match(/(pan|min|aud)[-](\d+)/i);
+    if (branchMatch) {
+      issueId = `${branchMatch[1].toUpperCase()}-${branchMatch[2]}`;
+    }
+  } catch {
+  }
+}
+if (!issueId) {
+  issueId = "UNKNOWN";
+}
 for (const line of lines) {
   if (!line.trim()) continue;
   try {
