@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
-import { planSync, executeSync, planHooksSync, syncHooks } from '../../lib/sync.js';
+import { planSync, executeSync, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
 import { SYNC_TARGETS, Runtime, isDevMode } from '../../lib/paths.js';
 import { listProjects } from '../../lib/projects.js';
 
@@ -190,6 +190,27 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.succeed(`Synced ${hooksResult.synced.length} hooks to ~/.panopticon/bin/`);
   } else {
     hooksSpinner.info('No hooks to sync');
+  }
+
+  // Check jq availability (required by statusline, beads, specialists)
+  if (!checkCommand('jq')) {
+    console.log(chalk.yellow('\n  ⚠ jq not found — statusline and other features need it'));
+    console.log(chalk.dim('    Install: apt install jq / brew install jq\n'));
+  }
+
+  // Sync statusline to all runtimes
+  const statuslineSpinner = ora('Syncing statusline...').start();
+  const statuslineResult = syncStatusline();
+
+  if (statuslineResult.errors.length > 0) {
+    statuslineSpinner.warn(`Synced statusline to ${statuslineResult.synced.length} runtime(s), ${statuslineResult.errors.length} error(s)`);
+    for (const error of statuslineResult.errors) {
+      console.log(chalk.red(`  ✗ ${error}`));
+    }
+  } else if (statuslineResult.synced.length > 0) {
+    statuslineSpinner.succeed(`Synced statusline to ${statuslineResult.synced.join(', ')}`);
+  } else {
+    statuslineSpinner.info('No statusline script found (scripts/statusline.sh)');
   }
 
   // Check and install claude-code-router if missing

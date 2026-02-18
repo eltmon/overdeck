@@ -77,9 +77,10 @@ describe('model-fallback', () => {
     it('should return all Anthropic models', () => {
       const models = getModelsByProvider('anthropic');
       expect(models).toContain('claude-opus-4-6');
+      expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(3);
+      expect(models).toHaveLength(4);
     });
 
     it('should return all OpenAI models', () => {
@@ -135,17 +136,17 @@ describe('model-fallback', () => {
 
     it('should fallback GPT-5.2 Codex to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('claude-sonnet-4-5');
+      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('claude-sonnet-4-6');
     });
 
     it('should fallback O3 Deep Research to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-4-5');
+      expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-4-6');
     });
 
     it('should fallback GPT-4o to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-4o', enabled)).toBe('claude-sonnet-4-5');
+      expect(applyFallback('gpt-4o', enabled)).toBe('claude-sonnet-4-6');
     });
 
     it('should fallback GPT-4o-mini to Haiku', () => {
@@ -155,7 +156,7 @@ describe('model-fallback', () => {
 
     it('should fallback Gemini Pro to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-4-5');
+      expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-4-6');
     });
 
     it('should fallback Gemini Flash to Haiku', () => {
@@ -181,7 +182,7 @@ describe('model-fallback', () => {
         expect.stringContaining('Model gpt-5.2-codex requires openai API key')
       );
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('falling back to claude-sonnet-4-5')
+        expect.stringContaining('falling back to claude-sonnet-4-6')
       );
     });
 
@@ -208,14 +209,14 @@ describe('model-fallback', () => {
     });
 
     it('should return fallback for OpenAI models', () => {
-      expect(getFallbackModel('gpt-5.2-codex')).toBe('claude-sonnet-4-5');
-      expect(getFallbackModel('o3-deep-research')).toBe('claude-sonnet-4-5');
-      expect(getFallbackModel('gpt-4o')).toBe('claude-sonnet-4-5');
+      expect(getFallbackModel('gpt-5.2-codex')).toBe('claude-sonnet-4-6');
+      expect(getFallbackModel('o3-deep-research')).toBe('claude-sonnet-4-6');
+      expect(getFallbackModel('gpt-4o')).toBe('claude-sonnet-4-6');
       expect(getFallbackModel('gpt-4o-mini')).toBe('claude-haiku-4-5');
     });
 
     it('should return fallback for Google models', () => {
-      expect(getFallbackModel('gemini-3-pro-preview')).toBe('claude-sonnet-4-5');
+      expect(getFallbackModel('gemini-3-pro-preview')).toBe('claude-sonnet-4-6');
       expect(getFallbackModel('gemini-3-flash-preview')).toBe('claude-haiku-4-5');
     });
 
@@ -332,16 +333,17 @@ describe('model-fallback', () => {
       const models = getAvailableModels(enabled);
 
       expect(models).toContain('claude-opus-4-6');
+      expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(3);
+      expect(models).toHaveLength(4);
     });
 
     it('should return all models when all providers enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'zai', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(15); // 3 Anthropic + 4 OpenAI + 4 Google + 2 Z.AI + 2 Kimi
+      expect(models.length).toBe(16); // 4 Anthropic + 4 OpenAI + 4 Google + 2 Z.AI + 2 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -350,7 +352,7 @@ describe('model-fallback', () => {
 
       expect(models).toContain('gpt-5.2-codex');
       expect(models).toContain('gpt-4o');
-      expect(models.length).toBe(7); // 3 Anthropic + 4 OpenAI
+      expect(models.length).toBe(8); // 4 Anthropic + 4 OpenAI
     });
 
     it('should include Google models when Google enabled', () => {
@@ -361,16 +363,16 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3-flash-preview');
       expect(models).toContain('gemini-2.5-pro');
       expect(models).toContain('gemini-2.5-flash');
-      expect(models.length).toBe(7); // 3 Anthropic + 4 Google
+      expect(models.length).toBe(8); // 4 Anthropic + 4 Google
     });
   });
 
   describe('fallback strategy validation', () => {
     it('should map premium models to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('claude-sonnet-4-5');
-      expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-4-5');
-      expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-4-5');
+      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('claude-sonnet-4-6');
+      expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-4-6');
+      expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-4-6');
     });
 
     it('should map economy models to Haiku', () => {

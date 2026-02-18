@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync } from 'fs';
-import { join, basename } from 'path';
+import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync, readFileSync, writeFileSync } from 'fs';
+import { join, basename, dirname } from 'path';
+import { homedir } from 'os';
 import { SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SYNC_TARGETS, isDevMode, type Runtime } from './paths.js';
 
 export interface SyncItem {
@@ -358,4 +359,84 @@ export function syncHooks(): { synced: string[]; errors: string[] } {
   }
 
   return result;
+}
+
+/**
+ * Runtime-specific statusline configurations
+ * Maps runtime to: config dir, statusline filename, settings file
+ */
+const STATUSLINE_TARGETS: Record<string, { configDir: string; scriptName: string; settingsFile: string }> = {
+  claude: {
+    configDir: join(homedir(), '.claude'),
+    scriptName: 'statusline-command.sh',
+    settingsFile: join(homedir(), '.claude', 'settings.json'),
+  },
+  // Other runtimes can be added as they support statusline
+};
+
+/**
+ * Sync statusline script to all supported runtimes
+ * Copies the canonical statusline.sh from panopticon scripts to each runtime's config dir
+ * and ensures the runtime's settings.json references it.
+ */
+export function syncStatusline(): { synced: string[]; errors: string[] } {
+  const result = { synced: [] as string[], errors: [] as string[] };
+
+  const sourceScript = join(SOURCE_SCRIPTS_DIR, 'statusline.sh');
+  if (!existsSync(sourceScript)) {
+    return result;
+  }
+
+  for (const [runtime, target] of Object.entries(STATUSLINE_TARGETS)) {
+    try {
+      // Ensure config dir exists
+      mkdirSync(target.configDir, { recursive: true });
+
+      // Copy statusline script
+      const targetScript = join(target.configDir, target.scriptName);
+      copyFileSync(sourceScript, targetScript);
+      chmodSync(targetScript, 0o755);
+
+      // Update settings.json to reference the statusline
+      updateSettingsStatusline(target.settingsFile, targetScript);
+
+      result.synced.push(runtime);
+    } catch (error) {
+      result.errors.push(`${runtime}: ${error}`);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Update a settings.json file to include the statusLine configuration
+ * Preserves all existing settings (hooks, etc.)
+ */
+function updateSettingsStatusline(settingsFile: string, scriptPath: string): void {
+  let settings: Record<string, any> = {};
+
+  if (existsSync(settingsFile)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsFile, 'utf-8'));
+    } catch {
+      // If settings file is corrupt, start fresh but preserve the file
+      settings = {};
+    }
+  }
+
+  // Only update if statusLine is missing or points to a different script
+  const currentCommand = settings.statusLine?.command;
+  if (currentCommand === scriptPath && settings.statusLine?.type === 'command') {
+    return; // Already configured correctly
+  }
+
+  settings.statusLine = {
+    type: 'command',
+    command: scriptPath,
+    padding: 0,
+  };
+
+  mkdirSync(dirname(settingsFile), { recursive: true });
+  writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
 }

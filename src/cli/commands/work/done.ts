@@ -205,7 +205,15 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
     }
 
-    // Step 2: Update agent runtime state to idle
+    // Step 2: Update agent state to stopped (so it appears in dashboard agents list)
+    const { getAgentState, saveAgentState } = await import('../../../lib/agents.js');
+    const existingState = getAgentState(agentId);
+    if (existingState) {
+      existingState.status = 'stopped';
+      existingState.lastActivity = new Date().toISOString();
+      saveAgentState(existingState);
+    }
+    // Also update runtime state to idle
     saveAgentRuntimeState(agentId, {
       state: 'idle',
       lastActivity: new Date().toISOString(),

@@ -44,7 +44,7 @@ export async function determineHealthStatusAsync(
 ): Promise<{ status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string } | null> {
   const health = await checkAgentHealthAsync(agentId);
 
-  // Read state.json once (used for both status check and activity check)
+  // Read state.json for config (status) and runtime.json for heartbeat (lastActivity)
   let agentStatus: string | undefined;
   let lastActivity: Date | null = null;
 
@@ -52,10 +52,28 @@ export async function determineHealthStatusAsync(
     try {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
       agentStatus = state.status;
+      // Legacy: lastActivity may still be in state.json
       lastActivity = state.lastActivity ? new Date(state.lastActivity) : null;
     } catch {
       // Silently ignore corrupted state.json - treat as missing/test artifact
       // Agent will be excluded from health checks
+    }
+  }
+
+  // Check runtime.json for more recent lastActivity (hooks write here now)
+  const runtimeFile = stateFile.replace('state.json', 'runtime.json');
+  if (existsSync(runtimeFile)) {
+    try {
+      const runtime = JSON.parse(readFileSync(runtimeFile, 'utf-8'));
+      if (runtime.lastActivity) {
+        const runtimeDate = new Date(runtime.lastActivity);
+        // Use whichever is more recent
+        if (!lastActivity || runtimeDate > lastActivity) {
+          lastActivity = runtimeDate;
+        }
+      }
+    } catch {
+      // Non-critical — use state.json lastActivity
     }
   }
 

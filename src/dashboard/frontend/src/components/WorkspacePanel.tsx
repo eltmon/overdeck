@@ -1247,7 +1247,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               {reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test'}
             </button>
 
-            {agent && (
+            {agent && agent.status !== 'stopped' && (
               <button
                 onClick={handleKill}
                 disabled={killMutation.isPending}
@@ -1270,8 +1270,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               Close (No Merge)
             </button>
 
-            {/* Start Agent / Create Workspace - only when no agent */}
-            {!agent && (
+            {/* Start Agent / Create Workspace - when no agent or agent is stopped */}
+            {(!agent || agent.status === 'stopped') && (
               <>
                 <button
                   onClick={() => startAgentMutation.mutate()}

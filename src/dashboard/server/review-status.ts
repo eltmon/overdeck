@@ -16,6 +16,7 @@ export interface ReviewStatus {
   mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
   reviewNotes?: string;
   testNotes?: string;
+  mergeNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
   autoRequeueCount?: number;

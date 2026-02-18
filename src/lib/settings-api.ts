@@ -27,26 +27,26 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
 
     // Implementation phases - Kimi K2.5 for excellent coding at great value
     'issue-agent:implementation': 'kimi-k2.5',
-    'issue-agent:testing': 'claude-sonnet-4-5',
-    'issue-agent:documentation': 'claude-sonnet-4-5',
-    'issue-agent:review-response': 'claude-sonnet-4-5',
+    'issue-agent:testing': 'claude-sonnet-4-6',
+    'issue-agent:documentation': 'claude-sonnet-4-6',
+    'issue-agent:review-response': 'claude-sonnet-4-6',
 
     // Specialist agents - quality critical
     'specialist-review-agent': 'claude-opus-4-6',
-    'specialist-test-agent': 'claude-sonnet-4-5',
-    'specialist-merge-agent': 'claude-sonnet-4-5',
+    'specialist-test-agent': 'claude-sonnet-4-6',
+    'specialist-merge-agent': 'claude-sonnet-4-6',
 
     // Convoy reviewers - mixed based on criticality
     'convoy:security-reviewer': 'claude-opus-4-6',   // SAFETY CRITICAL
-    'convoy:performance-reviewer': 'claude-sonnet-4-5',
-    'convoy:correctness-reviewer': 'claude-sonnet-4-5',
-    'convoy:synthesis-agent': 'claude-sonnet-4-5',
+    'convoy:performance-reviewer': 'claude-sonnet-4-6',
+    'convoy:correctness-reviewer': 'claude-sonnet-4-6',
+    'convoy:synthesis-agent': 'claude-sonnet-4-6',
 
     // Subagents - speed-optimized (Haiku 2x faster, 1/3 cost)
     'subagent:explore': 'claude-haiku-4-5',
     'subagent:plan': 'claude-haiku-4-5',
     'subagent:bash': 'claude-haiku-4-5',
-    'subagent:general-purpose': 'claude-sonnet-4-5',
+    'subagent:general-purpose': 'claude-sonnet-4-6',
 
     // Workflow agents - Opus for planning/PRDs, Haiku for speed tasks
     'prd-agent': 'claude-opus-4-6',
@@ -55,7 +55,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'planning-agent': 'claude-opus-4-6',
 
     // CLI modes - speed for quick, quality for interactive
-    'cli:interactive': 'claude-sonnet-4-5',
+    'cli:interactive': 'claude-sonnet-4-6',
     'cli:quick-command': 'claude-haiku-4-5',
   };
 }

@@ -116,6 +116,43 @@ export interface DatabaseConfig {
   };
 }
 
+export interface TunnelHostname {
+  /** Hostname pattern (supports {{FEATURE_FOLDER}} etc.) e.g., "api-{{FEATURE_FOLDER}}.mindyournow.com" */
+  pattern: string;
+  /** HTTP Host header for Traefik routing e.g., "api-{{FEATURE_FOLDER}}.myn.localhost" */
+  http_host_header?: string;
+  /** Skip TLS verification for local dev (default: true) */
+  no_tls_verify?: boolean;
+}
+
+export interface TunnelConfig {
+  /** Tunnel provider (currently only Cloudflare) */
+  provider: 'cloudflare';
+  /** Cloudflare tunnel ID */
+  tunnel_id: string;
+  /** Cloudflare account ID */
+  account_id: string;
+  /** Cloudflare zone ID */
+  zone_id: string;
+  /** Path to credentials file (cert.pem) containing API token */
+  credentials_file: string;
+  /** Service target for ingress rules (e.g., "https://localhost") */
+  service_target: string;
+  /** Hostnames to create ingress rules + DNS records for */
+  hostnames: TunnelHostname[];
+}
+
+export interface HumeConfig {
+  /** Env var name containing the Hume API key (default: HUME_API_KEY) */
+  api_key_env?: string;
+  /** Config ID of the production/template config to clone from */
+  template_config_id: string;
+  /** Config name pattern for workspaces (supports placeholders) */
+  name_pattern: string;
+  /** BYOLLM callback URL pattern (supports placeholders) */
+  byollm_url_pattern: string;
+}
+
 export interface WorkspaceConfig {
   /** Workspace type: 'polyrepo' (multiple git repos) or 'monorepo' (single repo, default) */
   type?: 'polyrepo' | 'monorepo';
@@ -139,6 +176,10 @@ export interface WorkspaceConfig {
   env?: EnvConfig;
   /** Service definitions for startup commands */
   services?: ServiceConfig[];
+  /** Cloudflare tunnel configuration for external access */
+  tunnel?: TunnelConfig;
+  /** Hume EVI config management for workspace lifecycle */
+  hume?: HumeConfig;
 }
 
 export interface TestsConfig {

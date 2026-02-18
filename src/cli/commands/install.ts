@@ -168,6 +168,15 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'npm install -g @musistudio/claude-code-router',
   });
 
+  // jq (JSON processor — used by statusline, beads, merge-agent, review-agent, dashboard)
+  const hasJq = checkCommand('jq');
+  results.push({
+    name: 'jq',
+    passed: hasJq,
+    message: hasJq ? 'installed' : 'not found',
+    fix: 'apt install jq / brew install jq',
+  });
+
   // ttyd (web terminal for planning sessions)
   const hasTtyd = checkCommand('ttyd') || existsSync(join(homedir(), 'bin', 'ttyd'));
   results.push({

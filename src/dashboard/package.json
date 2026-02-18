@@ -10,6 +10,6 @@
     "install:all": "npm install && cd frontend && npm install && cd ../server && npm install"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^8.2.2"
   }
 }

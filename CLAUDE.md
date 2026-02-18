@@ -1,5 +1,15 @@
 # Panopticon CLI - Development Guidelines
 
+## Engineering Philosophy: No Bandaids
+
+**NEVER apply workarounds, hacks, or "just get it working" fixes.** Every issue, no matter how minor, must be addressed at its root cause as soon as it arises. If something is broken, find out WHY it's broken and fix the underlying problem — don't paper over symptoms with fallback chains or special-case handling.
+
+This means:
+- Investigate before fixing. Understand the full causal chain.
+- If a fix requires understanding code you haven't read, read it first.
+- If a component is generating bad data, fix the component — don't add defensive code downstream to tolerate bad data.
+- If an agent is misbehaving, fix the agent's constraints — don't add monitoring to catch the misbehavior after the fact.
+
 ## CRITICAL: No execSync in Dashboard Server Code
 
 **NEVER use `execSync` in any code reachable from the dashboard server** (Express routes, Socket.io handlers, Cloister specialists, deacon, or any module imported by `src/dashboard/server/index.ts`).
@@ -40,3 +50,25 @@ await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
 ```
 
 Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
+
+## CRITICAL: Deep-Wipe Destroys Everything — NEVER Run Without Explicit User Confirmation
+
+The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace: true` is **irreversible** and destroys:
+
+1. **tmux sessions** — all agent sessions killed
+2. **Agent state directories** — `~/.panopticon/agents/<id>/` removed
+3. **Entire workspace directory** — this includes:
+   - `.planning/STATE.md` — planning progress and status
+   - `.planning/PRD.md` — the **workspace-specific implementation PRD** (generated during planning, distinct from the docs-level PRD)
+   - `.planning/beads/` — all task tracking beads
+   - Any implementation work in progress
+4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
+5. **Linear/GitHub status** — issue status reset to Todo/Open
+
+**The docs-level PRD** (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) survives because it's committed to the docs repo, but it is NOT the same as the workspace implementation plan generated during planning.
+
+**Rules:**
+- **NEVER call deep-wipe programmatically** without the user explicitly requesting it
+- **NEVER attempt destructive HTTP requests** (POST, DELETE) speculatively — HTTP requests execute immediately when sent; tool rejection by the user CANNOT stop an already-sent request
+- When a user wants to restart an agent, use the regular stop/restart flow, NOT deep-wipe
+- Deep-wipe is a last resort for cleaning up abandoned workspaces, not a routine operation

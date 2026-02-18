@@ -1,4 +1,5 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { Loader2, ChevronRight, ChevronDown, GripHorizontal } from 'lucide-react';
 import styles from '../styles/mission-control.module.css';
 
 interface ActivitySection {
@@ -16,6 +17,7 @@ interface AgentSectionProps {
   isUnread: boolean;
   onClick: () => void;
   cost?: number;
+  defaultExpanded?: boolean;
 }
 
 const TYPE_STYLES: Record<string, string> = {
@@ -30,6 +32,15 @@ const STATUS_STYLES: Record<string, string> = {
   running: styles.statusRunning,
   completed: styles.statusCompleted,
   failed: styles.statusFailed,
+};
+
+// Left border accent colors per section type
+const TYPE_ACCENT_COLORS: Record<string, string> = {
+  planning: '#3B82F6',
+  work: '#10B981',
+  review: '#F59E0B',
+  test: '#6366F1',
+  merge: '#EC4899',
 };
 
 function formatDuration(seconds: number | null): string {
@@ -51,7 +62,6 @@ function formatTime(iso: string): string {
 
 function formatModel(model: string): string {
   if (!model || model === 'unknown') return '';
-  // Shorten common model names
   return model
     .replace('claude-opus-4-6', 'Opus 4.6')
     .replace('claude-sonnet-4-5-20250929', 'Sonnet 4.5')
@@ -65,28 +75,126 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
-export function AgentSection({ section, isUnread, onClick, cost }: AgentSectionProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
+function getPreviewLine(transcript: string): string {
+  if (!transcript) return '(no output yet)';
+  const lines = transcript.split('\n').filter(l => l.trim().length > 0);
+  if (lines.length === 0) return '(no output yet)';
+  const last = lines[lines.length - 1].trim();
+  return last.length > 120 ? last.slice(0, 120) + '...' : last;
+}
 
-  // Tail-anchored scrolling: always scroll to bottom on initial render and for running sections
-  const hasInitialScrolled = useRef(false);
+export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded = false }: AgentSectionProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  // null = natural height (no constraint), number = user-set max-height
+  const [customHeight, setCustomHeight] = useState<number | null>(null);
+  const isDragging = useRef(false);
+  const startY = useRef(0);
+  const startHeight = useRef(0);
+
+  // Auto-expand running sections
   useEffect(() => {
-    if (contentRef.current) {
-      if (!hasInitialScrolled.current || section.status === 'running') {
-        requestAnimationFrame(() => {
-          if (contentRef.current) {
-            contentRef.current.scrollTop = contentRef.current.scrollHeight;
-          }
-        });
-        hasInitialScrolled.current = true;
-      }
+    if (section.status === 'running') {
+      setExpanded(true);
     }
-  }, [section.transcript, section.status]);
+  }, [section.status]);
+
+  // Scroll to bottom only for running sections (tail-follow)
+  useEffect(() => {
+    if (contentRef.current && expanded && section.status === 'running') {
+      requestAnimationFrame(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
+      });
+    }
+  }, [section.transcript, section.status, expanded]);
+
+  // Resize drag handlers — dragging sets a max-height constraint
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isDragging.current = true;
+    startY.current = e.clientY;
+    // If no constraint yet, measure natural height as starting point
+    startHeight.current = contentRef.current?.offsetHeight || 300;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = e.clientY - startY.current;
+      const newHeight = Math.max(80, Math.min(2000, startHeight.current + delta));
+      setCustomHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Double-click resize handle to toggle between constrained/unconstrained
+  const handleResizeDoubleClick = useCallback(() => {
+    setCustomHeight(prev => prev === null ? 400 : null);
+  }, []);
+
+  const handleHeaderClick = (e: React.MouseEvent) => {
+    if (e.button === 1 || e.ctrlKey) {
+      onClick();
+      return;
+    }
+    setExpanded(!expanded);
+  };
+
+  const accentColor = TYPE_ACCENT_COLORS[section.type] || 'var(--mc-border)';
+  const isConstrained = customHeight !== null;
+
+  const contentStyle: React.CSSProperties = {};
+  if (isConstrained && expanded) {
+    contentStyle.maxHeight = `${customHeight}px`;
+  }
+
+  const contentClass = isConstrained
+    ? `${styles.sectionContent} ${styles.sectionContentConstrained}`
+    : styles.sectionContent;
 
   return (
-    <div className={styles.agentSection}>
-      <div className={styles.sectionHeader} onClick={onClick} title="Click to focus this section">
-        <div className={`${styles.sectionStatus} ${STATUS_STYLES[section.status] || styles.statusCompleted}`} />
+    <div
+      className={`${styles.agentSection} ${expanded ? styles.agentSectionExpanded : ''}`}
+      style={{ borderLeftColor: accentColor }}
+    >
+      <div
+        className={styles.sectionHeader}
+        onClick={handleHeaderClick}
+        title="Click to expand/collapse, Ctrl+click to isolate"
+      >
+        <span className={styles.sectionChevron}>
+          {expanded ? (
+            <ChevronDown size={12} style={{ color: 'var(--mc-text-muted)' }} />
+          ) : (
+            <ChevronRight size={12} style={{ color: 'var(--mc-text-muted)' }} />
+          )}
+        </span>
+
+        {section.status === 'running' ? (
+          <Loader2 size={12} className={styles.spinning} style={{ color: 'var(--mc-success)', flexShrink: 0 }} />
+        ) : (
+          <div className={`${styles.sectionStatus} ${STATUS_STYLES[section.status] || styles.statusCompleted}`} />
+        )}
+
         <span className={`${styles.sectionType} ${TYPE_STYLES[section.type] || ''}`}>
           {section.type}
         </span>
@@ -102,9 +210,36 @@ export function AgentSection({ section, isUnread, onClick, cost }: AgentSectionP
         )}
         {isUnread && <div className={styles.unreadDot} />}
       </div>
-      <div ref={contentRef} className={styles.sectionContent}>
-        {section.transcript || '(no output yet)'}
-      </div>
+
+      {/* Preview line when collapsed */}
+      {!expanded && (
+        <div className={styles.sectionPreview}>
+          {getPreviewLine(section.transcript)}
+        </div>
+      )}
+
+      {/* Full content when expanded */}
+      {expanded && (
+        <>
+          <div
+            ref={contentRef}
+            className={contentClass}
+            style={contentStyle}
+          >
+            {section.transcript || '(no output yet)'}
+          </div>
+
+          {/* Resize handle — drag to constrain, double-click to toggle */}
+          <div
+            className={styles.sectionResizeHandle}
+            onMouseDown={handleResizeMouseDown}
+            onDoubleClick={handleResizeDoubleClick}
+            title={isConstrained ? 'Drag to resize, double-click to unconstrain' : 'Drag to constrain height, double-click to set default'}
+          >
+            <GripHorizontal size={12} style={{ color: 'var(--mc-text-muted)', opacity: isConstrained ? 0.8 : 0.4 }} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -265,15 +265,16 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
     setIsolatedSection(null);
   };
 
-  // Scroll to bottom on issueId change and on every data refresh
+  // Scroll to bottom once when switching to a new feature (after sections load)
   const prevIssueRef = useRef<string | null>(null);
+  const hasScrolledRef = useRef(false);
   useEffect(() => {
-    if (sections.length > 0 && containerRef.current) {
-      // Always scroll to bottom when issueId changes, or on first load
-      const isNewIssue = prevIssueRef.current !== issueId;
-      if (isNewIssue) {
-        prevIssueRef.current = issueId;
-      }
+    if (prevIssueRef.current !== issueId) {
+      prevIssueRef.current = issueId;
+      hasScrolledRef.current = false;
+    }
+    if (sections.length > 0 && containerRef.current && !hasScrolledRef.current) {
+      hasScrolledRef.current = true;
       // Use rAF to ensure DOM has rendered the content before measuring scroll height
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -337,17 +338,22 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
             Total: ${totalCost < 0.01 ? '<0.01' : totalCost.toFixed(2)}
           </div>
         )}
-        {sections.map((section) => {
-          // Map section type to cost stage key
-          const stageMap: Record<string, string> = {
-            work: 'implementation',
-            planning: 'planning',
-            review: 'review',
-            test: 'test',
-            merge: 'merge',
+        {sections.map((section, index) => {
+          // Map section type to cost stage key(s)
+          // Planning includes exploration sub-stage; work maps to implementation
+          const stageKeys: Record<string, string[]> = {
+            work: ['implementation'],
+            planning: ['planning', 'exploration'],
+            review: ['review'],
+            test: ['test'],
+            merge: ['merge'],
           };
-          const stageKey = stageMap[section.type] || section.type;
-          const sectionCost = costByStage[stageKey]?.cost;
+          const keys = stageKeys[section.type] || [section.type];
+          const sectionCost = keys.reduce((sum, k) => sum + (costByStage[k]?.cost || 0), 0) || undefined;
+
+          // Auto-expand: running sections + the most recent section
+          const isLast = index === sections.length - 1;
+          const shouldExpand = section.status === 'running' || isLast;
 
           return (
             <AgentSection
@@ -356,6 +362,7 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
               isUnread={!readSections.has(section.sessionId) && prevSectionsRef.current.length > 0}
               onClick={() => handleSectionClick(section)}
               cost={sectionCost}
+              defaultExpanded={shouldExpand}
             />
           );
         })}

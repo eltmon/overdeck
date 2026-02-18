@@ -80,7 +80,7 @@ export interface SpawnRemoteAgentOptions {
  * Spawn a Claude agent on a remote VM
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
-  const { issueId, workspace, model = 'claude-sonnet-4-5', prompt } = options;
+  const { issueId, workspace, model = 'claude-sonnet-4-6', prompt } = options;
 
   const agentId = `agent-${issueId.toLowerCase()}`;
   const vmName = workspace.vmName;

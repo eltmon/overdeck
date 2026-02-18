@@ -107,7 +107,7 @@ function getDigestModel(projectKey: string, specialistType: string): string {
     return getModelId(workTypeId);
   } catch (error) {
     // Default to Sonnet if can't resolve
-    return 'claude-sonnet-4-5';
+    return 'claude-sonnet-4-6';
   }
 }
 

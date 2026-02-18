@@ -51,8 +51,11 @@ import {
   stopDeacon,
   isDeaconRunning,
   getDeaconStatus,
+  getLastPatrolResult,
+  getDeaconLogs,
   runPatrol,
   type PatrolResult,
+  type DeaconLogEntry,
 } from './deacon.js';
 import { PANOPTICON_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync } from 'fs';
@@ -1035,6 +1038,20 @@ export class CloisterService {
    */
   getDeaconStatus() {
     return getDeaconStatus();
+  }
+
+  /**
+   * Get the most recent patrol result (actions, cycle, timestamp)
+   */
+  getLastPatrolResult(): PatrolResult | null {
+    return getLastPatrolResult();
+  }
+
+  /**
+   * Get recent deacon log entries
+   */
+  getDeaconLogs(limit = 100): DeaconLogEntry[] {
+    return getDeaconLogs(limit);
   }
 
   /**

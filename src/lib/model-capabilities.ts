@@ -92,6 +92,28 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning.',
   },
 
+  'claude-sonnet-4-6': {
+    model: 'claude-sonnet-4-6',
+    provider: 'anthropic',
+    displayName: 'Claude Sonnet 4.6',
+    costPer1MTokens: 9.0, // $3 in / $15 out → avg ~$9
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 94,
+      'code-review': 94,
+      debugging: 92,
+      planning: 90,
+      documentation: 92,
+      testing: 92,
+      security: 88,
+      performance: 88,
+      synthesis: 90,
+      speed: 70,
+      'context-length': 95,
+    },
+    notes: 'Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning.',
+  },
+
   'claude-sonnet-4-5': {
     model: 'claude-sonnet-4-5',
     provider: 'anthropic',

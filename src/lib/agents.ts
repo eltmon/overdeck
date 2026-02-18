@@ -170,45 +170,86 @@ export interface ActivityEntry {
 }
 
 /**
+ * Get the path to an agent's runtime state file (separate from config state)
+ */
+export function getAgentRuntimeFile(agentId: string): string {
+  return join(getAgentDir(agentId), 'runtime.json');
+}
+
+/**
  * Get agent runtime state (from hooks)
+ *
+ * Reads from runtime.json (new) with fallback to state.json (legacy migration).
+ * This separation prevents bash hooks from corrupting AgentState config.
  */
 export function getAgentRuntimeState(agentId: string): AgentRuntimeState | null {
+  const runtimeFile = getAgentRuntimeFile(agentId);
   const stateFile = join(getAgentDir(agentId), 'state.json');
 
-  // If file doesn't exist, agent is uninitialized
-  if (!existsSync(stateFile)) {
+  // Try runtime.json first (new location)
+  if (existsSync(runtimeFile)) {
+    try {
+      const content = readFileSync(runtimeFile, 'utf8');
+      return JSON.parse(content) as AgentRuntimeState;
+    } catch {
+      // Fall through to legacy
+    }
+  }
+
+  // Fallback to state.json (legacy — runtime fields were mixed in)
+  if (existsSync(stateFile)) {
+    try {
+      const content = readFileSync(stateFile, 'utf8');
+      const parsed = JSON.parse(content);
+      // Only use if it has runtime-specific fields
+      if (parsed.state && parsed.lastActivity) {
+        return parsed as AgentRuntimeState;
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  // No state at all — uninitialized
+  if (!existsSync(stateFile) && !existsSync(runtimeFile)) {
     return {
       state: 'uninitialized',
       lastActivity: new Date().toISOString(),
     };
   }
 
-  try {
-    const content = readFileSync(stateFile, 'utf8');
-    return JSON.parse(content) as AgentRuntimeState;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 /**
- * Save agent runtime state
+ * Save agent runtime state to runtime.json (separate from AgentState config)
+ *
+ * This writes ONLY to runtime.json, never touching state.json.
+ * This separation is critical: bash hooks write runtime.json on every tool call,
+ * while AgentState in state.json is only written at lifecycle events (spawn/stop/handoff).
  */
 export function saveAgentRuntimeState(agentId: string, state: Partial<AgentRuntimeState>): void {
   const dir = getAgentDir(agentId);
   mkdirSync(dir, { recursive: true });
 
-  // Merge with existing state
-  const existing = getAgentRuntimeState(agentId);
+  const runtimeFile = getAgentRuntimeFile(agentId);
+
+  // Merge with existing runtime state (read from runtime.json only, not state.json)
+  let existing: AgentRuntimeState | null = null;
+  if (existsSync(runtimeFile)) {
+    try {
+      existing = JSON.parse(readFileSync(runtimeFile, 'utf8'));
+    } catch {
+      // Ignore corrupt file
+    }
+  }
+
   const merged: AgentRuntimeState = {
     ...(existing || { state: 'uninitialized', lastActivity: new Date().toISOString() }),
     ...state,
   };
 
-  writeFileSync(
-    join(dir, 'state.json'),
-    JSON.stringify(merged, null, 2)
-  );
+  writeFileSync(runtimeFile, JSON.stringify(merged, null, 2));
 }
 
 /**
@@ -310,7 +351,7 @@ export interface SpawnOptions {
  * 3. Work type from phase (options.phase → issue-agent:{phase})
  * 4. Specialist work type (options.agentType → specialist-{type})
  * 5. Complexity-based routing (LEGACY - deprecated)
- * 6. Default fallback (claude-sonnet-4-5)
+ * 6. Default fallback (claude-sonnet-4-6)
  */
 function determineModel(options: SpawnOptions): string {
   console.log(`[DEBUG] determineModel called with:`, { model: options.model, workType: options.workType, phase: options.phase, agentType: options.agentType, difficulty: options.difficulty });
@@ -352,23 +393,23 @@ function determineModel(options: SpawnOptions): string {
       }
     }
 
-    // Fall back to default model from Cloister config or claude-sonnet-4-5
+    // Fall back to default model from Cloister config or claude-sonnet-4-6
     try {
       const cloisterConfig = loadCloisterConfig();
       const defaultModel = cloisterConfig.model_selection?.default_model || 'sonnet';
       const modelMap: Record<string, string> = {
         'opus': 'claude-opus-4-6',
-        'sonnet': 'claude-sonnet-4-5',
+        'sonnet': 'claude-sonnet-4-6',
         'haiku': 'claude-haiku-4-5',
       };
-      return modelMap[defaultModel] || 'claude-sonnet-4-5';
+      return modelMap[defaultModel] || 'claude-sonnet-4-6';
     } catch {
-      return 'claude-sonnet-4-5';
+      return 'claude-sonnet-4-6';
     }
   } catch (error) {
     // If work type router fails, fall back to default
     console.warn('Warning: Could not resolve model using work type router, using default');
-    return options.model || 'claude-sonnet-4-5';
+    return options.model || 'claude-sonnet-4-6';
   }
 }
 
@@ -554,6 +595,7 @@ export function stopAgent(agentId: string): void {
   if (state) {
     // Ensure id is set — runtime state files may lack it (PAN-150)
     if (!state.id) state.id = normalizedId;
+
     state.status = 'stopped';
     saveAgentState(state);
   }
