@@ -1,4 +1,4 @@
-# Planning Session: PAN-166
+# Planning Session: PAN-209
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,64 +22,26 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-166
-- **Title:** Rally tracker: WSAPI query parse error on IssueDataService poll
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/166
+- **ID:** PAN-209
+- **Title:** Mouse scroll in planning dialog scrolls chat input instead of agent output
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/209
 
 ## Description
-## Bug Report
+## Problem
 
-**Version:** panopticon-cli v0.4.9  
-**Tracker:** Rally (WSAPI)
-
-## Description
-
-When the Rally tracker is configured as the primary tracker, the `IssueDataService` background poller fails repeatedly with a WSAPI query parse error:
-
-```
-[IssueDataService] Rally poll error: Rally API query failed: Could not parse: Error parsing expression -- expected ")" but saw "AND" instead.
-```
-
-This error repeats on every poll cycle, resulting in no issues being displayed in the dashboard.
-
-## Configuration
-
-```toml
-[trackers]
-primary = "rally"
-
-  [trackers.rally]
-  type = "rally"
-  api_key_env = "RALLY_API_KEY"
-  server = "https://rally1.rallydev.com"
-```
-
-- API key is valid and loaded (confirmed via `api/settings` endpoint showing `tracker_keys.rally`)
-- No `workspace` or `project` specified in config (may be contributing to malformed query)
-- Two projects registered in `projects.yaml` (HSv3, HS POS Integrations)
-
-## Root Cause (Suspected)
-
-The Rally WSAPI query filter is being constructed with incorrect parenthesization. Rally's WSAPI requires nested parentheses for compound AND/OR expressions, e.g.:
-
-```
-((State = "In-Progress") AND (Project.Name = "Foo"))
-```
-
-The query builder appears to be generating a flat expression that the WSAPI parser rejects.
-
-## Steps to Reproduce
-
-1. `pan install` (v0.4.9)
-2. Configure Rally as primary tracker in `config.toml`
-3. Set `RALLY_API_KEY` in `~/.panopticon.env`
-4. `pan up`
-5. Observe repeated error in server logs
-6. `curl http://localhost:3011/api/issues` returns `[]`
+In the PlanDialog's terminal/chat view, middle mouse scroll (or regular scroll wheel) scrolls the chat input textbox instead of the agent output pane. The user expects scrolling to navigate the agent's output history.
 
 ## Expected Behavior
 
-Issues from the configured Rally workspace/project should be fetched and displayed in the dashboard.
+Scroll wheel over the planning dialog should scroll the agent output (terminal/log area), not the chat input field.
+
+## Affected Component
+
+- `src/dashboard/frontend/src/components/PlanDialog.tsx` — the XTerminal / output area and chat input layout
+
+## Likely Cause
+
+The chat input textarea may be capturing scroll events, or the output pane lacks proper `overflow-y: auto` / scroll focus. The z-order or focus state may cause the input to receive scroll events when the cursor is over the output area.
 
 ---
 
