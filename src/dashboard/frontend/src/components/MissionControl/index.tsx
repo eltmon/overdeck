@@ -4,6 +4,7 @@ import { Compass } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { ActivityView } from './ActivityView';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
+import { DeaconStatus } from './DeaconStatus';
 import { BeadsDialog } from '../BeadsDialog';
 import type { Issue } from '../../types';
 import styles from './styles/mission-control.module.css';
@@ -145,6 +146,8 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
               ))
             )}
           </div>
+
+          <DeaconStatus />
         </div>
 
         {/* Resize Handle */}

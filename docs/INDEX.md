@@ -42,6 +42,7 @@
 | [ARCHITECTURE-CACHING.md](./ARCHITECTURE-CACHING.md) | Dashboard API caching, real-time push, and rate limit management |
 | [DNS_SETUP.md](./DNS_SETUP.md) | Local DNS resolution for development |
 | [cost-tracking.md](./cost-tracking.md) | Event-sourced cost tracking system |
+| [CONFIGURATION.md § External Services](./CONFIGURATION.md#external-service-integrations) | Cloudflare tunnels, Hume EVI, and adding new integrations |
 
 ---
 
@@ -113,6 +114,9 @@
 ### Infrastructure
 - **"workspace"** / **"workspaces"** → README.md, PRD-REMOTE-WORKSPACES.md
 - **"Docker"** → README.md, DNS_SETUP.md
+- **"Hume"** / **"EVI"** / **"voice"** / **"BYOLLM"** → CONFIGURATION.md (External Service Integrations)
+- **"tunnel"** / **"Cloudflare"** → CONFIGURATION.md (External Service Integrations)
+- **"external services"** / **"integrations"** → CONFIGURATION.md (External Service Integrations)
 - **"DNS"** / **"domains"** → DNS_SETUP.md
 - **"remote"** → PRD-REMOTE-WORKSPACES.md
 - **"git"** / **"worktree"** → README.md, CLAUDE.md

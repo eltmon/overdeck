@@ -21,7 +21,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(),
   createSession: vi.fn(),
   sendKeys: vi.fn(),
-  sendKeysAsync: vi.fn(),
+  sendKeysAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('Agent Lifecycle Integration (PAN-80)', () => {
@@ -274,12 +274,21 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
       const retrievedSessionId = getSessionId(agentId);
       expect(retrievedSessionId).toBe(sessionId);
 
-      // Verify createSession was called with --resume flag
+      // Verify createSession was called with a launcher script that contains --resume
       expect(tmuxMock.createSession).toHaveBeenCalled();
       const createSessionCall = vi.mocked(tmuxMock.createSession).mock.calls[0];
       const command = createSessionCall[2]; // 3rd param is the command
-      expect(command).toContain('--resume');
-      expect(command).toContain(sessionId);
+      // Command is either direct --resume or a launcher script wrapping it
+      if (command.startsWith('bash ')) {
+        // Launcher script path — read it and verify contents
+        const launcherPath = command.replace(/^bash "/, '').replace(/"$/, '');
+        const launcherContent = readFileSync(launcherPath, 'utf-8');
+        expect(launcherContent).toContain('--resume');
+        expect(launcherContent).toContain(sessionId);
+      } else {
+        expect(command).toContain('--resume');
+        expect(command).toContain(sessionId);
+      }
     });
 
     it('should handle resume with optional message', async () => {
@@ -331,7 +340,7 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
 
       await resumeAgent(agentId, message);
 
-      // Verify sendKeysAsync was called with the message (resumeAgent uses async variant)
+      // Verify sendKeysAsync was called with the message
       expect(tmuxMock.sendKeysAsync).toHaveBeenCalledWith(agentId, message);
     });
   });

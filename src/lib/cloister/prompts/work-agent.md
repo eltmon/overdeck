@@ -2,6 +2,16 @@
 
 **Workspace:** {{WORKSPACE_PATH}}
 
+## CRITICAL: Stay In Your Workspace
+
+**You MUST only operate within your workspace directory: `{{WORKSPACE_PATH}}`**
+
+- NEVER `cd` to the parent project directory or any path outside your workspace
+- NEVER run `git stash`, `git checkout`, or any destructive git commands outside your workspace
+- Your workspace is a git worktree — it has its own branch and working tree independent of the main repo
+- Running git commands in the parent repo will destroy other agents' uncommitted work
+- If you need to check main branch state, use `git log origin/main` from within your workspace
+
 {{#if POLYREPO_CONTEXT}}
 {{POLYREPO_CONTEXT}}
 {{/if}}

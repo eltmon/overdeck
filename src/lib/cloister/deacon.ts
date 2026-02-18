@@ -55,7 +55,7 @@ import {
   completeSpecialistTask,
 } from './specialists.js';
 import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState } from '../agents.js';
-import { sessionExists } from '../tmux.js';
+import { sessionExists, sendKeysAsync } from '../tmux.js';
 
 // ============================================================================
 // Configuration
@@ -343,7 +343,27 @@ export async function checkSpecialistHealth(
     };
   }
 
-  // Not responsive - increment failure counter
+  // Stale heartbeat — but an idle specialist is EXPECTED to have a stale heartbeat
+  // (no tool calls = no hook-based heartbeat updates). Don't count idle specialists
+  // as failures — only escalate when the specialist should be actively working.
+  const tmuxSession = getTmuxSessionName(name);
+  const runtimeState = getAgentRuntimeState(tmuxSession);
+  const isIdle = !runtimeState || runtimeState.state === 'idle';
+
+  if (isIdle) {
+    // Idle specialist with stale heartbeat is normal — treat as responsive
+    if (!sharedState) saveState(state);
+    return {
+      specialistName: name,
+      isResponsive: false,  // heartbeat IS stale
+      wasRunning: true,
+      consecutiveFailures: healthState.consecutiveFailures,  // don't increment
+      shouldForceKill: false,  // never force-kill an idle specialist
+      inCooldown: isInCooldown(healthState),
+    };
+  }
+
+  // Active specialist with stale heartbeat — genuinely unresponsive
   healthState.consecutiveFailures++;
   if (!sharedState) saveState(state);
 
@@ -1023,6 +1043,119 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
   return actions;
 }
 
+// Track per-issue cooldowns for dead-end recovery to avoid spamming
+const deadEndCooldowns = new Map<string, number>();
+
+// Minimum time (ms) after status update before dead-end detection intervenes
+const DEAD_END_STALENESS_MS = 5 * 60 * 1000; // 5 minutes
+// Cooldown between successive dead-end recovery attempts for the same issue
+const DEAD_END_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Detect dead-end agents: review blocked or tests failed, but work agent is idle.
+ *
+ * This happens when:
+ * - Review feedback was delivered with a wrong URL (now fixed, but old feedback persists)
+ * - Agent forgot how to resubmit (context compaction lost instructions)
+ * - Feedback delivery to tmux failed silently
+ *
+ * Recovery: re-queue the review via the request-review API endpoint and
+ * send the agent a nudge message with the correct resubmit command.
+ */
+export async function checkDeadEndAgents(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    if (!existsSync(REVIEW_STATUS_FILE)) {
+      return actions;
+    }
+
+    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
+    const statuses: Record<string, {
+      issueId?: string;
+      reviewStatus?: string;
+      testStatus?: string;
+      readyForMerge?: boolean;
+      mergeStatus?: string;
+      updatedAt?: string;
+      autoRequeueCount?: number;
+      history?: Array<{ type: string; status: string; timestamp?: string }>;
+    }> = JSON.parse(content);
+
+    const now = Date.now();
+
+    for (const [key, status] of Object.entries(statuses)) {
+      // Only act on blocked reviews or failed tests
+      const isReviewBlocked = status.reviewStatus === 'blocked';
+      const isTestFailed = status.testStatus === 'failed';
+      if (!isReviewBlocked && !isTestFailed) continue;
+
+      // Skip merged/completed issues
+      if (status.mergeStatus === 'merged' || status.readyForMerge) continue;
+
+      // Check staleness: status must have been set at least 5 min ago
+      if (status.updatedAt) {
+        const statusAge = now - new Date(status.updatedAt).getTime();
+        if (statusAge < DEAD_END_STALENESS_MS) continue;
+      }
+
+      // Check per-issue cooldown
+      const lastRecovery = deadEndCooldowns.get(key);
+      if (lastRecovery && (now - lastRecovery) < DEAD_END_COOLDOWN_MS) continue;
+
+      // Circuit breaker: don't intervene if already at max requeues
+      const autoRequeueCount = status.autoRequeueCount || 0;
+      if (autoRequeueCount >= 3) {
+        console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/3 requeues used)`);
+        continue;
+      }
+
+      // Check if the work agent exists and is idle
+      const issueId = status.issueId || key;
+      const agentSessionName = `agent-${issueId.toLowerCase()}`;
+
+      if (!sessionExists(agentSessionName)) {
+        // No agent session — nothing to recover
+        continue;
+      }
+
+      // Check if agent is actively working (don't interrupt active agents)
+      const isActive = await isAgentActiveInTmux(agentSessionName);
+      if (isActive) {
+        // Agent is still working on fixes — let it finish
+        continue;
+      }
+
+      // Agent is idle with a blocked/failed status — this is a dead end
+      const statusType = isReviewBlocked ? 'review blocked' : 'tests failed';
+      console.log(`[deacon] Dead-end detected: ${key} (${statusType}) with idle agent ${agentSessionName}`);
+
+      // Record cooldown before taking action
+      deadEndCooldowns.set(key, now);
+
+      // Send the agent a nudge message with the correct resubmit command
+      try {
+        const nudgeMessage = isReviewBlocked
+          ? `The review agent found issues in your code. Check .planning/feedback/ for details, fix the issues, commit and push, then resubmit with: curl -X POST http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}' — or run: pan work done ${issueId} -c "Fixed review issues"`
+          : `Tests failed for your changes. Check .planning/feedback/ for details, fix the failures, commit and push, then resubmit with: curl -X POST http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}' — or run: pan work done ${issueId} -c "Fixed test failures"`;
+
+        await sendKeysAsync(agentSessionName, nudgeMessage);
+        actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
+        console.log(`[deacon] Sent dead-end recovery nudge to ${agentSessionName}`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[deacon] Failed to send dead-end nudge to ${agentSessionName}:`, msg);
+        actions.push(`Dead-end recovery failed for ${agentSessionName}: ${msg}`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error in dead-end detection:', msg);
+  }
+
+  return actions;
+}
+
 /**
  * Run a single patrol cycle
  */
@@ -1035,6 +1168,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   const results: HealthCheckResult[] = [];
   const actions: string[] = [];
 
+  addLog('info', `Patrol cycle ${state.patrolCycle} — checking ${enabled.length} specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking ${enabled.length} specialists`);
 
   for (const specialist of enabled) {
@@ -1043,6 +1177,7 @@ export async function runPatrol(): Promise<PatrolResult> {
 
     // Handle stuck specialists
     if (result.shouldForceKill) {
+      addLog('warn', `${specialist.name} stuck (${result.consecutiveFailures} failures), force-killing`, state.patrolCycle);
       console.log(`[deacon] ${specialist.name} stuck (${result.consecutiveFailures} failures), force-killing`);
       const killResult = await forceKillSpecialist(specialist.name, state);
       actions.push(`Force-killed ${specialist.name}: ${killResult.message}`);
@@ -1053,8 +1188,10 @@ export async function runPatrol(): Promise<PatrolResult> {
         const initResult = await initializeSpecialist(specialist.name);
         if (initResult.success) {
           actions.push(`Auto-restarted ${specialist.name}`);
+          addLog('action', `Auto-restarted ${specialist.name}`, state.patrolCycle);
         } else {
           actions.push(`Failed to restart ${specialist.name}: ${initResult.message}`);
+          addLog('error', `Failed to restart ${specialist.name}: ${initResult.message}`, state.patrolCycle);
         }
       }
     } else if (!result.wasRunning && !result.inCooldown) {
@@ -1063,8 +1200,10 @@ export async function runPatrol(): Promise<PatrolResult> {
       const initResult = await initializeSpecialist(specialist.name);
       if (initResult.success) {
         actions.push(`Auto-started ${specialist.name}`);
+        addLog('action', `Auto-started ${specialist.name}`, state.patrolCycle);
       } else if (initResult.error !== 'already_running') {
         actions.push(`Failed to start ${specialist.name}: ${initResult.message}`);
+        addLog('error', `Failed to start ${specialist.name}: ${initResult.message}`, state.patrolCycle);
       }
     }
 
@@ -1130,24 +1269,30 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
 
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
-  // Now checks tmux status indicators to avoid false positives on computing agents
   const suspendActions = await checkAndSuspendIdleAgents();
   actions.push(...suspendActions);
+  for (const a of suspendActions) addLog('action', a, state.patrolCycle);
 
   // Check for orphaned review/test statuses (PAN-88)
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
+  for (const a of orphanActions) addLog('action', a, state.patrolCycle);
+
+  // Detect dead-end agents: review blocked or tests failed but agent is idle
+  const deadEndActions = await checkDeadEndAgents();
+  actions.push(...deadEndActions);
+  for (const a of deadEndActions) addLog('action', a, state.patrolCycle);
 
   // Check for lazy agent behavior and auto-correct (PAN-80, fixed in PAN-154)
-  // Now checks tmux status indicators to avoid false positives on computing agents
   const lazyActions = await checkAndCorrectLazyAgents();
   actions.push(...lazyActions);
+  for (const a of lazyActions) addLog('action', a, state.patrolCycle);
 
   // Periodic agent state cleanup (PAN-154)
-  // Runs at ~1 in 300 patrols (~daily at 30s intervals)
   if (Math.random() < 0.003) {
     const cleanupActions = await cleanupStaleAgentState();
     actions.push(...cleanupActions);
+    for (const a of cleanupActions) addLog('action', a, state.patrolCycle);
   }
 
   // Check for mass death (uses shared state)
@@ -1155,6 +1300,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   if (massDeathCheck.isMassDeath && massDeathCheck.message) {
     console.error(`[deacon] ${massDeathCheck.message}`);
     actions.push(massDeathCheck.message);
+    addLog('error', massDeathCheck.message, state.patrolCycle);
   }
 
   // Single save for the entire patrol cycle — all mutations from
@@ -1162,13 +1308,62 @@ export async function runPatrol(): Promise<PatrolResult> {
   // accumulate in the shared state object and are persisted once here.
   saveState(state);
 
-  return {
+  const result: PatrolResult = {
     cycle: state.patrolCycle,
     timestamp: state.lastPatrol,
     specialists: results,
     actionsToken: actions,
     massDeathDetected: massDeathCheck.isMassDeath,
   };
+
+  lastPatrolResult = result;
+  return result;
+}
+
+// Store the most recent patrol result for API access
+let lastPatrolResult: PatrolResult | null = null;
+
+// ============================================================================
+// Deacon Log Buffer
+// ============================================================================
+
+export interface DeaconLogEntry {
+  timestamp: string;
+  level: 'info' | 'warn' | 'action' | 'error';
+  message: string;
+  cycle?: number;
+}
+
+const MAX_LOG_ENTRIES = 200;
+const deaconLogs: DeaconLogEntry[] = [];
+
+function addLog(level: DeaconLogEntry['level'], message: string, cycle?: number): void {
+  deaconLogs.push({
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    cycle,
+  });
+  // Trim to max size
+  if (deaconLogs.length > MAX_LOG_ENTRIES) {
+    deaconLogs.splice(0, deaconLogs.length - MAX_LOG_ENTRIES);
+  }
+}
+
+/**
+ * Get recent deacon log entries.
+ * Returns the most recent `limit` entries (default 100).
+ */
+export function getDeaconLogs(limit = 100): DeaconLogEntry[] {
+  return deaconLogs.slice(-limit);
+}
+
+/**
+ * Get the result of the most recent patrol cycle.
+ * Used by the dashboard API to show recent Deacon actions.
+ */
+export function getLastPatrolResult(): PatrolResult | null {
+  return lastPatrolResult;
 }
 
 /**

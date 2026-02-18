@@ -526,7 +526,7 @@ export async function spawnEphemeralSpecialist(
 
   try {
     // Determine model for this specialist
-    let model = 'claude-sonnet-4-5'; // default
+    let model = 'claude-sonnet-4-6'; // default
     try {
       const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
       model = getModelId(workTypeId);
@@ -1361,7 +1361,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   const cwd = process.env.HOME || '/home/eltmon';
 
   // Determine model for this specialist using work type router
-  let model = 'claude-sonnet-4-5'; // default fallback
+  let model = 'claude-sonnet-4-6'; // default fallback
   try {
     // Map specialist name to work type ID
     const workTypeId: WorkTypeId = `specialist-${name}` as WorkTypeId;
@@ -1543,7 +1543,7 @@ export async function wakeSpecialist(
 
     try {
       // Resolve model from work type router (respects config.yaml overrides)
-      let model = 'claude-sonnet-4-5'; // default fallback
+      let model = 'claude-sonnet-4-6'; // default fallback
       try {
         const workTypeId: WorkTypeId = `specialist-${name}` as WorkTypeId;
         model = getModelId(workTypeId);

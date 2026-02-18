@@ -235,7 +235,7 @@ async function sendFeedbackToWorkAgent(
 
   if (result.reviewResult === 'CHANGES_REQUESTED') {
     const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-    body += `\n## Required Actions\n\nFix the issues above, commit and push, then resubmit for review:\n\`\`\`bash\ncurl -X POST ${apiUrl}/api/review/queue -H "Content-Type: application/json" -d '{"issueId":"${context.issueId}"}'\n\`\`\`\nDo NOT stop until review passes.\n`;
+    body += `\n## Required Actions\n\nFix the issues above, commit and push, then resubmit for review:\n\`\`\`bash\ncurl -X POST ${apiUrl}/api/workspaces/${context.issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\`\`\`\nDo NOT stop until review passes.\n`;
   } else if (result.reviewResult === 'APPROVED') {
     body += `\n## Next Steps\n\nCode approved. It will proceed to testing.\n`;
   }

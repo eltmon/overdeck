@@ -72,7 +72,7 @@ describe('router-config', () => {
       expect(config.providers[0].apiKey).toBe('$ANTHROPIC_API_KEY');
       expect(config.providers[0].models).toEqual([
         'claude-opus-4-6',
-        'claude-sonnet-4-5',
+        'claude-sonnet-4-6',
         'claude-haiku-4-5',
       ]);
     });
@@ -398,7 +398,7 @@ describe('router-config', () => {
             name: 'anthropic',
             baseURL: 'https://api.anthropic.com/v1',
             apiKey: '$ANTHROPIC_API_KEY',
-            models: ['claude-opus-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+            models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
           },
         ],
         router: {

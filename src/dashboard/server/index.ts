@@ -9,7 +9,7 @@ import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync, rmSync, symlinkSync, chmodSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { Server as SocketIOServer } from 'socket.io';
@@ -35,6 +35,7 @@ import { sendKeysAsync } from '../../lib/tmux.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig, findProjectByTeam, extractTeamPrefix } from '../../lib/projects.js';
+import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
@@ -1838,8 +1839,9 @@ app.get('/api/agents', async (_req, res) => {
         // Check for pending AskUserQuestion (agent waiting for user input)
         const pendingQuestions = await getAgentPendingQuestions(name);
 
-        // Check runtime state - 'idle' means agent is at the prompt waiting for input
-        const isIdle = state.state === 'idle' || (state.currentTool === 'AskUserQuestion' && pendingQuestions.length === 0);
+        // Check runtime state from runtime.json (separate from state.json config)
+        const runtimeState = getAgentRuntimeState(name);
+        const isIdle = runtimeState?.state === 'idle' || (runtimeState?.currentTool === 'AskUserQuestion' && pendingQuestions.length === 0);
 
         // Check workspace location (local vs remote)
         const workspaceLocation = getWorkspaceLocation(issueId);
@@ -1916,10 +1918,26 @@ app.get('/api/agents', async (_req, res) => {
 
         try {
           const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-          if (state.status !== 'stopped') continue;
+
+          // Read runtime state from runtime.json (separate from state.json config)
+          const runtimeFile = join(agentsDir, dir, 'runtime.json');
+          let runtimeData: any = {};
+          if (existsSync(runtimeFile)) {
+            try { runtimeData = JSON.parse(readFileSync(runtimeFile, 'utf-8')); } catch {}
+          }
+
+          // Agent is stopped if: explicit status, or completed marker, or idle with no tmux session
+          const hasCompletedMarker = existsSync(join(agentsDir, dir, 'completed')) ||
+            existsSync(join(agentsDir, dir, 'completed.processed'));
+          const runtimeIdle = runtimeData.state === 'idle' || state.state === 'idle'; // check both for migration
+          const isStopped = state.status === 'stopped' || hasCompletedMarker ||
+            (runtimeIdle && state.status !== 'starting');
+          if (!isStopped) continue;
 
           // Only show agents stopped within the last hour
-          const stoppedAt = state.lastActivity ? new Date(state.lastActivity) : null;
+          // Check runtime.json first (most recent), then state.json
+          const lastActivity = runtimeData.lastActivity || state.lastActivity;
+          const stoppedAt = lastActivity ? new Date(lastActivity) : null;
           if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000) continue;
 
           const isPlanning = dir.startsWith('planning-');
@@ -2030,18 +2048,21 @@ app.get('/api/agents/:id/output', async (req, res) => {
       stdout = result.stdout;
     }
 
-    // If tmux returned nothing useful, fall back to saved output log
+    // If tmux returned nothing useful, fall back to saved output.log
     if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
       const savedLog = join(agentStateDir, 'output.log');
       if (existsSync(savedLog)) {
         const logContent = readFileSync(savedLog, 'utf-8');
-        // Return the last N lines from the saved log
         const logLines = logContent.split('\n');
         const numLines = typeof lines === 'string' ? parseInt(lines, 10) : lines as number;
         stdout = logLines.slice(-numLines).join('\n');
       }
     }
 
+    // Never return raw "Session not found" — let the frontend show its own empty-state message
+    if (stdout?.trim() === 'Session not found') {
+      stdout = '';
+    }
     res.json({ output: stdout });
   } catch (error) {
     // Even on error, try the saved log
@@ -2056,7 +2077,7 @@ app.get('/api/agents/:id/output', async (req, res) => {
     } catch {
       // Fall through
     }
-    res.json({ output: 'Failed to capture output' });
+    res.json({ output: '' });
   }
 });
 
@@ -3111,15 +3132,37 @@ app.put('/api/cloister/config', (req, res) => {
 // Deacon API Endpoints (PAN-33 Phase 6 - Specialist Health Monitor)
 // ============================================================================
 
-// Get deacon status
+// Get deacon status (includes last patrol actions for dashboard display)
 app.get('/api/deacon/status', (_req, res) => {
   try {
     const service = getCloisterService();
     const status = service.getDeaconStatus();
-    res.json(status);
+    const lastPatrol = service.getLastPatrolResult();
+    res.json({
+      ...status,
+      lastPatrol: lastPatrol ? {
+        cycle: lastPatrol.cycle,
+        timestamp: lastPatrol.timestamp,
+        actions: lastPatrol.actionsToken,
+        massDeathDetected: lastPatrol.massDeathDetected,
+      } : null,
+    });
   } catch (error: any) {
     console.error('Error getting deacon status:', error);
     res.status(500).json({ error: 'Failed to get deacon status: ' + error.message });
+  }
+});
+
+// Get recent deacon logs
+app.get('/api/deacon/logs', (req, res) => {
+  try {
+    const service = getCloisterService();
+    const limit = parseInt(req.query.limit as string) || 100;
+    const logs = service.getDeaconLogs(Math.min(limit, 200));
+    res.json({ logs });
+  } catch (error: any) {
+    console.error('Error getting deacon logs:', error);
+    res.status(500).json({ error: 'Failed to get deacon logs: ' + error.message });
   }
 });
 
@@ -3347,7 +3390,7 @@ app.post('/api/specialists/:name/wake', async (req, res) => {
     // Get specialist model from settings
     const specSettings = loadSettings();
     const specModelKey = `${name}_agent` as keyof typeof specSettings.models.specialists;
-    const specModel = specSettings.models.specialists[specModelKey] || 'claude-sonnet-4-5';
+    const specModel = specSettings.models.specialists[specModelKey] || 'claude-sonnet-4-6';
     const specCmd = getAgentCommand(specModel);
     const specCmdWithArgs = specCmd.args.length > 0
       ? `${specCmd.command} ${specCmd.args.join(' ')} --dangerously-skip-permissions`
@@ -5866,7 +5909,7 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
       const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-      const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nFix these issues, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/review/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}"}'\nDo NOT stop until review passes.`;
+      const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nFix these issues, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\nDo NOT stop until review passes.`;
       try {
         const { writeFeedbackFile } = await import('../../lib/cloister/feedback-writer.js');
         const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -6004,7 +6047,8 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     // Auto-send test failure feedback to work agent
     if (testStatus === 'failed' && testNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
-      const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nPlease fix the failing tests and re-request review.`;
+      const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+      const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nFix the failing tests, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\nDo NOT stop until review passes.`;
       try {
         const { writeFeedbackFile } = await import('../../lib/cloister/feedback-writer.js');
         const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -10327,25 +10371,20 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
       // Shadow state might not exist, that's fine
     }
 
-    // 3. Find project path for workspace and planning dir cleanup
+    // 3. Find project path and config for workspace and planning dir cleanup
     let projectPath: string | undefined;
+    let projectName: string | undefined;
     if (!githubCheck.isGitHub) {
       const prefix = id.split('-')[0].toUpperCase();
-      const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
-      if (existsSync(projectsYamlPath)) {
-        const yaml = await import('js-yaml');
-        const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
-        for (const [, config] of Object.entries(projectsConfig.projects || {})) {
-          const projConfig = config as any;
-          if (projConfig.linear_team?.toUpperCase() === prefix) {
-            projectPath = projConfig.path;
-            break;
-          }
-        }
+      const projectConfig = findProjectByTeam(prefix);
+      if (projectConfig) {
+        projectPath = projectConfig.path;
+        projectName = projectConfig.name;
       }
     } else {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
+      projectName = githubCheck.repo || (projectPath ? basename(projectPath) : undefined);
     }
 
     // 4. Clean up legacy planning directory
@@ -10368,6 +10407,53 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
     // 5. Optionally delete workspace
     if (deleteWorkspace && projectPath) {
       const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+      // 5a. Stop Docker containers BEFORE deleting workspace files
+      // Compose files live inside the workspace, so they must still exist for this step
+      if (existsSync(workspacePath)) {
+        const dockerResult = await stopWorkspaceDocker(
+          workspacePath,
+          projectName || basename(projectPath),
+          issueLower,
+        );
+        cleanupLog.push(...dockerResult.steps);
+      }
+
+      // 5b. Remove Cloudflare tunnel entries before workspace deletion
+      const wsConfig = projectConfig?.workspace;
+      const featureFolder = `feature-${issueLower}`;
+      const domain = wsConfig?.dns?.domain || 'localhost';
+      const placeholders = {
+        FEATURE_NAME: issueLower,
+        FEATURE_FOLDER: featureFolder,
+        BRANCH_NAME: `feature/${issueLower}`,
+        COMPOSE_PROJECT: `${projectName || 'workspace'}-${featureFolder}`,
+        DOMAIN: domain,
+        PROJECT_NAME: projectName || basename(projectPath),
+        PROJECT_PATH: projectPath,
+        WORKSPACE_PATH: workspacePath,
+      };
+      if (wsConfig?.tunnel) {
+        try {
+          const { removeTunnelIngress } = await import('../../lib/tunnel.js');
+          const tunnelResult = await removeTunnelIngress(wsConfig.tunnel, placeholders);
+          cleanupLog.push(...tunnelResult.steps);
+        } catch (tunnelErr) {
+          cleanupLog.push(`Tunnel cleanup warning: ${(tunnelErr as Error).message}`);
+        }
+      }
+
+      // 5c. Remove Hume EVI config
+      if (wsConfig?.hume) {
+        try {
+          const { deleteHumeConfig } = await import('../../lib/hume.js');
+          const humeResult = await deleteHumeConfig(wsConfig.hume, placeholders);
+          cleanupLog.push(...humeResult.steps);
+        } catch (humeErr) {
+          cleanupLog.push(`Hume cleanup warning: ${(humeErr as Error).message}`);
+        }
+      }
+
       const branchName = `feature/${issueLower}`;
       const gitDirs = ['api', 'frontend', 'fe', '.'];
 
@@ -12114,6 +12200,16 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
               transcript = stdout.trim();
             } catch { /* agent may not be running */ }
 
+            // Fallback for work agents: output.log (graceful-stop capture)
+            if (!isPlanning && !transcript) {
+              try {
+                const outputLog = join(agentDir, 'output.log');
+                if (existsSync(outputLog)) {
+                  transcript = readFileSync(outputLog, 'utf-8');
+                }
+              } catch { /* skip */ }
+            }
+
             // If planning agent has no live tmux, use STATE.md as transcript
             if (isPlanning && !transcript) {
               try {
@@ -12125,13 +12221,16 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
               } catch { /* skip */ }
             }
 
+            // Read runtime state from runtime.json (separate from state.json config)
+            const rtState = getAgentRuntimeState(checkId);
+
             sections.push({
               type: sectionType,
               sessionId: checkId,
               model: state.model || state.runtime || 'unknown',
               startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
               duration: state.startedAt ? Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000) : null,
-              status: state.state === 'active' ? 'running' : state.state === 'suspended' ? 'completed' : (state.status || 'completed'),
+              status: rtState?.state === 'active' ? 'running' : rtState?.state === 'suspended' ? 'completed' : (state.status || 'completed'),
               transcript,
             });
           } catch { /* skip malformed state */ }
@@ -12594,7 +12693,7 @@ Be specific: reference actual file names, function names, requirement text, disc
       const apiSettings = loadSettingsApi();
       const statusModelId = (apiSettings.models?.overrides as Record<string, string>)?.['status-review']
         || loadSettings().models.status_review
-        || 'claude-sonnet-4-5';
+        || 'claude-sonnet-4-6';
       const { command: cliCmd, args: cliArgs } = getAgentCommand(statusModelId);
       const modelFlag = cliArgs.length > 0 ? ` ${cliArgs.join(' ')}` : '';
       const promptFile = join(planningDir, '.status-review-prompt.tmp');

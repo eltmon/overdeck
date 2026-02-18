@@ -19,6 +19,7 @@ export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi';
 const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Anthropic models
   'claude-opus-4-6': 'anthropic',
+  'claude-sonnet-4-6': 'anthropic',
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
@@ -47,9 +48,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  * Fallback mapping: non-Anthropic model → Anthropic equivalent
  *
  * Mapping strategy:
- * - Premium models (GPT-5.2, O3, Gemini Pro) → Sonnet 4.5 (good balance)
+ * - Premium models (GPT-5.2, O3, Gemini Pro) → Sonnet 4.6 (good balance)
  * - Economy models (GPT-4o-mini, Gemini Flash, GLM Flash) → Haiku 4.5
- * - GPT-4o → Sonnet 4.5 (similar tier)
+ * - GPT-4o → Sonnet 4.6 (similar tier)
  * - GLM-4.7 → Haiku 4.5 (economy tier)
  *
  * Note: We intentionally avoid Opus 4.6 as default fallback to keep costs reasonable.
@@ -57,13 +58,13 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
  */
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
-  'gpt-5.2-codex': 'claude-sonnet-4-5', // Premium code model → Sonnet
-  'o3-deep-research': 'claude-sonnet-4-5', // Premium research model → Sonnet
-  'gpt-4o': 'claude-sonnet-4-5', // Flagship model → Sonnet
+  'gpt-5.2-codex': 'claude-sonnet-4-6', // Premium code model → Sonnet
+  'o3-deep-research': 'claude-sonnet-4-6', // Premium research model → Sonnet
+  'gpt-4o': 'claude-sonnet-4-6', // Flagship model → Sonnet
   'gpt-4o-mini': 'claude-haiku-4-5', // Economy model → Haiku
 
   // Google → Anthropic
-  'gemini-3-pro-preview': 'claude-sonnet-4-5', // Premium model → Sonnet
+  'gemini-3-pro-preview': 'claude-sonnet-4-6', // Premium model → Sonnet
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
 
   // Z.AI → Anthropic
@@ -71,14 +72,14 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'glm-4.7-flash': 'claude-haiku-4-5', // Fast model → Haiku
 
   // Kimi → Anthropic
-  'kimi-k2': 'claude-sonnet-4-5', // Good balance model → Sonnet
-  'kimi-k2.5': 'claude-sonnet-4-5', // Premium model → Sonnet
+  'kimi-k2': 'claude-sonnet-4-6', // Good balance model → Sonnet
+  'kimi-k2.5': 'claude-sonnet-4-6', // Premium model → Sonnet
 };
 
 /**
  * Default fallback when model not in explicit mapping
  */
-const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-4-5';
+const DEFAULT_FALLBACK: AnthropicModel = 'claude-sonnet-4-6';
 
 /**
  * Get the provider for a model ID

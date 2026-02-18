@@ -17,6 +17,8 @@ import {
   getDefaultWorkspaceConfig,
 } from './workspace-config.js';
 import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
+import { addTunnelIngress, removeTunnelIngress } from './tunnel.js';
+import { createHumeConfig, deleteHumeConfig } from './hume.js';
 
 const execAsync = promisify(exec);
 
@@ -498,6 +500,31 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   // With beads v0.47.1+, worktrees use shared database with labels for isolation
   // The workspace.ts command creates a bead with workspace:issue-id label
 
+  // Set up Cloudflare tunnel for external access (before Docker so containers can use tunnel URLs)
+  if (workspaceConfig.tunnel) {
+    const tunnelResult = await addTunnelIngress(workspaceConfig.tunnel, placeholders);
+    result.steps.push(...tunnelResult.steps);
+    if (!tunnelResult.success) {
+      result.errors.push('Tunnel setup had failures (see steps for details)');
+    }
+  }
+
+  // Create Hume EVI config and write env file for Docker (before Docker so containers pick up the config ID)
+  if (workspaceConfig.hume) {
+    const humeResult = await createHumeConfig(workspaceConfig.hume, placeholders);
+    result.steps.push(...humeResult.steps);
+    if (humeResult.configId) {
+      writeFileSync(
+        join(workspacePath, '.hume-config'),
+        `HUME_CONFIG_ID=${humeResult.configId}\nVITE_HUME_CONFIG_ID=${humeResult.configId}\n`,
+      );
+      result.steps.push('Wrote .hume-config with Hume EVI config ID');
+    }
+    if (!humeResult.success) {
+      result.errors.push('Hume EVI config setup had failures (see steps for details)');
+    }
+  }
+
   // Start Docker containers if requested
   if (startDocker) {
     // Check for Traefik
@@ -562,6 +589,99 @@ export interface WorkspaceRemoveResult {
 }
 
 /**
+ * Result of Docker container cleanup for a workspace.
+ */
+export interface DockerCleanupResult {
+  /** Whether compose files were found (containers may or may not have been running) */
+  containersFound: boolean;
+  /** Human-readable log of cleanup steps taken */
+  steps: string[];
+}
+
+/**
+ * Stop Docker containers and clean up Docker-created files for a workspace.
+ *
+ * Extracted as a standalone function so it can be used by:
+ * - removeWorkspace() during normal workspace removal
+ * - deep-wipe endpoint for complete issue cleanup
+ * - workspace-migrate for pre-migration cleanup
+ *
+ * Failures are logged but never thrown — callers should not fail if Docker is unavailable.
+ */
+export async function stopWorkspaceDocker(
+  workspacePath: string,
+  projectName: string,
+  featureName: string,
+): Promise<DockerCleanupResult> {
+  const result: DockerCleanupResult = {
+    containersFound: false,
+    steps: [],
+  };
+
+  // Construct docker-compose project name (must match what was used at startup)
+  const projectPrefix = projectName.toLowerCase().replace(/\s+/g, '-') || 'workspace';
+  const composeProject = `${projectPrefix}-feature-${featureName}`;
+
+  // Find all compose files in devcontainer directory (some projects use multiple)
+  const devcontainerDir = join(workspacePath, '.devcontainer');
+  const composeFiles: string[] = [];
+
+  if (existsSync(devcontainerDir)) {
+    const possibleFiles = [
+      'docker-compose.devcontainer.yml',
+      'docker-compose.yml',
+      'compose.yml',
+      'compose.infra.yml',
+      'compose.override.yml',
+    ];
+    for (const file of possibleFiles) {
+      const fullPath = join(devcontainerDir, file);
+      if (existsSync(fullPath)) {
+        composeFiles.push(fullPath);
+      }
+    }
+  }
+
+  // Fallback: check for compose file in workspace root
+  if (composeFiles.length === 0) {
+    const rootCompose = join(workspacePath, 'docker-compose.yml');
+    if (existsSync(rootCompose)) {
+      composeFiles.push(rootCompose);
+    }
+  }
+
+  if (composeFiles.length > 0) {
+    result.containersFound = true;
+    try {
+      const fileFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
+      const cwd = existsSync(devcontainerDir) ? devcontainerDir : workspacePath;
+
+      await execAsync(`docker compose -p "${composeProject}" ${fileFlags} down -v --remove-orphans`, {
+        cwd,
+        timeout: 60000,
+      });
+      result.steps.push(`Stopped Docker containers (project: ${composeProject}, ${composeFiles.length} compose files)`);
+    } catch (error: any) {
+      // Log but don't fail — containers might not be running
+      result.steps.push(`Docker cleanup attempted (${error.message?.split('\n')[0] || 'containers may not be running'})`);
+    }
+  }
+
+  // Clean up Docker-created files (root-owned in containers)
+  try {
+    await execAsync(
+      `docker run --rm -v "${workspacePath}:/workspace" alpine sh -c "find /workspace -user root -delete 2>&1 | tail -100 || true"`,
+      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }
+    );
+    result.steps.push('Cleaned up Docker-created files');
+  } catch {
+    // Alpine container might not be available
+  }
+
+  return result;
+}
+
+/**
  * Remove a workspace
  */
 export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<WorkspaceRemoveResult> {
@@ -588,68 +708,9 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
     return result;
   }
 
-  // Stop Docker containers
-  // Construct docker-compose project name (must match what was used at startup)
-  const projectPrefix = projectConfig.name?.toLowerCase().replace(/\s+/g, '-') || 'workspace';
-  const composeProject = `${projectPrefix}-feature-${featureName}`;
-
-  // Find all compose files in devcontainer directory (some projects use multiple)
-  const devcontainerDir = join(workspacePath, '.devcontainer');
-  const composeFiles: string[] = [];
-
-  if (existsSync(devcontainerDir)) {
-    // Look for common compose file patterns
-    const possibleFiles = [
-      'docker-compose.devcontainer.yml',
-      'docker-compose.yml',
-      'compose.yml',
-      'compose.infra.yml',
-      'compose.override.yml',
-    ];
-    for (const file of possibleFiles) {
-      const fullPath = join(devcontainerDir, file);
-      if (existsSync(fullPath)) {
-        composeFiles.push(fullPath);
-      }
-    }
-  }
-
-  // Fallback: check for compose file in workspace root
-  if (composeFiles.length === 0) {
-    const rootCompose = join(workspacePath, 'docker-compose.yml');
-    if (existsSync(rootCompose)) {
-      composeFiles.push(rootCompose);
-    }
-  }
-
-  if (composeFiles.length > 0) {
-    try {
-      // Build -f flags for all compose files
-      const fileFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
-      const cwd = existsSync(devcontainerDir) ? devcontainerDir : workspacePath;
-
-      // Stop containers and remove volumes
-      await execAsync(`docker compose -p "${composeProject}" ${fileFlags} down -v --remove-orphans`, {
-        cwd,
-        timeout: 60000,  // 60 second timeout
-      });
-      result.steps.push(`Stopped Docker containers (project: ${composeProject}, ${composeFiles.length} compose files)`);
-    } catch (error: any) {
-      // Log but don't fail - containers might not be running
-      result.steps.push(`Docker cleanup attempted (${error.message?.split('\n')[0] || 'containers may not be running'})`);
-    }
-  }
-
-  // Clean up Docker-created files (root-owned in containers)
-  try {
-    await execAsync(
-      `docker run --rm -v "${workspacePath}:/workspace" alpine sh -c "find /workspace -user root -delete 2>&1 | tail -100 || true"`,
-      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }
-    );
-    result.steps.push('Cleaned up Docker-created files');
-  } catch {
-    // Alpine container might not be available
-  }
+  // Stop Docker containers and clean up Docker-created files
+  const dockerResult = await stopWorkspaceDocker(workspacePath, projectConfig.name || 'workspace', featureName);
+  result.steps.push(...dockerResult.steps);
 
   // Remove worktrees
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
@@ -688,6 +749,20 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
         result.steps.push(`Removed DNS entry: ${hostname}`);
       }
     }
+  }
+
+  // Remove Cloudflare tunnel entries
+  if (workspaceConfig.tunnel) {
+    const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
+    const tunnelResult = await removeTunnelIngress(workspaceConfig.tunnel, placeholders);
+    result.steps.push(...tunnelResult.steps);
+  }
+
+  // Remove Hume EVI config
+  if (workspaceConfig.hume) {
+    const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
+    const humeResult = await deleteHumeConfig(workspaceConfig.hume, placeholders);
+    result.steps.push(...humeResult.steps);
   }
 
   // Release ports

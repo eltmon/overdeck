@@ -126,9 +126,14 @@ KIMI_API_KEY=sk-kimi-...
 
 # Linear (for issue tracking)
 LINEAR_API_KEY=lin_api_...
+
+# Hume AI (optional - for EVI voice config management)
+HUME_API_KEY=your-hume-api-key
 ```
 
 **Note**: Direct-compatible providers (Kimi, GLM) don't need claude-code-router. Only OpenAI and Gemini require the router.
+
+**Note**: `HUME_API_KEY` is only needed if your project uses Hume EVI integration (see [External Service Integrations](#external-service-integrations) below).
 
 ---
 
@@ -659,6 +664,81 @@ npm install -g @musistudio/claude-code-router
 - [Kimi Third-Party Agents Documentation](https://www.kimi.com/code/docs/en/more/third-party-agents.html)
 - [Setup Guide (Medium)](https://guozheng-ge.medium.com/set-up-claude-code-using-third-party-coding-models-glm-4-7-minimax-2-1-kimi-k2-5a3cdf38c261)
 - [Kimi API Documentation](https://platform.moonshot.ai/docs)
+
+---
+
+## External Service Integrations
+
+Panopticon can manage external service configurations as part of the workspace lifecycle. These are configured per-project in `~/.panopticon/projects.yaml` under the `workspace` section.
+
+### Cloudflare Tunnels
+
+Automatically creates/deletes Cloudflare tunnel ingress routes so workspaces are accessible via public URLs (e.g., `api-feature-min-123.mindyournow.com`).
+
+**Config** (in `projects.yaml`):
+```yaml
+workspace:
+  tunnel:
+    provider: cloudflare
+    tunnel_id: "your-tunnel-id"
+    account_id: "your-account-id"
+    zone_id: "your-zone-id"
+    credentials_file: ~/.cloudflared/cert.pem
+    service_target: "https://localhost"
+    hostnames:
+      - pattern: "api-{{FEATURE_FOLDER}}.yourdomain.com"
+        http_host_header: "api-{{FEATURE_FOLDER}}.yourdomain.localhost"
+        no_tls_verify: true
+```
+
+**Lifecycle**: Created during `pan workspace create`, deleted during `pan workspace remove` and deep-wipe.
+
+**Module**: `src/lib/tunnel.ts`
+
+### Hume EVI (Voice AI)
+
+Automatically creates/deletes per-workspace Hume EVI configs for BYOLLM (Bring Your Own LLM). Each workspace gets its own Hume config with a workspace-specific callback URL, cloned from a production template config.
+
+**Prerequisites**: `HUME_API_KEY` in `~/.panopticon.env`
+
+**Config** (in `projects.yaml`):
+```yaml
+workspace:
+  hume:
+    template_config_id: "your-production-config-id"
+    name_pattern: "kaia-{{FEATURE_FOLDER}}"
+    byollm_url_pattern: "https://api-{{FEATURE_FOLDER}}.yourdomain.com/api/v1/ai/hume/chat/completions"
+```
+
+| Field | Description |
+|-------|-------------|
+| `template_config_id` | Hume EVI config ID to clone from (production config) |
+| `name_pattern` | Name for workspace configs (supports `{{FEATURE_FOLDER}}`, `{{FEATURE_NAME}}` placeholders) |
+| `byollm_url_pattern` | BYOLLM callback URL pattern (Hume calls this for LLM completions) |
+| `api_key_env` | Env var name for Hume API key (default: `HUME_API_KEY`) |
+
+**Lifecycle**:
+- **Create**: Clones template config with workspace-specific BYOLLM URL, writes `.hume-config` env file (`HUME_CONFIG_ID`, `VITE_HUME_CONFIG_ID`) to workspace root
+- **Remove/Deep-wipe**: Deletes workspace-specific Hume config via API
+
+**Docker integration**: Add `.hume-config` as optional `env_file` in your docker-compose template:
+```yaml
+env_file:
+  - path: ../.hume-config
+    required: false
+```
+
+**Module**: `src/lib/hume.ts`
+
+### Adding New Integrations
+
+External service integrations follow a common pattern (see `tunnel.ts` and `hume.ts`):
+
+1. Define a config interface in `workspace-config.ts`
+2. Create a module with `create*()` and `delete*()` functions
+3. Wire into `createWorkspace()` (before Docker start) and `removeWorkspace()`
+4. Wire into the deep-wipe endpoint in `dashboard/server/index.ts`
+5. Add to `projects.yaml` schema
 
 ---
 

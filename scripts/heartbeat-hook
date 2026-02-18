@@ -105,18 +105,18 @@ if [ -n "$ACTIVITY_ENTRY" ]; then
   fi
 fi
 
-# Update agent runtime state with latest activity timestamp (PAN-119)
-STATE_FILE="$AGENT_DIR/state.json"
+# Update agent runtime state in runtime.json (NOT state.json — prevents corrupting AgentState config)
+RUNTIME_FILE="$AGENT_DIR/runtime.json"
 TIMESTAMP="$(date -Iseconds)"
 
-if [ -f "$STATE_FILE" ]; then
-  # Update existing state file's lastActivity field
-  TEMP_STATE="$STATE_FILE.tmp"
+if [ -f "$RUNTIME_FILE" ]; then
+  # Update existing runtime state
+  TEMP_RUNTIME="$RUNTIME_FILE.tmp"
   jq --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" \
     '.lastActivity = $ts | .currentTool = $tool | .state = "active"' \
-    "$STATE_FILE" > "$TEMP_STATE" 2>/dev/null && mv "$TEMP_STATE" "$STATE_FILE" 2>/dev/null || true
+    "$RUNTIME_FILE" > "$TEMP_RUNTIME" 2>/dev/null && mv "$TEMP_RUNTIME" "$RUNTIME_FILE" 2>/dev/null || true
 else
-  # Create initial state file
+  # Create initial runtime state
   jq -n \
     --arg ts "$TIMESTAMP" \
     --arg tool "$TOOL_NAME" \
@@ -124,7 +124,7 @@ else
       state: "active",
       lastActivity: $ts,
       currentTool: $tool
-    }' > "$STATE_FILE" 2>/dev/null || true
+    }' > "$RUNTIME_FILE" 2>/dev/null || true
 fi
 
 # Record cost event from tool usage (PAN-81)

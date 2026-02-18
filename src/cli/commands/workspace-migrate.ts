@@ -758,30 +758,10 @@ export async function migrateLocalToRemote(
     result.steps.push('Saved workspace metadata');
 
     // 14. Cleanup local (unless --keep)
+    // Docker containers are stopped by removeWorkspace() via stopWorkspaceDocker()
     if (!options.keep) {
       spinner.text = 'Cleaning up local workspace...';
       try {
-        // Stop Docker containers
-        const devcontainerDir = join(localPath, '.devcontainer');
-        if (existsSync(devcontainerDir)) {
-          const composeFiles = readdirSync(devcontainerDir)
-            .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
-          if (composeFiles.length > 0) {
-            const projectPrefix = projectConfig?.name?.toLowerCase().replace(/\s+/g, '-') || 'workspace';
-            const composeProject = `${projectPrefix}-feature-${issueId.toLowerCase()}`;
-            try {
-              await execAsync(`docker compose -p "${composeProject}" down -v`, {
-                cwd: devcontainerDir,
-                timeout: 60000,
-              });
-              result.steps.push('Stopped Docker containers');
-            } catch {
-              result.steps.push('Docker containers may have already been stopped');
-            }
-          }
-        }
-
-        // Remove workspace using workspace-manager
         if (projectConfig) {
           const removeResult = await removeWorkspace({
             projectConfig,

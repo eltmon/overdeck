@@ -322,7 +322,7 @@ export function selectModel(
     if (!fallback) {
       // No available models at all - use Anthropic default
       return {
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-4-6',
         score: 0,
         reason: 'No models available, falling back to default',
         candidates: candidates.map((c) => ({
