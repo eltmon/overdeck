@@ -8,12 +8,15 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentState } from '../agents.js';
 import type { SpecialistType } from './specialists.js';
 import { getTmuxSessionName } from './specialists.js';
+
+const execAsync = promisify(exec);
 
 /**
  * Token threshold for triggering session rotation
@@ -91,16 +94,16 @@ export function needsSessionRotation(agentId: string): boolean {
  * @param tiers - Memory tier configuration
  * @returns Memory content as string
  */
-export function buildMergeAgentMemory(
+export async function buildMergeAgentMemory(
   workingDir: string,
   tiers: MemoryTiers = DEFAULT_MEMORY_TIERS
-): string {
+): Promise<string> {
   const merges: MergeRecord[] = [];
 
   try {
     // Get recent merge commits
     const totalMerges = Math.max(tiers.recent_summary, tiers.recent_detailed, tiers.recent_full);
-    const gitLog = execSync(
+    const { stdout: gitLog } = await execAsync(
       `git log --merges --format="%H|%s|%an|%ad|%D" -n ${totalMerges}`,
       { cwd: workingDir, encoding: 'utf-8' }
     );
@@ -136,18 +139,16 @@ export function buildMergeAgentMemory(
 
     try {
       // Get files changed
-      const files = execSync(`git show --name-only --format= ${merge.hash}`, {
+      const { stdout: filesOutput } = await execAsync(`git show --name-only --format= ${merge.hash}`, {
         cwd: workingDir,
         encoding: 'utf-8',
-      })
-        .trim()
-        .split('\n')
-        .filter(f => f);
+      });
+      const files = filesOutput.trim().split('\n').filter(f => f);
 
       memory += `- Files changed: ${files.length}\n`;
 
       // Get diff (limited to avoid huge memory files)
-      const diff = execSync(`git show ${merge.hash} --stat`, {
+      const { stdout: diff } = await execAsync(`git show ${merge.hash} --stat`, {
         cwd: workingDir,
         encoding: 'utf-8',
         maxBuffer: 10 * 1024 * 1024,
@@ -231,7 +232,7 @@ export async function rotateSpecialistSession(
     let memoryFile: string | undefined;
 
     if (specialistName === 'merge-agent' && workingDir) {
-      memoryContent = buildMergeAgentMemory(workingDir);
+      memoryContent = await buildMergeAgentMemory(workingDir);
       memoryFile = join(PANOPTICON_HOME, `merge-agent-memory-${Date.now()}.md`);
       writeFileSync(memoryFile, memoryContent);
       console.log(`Built memory file: ${memoryFile}`);
@@ -240,7 +241,7 @@ export async function rotateSpecialistSession(
     // Kill current session
     const tmuxSession = getTmuxSessionName(specialistName);
     try {
-      execSync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' });
+      await execAsync(`tmux kill-session -t "${tmuxSession}"`);
       console.log(`Killed session: ${tmuxSession}`);
     } catch (error) {
       // Session might already be dead

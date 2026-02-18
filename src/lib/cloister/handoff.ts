@@ -8,7 +8,6 @@
 
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
 import type { AgentState } from '../agents.js';
 import { getAgentState, saveAgentState, stopAgent, spawnAgent, getAgentDir } from '../agents.js';
 import type { HandoffContext } from './handoff-context.js';
