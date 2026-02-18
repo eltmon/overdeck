@@ -304,3 +304,7 @@ export function cleanupLegacyRuntimeSymlinks(): CleanupResult {
 - This is a **breaking change** for users who configured multiple sync targets
 - Alternative model selection is now handled by [claude-code-router](https://github.com/musistudio/claude-code-router)
 - The crash fixed in `843ad26` (opencode in config but not in SYNC_TARGETS) is fully resolved by this change
+
+## Specialist Feedback
+
+- **[2026-02-18T13:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`

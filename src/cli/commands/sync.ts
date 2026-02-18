@@ -9,6 +9,7 @@ import { createBackup } from '../../lib/backup.js';
 import { planSync, executeSync, planHooksSync, syncHooks } from '../../lib/sync.js';
 import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { listProjects } from '../../lib/projects.js';
+import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
 
 // Get path to bundled git hooks
 const __filename = fileURLToPath(import.meta.url);
@@ -89,6 +90,20 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log('');
     console.log(chalk.dim('Run without --dry-run to apply changes.'));
     return;
+  }
+
+  // Run one-time migration: strip legacy sync targets from config.toml
+  const syncMigration = migrateSyncTargets();
+  if (syncMigration.migrated) {
+    if (syncMigration.hadNonClaudeTargets) {
+      console.log(chalk.yellow('Config updated: removed non-Claude sync targets (Panopticon now syncs to Claude Code only).'));
+    }
+  }
+
+  // Run one-time migration: remove Panopticon-managed symlinks from legacy runtime dirs
+  const cleanupResult = cleanupLegacyRuntimeSymlinks();
+  if (cleanupResult.cleaned.length > 0) {
+    console.log(chalk.dim(`Removed ${cleanupResult.total} legacy runtime symlink(s): ${cleanupResult.cleaned.join(', ')}`));
   }
 
   const config = loadConfig();

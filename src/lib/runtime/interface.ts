@@ -1,11 +1,8 @@
 /**
- * Multi-Runtime Architecture
+ * Runtime Architecture
  *
- * Provides a unified interface for interacting with different AI coding assistants:
- * - Claude Code
- * - Codex (OpenAI Codex CLI)
- * - Cursor
- * - Gemini CLI
+ * Provides a unified interface for interacting with Claude Code,
+ * the sole supported AI coding assistant runtime.
  */
 
 export type RuntimeType = 'claude';

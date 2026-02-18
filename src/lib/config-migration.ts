@@ -5,7 +5,7 @@
  * Legacy presets are no longer supported - all selection is now smart/capability-based.
  */
 
-import { readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, readdirSync, lstatSync, readlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
@@ -211,8 +211,6 @@ export interface LegacyCleanupResult {
 }
 
 export function cleanupLegacyRuntimeSymlinks(): LegacyCleanupResult {
-  const { readdirSync, lstatSync, readlinkSync, unlinkSync } = require('fs') as typeof import('fs');
-
   const legacyDirs = [
     { name: 'codex', base: join(homedir(), '.codex') },
     { name: 'cursor', base: join(homedir(), '.cursor') },
