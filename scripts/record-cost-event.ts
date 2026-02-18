@@ -12,6 +12,7 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync, openSync, readSync, fstatSync, closeSync } from 'fs';
+import { execFileSync } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
 import { calculateCost, getPricing, AIProvider } from '../src/lib/cost.js';
@@ -97,10 +98,32 @@ closeSync(fd);
 const newContent = buffer.toString('utf-8');
 const lines = newContent.split('\n');
 
-// Get agent/issue context from environment
+// Get agent/issue context from environment, with git branch fallback
 const agentId: string = process.env.PANOPTICON_AGENT_ID || 'unattributed';
-const issueId: string = process.env.PANOPTICON_ISSUE_ID || 'UNKNOWN';
+let issueId: string = process.env.PANOPTICON_ISSUE_ID || '';
 const sessionType: string = process.env.PANOPTICON_SESSION_TYPE || 'implementation';
+
+// Infer issue ID from git branch if not set (covers ad-hoc Claude sessions)
+if (!issueId || issueId === 'UNKNOWN') {
+  try {
+    const branch = execFileSync('git', ['branch', '--show-current'], {
+      encoding: 'utf-8',
+      timeout: 2000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    const branchMatch = branch.match(/(pan|min|aud)[-](\d+)/i);
+    if (branchMatch) {
+      issueId = `${branchMatch[1].toUpperCase()}-${branchMatch[2]}`;
+    }
+  } catch {
+    // Git not available or not in a repo — that's fine
+  }
+}
+
+// Final fallback
+if (!issueId) {
+  issueId = 'UNKNOWN';
+}
 
 // Process new transcript lines looking for assistant messages with usage
 for (const line of lines) {
