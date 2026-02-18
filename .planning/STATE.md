@@ -1,65 +1,70 @@
-# PAN-209: Mouse scroll in planning dialog scrolls chat input instead of agent output
+# PAN-208: Stale planning state causes premature 'Planning Complete' on restart
+
+## Status: Complete
 
 ## Problem
 
-In the PlanDialog's web terminal (XTerminal component), mouse wheel scroll events are forwarded to the tmux session, which passes them to Claude Code's TUI. Claude Code's input area captures the scroll instead of the agent output scrolling. The user expects scroll wheel to navigate the output history, just like a regular terminal emulator.
+When re-opening the Plan dialog for a previously-planned issue (even after deep-wipe), the PlanDialog shows "Planning Complete" after a few seconds without the planning agent actually running. The root cause is a timing/logic issue where:
 
-## Root Cause
+1. `STATE.md` from a previous planning session contains `## Status: Complete`
+2. The status endpoint (`GET /api/planning/:id/status`) returns `planningCompleted: true` based on regex matching
+3. PlanDialog's initial `checking` step auto-transitions to `complete` before `start-planning` is ever called
+4. The stale STATE.md cleanup in `start-planning` never runs because the user never reaches the "Start Planning" button
 
-1. **`scrollback: 0`** in XTerminal.tsx (line 220) — xterm.js has no local scrollback buffer, so there's nothing for it to scroll through
-2. **tmux mouse tracking** — tmux has `set -g mouse on`, so xterm.js forwards mouse events (including wheel) as escape sequences to tmux
-3. **Alternate screen mode** — Claude Code is a TUI that runs in alternate screen buffer, so tmux forwards scroll events to Claude Code instead of entering copy-mode
-4. **Claude Code handles the scroll** — Claude Code's input area receives the scroll events and scrolls its own content
+Additionally, `.planning-complete` marker file is **checked but never created** — dead code.
 
-## Investigation: `scrollback: 0` History
+## Decisions
 
-`scrollback: 0` was set in commit `2282e69` (Feb 3, 2026) as part of a 14-attempt effort to fix a remote terminal visual corruption bug (tmux status bar duplication). The research shows:
+1. **Use `.planning-complete` marker as the sole completion signal** — remove STATE.md regex matching from the status endpoint. The marker is created explicitly by `complete-planning` and deleted by `start-planning` and `deep-wipe`.
+2. **Create the marker file** in `complete-planning` endpoint before git commit.
+3. **Clear the marker** in `start-planning` alongside stale STATE.md cleanup.
+4. **Deep-wipe cleans workspace .planning/** — explicitly delete `.planning-complete` from workspace when `deleteWorkspace=false`.
+5. **PlanDialog trusts only the marker** — the `planningCompleted` field remains, but is now backed solely by the marker file, making it reliable.
 
-- **`scrollback: 0` was Attempt 11** — it "initially showed improvement but the bug returned after ~10 seconds"
-- **The ACTUAL fix was Attempt 14** — waiting for client dimensions before starting the SSH session (preventing a 120-col vs actual-col mismatch)
-- `scrollback: 0` was left as a defensive "belt-and-suspenders" measure but is NOT the primary fix
-- Other fixes committed alongside it (dimension sync, write queue, scroll-to-bottom) remain in place
+## Architecture
 
-**Conclusion**: Re-enabling scrollback should be safe. The real fix (Attempt 14) is independent.
+### Files to Modify
 
-## Approach
+| File | Change | Difficulty |
+|------|--------|------------|
+| `src/dashboard/server/index.ts` (status endpoint, ~8868-8887) | Remove STATE.md regex, rely only on `.planning-complete` marker | simple |
+| `src/dashboard/server/index.ts` (start-planning, ~8463-8469) | Also delete `.planning-complete` marker alongside STATE.md | simple |
+| `src/dashboard/server/index.ts` (complete-planning, ~9707) | Write `.planning-complete` marker before git add | simple |
+| `src/dashboard/server/index.ts` (deep-wipe, ~10351-10358) | Also clean `.planning-complete` from workspace `.planning/` | simple |
+| `src/dashboard/frontend/src/components/PlanDialog.tsx` (~237-240) | No change needed if backend is fixed, but add `hasCompletionMarker` to response type for clarity | trivial |
 
-### Single-file change: `src/dashboard/frontend/src/components/XTerminal.tsx`
+### Flow After Fix
 
-**1. Re-enable scrollback buffer**
-- Change `scrollback: 0` to `scrollback: 5000`
-- This gives xterm.js a local buffer for scroll history
+**Planning completes:**
+1. User clicks "Done" → `complete-planning` runs
+2. Creates `.planning-complete` marker in `.planning/` directory
+3. Commits `.planning/` (including marker) to git
+4. Status endpoint returns `planningCompleted: true` (marker exists)
 
-**2. Intercept wheel events**
-- Add a `wheel` event listener on the terminal container
-- `event.preventDefault()` + `event.stopPropagation()` to prevent xterm.js from forwarding scroll events to tmux as mouse escape sequences
-- Manually adjust xterm.js viewport scroll position using `terminal.scrollLines()` based on wheel delta
+**Re-plan (without deep-wipe):**
+1. User clicks "Plan" → dialog opens → `checking` step
+2. Status endpoint finds `.planning-complete` → `planningCompleted: true` → dialog shows `complete`
+3. This is CORRECT — planning genuinely completed, user can proceed to handoff
 
-**3. Smart auto-scroll**
-- Currently `scrollToBottom()` fires after every write (attempt 13 leftover), which would fight user scrolling
-- Change to: only auto-scroll if the viewport is already at the bottom
-- Use xterm.js buffer state to detect if user has scrolled up (`buffer.active.baseY + buffer.active.viewportY < buffer.active.baseY`)
+**Re-plan (after deep-wipe):**
+1. Deep-wipe removes workspace (and marker with it)
+2. User clicks "Plan" → dialog opens → `checking` step
+3. Status endpoint: no workspace → no marker → `planningCompleted: false` → dialog shows `ready`
+4. User clicks "Start Planning" → `start-planning` creates fresh workspace
+5. This is CORRECT — fresh planning session starts
 
-### Files Modified
-- `src/dashboard/frontend/src/components/XTerminal.tsx` — 1 file, ~20-30 lines changed
+**Re-plan (after deep-wipe without deleteWorkspace):**
+1. Deep-wipe cleans `.planning-complete` from workspace `.planning/` dir
+2. Same flow as above — marker gone, dialog shows `ready`
 
-### Risk Assessment
-- **Low risk**: The status bar fix (Attempt 14) is independent of scrollback setting
-- **Regression check**: Verify remote terminal status bar doesn't duplicate after change
-- **Fallback**: If status bar issue returns, scrollback can be reduced or the wheel interceptor can be adjusted without reverting to 0
+## Edge Cases
 
-## Decisions Made
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Re-enable scrollback | Yes | Attempt 14 was the real fix, not scrollback: 0 |
-| Scrollback size | 5000 lines | Good balance of history vs memory |
-| Auto-scroll behavior | Smart (only if at bottom) | User requested; prevents snapping away from read position |
-| Wheel event handling | Intercept + manual scroll | Prevents forwarding to tmux/Claude Code |
-| Scope | XTerminal.tsx only | All changes are in the terminal component |
+- **Planning agent writes "Status: Complete" in STATE.md but crashes before dialog completion**: Previously this would cause false positive. Now: no marker = not complete. User must click "Done" through the dialog.
+- **`.planning-complete` committed to git branch, branch not deleted**: Deep-wipe with `deleteWorkspace=true` deletes branch. Without it, the marker is explicitly deleted from the filesystem.
+- **Remote planning sessions**: Marker is created locally by `complete-planning` endpoint after syncing remote state. Same lifecycle applies.
 
 ## Out of Scope
-- tmux configuration changes
-- Claude Code TUI scroll behavior
-- Server-side WebSocket changes
-- Other dialog scroll issues
+
+- Changing the PlanDialog step state machine beyond what's needed
+- Modifying beads or task tracking behavior
+- Changing the planning agent's behavior or prompts
