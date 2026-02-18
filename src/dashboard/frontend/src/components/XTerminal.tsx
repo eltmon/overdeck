@@ -217,7 +217,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
-        scrollback: 0,  // DISABLE scrollback - prevents tmux status bar from duplicating
+        scrollback: 5000,  // Local scroll buffer; the real status-bar fix is dimension-sync (Attempt 14)
         convertEol: false,  // Don't convert EOL - let escape sequences pass through raw
         scrollOnUserInput: true,
         allowProposedApi: true,
@@ -279,6 +279,17 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
+
+      // Intercept wheel events: scroll xterm.js locally instead of forwarding to tmux.
+      // Without this, xterm.js sends mouse escape sequences to tmux, which passes them
+      // to Claude Code's TUI input area instead of entering copy-mode.
+      const handleWheel = (event: WheelEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const scrollLines = Math.round(event.deltaY / 20);
+        term!.scrollLines(scrollLines);
+      };
+      terminalRef.current.addEventListener('wheel', handleWheel, { passive: false });
     }
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
@@ -329,12 +340,8 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       };
     }
 
-    // ATTEMPT 13: Force viewport to stay at bottom after every write
-    // The issue: when content scrolls, xterm.js viewport can desync from cursor position
-    // tmux status bar writes to row 29 with \e[29;1H, but if viewport has scrolled,
-    // row 29 is no longer at the visual bottom
-    //
-    // Solution: Call scrollToBottom() after each write to keep viewport aligned
+    // Write queue: serialize writes to avoid race conditions in xterm.js.
+    // Smart auto-scroll: only snap to bottom after a write if the user hasn't scrolled up.
     const writeQueue: string[] = [];
     let isWriting = false;
 
@@ -350,9 +357,12 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
       // Use write callback to know when this write completes
       term.write(data, () => {
-        // ATTEMPT 13: Force scroll to bottom after every write
-        // This keeps the viewport aligned with cursor position
-        term!.scrollToBottom();
+        // Smart auto-scroll: only snap to bottom if user hasn't scrolled up
+        const buf = term!.buffer.active;
+        const isAtBottom = buf.viewportY >= buf.length - term!.rows;
+        if (isAtBottom) {
+          term!.scrollToBottom();
+        }
 
         isWriting = false;
         // Process next item in queue
