@@ -8504,12 +8504,17 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         }
       }
 
-      // Clear stale STATE.md from previous planning session (start fresh)
+      // Clear stale STATE.md and .planning-complete from previous planning session (start fresh)
       // This prevents new planning agents from seeing old state and thinking work is done
       const staleStatePath = join(planningDir, 'STATE.md');
       if (existsSync(staleStatePath)) {
         console.log(`[start-planning] Clearing stale STATE.md from previous session`);
         await execAsync(`rm -f "${staleStatePath}"`, { encoding: 'utf-8' });
+      }
+      const staleMarkerPath = join(planningDir, '.planning-complete');
+      if (existsSync(staleMarkerPath)) {
+        console.log(`[start-planning] Clearing stale .planning-complete marker from previous session`);
+        await execAsync(`rm -f "${staleMarkerPath}"`, { encoding: 'utf-8' });
       }
 
       const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
@@ -8909,26 +8914,13 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
     const hasStateFile = planningDir ? existsSync(join(planningDir, 'STATE.md')) : false;
     const hasPromptFile = planningDir ? existsSync(join(planningDir, 'PLANNING_PROMPT.md')) : false;
 
-    // Planning is only "completed" if explicitly marked via the .planning-complete marker file
-    // This prevents false positives when session crashes or exits unexpectedly
+    // Planning is only "completed" if explicitly marked via the .planning-complete marker file.
+    // This prevents false positives when STATE.md from a prior session contains "Status: Complete"
+    // but the user never clicked Done in the dialog (e.g. after a crash or deep-wipe).
     const hasCompletionMarker = planningDir ? existsSync(join(planningDir, '.planning-complete')) : false;
 
-    // Check STATE.md for explicit completion status (look for "## Status: Complete" marker)
-    let hasStatusComplete = false;
-    if (hasStateFile && planningDir) {
-      try {
-        const stateContent = readFileSync(join(planningDir, 'STATE.md'), 'utf-8');
-        // Look for explicit completion markers in STATE.md
-        hasStatusComplete = /##\s*Status:\s*Complete/i.test(stateContent) ||
-                          /##\s*Planning Status:\s*Complete/i.test(stateContent);
-      } catch {
-        // Ignore read errors
-      }
-    }
-
-    // Planning is completed ONLY if there's an explicit completion marker OR STATE.md says complete
-    // Having STATE.md alone doesn't mean planning is done - it's a working document
-    const planningCompleted = hasCompletionMarker || hasStatusComplete;
+    // Use only the marker file — never STATE.md regex — as the completion signal.
+    const planningCompleted = hasCompletionMarker;
 
     res.json({
       active: sessionExists,
@@ -9748,6 +9740,11 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
             // bd might not be installed or .beads might not exist
           }
 
+          // Write .planning-complete marker so the status endpoint knows planning is done.
+          // This is the sole completion signal — STATE.md alone is not sufficient.
+          writeFileSync(join(planningDir, '.planning-complete'), '', 'utf-8');
+          console.log(`[complete-planning] Wrote .planning-complete marker`);
+
           // Git add planning and beads directories
           await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
           // Also add .beads/ if it exists (planning may create beads tasks)
@@ -10402,6 +10399,17 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
       cleanupLog.push(`Cleared review status for ${id.toUpperCase()}`);
     } catch {
       // Review status might not exist
+    }
+
+    // 4c. Clear .planning-complete marker so the dialog resets to "ready" after a deep-wipe.
+    // When deleteWorkspace=true the whole directory is removed, so we only need this for
+    // the preserve-workspace case.
+    if (!deleteWorkspace && projectPath) {
+      const workspacePlanningMarker = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', '.planning-complete');
+      if (existsSync(workspacePlanningMarker)) {
+        unlinkSync(workspacePlanningMarker);
+        cleanupLog.push(`Cleared .planning-complete marker from workspace`);
+      }
     }
 
     // 5. Optionally delete workspace
