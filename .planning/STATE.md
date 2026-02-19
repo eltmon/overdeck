@@ -101,3 +101,19 @@ const { stdout: output } = await execAsync('cmd', { encoding: 'utf-8' });
 ## Risk Assessment
 
 **Low risk.** All changes follow the established PAN-70 pattern. The cascade for server/index.ts is well-contained (3 private functions, all within the same file). Session-rotation.ts changes are even simpler — the caller is already async.
+
+## Current Status
+
+**IMPLEMENTATION COMPLETE** — commit `21de8a2` on `feature/pan-205`, pushed to remote.
+
+All 3 files changed:
+- `src/lib/cloister/session-rotation.ts`: 4 execSync → execAsync, buildMergeAgentMemory made async
+- `src/dashboard/server/index.ts`: getAgentWorkspace + getAgentJsonlPath made async, dynamic require removed
+- `src/lib/cloister/handoff.ts`: dead execSync import removed
+
+Build passes. All beads closed.
+
+## Specialist Feedback
+
+- **[2026-02-18T13:20Z] test-agent → FAILED** — `.planning/feedback/001-test-agent-failed.md`
+- **[2026-02-18T14:16Z] test-agent → FAILED** — `.planning/feedback/002-test-agent-failed.md`
