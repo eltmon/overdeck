@@ -10386,9 +10386,10 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
     // 3. Find project path and config for workspace and planning dir cleanup
     let projectPath: string | undefined;
     let projectName: string | undefined;
+    let projectConfig: ProjectConfig | null = null;
     if (!githubCheck.isGitHub) {
       const prefix = id.split('-')[0].toUpperCase();
-      const projectConfig = findProjectByTeam(prefix);
+      projectConfig = findProjectByTeam(prefix);
       if (projectConfig) {
         projectPath = projectConfig.path;
         projectName = projectConfig.name;
