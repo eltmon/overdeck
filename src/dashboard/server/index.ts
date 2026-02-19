@@ -654,7 +654,7 @@ function getGitHubLocalPaths(): Record<string, string> {
  * Get workspace path from agent state file
  * Agent state is stored in ~/.panopticon/agents/<agent-id>/state.json
  */
-function getAgentWorkspace(agentId: string): string | null {
+async function getAgentWorkspace(agentId: string): Promise<string | null> {
   const stateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
   if (existsSync(stateFile)) {
     try {
@@ -665,9 +665,9 @@ function getAgentWorkspace(agentId: string): string | null {
 
   // Fallback: try tmux pane's actual working directory first (most accurate)
   try {
-    const { execSync } = require('child_process');
-    const paneCwd = execSync(`tmux display-message -t ${agentId} -p '#{pane_current_path}' 2>/dev/null`, { encoding: 'utf-8' }).trim();
-    if (paneCwd && existsSync(paneCwd)) return paneCwd;
+    const { stdout: paneCwd } = await execAsync(`tmux display-message -t ${agentId} -p '#{pane_current_path}' 2>/dev/null`, { encoding: 'utf-8' });
+    const trimmed = paneCwd.trim();
+    if (trimmed && existsSync(trimmed)) return trimmed;
   } catch {}
 
   // Fallback: derive workspace from agent ID (handles hook-based state overwrite)
@@ -788,8 +788,8 @@ function getActiveSessionPath(projectDir: string): string | null {
  * Get the JSONL session path for an agent by traversing:
  * agent ID -> state.json -> workspace -> Claude project dir -> sessions-index.json -> JSONL
  */
-function getAgentJsonlPath(agentId: string): string | null {
-  const workspace = getAgentWorkspace(agentId);
+async function getAgentJsonlPath(agentId: string): Promise<string | null> {
+  const workspace = await getAgentWorkspace(agentId);
   if (!workspace) return null;
 
   const projectDir = getClaudeProjectDir(workspace);
@@ -880,7 +880,7 @@ async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]
  * Get pending questions for an agent by ID
  */
 async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
-  const jsonlPath = getAgentJsonlPath(agentId);
+  const jsonlPath = await getAgentJsonlPath(agentId);
   if (!jsonlPath) return [];
   return getPendingQuestions(jsonlPath);
 }

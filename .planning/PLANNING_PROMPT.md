@@ -1,4 +1,4 @@
-# Planning Session: PAN-208
+# Planning Session: PAN-205
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,48 +22,63 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-208
-- **Title:** Stale planning state causes premature 'Planning Complete' on restart
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/208
+- **ID:** PAN-205
+- **Title:** Convert remaining ~83 execSync calls to async across CLI and lib files
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/205
 
 ## Description
 ## Problem
 
-When clicking "Plan" on an issue that was previously planned (even after deep-wipe), the PlanDialog shows "Planning Complete" after only a few seconds without the planning agent actually running. Closing the dialog and clicking "Resume Planning" works correctly.
+PAN-70 and PAN-72 converted the highest-impact `execSync` calls in the dashboard server, specialists, and health files. However, **~83 `execSync` calls remain across 15 files**, some of which are called from the dashboard server and still block the event loop.
 
-## Root Cause
+## Remaining execSync calls by file
 
-1. **Stale `STATE.md` survives workspace recreation**: The `.planning/` directory in the workspace contains `STATE.md` from a previous planning session. Since workspaces are git worktrees, the branch may still contain the old `.planning/` directory even after the worktree is deleted and recreated.
+| File | Count | Impact |
+|------|-------|--------|
+| `src/cli/commands/install.ts` | 14 | Low (CLI one-shot) |
+| `src/lib/tmux.ts` | 13 | **HIGH** (called from dashboard via agents.ts) |
+| `src/cli/index.ts` | 8 | Low (CLI entry) |
+| `src/cli/commands/setup/hooks.ts` | 8 | Low (CLI one-shot) |
+| `src/lib/worktree.ts` | 7 | **MEDIUM** (called during workspace creation) |
+| `src/lib/cloister/session-rotation.ts` | 5 | **HIGH** (called from dashboard cloister) |
+| `src/cli/commands/work/approve.ts` | 5 | Low (CLI) |
+| `src/cli/commands/beads.ts` | 4 | Low (CLI) |
+| `src/lib/dns.ts` | 3 | Medium (called during workspace setup) |
+| `src/cli/commands/update.ts` | 3 | Low (CLI) |
+| `src/cli/commands/sync.ts` | 3 | Low (CLI) |
+| `src/cli/commands/doctor.ts` | 3 | Low (CLI) |
+| `src/lib/skills-merge.ts` | 2 | Low |
+| `src/cli/commands/work/issue.ts` | 2 | Low (CLI) |
+| `src/lib/cloister/handoff.ts` | 1 | Medium |
+| `src/dashboard/server/index.ts` | 1 | Low (1 remaining) |
 
-2. **Status endpoint trusts STATE.md pattern matching**: `GET /api/planning/:id/status` checks if `STATE.md` contains `## Status: Complete` or `## Planning Status: Complete` (regex). It doesn't validate whether this is from the current planning attempt.
+## Priority
 
-3. **PlanDialog auto-transitions on initial check**: When the dialog opens in "checking" step, if `data.planningCompleted` is `true`, it immediately transitions to `step='complete'` **without** requiring:
-   - An active session connection
-   - A minimum time threshold
-   - The `.planning-complete` marker file
+High-impact files that block the dashboard event loop:
+1. **`tmux.ts`** — `createSession()`, `killSession()`, `sendKeys()`, `capturePane()` are all sync and called from the async dashboard server
+2. **`session-rotation.ts`** — cloister rotation runs on the dashboard
+3. **`worktree.ts`** — workspace creation blocks during git operations
 
-## Affected Code
+CLI-only files (`cli/commands/*`) are lower priority since they're one-shot commands.
 
-- **Status endpoint**: `src/dashboard/server/index.ts` lines ~8812-8909
-- **PlanDialog initial check**: `src/dashboard/frontend/src/components/PlanDialog.tsx` lines ~226-251
-- **Deep-wipe**: `src/dashboard/server/index.ts` lines ~10284-10491
+## Approach
 
-## Proposed Fix
+Follow the same pattern established by PAN-70:
+```typescript
+// Before
+const output = execSync('cmd', { encoding: 'utf-8' });
 
-1. **Start-planning should clear stale planning state**: Before spawning a new planning agent, delete any existing `.planning/` directory in the workspace (or at least remove `STATE.md` and `.planning-complete` marker)
-2. **PlanDialog should require session connection**: Don't transition to "complete" on initial check unless `hasConnectedToSession.current === true` (the agent was actually seen running)
-3. **Deep-wipe should clean workspace-backed `.planning/`**: Currently only cleans the legacy project-level `.planning/{issue}/` directory, not the workspace-backed one
+// After  
+const { stdout: output } = await execAsync('cmd', { encoding: 'utf-8' });
+```
 
-## Reproduction
+For `tmux.ts`, this means making `createSession()`, `killSession()`, `sendKeys()`, and `capturePane()` async — which will cascade to all callers in `agents.ts`, `convoy.ts`, etc.
 
-1. Plan an issue to completion
-2. Deep-wipe the issue
-3. Click "Plan" again
-4. Dialog shows "Planning Complete" after ~2-3 seconds without the agent running
+## Context
 
-## Related
-
-- PAN-207 (ERR_NETWORK_CHANGED) was a separate issue with Docker network disruptions, now fixed with retry logic
+- PAN-70: Converted ~70 calls in server/index.ts, specialists.ts, health.ts
+- PAN-72: Converted remaining cloister calls in triggers.ts, handoff-context.ts, plan.ts
+- This issue covers the remaining tail
 
 ---
 
