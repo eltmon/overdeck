@@ -1,4 +1,4 @@
-# Planning Session: PAN-209
+# Planning Session: PAN-208
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,26 +22,48 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-209
-- **Title:** Mouse scroll in planning dialog scrolls chat input instead of agent output
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/209
+- **ID:** PAN-208
+- **Title:** Stale planning state causes premature 'Planning Complete' on restart
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/208
 
 ## Description
 ## Problem
 
-In the PlanDialog's terminal/chat view, middle mouse scroll (or regular scroll wheel) scrolls the chat input textbox instead of the agent output pane. The user expects scrolling to navigate the agent's output history.
+When clicking "Plan" on an issue that was previously planned (even after deep-wipe), the PlanDialog shows "Planning Complete" after only a few seconds without the planning agent actually running. Closing the dialog and clicking "Resume Planning" works correctly.
 
-## Expected Behavior
+## Root Cause
 
-Scroll wheel over the planning dialog should scroll the agent output (terminal/log area), not the chat input field.
+1. **Stale `STATE.md` survives workspace recreation**: The `.planning/` directory in the workspace contains `STATE.md` from a previous planning session. Since workspaces are git worktrees, the branch may still contain the old `.planning/` directory even after the worktree is deleted and recreated.
 
-## Affected Component
+2. **Status endpoint trusts STATE.md pattern matching**: `GET /api/planning/:id/status` checks if `STATE.md` contains `## Status: Complete` or `## Planning Status: Complete` (regex). It doesn't validate whether this is from the current planning attempt.
 
-- `src/dashboard/frontend/src/components/PlanDialog.tsx` — the XTerminal / output area and chat input layout
+3. **PlanDialog auto-transitions on initial check**: When the dialog opens in "checking" step, if `data.planningCompleted` is `true`, it immediately transitions to `step='complete'` **without** requiring:
+   - An active session connection
+   - A minimum time threshold
+   - The `.planning-complete` marker file
 
-## Likely Cause
+## Affected Code
 
-The chat input textarea may be capturing scroll events, or the output pane lacks proper `overflow-y: auto` / scroll focus. The z-order or focus state may cause the input to receive scroll events when the cursor is over the output area.
+- **Status endpoint**: `src/dashboard/server/index.ts` lines ~8812-8909
+- **PlanDialog initial check**: `src/dashboard/frontend/src/components/PlanDialog.tsx` lines ~226-251
+- **Deep-wipe**: `src/dashboard/server/index.ts` lines ~10284-10491
+
+## Proposed Fix
+
+1. **Start-planning should clear stale planning state**: Before spawning a new planning agent, delete any existing `.planning/` directory in the workspace (or at least remove `STATE.md` and `.planning-complete` marker)
+2. **PlanDialog should require session connection**: Don't transition to "complete" on initial check unless `hasConnectedToSession.current === true` (the agent was actually seen running)
+3. **Deep-wipe should clean workspace-backed `.planning/`**: Currently only cleans the legacy project-level `.planning/{issue}/` directory, not the workspace-backed one
+
+## Reproduction
+
+1. Plan an issue to completion
+2. Deep-wipe the issue
+3. Click "Plan" again
+4. Dialog shows "Planning Complete" after ~2-3 seconds without the agent running
+
+## Related
+
+- PAN-207 (ERR_NETWORK_CHANGED) was a separate issue with Docker network disruptions, now fixed with retry logic
 
 ---
 
