@@ -21,6 +21,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(),
   createSession: vi.fn(),
   sendKeys: vi.fn(),
+  sendKeysAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('Agent Lifecycle Integration (PAN-80)', () => {
@@ -326,11 +327,12 @@ describe('Agent Lifecycle Integration (PAN-80)', () => {
         writeFileSync(readyPath, JSON.stringify({ ready: true }));
       });
       vi.mocked(tmuxMock.sendKeys).mockImplementation(() => {});
+      vi.mocked(tmuxMock.sendKeysAsync).mockResolvedValue(undefined);
 
       await resumeAgent(agentId, message);
 
-      // Verify sendKeys was called with the message
-      expect(tmuxMock.sendKeys).toHaveBeenCalledWith(agentId, message);
+      // Verify sendKeysAsync was called with the message
+      expect(tmuxMock.sendKeysAsync).toHaveBeenCalledWith(agentId, message);
     });
   });
 

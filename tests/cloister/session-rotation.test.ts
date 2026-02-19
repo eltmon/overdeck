@@ -25,9 +25,36 @@ vi.mock('../../src/lib/cloister/specialists.js', () => ({
   getTmuxSessionName: vi.fn((name: string) => `specialist-${name}`),
 }));
 
-vi.mock('child_process', () => ({
-  execSync: vi.fn(),
-}));
+// Hoist the exec mock so it's available inside vi.mock factory
+const execMock = vi.hoisted(() => vi.fn<[string, any?], string>().mockReturnValue(''));
+
+vi.mock('child_process', () => {
+  // Mirror Node's exec custom promisify so promisify(exec) returns { stdout, stderr }
+  const kCustom = Symbol.for('nodejs.util.promisify.custom');
+
+  function exec(cmd: string, optionsOrCb: any, maybeCallback?: any) {
+    const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCallback;
+    const options = typeof optionsOrCb === 'function' ? undefined : optionsOrCb;
+    try {
+      const result = execMock(cmd, options);
+      callback(null, result, '');
+    } catch (err) {
+      callback(err, '', '');
+    }
+  }
+
+  (exec as any)[kCustom] = (cmd: string, options?: any) =>
+    new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      try {
+        const result = execMock(cmd, options);
+        resolve({ stdout: result ?? '', stderr: '' });
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+  return { exec };
+});
 
 vi.mock('fs', () => ({
   readFileSync: vi.fn(),
@@ -37,11 +64,10 @@ vi.mock('fs', () => ({
 
 import { getRuntimeForAgent } from '../../src/lib/runtimes/index.js';
 import { getAgentState } from '../../src/lib/agents.js';
-import { execSync } from 'child_process';
 
 const mockGetRuntimeForAgent = vi.mocked(getRuntimeForAgent);
 const mockGetAgentState = vi.mocked(getAgentState);
-const mockExecSync = vi.mocked(execSync);
+const mockExecSync = execMock;
 
 describe('session-rotation', () => {
   beforeEach(() => {
@@ -111,16 +137,16 @@ describe('session-rotation', () => {
   });
 
   describe('buildMergeAgentMemory', () => {
-    it('should return fallback message on git error', () => {
+    it('should return fallback message on git error', async () => {
       mockExecSync.mockImplementation(() => {
         throw new Error('Not a git repo');
       });
 
-      const memory = buildMergeAgentMemory('/tmp/test');
+      const memory = await buildMergeAgentMemory('/tmp/test');
       expect(memory).toBe('No merge history available.\n');
     });
 
-    it('should build memory with merge commits', () => {
+    it('should build memory with merge commits', async () => {
       // Mock git log returning merge commits
       mockExecSync.mockImplementation((cmd: string) => {
         if (cmd.includes('git log --merges')) {
@@ -135,7 +161,7 @@ describe('session-rotation', () => {
         return '';
       });
 
-      const memory = buildMergeAgentMemory('/tmp/test', {
+      const memory = await buildMergeAgentMemory('/tmp/test', {
         recent_summary: 10,
         recent_detailed: 5,
         recent_full: 2,
@@ -147,18 +173,18 @@ describe('session-rotation', () => {
       expect(memory).toContain('Files changed');
     });
 
-    it('should handle empty merge history', () => {
+    it('should handle empty merge history', async () => {
       mockExecSync.mockReturnValue('');
 
-      const memory = buildMergeAgentMemory('/tmp/test');
+      const memory = await buildMergeAgentMemory('/tmp/test');
       expect(memory).toContain('# Merge-Agent Session Memory');
       expect(memory).toContain('Last 20 merges');
     });
 
-    it('should use default tiers when not specified', () => {
+    it('should use default tiers when not specified', async () => {
       mockExecSync.mockReturnValue('');
 
-      buildMergeAgentMemory('/tmp/test');
+      await buildMergeAgentMemory('/tmp/test');
 
       // Should have called git log with max of default tiers
       expect(mockExecSync).toHaveBeenCalledWith(
