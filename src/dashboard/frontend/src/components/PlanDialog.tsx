@@ -254,31 +254,12 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     }
   }, [isOpen, issue.identifier, step]);
 
-  // Track when we entered planning step to avoid stale data race condition
-  const enteredPlanningAt = useRef<number>(0);
-
-  // Update timestamp when entering planning step
-  useEffect(() => {
-    if (step === 'planning') {
-      enteredPlanningAt.current = Date.now();
-    }
-  }, [step]);
-
-  // Watch for session ending while in planning step
-  useEffect(() => {
-    // Only transition to 'complete' if:
-    // 1. We're in the planning step
-    // 2. We have fresh status data showing session is inactive
-    // 3. We actually connected to a session in THIS dialog instance (not stale cache)
-    // 4. We've been in planning step for at least 10 seconds (generous startup window)
-    // 5. The status data was fetched AFTER we entered planning step (not stale cache)
-    const timeSinceEntered = Date.now() - enteredPlanningAt.current;
-    const dataFetchedAfterEntry = statusQuery.dataUpdatedAt > enteredPlanningAt.current;
-    if (step === 'planning' && statusQuery.data && !statusQuery.data.active && hasConnectedToSession.current && timeSinceEntered > 10000 && dataFetchedAfterEntry) {
-      // Session is no longer active - it ended or was stopped
-      setStep('complete');
-    }
-  }, [step, statusQuery.data, statusQuery.dataUpdatedAt]);
+  // DELIBERATE: No automatic transition to 'complete' based on session status.
+  // Previous attempts to auto-detect session ending via polling caused persistent
+  // premature 'complete' transitions due to stale cache, Docker network disruption
+  // (PAN-207), and PTY disconnect race conditions. The ONLY paths to 'complete' are:
+  // 1. User clicks "Done" button → stopPlanningMutation.onSuccess
+  // 2. Initial check finds .planning-complete marker → step set in checking effect
 
   const handleStartPlanning = () => {
     setStep('starting');
@@ -335,7 +316,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               const data = await res.json();
               if (data.active) {
                 hasConnectedToSession.current = true;
-                enteredPlanningAt.current = Date.now();
                 setStep('planning');
               }
             } catch {}
