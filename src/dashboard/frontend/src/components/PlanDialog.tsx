@@ -91,6 +91,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       setResult(data);
       if (data.planningAgent.started) {
         hasConnectedToSession.current = true;
+        // Invalidate stale status cache BEFORE entering planning step
+        // Without this, the status query returns cached active:false from
+        // the initial check, causing premature 'complete' transition (PAN-213)
+        queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
         setStep('planning');
       } else if (data.planningAgent.error) {
         setError(data.planningAgent.error);
@@ -266,13 +270,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     // 1. We're in the planning step
     // 2. We have fresh status data showing session is inactive
     // 3. We actually connected to a session in THIS dialog instance (not stale cache)
-    // 4. We've been in planning step for at least 2 seconds (avoid stale data race)
+    // 4. We've been in planning step for at least 10 seconds (generous startup window)
+    // 5. The status data was fetched AFTER we entered planning step (not stale cache)
     const timeSinceEntered = Date.now() - enteredPlanningAt.current;
-    if (step === 'planning' && statusQuery.data && !statusQuery.data.active && hasConnectedToSession.current && timeSinceEntered > 2000) {
+    const dataFetchedAfterEntry = statusQuery.dataUpdatedAt > enteredPlanningAt.current;
+    if (step === 'planning' && statusQuery.data && !statusQuery.data.active && hasConnectedToSession.current && timeSinceEntered > 10000 && dataFetchedAfterEntry) {
       // Session is no longer active - it ended or was stopped
       setStep('complete');
     }
-  }, [step, statusQuery.data]);
+  }, [step, statusQuery.data, statusQuery.dataUpdatedAt]);
 
   const handleStartPlanning = () => {
     setStep('starting');
@@ -320,7 +326,22 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     return (
       <div
         className="fixed bottom-4 right-4 z-50 bg-surface-raised rounded-lg shadow-2xl border border-divider px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-surface-overlay transition-colors"
-        onClick={() => setMinimized(false)}
+        onClick={async () => {
+          // Recheck session status when unminimizing — recover to planning
+          // if session is still active but step was prematurely set to 'complete'
+          if (step === 'complete') {
+            try {
+              const res = await fetch(`/api/planning/${issue.identifier}/status`);
+              const data = await res.json();
+              if (data.active) {
+                hasConnectedToSession.current = true;
+                enteredPlanningAt.current = Date.now();
+                setStep('planning');
+              }
+            } catch {}
+          }
+          setMinimized(false);
+        }}
       >
         <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
           <Sparkles className="w-3 h-3 text-content" />
@@ -335,6 +356,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               <span className="px-1.5 py-0.5 bg-gray-500/30 text-content-subtle text-xs rounded">Local</span>
             )}
           </>
+        )}
+        {step === 'complete' && (
+          <span className="px-1.5 py-0.5 bg-green-500/30 text-green-300 text-xs rounded">Done</span>
         )}
       </div>
     );

@@ -30,36 +30,16 @@ var CERTS_DIR = join(PANOPTICON_HOME, "certs");
 var CONFIG_FILE = join(CONFIG_DIR, "config.toml");
 var SETTINGS_FILE = join(CONFIG_DIR, "settings.json");
 var CLAUDE_DIR = join(homedir(), ".claude");
-var CODEX_DIR = join(homedir(), ".codex");
-var CURSOR_DIR = join(homedir(), ".cursor");
-var GEMINI_DIR = join(homedir(), ".gemini");
-var OPENCODE_DIR = join(homedir(), ".opencode");
-var SYNC_TARGETS = {
-  claude: {
-    skills: join(CLAUDE_DIR, "skills"),
-    commands: join(CLAUDE_DIR, "commands"),
-    agents: join(CLAUDE_DIR, "agents")
-  },
-  codex: {
-    skills: join(CODEX_DIR, "skills"),
-    commands: join(CODEX_DIR, "commands"),
-    agents: join(CODEX_DIR, "agents")
-  },
-  cursor: {
-    skills: join(CURSOR_DIR, "skills"),
-    commands: join(CURSOR_DIR, "commands"),
-    agents: join(CURSOR_DIR, "agents")
-  },
-  gemini: {
-    skills: join(GEMINI_DIR, "skills"),
-    commands: join(GEMINI_DIR, "commands"),
-    agents: join(GEMINI_DIR, "agents")
-  },
-  opencode: {
-    skills: join(OPENCODE_DIR, "skills"),
-    commands: join(OPENCODE_DIR, "commands"),
-    agents: join(OPENCODE_DIR, "agents")
-  }
+var LEGACY_RUNTIME_DIRS = {
+  codex: join(homedir(), ".codex"),
+  cursor: join(homedir(), ".cursor"),
+  gemini: join(homedir(), ".gemini"),
+  opencode: join(homedir(), ".opencode")
+};
+var SYNC_TARGET = {
+  skills: join(CLAUDE_DIR, "skills"),
+  commands: join(CLAUDE_DIR, "commands"),
+  agents: join(CLAUDE_DIR, "agents")
 };
 var TEMPLATES_DIR = join(PANOPTICON_HOME, "templates");
 var CLAUDE_MD_TEMPLATES = join(TEMPLATES_DIR, "claude-md", "sections");
