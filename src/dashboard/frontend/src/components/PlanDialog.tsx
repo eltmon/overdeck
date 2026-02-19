@@ -622,23 +622,20 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       <XTerminal
                         sessionName={result.planningAgent.sessionName}
                         onDisconnect={() => {
-                          // Session ended - only go back to ready if session is actually inactive
-                          statusQuery.refetch().then(({ data }) => {
-                            if (!data?.active) {
-                              setStep('complete');
-                            }
-                          });
+                          // PTY/WebSocket disconnected — this often happens during Docker
+                          // network disruption (PAN-207), NOT because planning actually ended.
+                          // Don't eagerly transition to 'complete' here. Instead, just trigger
+                          // a status refetch and let the polling useEffect handle the transition
+                          // with proper guards (dataUpdatedAt, 10s minimum, etc.)
+                          statusQuery.refetch();
                         }}
                       />
                     ) : statusQuery.data?.sessionName ? (
                       <XTerminal
                         sessionName={statusQuery.data.sessionName}
                         onDisconnect={() => {
-                          statusQuery.refetch().then(({ data }) => {
-                            if (!data?.active) {
-                              setStep('complete');
-                            }
-                          });
+                          // Same as above — don't eagerly transition, just refetch
+                          statusQuery.refetch();
                         }}
                       />
                     ) : (
