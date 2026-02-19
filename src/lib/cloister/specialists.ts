@@ -1697,15 +1697,41 @@ Use the send-feedback-to-agent skill to report findings back to the issue agent.
     case 'review-agent': {
       // Pre-check: detect stale branch (0 diff from main) before waking the agent
       const workspace = task.workspace || 'unknown';
-      let staleBranch = false;
+
+      // Resolve git directory — polyrepo workspaces have .git in subdirectories, not at root
+      let gitDirs: string[] = [];
       if (workspace !== 'unknown') {
+        if (existsSync(join(workspace, '.git'))) {
+          // Monorepo or single-repo workspace — .git at root
+          gitDirs = [workspace];
+        } else {
+          // Polyrepo — find subdirectories that contain .git
+          try {
+            const entries = readdirSync(workspace, { withFileTypes: true });
+            for (const entry of entries) {
+              if (entry.isDirectory() && existsSync(join(workspace, entry.name, '.git'))) {
+                gitDirs.push(join(workspace, entry.name));
+              }
+            }
+          } catch {}
+        }
+      }
+      // Use first git dir for pre-check (primary repo), fall back to workspace root
+      const gitDir = gitDirs[0] || workspace;
+
+      let staleBranch = false;
+      if (workspace !== 'unknown' && gitDirs.length > 0) {
         try {
-          const { stdout: diffOutput } = await execAsync(
-            `cd "${workspace}" && git fetch origin main 2>/dev/null; git diff --name-only main...HEAD 2>/dev/null`,
-            { encoding: 'utf-8', timeout: 15000 }
-          );
-          const changedFiles = diffOutput.trim().split('\n').filter((f: string) => f.length > 0);
-          if (changedFiles.length === 0) {
+          // For polyrepos, check all git dirs — if ANY has changes, it's not stale
+          let totalChangedFiles = 0;
+          for (const dir of gitDirs) {
+            const { stdout: dirDiff } = await execAsync(
+              `cd "${dir}" && git fetch origin main 2>/dev/null; git diff --name-only main...HEAD 2>/dev/null`,
+              { encoding: 'utf-8', timeout: 15000 }
+            );
+            totalChangedFiles += dirDiff.trim().split('\n').filter((f: string) => f.length > 0).length;
+          }
+          if (totalChangedFiles === 0) {
             staleBranch = true;
             console.log(`[specialist] review-agent: stale branch detected for ${task.issueId} — 0 files changed vs main`);
 
@@ -1733,10 +1759,20 @@ Use the send-feedback-to-agent skill to report findings back to the issue agent.
         }
       }
 
+      // Build git commands for the prompt — polyrepo workspaces need git commands in subdirectories
+      const isPolyrepo = gitDirs.length > 1;
+      const gitDiffCommands = gitDirs.length > 0
+        ? gitDirs.map(d => `cd "${d}" && git diff --name-only main...HEAD`).join('\n')
+        : `cd "${workspace}" && git diff --name-only main...HEAD`;
+      const gitDiffFileCmd = gitDirs.length > 0
+        ? `cd "${gitDir}" && git diff main...HEAD -- <file>`
+        : `cd "${workspace}" && git diff main...HEAD -- <file>`;
+
       prompt = `New review task for ${task.issueId}:
 
 Branch: ${task.branch || 'unknown'}
 Workspace: ${workspace}
+${isPolyrepo ? `Polyrepo: git repos in subdirectories: ${gitDirs.map(d => basename(d)).join(', ')}` : ''}
 ${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
 
 Your task:
@@ -1751,11 +1787,12 @@ The TEST agent will run tests in the next step.
 ## How to Review Changes
 
 **Step 0 (CRITICAL):** First check if there are ANY changes to review:
+${isPolyrepo ? `This is a polyrepo — run git diff in each repo subdirectory:` : ''}
 \`\`\`bash
-cd ${workspace} && git diff --name-only main...HEAD
+${gitDiffCommands}
 \`\`\`
 
-**If the diff is EMPTY (0 files changed):** The branch is stale or already merged into main. In this case:
+**If the diff is EMPTY (0 files changed across all repos):** The branch is stale or already merged into main. In this case:
 1. Do NOT attempt a full review
 2. Update status as passed immediately:
 \`\`\`bash
@@ -1769,7 +1806,7 @@ pan work tell ${task.issueId} "Review complete: branch has 0 diff from main — 
 
 **Step 1:** Get the list of changed files:
 \`\`\`bash
-cd ${workspace} && git diff --name-only main...HEAD
+${gitDiffCommands}
 \`\`\`
 
 **Step 2:** Read the CURRENT version of each changed file using the Read tool.
@@ -1777,7 +1814,7 @@ Review the actual file contents — do NOT rely solely on diff output.
 
 **Step 3:** If you need to see what specifically changed, use:
 \`\`\`bash
-cd ${workspace} && git diff main...HEAD -- <file>
+${gitDiffFileCmd}
 \`\`\`
 
 ## Avoiding False Positives
