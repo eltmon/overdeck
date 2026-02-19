@@ -306,6 +306,7 @@ auto_wake = true
 3. **Use appropriate priority**: Don't mark everything as urgent
 4. **Include context**: Add relevant information in the context field
 5. **Exit after submission**: Let specialists handle review/merge
+6. **Use `pan work done` not `pan approve`**: `pan work done <ISSUE-ID>` is the agent completion command (run via Bash). `pan approve` is supervisor-only.
 
 ### For Specialist Configuration
 
@@ -313,6 +314,49 @@ auto_wake = true
 2. **Monitor history logs**: Check `~/.panopticon/specialists/<name>/history.jsonl`
 3. **Reset sessions periodically**: If context gets too large (>100K tokens)
 4. **Configure test commands**: Override auto-detection for custom test setups
+
+## Review Cycle Circuit Breaker
+
+Agents can automatically request re-review up to **3 times** (`MAX_AUTO_REQUEUE = 3`). After 3 cycles of specialist feedback and agent fixes, the circuit breaker trips and human intervention is required.
+
+### What Happens at the Limit
+
+When the circuit breaker fires:
+1. The API returns HTTP 429 with `"Circuit breaker triggered"`
+2. The deacon stops sending recovery nudges to the agent
+3. The dashboard ACTIONS section shows **"Review cycles: 3/3"** with a warning: **"Human intervention needed"**
+4. The agent cannot proceed further without human help
+
+### Human Intervention
+
+When the circuit breaker fires, the human should:
+
+1. **Review the feedback history** — expand the status section in the dashboard workspace panel to see what went wrong across cycles
+2. **Assess the situation** — is the agent going in circles? Are the review-agent's requests reasonable? Is there a pre-existing test failure confusing things?
+3. **Click "Review & Test"** in the dashboard to reset the counter and run a fresh review cycle
+4. Alternatively, **review the code manually** and either merge directly or send specific guidance to the agent via `pan tell <ISSUE-ID> "message"`
+
+### Full Review Flow
+
+```
+Agent runs `pan work done` (Bash command)
+  → Auto-triggers review-agent
+    → review-agent reviews code
+      → APPROVED → queues test-agent
+        → test-agent runs tests
+          → PASS → marks ready for merge (human clicks MERGE or merge-agent handles)
+          → FAIL → feedback to .planning/feedback/ → agent fixes → re-requests review
+      → CHANGES REQUESTED → feedback to .planning/feedback/ → agent fixes → re-requests review
+        → This cycle repeats up to 3 times before circuit breaker trips
+```
+
+### Key API Endpoints
+
+| Endpoint | Purpose | Counter Effect |
+|----------|---------|---------------|
+| `POST /api/workspaces/:id/request-review` | Agent re-review request | Increments (max 3) |
+| `POST /api/workspaces/:id/review` | Human-initiated review | Resets to 0 |
+| `GET /api/workspaces/:id/review-status` | Status including `autoRequeueCount` | Read-only |
 
 ## Troubleshooting
 
