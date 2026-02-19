@@ -40,6 +40,20 @@ Start by reading the STATE.md file to understand the plan, then begin implementa
 If no STATE.md exists, check the issue tracker for requirements.
 {{/env}}
 
+## On Restart: Rebase onto Latest Main
+
+If `.planning/STATE.md` already has implementation progress (this is a restart, not a fresh start), rebase onto latest main before doing anything else:
+
+```bash
+git fetch origin main && git rebase origin/main
+```
+
+- Clean rebase → continue work
+- Simple conflicts (< 5 files, obvious resolution) → resolve them and `git rebase --continue`
+- Complex conflicts → `git rebase --abort` and note in STATE.md that manual rebase is needed
+
+**This takes < 30 seconds. Do it before reading feedback or resuming work.**
+
 {{#if BEADS_TASKS}}
 ## Beads Tasks
 
@@ -153,7 +167,7 @@ but STATE.md provides the narrative context and current state that beads alone c
 3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`
 
 {{#env LOCAL}}
-**Before declaring work complete, run:**
+**Before declaring work complete, run these as BASH COMMANDS (using the Bash tool):**
 ```bash
 npm test                                         # Run tests
 git add -A && git commit -m "feat: description"  # Commit ALL changes
@@ -162,7 +176,9 @@ git status                                       # Must show "nothing to commit"
 pan work done {{ISSUE_ID}} -c "Brief summary"      # Signal completion
 ```
 
-**IMPORTANT:** Run `pan work done` when finished - this updates the issue to "In Review" so the user knows to review your work.
+**IMPORTANT:** `pan work done` MUST be executed as a Bash command (via the Bash tool). Do NOT type it at the Claude Code interactive prompt — it will not work correctly.
+
+**WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan work done` to signal completion.
 {{/env}}
 {{#env REMOTE}}
 When ALL tasks are complete, commit and push everything:

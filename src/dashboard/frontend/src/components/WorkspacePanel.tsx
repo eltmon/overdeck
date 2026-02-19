@@ -64,6 +64,7 @@ interface ReviewStatus {
   testNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
+  autoRequeueCount?: number;
   history?: StatusHistoryEntry[];
 }
 
@@ -1192,6 +1193,21 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                   <span className="text-content-muted text-[10px]">{formatRelativeTime(reviewStatus.updatedAt)}</span>
                 )}
               </div>
+              {/* Review cycle count */}
+              {(reviewStatus.autoRequeueCount ?? 0) > 0 && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-content-subtle">Review cycles:</span>
+                  <span className={(reviewStatus.autoRequeueCount ?? 0) >= 3 ? 'text-red-400 font-medium' : 'text-content-body'}>
+                    {reviewStatus.autoRequeueCount}/3
+                  </span>
+                  {(reviewStatus.autoRequeueCount ?? 0) >= 3 && (
+                    <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-900/20 px-1.5 py-0.5 rounded">
+                      <AlertTriangle className="w-2.5 h-2.5" />
+                      Human intervention needed
+                    </span>
+                  )}
+                </div>
+              )}
               {reviewStatus.reviewNotes && (
                 <div className="mt-1 text-content-subtle text-xs">{reviewStatus.reviewNotes}</div>
               )}
