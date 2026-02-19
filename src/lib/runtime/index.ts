@@ -1,37 +1,23 @@
 /**
- * Multi-Runtime Architecture
+ * Runtime Architecture (Claude Code only)
  *
- * Export all runtime adapters and provide a unified registry
+ * Export the Claude runtime adapter and provide a registry
  */
 
 export * from './interface.js';
 export { createClaudeAdapter } from './claude.js';
-export { createCodexAdapter } from './codex.js';
-export { createCursorAdapter } from './cursor.js';
-export { createGeminiAdapter } from './gemini.js';
 
 import type { RuntimeAdapter, RuntimeType, RuntimeRegistry } from './interface.js';
 import { createClaudeAdapter } from './claude.js';
-import { createCodexAdapter } from './codex.js';
-import { createCursorAdapter } from './cursor.js';
-import { createGeminiAdapter } from './gemini.js';
 
 /**
- * Create a runtime registry with all built-in adapters
+ * Create a runtime registry with the Claude adapter
  */
 export function createRuntimeRegistry(): RuntimeRegistry {
   const adapters = new Map<RuntimeType, RuntimeAdapter>();
 
-  // Register built-in adapters
   const claude = createClaudeAdapter();
-  const codex = createCodexAdapter();
-  const cursor = createCursorAdapter();
-  const gemini = createGeminiAdapter();
-
   adapters.set('claude', claude);
-  adapters.set('codex', codex);
-  adapters.set('cursor', cursor);
-  adapters.set('gemini', gemini);
 
   return {
     register(adapter: RuntimeAdapter): void {
@@ -80,25 +66,17 @@ export function createRuntimeRegistry(): RuntimeRegistry {
  * Get a runtime adapter by type
  */
 export function getRuntimeAdapter(type: RuntimeType): RuntimeAdapter {
-  switch (type) {
-    case 'claude':
-      return createClaudeAdapter();
-    case 'codex':
-      return createCodexAdapter();
-    case 'cursor':
-      return createCursorAdapter();
-    case 'gemini':
-      return createGeminiAdapter();
-    default:
-      throw new Error(`Unknown runtime type: ${type}`);
+  if (type !== 'claude') {
+    throw new Error(`Unknown runtime type: ${type}. Only 'claude' is supported.`);
   }
+  return createClaudeAdapter();
 }
 
 /**
  * Get all supported runtime types
  */
 export function getSupportedRuntimes(): RuntimeType[] {
-  return ['claude', 'codex', 'cursor', 'gemini'];
+  return ['claude'];
 }
 
 /**

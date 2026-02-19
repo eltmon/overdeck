@@ -56,27 +56,8 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
       return null;
     }
 
-    // Map the state.runtime to a RuntimeName
-    // The state.runtime may be 'claude', 'opencode', etc.
-    let runtimeName: RuntimeName;
-
-    switch (state.runtime) {
-      case 'claude':
-      case 'claude-code':
-        runtimeName = 'claude-code';
-        break;
-      case 'opencode':
-        runtimeName = 'opencode';
-        break;
-      case 'codex':
-        runtimeName = 'codex';
-        break;
-      default:
-        // Default to claude-code if unknown
-        runtimeName = 'claude-code';
-    }
-
-    return this.get(runtimeName) || null;
+    // All agents use claude-code runtime
+    return this.get('claude-code') || null;
   }
 }
 
@@ -98,7 +79,7 @@ export function getGlobalRegistry(): RuntimeRegistry {
     // Register Claude Code runtime by default
     globalRegistry.register(createClaudeCodeRuntime());
 
-    // TODO: Register other runtimes (OpenCode, Codex) when implemented
+    // Claude Code is the sole supported runtime
   }
   return globalRegistry;
 }

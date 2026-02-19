@@ -1,4 +1,4 @@
-# Planning Session: PAN-205
+# Planning Session: PAN-142
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,63 +22,36 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-205
-- **Title:** Convert remaining ~83 execSync calls to async across CLI and lib files
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/205
+- **ID:** PAN-142
+- **Title:** PAN-141: Remove opencode, codex, cursor, gemini sync targets - consolidate on Claude Code only
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/142
 
 ## Description
-## Problem
+## Summary
 
-PAN-70 and PAN-72 converted the highest-impact `execSync` calls in the dashboard server, specialists, and health files. However, **~83 `execSync` calls remain across 15 files**, some of which are called from the dashboard server and still block the event loop.
+We've decided to use Claude Code as the sole AI coding tool, with claude-code-router handling alternative models. The multi-runtime sync support (opencode, codex, cursor, gemini) is no longer needed and adds maintenance burden.
 
-## Remaining execSync calls by file
+## What to remove
 
-| File | Count | Impact |
-|------|-------|--------|
-| `src/cli/commands/install.ts` | 14 | Low (CLI one-shot) |
-| `src/lib/tmux.ts` | 13 | **HIGH** (called from dashboard via agents.ts) |
-| `src/cli/index.ts` | 8 | Low (CLI entry) |
-| `src/cli/commands/setup/hooks.ts` | 8 | Low (CLI one-shot) |
-| `src/lib/worktree.ts` | 7 | **MEDIUM** (called during workspace creation) |
-| `src/lib/cloister/session-rotation.ts` | 5 | **HIGH** (called from dashboard cloister) |
-| `src/cli/commands/work/approve.ts` | 5 | Low (CLI) |
-| `src/cli/commands/beads.ts` | 4 | Low (CLI) |
-| `src/lib/dns.ts` | 3 | Medium (called during workspace setup) |
-| `src/cli/commands/update.ts` | 3 | Low (CLI) |
-| `src/cli/commands/sync.ts` | 3 | Low (CLI) |
-| `src/cli/commands/doctor.ts` | 3 | Low (CLI) |
-| `src/lib/skills-merge.ts` | 2 | Low |
-| `src/cli/commands/work/issue.ts` | 2 | Low (CLI) |
-| `src/lib/cloister/handoff.ts` | 1 | Medium |
-| `src/dashboard/server/index.ts` | 1 | Low (1 remaining) |
-
-## Priority
-
-High-impact files that block the dashboard event loop:
-1. **`tmux.ts`** — `createSession()`, `killSession()`, `sendKeys()`, `capturePane()` are all sync and called from the async dashboard server
-2. **`session-rotation.ts`** — cloister rotation runs on the dashboard
-3. **`worktree.ts`** — workspace creation blocks during git operations
-
-CLI-only files (`cli/commands/*`) are lower priority since they're one-shot commands.
-
-## Approach
-
-Follow the same pattern established by PAN-70:
-```typescript
-// Before
-const output = execSync('cmd', { encoding: 'utf-8' });
-
-// After  
-const { stdout: output } = await execAsync('cmd', { encoding: 'utf-8' });
-```
-
-For `tmux.ts`, this means making `createSession()`, `killSession()`, `sendKeys()`, and `capturePane()` async — which will cascade to all callers in `agents.ts`, `convoy.ts`, etc.
+- **`src/lib/paths.ts`**: Remove `CODEX_DIR`, `CURSOR_DIR`, `GEMINI_DIR`, `OPENCODE_DIR` and their `SYNC_TARGETS` entries. Keep only `claude`.
+- **`src/lib/sync.ts`**: Simplify — no longer need to handle multiple runtimes
+- **`src/cli/commands/sync.ts`**: Simplify runtime loop (or remove it entirely since there's only one target)
+- **`~/.panopticon/config.toml`**: `targets` field becomes unnecessary (always claude)
+- **Clean up `~/.opencode/skills/`** etc. — remove any synced symlinks
 
 ## Context
 
-- PAN-70: Converted ~70 calls in server/index.ts, specialists.ts, health.ts
-- PAN-72: Converted remaining cloister calls in triggers.ts, handoff-context.ts, plan.ts
-- This issue covers the remaining tail
+- Alternative models are accessed via [claude-code-router](https://github.com/musistudio/claude-code-router), not separate tools
+- opencode, codex, cursor, gemini targets were aspirational but we've standardized on Claude Code
+- Simplifying this reduces code surface and config confusion
+- The crash fixed in 843ad26 was caused by opencode being in config but not in SYNC_TARGETS — removing multi-target eliminates this class of bug entirely
+
+## Acceptance Criteria
+
+- [ ] Only `claude` sync target remains
+- [ ] Config `[sync].targets` is either removed or defaults to `["claude"]`
+- [ ] Synced symlinks in `~/.opencode/`, `~/.codex/`, `~/.cursor/`, `~/.gemini/` are cleaned up
+- [ ] Tests updated
 
 ---
 

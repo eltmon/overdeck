@@ -7,8 +7,9 @@ import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
 import { planSync, executeSync, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
-import { SYNC_TARGETS, Runtime, isDevMode } from '../../lib/paths.js';
+import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { listProjects } from '../../lib/projects.js';
+import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
 
 // Get path to bundled git hooks
 const __filename = fileURLToPath(import.meta.url);
@@ -32,20 +33,6 @@ interface SyncOptions {
 }
 
 export async function syncCommand(options: SyncOptions): Promise<void> {
-  const config = loadConfig();
-  const targets = config.sync?.targets;
-
-  // Defensive check: ensure targets is defined and is a valid array
-  if (!targets || !Array.isArray(targets) || targets.length === 0) {
-    console.log(chalk.yellow('No sync targets configured.'));
-    console.log(chalk.dim('Edit ~/.panopticon/config.toml to add targets to the [sync] section.'));
-    console.log(chalk.dim('Example: targets = ["claude-code", "cursor"]'));
-    return;
-  }
-
-  // Type assertion is now safe since we've validated the array
-  const validTargets = targets as Runtime[];
-
   // Dry run mode
   if (options.dryRun) {
     console.log(chalk.bold('Sync Plan (dry run):\n'));
@@ -67,23 +54,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       console.log('');
     }
 
-    for (const runtime of validTargets) {
-      let plan;
-      try {
-        plan = planSync(runtime);
-      } catch (err: any) {
-        console.log(chalk.red(`${runtime}: ${err.message}`));
-        console.log('');
-        continue;
-      }
+    const plan = planSync();
 
-      console.log(chalk.cyan(`${runtime}:`));
+    console.log(chalk.cyan('claude:'));
 
-      if (plan.skills.length === 0 && plan.commands.length === 0 && plan.agents.length === 0 && plan.devSkills.length === 0) {
-        console.log(chalk.dim('  (nothing to sync)'));
-        continue;
-      }
-
+    if (plan.skills.length === 0 && plan.commands.length === 0 && plan.agents.length === 0 && plan.devSkills.length === 0) {
+      console.log(chalk.dim('  (nothing to sync)'));
+    } else {
       for (const item of plan.skills) {
         const icon = item.status === 'conflict' ? chalk.yellow('!') : chalk.green('+');
         const status = item.status === 'conflict' ? chalk.yellow('[conflict]') : '';
@@ -108,23 +85,38 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         const status = item.status === 'conflict' ? chalk.yellow('[conflict]') : '';
         console.log(`  ${icon} agent/${item.name} ${status}`);
       }
-
-      console.log('');
     }
 
+    console.log('');
     console.log(chalk.dim('Run without --dry-run to apply changes.'));
     return;
   }
+
+  // Run one-time migration: strip legacy sync targets from config.toml
+  const syncMigration = migrateSyncTargets();
+  if (syncMigration.migrated) {
+    if (syncMigration.hadNonClaudeTargets) {
+      console.log(chalk.yellow('Config updated: removed non-Claude sync targets (Panopticon now syncs to Claude Code only).'));
+    }
+  }
+
+  // Run one-time migration: remove Panopticon-managed symlinks from legacy runtime dirs
+  const cleanupResult = cleanupLegacyRuntimeSymlinks();
+  if (cleanupResult.cleaned.length > 0) {
+    console.log(chalk.dim(`Removed ${cleanupResult.total} legacy runtime symlink(s): ${cleanupResult.cleaned.join(', ')}`));
+  }
+
+  const config = loadConfig();
 
   // Create backup if enabled
   if (config.sync.backup_before_sync) {
     const spinner = ora('Creating backup...').start();
 
-    const backupDirs = validTargets.flatMap((r) => [
-      SYNC_TARGETS[r].skills,
-      SYNC_TARGETS[r].commands,
-      SYNC_TARGETS[r].agents,
-    ]);
+    const backupDirs = [
+      SYNC_TARGET.skills,
+      SYNC_TARGET.commands,
+      SYNC_TARGET.agents,
+    ];
 
     const backup = createBackup(backupDirs);
 
@@ -140,41 +132,21 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   // Execute sync
-  const spinner = ora('Syncing...').start();
+  const spinner = ora('Syncing to Claude Code...').start();
 
-  let totalCreated = 0;
-  let totalConflicts = 0;
+  const result = executeSync({ force: options.force });
 
-  for (const runtime of validTargets) {
-    spinner.text = `Syncing to ${runtime}...`;
-
-    let result;
-    try {
-      result = executeSync(runtime, { force: options.force });
-    } catch (err: any) {
-      console.log('');
-      console.log(chalk.red(`  ✗ ${runtime}: ${err.message}`));
-      continue;
+  if (result.conflicts.length > 0 && !options.force) {
+    spinner.warn(`Synced ${result.created.length} items, ${result.conflicts.length} conflicts`);
+    console.log('');
+    console.log(chalk.yellow('Conflicts:'));
+    for (const name of result.conflicts) {
+      console.log(chalk.dim(`  - ${name} (use --force to overwrite)`));
     }
-
-    totalCreated += result.created.length;
-    totalConflicts += result.conflicts.length;
-
-    if (result.conflicts.length > 0 && !options.force) {
-      console.log('');
-      console.log(chalk.yellow(`Conflicts in ${runtime}:`));
-      for (const name of result.conflicts) {
-        console.log(chalk.dim(`  - ${name} (use --force to overwrite)`));
-      }
-    }
-  }
-
-  if (totalConflicts > 0 && !options.force) {
-    spinner.warn(`Synced ${totalCreated} items, ${totalConflicts} conflicts`);
     console.log('');
     console.log(chalk.dim('Use --force to overwrite conflicting items.'));
   } else {
-    spinner.succeed(`Synced ${totalCreated} items to ${validTargets.join(', ')}`);
+    spinner.succeed(`Synced ${result.created.length} items to Claude Code`);
   }
 
   // Sync hooks (bin scripts)

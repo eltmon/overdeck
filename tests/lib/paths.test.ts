@@ -11,10 +11,8 @@ import {
   COSTS_DIR,
   CONFIG_FILE,
   CLAUDE_DIR,
-  CODEX_DIR,
-  CURSOR_DIR,
-  GEMINI_DIR,
-  SYNC_TARGETS,
+  LEGACY_RUNTIME_DIRS,
+  SYNC_TARGET,
   TEMPLATES_DIR,
   CLAUDE_MD_TEMPLATES,
   INIT_DIRS,
@@ -50,35 +48,27 @@ describe('paths', () => {
     });
   });
 
-  describe('AI tool directories', () => {
-    it('should have correct paths', () => {
+  describe('CLAUDE_DIR', () => {
+    it('should be .claude in user home', () => {
       expect(CLAUDE_DIR).toBe(join(home, '.claude'));
-      expect(CODEX_DIR).toBe(join(home, '.codex'));
-      expect(CURSOR_DIR).toBe(join(home, '.cursor'));
-      expect(GEMINI_DIR).toBe(join(home, '.gemini'));
     });
   });
 
-  describe('SYNC_TARGETS', () => {
-    it('should have claude target', () => {
-      expect(SYNC_TARGETS.claude).toBeDefined();
-      expect(SYNC_TARGETS.claude.skills).toBe(join(home, '.claude', 'skills'));
-      expect(SYNC_TARGETS.claude.commands).toBe(join(home, '.claude', 'commands'));
+  describe('LEGACY_RUNTIME_DIRS', () => {
+    it('should have correct paths for legacy runtimes', () => {
+      expect(LEGACY_RUNTIME_DIRS.codex).toBe(join(home, '.codex'));
+      expect(LEGACY_RUNTIME_DIRS.cursor).toBe(join(home, '.cursor'));
+      expect(LEGACY_RUNTIME_DIRS.gemini).toBe(join(home, '.gemini'));
+      expect(LEGACY_RUNTIME_DIRS.opencode).toBe(join(home, '.opencode'));
     });
+  });
 
-    it('should have codex target', () => {
-      expect(SYNC_TARGETS.codex).toBeDefined();
-      expect(SYNC_TARGETS.codex.skills).toBe(join(home, '.codex', 'skills'));
-    });
-
-    it('should have cursor target', () => {
-      expect(SYNC_TARGETS.cursor).toBeDefined();
-      expect(SYNC_TARGETS.cursor.skills).toBe(join(home, '.cursor', 'skills'));
-    });
-
-    it('should have gemini target', () => {
-      expect(SYNC_TARGETS.gemini).toBeDefined();
-      expect(SYNC_TARGETS.gemini.skills).toBe(join(home, '.gemini', 'skills'));
+  describe('SYNC_TARGET', () => {
+    it('should have claude target paths', () => {
+      expect(SYNC_TARGET).toBeDefined();
+      expect(SYNC_TARGET.skills).toBe(join(home, '.claude', 'skills'));
+      expect(SYNC_TARGET.commands).toBe(join(home, '.claude', 'commands'));
+      expect(SYNC_TARGET.agents).toBe(join(home, '.claude', 'agents'));
     });
   });
 

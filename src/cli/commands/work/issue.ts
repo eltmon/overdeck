@@ -80,7 +80,6 @@ import type { SpawnRemoteAgentOptions } from '../../../lib/remote/remote-agents.
 
 interface IssueOptions {
   model: string;
-  runtime: string;
   dryRun?: boolean;
   shadow?: boolean;
   remote?: boolean;
@@ -558,7 +557,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.log(chalk.bold('Would create:'));
       console.log(`  Agent ID:   agent-${normalizedId}`);
       console.log(`  Workspace:  ${workspace}`);
-      console.log(`  Runtime:    ${options.runtime}`);
       console.log(`  Model:      ${options.model}`);
 
       // Show what context would be included
@@ -586,7 +584,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const agent = await spawnAgent({
       issueId: id,
       workspace,
-      runtime: options.runtime,
       model: options.model,
       phase: options.phase as SpawnOptions['phase'],
       prompt,

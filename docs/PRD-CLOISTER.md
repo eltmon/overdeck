@@ -341,8 +341,7 @@ The simplest approach for ephemeral issue agents. Kill current agent, spawn new 
 ```typescript
 async function killAndSpawnHandoff(
   fromAgent: string,
-  toModel: string,
-  toRuntime: RuntimeName
+  toModel: string
 ): Promise<Agent> {
   // 1. Signal current agent to save state
   await sendMessage(fromAgent,
@@ -369,7 +368,6 @@ async function killAndSpawnHandoff(
     agentId: fromAgent,  // Reuse same agent ID
     workspace,
     model: toModel,
-    runtime: toRuntime,
     prompt
   });
 }
@@ -499,53 +497,7 @@ ${task.additionalContext || ''}
 **Pros:** Specialist retains expertise, faster context loading
 **Cons:** Session can grow large, needs rotation strategy
 
-#### Method 3: Runtime Switch (Cross-Runtime Handoff)
-
-When handing off to a different runtime (e.g., Claude Code → OpenCode):
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Claude Code │────▶│  Cloister   │────▶│  OpenCode   │
-│  (Sonnet)   │     │  (runtime   │     │ (DeepSeek)  │
-│  $$$        │     │   switch)   │     │  $          │
-└─────────────┘     └─────────────┘     └─────────────┘
-      │                   │                   │
-      ▼                   ▼                   ▼
-   STATE.md           Converts context    opencode --model
-   (Claude fmt)       to new runtime      deepseek-v3 -p "..."
-```
-
-```typescript
-async function crossRuntimeHandoff(
-  fromAgent: string,
-  toModel: string,
-  toRuntime: RuntimeName
-): Promise<Agent> {
-  const fromRuntime = getAgentRuntime(fromAgent);
-  const toRuntimeImpl = getRuntime(toRuntime);
-
-  // 1. Ensure state is saved
-  await sendMessage(fromAgent, "Update STATE.md and commit any changes.");
-  await waitForIdle(fromAgent);
-
-  // 2. Capture context in runtime-agnostic format
-  const context = await captureHandoffContext(getAgentWorkspace(fromAgent));
-
-  // 3. Kill old agent
-  await fromRuntime.killAgent(fromAgent);
-
-  // 4. Spawn on new runtime
-  // Note: Different runtimes may have different prompt formats
-  const prompt = toRuntimeImpl.formatHandoffPrompt(context);
-
-  return toRuntimeImpl.spawnAgent({
-    agentId: fromAgent,
-    workspace: context.workspace,
-    model: toModel,
-    prompt
-  });
-}
-```
+> **Note:** Cross-runtime handoffs (Method 3) were removed in PAN-142. All agents now run on Claude Code, with alternative models accessed via `claude-code-router`.
 
 ### Handoff Triggers
 
@@ -589,15 +541,14 @@ handoffs:
 
   # Beads complexity routing
   complexity_routing:
-    trivial: { model: deepseek-v3, runtime: opencode }
-    simple: { model: deepseek-v3, runtime: opencode }
-    medium: { model: sonnet, runtime: claude-code }
-    complex: { model: sonnet, runtime: claude-code }
-    expert: { model: opus, runtime: claude-code }
+    trivial: { model: haiku }
+    simple: { model: haiku }
+    medium: { model: sonnet }
+    complex: { model: sonnet }
+    expert: { model: opus }
 
   # Manual approval required for these
   require_approval:
-    - cross_runtime  # Claude Code ↔ OpenCode
     - escalate_to_opus
     - downgrade_from_opus
 ```
@@ -615,7 +566,6 @@ interface HandoffContext {
 
   // Previous agent info
   previousModel: string;
-  previousRuntime: RuntimeName;
   previousSessionId?: string;
 
   // Files to read
@@ -697,8 +647,8 @@ async function captureHandoffContext(workspace: string): Promise<HandoffContext>
 │  │  💡 Handoff Suggestion                              │   │
 │  │                                                      │   │
 │  │  When "Add emergency stop" completes, hand off to:  │   │
-│  │  • test-agent (DeepSeek via OpenCode)               │   │
-│  │  • Estimated savings: $1.20 → $0.08                 │   │
+│  │  • test-agent (Haiku via claude-code-router)        │   │
+│  │  • Estimated cost: $0.08                            │   │
 │  │                                                      │   │
 │  │  [Auto-handoff: ON ▼]  [Configure...]               │   │
 │  └─────────────────────────────────────────────────────┘   │
@@ -706,7 +656,7 @@ async function captureHandoffContext(workspace: string): Promise<HandoffContext>
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │  Manual Handoff                                      │   │
 │  │                                                      │   │
-│  │  [▼ Select Model    ] [▼ Select Runtime ]           │   │
+│  │  [▼ Select Model    ]                               │   │
 │  │                                                      │   │
 │  │  [Handoff Now]  [Escalate to Opus]  [Downgrade]     │   │
 │  └─────────────────────────────────────────────────────┘   │
@@ -760,17 +710,15 @@ GET /api/agents/:id/handoff/suggestion
     suggested: true,
     trigger: "next_task_complexity",
     currentModel: "sonnet",
-    suggestedModel: "deepseek-v3",
-    suggestedRuntime: "opencode",
+    suggestedModel: "haiku",
     reason: "Next task 'Write tests' has complexity 'simple'",
-    estimatedSavings: { from: 1.20, to: 0.08 }
+    estimatedCost: 0.08
   }
 
 // Trigger manual handoff
 POST /api/agents/:id/handoff
 ← {
     toModel: "opus",
-    toRuntime: "claude-code",
     reason: "Manual escalation - agent seems confused"
   }
 → { success: true, newSessionId: "..." }
@@ -868,12 +816,11 @@ model_selection:
 │           └─────────────┴─────┬──────┴───────────┘           │
 │                               │                              │
 │  ┌────────────────────────────┴────────────────────────────┐│
-│  │              Runtime Abstraction Layer                   ││
-│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐     ││
-│  │  │ Claude Code  │ │   OpenCode   │ │    Codex     │     ││
-│  │  │   Runtime    │ │   Runtime    │ │   Runtime    │     ││
-│  │  │    JSONL     │ │ SQLite+JSON  │ │    JSONL     │     ││
-│  │  └──────────────┘ └──────────────┘ └──────────────┘     ││
+│  │              Claude Code Runtime                        ││
+│  │  ┌──────────────────────────────────────────────┐       ││
+│  │  │ Claude Code (sole runtime)                   │       ││
+│  │  │ JSONL sessions, multi-model via router       │       ││
+│  │  └──────────────────────────────────────────────┘       ││
 │  └─────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
             │             │            │           │
@@ -886,7 +833,7 @@ model_selection:
 │  │  💎 Opus    → planning-agent, complex escalations       ││
 │  │  🔷 Sonnet  → merge-agent, review-agent, features       ││
 │  │  💠 Haiku   → test-agent, simple tasks, cleanup         ││
-│  │  💰 Cheap   → DeepSeek, Qwen, GLM via OpenCode          ││
+│  │  💰 Alt     → DeepSeek, Qwen, GLM via claude-code-router││
 │  └─────────────────────────────────────────────────────────┘│
 │                                                              │
 │  ┌─────────────────────┐    ┌─────────────────────────────┐ │
@@ -894,39 +841,27 @@ model_selection:
 │  │  ┌───────────────┐  │    │  ┌───────┐ ┌───────┐       │ │
 │  │  │ merge-agent 🔷│  │    │  │pan-18 │ │pan-19 │ ...   │ │
 │  │  │ review-agent🔷│  │    │  │  🔷   │ │  💰   │       │ │
-│  │  │ test-agent 💰 │  │    │  └───────┘ └───────┘       │ │
+│  │  │ test-agent 💠 │  │    │  └───────┘ └───────┘       │ │
 │  │  │ planning   💎 │  │    │                             │ │
 │  │  └───────────────┘  │    │                             │ │
 │  └─────────────────────┘    └─────────────────────────────┘ │
 │                                                              │
 │  ┌─────────────────────────────────────────────────────────┐│
 │  │  Beads Task Queue                                       ││
-│  │  [trivial💰] [simple💰] [medium🔷] [complex🔷] [expert💎]││
+│  │  [trivial💠] [simple💠] [medium🔷] [complex🔷] [expert💎]││
 │  └─────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Multi-Runtime Support
+## Runtime Architecture
 
-Cloister is designed to work with multiple AI coding agents through a runtime abstraction layer. This allows organizations to:
-
-1. **Use the best tool for the job** - Claude Code for complex work, OpenCode for cheap models
-2. **Avoid vendor lock-in** - Switch between runtimes as needed
-3. **Optimize costs** - Route trivial tasks to 10-30x cheaper models
-
-### Supported Runtimes
-
-| Runtime | Storage | Session Resume | Models | Status |
-|---------|---------|----------------|--------|--------|
-| **Claude Code** | JSONL in `~/.claude/` | `--resume <id>` | Claude family | Primary |
-| **OpenCode** | SQLite in `~/.local/share/opencode/` | `--continue` | 75+ providers | Planned |
-| **Codex** | JSONL in `~/.codex/sessions/` | `--resume`, `--continue` | OpenAI family | Planned |
+Claude Code is the sole supported runtime. Alternative models (DeepSeek, Gemini, GPT, etc.) are accessed through `claude-code-router`, which configures Claude Code to use third-party API endpoints.
 
 ### Runtime Interface
 
 ```typescript
 interface AgentRuntime {
-  name: 'claude-code' | 'opencode' | 'codex';
+  name: 'claude-code';
 
   // Session management
   getSessionPath(agentId: string): string;
@@ -952,137 +887,26 @@ interface AgentRuntime {
 interface SpawnConfig {
   workspace: string;
   prompt: string;
-  model?: string;          // e.g., 'sonnet', 'deepseek-v3', 'gpt-4'
+  model?: string;          // e.g., 'sonnet', 'haiku', 'opus'
   sessionId?: string;      // For --resume
-  runtime?: RuntimeName;   // Override default
 }
 ```
 
-### Claude Code Runtime
+### Model Selection
 
-```typescript
-class ClaudeCodeRuntime implements AgentRuntime {
-  name = 'claude-code' as const;
-
-  getSessionPath(agentId: string): string {
-    // Read ~/.panopticon/agents/{agentId}/state.json for workspace
-    // Transform workspace to Claude project dir
-    // Read sessions-index.json for active session
-    // Return JSONL path
-  }
-
-  getLastActivity(agentId: string): Date {
-    const jsonlPath = this.getSessionPath(agentId);
-    return fs.statSync(jsonlPath).mtime;
-  }
-
-  getTokenUsage(agentId: string): TokenUsage {
-    // Parse JSONL for usage entries
-    // Sum input_tokens, output_tokens, cache_read, cache_write
-  }
-
-  spawnAgent(config: SpawnConfig): Agent {
-    // tmux new-session -d -s {agentId}
-    // claude --model {model} -p "{prompt}"
-  }
-}
-```
-
-### OpenCode Runtime (Future)
-
-```typescript
-class OpenCodeRuntime implements AgentRuntime {
-  name = 'opencode' as const;
-
-  getSessionPath(agentId: string): string {
-    // Query SQLite at ~/.local/share/opencode/storage/
-    // Find session by workspace/agent mapping
-  }
-
-  getLastActivity(agentId: string): Date {
-    // Query SQLite for last message timestamp
-    // Or check session JSON file mtime
-  }
-
-  getTokenUsage(agentId: string): TokenUsage {
-    // Use opencode-tokenscope or parse storage directly
-  }
-
-  spawnAgent(config: SpawnConfig): Agent {
-    // tmux new-session -d -s {agentId}
-    // opencode --model {model} -p "{prompt}"
-  }
-}
-```
-
-### Codex Runtime (Future)
-
-```typescript
-class CodexRuntime implements AgentRuntime {
-  name = 'codex' as const;
-
-  getSessionPath(agentId: string): string {
-    // Find in ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
-    // Match by agent state mapping
-  }
-
-  getLastActivity(agentId: string): Date {
-    const jsonlPath = this.getSessionPath(agentId);
-    return fs.statSync(jsonlPath).mtime;
-  }
-
-  spawnAgent(config: SpawnConfig): Agent {
-    // tmux new-session -d -s {agentId}
-    // codex --model {model} -p "{prompt}"
-  }
-}
-```
-
-### Runtime Selection
+Model routing is handled by `claude-code-router` (see `docs/WORK-TYPES.md`), not by switching runtimes. All agents run as Claude Code processes:
 
 ```yaml
 # ~/.panopticon/cloister.yaml
-
-runtimes:
-  default: claude-code
-
-  # Model → Runtime mapping
-  model_routing:
-    # Claude models use Claude Code
-    opus: claude-code
-    sonnet: claude-code
-    haiku: claude-code
-
-    # Cheap models use OpenCode
-    deepseek-v3: opencode
-    qwen3-coder: opencode
-    glm-4: opencode
-    kimi-k2: opencode
-
-    # OpenAI models use Codex
-    gpt-4: codex
-    o1: codex
-    o3-mini: codex
-
-  # Override per specialist
-  specialists:
-    test-agent:
-      runtime: opencode
-      model: deepseek-v3  # 15x cheaper than Haiku
-    planning-agent:
-      runtime: claude-code
-      model: opus
+complexity_routing:
+  trivial: { model: haiku }
+  simple: { model: haiku }
+  medium: { model: sonnet }
+  complex: { model: sonnet }
+  expert: { model: opus }
 ```
 
-### Cost Comparison by Runtime
-
-| Task Type | Claude Code (Haiku) | OpenCode (DeepSeek) | Savings |
-|-----------|---------------------|---------------------|---------|
-| Run tests | $0.25/1M in, $1.25/1M out | $0.27/1M in, $1.10/1M out | ~15% |
-| Simple fix | $0.25/1M in, $1.25/1M out | $0.15/1M in (Kimi) | ~50% |
-| Formatting | $0.25/1M in, $1.25/1M out | $0.35/1M in (Qwen) | ~30% |
-
-For trivial tasks running overnight, using OpenCode with cheap models could reduce costs by 50-90%.
+Alternative models from other providers (DeepSeek, Gemini, GPT, etc.) can be configured through `claude-code-router`'s API compatibility layer. See `docs/CONFIGURATION.md` for details.
 
 ## Heartbeat System
 

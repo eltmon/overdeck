@@ -10,7 +10,7 @@ import {
   COSTS_DIR,
   CONFIG_FILE,
   CLAUDE_DIR,
-  SYNC_TARGETS,
+  SYNC_TARGET,
   INIT_DIRS,
 } from '../../../src/lib/paths.js';
 
@@ -53,24 +53,16 @@ describe('paths', () => {
     });
   });
 
-  describe('SYNC_TARGETS', () => {
-    it('should have all supported runtimes', () => {
-      expect(SYNC_TARGETS).toHaveProperty('claude');
-      expect(SYNC_TARGETS).toHaveProperty('codex');
-      expect(SYNC_TARGETS).toHaveProperty('cursor');
-      expect(SYNC_TARGETS).toHaveProperty('gemini');
-    });
-
-    it('should have skills and commands for each runtime', () => {
-      for (const runtime of Object.keys(SYNC_TARGETS) as Array<keyof typeof SYNC_TARGETS>) {
-        expect(SYNC_TARGETS[runtime]).toHaveProperty('skills');
-        expect(SYNC_TARGETS[runtime]).toHaveProperty('commands');
-      }
+  describe('SYNC_TARGET', () => {
+    it('should have skills and commands for claude', () => {
+      expect(SYNC_TARGET).toHaveProperty('skills');
+      expect(SYNC_TARGET).toHaveProperty('commands');
+      expect(SYNC_TARGET).toHaveProperty('agents');
     });
 
     it('should use correct directory patterns', () => {
-      expect(SYNC_TARGETS.claude.skills).toBe(join(home, '.claude', 'skills'));
-      expect(SYNC_TARGETS.claude.commands).toBe(join(home, '.claude', 'commands'));
+      expect(SYNC_TARGET.skills).toBe(join(home, '.claude', 'skills'));
+      expect(SYNC_TARGET.commands).toBe(join(home, '.claude', 'commands'));
     });
   });
 

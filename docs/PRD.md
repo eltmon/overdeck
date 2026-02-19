@@ -49,7 +49,7 @@ Panopticon makes deliberate, opinionated choices to reduce complexity and ensure
 |----------|-----------|
 | **SSH for all git operations** | HTTPS requires interactive credentials or credential helpers that vary by platform. SSH keys work consistently across local machines, remote VMs, and CI environments. Panopticon automatically converts HTTPS URLs to SSH format. |
 | **Beads over GitHub Issues** | Local-first issue tracking that works offline, integrates with git, and provides resumability across sessions. |
-| **Skills over custom prompts** | Standardized SKILL.md format works across Claude Code, Codex, Cursor, and Gemini. |
+| **Skills over custom prompts** | Standardized SKILL.md format works across AI coding assistants. |
 | **Linear as source of truth** | One issue tracker, synced to beads. No scattered TODO files. |
 | **Worktrees over branches** | Each feature gets an isolated directory, not just a branch. Enables parallel work. |
 | **Remote-first workspaces** | Heavy workloads (Docker, agents) run on remote VMs by default, keeping local machines responsive. |
@@ -59,7 +59,7 @@ Panopticon makes deliberate, opinionated choices to reduce complexity and ensure
 This document synthesizes insights from:
 
 1. **Cursor's Dynamic Context Discovery** - Pull context on demand, reduce token usage by 46.9%
-2. **Gastown's Agent Orchestration** - Beads, FPP, hooks, multi-runtime support, health monitoring
+2. **Gastown's Agent Orchestration** - Beads, FPP, hooks, health monitoring
 3. **GSD-Plus Context Engineering** - Structured state management (STATE.md, WORKSPACE.md, SUMMARY.md)
 4. **Current Panopticon Implementation** - What we've already built in MYN infra
 5. **Claude Code Skills** - Progressive disclosure, cross-platform compatibility
@@ -79,13 +79,8 @@ The AI coding tool ecosystem has converged on `SKILL.md` format. **Six major too
 | Tool | SKILL.md Support | Skill Locations |
 |------|------------------|-----------------|
 | **Claude Code** | ✅ Native | `~/.claude/skills/`, `.claude/skills/` |
-| **Codex** | ✅ Native | `~/.codex/skills/`, `.codex/skills/` |
-| **Cursor** | ✅ Native | `~/.cursor/skills/`, `.cursor/skills/`, `.claude/skills/` |
-| **Gemini CLI** | ✅ Native | `~/.gemini/skills/`, `.gemini/skills/` |
-| **Google Antigravity** | ✅ Native | `~/.gemini/antigravity/skills/`, `.agent/skills/` |
-| **Factory, Amp** | ⚠️ AGENTS.md | Project root (legacy format) |
 
-This means **one skill file works everywhere** with no conversion needed for the 5 major tools.
+Panopticon syncs skills to Claude Code's `~/.claude/skills/` directory. Alternative models are accessed through `claude-code-router`, not separate runtimes.
 
 ### About the Name
 
@@ -97,7 +92,7 @@ The parallels to our project are intentional:
 |----------------------|----------------|
 | Time Lords' parliament & central oversight | Agent orchestration & central oversight |
 | Eye of Harmony hidden beneath (source of power) | The "eye" watching all agents (source of visibility) |
-| Six sides for six Founders of Gallifrey | Multi-runtime support (Claude, Codex, Cursor, Gemini, etc.) |
+| Six sides for six Founders of Gallifrey | Multi-model support via claude-code-router |
 | Central to Gallifreyan governance | Central to your development workflow |
 | Clouds formed near its high ceiling | Runs in the cloud (or locally!) |
 
@@ -152,7 +147,7 @@ Panopticon sits **above** individual projects and manages them:
 │    Linear Sync   │   Runtime Manager   │   Health Monitor       │
 │  ─────────────────────────────────────────────────────────────  │
 │  - Issue → Workspace mapping                                    │
-│  - Multi-runtime support (Claude, Codex, Cursor, Gemini, etc.)  │
+│  - Claude Code agent management (multi-model via router)        │
 │  - Stuck detection + auto-recovery                              │
 │  - A/B testing framework                                        │
 └─────────────────────────────────────────────────────────────────┘
