@@ -40,20 +40,6 @@ Start by reading the STATE.md file to understand the plan, then begin implementa
 If no STATE.md exists, check the issue tracker for requirements.
 {{/env}}
 
-## On Restart: Rebase onto Latest Main
-
-If `.planning/STATE.md` already has implementation progress (this is a restart, not a fresh start), rebase onto latest main before doing anything else:
-
-```bash
-git fetch origin main && git rebase origin/main
-```
-
-- Clean rebase → continue work
-- Simple conflicts (< 5 files, obvious resolution) → resolve them and `git rebase --continue`
-- Complex conflicts → `git rebase --abort` and note in STATE.md that manual rebase is needed
-
-**This takes < 30 seconds. Do it before reading feedback or resuming work.**
-
 {{#if BEADS_TASKS}}
 ## Beads Tasks
 
@@ -86,8 +72,14 @@ Specialist agents have left feedback that you MUST address:
 
 ## CRITICAL: Check Completion Status FIRST
 
-**Before doing ANY work, check if this issue is already complete:**
+**Before doing ANY work, perform these checks in order:**
 
+0. **Rebase onto latest main** (if `.planning/STATE.md` already has progress — this is a restart):
+   ```bash
+   git fetch origin main && git rebase origin/main
+   ```
+   - Clean rebase → continue. Simple conflicts (< 5 files) → resolve and `git rebase --continue`. Complex → `git rebase --abort` and note in STATE.md.
+   - Skip this step only if STATE.md does not exist yet (fresh start).
 1. Read `.planning/STATE.md` and check the "Remaining Work" section
 2. Check the "Specialist Feedback" section — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
 3. If remaining work says "None" or "Implementation complete" AND no unaddressed feedback → work is DONE
