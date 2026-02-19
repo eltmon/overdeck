@@ -30,7 +30,6 @@ export function registerWorkCommands(program: Command): void {
     .command('issue <id>')
     .description('Spawn agent for Linear issue')
     .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
-    .option('--runtime <runtime>', 'AI runtime (claude/codex)', 'claude')
     .option('--dry-run', 'Show what would be created')
     .option('--shadow', 'Enable shadow mode (track status locally, don\'t update tracker)')
     .option('--no-shadow', 'Disable shadow mode (override config/env settings)')

@@ -32,43 +32,23 @@ export const CERTS_DIR = join(PANOPTICON_HOME, 'certs');
 export const CONFIG_FILE = join(CONFIG_DIR, 'config.toml');
 export const SETTINGS_FILE = join(CONFIG_DIR, 'settings.json');
 
-// AI tool directories
+// AI tool directory (Claude Code is the sole supported runtime)
 export const CLAUDE_DIR = join(homedir(), '.claude');
-export const CODEX_DIR = join(homedir(), '.codex');
-export const CURSOR_DIR = join(homedir(), '.cursor');
-export const GEMINI_DIR = join(homedir(), '.gemini');
-export const OPENCODE_DIR = join(homedir(), '.opencode');
 
-// Target sync locations
-export const SYNC_TARGETS = {
-  claude: {
-    skills: join(CLAUDE_DIR, 'skills'),
-    commands: join(CLAUDE_DIR, 'commands'),
-    agents: join(CLAUDE_DIR, 'agents'),
-  },
-  codex: {
-    skills: join(CODEX_DIR, 'skills'),
-    commands: join(CODEX_DIR, 'commands'),
-    agents: join(CODEX_DIR, 'agents'),
-  },
-  cursor: {
-    skills: join(CURSOR_DIR, 'skills'),
-    commands: join(CURSOR_DIR, 'commands'),
-    agents: join(CURSOR_DIR, 'agents'),
-  },
-  gemini: {
-    skills: join(GEMINI_DIR, 'skills'),
-    commands: join(GEMINI_DIR, 'commands'),
-    agents: join(GEMINI_DIR, 'agents'),
-  },
-  opencode: {
-    skills: join(OPENCODE_DIR, 'skills'),
-    commands: join(OPENCODE_DIR, 'commands'),
-    agents: join(OPENCODE_DIR, 'agents'),
-  },
+// Legacy runtime directories (kept for symlink cleanup migration)
+export const LEGACY_RUNTIME_DIRS = {
+  codex: join(homedir(), '.codex'),
+  cursor: join(homedir(), '.cursor'),
+  gemini: join(homedir(), '.gemini'),
+  opencode: join(homedir(), '.opencode'),
 } as const;
 
-export type Runtime = keyof typeof SYNC_TARGETS;
+// Sync target (Claude Code only)
+export const SYNC_TARGET = {
+  skills: join(CLAUDE_DIR, 'skills'),
+  commands: join(CLAUDE_DIR, 'commands'),
+  agents: join(CLAUDE_DIR, 'agents'),
+} as const;
 
 // Templates directory (in user's ~/.panopticon)
 export const TEMPLATES_DIR = join(PANOPTICON_HOME, 'templates');

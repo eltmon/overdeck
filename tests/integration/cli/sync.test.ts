@@ -9,18 +9,16 @@ const mockClaudeSkills = join(TEMP_DIR, '.claude', 'skills');
 
 vi.mock('../../../src/lib/paths.js', () => ({
   SKILLS_DIR: mockPanopticonSkills,
-  SYNC_TARGETS: {
-    claude: {
-      skills: mockClaudeSkills,
-      commands: join(TEMP_DIR, '.claude', 'commands'),
-    },
+  SYNC_TARGET: {
+    skills: mockClaudeSkills,
+    commands: join(TEMP_DIR, '.claude', 'commands'),
+    agents: join(TEMP_DIR, '.claude', 'agents'),
   },
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: vi.fn().mockReturnValue({
     sync: {
-      targets: ['claude'],
       strategy: 'symlink',
       backup_before_sync: false,
     },

@@ -5,7 +5,7 @@
  * Legacy presets are no longer supported - all selection is now smart/capability-based.
  */
 
-import { readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, readdirSync, lstatSync, readlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
@@ -195,4 +195,95 @@ export function getMigrationStatus(): {
     hasLegacySettings: existsSync(LEGACY_SETTINGS_PATH),
     hasNewConfig: existsSync(NEW_CONFIG_PATH),
   };
+}
+
+/**
+ * Clean up legacy runtime symlinks from removed runtimes.
+ *
+ * PAN-142: Panopticon consolidated to Claude Code as the sole runtime.
+ * This removes any Panopticon-managed symlinks from legacy runtime directories
+ * (codex, cursor, gemini, opencode).
+ */
+export interface LegacyCleanupResult {
+  cleaned: string[];
+  total: number;
+  errors: string[];
+}
+
+export function cleanupLegacyRuntimeSymlinks(): LegacyCleanupResult {
+  const legacyDirs = [
+    { name: 'codex', base: join(homedir(), '.codex') },
+    { name: 'cursor', base: join(homedir(), '.cursor') },
+    { name: 'gemini', base: join(homedir(), '.gemini') },
+    { name: 'opencode', base: join(homedir(), '.opencode') },
+  ];
+
+  const cleaned: string[] = [];
+  const errors: string[] = [];
+
+  for (const { name, base } of legacyDirs) {
+    for (const subdir of ['skills', 'commands', 'agents']) {
+      const dir = join(base, subdir);
+      if (!existsSync(dir)) continue;
+
+      try {
+        const entries = readdirSync(dir);
+        for (const entry of entries) {
+          const entryPath = join(dir, entry);
+          try {
+            const stats = lstatSync(entryPath);
+            if (!stats.isSymbolicLink()) continue;
+
+            const linkTarget = readlinkSync(entryPath);
+            // Only remove symlinks pointing to Panopticon directories
+            if (linkTarget.includes('.panopticon')) {
+              unlinkSync(entryPath);
+              cleaned.push(`${name}/${subdir}/${entry}`);
+            }
+          } catch (err: any) {
+            errors.push(`${name}/${subdir}/${entry}: ${err.message}`);
+          }
+        }
+      } catch (err: any) {
+        // Directory may not be readable, that's fine
+        errors.push(`${name}/${subdir}: ${err.message}`);
+      }
+    }
+  }
+
+  return { cleaned, total: cleaned.length, errors };
+}
+
+/**
+ * Migrate legacy sync config by stripping the 'targets' field from config.toml.
+ * This handles users who had `targets = ["claude", "codex"]` in their config.
+ */
+export function migrateSyncTargets(): { migrated: boolean; hadNonClaudeTargets: boolean } {
+  const configPath = join(homedir(), '.panopticon', 'config.toml');
+
+  if (!existsSync(configPath)) {
+    return { migrated: false, hadNonClaudeTargets: false };
+  }
+
+  try {
+    const content = readFileSync(configPath, 'utf-8');
+
+    // Check if targets field exists
+    const targetsMatch = content.match(/^targets\s*=\s*\[([^\]]*)\]/m);
+    if (!targetsMatch) {
+      return { migrated: false, hadNonClaudeTargets: false };
+    }
+
+    // Check if non-claude targets were configured
+    const targetsStr = targetsMatch[1];
+    const hadNonClaudeTargets = /codex|cursor|gemini|opencode/i.test(targetsStr);
+
+    // Remove the targets line
+    const newContent = content.replace(/^targets\s*=\s*\[[^\]]*\]\s*\n?/m, '');
+    writeFileSync(configPath, newContent, 'utf-8');
+
+    return { migrated: true, hadNonClaudeTargets };
+  } catch {
+    return { migrated: false, hadNonClaudeTargets: false };
+  }
 }

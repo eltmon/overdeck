@@ -1,14 +1,11 @@
 /**
- * Multi-Runtime Architecture
+ * Runtime Architecture
  *
- * Provides a unified interface for interacting with different AI coding assistants:
- * - Claude Code
- * - Codex (OpenAI Codex CLI)
- * - Cursor
- * - Gemini CLI
+ * Provides a unified interface for interacting with Claude Code,
+ * the sole supported AI coding assistant runtime.
  */
 
-export type RuntimeType = 'claude' | 'codex' | 'cursor' | 'gemini';
+export type RuntimeType = 'claude';
 
 /**
  * Configuration for a runtime
@@ -202,47 +199,3 @@ export const CLAUDE_FEATURES: RuntimeFeatures = {
   codeExecution: true,
 };
 
-/**
- * Codex feature set
- */
-export const CODEX_FEATURES: RuntimeFeatures = {
-  skills: true,
-  commands: false,
-  mcpServers: false,
-  hooks: false,
-  multiModel: false,
-  backgroundAgents: false,
-  planMode: false,
-  webSearch: false,
-  codeExecution: true,
-};
-
-/**
- * Cursor feature set
- */
-export const CURSOR_FEATURES: RuntimeFeatures = {
-  skills: true,
-  commands: false,
-  mcpServers: true,
-  hooks: false,
-  multiModel: true,
-  backgroundAgents: false,
-  planMode: false,
-  webSearch: false,
-  codeExecution: true,
-};
-
-/**
- * Gemini CLI feature set
- */
-export const GEMINI_FEATURES: RuntimeFeatures = {
-  skills: true,
-  commands: false,
-  mcpServers: false,
-  hooks: false,
-  multiModel: false,
-  backgroundAgents: false,
-  planMode: false,
-  webSearch: true,
-  codeExecution: true,
-};
