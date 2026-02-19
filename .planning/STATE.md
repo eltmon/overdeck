@@ -117,3 +117,4 @@ Build passes. All beads closed.
 
 - **[2026-02-18T13:20Z] test-agent → FAILED** — `.planning/feedback/001-test-agent-failed.md`
 - **[2026-02-18T14:16Z] test-agent → FAILED** — `.planning/feedback/002-test-agent-failed.md`
+- **[2026-02-18T19:20Z] FIXED** — both regressions resolved in commit `6259b77`
