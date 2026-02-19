@@ -3893,14 +3893,24 @@ app.post('/api/specialists/:name/auto-complete', async (req, res) => {
     });
 
     // Update review/test status based on specialist type
-    if (name === 'review-agent') {
-      setReviewStatus(issueId, {
-        reviewStatus: status === 'passed' ? 'passed' : 'blocked',
-        reviewNotes: `Auto-detected: ${status}`,
-      });
+    // BUT: don't override if the specialist already reported a more detailed status
+    // (the specialist's own assessment takes priority over dumb regex pattern matching)
+    const existingStatus = getReviewStatus(issueId);
 
-      // If passed, queue test-agent
-      if (status === 'passed') {
+    if (name === 'review-agent') {
+      const alreadyReported = existingStatus?.reviewNotes && !existingStatus.reviewNotes.startsWith('Auto-detected:');
+      if (alreadyReported) {
+        console.log(`[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.reviewStatus})`);
+      } else {
+        setReviewStatus(issueId, {
+          reviewStatus: status === 'passed' ? 'passed' : 'blocked',
+          reviewNotes: `Auto-detected: ${status}`,
+        });
+      }
+
+      // If passed (by either method), queue test-agent
+      const effectiveReviewStatus = alreadyReported ? existingStatus!.reviewStatus : (status === 'passed' ? 'passed' : 'blocked');
+      if (effectiveReviewStatus === 'passed') {
         // Get workspace info from work agent state
         const workAgentId = `agent-${issueId.toLowerCase()}`;
         const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
@@ -3925,10 +3935,15 @@ app.post('/api/specialists/:name/auto-complete', async (req, res) => {
         console.log(`[specialists] Queued test-agent for ${issueId} after review passed`);
       }
     } else if (name === 'test-agent') {
-      setReviewStatus(issueId, {
-        testStatus: status === 'passed' ? 'passed' : 'failed',
-        testNotes: `Auto-detected: ${status}`,
-      });
+      const alreadyReported = existingStatus?.testNotes && !existingStatus.testNotes.startsWith('Auto-detected:');
+      if (alreadyReported) {
+        console.log(`[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.testStatus})`);
+      } else {
+        setReviewStatus(issueId, {
+          testStatus: status === 'passed' ? 'passed' : 'failed',
+          testNotes: `Auto-detected: ${status}`,
+        });
+      }
     }
 
     // Clear the current task from queue (if it matches)
