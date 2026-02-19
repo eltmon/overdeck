@@ -7849,93 +7849,89 @@ app.post('/api/agents', async (req, res) => {
       const containerUid = process.getuid?.() ?? 1000;
       const containerGid = process.getgid?.() ?? 1000;
 
-      const containerPromise = new Promise<boolean>((resolve) => {
-        const containerChild = spawn('./dev', ['all'], {
-          cwd: workspacePath,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          env: { ...process.env, UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` },
-        });
-
-        containerChild.stdout?.on('data', (data) => {
-          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
-            appendActivityOutput(cActivityId, line);
-          });
-        });
-        containerChild.stderr?.on('data', (data) => {
-          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
-            appendActivityOutput(cActivityId, `[stderr] ${line}`);
-          });
-        });
-
-        containerChild.on('close', (code) => {
-          appendActivityOutput(cActivityId, `[${new Date().toISOString()}] ./dev all exited with code ${code}`);
-          updateActivity(cActivityId, { status: code === 0 ? 'completed' : 'failed' });
-          resolve(code === 0);
-        });
-
-        containerChild.on('error', (err) => {
-          appendActivityOutput(cActivityId, `[error] ${err.message}`);
-          updateActivity(cActivityId, { status: 'failed' });
-          resolve(false);
-        });
-
-        setTimeout(() => {
-          appendActivityOutput(cActivityId, '[timeout] Container startup exceeded 5 minutes');
-          containerChild.kill('SIGTERM');
-          resolve(false);
-        }, 5 * 60 * 1000);
+      // Spawn ./dev all in the background — DON'T await its exit.
+      // ./dev all calls `./dev wait-ready` which blocks for up to 5 minutes
+      // polling internal health checks. We poll container status ourselves
+      // (via docker ps) which is faster and doesn't depend on the script exiting.
+      const containerChild = spawn('./dev', ['all'], {
+        cwd: workspacePath,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` },
       });
 
-      console.log(`[start-agent] Starting containers for ${issueId}, waiting for ready...`);
-      appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Starting containers...`);
+      containerChild.stdout?.on('data', (data) => {
+        data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+          appendActivityOutput(cActivityId, line);
+        });
+      });
+      containerChild.stderr?.on('data', (data) => {
+        data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+          appendActivityOutput(cActivityId, `[stderr] ${line}`);
+        });
+      });
 
-      const devCompleted = await containerPromise;
+      containerChild.on('close', (code) => {
+        appendActivityOutput(cActivityId, `[${new Date().toISOString()}] ./dev all exited with code ${code}`);
+        updateActivity(cActivityId, { status: code === 0 ? 'completed' : 'failed' });
+      });
 
-      if (devCompleted) {
-        // Poll for container health
-        const maxWaitMs = 60000;
-        const pollIntervalMs = 2000;
-        const startTime = Date.now();
-        let healthy = false;
+      containerChild.on('error', (err) => {
+        appendActivityOutput(cActivityId, `[error] ${err.message}`);
+        updateActivity(cActivityId, { status: 'failed' });
+      });
 
-        appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Checking container health...`);
+      // Kill ./dev all if it hasn't exited in 5 minutes (safety net)
+      const killTimeout = setTimeout(() => {
+        if (!containerChild.killed) {
+          appendActivityOutput(cActivityId, '[timeout] Container startup exceeded 5 minutes, killing ./dev all');
+          containerChild.kill('SIGTERM');
+        }
+      }, 5 * 60 * 1000);
 
-        while (Date.now() - startTime < maxWaitMs) {
-          try {
-            const { stdout } = await execAsync(
-              `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
-              { encoding: 'utf-8' }
-            );
-            const containers = stdout.trim().split('\n').filter(Boolean);
-            const allHealthy = containers.length > 0 && containers.every(line => {
-              const status = line.split('|')[1] || '';
-              return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
-            });
+      // Clean up timeout when process exits naturally
+      containerChild.on('close', () => clearTimeout(killTimeout));
 
-            if (allHealthy) {
-              healthy = true;
-              appendActivityOutput(cActivityId, `[${new Date().toISOString()}] All ${containers.length} containers ready`);
-              console.log(`[start-agent] All ${containers.length} containers ready for ${issueId}`);
-              break;
-            }
-            await new Promise(r => setTimeout(r, pollIntervalMs));
-          } catch (healthErr) {
-            console.error('[start-agent] Error checking container health:', healthErr);
-            await new Promise(r => setTimeout(r, pollIntervalMs));
+      console.log(`[start-agent] Starting containers for ${issueId}, polling for ready...`);
+      appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Starting containers, polling for health...`);
+
+      // Poll container health directly via docker ps — don't wait for ./dev all to exit
+      const maxWaitMs = 3 * 60 * 1000; // 3 minutes
+      const pollIntervalMs = 3000;
+      const startTime = Date.now();
+      let healthy = false;
+
+      while (Date.now() - startTime < maxWaitMs) {
+        try {
+          const { stdout } = await execAsync(
+            `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+            { encoding: 'utf-8' }
+          );
+          const containers = stdout.trim().split('\n').filter(Boolean);
+          const allHealthy = containers.length > 0 && containers.every(line => {
+            const status = line.split('|')[1] || '';
+            return status.includes('Up') && (!status.includes('(') || status.includes('(healthy)'));
+          });
+
+          if (allHealthy) {
+            healthy = true;
+            appendActivityOutput(cActivityId, `[${new Date().toISOString()}] All ${containers.length} containers ready`);
+            console.log(`[start-agent] All ${containers.length} containers ready for ${issueId}`);
+            break;
           }
+        } catch (healthErr) {
+          console.error('[start-agent] Error checking container health:', healthErr);
         }
-
-        if (!healthy) {
-          appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Warning: Container health check timed out, proceeding anyway`);
-          console.warn(`[start-agent] Container health check timed out for ${issueId}`);
-        }
-
-        // Containers ready (or timed out) — spawn agent now
-        await spawnAgentAndUpdateStatus(healthy);
-      } else {
-        appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Container startup failed — not spawning agent`);
-        console.error(`[start-agent] Container startup failed for ${issueId}`);
+        await new Promise(r => setTimeout(r, pollIntervalMs));
       }
+
+      if (!healthy) {
+        appendActivityOutput(cActivityId, `[${new Date().toISOString()}] Warning: Container health check timed out after ${Math.round((Date.now() - startTime) / 1000)}s, proceeding anyway`);
+        console.warn(`[start-agent] Container health check timed out for ${issueId}`);
+      }
+
+      // Containers ready (or timed out) — spawn agent now
+      // Don't wait for ./dev all to finish; it will clean up on its own
+      await spawnAgentAndUpdateStatus(healthy);
     };
 
     if (existsSync(workspacePath) && existsSync(devScript)) {
