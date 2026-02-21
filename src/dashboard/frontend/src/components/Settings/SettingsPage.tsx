@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Loader2, X } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
@@ -20,7 +21,13 @@ async function fetchSettings(): Promise<SettingsConfig> {
   return res.json();
 }
 
-async function saveSettings(settings: SettingsConfig): Promise<void> {
+interface SaveSettingsResponse {
+  success: boolean;
+  message: string;
+  warnings?: string[];
+}
+
+async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
   const res = await fetch('/api/settings', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -30,6 +37,7 @@ async function saveSettings(settings: SettingsConfig): Promise<void> {
     const error = await res.text();
     throw new Error(error || 'Failed to save settings');
   }
+  return res.json();
 }
 
 async function fetchOptimalDefaults(): Promise<SettingsConfig> {
@@ -176,14 +184,35 @@ export function SettingsPage() {
   useEffect(() => {
     if (settings && !formData) {
       setFormData(settings);
+      // Show toast for deprecation warnings
+      if (settings.deprecation_warnings && settings.deprecation_warnings.length > 0) {
+        const count = settings.deprecation_warnings.length;
+        toast.warning(
+          `${count} deprecated model${count > 1 ? 's' : ''} detected. Click "Save" to migrate automatically.`,
+          { duration: 10000 }
+        );
+      }
     }
   }, [settings, formData]);
 
   const saveMutation = useMutation({
     mutationFn: saveSettings,
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
+
+      // Show success toast
+      toast.success('Settings saved successfully');
+
+      // Show warnings if present
+      if (response.warnings && response.warnings.length > 0) {
+        response.warnings.forEach((warning) => {
+          toast.warning(warning, { duration: 8000 });
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to save settings: ${error.message}`);
     },
   });
 
@@ -340,6 +369,38 @@ export function SettingsPage() {
           <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
         </div>
       </div>
+
+      {/* Deprecation Warning Banner */}
+      {formData.deprecation_warnings && formData.deprecation_warnings.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-6">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-400 text-xl shrink-0 mt-0.5">warning</span>
+            <div className="flex-1">
+              <p className="text-amber-400 font-semibold mb-2">
+                Deprecated Model IDs Detected
+              </p>
+              <div className="space-y-1">
+                {formData.deprecation_warnings.map((warning, idx) => (
+                  <p key={idx} className="text-amber-400/90 text-sm">
+                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded">{warning.workType}</span>
+                    {': '}
+                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded line-through">
+                      {warning.from}
+                    </span>
+                    {' → '}
+                    <span className="font-mono text-xs bg-amber-500/20 px-1.5 py-0.5 rounded">
+                      {warning.to}
+                    </span>
+                  </p>
+                ))}
+              </div>
+              <p className="text-amber-400/80 text-xs mt-3">
+                Click <span className="font-semibold">Save</span> to automatically migrate to current model IDs. A backup will be created before migration.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Smart Model Selection Hero */}
       <section className="mb-10">
@@ -651,14 +712,20 @@ export function SettingsPage() {
                   const { score, matched, missing } = getCapabilityMatchScore(currentModelId, agent.id);
                   const requiredCaps = WORK_TYPE_CAPABILITIES[agent.id] || [];
 
+                  // Check if this model is deprecated
+                  const isDeprecated = formData.deprecation_warnings?.some(
+                    (w) => w.workType === agent.id && w.from === currentModelId
+                  );
+
                   // Determine fit quality (poor fit is implicit else case)
-                  const isGoodFit = score >= 1;
-                  const isOkFit = score >= 0.5 && score < 1;
+                  const isGoodFit = score >= 1 && !isDeprecated;
+                  const isOkFit = score >= 0.5 && score < 1 && !isDeprecated;
 
                   // Build hover text
                   const hoverText = [
                     `${agent.name}: ${agent.description}`,
                     `Model: ${modelDisplay}`,
+                    isDeprecated ? '⚠️ DEPRECATED: Click to update to current model' : '',
                     `Needs: ${requiredCaps.map(c => CAPABILITY_INFO[c].name).join(', ')}`,
                     matched.length > 0 ? `✓ Has: ${matched.map(c => CAPABILITY_INFO[c].name).join(', ')}` : '',
                     missing.length > 0 ? `✗ Missing: ${missing.map(c => CAPABILITY_INFO[c].name).join(', ')}` : '',
@@ -669,22 +736,31 @@ export function SettingsPage() {
                       key={agent.id}
                       onClick={() => setModalWorkType(agent.id)}
                       title={hoverText}
-                      className={`p-3 border rounded-lg cursor-pointer transition-all group ${
-                        isGoodFit
-                          ? 'bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10'
-                          : isOkFit
-                            ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10'
-                            : 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/10'
+                      className={`p-3 border rounded-lg cursor-pointer transition-all group relative ${
+                        isDeprecated
+                          ? 'bg-amber-500/10 border-amber-500/50 hover:border-amber-500/70 hover:bg-amber-500/15'
+                          : isGoodFit
+                            ? 'bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10'
+                            : isOkFit
+                              ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10'
+                              : 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/10'
                       }`}
                     >
+                      {isDeprecated && (
+                        <div className="absolute top-1 right-1">
+                          <span className="bg-amber-500 text-content text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
+                            DEPRECATED
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mb-2">
                         <span className={`material-symbols-outlined text-sm ${
-                          isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                          isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
                         }`}>
                           {agent.icon}
                         </span>
                         <span className={`text-[9px] font-bold ${
-                          isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                          isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
                         }`}>
                           {Math.round(score * 100)}%
                         </span>

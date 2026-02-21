@@ -62,10 +62,17 @@ export interface TrackerKeysConfig {
   rally?: string;
 }
 
+export interface DeprecationWarning {
+  workType: WorkTypeId;
+  from: string;
+  to: string;
+}
+
 export interface SettingsConfig {
   models: ModelsConfig;
   api_keys: ApiKeysConfig;
   tracker_keys?: TrackerKeysConfig;
+  deprecation_warnings?: DeprecationWarning[];
 }
 
 export interface AvailableModels {

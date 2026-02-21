@@ -69,6 +69,15 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
   return resolved;
 }
 
+/**
+ * Deprecation warning in API format
+ */
+export interface ApiDeprecationWarning {
+  workType: WorkTypeId;
+  from: string;
+  to: string;
+}
+
 // API format matches frontend SettingsConfig interface
 // Note: No cost_sensitivity - we're opinionated and always pick the best model
 // for each task. Users control cost by which providers they enable.
@@ -96,13 +105,28 @@ export interface ApiSettingsConfig {
     gitlab?: string;
     rally?: string;
   };
+  deprecation_warnings?: ApiDeprecationWarning[];
 }
 
 /**
  * Load settings in API format (for GET /api/settings)
+ *
+ * Also detects deprecated model IDs in current overrides and returns warnings.
  */
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
+
+  // Detect deprecated models in current overrides
+  const deprecationWarnings: ApiDeprecationWarning[] = [];
+  for (const [workType, modelId] of Object.entries(config.overrides)) {
+    if (modelId && MODEL_DEPRECATIONS[modelId]) {
+      deprecationWarnings.push({
+        workType: workType as WorkTypeId,
+        from: modelId,
+        to: MODEL_DEPRECATIONS[modelId],
+      });
+    }
+  }
 
   return {
     models: {
@@ -118,6 +142,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     },
     api_keys: config.apiKeys,
     tracker_keys: config.trackerKeys,
+    deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }
 

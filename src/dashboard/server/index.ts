@@ -2857,7 +2857,11 @@ app.put('/api/settings', (req, res) => {
     // const routerConfig = generateRouterConfig(newSettings);
     // writeRouterConfig(routerConfig);
 
-    res.json({ success: true, message: 'Settings saved to config.yaml' });
+    res.json({
+      success: true,
+      message: 'Settings saved to config.yaml',
+      warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+    });
   } catch (error: any) {
     console.error('Error saving settings:', error);
     res.status(500).json({ error: 'Failed to save settings: ' + error.message });
