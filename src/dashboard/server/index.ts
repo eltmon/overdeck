@@ -12798,20 +12798,20 @@ app.post('/api/mission-control/planning/:issueId/upload', async (req, res) => {
     return res.status(400).json({ error: 'type must be transcript or note' });
   }
 
-  // Sanitize filename
-  let safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
-  let processedContent = content;
-
-  // Convert VTT files to Markdown
-  if (safeName.endsWith('.vtt')) {
-    const { vttToMarkdown } = await import('./utils/vtt-parser.js');
-    processedContent = vttToMarkdown(content);
-    safeName = safeName.replace(/\.vtt$/, '.md');
-  }
-
-  const ext = safeName.endsWith('.md') || safeName.endsWith('.txt') ? '' : '.md';
-
   try {
+    // Sanitize filename
+    let safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
+    let processedContent = content;
+
+    // Convert VTT files to Markdown
+    if (safeName.endsWith('.vtt')) {
+      const { vttToMarkdown } = await import('./utils/vtt-parser.js');
+      processedContent = vttToMarkdown(content);
+      safeName = safeName.replace(/\.vtt$/, '.md');
+    }
+
+    const ext = safeName.endsWith('.md') || safeName.endsWith('.txt') ? '' : '.md';
+
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     const subdir = type === 'transcript' ? 'transcripts' : 'notes';
