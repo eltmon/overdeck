@@ -409,10 +409,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     const workspaceTldrDir = join(workspacePath, '.tldr');
 
     if (existsSync(mainTldrDir)) {
-      const { execAsync: cpExec } = await import('child_process');
-      const { promisify } = await import('util');
-      const cpAsync = promisify(cpExec);
-      await cpAsync(`cp -r "${mainTldrDir}" "${workspaceTldrDir}"`);
+      await execAsync(`cp -r "${mainTldrDir}" "${workspaceTldrDir}"`);
       result.steps.push('Copied TLDR index from main branch');
     }
 
