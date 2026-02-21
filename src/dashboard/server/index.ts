@@ -11460,7 +11460,8 @@ function getIndexStats(rootPath: string, isMain: boolean): { fileCount?: number;
     }
 
     return { fileCount, indexAge, edgeCount };
-  } catch {
+  } catch (err) {
+    console.error(`[getIndexStats] Error for ${rootPath}:`, err);
     return {};
   }
 }
