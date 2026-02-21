@@ -43,6 +43,11 @@ import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
 import type { Issue } from '../frontend/src/types.js';
 
+// Read package version once at startup — version never changes at runtime
+const panopticonVersion: string = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json'), 'utf-8')
+).version;
+
 // Load environment variables from ~/.panopticon.env at startup
 // This makes API keys available to the settings system
 const envLoadResult = loadPanopticonEnv();
@@ -3202,13 +3207,7 @@ app.post('/api/deacon/patrol', async (_req, res) => {
 // ============================================================================
 
 app.get('/api/version', (_req, res) => {
-  try {
-    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json');
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-    res.json({ version: pkg.version });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to read version: ' + error.message });
-  }
+  res.json({ version: panopticonVersion });
 });
 
 // ============================================================================
