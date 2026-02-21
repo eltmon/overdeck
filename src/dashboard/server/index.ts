@@ -5956,10 +5956,10 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
             source: 'review-passed-auto',
           });
           // Update testStatus based on whether the agent was woken or queued
-          if (testResult.action === 'woken') {
-            setReviewStatus(issueId, { testStatus: 'testing' });
+          if (testResult.success) {
+            setReviewStatus(issueId, { testStatus: testResult.queued ? 'queued' : 'testing' });
           }
-          console.log(`[review-status] Auto-queued test-agent for ${issueId}: ${testResult.action}`);
+          console.log(`[review-status] Auto-queued test-agent for ${issueId}: ${testResult.success ? (testResult.queued ? 'queued' : 'woken') : 'failed'} - ${testResult.message}`);
         } else {
           console.log(`[review-status] Test-agent already has ${issueId} queued, skipping`);
         }
