@@ -204,6 +204,67 @@ async function conditionalBeadsCompaction(projectPath: string): Promise<void> {
 }
 
 /**
+ * Notify TLDR daemon to reindex changed files after merge
+ */
+async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
+  try {
+    console.log(`[merge-agent] Notifying TLDR daemon to reindex changed files...`);
+
+    // Check if TLDR daemon is available
+    const venvPath = join(projectPath, '.venv');
+    if (!existsSync(venvPath)) {
+      console.log(`[merge-agent] No .venv found, skipping TLDR notification`);
+      return;
+    }
+
+    // Get changed files from the merge
+    const { stdout } = await execAsync(`git diff --name-only HEAD~1 HEAD`, {
+      cwd: projectPath,
+      encoding: 'utf-8'
+    });
+
+    const changedFiles = stdout
+      .trim()
+      .split('\n')
+      .filter(f => f.trim().length > 0)
+      .filter(f => {
+        // Only include source code files (skip docs, configs, etc)
+        const ext = f.split('.').pop()?.toLowerCase();
+        return ext && ['ts', 'js', 'tsx', 'jsx', 'py', 'java', 'go', 'rs', 'cpp', 'c', 'h'].includes(ext);
+      });
+
+    if (changedFiles.length === 0) {
+      console.log(`[merge-agent] No source files changed, skipping TLDR notification`);
+      return;
+    }
+
+    console.log(`[merge-agent] Found ${changedFiles.length} changed source files to reindex`);
+
+    // Get TLDR daemon service
+    const { getTldrDaemonService } = await import('../tldr-daemon.js');
+    const tldrService = getTldrDaemonService(projectPath, venvPath);
+
+    // Check if daemon is running
+    const status = await tldrService.getStatus();
+    if (!status.running) {
+      console.log(`[merge-agent] TLDR daemon not running, skipping notification`);
+      return;
+    }
+
+    // Trigger warm to reindex (this will update the index incrementally)
+    console.log(`[merge-agent] Triggering TLDR index warm...`);
+    await tldrService.warm(true);  // background mode
+
+    console.log(`[merge-agent] ✓ TLDR daemon notified to reindex`);
+    logActivity('tldr_notified', `Notified TLDR daemon to reindex ${changedFiles.length} files`);
+  } catch (error: any) {
+    // Non-fatal - log warning and continue
+    console.warn(`[merge-agent] Failed to notify TLDR daemon: ${error.message}`);
+    logActivity('tldr_notify_error', `TLDR notification failed: ${error.message}`);
+  }
+}
+
+/**
  * Post-merge cleanup: move PRD to completed, update issue status
  */
 async function postMergeCleanup(issueId: string, projectPath: string): Promise<void> {
@@ -677,6 +738,9 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
 
               // Run post-merge cleanup (move PRD, update issue status)
               await postMergeCleanup(context.issueId, context.projectPath);
+
+              // Notify TLDR daemon to reindex changed files
+              await notifyTldrDaemon(context.projectPath, context.sourceBranch);
 
               return result;
             } else {

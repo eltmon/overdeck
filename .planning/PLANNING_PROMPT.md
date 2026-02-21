@@ -1,4 +1,4 @@
-# Planning Session: PAN-136
+# Planning Session: PAN-173
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,39 +22,28 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-136
-- **Title:** Fix pre-existing test failures (16 failures across multiple suites)
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/136
+- **ID:** PAN-173
+- **Title:** PAN-173: TLDR-Code integration for token-efficient agent code analysis
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/173
 
 ## Description
-## Problem
+## Summary
+Integrate TLDR-Code (or similar) to give agents graduated code summaries instead of reading full files. 95% token savings (1.2k vs 23k tokens per file).
 
-There are 16 pre-existing test failures across multiple test suites that are unrelated to any specific feature branch. These failures cause the specialist handoff cycle to break - test-agent marks `testStatus: "failed"` even when all issue-specific tests pass, preventing the merge flow.
-
-## Failing Suites (as of PAN-105 test run)
-
-These failures need investigation and fixing:
-
-- `tests/lib/model-presets.test.ts` - Likely removed/refactored without updating tests
-- `tests/lib/router-config.test.ts` - Configuration test failures
-- `tests/lib/settings-api.test.ts` - Settings API test failures
-- Other suites with intermittent or stale test failures
+## Details
+- 5 analysis layers: AST structure → call graph → control flow → data flow → program slicing
+- Available as `pip install tldr-code`
+- Agent workspaces get `.tldr/` cache, agents read summaries first
+- Background daemon option for 300x speedup (in-memory indexes)
 
 ## Impact
+Agents last 2-3x longer in context window. Biggest single capability gain.
 
-- Blocks the specialist workflow: review passes → test-agent reports "failed" → work agent loops trying to fix unrelated tests
-- Makes it impossible to distinguish real regressions from pre-existing issues
-- Forces manual merge intervention
+## Source
+Inspired by Continuous-Claude-v3 (parcadei/Continuous-Claude-v3)
 
-## Proposed Fix
-
-1. Run full test suite and catalog all failures
-2. Fix each failing test (update expectations, remove stale tests, fix broken assertions)
-3. Ensure CI passes with zero failures on main branch
-4. Consider adding a "known failures" baseline to test-agent so it can distinguish new regressions from pre-existing issues
-
-## Labels
-bug, testing, infrastructure
+## Effort
+Medium — need Python bridge or subprocess calls from agent hooks
 
 ---
 
