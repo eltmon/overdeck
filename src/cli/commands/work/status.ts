@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { listRunningAgents } from '../../../lib/agents.js';
 import { isShadowed, getShadowState } from '../../../lib/shadow-state.js';
+import { getTldrMetrics } from '../../../lib/tldr-daemon.js';
 
 interface StatusOptions {
   json?: boolean;
@@ -59,6 +60,17 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log(`  Runtime:  ${agent.runtime} (${agent.model})`);
     console.log(`  Duration: ${duration} min`);
     console.log(`  Workspace: ${chalk.dim(agent.workspace)}`);
+
+    // Show TLDR session metrics if a .tldr/ dir exists in the workspace
+    try {
+      const tldr = getTldrMetrics(agent.workspace);
+      if (tldr.interceptions > 0 || tldr.bypasses > 0) {
+        const savedK = Math.round(tldr.estimatedTokensSaved / 1000);
+        const bypassStr = tldr.bypasses > 0 ? ` (${tldr.bypasses} bypassed)` : '';
+        console.log(`  TLDR:     ${chalk.green(`${tldr.interceptions} summaries`)}${bypassStr}, ~${savedK}K tokens saved`);
+      }
+    } catch { /* non-fatal — workspace may not have TLDR */ }
+
     console.log('');
   }
 
