@@ -15,8 +15,8 @@ export function TranscriptUpload({ issueId, onClose }: TranscriptUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = useCallback(async (file: File) => {
-    if (!file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
-      setUploadResult('Only .md and .txt files are supported');
+    if (!file.name.endsWith('.md') && !file.name.endsWith('.txt') && !file.name.endsWith('.vtt')) {
+      setUploadResult('Only .md, .txt, and .vtt files are supported');
       return;
     }
 
@@ -116,13 +116,13 @@ export function TranscriptUpload({ issueId, onClose }: TranscriptUploadProps) {
             <p className={styles.uploadText}>
               {uploading ? 'Uploading...' : 'Drop a file here or click to browse'}
             </p>
-            <p className={styles.uploadHint}>Accepts .md and .txt files</p>
+            <p className={styles.uploadHint}>Accepts .md, .txt, and .vtt files</p>
           </div>
 
           <input
             ref={fileInputRef}
             type="file"
-            accept=".md,.txt"
+            accept=".md,.txt,.vtt"
             onChange={handleFileSelect}
             style={{ display: 'none' }}
           />

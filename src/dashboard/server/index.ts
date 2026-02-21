@@ -12799,7 +12799,16 @@ app.post('/api/mission-control/planning/:issueId/upload', async (req, res) => {
   }
 
   // Sanitize filename
-  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
+  let safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
+  let processedContent = content;
+
+  // Convert VTT files to Markdown
+  if (safeName.endsWith('.vtt')) {
+    const { vttToMarkdown } = await import('./utils/vtt-parser.js');
+    processedContent = vttToMarkdown(content);
+    safeName = safeName.replace(/\.vtt$/, '.md');
+  }
+
   const ext = safeName.endsWith('.md') || safeName.endsWith('.txt') ? '' : '.md';
 
   try {
@@ -12810,7 +12819,7 @@ app.post('/api/mission-control/planning/:issueId/upload', async (req, res) => {
 
     mkdirSync(dirPath, { recursive: true });
     const filePath = join(dirPath, safeName + ext);
-    writeFileSync(filePath, content, 'utf-8');
+    writeFileSync(filePath, processedContent, 'utf-8');
 
     // Emit socket event
     if (socketIo) {
