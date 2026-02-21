@@ -11422,11 +11422,43 @@ app.get('/api/services/tldr/status', async (_req, res) => {
       pid?: number;
       healthy: boolean;
       workspacePath: string;
+      fileCount?: number;
+      indexAge?: string;
     }> = [];
+
+    // Gather index stats from .tldr directory (mirrors CLI logic in tldr.ts)
+    function getIndexStats(rootPath: string, isMain: boolean): { fileCount?: number; indexAge?: string } {
+      const tldrPath = join(rootPath, '.tldr');
+      if (!existsSync(tldrPath)) return {};
+      try {
+        const stats = statSync(tldrPath);
+        const ageMs = Date.now() - stats.mtimeMs;
+
+        let indexAge: string;
+        if (isMain) {
+          const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+          indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+        } else {
+          const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+          indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+        }
+
+        let fileCount: number | undefined;
+        const astPath = join(tldrPath, 'ast');
+        if (existsSync(astPath)) {
+          fileCount = readdirSync(astPath).length;
+        }
+
+        return { fileCount, indexAge };
+      } catch {
+        return {};
+      }
+    }
 
     if (existsSync(venvPath)) {
       const service = getTldrDaemonService(projectRoot, venvPath);
       const status = await service.getStatus();
+      const indexStats = getIndexStats(projectRoot, true);
 
       results.push({
         workspace: 'main',
@@ -11434,6 +11466,7 @@ app.get('/api/services/tldr/status', async (_req, res) => {
         pid: status.pid,
         healthy: status.healthy,
         workspacePath: projectRoot,
+        ...indexStats,
       });
     }
 
@@ -11450,6 +11483,7 @@ app.get('/api/services/tldr/status', async (_req, res) => {
         if (existsSync(wsVenvPath)) {
           const service = getTldrDaemonService(wsPath, wsVenvPath);
           const status = await service.getStatus();
+          const indexStats = getIndexStats(wsPath, false);
 
           results.push({
             workspace: ws.name,
@@ -11457,6 +11491,7 @@ app.get('/api/services/tldr/status', async (_req, res) => {
             pid: status.pid,
             healthy: status.healthy,
             workspacePath: wsPath,
+            ...indexStats,
           });
         }
       }
@@ -11532,12 +11567,33 @@ app.get('/api/workspaces/:issueId/tldr', async (req, res) => {
     const service = getTldrDaemonService(workspacePath, venvPath);
     const status = await service.getStatus();
 
+    // Gather index stats
+    const tldrPath = join(workspacePath, '.tldr');
+    let fileCount: number | undefined;
+    let indexAge: string | undefined;
+    if (existsSync(tldrPath)) {
+      try {
+        const stats = statSync(tldrPath);
+        const ageMs = Date.now() - stats.mtimeMs;
+        const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+        indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+        const astPath = join(tldrPath, 'ast');
+        if (existsSync(astPath)) {
+          fileCount = readdirSync(astPath).length;
+        }
+      } catch {
+        // Ignore stat errors
+      }
+    }
+
     res.json({
       available: true,
       running: status.running,
       pid: status.pid,
       healthy: status.healthy,
       workspacePath,
+      fileCount,
+      indexAge,
     });
   } catch (error: any) {
     console.error('Error getting workspace TLDR status:', error);
