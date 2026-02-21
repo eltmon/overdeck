@@ -213,8 +213,35 @@ export async function setupHooksCommand(): Promise<void> {
     console.log(chalk.dim('  Install Python3 to enable token-efficient code analysis\n'));
   }
 
-  // 6. Check if hooks are already configured
+  // 6. Configure TLDR MCP server (before hooks check so existing users get TLDR)
+  let tldrConfigured = false;
+  if (python3Available) {
+    if (!settings.mcpServers) {
+      settings.mcpServers = {};
+    }
+
+    // Check if tldr MCP server is already configured
+    if (settings.mcpServers.tldr) {
+      console.log(chalk.cyan('✓ TLDR MCP server already configured'));
+    } else {
+      // Add tldr MCP server configuration
+      // Relative paths (.venv/bin/tldr-mcp and .) resolve from Claude Code's working directory
+      settings.mcpServers.tldr = {
+        command: '.venv/bin/tldr-mcp',
+        args: ['--project', '.']
+      };
+      console.log(chalk.green('✓ Configured TLDR MCP server'));
+      tldrConfigured = true;
+    }
+  }
+
+  // 7. Check if hooks are already configured
   if (hooksAlreadyConfigured(settings, binDir)) {
+    // If we just configured TLDR, save settings before returning
+    if (tldrConfigured) {
+      writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      console.log(chalk.green('✓ Updated Claude Code settings.json with TLDR MCP server'));
+    }
     console.log(chalk.cyan('\n✓ Panopticon hooks already configured'));
     console.log(chalk.dim('  No changes needed\n'));
     return;
@@ -266,26 +293,6 @@ export async function setupHooksCommand(): Promise<void> {
       }
     ]
   });
-
-  // 7. Configure TLDR MCP server (if Python3 is available)
-  if (python3Available) {
-    if (!settings.mcpServers) {
-      settings.mcpServers = {};
-    }
-
-    // Check if tldr MCP server is already configured
-    if (settings.mcpServers.tldr) {
-      console.log(chalk.cyan('✓ TLDR MCP server already configured'));
-    } else {
-      // Add tldr MCP server configuration
-      // Relative paths (.venv/bin/tldr-mcp and .) resolve from Claude Code's working directory
-      settings.mcpServers.tldr = {
-        command: '.venv/bin/tldr-mcp',
-        args: ['--project', '.']
-      };
-      console.log(chalk.green('✓ Configured TLDR MCP server'));
-    }
-  }
 
   // 8. Write updated settings
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
