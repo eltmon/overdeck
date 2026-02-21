@@ -156,8 +156,20 @@ if [ -n "$COST_SCRIPT" ] && [ -f "$COST_SCRIPT" ]; then
   export PANOPTICON_ISSUE_ID="${PANOPTICON_ISSUE_ID:-UNKNOWN}"
   export PANOPTICON_SESSION_TYPE="${PANOPTICON_SESSION_TYPE:-implementation}"
 
-  # Call cost recording script with tool info on stdin
-  echo "$TOOL_INFO" | node "$COST_SCRIPT" 2>/dev/null || true
+  # Serialize per-session cost recording with flock to prevent duplicate events.
+  # Claude Code fires parallel tool calls, which spawn multiple heartbeat-hooks
+  # simultaneously. Without serialization they race on the same offset file and
+  # record duplicate cost events. flock -x waits for exclusive access, ensuring
+  # only one process reads/updates the offset at a time per session.
+  STATE_DIR="$HOME/.panopticon/costs/state"
+  mkdir -p "$STATE_DIR"
+  SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
+  LOCK_FILE="$STATE_DIR/${SESSION_ID}.lock"
+
+  {
+    flock -x -w 30 200
+    echo "$TOOL_INFO" | node "$COST_SCRIPT" 2>/dev/null || true
+  } 200>"$LOCK_FILE"
 fi
 
 # Always exit successfully - never break Claude Code execution

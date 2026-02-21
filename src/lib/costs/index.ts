@@ -12,6 +12,7 @@ export {
   readEventsFromLine,
   getLastEventMetadata,
   replaceEventsFile,
+  deduplicateEvents,
   eventsFileExists,
   getEventsFilePath,
   type CostEvent,
