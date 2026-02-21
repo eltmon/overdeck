@@ -40,16 +40,13 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const agentsWithShadow = agents.map(agent => {
       const shadowed = agent.issueId ? isShadowed(agent.issueId) : false;
       const shadowState = shadowed ? getShadowState(agent.issueId) : null;
-      const result: Record<string, unknown> = {
+      return {
         ...agent,
         shadowMode: shadowed,
         shadowStatus: shadowState?.shadowStatus,
         trackerStatus: shadowState?.trackerStatus,
+        ...(options.context ? { contextPercent: readContextPercent(agent.id) } : {}),
       };
-      if (options.context) {
-        result.contextPercent = readContextPercent(agent.id);
-      }
-      return result;
     });
     console.log(JSON.stringify(agentsWithShadow, null, 2));
     return;
@@ -86,7 +83,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     if (options.context) {
       const ctxPct = readContextPercent(agent.id);
       const ctxStr = ctxPct !== null ? `${ctxPct}%` : '--';
-      console.log(`  Context:  ctx: ${ctxStr}`);
+      console.log(`  Context:  ${ctxStr}`);
     }
 
     console.log(`  Runtime:  ${agent.runtime} (${agent.model})`);
