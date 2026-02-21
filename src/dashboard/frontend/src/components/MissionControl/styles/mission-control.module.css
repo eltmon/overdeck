@@ -957,3 +957,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Sidebar Footer */
+.sidebarFooter {
+  border-top: 1px solid var(--mc-border);
+  padding: var(--mc-space-2) var(--mc-space-4);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.versionLabel {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  font-family: var(--mc-font-mono);
+  letter-spacing: 0.03em;
+}
