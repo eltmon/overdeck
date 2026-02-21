@@ -152,3 +152,5 @@ Agent needs to understand auth.ts
 ## Specialist Feedback
 
 - **[2026-02-21T04:32Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
+- **[2026-02-21T04:37Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/004-review-agent-changes-requested.md`
+- **[2026-02-21T04:39Z] test-agent → FAILED** — `.planning/feedback/005-test-agent-failed.md`
