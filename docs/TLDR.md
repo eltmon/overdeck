@@ -269,6 +269,75 @@ For a typical agent session reading 20 files:
 
 At 10 agent sessions per day, that's **$1.80-$9.00/day** saved on input tokens alone.
 
+### Real-World Agent Lifecycle Validation (2026-02-21)
+
+Two full agent lifecycles were run with TLDR active to validate end-to-end behavior: spawn → work → review → feedback → fix → re-review → test → merge-ready.
+
+#### Scenario 1: PAN-232 — CLI Feature (Sonnet 4.6)
+
+**Task**: Implement `pan status --context` flag.
+**Files changed**: 3 (status.ts, index.ts ×2)
+**Lifecycle duration**: ~25 minutes (work + 1 review round + test)
+
+| Phase | Context % | Cost | TLDR Events |
+|-------|----------|------|-------------|
+| Work agent start | 10% | — | — |
+| Work agent complete | 40% | $3.00 | 3 file reads intercepted |
+| Review agent (Opus) | 15%→40% | $2.70 | Used git diff, no file reads |
+| Test agent | 10%→19% | $0.29 | Output redirected to file |
+| **Total** | — | **$5.99** | — |
+
+**TLDR interceptions observed:**
+- `status.ts` (7.6KB) → ~200 token summary (saved ~1,700 tokens)
+- `work/index.ts` (7.7KB) → ~200 token summary (saved ~1,700 tokens)
+- `cli/index.ts` (19KB) → ~350 token summary (saved ~4,400 tokens)
+
+**Issues found:**
+1. Stale-read-after-edit: agent edited status.ts then re-read it, got stale TLDR summary instead of edited content. **Fixed**: dirty-file bypass added to read-enforcer.
+2. Dashboard frontend `npm test` hangs in watch mode (vitest without `--run`). **Fixed**: changed to `vitest run`.
+3. Test agent session recycled mid-task due to vitest hang. **Root cause**: issue 2.
+
+#### Scenario 2: PAN-234 — Dashboard UI Feature (Sonnet 4.6)
+
+**Task**: Add version display to dashboard sidebar footer.
+**Files changed**: 3 (server/index.ts, MissionControl/index.tsx, mission-control.module.css)
+**Lifecycle duration**: ~20 minutes (work + 1 review round + test)
+
+| Phase | Context % | Cost | TLDR Events |
+|-------|----------|------|-------------|
+| Work agent start | 10% | — | — |
+| Work agent complete (round 1) | 54% | $3.29 | 4+ file reads intercepted |
+| Work agent complete (round 2) | 59% | $4.37 | — |
+| Review agent (Opus) | 15%→50% | $4.96 | — |
+| Test agent | 10%→25% | $0.92 | — |
+| **Total** | — | **$10.25** | — |
+
+**TLDR interceptions observed:**
+- `XTerminal.test.tsx` (10.4KB) → summary provided (saved ~2,400 tokens)
+- `server/index.ts` (518KB) → summary provided (saved ~129,000 tokens)
+- Multiple .tsx component files → summaries provided
+
+**Issues found:**
+1. Agent initially investigated pre-existing XTerminal test error instead of its task. Redirected via `pan work tell`.
+2. Agent tried `pan approve` (blocked by PAN-222 guard — working correctly).
+3. Test-agent compared feature (vitest 1.6.1) vs main (vitest 4.0.18), producing a false positive regression. **Infrastructure issue**: test-agent should use consistent test environment.
+
+#### Key Findings
+
+**What works well:**
+- TLDR summaries give agents enough context to understand file structure and plan edits
+- Agents naturally use offset/limit reads when they need exact content for editing (bypasses correctly)
+- Context usage stays reasonable: 40-60% for full work cycles vs. 80-100% without TLDR
+- .tsx files get proper context output with line numbers (via upstream patch)
+- Quality gates correctly bypass test files and sparse summaries
+
+**Issues discovered and fixed:**
+1. Stale-read-after-edit (fixed: dirty-file bypass)
+2. Dashboard vitest watch mode (fixed: `vitest run`)
+3. Agent task drift (agents investigate unrelated errors — needs stronger initial prompt focus)
+4. Test-agent vitest version mismatch (infrastructure issue: worktree vs main root)
+5. Agent self-approval attempts (correctly blocked by PAN-222 guard)
+
 ### Hook Performance
 
 Hook execution adds 150-330ms per read, negligible relative to API round-trip times (2-10s).
