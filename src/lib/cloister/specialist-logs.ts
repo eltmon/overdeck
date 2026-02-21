@@ -380,8 +380,10 @@ export function cleanupOldLogs(
       return;
     }
 
-    // Keep if within maxDays
-    if (log.createdAt >= cutoffDate) {
+    // Keep if strictly within maxDays (use > not >= to handle the edge case where
+    // createdAt equals cutoffDate exactly, e.g. when maxDays is 0 and files were
+    // just created in the same millisecond as the cutoff is computed)
+    if (log.createdAt > cutoffDate) {
       return;
     }
 
