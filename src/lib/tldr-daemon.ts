@@ -12,6 +12,145 @@ import { join } from 'path';
 import { createHash } from 'crypto';
 import { PANOPTICON_HOME } from './paths.js';
 
+// ============================================================================
+// TLDR Session Metrics (PAN-236)
+// ============================================================================
+
+/**
+ * Per-session TLDR metrics — delta since last captured cost event.
+ *
+ * Metrics are file-based, stored in <workspace>/.tldr/:
+ *   interceptions.log — written by tldr-read-enforcer on each TLDR serve
+ *   bypasses.log      — written by tldr-read-enforcer on each deliberate bypass
+ *   metrics-checkpoint.json — tracks line offsets for delta (per-cost-event) reporting
+ */
+export interface TldrSessionMetrics {
+  interceptions: number;                   // TLDR summaries served since last checkpoint
+  bypasses: number;                        // TLDR bypasses since last checkpoint
+  estimatedTokensSaved: number;            // Rough token savings (fullTokens - ~1000 per interception)
+  filesAnalyzed: string[];                 // Unique files summarized in this window
+  bypassReasons: Record<string, number>;   // e.g. { "offset-limit": 3, "recently-edited": 1 }
+}
+
+/** Checkpoint persisted to .tldr/metrics-checkpoint.json */
+interface TldrMetricsCheckpoint {
+  interceptionsLine: number;
+  bypassesLine: number;
+  capturedAt: string;
+}
+
+/**
+ * Read TLDR session metrics for a workspace from log files.
+ *
+ * @param workspacePath - Workspace root (where .tldr/ lives)
+ * @param sinceCheckpoint - Only return metrics since the last captured checkpoint
+ */
+export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): TldrSessionMetrics {
+  const tldrDir = join(workspacePath, '.tldr');
+  const interceptionsLog = join(tldrDir, 'interceptions.log');
+  const bypassesLog = join(tldrDir, 'bypasses.log');
+  const checkpointFile = join(tldrDir, 'metrics-checkpoint.json');
+
+  let interceptionsStartLine = 0;
+  let bypassesStartLine = 0;
+
+  if (sinceCheckpoint && existsSync(checkpointFile)) {
+    try {
+      const checkpoint = JSON.parse(readFileSync(checkpointFile, 'utf-8')) as TldrMetricsCheckpoint;
+      interceptionsStartLine = checkpoint.interceptionsLine || 0;
+      bypassesStartLine = checkpoint.bypassesLine || 0;
+    } catch { /* start from 0 on parse error */ }
+  }
+
+  // Parse interceptions log: each line is "timestamp file_size rel_path"
+  const allInterceptionLines = existsSync(interceptionsLog)
+    ? readFileSync(interceptionsLog, 'utf-8').split('\n').filter(l => l.trim())
+    : [];
+  const newInterceptions = allInterceptionLines.slice(interceptionsStartLine);
+
+  let estimatedTokensSaved = 0;
+  const filesAnalyzed: string[] = [];
+
+  for (const line of newInterceptions) {
+    const parts = line.trim().split(' ');
+    if (parts.length >= 3) {
+      const fileSizeBytes = parseInt(parts[1], 10) || 0;
+      const relPath = parts.slice(2).join(' ');
+      // Rough estimate: ~1 token per 4 bytes for code; TLDR summary is ~1000 tokens
+      const fullTokens = Math.round(fileSizeBytes / 4);
+      estimatedTokensSaved += Math.max(0, fullTokens - 1000);
+      if (relPath && !filesAnalyzed.includes(relPath)) {
+        filesAnalyzed.push(relPath);
+      }
+    }
+  }
+
+  // Parse bypasses log: each line is "timestamp reason [rel_path]"
+  const allBypassLines = existsSync(bypassesLog)
+    ? readFileSync(bypassesLog, 'utf-8').split('\n').filter(l => l.trim())
+    : [];
+  const newBypasses = allBypassLines.slice(bypassesStartLine);
+  const bypassReasons: Record<string, number> = {};
+
+  for (const line of newBypasses) {
+    const parts = line.trim().split(' ');
+    if (parts.length >= 2) {
+      const reason = parts[1];
+      bypassReasons[reason] = (bypassReasons[reason] || 0) + 1;
+    }
+  }
+
+  return {
+    interceptions: newInterceptions.length,
+    bypasses: newBypasses.length,
+    estimatedTokensSaved,
+    filesAnalyzed,
+    bypassReasons,
+  };
+}
+
+/**
+ * Capture TLDR metrics since the last checkpoint and advance the checkpoint.
+ *
+ * Call this once per cost event batch to get the delta metrics for that batch,
+ * then update the checkpoint so the next call starts from here.
+ *
+ * @param workspacePath - Workspace root (where .tldr/ lives)
+ * @returns Metrics delta since last capture, or null if no .tldr/ directory exists
+ */
+export function captureTldrMetrics(workspacePath: string): TldrSessionMetrics | null {
+  const tldrDir = join(workspacePath, '.tldr');
+  if (!existsSync(tldrDir)) {
+    return null;
+  }
+
+  const metrics = getTldrMetrics(workspacePath, true);
+
+  // Advance checkpoint to current line counts
+  const interceptionsLog = join(tldrDir, 'interceptions.log');
+  const bypassesLog = join(tldrDir, 'bypasses.log');
+  const checkpointFile = join(tldrDir, 'metrics-checkpoint.json');
+
+  const interceptionsTotal = existsSync(interceptionsLog)
+    ? readFileSync(interceptionsLog, 'utf-8').split('\n').filter(l => l.trim()).length
+    : 0;
+  const bypassesTotal = existsSync(bypassesLog)
+    ? readFileSync(bypassesLog, 'utf-8').split('\n').filter(l => l.trim()).length
+    : 0;
+
+  const checkpoint: TldrMetricsCheckpoint = {
+    interceptionsLine: interceptionsTotal,
+    bypassesLine: bypassesTotal,
+    capturedAt: new Date().toISOString(),
+  };
+
+  try {
+    writeFileSync(checkpointFile, JSON.stringify(checkpoint, null, 2), 'utf-8');
+  } catch { /* non-fatal — metrics still returned */ }
+
+  return metrics;
+}
+
 const execAsync = promisify(exec);
 
 /** Directory for TLDR daemon state files */

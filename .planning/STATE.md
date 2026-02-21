@@ -1,59 +1,57 @@
-# PAN-220: Metrics Dashboard Improvements — TLDR Stats, Cost Accuracy, Label Clarity
+# PAN-236: Add TLDR Session Metrics Tracking to Agent Cost Events
 
 ## Problem
 
-The metrics dashboard had four issues:
-1. **Race condition** in `record-cost-event.js` causing duplicate cost events (~39% phantom costs)
-2. **Duplicate route** — stub `/api/costs/summary` at line 4801 shadowed the real implementation, returning $0
-3. **Label ambiguity** — "Cost Today" uses UTC midnight but didn't say so
-4. **TLDR stats missing** — `TldrServiceStatus` component existed but wasn't integrated into the metrics page
+The TLDR daemon runs and intercepts file reads, but there's zero visibility into:
+- How often it fires (interceptions)
+- How often it's bypassed (and why)
+- How many tokens it saves
+- Whether it's actually working during agent sessions
 
-## Implementation
+## Implementation Plan
 
-### Fix 1: Race Condition (scripts/heartbeat-hook)
+### 1. TLDR interception counter in `src/lib/tldr-daemon.ts`
+Add in-memory metrics accumulator tracking per-workspace:
+- `interceptions`: number of times TLDR provided a summary instead of full file read
+- `bypasses`: number of times TLDR was skipped (with reason)
+- `estimatedTokensSaved`: rough estimate based on `(fullFileTokens - tldrTokens)` per interception
+- `filesAnalyzed`: unique files summarized in this session
 
-Added per-session `flock -x` around the `node record-cost-event.js` call. Claude Code fires parallel tool calls, spawning multiple heartbeat-hook processes that race on the same transcript offset file. `flock -x -w 30` serializes them, ensuring only one process reads/processes/updates the offset at a time.
+Export `getTldrMetrics(workspacePath: string): TldrSessionMetrics` and `resetTldrMetrics(workspacePath: string)`.
 
-**File:** `scripts/heartbeat-hook`
+### 2. Extend `CostEvent` in `src/lib/costs/events.ts`
+Add optional TLDR fields (backward compatible):
+```typescript
+tldrInterceptions?: number;
+tldrBypasses?: number;
+tldrTokensSaved?: number;
+tldrBypassReasons?: Record<string, number>;
+```
 
-### Fix 2: Duplicate /api/costs/summary Route (src/dashboard/server/index.ts)
+### 3. Attach metrics when recording cost events
+In the cost recording flow, call `getTldrMetrics()` to snapshot and attach TLDR counters, then reset accumulators (delta tracking, not cumulative).
 
-Removed the stub endpoint at the old location (line 4801) that returned all zeros. Express uses the first matching route, so the stub was always served instead of the correct implementation at line 11065.
+### 4. Surface in agent status
+Add TLDR metrics to agent status response used by `pan status` and dashboard.
 
-**File:** `src/dashboard/server/index.ts`
+## Files to Modify
 
-### Fix 3: Event Deduplication (src/lib/costs/events.ts + index.ts + server)
-
-Added `deduplicateEvents()` function that removes events caused by the historical race condition. Deduplication key: `agentId|issueId|model|input|output|cacheRead|cacheWrite`. Events within 60 seconds of the last kept event for the same key are considered race-condition duplicates and removed.
-
-Exposed via `POST /api/costs/deduplicate` endpoint.
-
-### Fix 4: Label Clarification
-
-Changed "Cost Today" → "Cost Today (UTC)" in:
-- `MetricsSummary.tsx`
-- `MetricsPage.tsx`
-
-### Fix 5: TLDR Stats Integration (MetricsPage.tsx)
-
-Imported `TldrServiceStatus` and added a "Services" section to the metrics page that shows TLDR daemon status, health, and workspace daemon count.
-
-## Files Modified
-
-| File | Change |
-|------|--------|
-| `scripts/heartbeat-hook` | Added flock serialization around cost recording |
-| `src/dashboard/server/index.ts` | Removed stub /api/costs/summary, added /api/costs/deduplicate, added deduplicateEvents import |
-| `src/lib/costs/events.ts` | Added deduplicateEvents() |
-| `src/lib/costs/index.ts` | Export deduplicateEvents |
-| `src/dashboard/frontend/src/components/MetricsSummary.tsx` | "Cost Today (UTC)" label |
-| `src/dashboard/frontend/src/components/MetricsPage.tsx` | "Cost Today (UTC)" label + TldrServiceStatus |
-| `src/lib/costs/__tests__/events.test.ts` | New tests for deduplicateEvents |
+- `src/lib/tldr-daemon.ts` — Add metrics accumulator and exports
+- `src/lib/costs/events.ts` — Extend CostEvent interface
+- `src/lib/costs/index.ts` — Wire metrics into cost event recording
+- `src/lib/agents.ts` — Include TLDR metrics in agent status
+- `scripts/record-cost-event.js` — Attach TLDR metrics when recording
 
 ## Current Status
 
-**COMPLETE** — All changes implemented, tests pass (only pre-existing specialist-logs.test.ts failure unrelated to this PR).
+**IN PROGRESS** — Starting implementation.
 
 ## Remaining Work
 
-None. Implementation complete.
+1. Read and understand existing code
+2. Add TldrSessionMetrics interface and accumulator to tldr-daemon.ts
+3. Extend CostEvent interface
+4. Wire metrics into cost recording
+5. Surface in agent status
+6. Add tests
+7. Commit and push

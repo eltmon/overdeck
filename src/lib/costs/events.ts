@@ -23,6 +23,13 @@ export interface CostEvent {
   cacheRead: number;       // Cache read tokens
   cacheWrite: number;      // Cache write tokens
   cost: number;            // Cost in USD
+
+  // TLDR metrics — delta since last cost event (PAN-236)
+  // Present only when a TLDR daemon is active for the workspace.
+  tldrInterceptions?: number;              // TLDR summaries served since last cost event
+  tldrBypasses?: number;                  // TLDR bypasses since last cost event
+  tldrTokensSaved?: number;               // Estimated tokens saved since last cost event
+  tldrBypassReasons?: Record<string, number>; // e.g. { "offset-limit": 3, "recently-edited": 1 }
 }
 
 export interface EventMetadata {

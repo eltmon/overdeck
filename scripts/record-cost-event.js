@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 // scripts/record-cost-event.ts
-import { readFileSync as readFileSync2, existsSync as existsSync2, writeFileSync as writeFileSync2, mkdirSync as mkdirSync2, openSync, readSync, fstatSync, closeSync } from "fs";
+import { readFileSync as readFileSync3, existsSync as existsSync3, writeFileSync as writeFileSync3, mkdirSync as mkdirSync3, openSync, readSync, fstatSync, closeSync } from "fs";
 import { execFileSync } from "child_process";
-import { join as join4 } from "path";
+import { join as join5 } from "path";
 import { homedir as homedir3 } from "os";
 
 // src/lib/cost.ts
@@ -143,26 +143,105 @@ function appendCostEvent(event2) {
   appendFileSync(getEventsFile(), line, "utf-8");
 }
 
+// src/lib/tldr-daemon.ts
+import { exec } from "child_process";
+import { promisify } from "util";
+import { existsSync as existsSync2, writeFileSync as writeFileSync2, readFileSync as readFileSync2, mkdirSync as mkdirSync2, unlinkSync } from "fs";
+import { join as join4 } from "path";
+function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
+  const tldrDir = join4(workspacePath, ".tldr");
+  const interceptionsLog = join4(tldrDir, "interceptions.log");
+  const bypassesLog = join4(tldrDir, "bypasses.log");
+  const checkpointFile = join4(tldrDir, "metrics-checkpoint.json");
+  let interceptionsStartLine = 0;
+  let bypassesStartLine = 0;
+  if (sinceCheckpoint && existsSync2(checkpointFile)) {
+    try {
+      const checkpoint = JSON.parse(readFileSync2(checkpointFile, "utf-8"));
+      interceptionsStartLine = checkpoint.interceptionsLine || 0;
+      bypassesStartLine = checkpoint.bypassesLine || 0;
+    } catch {
+    }
+  }
+  const allInterceptionLines = existsSync2(interceptionsLog) ? readFileSync2(interceptionsLog, "utf-8").split("\n").filter((l) => l.trim()) : [];
+  const newInterceptions = allInterceptionLines.slice(interceptionsStartLine);
+  let estimatedTokensSaved = 0;
+  const filesAnalyzed = [];
+  for (const line of newInterceptions) {
+    const parts = line.trim().split(" ");
+    if (parts.length >= 3) {
+      const fileSizeBytes = parseInt(parts[1], 10) || 0;
+      const relPath = parts.slice(2).join(" ");
+      const fullTokens = Math.round(fileSizeBytes / 4);
+      estimatedTokensSaved += Math.max(0, fullTokens - 1e3);
+      if (relPath && !filesAnalyzed.includes(relPath)) {
+        filesAnalyzed.push(relPath);
+      }
+    }
+  }
+  const allBypassLines = existsSync2(bypassesLog) ? readFileSync2(bypassesLog, "utf-8").split("\n").filter((l) => l.trim()) : [];
+  const newBypasses = allBypassLines.slice(bypassesStartLine);
+  const bypassReasons = {};
+  for (const line of newBypasses) {
+    const parts = line.trim().split(" ");
+    if (parts.length >= 2) {
+      const reason = parts[1];
+      bypassReasons[reason] = (bypassReasons[reason] || 0) + 1;
+    }
+  }
+  return {
+    interceptions: newInterceptions.length,
+    bypasses: newBypasses.length,
+    estimatedTokensSaved,
+    filesAnalyzed,
+    bypassReasons
+  };
+}
+function captureTldrMetrics(workspacePath) {
+  const tldrDir = join4(workspacePath, ".tldr");
+  if (!existsSync2(tldrDir)) {
+    return null;
+  }
+  const metrics = getTldrMetrics(workspacePath, true);
+  const interceptionsLog = join4(tldrDir, "interceptions.log");
+  const bypassesLog = join4(tldrDir, "bypasses.log");
+  const checkpointFile = join4(tldrDir, "metrics-checkpoint.json");
+  const interceptionsTotal = existsSync2(interceptionsLog) ? readFileSync2(interceptionsLog, "utf-8").split("\n").filter((l) => l.trim()).length : 0;
+  const bypassesTotal = existsSync2(bypassesLog) ? readFileSync2(bypassesLog, "utf-8").split("\n").filter((l) => l.trim()).length : 0;
+  const checkpoint = {
+    interceptionsLine: interceptionsTotal,
+    bypassesLine: bypassesTotal,
+    capturedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  try {
+    writeFileSync2(checkpointFile, JSON.stringify(checkpoint, null, 2), "utf-8");
+  } catch {
+  }
+  return metrics;
+}
+var execAsync = promisify(exec);
+var TLDR_STATE_DIR = join4(PANOPTICON_HOME, "tldr");
+
 // scripts/record-cost-event.ts
 var event;
 try {
-  const input = readFileSync2(0, "utf-8");
+  const input = readFileSync3(0, "utf-8");
   event = JSON.parse(input);
 } catch {
   process.exit(0);
 }
 var transcriptPath = event?.transcript_path;
-if (!transcriptPath || !existsSync2(transcriptPath)) {
+if (!transcriptPath || !existsSync3(transcriptPath)) {
   process.exit(0);
 }
 var sessionId = event?.session_id || "unknown";
-var stateDir = join4(process.env.HOME || homedir3(), ".panopticon", "costs", "state");
-mkdirSync2(stateDir, { recursive: true });
-var stateFile = join4(stateDir, `${sessionId}.offset`);
+var stateDir = join5(process.env.HOME || homedir3(), ".panopticon", "costs", "state");
+mkdirSync3(stateDir, { recursive: true });
+var stateFile = join5(stateDir, `${sessionId}.offset`);
 var lastOffset = 0;
-if (existsSync2(stateFile)) {
+if (existsSync3(stateFile)) {
   try {
-    lastOffset = parseInt(readFileSync2(stateFile, "utf-8").trim(), 10) || 0;
+    lastOffset = parseInt(readFileSync3(stateFile, "utf-8").trim(), 10) || 0;
   } catch {
   }
 }
@@ -175,7 +254,7 @@ try {
 var stat = fstatSync(fd);
 if (stat.size <= lastOffset) {
   closeSync(fd);
-  writeFileSync2(stateFile, String(stat.size), "utf-8");
+  writeFileSync3(stateFile, String(stat.size), "utf-8");
   process.exit(0);
 }
 var bytesToRead = stat.size - lastOffset;
@@ -204,6 +283,19 @@ if (!issueId || issueId === "UNKNOWN") {
 if (!issueId) {
   issueId = "UNKNOWN";
 }
+var tldrMetrics = null;
+try {
+  const workspaceRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf-8",
+    timeout: 2e3,
+    stdio: ["pipe", "pipe", "pipe"]
+  }).trim();
+  if (workspaceRoot) {
+    tldrMetrics = captureTldrMetrics(workspaceRoot);
+  }
+} catch {
+}
+var tldrAttachedToFirstEvent = false;
 for (const line of lines) {
   if (!line.trim()) continue;
   try {
@@ -235,6 +327,15 @@ for (const line of lines) {
       cacheWriteTokens,
       cacheTTL: "5m"
     }, pricing);
+    const tldrFields = tldrMetrics && !tldrAttachedToFirstEvent && tldrMetrics.interceptions + tldrMetrics.bypasses > 0 ? {
+      tldrInterceptions: tldrMetrics.interceptions,
+      tldrBypasses: tldrMetrics.bypasses,
+      tldrTokensSaved: tldrMetrics.estimatedTokensSaved,
+      tldrBypassReasons: Object.keys(tldrMetrics.bypassReasons).length > 0 ? tldrMetrics.bypassReasons : void 0
+    } : {};
+    if (tldrMetrics && !tldrAttachedToFirstEvent) {
+      tldrAttachedToFirstEvent = true;
+    }
     appendCostEvent({
       ts: (/* @__PURE__ */ new Date()).toISOString(),
       type: "cost",
@@ -247,10 +348,11 @@ for (const line of lines) {
       output: outputTokens,
       cacheRead: cacheReadTokens,
       cacheWrite: cacheWriteTokens,
-      cost
+      cost,
+      ...tldrFields
     });
   } catch {
   }
 }
-writeFileSync2(stateFile, String(stat.size), "utf-8");
+writeFileSync3(stateFile, String(stat.size), "utf-8");
 process.exit(0);
