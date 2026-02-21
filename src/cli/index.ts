@@ -152,6 +152,7 @@ program
   .description('Show running agents (shorthand for work status)')
   .option('--json', 'Output as JSON')
   .option('--tldr', 'Show TLDR index health across all workspaces')
+  .option('--context', 'Show context window usage % for each agent')
   .action(statusCommand);
 
 // Dashboard commands
