@@ -1,12 +1,21 @@
 import chalk from 'chalk';
 import { listRunningAgents } from '../../../lib/agents.js';
 import { isShadowed, getShadowState } from '../../../lib/shadow-state.js';
+import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
+import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
+import { join, basename } from 'path';
 
 interface StatusOptions {
   json?: boolean;
+  tldr?: boolean;
 }
 
 export async function statusCommand(options: StatusOptions): Promise<void> {
+  if (options.tldr) {
+    await tldrIndexStatusCommand();
+    return;
+  }
+
   // Filter out invalid agent states (missing required fields)
   const agents = listRunningAgents().filter(agent =>
     agent.id && agent.issueId && agent.workspace
@@ -68,4 +77,144 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log(chalk.dim('👻 = Shadow mode (tracking status locally)'));
     console.log('');
   }
+}
+
+interface TldrIndexEntry {
+  label: string;
+  running: boolean;
+  fileCount: number | null;
+  edgeCount: number | null;
+  ageMs: number | null;
+}
+
+function readTldrIndexData(workspacePath: string): { fileCount: number | null; edgeCount: number | null; ageMs: number | null } {
+  const tldrPath = join(workspacePath, '.tldr');
+  if (!existsSync(tldrPath)) {
+    return { fileCount: null, edgeCount: null, ageMs: null };
+  }
+
+  let fileCount: number | null = null;
+  let edgeCount: number | null = null;
+  let ageMs: number | null = null;
+
+  const cgPath = join(tldrPath, 'cache', 'call_graph.json');
+  if (existsSync(cgPath)) {
+    try {
+      const cg = JSON.parse(readFileSync(cgPath, 'utf-8')) as { edges?: Array<{ from_file?: string; to_file?: string }> };
+      if (Array.isArray(cg.edges)) {
+        edgeCount = cg.edges.length;
+        const files = new Set<string>();
+        for (const e of cg.edges) {
+          if (e.from_file) files.add(e.from_file);
+          if (e.to_file) files.add(e.to_file);
+        }
+        fileCount = files.size;
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  const langPath = join(tldrPath, 'languages.json');
+  if (existsSync(langPath)) {
+    try {
+      const langData = JSON.parse(readFileSync(langPath, 'utf-8')) as { timestamp?: number };
+      if (langData.timestamp) {
+        ageMs = Date.now() - langData.timestamp * 1000;
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  if (ageMs === null) {
+    try {
+      const stats = statSync(tldrPath);
+      ageMs = Date.now() - stats.mtimeMs;
+    } catch { /* ignore stat errors */ }
+  }
+
+  return { fileCount, edgeCount, ageMs };
+}
+
+function formatTldrAge(ageMs: number | null): string {
+  if (ageMs === null) return 'unknown';
+  const ageMin = Math.floor(ageMs / 60000);
+  if (ageMin < 60) return `${ageMin}m`;
+  const ageHours = Math.floor(ageMin / 60);
+  if (ageHours < 24) return `${ageHours}h`;
+  return `${Math.floor(ageHours / 24)}d`;
+}
+
+function formatTldrRow(label: string, entry: TldrIndexEntry): string {
+  const files = entry.fileCount !== null ? entry.fileCount.toLocaleString() : 'N/A';
+  const edges = entry.edgeCount !== null ? entry.edgeCount.toLocaleString() : 'N/A';
+  const age = formatTldrAge(entry.ageMs);
+  const daemonStr = entry.running ? chalk.green('running ✓') : chalk.dim('stopped ○');
+  const notIndexed = entry.fileCount === null ? chalk.dim(' (not indexed)') : '';
+  return `  ${chalk.bold(label)}${notIndexed}  Files: ${files}  Edges: ${edges}  Age: ${age}  Daemon: ${daemonStr}`;
+}
+
+export async function tldrIndexStatusCommand(projectRoot = process.cwd()): Promise<void> {
+  const projectName = basename(projectRoot);
+
+  const mainEntries: TldrIndexEntry[] = [];
+  const workspaceEntries: TldrIndexEntry[] = [];
+
+  const mainVenvPath = join(projectRoot, '.venv');
+  if (existsSync(mainVenvPath)) {
+    const service = getTldrDaemonService(projectRoot, mainVenvPath);
+    const status = await service.getStatus();
+    const { fileCount, edgeCount, ageMs } = readTldrIndexData(projectRoot);
+    mainEntries.push({ label: `Main (${projectName})`, running: status.running, fileCount, edgeCount, ageMs });
+  }
+
+  const workspacesDir = join(projectRoot, 'workspaces');
+  if (existsSync(workspacesDir)) {
+    const dirs = readdirSync(workspacesDir, { withFileTypes: true })
+      .filter(d => d.isDirectory() && d.name.startsWith('feature-'));
+    for (const ws of dirs) {
+      const wsPath = join(workspacesDir, ws.name);
+      const wsVenvPath = join(wsPath, '.venv');
+      if (existsSync(wsVenvPath)) {
+        const service = getTldrDaemonService(wsPath, wsVenvPath);
+        const status = await service.getStatus();
+        const { fileCount, edgeCount, ageMs } = readTldrIndexData(wsPath);
+        workspaceEntries.push({ label: ws.name, running: status.running, fileCount, edgeCount, ageMs });
+      }
+    }
+  }
+
+  console.log(chalk.bold('\nTLDR Index Health'));
+  console.log('─────────────────');
+
+  if (mainEntries.length === 0 && workspaceEntries.length === 0) {
+    console.log(chalk.dim('\nNo TLDR indexes found (no .venv directories)'));
+    console.log(chalk.dim('Run `pan setup` to configure TLDR'));
+    return;
+  }
+
+  for (const entry of mainEntries) {
+    console.log(formatTldrRow(entry.label, entry));
+  }
+
+  if (workspaceEntries.length > 0) {
+    console.log('');
+    console.log(chalk.bold('Workspaces'));
+    for (const entry of workspaceEntries) {
+      console.log(formatTldrRow(entry.label, entry));
+    }
+  }
+
+  const allEntries = [...mainEntries, ...workspaceEntries];
+  const ONE_HOUR = 60 * 60 * 1000;
+  const anyMissing = allEntries.some(e => e.fileCount === null);
+  const anyNotRunning = allEntries.some(e => !e.running);
+  const anyStale = allEntries.some(e => e.ageMs === null || e.ageMs >= ONE_HOUR);
+
+  console.log('');
+  if (anyMissing || anyNotRunning) {
+    console.log(`Health: ${chalk.red('✗ TLDR not fully configured')}`);
+  } else if (anyStale) {
+    console.log(`Health: ${chalk.yellow('⚠ Some indexes stale (>1h)')}`);
+  } else {
+    console.log(`Health: ${chalk.green('✓ All indexes fresh')}`);
+  }
+  console.log('');
 }

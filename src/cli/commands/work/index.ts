@@ -43,6 +43,7 @@ export function registerWorkCommands(program: Command): void {
     .command('status')
     .description('Show all running agents')
     .option('--json', 'Output as JSON')
+    .option('--tldr', 'Show TLDR index health across all workspaces')
     .action(statusCommand);
 
   work

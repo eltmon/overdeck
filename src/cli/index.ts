@@ -150,6 +150,7 @@ program
   .command('status')
   .description('Show running agents (shorthand for work status)')
   .option('--json', 'Output as JSON')
+  .option('--tldr', 'Show TLDR index health across all workspaces')
   .action(statusCommand);
 
 // Dashboard commands
