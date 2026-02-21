@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
 import { AgentList } from './components/AgentList';
 import { TerminalView } from './components/TerminalView';
@@ -463,6 +464,9 @@ export default function App() {
         cycleFilter="current"
         includeCompletedFilter={false}
       />
+
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   );
 }
