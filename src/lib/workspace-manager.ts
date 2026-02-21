@@ -338,6 +338,66 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   mkdirSync(workspacePath, { recursive: true });
   result.steps.push('Created workspace directory');
 
+  // Create Python venv and install llm-tldr for TLDR daemon
+  try {
+    // Check if python3 is available
+    await execAsync('python3 --version');
+
+    const venvPath = join(workspacePath, '.venv');
+    result.steps.push('Creating Python venv for TLDR...');
+
+    // Create venv
+    await execAsync(`python3 -m venv "${venvPath}"`, { cwd: workspacePath });
+    result.steps.push('Created Python venv');
+
+    // Install llm-tldr
+    const pipPath = join(venvPath, 'bin', 'pip');
+    await execAsync(`"${pipPath}" install llm-tldr`, { cwd: workspacePath, timeout: 120000 });
+    result.steps.push('Installed llm-tldr package');
+  } catch (error: any) {
+    // Python3 not available or installation failed - log warning but don't fail
+    const errorMsg = error?.message || String(error);
+    if (errorMsg.includes('python3: not found') || errorMsg.includes('command not found')) {
+      console.warn('⚠ Python3 not available - skipping TLDR setup');
+      result.steps.push('Skipped TLDR setup (Python3 not available)');
+    } else {
+      console.warn(`⚠ Failed to set up TLDR: ${errorMsg}`);
+      result.steps.push(`TLDR setup failed: ${errorMsg.substring(0, 100)}`);
+    }
+  }
+
+  // Copy .tldr/ index from main branch if it exists
+  // This gives new workspaces near-instant TLDR availability
+  const mainTldrPath = join(projectConfig.path, '.tldr');
+  const workspaceTldrPath = join(workspacePath, '.tldr');
+  if (existsSync(mainTldrPath)) {
+    try {
+      await execAsync(`cp -r "${mainTldrPath}" "${workspaceTldrPath}"`);
+      result.steps.push('Copied .tldr/ index from main branch');
+    } catch (error: any) {
+      // Non-fatal - workspace daemon will build from scratch if copy fails
+      console.warn(`⚠ Failed to copy .tldr/ index: ${error?.message}`);
+      result.steps.push('Skipped .tldr/ copy (will build from scratch)');
+    }
+  } else {
+    result.steps.push('Skipped .tldr/ copy (main index not found)');
+  }
+
+  // Start TLDR daemon for workspace (if venv was created successfully)
+  const venvPath = join(workspacePath, '.venv');
+  if (existsSync(venvPath)) {
+    try {
+      const { getTldrDaemonService } = await import('./tldr-daemon.js');
+      const tldrService = getTldrDaemonService(workspacePath, venvPath);
+      await tldrService.start(true);  // background mode
+      result.steps.push('Started TLDR daemon for workspace');
+    } catch (error: any) {
+      // Non-fatal - TLDR will be unavailable but workspace will still work
+      console.warn(`⚠ Failed to start TLDR daemon: ${error?.message}`);
+      result.steps.push(`TLDR daemon start failed: ${error?.message?.substring(0, 100)}`);
+    }
+  }
+
   // Handle polyrepo vs monorepo
   if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
     // Create worktrees for each repo
@@ -706,6 +766,20 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   if (dryRun) {
     result.steps.push('[DRY RUN] Would remove workspace at: ' + workspacePath);
     return result;
+  }
+
+  // Stop TLDR daemon for workspace (if it exists)
+  const venvPath = join(workspacePath, '.venv');
+  if (existsSync(venvPath)) {
+    try {
+      const { getTldrDaemonService } = await import('./tldr-daemon.js');
+      const tldrService = getTldrDaemonService(workspacePath, venvPath);
+      await tldrService.stop();
+      result.steps.push('Stopped TLDR daemon');
+    } catch (error: any) {
+      // Non-fatal - daemon may not be running
+      console.warn(`⚠ Failed to stop TLDR daemon: ${error?.message}`);
+    }
   }
 
   // Stop Docker containers and clean up Docker-created files
