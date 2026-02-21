@@ -1,6 +1,6 @@
 # PAN-136: Fix Pre-existing Test Failures
 
-## Status: COMPLETE
+## Status: PLANNED
 
 ## Problem
 
@@ -54,20 +54,4 @@ complexity.expert        = 'claude-opus-4-6'
 
 ## Verification
 
-After fixes, the 6 targeted test failures are resolved:
-- ✅ tests/lib/settings.test.ts: All 25 tests pass
-- ✅ tests/lib/tracker/factory.test.ts: All 9 tests pass
-
-Note: One pre-existing failure remains in tests/lib/cloister/specialist-logs.test.ts (also fails on main, out of scope for PAN-136).
-
-## Implementation Summary
-
-1. **settings.test.ts** - Updated 4 test cases to match current DEFAULT_SETTINGS:
-   - Fixed expectations for specialists (review_agent, test_agent, merge_agent)
-   - Fixed expectations for planning_agent
-   - Fixed expectations for complexity levels (trivial, simple, expert)
-
-2. **tracker/factory.test.ts** - Added config-yaml mock for test isolation:
-   - Mocked loadConfig() to return empty trackerKeys
-   - Prevents filesystem reads during tests
-   - Ensures TrackerAuthError is properly thrown when credentials missing
+After fixes, `npx vitest run` should show 0 failures.
