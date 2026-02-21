@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Database } from 'lucide-react';
 
 interface TldrDaemonStatus {
   workspace: string;
@@ -7,6 +7,8 @@ interface TldrDaemonStatus {
   pid?: number;
   healthy: boolean;
   workspacePath: string;
+  fileCount?: number;
+  indexAge?: string;
 }
 
 interface TldrStatusResponse {
@@ -60,13 +62,30 @@ export function TldrServiceStatus() {
     );
   }
 
-  // Find main daemon
   const mainDaemon = data.daemons.find(d => d.workspace === 'main');
-  if (!mainDaemon) {
-    return null;
-  }
+  const workspaceDaemons = data.daemons.filter(d => d.workspace !== 'main');
 
-  const isHealthy = mainDaemon.running && mainDaemon.healthy;
+  return (
+    <div className="space-y-3">
+      {/* Main daemon */}
+      {mainDaemon && (
+        <DaemonCard daemon={mainDaemon} label="Main Index" />
+      )}
+
+      {/* Workspace daemons */}
+      {workspaceDaemons.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {workspaceDaemons.map(d => (
+            <DaemonCard key={d.workspace} daemon={d} label={d.workspace} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DaemonCard({ daemon, label }: { daemon: TldrDaemonStatus; label: string }) {
+  const isHealthy = daemon.running && daemon.healthy;
 
   return (
     <div className={`rounded-lg p-4 border ${isHealthy ? 'bg-green-900/30 border-green-800/30' : 'bg-surface-raised border-divider'}`}>
@@ -78,21 +97,26 @@ export function TldrServiceStatus() {
             <XCircle className="w-5 h-5 text-gray-400" />
           )}
           <div>
-            <div className="font-medium text-content">TLDR Code Analysis</div>
+            <div className="font-medium text-content">{label}</div>
             <div className="text-sm text-content-subtle">
-              {mainDaemon.running ? 'Running' : 'Stopped'}
-              {mainDaemon.running && mainDaemon.pid && ` (PID ${mainDaemon.pid})`}
+              {daemon.running ? 'Running' : 'Stopped'}
+              {daemon.running && daemon.pid && ` (PID ${daemon.pid})`}
             </div>
           </div>
         </div>
 
         <div className="text-right">
-          <div className="text-xs text-content-muted">
-            {data.daemons.length - 1} workspace daemon{data.daemons.length - 1 !== 1 ? 's' : ''}
-          </div>
-          <div className="text-xs text-content-subtle">
-            {mainDaemon.healthy ? 'Healthy' : 'Unhealthy'}
-          </div>
+          {daemon.fileCount != null && (
+            <div className="flex items-center gap-1 text-sm text-content">
+              <Database className="w-3.5 h-3.5 text-content-subtle" />
+              <span>{daemon.fileCount.toLocaleString()} files</span>
+            </div>
+          )}
+          {daemon.indexAge && (
+            <div className="text-xs text-content-muted">
+              Updated {daemon.indexAge}
+            </div>
+          )}
         </div>
       </div>
     </div>
