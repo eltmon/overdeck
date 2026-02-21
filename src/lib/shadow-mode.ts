@@ -69,7 +69,7 @@ export function resolveShadowMode(options: ShadowModeOptions = {}): ShadowModeRe
   }
 
   // Load configuration (this merges project, global, and env settings)
-  const config = loadConfig();
+  const { config } = loadConfig();
 
   // 3. Check per-project configuration (already merged into config.shadow)
   // 4. Check global configuration (already merged into config.shadow)
@@ -161,7 +161,7 @@ export function getShadowModeStatus(options: ShadowModeOptions = {}): string {
  * Check if shadow mode is configured at the project level
  */
 export function hasProjectShadowConfig(): boolean {
-  const config = loadConfig();
+  const { config } = loadConfig();
 
   // Check if there's any project-specific shadow configuration
   // This is a heuristic - if shadow is enabled but not from env, it's likely project config
@@ -182,7 +182,7 @@ export function getShadowModeSummary(): {
   envSet: boolean;
   pendingSyncCount: number;
 } {
-  const config = loadConfig();
+  const { config } = loadConfig();
 
   return {
     globalEnabled: config.shadow.enabled,
