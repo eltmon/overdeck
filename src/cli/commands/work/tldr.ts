@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { getTldrDaemonService, listTldrDaemonServices } from '../../../lib/tldr-daemon.js';
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join, basename } from 'path';
 
 interface TldrOptions {
@@ -55,16 +55,36 @@ async function statusCommand(options: TldrOptions): Promise<void> {
 
     if (existsSync(tldrPath)) {
       try {
-        const stats = statSync(tldrPath);
-        const ageMs = Date.now() - stats.mtimeMs;
-        const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
-        indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+        // Index age from languages.json timestamp (set during warm)
+        const langPath = join(tldrPath, 'languages.json');
+        if (existsSync(langPath)) {
+          const langData = JSON.parse(readFileSync(langPath, 'utf-8'));
+          if (langData.timestamp) {
+            const ageMs = Date.now() - (langData.timestamp * 1000);
+            const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+            indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+          }
+        }
+        // Fall back to directory mtime
+        if (indexAge === 'N/A') {
+          const stats = statSync(tldrPath);
+          const ageMs = Date.now() - stats.mtimeMs;
+          const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+          indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+        }
 
-        // Count files in ast directory as proxy for indexed files
-        const astPath = join(tldrPath, 'ast');
-        if (existsSync(astPath)) {
-          const files = readdirSync(astPath);
-          fileCount = String(files.length);
+        // File count from call_graph.json
+        const cgPath = join(tldrPath, 'cache', 'call_graph.json');
+        if (existsSync(cgPath)) {
+          const cg = JSON.parse(readFileSync(cgPath, 'utf-8'));
+          if (Array.isArray(cg.edges)) {
+            const files = new Set<string>();
+            for (const e of cg.edges) {
+              if (e.from_file) files.add(e.from_file);
+              if (e.to_file) files.add(e.to_file);
+            }
+            fileCount = String(files.size);
+          }
         }
       } catch {
         // Ignore stat errors
@@ -101,15 +121,36 @@ async function statusCommand(options: TldrOptions): Promise<void> {
 
         if (existsSync(tldrPath)) {
           try {
-            const stats = statSync(tldrPath);
-            const ageMs = Date.now() - stats.mtimeMs;
-            const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
-            indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+            // Index age from languages.json timestamp
+            const langPath = join(tldrPath, 'languages.json');
+            if (existsSync(langPath)) {
+              const langData = JSON.parse(readFileSync(langPath, 'utf-8'));
+              if (langData.timestamp) {
+                const ageMs = Date.now() - (langData.timestamp * 1000);
+                const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+                indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+              }
+            }
+            // Fall back to directory mtime
+            if (indexAge === 'N/A') {
+              const stats = statSync(tldrPath);
+              const ageMs = Date.now() - stats.mtimeMs;
+              const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+              indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+            }
 
-            const astPath = join(tldrPath, 'ast');
-            if (existsSync(astPath)) {
-              const files = readdirSync(astPath);
-              fileCount = String(files.length);
+            // File count from call_graph.json
+            const cgPath = join(tldrPath, 'cache', 'call_graph.json');
+            if (existsSync(cgPath)) {
+              const cg = JSON.parse(readFileSync(cgPath, 'utf-8'));
+              if (Array.isArray(cg.edges)) {
+                const files = new Set<string>();
+                for (const e of cg.edges) {
+                  if (e.from_file) files.add(e.from_file);
+                  if (e.to_file) files.add(e.to_file);
+                }
+                fileCount = String(files.size);
+              }
             }
           } catch {
             // Ignore stat errors

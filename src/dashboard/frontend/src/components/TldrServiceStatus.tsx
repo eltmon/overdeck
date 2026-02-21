@@ -9,6 +9,7 @@ interface TldrDaemonStatus {
   workspacePath: string;
   fileCount?: number;
   indexAge?: string;
+  edgeCount?: number;
 }
 
 interface TldrStatusResponse {
@@ -109,7 +110,7 @@ function DaemonCard({ daemon, label }: { daemon: TldrDaemonStatus; label: string
           {daemon.fileCount != null && (
             <div className="flex items-center gap-1 text-sm text-content">
               <Database className="w-3.5 h-3.5 text-content-subtle" />
-              <span>{daemon.fileCount.toLocaleString()} files</span>
+              <span>{daemon.fileCount.toLocaleString()} files{daemon.edgeCount != null && `, ${daemon.edgeCount.toLocaleString()} edges`}</span>
             </div>
           )}
           {daemon.indexAge && (
