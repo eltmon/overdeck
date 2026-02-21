@@ -1863,40 +1863,52 @@ Branch: ${task.branch || 'unknown'}
 Workspace: ${task.workspace || 'unknown'}
 
 Your task:
-1. Run the full test suite on the feature branch
-2. Run the same test suite on the main branch (baseline)
-3. Compare results: identify which failures are NEW vs pre-existing
-4. Only fail the feature branch for NEW regressions
+1. Run the full test suite — redirect output to file, read only summaries
+2. If ALL pass, skip baseline and report PASS
+3. If failures, run baseline on main and compare
+4. Only fail for NEW regressions (not pre-existing)
 5. Update status via API when done
+
+## CRITICAL: Context Management — Output Redirection
+
+**NEVER let full test output flow into your context.** Always redirect to file and read only summaries.
+Raw test output from large suites (1000+ tests) WILL fill your context and cause compaction, losing your task.
 
 ## CRITICAL: Bash Timeout for Test Commands
 
 **ALWAYS use timeout: 300000 (5 minutes) when running test commands.**
-Test suites commonly take 2-5 minutes. The default bash timeout is only 2 minutes and WILL cause premature failures.
-Do NOT run test commands in background mode — run them directly with a 5-minute timeout.
 
-Example:
+## Step 1: Run Feature Branch Tests
+
 \`\`\`bash
-cd ${task.workspace || 'unknown'} && npm test 2>&1 | tail -30
+cd ${task.workspace || 'unknown'} && npm test 2>&1 > /tmp/test-feature.txt; echo "EXIT_CODE: $?"
 # Use timeout: 300000 for this command
+tail -20 /tmp/test-feature.txt
 \`\`\`
 
-## CRITICAL: Baseline Comparison
+## Step 2: Check Results
 
-**You MUST compare test results against the main branch baseline.**
+- If ALL tests pass (exit code 0) → skip baseline, go to "Update Status"
+- If failures exist → continue to Step 3
 
-Pre-existing failures that also occur on main branch should NOT block the feature branch.
+## Step 3: Baseline Comparison (ONLY if failures found)
 
-Steps:
-1. Run \`npm test\` (or detected command) on the feature branch - record results (timeout: 300000)
-2. Run tests on main branch baseline (timeout: 300000): \`cd ${task.context?.workspace ? task.context.workspace.replace(/workspaces\/feature-[^/]+/, '') : 'unknown'} && npm test 2>&1 | tail -30\`
-3. Compare: any test that fails on BOTH branches is pre-existing
-4. Only NEW failures (pass on main, fail on feature) should block
+\`\`\`bash
+cd ${task.context?.workspace ? task.context.workspace.replace(/workspaces\/feature-[^/]+/, '') : 'unknown'} && npm test 2>&1 > /tmp/test-main.txt; echo "EXIT_CODE: $?"
+# Use timeout: 300000 for this command
+tail -20 /tmp/test-main.txt
+\`\`\`
 
-**Pass criteria:** The feature branch introduces ZERO new test failures compared to main.
-**Fail criteria:** The feature branch introduces one or more NEW test failures not present on main.
+Then compare failures (targeted, NOT full output):
+\`\`\`bash
+grep -E "FAIL|✗|Error|failed" /tmp/test-feature.txt | head -30
+grep -E "FAIL|✗|Error|failed" /tmp/test-main.txt | head -30
+\`\`\`
 
-Report pre-existing failures as informational notes, but do NOT block the feature for them.
+Tests that fail on BOTH = pre-existing (don't block). Tests that fail ONLY on feature = NEW regression (block).
+
+**Pass criteria:** Feature branch introduces ZERO new test failures vs main.
+**Fail criteria:** Feature branch introduces NEW failures not present on main.
 
 ## REQUIRED: Update Status via API
 
@@ -1904,18 +1916,18 @@ You MUST execute the appropriate curl command and verify it succeeds. Do NOT jus
 
 If NO new regressions (tests PASS):
 \`\`\`bash
-# EXECUTE THIS - verify you see JSON response with testStatus:"passed"
 curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any]"}' | jq .
 \`\`\`
 
 If NEW regressions found (tests FAIL):
 \`\`\`bash
-# EXECUTE THIS - verify you see JSON response with testStatus:"failed"
 curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures only]"}' | jq .
 \`\`\`
 Then use send-feedback-to-agent skill to notify issue agent of NEW failures only.
 
 ⚠️ VERIFICATION: After running curl, confirm you see valid JSON output with the updated status. If you get an error or empty response, the update FAILED - report this.
+
+**NEVER run test commands without redirecting to a file.** This is not optional.
 
 IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
       break;

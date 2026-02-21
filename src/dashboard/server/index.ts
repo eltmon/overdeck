@@ -1846,6 +1846,23 @@ app.get('/api/agents', async (_req, res) => {
         // Check workspace location (local vs remote)
         const workspaceLocation = getWorkspaceLocation(issueId);
 
+        // Read context usage from statusline-written files (non-blocking, best-effort)
+        let contextPercent: number | null = null;
+        let initialContextPercent: number | null = null;
+        const agentCtxDir = join(homedir(), '.panopticon', 'agents', name);
+        try {
+          const ctxFile = join(agentCtxDir, 'context-pct');
+          if (existsSync(ctxFile)) {
+            contextPercent = parseInt(readFileSync(ctxFile, 'utf-8').trim(), 10) || null;
+          }
+          const initCtxFile = join(agentCtxDir, 'initial-context-pct');
+          if (existsSync(initCtxFile)) {
+            initialContextPercent = parseInt(readFileSync(initCtxFile, 'utf-8').trim(), 10) || null;
+          }
+        } catch {
+          // Non-fatal — context data is optional
+        }
+
         return {
           id: name,
           issueId,
@@ -1861,6 +1878,8 @@ app.get('/api/agents', async (_req, res) => {
           type: isPlanning ? 'planning' : 'agent',
           hasPendingQuestion: pendingQuestions.length > 0 || isIdle,
           pendingQuestionCount: pendingQuestions.length,
+          contextPercent,
+          initialContextPercent,
         };
       })
     );
@@ -4726,6 +4745,34 @@ app.get('/api/agents/:id/cost', (req, res) => {
       const projectDir = join(claudeProjectsDir, projectDirName);
       const sessionsIndexPath = join(projectDir, 'sessions-index.json');
 
+      // Helper: extract cost data from a JSONL file
+      const parseJsonlCost = (filePath: string) => {
+        const jsonlContent = readFileSync(filePath, 'utf-8');
+        const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
+
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            // Extract usage from message.usage or top-level usage
+            const usage = entry.message?.usage || entry.usage;
+            const model = entry.message?.model || entry.model;
+
+            if (usage) {
+              inputTokens += usage.input_tokens || 0;
+              outputTokens += usage.output_tokens || 0;
+              cacheReadTokens += usage.cache_read_input_tokens || 0;
+              cacheWriteTokens += usage.cache_creation_input_tokens || 0;
+            }
+            // Track the model being used
+            if (model && !detectedModel) {
+              detectedModel = model;
+            }
+          } catch {
+            // Skip malformed lines
+          }
+        }
+      };
+
       if (existsSync(sessionsIndexPath)) {
         try {
           const indexContent = JSON.parse(readFileSync(sessionsIndexPath, 'utf-8'));
@@ -4733,34 +4780,24 @@ app.get('/api/agents/:id/cost', (req, res) => {
           // Parse ALL sessions for this workspace (agent may have multiple sessions)
           for (const sessionEntry of (indexContent.entries || [])) {
             if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
-              const jsonlContent = readFileSync(sessionEntry.fullPath, 'utf-8');
-              const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
-
-              for (const line of lines) {
-                try {
-                  const entry = JSON.parse(line);
-                  // Extract usage from message.usage or top-level usage
-                  const usage = entry.message?.usage || entry.usage;
-                  const model = entry.message?.model || entry.model;
-
-                  if (usage) {
-                    inputTokens += usage.input_tokens || 0;
-                    outputTokens += usage.output_tokens || 0;
-                    cacheReadTokens += usage.cache_read_input_tokens || 0;
-                    cacheWriteTokens += usage.cache_creation_input_tokens || 0;
-                  }
-                  // Track the model being used
-                  if (model && !detectedModel) {
-                    detectedModel = model;
-                  }
-                } catch {
-                  // Skip malformed lines
-                }
-              }
+              parseJsonlCost(sessionEntry.fullPath);
             }
           }
         } catch {
           // Failed to parse sessions index
+        }
+      }
+
+      // Fallback: scan for .jsonl files directly in the project dir
+      // (sessions-index.json may not exist in newer Claude Code versions)
+      if (inputTokens === 0 && existsSync(projectDir)) {
+        try {
+          const files = readdirSync(projectDir).filter(f => f.endsWith('.jsonl'));
+          for (const file of files) {
+            parseJsonlCost(join(projectDir, file));
+          }
+        } catch {
+          // Non-fatal
         }
       }
     }

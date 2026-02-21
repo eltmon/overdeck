@@ -111,16 +111,15 @@ async function updateLinearStatus(apiKey: string, issueIdentifier: string): Prom
 export async function approveCommand(id: string, options: ApproveOptions = {}): Promise<void> {
   const agentId = id.startsWith('agent-') ? id : `agent-${id.toLowerCase()}`;
 
-  // Self-approval guard: agents cannot approve their own work
+  // Agent guard: pan approve is a supervisor-only command.
+  // Agents must use `pan work done` to signal completion — approval is for humans only.
+  // This guard uses process.exit(1) rather than return so the agent sees a clear failure.
   const callingAgentId = process.env.PANOPTICON_AGENT_ID;
   if (callingAgentId) {
-    const callingIssueId = callingAgentId.replace(/^agent-/i, '').toLowerCase();
-    const targetIssueId = agentId.replace(/^agent-/i, '').toLowerCase();
-    if (callingIssueId === targetIssueId) {
-      console.log(chalk.red('Error: Agents cannot approve their own work.'));
-      console.log(chalk.dim('Approval must come from a human or a different specialist agent.'));
-      return;
-    }
+    console.error(chalk.red('ERROR: pan approve is a supervisor-only command.'));
+    console.error(chalk.red(`Agents MUST use: pan work done <issue-id> -c "summary"`));
+    console.error(chalk.dim(`You are running as agent: ${callingAgentId}`));
+    process.exit(1);
   }
 
   const state = getAgentState(agentId);
