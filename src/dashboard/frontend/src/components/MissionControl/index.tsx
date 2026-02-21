@@ -32,6 +32,12 @@ async function fetchCostsByIssue(): Promise<{ issues: IssueCostEntry[] }> {
   return res.json();
 }
 
+async function fetchVersion(): Promise<{ version: string }> {
+  const res = await fetch('/api/version');
+  if (!res.ok) throw new Error('Failed to fetch version');
+  return res.json();
+}
+
 interface MissionControlProps {
   issues?: Issue[];
 }
@@ -55,6 +61,12 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
     queryKey: ['costs-by-issue'],
     queryFn: fetchCostsByIssue,
     refetchInterval: 15000,
+  });
+
+  const { data: versionData } = useQuery({
+    queryKey: ['version'],
+    queryFn: fetchVersion,
+    staleTime: Infinity,
   });
 
   // Build title map from issues
@@ -148,6 +160,11 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
           </div>
 
           <DeaconStatus />
+          {versionData && (
+            <div className={styles.sidebarFooter}>
+              <span className={styles.versionLabel}>v{versionData.version}</span>
+            </div>
+          )}
         </div>
 
         {/* Resize Handle */}
