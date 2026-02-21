@@ -18,7 +18,17 @@ interface ProviderDef {
   models: ModelDef[];
 }
 
-// Models grouped by provider
+/**
+ * Models grouped by provider
+ *
+ * IMPORTANT: This list MUST be kept in sync with MODEL_CAPABILITIES in src/lib/model-capabilities.ts
+ * When adding new models to MODEL_CAPABILITIES, update this list as well.
+ *
+ * TODO: Consolidate to single source of truth by fetching from /api/settings/available-models
+ * and deriving tier/capabilities from backend skill scores. Currently maintained separately
+ * to preserve simplified capability taxonomy for UI (reasoning, code, etc.) vs backend's
+ * detailed skill dimensions (code-generation, code-review, debugging, etc.)
+ */
 export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
@@ -32,32 +42,33 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   openai: {
     name: 'OpenAI',
     models: [
+      { id: 'gpt-5.2-codex' as ModelId, name: 'GPT-5.2 Codex', icon: 'code', tier: 'premium', capabilities: ['reasoning', 'code', 'complex-math'], description: '80% SWE-bench, premium coding' },
+      { id: 'o3-deep-research' as ModelId, name: 'O3 Deep Research', icon: 'psychology', tier: 'premium', capabilities: ['reasoning', 'complex-math'], description: 'Deep reasoning model for debugging' },
       { id: 'gpt-4o' as ModelId, name: 'GPT-4o', icon: 'science', tier: 'balanced', capabilities: ['reasoning', 'code', 'vision'], description: 'Versatile multimodal model' },
-      { id: 'o1' as ModelId, name: 'o1', icon: 'psychology', tier: 'premium', capabilities: ['reasoning', 'complex-math'], description: 'Deep reasoning, slower responses' },
-      { id: 'o3-mini' as ModelId, name: 'o3-mini', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'reasoning', 'code'], description: 'Fast reasoning model' },
+      { id: 'gpt-4o-mini' as ModelId, name: 'GPT-4o Mini', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Budget option for simple tasks' },
     ],
   },
   google: {
     name: 'Google',
     models: [
-      { id: 'gemini-2.5-pro' as ModelId, name: 'Gemini 2.5 Pro', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: '1M context, great for large codebases' },
-      { id: 'gemini-2.5-flash' as ModelId, name: 'Gemini 2.5 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'reasoning'], description: 'Fast and affordable' },
+      { id: 'gemini-3-pro-preview' as ModelId, name: 'Gemini 3 Pro', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: '1M context, first >1500 Elo on LMArena' },
+      { id: 'gemini-3-flash-preview' as ModelId, name: 'Gemini 3 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Extremely fast with 1M context' },
+      { id: 'gemini-2.5-pro' as ModelId, name: 'Gemini 2.5 Pro', icon: 'model_training', tier: 'balanced', capabilities: ['reasoning', 'large-context', 'code'], description: 'Advanced reasoning, 1M context' },
+      { id: 'gemini-2.5-flash' as ModelId, name: 'Gemini 2.5 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Fast and efficient with large context' },
     ],
   },
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
-      { id: 'kimi-k2' as ModelId, name: 'Kimi K2', icon: 'token', tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Strong coding, 128K context' },
-      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding model, 256K context' },
+      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: 'model_training', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
+      { id: 'kimi-k2' as ModelId, name: 'Kimi K2', icon: 'token', tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Strong value, 65.8% SWE-bench, 128K context' },
     ],
   },
   zai: {
     name: 'Zhipu (GLM)',
     models: [
-      { id: 'glm-4-plus' as ModelId, name: 'GLM-4 Plus', icon: 'hub', tier: 'premium', capabilities: ['reasoning', 'code'], description: 'Flagship reasoning model' },
-      { id: 'glm-4-air' as ModelId, name: 'GLM-4 Air', icon: 'cloud', tier: 'balanced', capabilities: ['reasoning', 'code', 'efficiency'], description: 'Balanced speed and quality' },
-      { id: 'glm-4-flash' as ModelId, name: 'GLM-4 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Ultra-fast responses' },
-      { id: 'glm-4-long' as ModelId, name: 'GLM-4 Long', icon: 'format_list_bulleted', tier: 'balanced', capabilities: ['large-context', 'reasoning'], description: '1M token context window' },
+      { id: 'glm-4.7' as ModelId, name: 'GLM 4.7', icon: 'hub', tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Top open-source for agentic coding, 73.8% SWE-bench, 200K context' },
+      { id: 'glm-4.7-flash' as ModelId, name: 'GLM 4.7 Flash', icon: 'bolt', tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and affordable, good for quick iterations' },
     ],
   },
 };
