@@ -1,4 +1,4 @@
-# Planning Session: PAN-142
+# Planning Session: PAN-136
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,36 +22,39 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-142
-- **Title:** PAN-141: Remove opencode, codex, cursor, gemini sync targets - consolidate on Claude Code only
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/142
+- **ID:** PAN-136
+- **Title:** Fix pre-existing test failures (16 failures across multiple suites)
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/136
 
 ## Description
-## Summary
+## Problem
 
-We've decided to use Claude Code as the sole AI coding tool, with claude-code-router handling alternative models. The multi-runtime sync support (opencode, codex, cursor, gemini) is no longer needed and adds maintenance burden.
+There are 16 pre-existing test failures across multiple test suites that are unrelated to any specific feature branch. These failures cause the specialist handoff cycle to break - test-agent marks `testStatus: "failed"` even when all issue-specific tests pass, preventing the merge flow.
 
-## What to remove
+## Failing Suites (as of PAN-105 test run)
 
-- **`src/lib/paths.ts`**: Remove `CODEX_DIR`, `CURSOR_DIR`, `GEMINI_DIR`, `OPENCODE_DIR` and their `SYNC_TARGETS` entries. Keep only `claude`.
-- **`src/lib/sync.ts`**: Simplify — no longer need to handle multiple runtimes
-- **`src/cli/commands/sync.ts`**: Simplify runtime loop (or remove it entirely since there's only one target)
-- **`~/.panopticon/config.toml`**: `targets` field becomes unnecessary (always claude)
-- **Clean up `~/.opencode/skills/`** etc. — remove any synced symlinks
+These failures need investigation and fixing:
 
-## Context
+- `tests/lib/model-presets.test.ts` - Likely removed/refactored without updating tests
+- `tests/lib/router-config.test.ts` - Configuration test failures
+- `tests/lib/settings-api.test.ts` - Settings API test failures
+- Other suites with intermittent or stale test failures
 
-- Alternative models are accessed via [claude-code-router](https://github.com/musistudio/claude-code-router), not separate tools
-- opencode, codex, cursor, gemini targets were aspirational but we've standardized on Claude Code
-- Simplifying this reduces code surface and config confusion
-- The crash fixed in 843ad26 was caused by opencode being in config but not in SYNC_TARGETS — removing multi-target eliminates this class of bug entirely
+## Impact
 
-## Acceptance Criteria
+- Blocks the specialist workflow: review passes → test-agent reports "failed" → work agent loops trying to fix unrelated tests
+- Makes it impossible to distinguish real regressions from pre-existing issues
+- Forces manual merge intervention
 
-- [ ] Only `claude` sync target remains
-- [ ] Config `[sync].targets` is either removed or defaults to `["claude"]`
-- [ ] Synced symlinks in `~/.opencode/`, `~/.codex/`, `~/.cursor/`, `~/.gemini/` are cleaned up
-- [ ] Tests updated
+## Proposed Fix
+
+1. Run full test suite and catalog all failures
+2. Fix each failing test (update expectations, remove stale tests, fix broken assertions)
+3. Ensure CI passes with zero failures on main branch
+4. Consider adding a "known failures" baseline to test-agent so it can distinguish new regressions from pre-existing issues
+
+## Labels
+bug, testing, infrastructure
 
 ---
 

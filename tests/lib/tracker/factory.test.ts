@@ -1,9 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTracker, TrackerConfig } from '../../../src/lib/tracker/factory.js';
 import { LinearTracker } from '../../../src/lib/tracker/linear.js';
 import { GitHubTracker } from '../../../src/lib/tracker/github.js';
 import { GitLabTracker } from '../../../src/lib/tracker/gitlab.js';
 import { TrackerAuthError } from '../../../src/lib/tracker/interface.js';
+
+// Mock config-yaml to prevent filesystem reads
+vi.mock('../../../src/lib/config-yaml.js', () => ({
+  loadConfig: vi.fn(() => ({ trackerKeys: {} })),
+}));
 
 describe('createTracker', () => {
   const originalEnv = { ...process.env };
