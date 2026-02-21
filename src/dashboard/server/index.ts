@@ -44,9 +44,20 @@ import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigra
 import type { Issue } from '../frontend/src/types.js';
 
 // Read package version once at startup — version never changes at runtime
-const panopticonVersion: string = JSON.parse(
-  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json'), 'utf-8')
-).version;
+// In built output (dist/dashboard/server.js), import.meta.url resolves to dist/dashboard/,
+// so we need 2 levels up. In source (src/dashboard/server/), we'd need 3.
+// Try both to handle dev (tsx) and production (esbuild bundle).
+function readPackageVersion(): string {
+  const base = dirname(fileURLToPath(import.meta.url));
+  for (const levels of [['..', '..'], ['..', '..', '..']]) {
+    const candidate = join(base, ...levels, 'package.json');
+    try {
+      return JSON.parse(readFileSync(candidate, 'utf-8')).version;
+    } catch { /* try next */ }
+  }
+  return '0.0.0'; // fallback if neither path works
+}
+const panopticonVersion: string = readPackageVersion();
 
 // Load environment variables from ~/.panopticon.env at startup
 // This makes API keys available to the settings system
@@ -12633,17 +12644,35 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
         }
 
         // For running specialist phases, try to get live tmux output
+        // Only show live output if the specialist is ACTUALLY working on this issue.
+        // Specialists are shared (one tmux pane handles all issues), so we must verify
+        // the output mentions this issue. Also detect stale "running" entries (>30min
+        // without completion = specialist moved on or crashed).
         if (ss.status === 'running') {
-          const tmuxName = `specialist-${ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
-          try {
-            const { stdout } = await execAsync(
-              `tmux capture-pane -t ${tmuxName} -p -S -100 2>/dev/null || echo ""`,
-              { encoding: 'utf-8', timeout: 5000 }
-            );
-            if (stdout.trim()) {
-              transcriptParts.push(`\n--- Live Output ---\n${stdout.trim()}`);
-            }
-          } catch { /* specialist may not be running */ }
+          const ageMs = Date.now() - new Date(ss.startedAt).getTime();
+          const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+
+          if (ageMs > STALE_THRESHOLD_MS) {
+            // Stale specialist phase — mark as timed out, don't show unrelated live output
+            ss.status = 'completed';
+            transcriptParts[0] = `${ss.type.toUpperCase()} TIMED OUT (no result recorded)`;
+          } else {
+            const tmuxName = `specialist-${ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
+            try {
+              const { stdout } = await execAsync(
+                `tmux capture-pane -t ${tmuxName} -p -S -100 2>/dev/null || echo ""`,
+                { encoding: 'utf-8', timeout: 5000 }
+              );
+              const output = stdout.trim();
+              // Only include output if it mentions this issue (prevent cross-issue leakage)
+              if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
+                transcriptParts.push(`\n--- Live Output ---\n${output}`);
+              } else if (output) {
+                // Specialist is working on a different issue — show waiting message
+                transcriptParts.push(`\n--- Waiting ---\nSpecialist is processing another issue. Will update when it reaches ${issueId}.`);
+              }
+            } catch { /* specialist may not be running */ }
+          }
         }
 
         // Include notes (review findings, test results)
