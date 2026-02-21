@@ -36,11 +36,11 @@ describe('settings', () => {
       const { getDefaultSettings } = await import('../../src/lib/settings.js');
       const defaults = getDefaultSettings();
 
-      // Default is Kimi K2.5 for all work types
-      expect(defaults.models.specialists.review_agent).toBe('kimi-k2.5');
-      expect(defaults.models.specialists.test_agent).toBe('kimi-k2.5');
-      expect(defaults.models.specialists.merge_agent).toBe('kimi-k2.5');
-      expect(defaults.models.planning_agent).toBe('kimi-k2.5');
+      // Default model configuration per DEFAULT_SETTINGS
+      expect(defaults.models.specialists.review_agent).toBe('claude-opus-4-6');
+      expect(defaults.models.specialists.test_agent).toBe('claude-sonnet-4-6');
+      expect(defaults.models.specialists.merge_agent).toBe('claude-sonnet-4-6');
+      expect(defaults.models.planning_agent).toBe('claude-opus-4-6');
       expect(defaults.api_keys).toEqual({});
     });
 
@@ -48,12 +48,12 @@ describe('settings', () => {
       const { getDefaultSettings } = await import('../../src/lib/settings.js');
       const defaults = getDefaultSettings();
 
-      // All complexity levels default to Kimi K2.5
-      expect(defaults.models.complexity.trivial).toBe('kimi-k2.5');
-      expect(defaults.models.complexity.simple).toBe('kimi-k2.5');
+      // Complexity levels per DEFAULT_SETTINGS
+      expect(defaults.models.complexity.trivial).toBe('claude-haiku-4-5');
+      expect(defaults.models.complexity.simple).toBe('claude-haiku-4-5');
       expect(defaults.models.complexity.medium).toBe('kimi-k2.5');
       expect(defaults.models.complexity.complex).toBe('kimi-k2.5');
-      expect(defaults.models.complexity.expert).toBe('kimi-k2.5');
+      expect(defaults.models.complexity.expert).toBe('claude-opus-4-6');
     });
 
     it('should return a deep copy (not same reference)', async () => {
@@ -118,10 +118,10 @@ describe('settings', () => {
       expect(loaded.models.specialists.test_agent).toBe('gpt-4o-mini');
       expect(loaded.api_keys.openai).toBe('sk-test-key');
 
-      // Other values should be defaults (Kimi K2.5)
-      expect(loaded.models.specialists.review_agent).toBe('kimi-k2.5');
-      expect(loaded.models.planning_agent).toBe('kimi-k2.5');
-      expect(loaded.models.complexity.trivial).toBe('kimi-k2.5');
+      // Other values should be defaults per DEFAULT_SETTINGS
+      expect(loaded.models.specialists.review_agent).toBe('claude-opus-4-6');
+      expect(loaded.models.planning_agent).toBe('claude-opus-4-6');
+      expect(loaded.models.complexity.trivial).toBe('claude-haiku-4-5');
     });
 
     it('should handle invalid JSON gracefully', async () => {
@@ -207,15 +207,15 @@ describe('settings', () => {
       // User override should apply
       expect(loaded.models.complexity.expert).toBe('gpt-5.2-codex');
 
-      // Other complexity levels should be defaults (Kimi K2.5)
-      expect(loaded.models.complexity.trivial).toBe('kimi-k2.5');
-      expect(loaded.models.complexity.simple).toBe('kimi-k2.5');
+      // Other complexity levels should be defaults per DEFAULT_SETTINGS
+      expect(loaded.models.complexity.trivial).toBe('claude-haiku-4-5');
+      expect(loaded.models.complexity.simple).toBe('claude-haiku-4-5');
       expect(loaded.models.complexity.medium).toBe('kimi-k2.5');
       expect(loaded.models.complexity.complex).toBe('kimi-k2.5');
 
-      // Other sections should be defaults (Kimi K2.5)
-      expect(loaded.models.specialists.review_agent).toBe('kimi-k2.5');
-      expect(loaded.models.planning_agent).toBe('kimi-k2.5');
+      // Other sections should be defaults per DEFAULT_SETTINGS
+      expect(loaded.models.specialists.review_agent).toBe('claude-opus-4-6');
+      expect(loaded.models.planning_agent).toBe('claude-opus-4-6');
     });
   });
 
