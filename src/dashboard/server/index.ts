@@ -3198,6 +3198,20 @@ app.post('/api/deacon/patrol', async (_req, res) => {
 });
 
 // ============================================================================
+// Version API Endpoint (PAN-234)
+// ============================================================================
+
+app.get('/api/version', (_req, res) => {
+  try {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+    res.json({ version: pkg.version });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to read version: ' + error.message });
+  }
+});
+
+// ============================================================================
 // Metrics API Endpoints (PAN-33 Phase 6)
 // ============================================================================
 
