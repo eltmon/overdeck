@@ -20,6 +20,34 @@
 import { ModelId } from './settings.js';
 
 /**
+ * Model ID deprecation mapping
+ *
+ * Maps deprecated model IDs to their current replacements.
+ * When a model ID changes (e.g., claude-opus-4-5 → claude-opus-4-6),
+ * add the mapping here to enable automatic migration.
+ *
+ * Strategy: Single-hop only. When a newer version arrives (e.g., 4-7),
+ * add both old→new mappings (4-5→4-7 and 4-6→4-7).
+ */
+export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
+  'claude-opus-4-5': 'claude-opus-4-6',
+  'claude-sonnet-4-5': 'claude-sonnet-4-6',
+};
+
+/**
+ * Resolve a model ID to its current version
+ *
+ * If the model ID is deprecated, returns the replacement.
+ * Otherwise, returns the model ID unchanged.
+ *
+ * @param modelId - Model ID to resolve (may be deprecated)
+ * @returns Current model ID
+ */
+export function resolveModelId(modelId: string): ModelId {
+  return (MODEL_DEPRECATIONS[modelId] as ModelId) || (modelId as ModelId);
+}
+
+/**
  * Skill dimensions that models are evaluated on
  */
 export type SkillDimension =
