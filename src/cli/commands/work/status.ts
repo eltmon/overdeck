@@ -1,13 +1,27 @@
 import chalk from 'chalk';
-import { listRunningAgents } from '../../../lib/agents.js';
-import { isShadowed, getShadowState } from '../../../lib/shadow-state.js';
-import { getTldrMetrics, getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
+import { listRunningAgents, getAgentDir } from '../../../lib/agents.js';
+import { isShadowed, getShadowState } from '../../../lib/shadow-state.js';
+import { getTldrMetrics, getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 
 interface StatusOptions {
   json?: boolean;
   tldr?: boolean;
+  context?: boolean;
+}
+
+export function readContextPercent(agentId: string): number | null {
+  const ctxFile = join(getAgentDir(agentId), 'context-pct');
+  try {
+    if (existsSync(ctxFile)) {
+      const val = parseInt(readFileSync(ctxFile, 'utf8').trim(), 10);
+      return isNaN(val) ? null : val;
+    }
+  } catch {
+    // Non-fatal — context data is optional
+  }
+  return null;
 }
 
 export async function statusCommand(options: StatusOptions): Promise<void> {
@@ -22,16 +36,20 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   );
 
   if (options.json) {
-    // Add shadow mode info to JSON output
+    // Add shadow mode info and optional context % to JSON output
     const agentsWithShadow = agents.map(agent => {
       const shadowed = agent.issueId ? isShadowed(agent.issueId) : false;
       const shadowState = shadowed ? getShadowState(agent.issueId) : null;
-      return {
+      const result: Record<string, unknown> = {
         ...agent,
         shadowMode: shadowed,
         shadowStatus: shadowState?.shadowStatus,
         trackerStatus: shadowState?.trackerStatus,
       };
+      if (options.context) {
+        result.contextPercent = readContextPercent(agent.id);
+      }
+      return result;
     });
     console.log(JSON.stringify(agentsWithShadow, null, 2));
     return;
@@ -63,6 +81,12 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     if (shadowed && shadowState) {
       const statusStr = `${shadowState.shadowStatus}${shadowState.trackerStatus !== shadowState.shadowStatus ? ` (tracker: ${shadowState.trackerStatus})` : ''}`;
       console.log(`  Shadow:   ${chalk.cyan('👻')} ${statusStr}`);
+    }
+
+    if (options.context) {
+      const ctxPct = readContextPercent(agent.id);
+      const ctxStr = ctxPct !== null ? `${ctxPct}%` : '--';
+      console.log(`  Context:  ctx: ${ctxStr}`);
     }
 
     console.log(`  Runtime:  ${agent.runtime} (${agent.model})`);
