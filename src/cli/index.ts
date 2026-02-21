@@ -150,6 +150,7 @@ program
   .command('status')
   .description('Show running agents (shorthand for work status)')
   .option('--json', 'Output as JSON')
+  .option('--context', 'Show context window usage % for each agent')
   .action(statusCommand);
 
 // Dashboard commands

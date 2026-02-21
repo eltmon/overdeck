@@ -43,6 +43,7 @@ export function registerWorkCommands(program: Command): void {
     .command('status')
     .description('Show all running agents')
     .option('--json', 'Output as JSON')
+    .option('--context', 'Show context window usage % for each agent')
     .action(statusCommand);
 
   work
