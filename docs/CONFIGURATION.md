@@ -9,6 +9,7 @@ Complete guide to configuring Panopticon's multi-model routing system.
 - [Presets](#presets)
 - [Per-Work-Type Overrides](#per-work-type-overrides)
 - [Provider Management](#provider-management)
+- [Model Deprecation & Migration](#model-deprecation--migration)
 - [Fallback Strategy](#fallback-strategy)
 - [Examples](#examples)
 - [Precedence Rules](#precedence-rules)
@@ -298,6 +299,82 @@ models:
 
 # Result: gpt-5.2-codex → claude-sonnet-4-5 (fallback)
 ```
+
+---
+
+## Model Deprecation & Migration
+
+When model IDs change (e.g., `claude-opus-4-5` → `claude-opus-4-6`), Panopticon automatically migrates your configuration to use the current model IDs.
+
+### How It Works
+
+1. **Auto-Detection**: When you load settings (via Dashboard or CLI), Panopticon checks your model overrides against a deprecation mapping
+2. **Automatic Backup**: If deprecated models are found, `config.yaml.bak` is created before any changes
+3. **Silent Migration**: Deprecated model IDs are replaced with current equivalents in memory and on disk
+4. **Console Logging**: Migration actions are logged to the console
+5. **Dashboard Warnings**: The Settings page shows amber banners and toast notifications for deprecated models
+
+### Current Deprecations
+
+```yaml
+# Deprecated → Current
+claude-opus-4-5 → claude-opus-4-6
+claude-sonnet-4-5 → claude-sonnet-4-6
+```
+
+### Example Migration
+
+**Before** (`~/.panopticon/config.yaml`):
+```yaml
+models:
+  overrides:
+    issue-agent:planning: claude-opus-4-5      # deprecated
+    issue-agent:implementation: claude-sonnet-4-5  # deprecated
+```
+
+**After auto-migration**:
+```yaml
+models:
+  overrides:
+    issue-agent:planning: claude-opus-4-6
+    issue-agent:implementation: claude-sonnet-4-6
+```
+
+**Backup created**: `~/.panopticon/config.yaml.bak` (your original config, for safety)
+
+**Console output**:
+```
+✓ Backed up config.yaml → config.yaml.bak
+
+🔄 Model ID Migration:
+  issue-agent:planning: claude-opus-4-5 → claude-opus-4-6
+  issue-agent:implementation: claude-sonnet-4-5 → claude-sonnet-4-6
+```
+
+### Dashboard Behavior
+
+When you open the Settings page with deprecated model IDs:
+
+1. **Deprecation Banner**: Amber banner at the top showing all deprecated overrides
+2. **Toast Notification**: Warning toast prompting you to save to complete migration
+3. **Card Highlighting**: Agent cards with deprecated models show amber borders and "DEPRECATED" badge
+4. **Auto-Fix on Save**: Clicking "Save" automatically migrates to current model IDs
+
+### Strategy
+
+- **Single-Hop Only**: Deprecation mappings are updated with each new model version
+- **When 4.7 arrives**: Both `4-5→4-7` and `4-6→4-7` mappings will be added
+- **No Multi-Hop**: We don't chain `4-5→4-6→4-7`; each mapping is direct
+
+### Restoring from Backup
+
+If you need to restore your original configuration:
+
+```bash
+cp ~/.panopticon/config.yaml.bak ~/.panopticon/config.yaml
+```
+
+**Note**: The backup file is overwritten on each migration, so it always contains the most recent pre-migration state.
 
 ---
 
