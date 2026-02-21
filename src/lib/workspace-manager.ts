@@ -387,52 +387,71 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
-  // Setup TLDR daemon for workspace (after worktree creation to ensure directory is ready)
+  // Setup TLDR code analysis for workspace (after worktree creation to ensure directory is ready)
   try {
     // Check if python3 is available
     await execAsync('python3 --version');
     const venvPath = join(workspacePath, '.venv');
+    const tldrBin = join(venvPath, 'bin', 'tldr');
 
-    // Create Python virtual environment
-    await execAsync(`python3 -m venv "${venvPath}"`, { cwd: workspacePath });
-    const pipPath = join(venvPath, 'bin', 'pip');
+    // Check if main branch already has a working venv with llm-tldr
+    const mainVenvTldr = join(projectConfig.path, '.venv', 'bin', 'tldr');
+    const mainVenvExists = existsSync(mainVenvTldr);
 
-    // Install llm-tldr package
-    await execAsync(`"${pipPath}" install llm-tldr`, { cwd: workspacePath, timeout: 120000 });
-    result.steps.push('Created Python venv and installed llm-tldr');
+    if (mainVenvExists) {
+      // Copy the entire venv from main — faster than pip install (seconds vs 30s+)
+      await execAsync(`cp -a "${join(projectConfig.path, '.venv')}" "${venvPath}"`);
+      result.steps.push('Copied Python venv from main branch');
+    } else {
+      // Create fresh venv and install llm-tldr
+      await execAsync(`python3 -m venv "${venvPath}"`, { cwd: workspacePath });
+      const pipPath = join(venvPath, 'bin', 'pip');
+      await execAsync(`"${pipPath}" install llm-tldr`, { cwd: workspacePath, timeout: 120000 });
+      result.steps.push('Created Python venv and installed llm-tldr');
 
-    // Copy .tldr index from main branch if it exists
-    const mainWorkspacePath = workspaceConfig.type === 'monorepo'
-      ? projectConfig.path
-      : join(projectConfig.path, workspaceConfig.repos?.[0]?.path || '');
-    const mainTldrDir = join(mainWorkspacePath, '.tldr');
-    const workspaceTldrDir = join(workspacePath, '.tldr');
-
-    if (existsSync(mainTldrDir)) {
-      await execAsync(`cp -r "${mainTldrDir}" "${workspaceTldrDir}"`);
-      result.steps.push('Copied TLDR index from main branch');
+      // Apply .tsx/.jsx support patch (upstream llm-tldr only checks .ts)
+      const patchScript = join(projectConfig.path, 'scripts', 'patches', 'llm-tldr-tsx-support.py');
+      if (existsSync(patchScript)) {
+        await execAsync(`python3 "${patchScript}" "${venvPath}"`);
+        result.steps.push('Applied llm-tldr .tsx/.jsx patch');
+      }
     }
 
-    // Start TLDR daemon for this workspace
-    const { getTldrDaemonService } = await import('./tldr-daemon.js');
-    const tldrService = getTldrDaemonService(workspacePath, venvPath);
-    await tldrService.start(true);
-    result.steps.push('Started TLDR daemon');
+    // Verify tldr binary exists after setup
+    if (!existsSync(tldrBin)) {
+      result.steps.push('TLDR setup incomplete: tldr binary not found after venv creation');
+    } else {
+      // Copy .tldr index from main branch if it exists
+      const mainTldrDir = join(projectConfig.path, '.tldr');
+      const workspaceTldrDir = join(workspacePath, '.tldr');
 
-    // Warm the index in the background — ensures workspaces always have a working index
-    // even when the main branch cache was empty (nothing to copy)
-    try {
-      await tldrService.warm(true);  // background=true: non-blocking
-      result.steps.push('TLDR index warm initiated (background)');
-    } catch {
-      // Non-fatal — daemon may not support warm yet
+      if (existsSync(mainTldrDir)) {
+        await execAsync(`cp -r "${mainTldrDir}" "${workspaceTldrDir}"`);
+        result.steps.push('Copied TLDR index from main branch');
+      }
+
+      // Start TLDR daemon for this workspace
+      const { getTldrDaemonService } = await import('./tldr-daemon.js');
+      const tldrService = getTldrDaemonService(workspacePath, venvPath);
+      await tldrService.start(true);
+      result.steps.push('Started TLDR daemon');
+
+      // Warm the index in the background — ensures workspaces always have a working index
+      // even when the main branch cache was empty (nothing to copy)
+      try {
+        await tldrService.warm(true);  // background=true: non-blocking
+        result.steps.push('TLDR index warm initiated (background)');
+      } catch {
+        // Non-fatal — daemon may not support warm yet
+      }
     }
   } catch (error: any) {
-    // TLDR setup is optional - don't fail workspace creation if it doesn't work
+    // TLDR setup is optional — don't fail workspace creation, but log clearly
     if (error.message?.includes('python3')) {
       result.steps.push('Skipped TLDR setup (python3 not available)');
     } else {
-      result.steps.push(`TLDR setup failed (non-critical): ${error.message}`);
+      console.warn(`⚠ TLDR setup failed: ${error.message}`);
+      result.steps.push(`TLDR setup failed: ${error.message}`);
     }
   }
 

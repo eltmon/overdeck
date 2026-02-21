@@ -92,9 +92,17 @@ Intercepts file reads and returns TLDR summaries for large code files.
 - Reads with `offset` or `limit` (targeted reads for editing)
 - Non-code files (.json, .md, .yaml, etc.)
 - No `.venv` in the project tree
-- TLDR command failure
+- TLDR command failure (graceful degradation)
+- Sparse summaries (< 100 tokens for files > 5KB) where both `context` and `extract` produce insufficient content (e.g., test files with `describe`/`it` blocks)
 
 **Behavior**: Returns a `deny` permission decision with TLDR context as `additionalContext`. Claude sees the summary and can then do a targeted read if it needs exact content.
+
+**Fallback chain**:
+1. `tldr context <module-path> --lang <language>` — primary (uses call graph, line numbers)
+2. If context fails or is sparse → `tldr extract <file-path>` — secondary (works on all file paths including `.tsx`)
+3. If extract also returns 0 functions/classes → bypass entirely (allow normal read)
+
+**Import formatting**: Raw JSON from `tldr imports` is formatted into readable `import { ... } from "..."` statements.
 
 ### 2. Post-Edit Notify (`PostToolUse` on `Edit|Write`)
 
@@ -139,14 +147,22 @@ pan tldr warm feature-pan-173
 ### Direct TLDR CLI
 
 ```bash
-# From any workspace or project root
-.venv/bin/tldr context src/lib/agents.ts
+# context expects MODULE PATHS (no extension) and explicit --lang
+.venv/bin/tldr context src/lib/agents --lang typescript
+.venv/bin/tldr context src/lib/config --lang typescript
+
+# extract works on FILE PATHS (with extension) — fallback for .tsx
+.venv/bin/tldr extract src/dashboard/frontend/src/components/App.tsx
+
+# Other commands
 .venv/bin/tldr structure src/lib/
-.venv/bin/tldr calls src/lib/agents.ts
-.venv/bin/tldr impact spawnAgent src/lib/agents.ts
-.venv/bin/tldr semantic "agent lifecycle management"
+.venv/bin/tldr calls src/lib/agents.ts --lang typescript
+.venv/bin/tldr impact spawnAgent src/lib/agents.ts --lang typescript
+.venv/bin/tldr imports src/lib/agents.ts --lang typescript
 .venv/bin/tldr warm .
 ```
+
+**Important**: `context` expects module paths WITHOUT extension (e.g., `src/lib/agents` not `src/lib/agents.ts`). Passing a file path with `.ts` silently returns a near-empty "~25 tokens" result. The `--lang` flag defaults to `python` — always pass `--lang typescript` for TypeScript projects.
 
 ## Dashboard API
 
@@ -183,11 +199,99 @@ Gitignore-syntax file controlling what gets indexed. Default excludes: `node_mod
 
 ## Token Savings
 
-| Scenario | Without TLDR | With TLDR | Savings |
-|----------|-------------|-----------|---------|
-| Understand 1 file | 15,000 tokens | 800 tokens | 95% |
-| Explore 20 files | 300,000 tokens | 16,000 tokens | 95% |
-| Typical session (explore + edit) | 300,000+ tokens | 61,000 tokens | 80% |
+### Full Codebase Analysis (2026-02-21)
+
+Measured across the entire Panopticon CLI codebase (243 code files > 3KB) with llm-tldr v1.5.2 + tsx patch. Token counts approximate (1 token ~ 4 chars).
+
+#### Summary
+
+| Metric | Value |
+|--------|-------|
+| Code files analyzed | 243 |
+| Files intercepted (TLDR summary) | 206 (85%) |
+| Files bypassed (full read) | 37 (15%) |
+| Tokens without TLDR (intercepted files) | 704,342 |
+| Tokens with TLDR (intercepted files) | 82,907 |
+| **Tokens saved** | **621,435 (88.2%)** |
+| Project-wide savings (including bypassed) | 76.4% |
+
+#### Method Breakdown
+
+| Method | Files | Notes |
+|--------|-------|-------|
+| `context` (primary) | 174 | Full call graph, line numbers, depth traversal |
+| `extract` (fallback) | 32 | For .tsx files and modules not in call graph |
+| Bypassed | 37 | Test files (sparse), CLI entry points |
+
+#### Per-File Results (top 15 by savings)
+
+| File | Raw Tokens | TLDR Tokens | Savings | Functions |
+|------|------------|-------------|---------|-----------|
+| `server/index.ts` | 129,582 | 2,850 | 97.8% | 57 |
+| `WorkspacePanel.tsx` | 18,575 | 492 | 97.4% | 10 |
+| `KanbanBoard.tsx` | 19,222 | 1,215 | 93.7% | 25 |
+| `specialists.ts` | 18,501 | 2,748 | 85.1% | 62 |
+| `IssueDetailPanel.tsx` | 13,369 | 366 | 97.3% | 6 |
+| `deacon.ts` | 12,227 | 1,162 | 90.5% | 30 |
+| `SettingsPage.tsx` | 11,217 | 356 | 96.8% | 6 |
+| `workspace.ts` (CLI) | 11,747 | 909 | 92.3% | 14 |
+| `merge-agent.ts` | 11,133 | 810 | 92.7% | 14 |
+| `workspace-manager.ts` | 7,726 | 813 | 89.5% | 12 |
+| `issue-data-service.ts` | 8,133 | 1,224 | 85.0% | 30 |
+| `agents.ts` | 7,506 | 1,202 | 84.0% | 28 |
+| `cloister/service.ts` | 9,032 | 2,248 | 75.1% | 55 |
+| `workspace-migrate.ts` | 8,436 | 844 | 90.0% | 11 |
+| `issue.ts` (CLI) | 5,429 | 951 | 82.5% | 12 |
+
+#### Typical Agent Session Impact
+
+| Session Size | Without TLDR | With TLDR | Savings |
+|-------------|-------------|-----------|---------|
+| Quick task (10 files) | ~34,000 tokens | ~4,000 tokens | 88% |
+| Standard task (20 files) | ~68,000 tokens | ~8,000 tokens | 88% |
+| Large task (40 files) | ~137,000 tokens | ~16,000 tokens | 88% |
+
+#### Cost Savings
+
+Per full codebase exploration (all 206 intercepted files read once):
+
+| Model | Without TLDR | With TLDR | Saved |
+|-------|-------------|-----------|-------|
+| Sonnet 4.6 ($3/M input) | $2.11 | $0.25 | **$1.86** |
+| Opus 4.6 ($15/M input) | $10.57 | $1.24 | **$9.32** |
+
+For a typical agent session reading 20 files:
+
+| Model | Without TLDR | With TLDR | Saved |
+|-------|-------------|-----------|-------|
+| Sonnet 4.6 | $0.21 | $0.02 | **$0.18** |
+| Opus 4.6 | $1.03 | $0.12 | **$0.90** |
+
+At 10 agent sessions per day, that's **$1.80-$9.00/day** saved on input tokens alone.
+
+### Hook Performance
+
+Hook execution adds 150-330ms per read, negligible relative to API round-trip times (2-10s).
+
+| File Size | Latency |
+|-----------|---------|
+| 6-10 KB | ~180ms |
+| 30 KB | ~220ms |
+| 500+ KB | ~330ms |
+
+### Quality Gates
+
+The read-enforcer applies quality gates to prevent useless summaries:
+
+| Condition | Behavior |
+|-----------|----------|
+| File < 3 KB | Bypass (full read) |
+| Non-code file (.json, .md, etc.) | Bypass (full read) |
+| Read with offset/limit | Bypass (targeted edit read) |
+| No .venv ancestor | Bypass (TLDR not available) |
+| Context < 100 tokens for file > 5 KB | Fallback to `extract`, bypass if extract also empty |
+| .tsx files | Full support via patched llm-tldr (upstream PR #53 pending) |
+| Test files (describe/it blocks, no functions) | Bypass (full read) — tree-sitter can't extract test structure |
 
 ## Troubleshooting
 
@@ -198,6 +302,10 @@ Gitignore-syntax file controlling what gets indexed. Default excludes: `node_mod
 | `tldr: command not found` | Not in venv | Use `.venv/bin/tldr` or activate venv |
 | Stale index (old file count) | Edits didn't trigger re-warm | `pan tldr warm` or edit 10+ files to trigger auto-warm |
 | Daemon not starting | PID file stale | Delete `~/.panopticon/tldr/*/daemon.json` and restart |
+| `.tsx` files get "Module not found" | Upstream llm-tldr `_get_module_exports()` only checks `.ts` | Fixed by local patch (`scripts/patches/llm-tldr-tsx-support.py`); upstream PR [#53](https://github.com/parcadei/llm-tldr/pull/53) pending |
+| Context returns "~25 tokens" | Module path includes file extension | Pass without extension: `src/lib/agents` not `src/lib/agents.ts` |
+| Context returns "~25 tokens" | Language defaults to Python | Pass `--lang typescript` explicitly |
+| Test files not summarized | tree-sitter doesn't extract `describe`/`it` blocks | By design: sparse summaries bypass to full read |
 
 ## Files
 

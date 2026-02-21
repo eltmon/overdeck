@@ -9,6 +9,8 @@
 #   - Non-code files (configs, docs, json, etc.)
 #   - No .venv available (TLDR not installed)
 #   - TLDR command fails (graceful degradation)
+#   - Summary too sparse to be useful (< 100 tokens for file > 5KB)
+#   - Recently edited files (in .tldr/dirty-files — agent needs to verify changes)
 
 # Don't use set -e — never break Claude Code execution
 INPUT=$(cat 2>/dev/null || echo '{}')
@@ -74,17 +76,164 @@ fi
 # Get relative path from project root
 REL_PATH="${FILE_PATH#$PROJECT_DIR/}"
 
-# Try to get TLDR context for this file
-TLDR_OUTPUT=$("$TLDR_BIN" context "$REL_PATH" 2>/dev/null)
-TLDR_EXIT=$?
-
-# Bypass: TLDR failed — allow normal read
-if [ $TLDR_EXIT -ne 0 ] || [ -z "$TLDR_OUTPUT" ]; then
+# Bypass: recently edited files (agent needs to verify its own changes)
+# The post-edit hook tracks edits in .tldr/dirty-files
+DIRTY_FILE="$PROJECT_DIR/.tldr/dirty-files"
+if [ -f "$DIRTY_FILE" ] && grep -qxF "$REL_PATH" "$DIRTY_FILE" 2>/dev/null; then
   exit 0
 fi
 
-# Also get structure for additional context
-TLDR_STRUCTURE=$("$TLDR_BIN" calls "$REL_PATH" 2>/dev/null || true)
+# Detect language from extension for tldr --lang flag
+case "$EXT_LOWER" in
+  ts|tsx)      TLDR_LANG="typescript" ;;
+  js|jsx)      TLDR_LANG="javascript" ;;
+  py)          TLDR_LANG="python" ;;
+  go)          TLDR_LANG="go" ;;
+  rs)          TLDR_LANG="rust" ;;
+  java|kt)     TLDR_LANG="java" ;;
+  rb)          TLDR_LANG="ruby" ;;
+  *)           TLDR_LANG="python" ;;
+esac
+
+# Strip file extension — tldr context expects module paths without extension
+# e.g., "src/lib/agents" not "src/lib/agents.ts"
+MODULE_PATH="${REL_PATH%.*}"
+
+# Try to get TLDR context for this file (module path mode)
+TLDR_OUTPUT=$("$TLDR_BIN" context "$MODULE_PATH" --lang "$TLDR_LANG" 2>/dev/null)
+TLDR_EXIT=$?
+
+# Quality gate: check if context output is too sparse to be useful.
+# Pattern: "~XX tokens" where XX < 100 means the summary captured almost nothing.
+# This happens with test files (describe/it blocks) and type-only files.
+CONTEXT_SPARSE=false
+if [ $TLDR_EXIT -eq 0 ] && [ -n "$TLDR_OUTPUT" ]; then
+  CTX_TOKENS=$(echo "$TLDR_OUTPUT" | grep -oP '\~\K\d+(?= tokens)' || echo "0")
+  if [ "$CTX_TOKENS" -lt 100 ] && [ "$FILE_SIZE" -gt 5120 ]; then
+    CONTEXT_SPARSE=true
+  fi
+fi
+
+# Fallback: if context failed, was sparse, or empty — try extract command
+# extract works on actual file paths (including .tsx) and returns structured JSON
+if [ $TLDR_EXIT -ne 0 ] || [ -z "$TLDR_OUTPUT" ] || [ "$CONTEXT_SPARSE" = true ]; then
+  EXTRACT_JSON=$("$TLDR_BIN" extract "$REL_PATH" 2>/dev/null)
+  EXTRACT_EXIT=$?
+  if [ $EXTRACT_EXIT -eq 0 ] && [ -n "$EXTRACT_JSON" ]; then
+    # Check if extract found any real content
+    EXTRACT_COUNTS=$(echo "$EXTRACT_JSON" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    nf = len(d.get('functions', []))
+    nc = len(d.get('classes', []))
+    print(f'{nf} {nc}')
+except:
+    print('0 0')
+" 2>/dev/null)
+    EXTRACT_FUNCS=$(echo "$EXTRACT_COUNTS" | cut -d' ' -f1)
+    EXTRACT_CLASSES=$(echo "$EXTRACT_COUNTS" | cut -d' ' -f2)
+
+    # If extract also found nothing useful, bypass entirely
+    if [ "${EXTRACT_FUNCS:-0}" -eq 0 ] && [ "${EXTRACT_CLASSES:-0}" -eq 0 ]; then
+      # Neither context nor extract found useful content — let the agent read the file
+      exit 0
+    fi
+
+    # Convert extract JSON to a readable summary with language-appropriate syntax
+    TLDR_OUTPUT=$(echo "$EXTRACT_JSON" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    lang = '$TLDR_LANG'
+    lines = []
+    fname = data.get('file_path', '$REL_PATH')
+    short = fname.split('/')[-1]
+    lines.append(f'## Code Context: {fname}')
+    lines.append('')
+
+    # Language-appropriate function keyword
+    fn_kw = {'typescript': 'function', 'javascript': 'function', 'python': 'def',
+             'go': 'func', 'rust': 'fn', 'java': '', 'ruby': 'def'}.get(lang, 'function')
+
+    for func in data.get('functions', []):
+        name = func.get('name', '?')
+        params = ', '.join(
+            p.get('name','') + (': ' + p.get('type','') if p.get('type') else '')
+            for p in func.get('parameters', [])
+        )
+        ret = func.get('return_type', '')
+        doc = (func.get('docstring') or '')[:80]
+        line = func.get('start_line') or '?'
+        sig = f'{fn_kw} {name}({params})'.strip()
+        if ret:
+            if lang in ('typescript', 'javascript', 'go', 'rust'):
+                sig += f': {ret}'
+            else:
+                sig += f' -> {ret}'
+        lines.append(f'{name} ({short}:{line})')
+        lines.append(f'   {sig}')
+        if doc:
+            lines.append(f'   // {doc}')
+        lines.append('')
+
+    for cls in data.get('classes', []):
+        name = cls.get('name', '?')
+        line = cls.get('start_line') or '?'
+        lines.append(f'class {name} ({short}:{line})')
+        for m in cls.get('methods', []):
+            mname = m.get('name', '?')
+            lines.append(f'   .{mname}()')
+        lines.append('')
+
+    nfunc = len(data.get('functions', []))
+    ncls = len(data.get('classes', []))
+    lines.append(f'---')
+    lines.append(f'{nfunc} functions, {ncls} classes (via extract)')
+    print('\n'.join(lines))
+except:
+    pass
+" 2>/dev/null)
+  fi
+fi
+
+# Bypass: both context and extract failed or produced nothing useful
+if [ -z "$TLDR_OUTPUT" ]; then
+  exit 0
+fi
+
+# Also get the file's imports and format them
+TLDR_IMPORTS_RAW=$("$TLDR_BIN" imports "$REL_PATH" --lang "$TLDR_LANG" 2>/dev/null || true)
+TLDR_IMPORTS=""
+if [ -n "$TLDR_IMPORTS_RAW" ]; then
+  TLDR_IMPORTS=$(echo "$TLDR_IMPORTS_RAW" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    lines = []
+    for imp in data:
+        mod = imp.get('module', '?')
+        names = imp.get('names', [])
+        default = imp.get('default')
+        parts = []
+        if default:
+            parts.append(default)
+        if names:
+            parts.append('{ ' + ', '.join(names) + ' }')
+        if parts:
+            lines.append(f'import {', '.join(parts)} from \"{mod}\"')
+        else:
+            lines.append(f'import \"{mod}\"')
+    print('\n'.join(lines))
+except:
+    # If JSON parsing fails, use raw output (may already be formatted)
+    sys.stdout.write(sys.stdin.read() if hasattr(sys, '_raw') else '')
+" 2>/dev/null)
+  # If Python formatting failed, fall back to raw
+  if [ -z "$TLDR_IMPORTS" ]; then
+    TLDR_IMPORTS="$TLDR_IMPORTS_RAW"
+  fi
+fi
 
 # Build the summary that Claude will see instead of the raw file
 SUMMARY="[TLDR Summary — ${FILE_SIZE} bytes saved from context]
@@ -94,11 +243,11 @@ File: ${FILE_PATH}
 ## Structure & Exports
 ${TLDR_OUTPUT}"
 
-if [ -n "$TLDR_STRUCTURE" ]; then
+if [ -n "$TLDR_IMPORTS" ]; then
   SUMMARY="${SUMMARY}
 
-## Call Graph
-${TLDR_STRUCTURE}"
+## Imports
+${TLDR_IMPORTS}"
 fi
 
 SUMMARY="${SUMMARY}
