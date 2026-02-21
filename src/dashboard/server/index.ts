@@ -40,7 +40,7 @@ import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
-import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents } from '../../lib/costs/index.js';
+import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
 import type { Issue } from '../frontend/src/types.js';
 
 // Load environment variables from ~/.panopticon.env at startup
@@ -4794,27 +4794,6 @@ app.get('/api/agents/:id/cost', (req, res) => {
   } catch (error: any) {
     console.error('Error getting agent cost:', error);
     res.status(500).json({ error: 'Failed to get agent cost: ' + error.message });
-  }
-});
-
-// Get cost summary
-app.get('/api/costs/summary', (req, res) => {
-  try {
-    // TODO: Aggregate costs from all agents
-    res.json({
-      totalCost: 0,
-      byModel: {
-        opus: 0,
-        sonnet: 0,
-        haiku: 0,
-      },
-      byAgent: {},
-      today: 0,
-      thisWeek: 0,
-    });
-  } catch (error: any) {
-    console.error('Error getting cost summary:', error);
-    res.status(500).json({ error: 'Failed to get cost summary: ' + error.message });
   }
 });
 
@@ -11187,6 +11166,21 @@ app.post('/api/costs/rebuild', async (_req, res) => {
   } catch (error: any) {
     console.error('Error rebuilding cost cache:', error);
     res.status(500).json({ error: 'Failed to rebuild cost cache: ' + error.message });
+  }
+});
+
+// POST /api/costs/deduplicate - Remove duplicate events from events.jsonl (PAN-220)
+app.post('/api/costs/deduplicate', (_req, res) => {
+  try {
+    const removed = deduplicateEvents();
+    res.json({
+      success: true,
+      message: `Deduplication complete: ${removed} duplicate event${removed !== 1 ? 's' : ''} removed`,
+      removed,
+    });
+  } catch (error: any) {
+    console.error('Error deduplicating cost events:', error);
+    res.status(500).json({ error: 'Failed to deduplicate cost events: ' + error.message });
   }
 });
 
