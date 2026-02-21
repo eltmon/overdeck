@@ -1,0 +1,72 @@
+#!/bin/bash
+# ~/.panopticon/bin/tldr-post-edit
+# PostToolUse hook on Edit/Write — notifies TLDR to re-warm after code changes.
+#
+# Tracks dirty files in a lightweight file. When the dirty count exceeds a
+# threshold, triggers a background re-warm so the index stays fresh.
+
+# Don't use set -e — never break Claude Code execution
+INPUT=$(cat 2>/dev/null || echo '{}')
+
+# Only act on Edit and Write tools
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+if [ "$TOOL_NAME" != "Edit" ] && [ "$TOOL_NAME" != "Write" ]; then
+  exit 0
+fi
+
+# Extract file path
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""' 2>/dev/null)
+if [ -z "$FILE_PATH" ]; then
+  exit 0
+fi
+
+# Only track code files
+EXT="${FILE_PATH##*.}"
+EXT_LOWER=$(echo "$EXT" | tr '[:upper:]' '[:lower:]')
+case "$EXT_LOWER" in
+  ts|tsx|js|jsx|py|java|go|rs|cpp|c|h|hpp|rb|php|kt|swift|cs|scala|lua|ex|exs)
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+# Find project root (where .venv lives)
+PROJECT_DIR=""
+DIR="$(dirname "$FILE_PATH")"
+while [ "$DIR" != "/" ]; do
+  if [ -d "$DIR/.venv" ]; then
+    PROJECT_DIR="$DIR"
+    break
+  fi
+  DIR=$(dirname "$DIR")
+done
+
+if [ -z "$PROJECT_DIR" ]; then
+  exit 0
+fi
+
+# Track dirty files
+DIRTY_FILE="$PROJECT_DIR/.tldr/dirty-files"
+mkdir -p "$PROJECT_DIR/.tldr" 2>/dev/null || true
+
+# Append the changed file (deduplicated on warm)
+REL_PATH="${FILE_PATH#$PROJECT_DIR/}"
+echo "$REL_PATH" >> "$DIRTY_FILE" 2>/dev/null || true
+
+# Count dirty files (fast line count)
+DIRTY_COUNT=$(wc -l < "$DIRTY_FILE" 2>/dev/null || echo 0)
+
+# Trigger background re-warm after 10 edits (keeps index reasonably fresh)
+WARM_THRESHOLD=10
+if [ "$DIRTY_COUNT" -ge "$WARM_THRESHOLD" ]; then
+  TLDR_BIN="$PROJECT_DIR/.venv/bin/tldr"
+  if [ -x "$TLDR_BIN" ]; then
+    # Clear dirty tracking before warm
+    : > "$DIRTY_FILE" 2>/dev/null || true
+    # Background warm — non-blocking
+    (cd "$PROJECT_DIR" && "$TLDR_BIN" warm . --background) >/dev/null 2>&1 &
+  fi
+fi
+
+exit 0

@@ -418,6 +418,15 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     const tldrService = getTldrDaemonService(workspacePath, venvPath);
     await tldrService.start(true);
     result.steps.push('Started TLDR daemon');
+
+    // Warm the index in the background — ensures workspaces always have a working index
+    // even when the main branch cache was empty (nothing to copy)
+    try {
+      await tldrService.warm(true);  // background=true: non-blocking
+      result.steps.push('TLDR index warm initiated (background)');
+    } catch {
+      // Non-fatal — daemon may not support warm yet
+    }
   } catch (error: any) {
     // TLDR setup is optional - don't fail workspace creation if it doesn't work
     if (error.message?.includes('python3')) {

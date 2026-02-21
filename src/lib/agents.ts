@@ -495,6 +495,22 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Auto-setup hooks if not configured
   checkAndSetupHooks();
 
+  // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal)
+  try {
+    const venvPath = join(options.workspace, '.venv');
+    if (existsSync(venvPath)) {
+      const { getTldrDaemonService } = await import('./tldr-daemon.js');
+      const tldrService = getTldrDaemonService(options.workspace, venvPath);
+      const status = await tldrService.getStatus();
+      if (!status.running) {
+        await tldrService.start(true);
+        console.log(`[${agentId}] Started TLDR daemon for workspace`);
+      }
+    }
+  } catch {
+    // Non-fatal — agents degrade to direct file reads if TLDR unavailable
+  }
+
   // Write initial task cache for heartbeat hook
   writeTaskCache(agentId, options.issueId);
 

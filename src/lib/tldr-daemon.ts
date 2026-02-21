@@ -311,8 +311,8 @@ export class TldrDaemonService {
 
     try {
       const cmd = background
-        ? `cd "${this.workspacePath}" && "${tldrBin}" index --all >/dev/null 2>&1 &`
-        : `cd "${this.workspacePath}" && "${tldrBin}" index --all`;
+        ? `cd "${this.workspacePath}" && "${tldrBin}" warm . >/dev/null 2>&1 &`
+        : `cd "${this.workspacePath}" && "${tldrBin}" warm .`;
 
       await execAsync(cmd);
       console.log(`✓ TLDR index warming initiated for ${this.workspacePath}`);
