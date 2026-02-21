@@ -1,4 +1,4 @@
-import { useQuery } from '@tantml:react-query';
+import { useQuery } from '@tanstack/react-query';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 interface TldrDaemonStatus {

@@ -148,3 +148,7 @@ Agent needs to understand auth.ts
 ### Cloister Integration
 - `src/lib/cloister/merge-agent.ts` — Notify main daemon after merge
 - `src/lib/cloister/specialists.ts` — Configure TLDR MCP for specialists
+
+## Specialist Feedback
+
+- **[2026-02-21T04:32Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
