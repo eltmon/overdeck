@@ -12,12 +12,19 @@ interface HookConfig {
   }>;
 }
 
+interface McpServer {
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
 interface ClaudeSettings {
   hooks?: {
     PreToolUse?: HookConfig[];
     PostToolUse?: HookConfig[];
     Stop?: HookConfig[];
   };
+  mcpServers?: Record<string, McpServer>;
   [key: string]: any;
 }
 
@@ -195,8 +202,46 @@ export async function setupHooksCommand(): Promise<void> {
     }
   }
 
-  // 5. Check if hooks are already configured
+  // 5. Check Python3 availability for TLDR
+  let python3Available = false;
+  try {
+    execSync('python3 --version', { stdio: 'pipe' });
+    python3Available = true;
+    console.log(chalk.green('✓ Python3 is available for TLDR'));
+  } catch {
+    console.log(chalk.yellow('⚠ Python3 not found - TLDR integration will be unavailable'));
+    console.log(chalk.dim('  Install Python3 to enable token-efficient code analysis\n'));
+  }
+
+  // 6. Configure TLDR MCP server (before hooks check so existing users get TLDR)
+  let tldrConfigured = false;
+  if (python3Available) {
+    if (!settings.mcpServers) {
+      settings.mcpServers = {};
+    }
+
+    // Check if tldr MCP server is already configured
+    if (settings.mcpServers.tldr) {
+      console.log(chalk.cyan('✓ TLDR MCP server already configured'));
+    } else {
+      // Add tldr MCP server configuration
+      // Relative paths (.venv/bin/tldr-mcp and .) resolve from Claude Code's working directory
+      settings.mcpServers.tldr = {
+        command: '.venv/bin/tldr-mcp',
+        args: ['--project', '.']
+      };
+      console.log(chalk.green('✓ Configured TLDR MCP server'));
+      tldrConfigured = true;
+    }
+  }
+
+  // 7. Check if hooks are already configured
   if (hooksAlreadyConfigured(settings, binDir)) {
+    // If we just configured TLDR, save settings before returning
+    if (tldrConfigured) {
+      writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      console.log(chalk.green('✓ Updated Claude Code settings.json with TLDR MCP server'));
+    }
     console.log(chalk.cyan('\n✓ Panopticon hooks already configured'));
     console.log(chalk.dim('  No changes needed\n'));
     return;
@@ -249,16 +294,21 @@ export async function setupHooksCommand(): Promise<void> {
     ]
   });
 
-  // 7. Write updated settings
+  // 8. Write updated settings
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   console.log(chalk.green('✓ Updated Claude Code settings.json'));
 
-  // 8. Success message
+  // 9. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));
   console.log(chalk.dim('Claude Code hooks are now configured:'));
   console.log(chalk.dim('  • PreToolUse  - Sets agent state to "active"'));
   console.log(chalk.dim('  • PostToolUse - Logs activity to activity.jsonl'));
-  console.log(chalk.dim('  • Stop       - Sets agent state to "idle"\n'));
+  console.log(chalk.dim('  • Stop       - Sets agent state to "idle"'));
+  if (python3Available) {
+    console.log(chalk.dim('  • TLDR MCP    - Token-efficient code analysis\n'));
+  } else {
+    console.log('');
+  }
   console.log(chalk.dim('When you run agents via `pan work issue`, they will report'));
   console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));
 }

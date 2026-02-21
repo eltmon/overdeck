@@ -387,6 +387,46 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
+  // Setup TLDR daemon for workspace (after worktree creation to ensure directory is ready)
+  try {
+    // Check if python3 is available
+    await execAsync('python3 --version');
+    const venvPath = join(workspacePath, '.venv');
+
+    // Create Python virtual environment
+    await execAsync(`python3 -m venv "${venvPath}"`, { cwd: workspacePath });
+    const pipPath = join(venvPath, 'bin', 'pip');
+
+    // Install llm-tldr package
+    await execAsync(`"${pipPath}" install llm-tldr`, { cwd: workspacePath, timeout: 120000 });
+    result.steps.push('Created Python venv and installed llm-tldr');
+
+    // Copy .tldr index from main branch if it exists
+    const mainWorkspacePath = workspaceConfig.type === 'monorepo'
+      ? projectConfig.path
+      : join(projectConfig.path, workspaceConfig.repos?.[0]?.path || '');
+    const mainTldrDir = join(mainWorkspacePath, '.tldr');
+    const workspaceTldrDir = join(workspacePath, '.tldr');
+
+    if (existsSync(mainTldrDir)) {
+      await execAsync(`cp -r "${mainTldrDir}" "${workspaceTldrDir}"`);
+      result.steps.push('Copied TLDR index from main branch');
+    }
+
+    // Start TLDR daemon for this workspace
+    const { getTldrDaemonService } = await import('./tldr-daemon.js');
+    const tldrService = getTldrDaemonService(workspacePath, venvPath);
+    await tldrService.start(true);
+    result.steps.push('Started TLDR daemon');
+  } catch (error: any) {
+    // TLDR setup is optional - don't fail workspace creation if it doesn't work
+    if (error.message?.includes('python3')) {
+      result.steps.push('Skipped TLDR setup (python3 not available)');
+    } else {
+      result.steps.push(`TLDR setup failed (non-critical): ${error.message}`);
+    }
+  }
+
   // Configure DNS
   if (workspaceConfig.dns) {
     const dnsMethod = workspaceConfig.dns.sync_method || 'wsl2hosts';
@@ -706,6 +746,20 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   if (dryRun) {
     result.steps.push('[DRY RUN] Would remove workspace at: ' + workspacePath);
     return result;
+  }
+
+  // Stop TLDR daemon for workspace (if it exists)
+  const venvPath = join(workspacePath, '.venv');
+  if (existsSync(venvPath)) {
+    try {
+      const { getTldrDaemonService } = await import('./tldr-daemon.js');
+      const tldrService = getTldrDaemonService(workspacePath, venvPath);
+      await tldrService.stop();
+      result.steps.push('Stopped TLDR daemon');
+    } catch (error: any) {
+      // Non-fatal - daemon may not be running
+      console.warn(`⚠ Failed to stop TLDR daemon: ${error?.message}`);
+    }
   }
 
   // Stop Docker containers and clean up Docker-created files

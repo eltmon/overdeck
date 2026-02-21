@@ -20,6 +20,7 @@ import { wipeCommand } from './wipe.js';
 import { shadowCommand } from './shadow.js';
 import { syncCommand } from './sync.js';
 import { refreshCommand } from './refresh.js';
+import { tldrCommand } from './tldr.js';
 
 export function registerWorkCommands(program: Command): void {
   const work = program
@@ -188,6 +189,14 @@ export function registerWorkCommands(program: Command): void {
     .description('Refresh tracker status cache for a shadowed issue')
     .option('--json', 'Output as JSON')
     .action(refreshCommand);
+
+  work
+    .command('tldr [action] [workspace]')
+    .description('TLDR daemon management: status, start, stop, warm')
+    .option('--json', 'Output as JSON')
+    .action((action, workspace, options) => {
+      tldrCommand(action || 'status', workspace, options);
+    });
 }
 
 // Re-export individual commands for direct use
