@@ -98,3 +98,7 @@ Three changes:
 ## Risk Assessment
 
 **Low risk.** This is additive — no existing behavior changes. The VTT parser is a pure function with no side effects. The upload handler modification is a simple conditional wrapper. Frontend change is three lines.
+
+## Specialist Feedback
+
+- **[2026-02-21T04:02Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
