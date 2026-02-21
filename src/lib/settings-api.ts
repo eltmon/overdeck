@@ -10,18 +10,21 @@ import yaml from 'js-yaml';
 import { loadConfig, getGlobalConfigPath, YamlConfig } from './config-yaml.js';
 import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
-import { MODEL_CAPABILITIES, getModelCapability } from './model-capabilities.js';
+import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 
 /**
  * Optimal model defaults based on research (see docs/MODEL_RECOMMENDATIONS.md)
  * - Opus 4.6: Critical thinking tasks (planning, PRDs, security review, exploration)
  * - Kimi K2.5: Implementation work agent (76.8% SWE-bench, excellent value)
- * - Sonnet 4.5: Quality specialist tasks (review responses, testing, documentation)
+ * - Sonnet 4.6: Quality specialist tasks (review responses, testing, documentation)
  * - Haiku 4.5: Speed-critical tasks (subagents, triage, quick CLI)
+ *
+ * NOTE: All model IDs are automatically resolved through deprecation mapping
+ * to ensure this function never returns deprecated models.
  */
 export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
-  return {
-    // High-complexity phases - Opus 4.6 for deep analysis
+  const rawDefaults: Partial<Record<WorkTypeId, string>> = {
+    // High-complexity phases - Opus 4.6 for deep analysis and planning
     'issue-agent:exploration': 'claude-opus-4-6',
 
     // Implementation phases - Kimi K2.5 for excellent coding at great value
@@ -36,7 +39,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'specialist-merge-agent': 'claude-sonnet-4-6',
 
     // Convoy reviewers - mixed based on criticality
-    'convoy:security-reviewer': 'claude-opus-4-6',   // SAFETY CRITICAL
+    'convoy:security-reviewer': 'claude-opus-4-6', // SAFETY CRITICAL
     'convoy:performance-reviewer': 'claude-sonnet-4-6',
     'convoy:correctness-reviewer': 'claude-sonnet-4-6',
     'convoy:synthesis-agent': 'claude-sonnet-4-6',
@@ -56,6 +59,14 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'cli:interactive': 'claude-sonnet-4-6',
     'cli:quick-command': 'claude-haiku-4-5',
   };
+
+  // Apply deprecation resolution to all model IDs
+  const resolved: Partial<Record<WorkTypeId, ModelId>> = {};
+  for (const [workType, modelId] of Object.entries(rawDefaults)) {
+    resolved[workType as WorkTypeId] = resolveModelId(modelId);
+  }
+
+  return resolved;
 }
 
 // API format matches frontend SettingsConfig interface
@@ -177,10 +188,22 @@ export function updateSettingsApi(updates: Partial<ApiSettingsConfig>): ApiSetti
 }
 
 /**
- * Validate settings from API format
+ * Validation result with errors and warnings
  */
-export function validateSettingsApi(settings: ApiSettingsConfig): { valid: boolean; errors: string[] } {
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Validate settings from API format
+ *
+ * Returns errors for invalid settings and warnings for deprecated model IDs.
+ */
+export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResult {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   // Validate providers
   if (!settings.models?.providers) {
@@ -192,11 +215,20 @@ export function validateSettingsApi(settings: ApiSettingsConfig): { valid: boole
     }
   }
 
-  // Validate overrides - check that model IDs are valid
+  // Validate overrides - check that model IDs are valid (including deprecated ones)
   if (settings.models?.overrides) {
     const validModelIds = Object.keys(MODEL_CAPABILITIES);
     for (const [workType, modelId] of Object.entries(settings.models.overrides)) {
-      if (modelId && !validModelIds.includes(modelId)) {
+      if (!modelId) continue;
+
+      // Check if deprecated
+      if (MODEL_DEPRECATIONS[modelId]) {
+        warnings.push(
+          `${workType}: "${modelId}" is deprecated, use "${MODEL_DEPRECATIONS[modelId]}" instead`
+        );
+      }
+      // Check if valid (current or deprecated)
+      else if (!validModelIds.includes(modelId)) {
         errors.push(`Invalid model ID "${modelId}" for work type "${workType}"`);
       }
     }
@@ -213,6 +245,7 @@ export function validateSettingsApi(settings: ApiSettingsConfig): { valid: boole
   return {
     valid: errors.length === 0,
     errors,
+    warnings,
   };
 }
 
