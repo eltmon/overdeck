@@ -1,156 +1,59 @@
-# PAN-173: TLDR-Code Integration for Token-Efficient Agent Code Analysis
+# PAN-220: Metrics Dashboard Improvements — TLDR Stats, Cost Accuracy, Label Clarity
 
 ## Problem
 
-Agents read full source files via Claude Code's built-in Read/Grep/Glob tools, consuming 10-25k tokens per file. On a complex implementation task touching 20+ files, agents burn 200-500k tokens just on code reading, exhausting their context window and limiting how much work they can do per session. There is no code summarization or structural analysis layer.
+The metrics dashboard had four issues:
+1. **Race condition** in `record-cost-event.js` causing duplicate cost events (~39% phantom costs)
+2. **Duplicate route** — stub `/api/costs/summary` at line 4801 shadowed the real implementation, returning $0
+3. **Label ambiguity** — "Cost Today" uses UTC midnight but didn't say so
+4. **TLDR stats missing** — `TldrServiceStatus` component existed but wasn't integrated into the metrics page
 
-## Solution
+## Implementation
 
-Integrate [llm-tldr](https://github.com/parcadei/llm-tldr) — a 5-layer code analysis tool that produces structured summaries (500-1,200 tokens per file instead of 10-25k). Uses its native MCP server (`tldr-mcp`) so Claude Code agents get TLDR tools directly. Persistent daemon on main branch with index sharing to new workspaces.
+### Fix 1: Race Condition (scripts/heartbeat-hook)
 
-## Architecture
+Added per-session `flock -x` around the `node record-cost-event.js` call. Claude Code fires parallel tool calls, spawning multiple heartbeat-hook processes that race on the same transcript offset file. `flock -x -w 30` serializes them, ensuring only one process reads/processes/updates the offset at a time.
 
-### Index Sharing Model
+**File:** `scripts/heartbeat-hook`
 
-```
-PROJECT ROOT (main branch)
-├── .tldr/                    ← Persistent index, always up-to-date
-│   ├── ast/                  ← Layer 1: functions, classes, methods
-│   ├── callgraph/            ← Layer 2: function relationships
-│   ├── cfg/                  ← Layer 3: control flow
-│   ├── dfg/                  ← Layer 4: data flow
-│   ├── pdg/                  ← Layer 5: program dependence
-│   └── semantic/             ← Embeddings for natural language search
-└── .tldrignore               ← Gitignore-compatible exclusion rules
+### Fix 2: Duplicate /api/costs/summary Route (src/dashboard/server/index.ts)
 
-WORKSPACE (git worktree from main)
-├── .tldr/                    ← Copied from main at creation time
-│   └── (same structure)      ← Workspace daemon handles delta updates
-└── .venv/                    ← Isolated Python environment
-    └── bin/
-        ├── tldr              ← CLI
-        └── tldr-mcp          ← MCP server
-```
+Removed the stub endpoint at the old location (line 4801) that returned all zeros. Express uses the first matching route, so the stub was always served instead of the correct implementation at line 11065.
 
-**Flow:**
-1. `pan up` → Start main daemon, warm indexes on project root
-2. `createWorkspace()` → Copy `.tldr/` from main, create `.venv`, install `llm-tldr`, start workspace daemon
-3. Agent spawns → MCP server already configured globally, agents get TLDR tools
-4. Agent works → Workspace daemon incrementally updates indexes as files change
-5. Merge to main → Notify main daemon to reindex changed files
-6. `removeWorkspace()` → Stop workspace daemon, cleanup
+**File:** `src/dashboard/server/index.ts`
 
-### MCP Integration
+### Fix 3: Event Deduplication (src/lib/costs/events.ts + index.ts + server)
 
-Global configuration in `~/.claude/settings.json`:
-```json
-{
-  "mcpServers": {
-    "tldr": {
-      "command": ".venv/bin/tldr-mcp",
-      "args": ["--project", "."]
-    }
-  }
-}
-```
+Added `deduplicateEvents()` function that removes events caused by the historical race condition. Deduplication key: `agentId|issueId|model|input|output|cacheRead|cacheWrite`. Events within 60 seconds of the last kept event for the same key are considered race-condition duplicates and removed.
 
-The relative path `.` resolves to the current working directory, so it works in both project root and workspace contexts. The `.venv/bin/tldr-mcp` path requires each workspace (and project root) to have a venv with llm-tldr installed.
+Exposed via `POST /api/costs/deduplicate` endpoint.
 
-### Daemon Architecture
+### Fix 4: Label Clarification
 
-```
-                 ┌─────────────────────────┐
-                 │   Main Daemon (always)   │
-                 │   Project root .tldr/    │
-                 │   Started by: pan up     │
-                 │   Stopped by: pan down   │
-                 └─────────────────────────┘
-                          │
-              ┌───────────┼───────────┐
-              ▼           ▼           ▼
-    ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-    │ WS Daemon #1 │ │ WS Daemon #2 │ │ WS Daemon #3 │
-    │ feature/173  │ │ feature/205  │ │ feature/209  │
-    │ Delta updates│ │ Delta updates│ │ Delta updates│
-    └──────────────┘ └──────────────┘ └──────────────┘
-```
+Changed "Cost Today" → "Cost Today (UTC)" in:
+- `MetricsSummary.tsx`
+- `MetricsPage.tsx`
 
-### Agent Workflow Change
+### Fix 5: TLDR Stats Integration (MetricsPage.tsx)
 
-**Before (current):**
-```
-Agent needs to understand auth.ts
-→ Read auth.ts (23,000 tokens)
-→ Read related imports (50,000 tokens)
-→ Total: 73,000 tokens for one subsystem
-```
+Imported `TldrServiceStatus` and added a "Services" section to the metrics page that shows TLDR daemon status, health, and workspace daemon count.
 
-**After (with TLDR):**
-```
-Agent needs to understand auth.ts
-→ tldr context auth.ts (1,200 tokens)
-→ Understands structure, dependencies, call graph
-→ Only reads specific functions if needed (2,000 tokens)
-→ Total: 3,200 tokens — 96% savings
-```
+## Files Modified
 
-## Decisions Made
+| File | Change |
+|------|--------|
+| `scripts/heartbeat-hook` | Added flock serialization around cost recording |
+| `src/dashboard/server/index.ts` | Removed stub /api/costs/summary, added /api/costs/deduplicate, added deduplicateEvents import |
+| `src/lib/costs/events.ts` | Added deduplicateEvents() |
+| `src/lib/costs/index.ts` | Export deduplicateEvents |
+| `src/dashboard/frontend/src/components/MetricsSummary.tsx` | "Cost Today (UTC)" label |
+| `src/dashboard/frontend/src/components/MetricsPage.tsx` | "Cost Today (UTC)" label + TldrServiceStatus |
+| `src/lib/costs/__tests__/events.test.ts` | New tests for deduplicateEvents |
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Package | `llm-tldr` (pip) | Native MCP server, 16 languages, 5 analysis layers |
-| Primary integration | MCP server (`tldr-mcp`) | Agents get native tools, cleanest DX |
-| Daemon lifecycle | Per-workspace + persistent main | Main provides hot indexes, workspaces handle deltas |
-| Index strategy | Copy from main at workspace creation | Near-instant TLDR for new workspaces |
-| Python dependency | Auto-install in workspace venv | Isolated, no system dependency conflicts |
-| MCP scope | Global `~/.claude/settings.json` | All Claude sessions get TLDR, including interactive |
-| Definition of done | Full pipeline with dashboard visibility | Agent spawns → uses TLDR → visible token savings |
+## Current Status
 
-## Out of Scope
+**COMPLETE** — All changes implemented, tests pass (only pre-existing specialist-logs.test.ts failure unrelated to this PR).
 
-- Custom TLDR analysis layers beyond what llm-tldr provides
-- Replacing Claude Code's built-in Read/Grep tools (TLDR supplements, not replaces)
-- Automatic "never read full files" enforcement (agents choose when to use TLDR)
-- Multi-language semantic search model customization
-- TLDR integration for remote workspaces (follow-up issue)
+## Remaining Work
 
-## Risk Assessment
-
-| Risk | Severity | Mitigation |
-|------|----------|------------|
-| Python not installed on system | Medium | Detect in `pan setup`, graceful skip if unavailable |
-| TLDR daemon crashes | Low | Health checks + auto-restart, agents degrade to direct file reads |
-| Index corruption | Low | Re-warm from source, daemon handles recovery |
-| MCP server conflicts | Low | Namespace as `tldr`, unique among MCP servers |
-| Large repo warm time | Medium | Background warm, workspace creation doesn't block on it |
-| Venv creation adds workspace setup time | Low | ~5-10 seconds, parallelizable with other setup steps |
-
-## Files to Modify
-
-### Core Infrastructure
-- `src/lib/workspace-manager.ts` — Add venv creation, .tldr/ copy, daemon start/stop
-- `src/lib/agents.ts` — Health check TLDR daemon before agent spawn
-- `src/cli/commands/setup/hooks.ts` — Add MCP server configuration to setup flow
-
-### New Files
-- `src/lib/tldr-daemon.ts` — TldrDaemonService (following Cloister service pattern)
-- `src/cli/commands/work/tldr.ts` — `pan tldr status|start|stop|warm` CLI commands
-- `scripts/tldr-setup.sh` — Venv creation and llm-tldr installation helper
-
-### Agent Integration
-- `src/lib/cloister/prompts/work-agent.md` — Add TLDR usage instructions
-- `CLAUDE.md` — Add TLDR guidance for agents
-
-### Dashboard
-- `src/dashboard/server/index.ts` — TLDR daemon status endpoints
-- `src/dashboard/frontend/src/components/` — TLDR status indicators
-
-### Cloister Integration
-- `src/lib/cloister/merge-agent.ts` — Notify main daemon after merge
-- `src/lib/cloister/specialists.ts` — Configure TLDR MCP for specialists
-
-## Specialist Feedback
-
-- **[2026-02-21T04:32Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
-- **[2026-02-21T04:37Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/004-review-agent-changes-requested.md`
-- **[2026-02-21T04:39Z] test-agent → FAILED** — `.planning/feedback/005-test-agent-failed.md`
+None. Implementation complete.

@@ -40,7 +40,7 @@ import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
-import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents } from '../../lib/costs/index.js';
+import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
 import type { Issue } from '../frontend/src/types.js';
 
 // Load environment variables from ~/.panopticon.env at startup
@@ -4794,27 +4794,6 @@ app.get('/api/agents/:id/cost', (req, res) => {
   } catch (error: any) {
     console.error('Error getting agent cost:', error);
     res.status(500).json({ error: 'Failed to get agent cost: ' + error.message });
-  }
-});
-
-// Get cost summary
-app.get('/api/costs/summary', (req, res) => {
-  try {
-    // TODO: Aggregate costs from all agents
-    res.json({
-      totalCost: 0,
-      byModel: {
-        opus: 0,
-        sonnet: 0,
-        haiku: 0,
-      },
-      byAgent: {},
-      today: 0,
-      thisWeek: 0,
-    });
-  } catch (error: any) {
-    console.error('Error getting cost summary:', error);
-    res.status(500).json({ error: 'Failed to get cost summary: ' + error.message });
   }
 });
 
@@ -11190,6 +11169,21 @@ app.post('/api/costs/rebuild', async (_req, res) => {
   }
 });
 
+// POST /api/costs/deduplicate - Remove duplicate events from events.jsonl (PAN-220)
+app.post('/api/costs/deduplicate', (_req, res) => {
+  try {
+    const removed = deduplicateEvents();
+    res.json({
+      success: true,
+      message: `Deduplication complete: ${removed} duplicate event${removed !== 1 ? 's' : ''} removed`,
+      removed,
+    });
+  } catch (error: any) {
+    console.error('Error deduplicating cost events:', error);
+    res.status(500).json({ error: 'Failed to deduplicate cost events: ' + error.message });
+  }
+});
+
 // GET /api/costs/stream - Stream recent cost events for real-time updates
 app.get('/api/costs/stream', (req, res) => {
   try {
@@ -11413,6 +11407,35 @@ const issueDataService = new IssueDataService(socketIo, cacheService);
 // Track active PTY sessions
 const activePtys = new Map<string, pty.IPty>();
 
+// Gather index stats from .tldr directory (mirrors CLI logic in tldr.ts)
+function getIndexStats(rootPath: string, isMain: boolean): { fileCount?: number; indexAge?: string } {
+  const tldrPath = join(rootPath, '.tldr');
+  if (!existsSync(tldrPath)) return {};
+  try {
+    const stats = statSync(tldrPath);
+    const ageMs = Date.now() - stats.mtimeMs;
+
+    let indexAge: string;
+    if (isMain) {
+      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+    } else {
+      const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+      indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+    }
+
+    let fileCount: number | undefined;
+    const astPath = join(tldrPath, 'ast');
+    if (existsSync(astPath)) {
+      fileCount = readdirSync(astPath).length;
+    }
+
+    return { fileCount, indexAge };
+  } catch {
+    return {};
+  }
+}
+
 // TLDR service endpoints
 app.get('/api/services/tldr/status', async (_req, res) => {
   try {
@@ -11428,11 +11451,14 @@ app.get('/api/services/tldr/status', async (_req, res) => {
       pid?: number;
       healthy: boolean;
       workspacePath: string;
+      fileCount?: number;
+      indexAge?: string;
     }> = [];
 
     if (existsSync(venvPath)) {
       const service = getTldrDaemonService(projectRoot, venvPath);
       const status = await service.getStatus();
+      const indexStats = getIndexStats(projectRoot, true);
 
       results.push({
         workspace: 'main',
@@ -11440,6 +11466,7 @@ app.get('/api/services/tldr/status', async (_req, res) => {
         pid: status.pid,
         healthy: status.healthy,
         workspacePath: projectRoot,
+        ...indexStats,
       });
     }
 
@@ -11456,6 +11483,7 @@ app.get('/api/services/tldr/status', async (_req, res) => {
         if (existsSync(wsVenvPath)) {
           const service = getTldrDaemonService(wsPath, wsVenvPath);
           const status = await service.getStatus();
+          const indexStats = getIndexStats(wsPath, false);
 
           results.push({
             workspace: ws.name,
@@ -11463,6 +11491,7 @@ app.get('/api/services/tldr/status', async (_req, res) => {
             pid: status.pid,
             healthy: status.healthy,
             workspacePath: wsPath,
+            ...indexStats,
           });
         }
       }
@@ -11538,12 +11567,16 @@ app.get('/api/workspaces/:issueId/tldr', async (req, res) => {
     const service = getTldrDaemonService(workspacePath, venvPath);
     const status = await service.getStatus();
 
+    const { fileCount, indexAge } = getIndexStats(workspacePath, false);
+
     res.json({
       available: true,
       running: status.running,
       pid: status.pid,
       healthy: status.healthy,
       workspacePath,
+      fileCount,
+      indexAge,
     });
   } catch (error: any) {
     console.error('Error getting workspace TLDR status:', error);

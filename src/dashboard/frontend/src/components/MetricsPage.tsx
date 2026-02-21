@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { DollarSign, TrendingUp, AlertTriangle, ArrowRightLeft } from 'lucide-react';
+import { TldrServiceStatus } from './TldrServiceStatus';
 
 interface MetricsSummary {
   today: {
@@ -63,7 +64,7 @@ export function MetricsPage() {
           <div className="bg-surface-raised border border-divider rounded-lg p-6">
             <div className="flex items-center gap-3 mb-3">
               <DollarSign className="w-6 h-6 text-green-400" />
-              <h3 className="text-lg font-semibold text-content">Cost Today</h3>
+              <h3 className="text-lg font-semibold text-content">Cost Today (UTC)</h3>
             </div>
             <div className="text-3xl font-bold text-content mb-2">
               ${summary.today.totalCost.toFixed(2)}
@@ -163,6 +164,12 @@ export function MetricsPage() {
           </div>
         </div>
       )}
+
+      {/* TLDR Code Analysis Status */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-content mb-4">Services</h2>
+        <TldrServiceStatus />
+      </div>
 
       {/* Placeholder for charts */}
       <div className="bg-surface-raised border border-divider rounded-lg p-6">

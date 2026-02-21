@@ -256,6 +256,64 @@ export function replaceEventsFile(events: CostEvent[]): void {
 }
 
 /**
+ * Deduplicate events.jsonl by removing duplicate cost events caused by the
+ * parallel-tool-call race condition (PAN-220).
+ *
+ * Two events are considered duplicates if they share the same agentId, issueId,
+ * model, input, output, cacheRead, and cacheWrite tokens, and their timestamps
+ * are within 60 seconds of each other. Only the first occurrence is kept.
+ *
+ * Returns the number of duplicate events removed.
+ */
+export function deduplicateEvents(): number {
+  if (!existsSync(getEventsFile())) {
+    return 0;
+  }
+
+  const content = readFileSync(getEventsFile(), 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim());
+
+  const kept: CostEvent[] = [];
+  // Track seen (key → earliest timestamp ms) for dedup window
+  const seen = new Map<string, number>();
+
+  for (const line of lines) {
+    let event: CostEvent;
+    try {
+      event = JSON.parse(line) as CostEvent;
+    } catch {
+      // Preserve malformed lines by skipping them (they won't be re-written,
+      // which is intentional — replaceEventsFile only writes valid events)
+      continue;
+    }
+
+    // Build deduplication key from fields that identify the same transcript entry
+    const key = `${event.agentId}|${event.issueId}|${event.model}|${event.input}|${event.output}|${event.cacheRead}|${event.cacheWrite}`;
+    const tsMs = new Date(event.ts).getTime();
+
+    // Compare to the last KEPT event for this key.
+    // Two events are duplicates if they have the same token fields and timestamps
+    // within 60 seconds of the most recently kept event (race condition window).
+    // Strict < preserves events exactly 60 seconds apart as legitimate.
+    const lastKeptMs = seen.get(key);
+    if (lastKeptMs !== undefined && Math.abs(tsMs - lastKeptMs) < 60_000) {
+      // Duplicate within 60-second window — skip
+      continue;
+    }
+
+    // Keep this event and record its timestamp as the new reference point
+    seen.set(key, tsMs);
+    kept.push(event);
+  }
+
+  const removed = lines.length - kept.length;
+  if (removed > 0) {
+    replaceEventsFile(kept);
+  }
+  return removed;
+}
+
+/**
  * Check if events file exists
  */
 export function eventsFileExists(): boolean {
