@@ -1,4 +1,4 @@
-# Planning Session: PAN-142
+# Planning Session: PAN-173
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,36 +22,28 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-142
-- **Title:** PAN-141: Remove opencode, codex, cursor, gemini sync targets - consolidate on Claude Code only
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/142
+- **ID:** PAN-173
+- **Title:** PAN-173: TLDR-Code integration for token-efficient agent code analysis
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/173
 
 ## Description
 ## Summary
+Integrate TLDR-Code (or similar) to give agents graduated code summaries instead of reading full files. 95% token savings (1.2k vs 23k tokens per file).
 
-We've decided to use Claude Code as the sole AI coding tool, with claude-code-router handling alternative models. The multi-runtime sync support (opencode, codex, cursor, gemini) is no longer needed and adds maintenance burden.
+## Details
+- 5 analysis layers: AST structure → call graph → control flow → data flow → program slicing
+- Available as `pip install tldr-code`
+- Agent workspaces get `.tldr/` cache, agents read summaries first
+- Background daemon option for 300x speedup (in-memory indexes)
 
-## What to remove
+## Impact
+Agents last 2-3x longer in context window. Biggest single capability gain.
 
-- **`src/lib/paths.ts`**: Remove `CODEX_DIR`, `CURSOR_DIR`, `GEMINI_DIR`, `OPENCODE_DIR` and their `SYNC_TARGETS` entries. Keep only `claude`.
-- **`src/lib/sync.ts`**: Simplify — no longer need to handle multiple runtimes
-- **`src/cli/commands/sync.ts`**: Simplify runtime loop (or remove it entirely since there's only one target)
-- **`~/.panopticon/config.toml`**: `targets` field becomes unnecessary (always claude)
-- **Clean up `~/.opencode/skills/`** etc. — remove any synced symlinks
+## Source
+Inspired by Continuous-Claude-v3 (parcadei/Continuous-Claude-v3)
 
-## Context
-
-- Alternative models are accessed via [claude-code-router](https://github.com/musistudio/claude-code-router), not separate tools
-- opencode, codex, cursor, gemini targets were aspirational but we've standardized on Claude Code
-- Simplifying this reduces code surface and config confusion
-- The crash fixed in 843ad26 was caused by opencode being in config but not in SYNC_TARGETS — removing multi-target eliminates this class of bug entirely
-
-## Acceptance Criteria
-
-- [ ] Only `claude` sync target remains
-- [ ] Config `[sync].targets` is either removed or defaults to `["claude"]`
-- [ ] Synced symlinks in `~/.opencode/`, `~/.codex/`, `~/.cursor/`, `~/.gemini/` are cleaned up
-- [ ] Tests updated
+## Effort
+Medium — need Python bridge or subprocess calls from agent hooks
 
 ---
 
