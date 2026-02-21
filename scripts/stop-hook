@@ -26,17 +26,20 @@ fi
 STATE_DIR="$HOME/.panopticon/agents/$AGENT_ID"
 mkdir -p "$STATE_DIR"
 
-# Write state to file (atomic write via temp file)
-TEMP_FILE="$STATE_DIR/state.json.tmp"
-jq -n \
-  --arg timestamp "$(date -Iseconds)" \
-  --arg state "idle" \
-  '{
-    state: $state,
-    lastActivity: $timestamp
-  }' > "$TEMP_FILE" 2>/dev/null || true
-
-mv "$TEMP_FILE" "$STATE_DIR/state.json" 2>/dev/null || true
+# Update runtime state in runtime.json (NOT state.json — state.json holds AgentState config
+# like workspace, runtime, model which must not be overwritten by hooks)
+RUNTIME_FILE="$STATE_DIR/runtime.json"
+TEMP_FILE="$RUNTIME_FILE.tmp"
+if [ -f "$RUNTIME_FILE" ]; then
+  # Merge with existing runtime state (preserves contextPercent, sessionId, etc.)
+  jq --arg ts "$(date -Iseconds)" \
+    '.state = "idle" | .lastActivity = $ts | del(.currentTool)' \
+    "$RUNTIME_FILE" > "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
+else
+  # Create initial runtime state
+  jq -n --arg ts "$(date -Iseconds)" \
+    '{state: "idle", lastActivity: $ts}' > "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$RUNTIME_FILE" 2>/dev/null || true
+fi
 
 # Optionally send heartbeat to API server (non-blocking)
 # Only if dashboard is running

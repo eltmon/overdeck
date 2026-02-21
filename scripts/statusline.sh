@@ -152,6 +152,18 @@ if [ -n "$usage_7d" ]; then
   [ -n "$u7_reset" ] && line3+=$(printf " %b(%s)%b" "$DIM" "$u7_reset" "$RST")
 fi
 
+# Write context % to agent dir for dashboard monitoring (non-blocking)
+if [ -n "$PANOPTICON_AGENT_ID" ] && [ -n "$ctx_used_pct" ]; then
+  CTX_DIR="$HOME/.panopticon/agents/$PANOPTICON_AGENT_ID"
+  if [ -d "$CTX_DIR" ]; then
+    printf '%.0f' "$ctx_used_pct" > "$CTX_DIR/context-pct" 2>/dev/null || true
+    # Capture initial context % (first time only)
+    if [ ! -f "$CTX_DIR/initial-context-pct" ]; then
+      printf '%.0f' "$ctx_used_pct" > "$CTX_DIR/initial-context-pct" 2>/dev/null || true
+    fi
+  fi
+fi
+
 printf "%b\n" "$line1"
 printf "%b\n" "$line2"
 [ -n "$line3" ] && printf "%b\n" "$line3"

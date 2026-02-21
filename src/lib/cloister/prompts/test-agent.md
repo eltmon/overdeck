@@ -96,39 +96,51 @@ If found, use: `go test ./...`
 
 **If no test runner is detected**, report an error and exit.
 
-### 2. Run Tests
+### 2. Run Tests (CRITICAL — Context Management)
 
-Execute the detected test command:
-
-```bash
-{{detectedTestCommand}}
-```
-
-**Capture both stdout and stderr** - test output may contain important diagnostics.
-
-**CRITICAL: Use a 5-minute (300000ms) timeout for test commands.** Test suites commonly take 2-5 minutes to run. The default 2-minute bash timeout WILL cause premature failures. Always specify the timeout parameter when running tests:
+**NEVER let full test output flow into your context.** Always redirect to file and read only summaries.
 
 ```bash
-# WRONG - will timeout after 2 minutes
-npm test
-
-# CORRECT - allows 5 minutes for test suite
-npm test  # with timeout: 300000
+# Redirect ALL output to file, then read only the summary
+{{detectedTestCommand}} 2>&1 > /tmp/test-feature.txt; echo "EXIT_CODE: $?"
+tail -20 /tmp/test-feature.txt
 ```
+
+**CRITICAL: Use a 5-minute (300000ms) timeout for test commands.**
+
+```bash
+# CORRECT - redirects output to file, uses 5-minute timeout
+npm test 2>&1 > /tmp/test-feature.txt; echo "EXIT_CODE: $?"  # with timeout: 300000
+tail -20 /tmp/test-feature.txt
+```
+
+**NEVER run test commands without redirecting to a file.** Raw test output from large suites (1000+ tests) WILL fill your context window and cause compaction, losing your task entirely.
 
 If tests take longer than 10 minutes, consider them hung and report failure.
 
-### 3. Establish Baseline (Main Branch)
+### Check Results Before Baseline
+
+- If ALL tests pass (exit code 0) → **skip baseline**, report PASS immediately
+- If failures exist → continue to Step 3
+
+### 3. Establish Baseline (Main Branch) — ONLY IF FAILURES FOUND
 
 **CRITICAL: Compare against main branch to distinguish pre-existing failures from new regressions.**
 
 ```bash
-# Save current state, run tests on main, restore
+# Save current state, run tests on main, restore — ALL output to file
 git stash
 git checkout main
-npm test 2>&1 | tee /tmp/main-test-results.txt
+{{detectedTestCommand}} 2>&1 > /tmp/test-main.txt; echo "EXIT_CODE: $?"  # with timeout: 300000
+tail -20 /tmp/test-main.txt
 git checkout {{branch}}
 git stash pop 2>/dev/null
+```
+
+Then compare failures (targeted, not full output):
+```bash
+grep -E "FAIL|✗|Error|failed" /tmp/test-feature.txt | head -30
+grep -E "FAIL|✗|Error|failed" /tmp/test-main.txt | head -30
 ```
 
 Record which tests fail on main. These are **pre-existing failures**.
@@ -208,15 +220,17 @@ curl -X POST {{apiUrl}}/api/specialists/done \
 ### Example Complete Workflow
 
 ```bash
-# 1. Run tests
-npm test
+# 1. Run tests — ALWAYS redirect to file
+npm test 2>&1 > /tmp/test-feature.txt; echo "EXIT_CODE: $?"  # timeout: 300000
+tail -20 /tmp/test-feature.txt
 
-# 2. If all pass:
+# 2. If all pass (exit code 0) — skip baseline, report immediately:
 curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"MIN-665","status":"passed","notes":"42 tests passed, 0 failed"}'
 
-# 2. If some fail:
+# 2. If some fail — run baseline, then report:
+grep -E "FAIL|✗|Error|failed" /tmp/test-feature.txt | head -30
 curl -X POST {{apiUrl}}/api/specialists/done \
   -H "Content-Type: application/json" \
   -d '{"specialist":"test","issueId":"MIN-665","status":"failed","notes":"40 passed, 2 failed: auth.test.ts timeout, user.test.ts assertion"}'

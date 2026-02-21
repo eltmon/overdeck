@@ -11,6 +11,8 @@ export interface IssueAgent {
   model: string;
   startedAt: string;
   consecutiveFailures: number;
+  contextPercent?: number | null;
+  initialContextPercent?: number | null;
 }
 
 export interface CloisterHealth {
@@ -240,6 +242,28 @@ export function IssueAgentCard({
                 >
                   <DollarSign className="w-3 h-3" />
                   ${costData.cost.toFixed(4)}
+                </span>
+              )}
+              {agent.contextPercent != null && (
+                <span
+                  className="flex items-center gap-1.5 text-xs"
+                  title={`Context: ${agent.contextPercent}%${agent.initialContextPercent ? ` (init: ${agent.initialContextPercent}%)` : ''}`}
+                >
+                  <span className="w-14 h-1.5 bg-gray-700 rounded-full overflow-hidden inline-block">
+                    <span
+                      className={`block h-full rounded-full transition-all ${
+                        agent.contextPercent > 80 ? 'bg-red-500' :
+                        agent.contextPercent > 50 ? 'bg-yellow-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(agent.contextPercent, 100)}%` }}
+                    />
+                  </span>
+                  <span className={
+                    agent.contextPercent > 80 ? 'text-red-400' :
+                    agent.contextPercent > 50 ? 'text-yellow-400' : 'text-content-muted'
+                  }>
+                    {agent.contextPercent}%
+                  </span>
                 </span>
               )}
             </div>
