@@ -11407,30 +11407,59 @@ const issueDataService = new IssueDataService(socketIo, cacheService);
 // Track active PTY sessions
 const activePtys = new Map<string, pty.IPty>();
 
-// Gather index stats from .tldr directory (mirrors CLI logic in tldr.ts)
-function getIndexStats(rootPath: string, isMain: boolean): { fileCount?: number; indexAge?: string } {
+// Gather index stats from .tldr directory
+// TLDR stores: .tldr/cache/call_graph.json (edges + file refs), .tldr/languages.json (timestamp)
+function getIndexStats(rootPath: string, isMain: boolean): { fileCount?: number; indexAge?: string; edgeCount?: number } {
   const tldrPath = join(rootPath, '.tldr');
   if (!existsSync(tldrPath)) return {};
   try {
-    const stats = statSync(tldrPath);
-    const ageMs = Date.now() - stats.mtimeMs;
-
-    let indexAge: string;
-    if (isMain) {
-      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
-      indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
-    } else {
-      const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
-      indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+    // Index age from languages.json timestamp (set during warm)
+    let indexAge: string | undefined;
+    const langPath = join(tldrPath, 'languages.json');
+    if (existsSync(langPath)) {
+      const langData = JSON.parse(readFileSync(langPath, 'utf-8'));
+      if (langData.timestamp) {
+        const ageMs = Date.now() - (langData.timestamp * 1000);
+        if (isMain) {
+          const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+          indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+        } else {
+          const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+          indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+        }
+      }
+    }
+    // Fall back to directory mtime if no languages.json
+    if (!indexAge) {
+      const stats = statSync(tldrPath);
+      const ageMs = Date.now() - stats.mtimeMs;
+      if (isMain) {
+        const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+        indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+      } else {
+        const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+        indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+      }
     }
 
+    // File count and edge count from call_graph.json
     let fileCount: number | undefined;
-    const astPath = join(tldrPath, 'ast');
-    if (existsSync(astPath)) {
-      fileCount = readdirSync(astPath).length;
+    let edgeCount: number | undefined;
+    const cgPath = join(tldrPath, 'cache', 'call_graph.json');
+    if (existsSync(cgPath)) {
+      const cg = JSON.parse(readFileSync(cgPath, 'utf-8'));
+      edgeCount = Array.isArray(cg.edges) ? cg.edges.length : undefined;
+      if (Array.isArray(cg.edges)) {
+        const files = new Set<string>();
+        for (const e of cg.edges) {
+          if (e.from_file) files.add(e.from_file);
+          if (e.to_file) files.add(e.to_file);
+        }
+        fileCount = files.size;
+      }
     }
 
-    return { fileCount, indexAge };
+    return { fileCount, indexAge, edgeCount };
   } catch {
     return {};
   }
@@ -11453,6 +11482,7 @@ app.get('/api/services/tldr/status', async (_req, res) => {
       workspacePath: string;
       fileCount?: number;
       indexAge?: string;
+      edgeCount?: number;
     }> = [];
 
     if (existsSync(venvPath)) {
@@ -11567,7 +11597,7 @@ app.get('/api/workspaces/:issueId/tldr', async (req, res) => {
     const service = getTldrDaemonService(workspacePath, venvPath);
     const status = await service.getStatus();
 
-    const { fileCount, indexAge } = getIndexStats(workspacePath, false);
+    const { fileCount, indexAge, edgeCount } = getIndexStats(workspacePath, false);
 
     res.json({
       available: true,
@@ -11577,6 +11607,7 @@ app.get('/api/workspaces/:issueId/tldr', async (req, res) => {
       workspacePath,
       fileCount,
       indexAge,
+      edgeCount,
     });
   } catch (error: any) {
     console.error('Error getting workspace TLDR status:', error);
