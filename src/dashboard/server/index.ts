@@ -11407,6 +11407,35 @@ const issueDataService = new IssueDataService(socketIo, cacheService);
 // Track active PTY sessions
 const activePtys = new Map<string, pty.IPty>();
 
+// Gather index stats from .tldr directory (mirrors CLI logic in tldr.ts)
+function getIndexStats(rootPath: string, isMain: boolean): { fileCount?: number; indexAge?: string } {
+  const tldrPath = join(rootPath, '.tldr');
+  if (!existsSync(tldrPath)) return {};
+  try {
+    const stats = statSync(tldrPath);
+    const ageMs = Date.now() - stats.mtimeMs;
+
+    let indexAge: string;
+    if (isMain) {
+      const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+      indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
+    } else {
+      const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+      indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+    }
+
+    let fileCount: number | undefined;
+    const astPath = join(tldrPath, 'ast');
+    if (existsSync(astPath)) {
+      fileCount = readdirSync(astPath).length;
+    }
+
+    return { fileCount, indexAge };
+  } catch {
+    return {};
+  }
+}
+
 // TLDR service endpoints
 app.get('/api/services/tldr/status', async (_req, res) => {
   try {
@@ -11425,35 +11454,6 @@ app.get('/api/services/tldr/status', async (_req, res) => {
       fileCount?: number;
       indexAge?: string;
     }> = [];
-
-    // Gather index stats from .tldr directory (mirrors CLI logic in tldr.ts)
-    function getIndexStats(rootPath: string, isMain: boolean): { fileCount?: number; indexAge?: string } {
-      const tldrPath = join(rootPath, '.tldr');
-      if (!existsSync(tldrPath)) return {};
-      try {
-        const stats = statSync(tldrPath);
-        const ageMs = Date.now() - stats.mtimeMs;
-
-        let indexAge: string;
-        if (isMain) {
-          const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
-          indexAge = ageDays === 0 ? 'today' : `${ageDays}d ago`;
-        } else {
-          const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
-          indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
-        }
-
-        let fileCount: number | undefined;
-        const astPath = join(tldrPath, 'ast');
-        if (existsSync(astPath)) {
-          fileCount = readdirSync(astPath).length;
-        }
-
-        return { fileCount, indexAge };
-      } catch {
-        return {};
-      }
-    }
 
     if (existsSync(venvPath)) {
       const service = getTldrDaemonService(projectRoot, venvPath);
@@ -11567,24 +11567,7 @@ app.get('/api/workspaces/:issueId/tldr', async (req, res) => {
     const service = getTldrDaemonService(workspacePath, venvPath);
     const status = await service.getStatus();
 
-    // Gather index stats
-    const tldrPath = join(workspacePath, '.tldr');
-    let fileCount: number | undefined;
-    let indexAge: string | undefined;
-    if (existsSync(tldrPath)) {
-      try {
-        const stats = statSync(tldrPath);
-        const ageMs = Date.now() - stats.mtimeMs;
-        const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
-        indexAge = ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
-        const astPath = join(tldrPath, 'ast');
-        if (existsSync(astPath)) {
-          fileCount = readdirSync(astPath).length;
-        }
-      } catch {
-        // Ignore stat errors
-      }
-    }
+    const { fileCount, indexAge } = getIndexStats(workspacePath, false);
 
     res.json({
       available: true,
