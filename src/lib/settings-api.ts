@@ -91,7 +91,7 @@ export interface ApiSettingsConfig {
  * Load settings in API format (for GET /api/settings)
  */
 export function loadSettingsApi(): ApiSettingsConfig {
-  const config = loadConfig();
+  const { config } = loadConfig();
 
   return {
     models: {

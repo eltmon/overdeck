@@ -48,7 +48,7 @@ export class WorkTypeRouter {
   private availableModels: ModelId[] | null = null;
 
   constructor(config?: NormalizedConfig) {
-    this.config = config || loadConfig();
+    this.config = config || loadConfig().config;
   }
 
   /**
@@ -162,7 +162,7 @@ export class WorkTypeRouter {
    * Reload configuration from disk
    */
   reloadConfig(): void {
-    this.config = loadConfig();
+    this.config = loadConfig().config;
     this.availableModels = null; // Clear cache
   }
 

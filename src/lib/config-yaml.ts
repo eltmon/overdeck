@@ -8,13 +8,14 @@
  * Uses smart (capability-based) model selection - no legacy presets.
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, copyFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
 import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
+import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 
 /**
  * Provider configuration (enable/disable + API keys)
@@ -131,6 +132,36 @@ export interface NormalizedConfig {
 
   /** Shadow mode configuration */
   shadow: NormalizedShadowConfig;
+}
+
+/**
+ * Model ID migration result
+ *
+ * Returned when deprecated model IDs are automatically migrated
+ * during config load.
+ */
+export interface MigrationResult {
+  /** List of migrated model IDs */
+  migrated: Array<{
+    /** Work type that was migrated */
+    workType: WorkTypeId;
+    /** Old (deprecated) model ID */
+    from: string;
+    /** New (current) model ID */
+    to: string;
+  }>;
+  /** Whether config.yaml was backed up before migration */
+  backedUp: boolean;
+}
+
+/**
+ * Config load result (config + optional migration info)
+ */
+export interface ConfigLoadResult {
+  /** Normalized configuration */
+  config: NormalizedConfig;
+  /** Migration result (if any deprecated models were migrated) */
+  migration?: MigrationResult;
 }
 
 /**
@@ -400,12 +431,118 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
 }
 
 /**
+ * Detect deprecated model IDs in config overrides
+ *
+ * Returns array of migrations to perform, or empty array if none found.
+ */
+function detectDeprecatedModels(config: YamlConfig | null): Array<{
+  workType: WorkTypeId;
+  from: string;
+  to: string;
+}> {
+  if (!config?.models?.overrides) {
+    return [];
+  }
+
+  const migrations: Array<{ workType: WorkTypeId; from: string; to: string }> = [];
+
+  for (const [workType, modelId] of Object.entries(config.models.overrides)) {
+    if (modelId && MODEL_DEPRECATIONS[modelId]) {
+      migrations.push({
+        workType: workType as WorkTypeId,
+        from: modelId,
+        to: MODEL_DEPRECATIONS[modelId],
+      });
+    }
+  }
+
+  return migrations;
+}
+
+/**
+ * Apply deprecation migrations to a YamlConfig (in-place)
+ */
+function applyMigrations(
+  config: YamlConfig,
+  migrations: Array<{ workType: WorkTypeId; from: string; to: string }>
+): void {
+  if (!config.models) {
+    config.models = {};
+  }
+  if (!config.models.overrides) {
+    config.models.overrides = {};
+  }
+
+  for (const { workType, to } of migrations) {
+    config.models.overrides[workType] = to as ModelId;
+  }
+}
+
+/**
+ * Create backup of global config file
+ */
+function backupGlobalConfig(): boolean {
+  try {
+    const backupPath = `${GLOBAL_CONFIG_PATH}.bak`;
+    copyFileSync(GLOBAL_CONFIG_PATH, backupPath);
+    console.log(`✓ Backed up config.yaml → config.yaml.bak`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to create config backup:`, error);
+    return false;
+  }
+}
+
+/**
+ * Write YamlConfig back to global config file
+ */
+function writeGlobalConfig(config: YamlConfig): void {
+  const yamlContent = yaml.dump(config, {
+    indent: 2,
+    lineWidth: 100,
+    noRefs: true,
+  });
+
+  writeFileSync(GLOBAL_CONFIG_PATH, yamlContent, 'utf-8');
+}
+
+/**
  * Load complete configuration (global + project + defaults)
  * Also loads API keys from environment variables as fallback
+ *
+ * IMPORTANT: This function may modify config.yaml if deprecated model IDs
+ * are detected. A backup is created before any modifications.
  */
-export function loadConfig(): NormalizedConfig {
-  const globalConfig = loadGlobalConfig();
+export function loadConfig(): ConfigLoadResult {
+  let globalConfig = loadGlobalConfig();
   const projectConfig = loadProjectConfig();
+
+  // Check for deprecated models in global config
+  let migrationResult: MigrationResult | undefined;
+  if (globalConfig && hasGlobalConfig()) {
+    const migrations = detectDeprecatedModels(globalConfig);
+
+    if (migrations.length > 0) {
+      // Create backup
+      const backedUp = backupGlobalConfig();
+
+      // Apply migrations to global config
+      applyMigrations(globalConfig, migrations);
+
+      // Write migrated config back to disk
+      writeGlobalConfig(globalConfig);
+
+      // Log migrations
+      console.log('\n🔄 Model ID Migration:');
+      for (const { workType, from, to } of migrations) {
+        console.log(`  ${workType}: ${from} → ${to}`);
+      }
+      console.log('');
+
+      migrationResult = { migrated: migrations, backedUp };
+    }
+  }
+
   const config = mergeConfigs(projectConfig, globalConfig);
 
   // Load API keys from environment variables as fallback
@@ -448,7 +585,7 @@ export function loadConfig(): NormalizedConfig {
     config.shadow.enabled = envShadowMode;
   }
 
-  return config;
+  return { config, migration: migrationResult };
 }
 
 /**

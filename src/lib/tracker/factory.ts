@@ -44,7 +44,7 @@ export interface TrackerConfig {
  */
 function getTrackerKeyFromConfig(trackerType: TrackerType): string | undefined {
   try {
-    const yamlConfig = loadYamlConfig();
+    const { config: yamlConfig } = loadYamlConfig();
     return yamlConfig.trackerKeys[trackerType];
   } catch {
     return undefined;

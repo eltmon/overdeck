@@ -416,7 +416,7 @@ function determineModel(options: SpawnOptions): string {
  * Tries each configured tracker until one succeeds.
  */
 async function transitionIssueToInProgress(issueId: string): Promise<void> {
-  const config = loadConfig();
+  const { config } = loadConfig();
   const trackersConfig = config.trackers;
 
   // Try primary tracker first, then secondary
