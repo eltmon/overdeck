@@ -11413,6 +11413,144 @@ const issueDataService = new IssueDataService(socketIo, cacheService);
 // Track active PTY sessions
 const activePtys = new Map<string, pty.IPty>();
 
+// TLDR service endpoints
+app.get('/api/services/tldr/status', async (_req, res) => {
+  try {
+    const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+
+    // Get main daemon status
+    const projectRoot = process.cwd();
+    const venvPath = join(projectRoot, '.venv');
+
+    const results: Array<{
+      workspace: string;
+      running: boolean;
+      pid?: number;
+      healthy: boolean;
+      workspacePath: string;
+    }> = [];
+
+    if (existsSync(venvPath)) {
+      const service = getTldrDaemonService(projectRoot, venvPath);
+      const status = await service.getStatus();
+
+      results.push({
+        workspace: 'main',
+        running: status.running,
+        pid: status.pid,
+        healthy: status.healthy,
+        workspacePath: projectRoot,
+      });
+    }
+
+    // Get workspace daemon statuses
+    const workspacesDir = join(projectRoot, 'workspaces');
+    if (existsSync(workspacesDir)) {
+      const workspaces = readdirSync(workspacesDir, { withFileTypes: true })
+        .filter(d => d.isDirectory() && d.name.startsWith('feature-'));
+
+      for (const ws of workspaces) {
+        const wsPath = join(workspacesDir, ws.name);
+        const wsVenvPath = join(wsPath, '.venv');
+
+        if (existsSync(wsVenvPath)) {
+          const service = getTldrDaemonService(wsPath, wsVenvPath);
+          const status = await service.getStatus();
+
+          results.push({
+            workspace: ws.name,
+            running: status.running,
+            pid: status.pid,
+            healthy: status.healthy,
+            workspacePath: wsPath,
+          });
+        }
+      }
+    }
+
+    res.json({ daemons: results });
+  } catch (error: any) {
+    console.error('Error getting TLDR status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/services/tldr/start', async (_req, res) => {
+  try {
+    const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+    const projectRoot = process.cwd();
+    const venvPath = join(projectRoot, '.venv');
+
+    if (!existsSync(venvPath)) {
+      return res.status(404).json({ error: 'No .venv found in project root' });
+    }
+
+    const service = getTldrDaemonService(projectRoot, venvPath);
+    await service.start();
+
+    res.json({ success: true, message: 'TLDR daemon started' });
+  } catch (error: any) {
+    console.error('Error starting TLDR daemon:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/services/tldr/stop', async (_req, res) => {
+  try {
+    const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+    const projectRoot = process.cwd();
+    const venvPath = join(projectRoot, '.venv');
+
+    if (!existsSync(venvPath)) {
+      return res.status(404).json({ error: 'No .venv found in project root' });
+    }
+
+    const service = getTldrDaemonService(projectRoot, venvPath);
+    await service.stop();
+
+    res.json({ success: true, message: 'TLDR daemon stopped' });
+  } catch (error: any) {
+    console.error('Error stopping TLDR daemon:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/workspaces/:issueId/tldr', async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+
+    const projectRoot = process.cwd();
+    const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    const venvPath = join(workspacePath, '.venv');
+
+    if (!existsSync(workspacePath)) {
+      return res.status(404).json({ error: 'Workspace not found' });
+    }
+
+    if (!existsSync(venvPath)) {
+      return res.json({
+        available: false,
+        reason: 'No .venv found in workspace'
+      });
+    }
+
+    const service = getTldrDaemonService(workspacePath, venvPath);
+    const status = await service.getStatus();
+
+    res.json({
+      available: true,
+      running: status.running,
+      pid: status.pid,
+      healthy: status.healthy,
+      workspacePath,
+    });
+  } catch (error: any) {
+    console.error('Error getting workspace TLDR status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Health check endpoint (must be after wss and activePtys are defined)
 app.get('/api/health', (_req, res) => {
   res.json({
