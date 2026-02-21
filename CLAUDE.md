@@ -72,3 +72,36 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 - **NEVER attempt destructive HTTP requests** (POST, DELETE) speculatively — HTTP requests execute immediately when sent; tool rejection by the user CANNOT stop an already-sent request
 - When a user wants to restart an agent, use the regular stop/restart flow, NOT deep-wipe
 - Deep-wipe is a last resort for cleaning up abandoned workspaces, not a routine operation
+
+## TLDR: Token-Efficient Code Analysis
+
+**If your workspace has a `.venv` directory, you have access to TLDR tools for code analysis.**
+
+TLDR provides structured code summaries using 500-1,200 tokens per file instead of 10-25k, extending how much work you can accomplish per session.
+
+### Available MCP Tools
+
+When TLDR is available, you'll have these MCP tools:
+- `tldr_context <file>` - File structure, exports, imports, key functions
+- `tldr_structure <directory>` - Directory layout and relationships
+- `tldr_calls <function> <file>` - Call graph (what calls this function)
+- `tldr_impact <function> <file>` - Impact analysis (what this function calls)
+- `tldr_semantic <query>` - Natural language code search
+
+### Recommended Workflow
+
+1. **Explore with TLDR first:**
+   - Use `tldr_context` to understand file structure before reading
+   - Use `tldr_semantic` to find relevant code by description
+   - Use `tldr_calls` and `tldr_impact` for dependency analysis
+
+2. **Read full files only when editing:**
+   - TLDR shows you the structure and what to edit
+   - Read the full file to get exact line numbers and implementation
+   - Edit the specific sections you identified
+
+3. **Avoid reading everything:**
+   - 20 files × 15k tokens = 300k tokens (exhausts context)
+   - 20 files × 800 tokens (TLDR) = 16k tokens (94% savings)
+
+**Use TLDR liberally to maximize your session effectiveness.**

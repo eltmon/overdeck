@@ -355,6 +355,26 @@ program
         process.exit(1);
       });
     }
+
+    // Start TLDR daemon on project root (if Python3 and venv available)
+    try {
+      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
+      const projectRoot = process.cwd();
+      const venvPath = join(projectRoot, '.venv');
+
+      if (existsSync(venvPath)) {
+        console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
+        const tldrService = getTldrDaemonService(projectRoot, venvPath);
+        await tldrService.start(true);  // background mode
+        console.log(chalk.green('✓ TLDR daemon started'));
+      } else {
+        console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
+        console.log(chalk.dim('  Run setup to create venv with llm-tldr'));
+      }
+    } catch (error: any) {
+      console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
+      console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
+    }
   });
 
 program
@@ -413,6 +433,27 @@ program
           console.log(chalk.yellow('⚠ Failed to stop Traefik'));
         }
       }
+    }
+
+    // Stop TLDR daemon on project root
+    try {
+      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+
+      const projectRoot = process.cwd();
+      const venvPath = join(projectRoot, '.venv');
+
+      if (existsSync(venvPath)) {
+        console.log(chalk.dim('\nStopping TLDR daemon...'));
+        const tldrService = getTldrDaemonService(projectRoot, venvPath);
+        await tldrService.stop();
+        console.log(chalk.green('✓ TLDR daemon stopped'));
+      }
+    } catch (error: any) {
+      // Non-fatal - TLDR daemon may not be running
+      console.log(chalk.dim('  (TLDR daemon not running)'));
     }
 
     console.log('');

@@ -10428,7 +10428,23 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
     if (deleteWorkspace && projectPath) {
       const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
-      // 5a. Stop Docker containers BEFORE deleting workspace files
+      // 5a. Stop TLDR daemon BEFORE deleting workspace files
+      if (existsSync(workspacePath)) {
+        const venvPath = join(workspacePath, '.venv');
+        if (existsSync(venvPath)) {
+          try {
+            const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
+            const tldrService = getTldrDaemonService(workspacePath, venvPath);
+            await tldrService.stop();
+            cleanupLog.push('Stopped TLDR daemon');
+          } catch (tldrErr) {
+            // Non-fatal - daemon may not be running
+            cleanupLog.push(`TLDR daemon stop warning: ${(tldrErr as Error).message}`);
+          }
+        }
+      }
+
+      // 5b. Stop Docker containers BEFORE deleting workspace files
       // Compose files live inside the workspace, so they must still exist for this step
       if (existsSync(workspacePath)) {
         const dockerResult = await stopWorkspaceDocker(
@@ -10439,7 +10455,7 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
         cleanupLog.push(...dockerResult.steps);
       }
 
-      // 5b. Remove Cloudflare tunnel entries before workspace deletion
+      // 5c. Remove Cloudflare tunnel entries before workspace deletion
       const wsConfig = projectConfig?.workspace;
       const featureFolder = `feature-${issueLower}`;
       const domain = wsConfig?.dns?.domain || 'localhost';
@@ -10463,7 +10479,7 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
         }
       }
 
-      // 5c. Remove Hume EVI config
+      // 5d. Remove Hume EVI config
       if (wsConfig?.hume) {
         try {
           const { deleteHumeConfig } = await import('../../lib/hume.js');
