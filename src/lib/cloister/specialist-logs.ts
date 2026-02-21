@@ -363,14 +363,19 @@ export function cleanupOldLogs(
   retention: { maxDays: number; maxRuns: number }
 ): number {
   const { maxDays, maxRuns } = retention;
+
+  // Compute cutoff BEFORE reading file stats. This ensures all files that existed
+  // when cleanup was invoked have birthtimes <= cutoffDate when maxDays=0, avoiding
+  // a race where a file created in the same millisecond as cutoffDate would be
+  // incorrectly retained by a >= comparison.
+  const now = new Date();
+  const cutoffDate = new Date(now.getTime() - maxDays * 24 * 60 * 60 * 1000);
+
   const allLogs = listRunLogs(projectKey, specialistType);
 
   if (allLogs.length === 0) {
     return 0;
   }
-
-  const now = new Date();
-  const cutoffDate = new Date(now.getTime() - maxDays * 24 * 60 * 60 * 1000);
 
   let deletedCount = 0;
 
@@ -380,10 +385,13 @@ export function cleanupOldLogs(
       return;
     }
 
-    // Keep if strictly within maxDays (use > not >= to handle the edge case where
-    // createdAt equals cutoffDate exactly, e.g. when maxDays is 0 and files were
-    // just created in the same millisecond as the cutoff is computed)
-    if (log.createdAt > cutoffDate) {
+    // Keep if within maxDays. Skip the age check entirely when maxDays=0, because
+    // "within 0 days" means no age-based protection — only maxRuns applies.
+    // This avoids a timing/rounding issue: Node.js converts nanosecond birthtime
+    // to milliseconds using standard rounding, so a file created at 431.6ms gets
+    // birthtime 432ms. If cutoff is 431ms (same wall-clock millisecond), the file
+    // incorrectly appears newer than the cutoff and gets retained.
+    if (maxDays > 0 && log.createdAt >= cutoffDate) {
       return;
     }
 
