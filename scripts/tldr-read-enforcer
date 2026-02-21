@@ -1,0 +1,126 @@
+#!/bin/bash
+# ~/.panopticon/bin/tldr-read-enforcer
+# PreToolUse hook on Read — intercepts file reads and returns TLDR summaries
+# for large code files, saving 90-95% of context tokens.
+#
+# Bypasses (allows normal read):
+#   - Files < 3KB (small enough to read directly)
+#   - Reads with offset/limit (targeted reads for editing)
+#   - Non-code files (configs, docs, json, etc.)
+#   - No .venv available (TLDR not installed)
+#   - TLDR command fails (graceful degradation)
+
+# Don't use set -e — never break Claude Code execution
+INPUT=$(cat 2>/dev/null || echo '{}')
+
+# Only act on Read tool
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+if [ "$TOOL_NAME" != "Read" ]; then
+  exit 0
+fi
+
+# Extract Read parameters
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""' 2>/dev/null)
+OFFSET=$(echo "$INPUT" | jq -r '.tool_input.offset // empty' 2>/dev/null)
+LIMIT=$(echo "$INPUT" | jq -r '.tool_input.limit // empty' 2>/dev/null)
+
+# Bypass: targeted reads (offset or limit specified — agent is reading for editing)
+if [ -n "$OFFSET" ] || [ -n "$LIMIT" ]; then
+  exit 0
+fi
+
+# Bypass: file doesn't exist
+if [ ! -f "$FILE_PATH" ]; then
+  exit 0
+fi
+
+# Bypass: small files (< 3KB)
+FILE_SIZE=$(stat -c%s "$FILE_PATH" 2>/dev/null || echo 0)
+if [ "$FILE_SIZE" -lt 3072 ]; then
+  exit 0
+fi
+
+# Bypass: non-code files
+EXT="${FILE_PATH##*.}"
+EXT_LOWER=$(echo "$EXT" | tr '[:upper:]' '[:lower:]')
+case "$EXT_LOWER" in
+  ts|tsx|js|jsx|py|java|go|rs|cpp|c|h|hpp|rb|php|kt|swift|cs|scala|lua|ex|exs)
+    # Code file — continue to TLDR
+    ;;
+  *)
+    # Non-code — allow normal read
+    exit 0
+    ;;
+esac
+
+# Find the .venv/bin/tldr binary
+# Check workspace first, then project root
+TLDR_BIN=""
+DIR="$(dirname "$FILE_PATH")"
+while [ "$DIR" != "/" ]; do
+  if [ -x "$DIR/.venv/bin/tldr" ]; then
+    TLDR_BIN="$DIR/.venv/bin/tldr"
+    PROJECT_DIR="$DIR"
+    break
+  fi
+  DIR=$(dirname "$DIR")
+done
+
+# Bypass: no TLDR binary found
+if [ -z "$TLDR_BIN" ]; then
+  exit 0
+fi
+
+# Get relative path from project root
+REL_PATH="${FILE_PATH#$PROJECT_DIR/}"
+
+# Try to get TLDR context for this file
+TLDR_OUTPUT=$("$TLDR_BIN" context "$REL_PATH" 2>/dev/null)
+TLDR_EXIT=$?
+
+# Bypass: TLDR failed — allow normal read
+if [ $TLDR_EXIT -ne 0 ] || [ -z "$TLDR_OUTPUT" ]; then
+  exit 0
+fi
+
+# Also get structure for additional context
+TLDR_STRUCTURE=$("$TLDR_BIN" calls "$REL_PATH" 2>/dev/null || true)
+
+# Build the summary that Claude will see instead of the raw file
+SUMMARY="[TLDR Summary — ${FILE_SIZE} bytes saved from context]
+
+File: ${FILE_PATH}
+
+## Structure & Exports
+${TLDR_OUTPUT}"
+
+if [ -n "$TLDR_STRUCTURE" ]; then
+  SUMMARY="${SUMMARY}
+
+## Call Graph
+${TLDR_STRUCTURE}"
+fi
+
+SUMMARY="${SUMMARY}
+
+---
+To read the full file, use Read with offset/limit parameters for the specific section you need to edit."
+
+# Deny the read and provide TLDR context instead
+# Use a temp file for the JSON to handle multiline safely
+TEMP_JSON=$(mktemp /tmp/tldr-hook-XXXXXX.json)
+jq -n --arg reason "TLDR summary provided instead of full file read (${FILE_SIZE} bytes → ~1K tokens)" \
+      --arg context "$SUMMARY" \
+  '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: $reason,
+      additionalContext: $context
+    }
+  }' > "$TEMP_JSON" 2>/dev/null
+
+cat "$TEMP_JSON"
+rm -f "$TEMP_JSON"
+
+exit 0
