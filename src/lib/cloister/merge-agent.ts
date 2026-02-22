@@ -16,7 +16,6 @@ const __dirname = dirname(__filename);
 import { PANOPTICON_HOME } from '../paths.js';
 import {
   getSessionId,
-  setSessionId,
   recordWake,
   getTmuxSessionName,
   wakeSpecialist,

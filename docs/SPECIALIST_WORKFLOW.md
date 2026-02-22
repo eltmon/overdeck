@@ -315,6 +315,57 @@ auto_wake = true
 3. **Reset sessions periodically**: If context gets too large (>100K tokens)
 4. **Configure test commands**: Override auto-detection for custom test setups
 
+## Session Persistence & Memory
+
+Specialist agents maintain persistent sessions across invocations, accumulating project knowledge over time. This is a key differentiator — specialists get smarter the more they work on a project.
+
+### How It Works
+
+Each specialist stores a session ID in `~/.panopticon/specialists/<name>.session`. When a specialist is woken up:
+
+1. **First wake** (no session file): A new UUID is generated, Claude Code starts with `--session-id <uuid>`, and the ID is persisted to disk.
+2. **Subsequent wakes**: The saved session ID is read and Claude Code starts with `--resume <sessionId>`, restoring the full conversation history.
+
+This means the merge-agent remembers every merge it has performed, the review-agent accumulates knowledge of code patterns and past review decisions, and the test-agent retains awareness of flaky tests and project-specific test configurations.
+
+### What Gets Preserved
+
+| Specialist | Accumulated Knowledge |
+|------------|----------------------|
+| **merge-agent** | Previous merge resolutions, conflict patterns, project conventions, which files commonly conflict |
+| **review-agent** | Code quality patterns, past review decisions, security patterns specific to the project |
+| **test-agent** | Test infrastructure knowledge, known flaky tests, failure patterns |
+
+### Session Rotation (Context Management)
+
+When a specialist's token usage exceeds **100K tokens**, session rotation triggers automatically:
+
+1. The current session is killed
+2. A **tiered memory file** is built from git history:
+   - **Last 100 merges**: commit hash + message (summary)
+   - **Last 50 merges**: + files changed (detailed)
+   - **Last 20 merges**: + full diffs (complete context)
+3. A fresh session starts with the memory file injected as context
+4. The new session ID is persisted for future `--resume`
+
+This ensures specialists maintain long-term knowledge without exhausting their context window.
+
+### Why This Matters
+
+Without session persistence, every specialist wake starts from zero — the merge-agent would re-learn the same conflict patterns, the review-agent would forget past decisions, and the test-agent would lose awareness of the test infrastructure. Session persistence transforms specialists from stateless workers into experienced team members that improve over time.
+
+### Resetting a Specialist
+
+To clear a specialist's accumulated context and start fresh:
+
+```bash
+# Delete the session file — next wake will create a new session
+rm ~/.panopticon/specialists/merge-agent.session
+
+# Or reset via CLI
+pan specialists reset merge-agent
+```
+
 ## Review Cycle Circuit Breaker
 
 Agents can automatically request re-review up to **3 times** (`MAX_AUTO_REQUEUE = 3`). After 3 cycles of specialist feedback and agent fixes, the circuit breaker trips and human intervention is required.

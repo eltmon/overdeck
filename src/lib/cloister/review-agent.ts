@@ -17,7 +17,6 @@ import { PANOPTICON_HOME } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import {
   getSessionId,
-  setSessionId,
   recordWake,
   getTmuxSessionName,
 } from './specialists.js';
