@@ -195,9 +195,24 @@ program
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {
-        const { generatePanopticonTraefikConfig } = await import('../lib/traefik.js');
+        const { generatePanopticonTraefikConfig, ensureProjectCerts, generateTlsConfig, cleanupStaleTlsSections } = await import('../lib/traefik.js');
+
+        // Clean stale tls: sections from older config files
+        cleanupStaleTlsSections();
+
         if (generatePanopticonTraefikConfig()) {
           console.log(chalk.dim('  Regenerated Traefik config from template'));
+        }
+
+        // Generate missing certs for registered projects
+        const generatedDomains = ensureProjectCerts();
+        for (const domain of generatedDomains) {
+          console.log(chalk.dim(`  Generated wildcard cert for *.${domain}`));
+        }
+
+        // Generate tls.yml from all discovered certs
+        if (generateTlsConfig()) {
+          console.log(chalk.dim('  Generated TLS config (tls.yml)'));
         }
       } catch {
         console.log(chalk.yellow('Warning: Could not regenerate Traefik config'));
