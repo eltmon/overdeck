@@ -1,6 +1,6 @@
 # PAN-238: Cost recording generates ~50% duplicate events despite flock serialization
 
-## Status: Planning Complete
+## Status: Implementation Complete
 
 ## Root Cause
 
@@ -67,3 +67,20 @@ PostToolUse → heartbeat-hook → flock → record-cost-event.ts
 - **Persisted seen-set growth**: Bounded per session. Sessions have finite lifetimes and the set only tracks requestIds, not full events. Can prune on session end.
 - **Backward compatibility**: `requestId` is optional on `CostEvent` — older events without it are unaffected. The upgraded `deduplicateEvents()` falls back to timestamp heuristic for events missing `requestId`.
 - **PAN-236 interaction**: TLDR metrics attachment uses a `tldrAttachedToFirstEvent` flag. With dedup, fewer events survive per batch, but the flag still attaches to the first survivor. No behavioral change needed.
+
+## Current Status
+
+Implementation complete. All 3 beads closed.
+
+## Remaining Work
+
+None.
+
+## Implementation Summary
+
+- `scripts/record-cost-event.ts` + `.js`: requestId dedup with persistent seen-set (`state/{sessionId}.seen`). Each requestId emits exactly one cost event per session.
+- `src/lib/costs/events.ts`: `requestId?` added to `CostEvent`. `deduplicateEvents()` upgraded with two strategies: primary requestId-based exact dedup; fallback 60-second window heuristic for legacy events.
+- `src/lib/costs/__tests__/events.test.ts`: 4 new tests for requestId dedup (10 total, all pass).
+- `src/dashboard/server/index.ts`: Startup call to `deduplicateEvents()` for one-time historical cleanup.
+
+Build passes, all tests pass (XTerminal timeout failure is pre-existing on main).
