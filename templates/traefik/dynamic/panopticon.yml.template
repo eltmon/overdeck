@@ -36,8 +36,3 @@ http:
       loadBalancer:
         servers:
           - url: "http://host.docker.internal:{{DASHBOARD_API_PORT}}"
-
-tls:
-  certificates:
-    - certFile: /etc/traefik/certs/_wildcard.{{TRAEFIK_DOMAIN}}.pem
-      keyFile: /etc/traefik/certs/_wildcard.{{TRAEFIK_DOMAIN}}-key.pem

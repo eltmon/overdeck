@@ -20,7 +20,7 @@ import {
 import { getDefaultConfig, saveConfig, loadConfig } from '../../lib/config.js';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
-import { generatePanopticonTraefikConfig, cleanupTemplateFiles } from '../../lib/traefik.js';
+import { generatePanopticonTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig } from '../../lib/traefik.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -306,6 +306,15 @@ async function installCommand(options: InstallOptions): Promise<void> {
         copyFileSync(traefikKeyFile, legacyKeyFile);
 
         spinner.succeed('Wildcard certificates generated (*.pan.localhost, *.localhost)');
+
+        // Generate certs for registered projects and build tls.yml
+        const generatedDomains = ensureProjectCerts();
+        for (const domain of generatedDomains) {
+          spinner.succeed(`Generated wildcard cert for *.${domain}`);
+        }
+        if (generateTlsConfig()) {
+          spinner.succeed('TLS config generated (tls.yml)');
+        }
       } catch (error) {
         spinner.warn('mkcert setup failed (HTTPS may not work)');
       }
@@ -459,6 +468,11 @@ async function installCommand(options: InstallOptions): Promise<void> {
       // Always regenerate panopticon.yml from template to pick up config changes
       if (generatePanopticonTraefikConfig()) {
         spinner.succeed('Traefik dynamic config generated (panopticon.yml)');
+      }
+
+      // Always regenerate tls.yml from discovered certs
+      if (generateTlsConfig()) {
+        spinner.succeed('TLS config generated (tls.yml)');
       }
 
       // Check if existing docker-compose.yml needs migration (for upgrades)
