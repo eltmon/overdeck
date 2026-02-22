@@ -13671,4 +13671,15 @@ server.listen(PORT, '0.0.0.0', async () => {
   } catch (error: any) {
     console.error('Failed to auto-start Cloister:', error.message);
   }
+
+  // One-time dedup of historical cost events on startup (PAN-238)
+  // Cleans up duplicate events recorded before requestId-based dedup was added.
+  try {
+    const removed = deduplicateEvents();
+    if (removed > 0) {
+      console.log(`Startup dedup: removed ${removed} duplicate cost event${removed !== 1 ? 's' : ''} (PAN-238)`);
+    }
+  } catch (error: any) {
+    console.error('Startup dedup failed (non-fatal):', error.message);
+  }
 });

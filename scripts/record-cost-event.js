@@ -245,6 +245,19 @@ if (existsSync3(stateFile)) {
   } catch {
   }
 }
+var seenFile = join5(stateDir, `${sessionId}.seen`);
+var seenRequestIds = /* @__PURE__ */ new Set();
+if (existsSync3(seenFile)) {
+  try {
+    const seenContent = readFileSync3(seenFile, "utf-8").trim();
+    if (seenContent) {
+      for (const id of seenContent.split("\n")) {
+        if (id.trim()) seenRequestIds.add(id.trim());
+      }
+    }
+  } catch {
+  }
+}
 var fd;
 try {
   fd = openSync(transcriptPath, "r");
@@ -303,6 +316,13 @@ for (const line of lines) {
     if (entry.type !== "assistant" || !entry.message?.usage) {
       continue;
     }
+    const requestId = entry.requestId;
+    if (requestId) {
+      if (seenRequestIds.has(requestId)) {
+        continue;
+      }
+      seenRequestIds.add(requestId);
+    }
     const usage = entry.message.usage;
     const model = entry.message.model || "claude-sonnet-4";
     const inputTokens = usage.input_tokens || 0;
@@ -349,10 +369,14 @@ for (const line of lines) {
       cacheRead: cacheReadTokens,
       cacheWrite: cacheWriteTokens,
       cost,
+      ...requestId ? { requestId } : {},
       ...tldrFields
     });
   } catch {
   }
 }
 writeFileSync3(stateFile, String(stat.size), "utf-8");
+if (seenRequestIds.size > 0) {
+  writeFileSync3(seenFile, Array.from(seenRequestIds).join("\n") + "\n", "utf-8");
+}
 process.exit(0);

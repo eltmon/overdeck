@@ -30,6 +30,8 @@ export interface CostEvent {
   tldrBypasses?: number;                  // TLDR bypasses since last cost event
   tldrTokensSaved?: number;               // Estimated tokens saved since last cost event
   tldrBypassReasons?: Record<string, number>; // e.g. { "offset-limit": 3, "recently-edited": 1 }
+
+  requestId?: string;                      // Claude Code transcript request ID — used for precise dedup (PAN-238)
 }
 
 export interface EventMetadata {
@@ -263,12 +265,16 @@ export function replaceEventsFile(events: CostEvent[]): void {
 }
 
 /**
- * Deduplicate events.jsonl by removing duplicate cost events caused by the
- * parallel-tool-call race condition (PAN-220).
+ * Deduplicate events.jsonl by removing duplicate cost events.
  *
- * Two events are considered duplicates if they share the same agentId, issueId,
- * model, input, output, cacheRead, and cacheWrite tokens, and their timestamps
- * are within 60 seconds of each other. Only the first occurrence is kept.
+ * Primary strategy (PAN-238): If an event has a `requestId`, deduplicate by
+ * exact requestId match. Claude Code's transcript contains multiple entries
+ * per API request (same requestId), so each requestId should produce exactly
+ * one cost event.
+ *
+ * Fallback strategy (PAN-220): For events without `requestId` (recorded before
+ * PAN-238), use the heuristic 60-second window: events with identical token
+ * fields within 60 seconds are considered race-condition duplicates.
  *
  * Returns the number of duplicate events removed.
  */
@@ -281,7 +287,9 @@ export function deduplicateEvents(): number {
   const lines = content.split('\n').filter(line => line.trim());
 
   const kept: CostEvent[] = [];
-  // Track seen (key → earliest timestamp ms) for dedup window
+  // requestId-based dedup: exact match (precise, PAN-238)
+  const seenRequestIds = new Set<string>();
+  // Legacy heuristic: (key → earliest timestamp ms) for events without requestId
   const seen = new Map<string, number>();
 
   for (const line of lines) {
@@ -294,7 +302,17 @@ export function deduplicateEvents(): number {
       continue;
     }
 
-    // Build deduplication key from fields that identify the same transcript entry
+    // Primary: requestId-based dedup — precise, no time-window needed
+    if (event.requestId) {
+      if (seenRequestIds.has(event.requestId)) {
+        continue; // Duplicate
+      }
+      seenRequestIds.add(event.requestId);
+      kept.push(event);
+      continue;
+    }
+
+    // Fallback: 60-second window heuristic for events without requestId
     const key = `${event.agentId}|${event.issueId}|${event.model}|${event.input}|${event.output}|${event.cacheRead}|${event.cacheWrite}`;
     const tsMs = new Date(event.ts).getTime();
 
@@ -304,11 +322,9 @@ export function deduplicateEvents(): number {
     // Strict < preserves events exactly 60 seconds apart as legitimate.
     const lastKeptMs = seen.get(key);
     if (lastKeptMs !== undefined && Math.abs(tsMs - lastKeptMs) < 60_000) {
-      // Duplicate within 60-second window — skip
-      continue;
+      continue; // Duplicate within 60-second window
     }
 
-    // Keep this event and record its timestamp as the new reference point
     seen.set(key, tsMs);
     kept.push(event);
   }

@@ -108,4 +108,42 @@ describe('deduplicateEvents', () => {
     expect(deduplicateEvents()).toBe(0);
     expect(readEvents()).toHaveLength(3);
   });
+
+  // requestId-based dedup tests (PAN-238)
+
+  it('should remove events with duplicate requestIds regardless of timestamp distance', () => {
+    const requestId = 'req-abc-123';
+    // Timestamps > 60s apart — heuristic would keep both, but requestId dedup removes the dup
+    const ts1 = new Date(Date.now() - 300_000).toISOString(); // 5 min ago
+    const ts2 = new Date().toISOString();
+    appendCostEvent(makeEvent({ ts: ts1, requestId, input: 1000 }));
+    appendCostEvent(makeEvent({ ts: ts2, requestId, input: 1000 })); // same requestId
+
+    const removed = deduplicateEvents();
+    expect(removed).toBe(1);
+    expect(readEvents()).toHaveLength(1);
+  });
+
+  it('should keep events with different requestIds even with identical token counts', () => {
+    const base = { input: 1000, output: 500, cacheRead: 0, cacheWrite: 0 };
+    appendCostEvent(makeEvent({ requestId: 'req-1', ...base }));
+    appendCostEvent(makeEvent({ requestId: 'req-2', ...base })); // different request
+
+    expect(deduplicateEvents()).toBe(0);
+    expect(readEvents()).toHaveLength(2);
+  });
+
+  it('should handle mixed events: requestId-based and legacy heuristic in the same file', () => {
+    const ts = new Date().toISOString();
+    // Event with requestId — dedup by requestId
+    appendCostEvent(makeEvent({ ts, requestId: 'req-xyz', input: 1000 }));
+    appendCostEvent(makeEvent({ ts, requestId: 'req-xyz', input: 1000 })); // dup by requestId
+    // Event without requestId — dedup by heuristic
+    appendCostEvent(makeEvent({ ts, input: 2000 }));
+    appendCostEvent(makeEvent({ ts, input: 2000 })); // dup by heuristic (same ts, same tokens)
+
+    const removed = deduplicateEvents();
+    expect(removed).toBe(2);
+    expect(readEvents()).toHaveLength(2);
+  });
 });
