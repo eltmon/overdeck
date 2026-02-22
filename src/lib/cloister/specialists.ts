@@ -10,6 +10,7 @@ import { join, basename } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { randomUUID } from 'crypto';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
@@ -1392,11 +1393,13 @@ Say: "I am the ${name} specialist, ready and waiting for tasks."`;
     const launcherScript = join(agentDir, 'launcher.sh');
 
     writeFileSync(promptFile, identityPrompt);
+    const newSessionId = randomUUID();
     writeFileSync(launcherScript, `#!/bin/bash
 cd "${cwd}"
 prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --model ${model} "$prompt"
+exec claude --dangerously-skip-permissions --session-id "${newSessionId}" --model ${model} "$prompt"
 `, { mode: 0o755 });
+    setSessionId(name, newSessionId);
 
     // Spawn Claude Code via launcher script (with provider env vars)
     await execAsync(
@@ -1561,10 +1564,15 @@ export async function wakeSpecialist(
         ? '--dangerously-skip-permissions --permission-mode bypassPermissions'
         : '--dangerously-skip-permissions';
 
-      // Start with --resume if we have a session, otherwise fresh
-      const claudeCmd = sessionId
-        ? `claude --resume "${sessionId}" ${modelFlag} ${permissionFlags}`
-        : `claude ${modelFlag} ${permissionFlags}`;
+      // Start with --resume if we have a session, otherwise generate a new session ID
+      let claudeCmd: string;
+      if (sessionId) {
+        claudeCmd = `claude --resume "${sessionId}" ${modelFlag} ${permissionFlags}`;
+      } else {
+        const newSessionId = randomUUID();
+        claudeCmd = `claude --session-id "${newSessionId}" ${modelFlag} ${permissionFlags}`;
+        setSessionId(name, newSessionId);
+      }
 
       await execAsync(
         `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "${claudeCmd}"`,
