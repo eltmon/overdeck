@@ -1,57 +1,69 @@
-# PAN-236: Add TLDR Session Metrics Tracking to Agent Cost Events
+# PAN-238: Cost recording generates ~50% duplicate events despite flock serialization
 
-## Problem
+## Status: Planning Complete
 
-The TLDR daemon runs and intercepts file reads, but there's zero visibility into:
-- How often it fires (interceptions)
-- How often it's bypassed (and why)
-- How many tokens it saves
-- Whether it's actually working during agent sessions
+## Root Cause
 
-## Implementation Plan
+The flock serialization (PAN-220) is working correctly — it prevents concurrent invocations from reading the same byte range. However, **Claude Code's transcript file itself contains multiple entries per API request** (same `requestId`).
 
-### 1. TLDR interception counter in `src/lib/tldr-daemon.ts`
-Add in-memory metrics accumulator tracking per-workspace:
-- `interceptions`: number of times TLDR provided a summary instead of full file read
-- `bypasses`: number of times TLDR was skipped (with reason)
-- `estimatedTokensSaved`: rough estimate based on `(fullFileTokens - tldrTokens)` per interception
-- `filesAnalyzed`: unique files summarized in this session
+Evidence from a live transcript:
+- 26 assistant entries with usage data → only 9 unique `requestId`s (65.4% duplicates)
+- Each `requestId` appears 2-5 times in the transcript JSONL
 
-Export `getTldrMetrics(workspacePath: string): TldrSessionMetrics` and `resetTldrMetrics(workspacePath: string)`.
+The cost recorder (`record-cost-event.ts`) processes all new transcript lines and emits a cost event for every `assistant` entry with usage data. Since the transcript contains multiple entries per request, we get multiple cost events per request — within a **single invocation**.
 
-### 2. Extend `CostEvent` in `src/lib/costs/events.ts`
-Add optional TLDR fields (backward compatible):
-```typescript
-tldrInterceptions?: number;
-tldrBypasses?: number;
-tldrTokensSaved?: number;
-tldrBypassReasons?: Record<string, number>;
+The flock doesn't help because the duplicates exist within a single processing batch, not across concurrent invocations.
+
+## Decisions
+
+1. **Fix at the source**: Deduplicate by `requestId` in `record-cost-event.ts` during transcript processing
+2. **Persistent requestId tracking**: Persist seen requestIds to a per-session state file (alongside `.offset`) to guard against crash-before-write scenarios
+3. **Upgrade deduplicateEvents()**: Replace the heuristic 60-second window dedup with `requestId`-based dedup for precision
+4. **One-time data cleanup**: Run dedup after deploy to clean historical duplicates
+5. **Add requestId to CostEvent**: Include `requestId` in the event type for traceability
+
+## PAN-236 Dependency
+
+PAN-236 (TLDR session metrics) is merging concurrently and modifies two of our target files:
+
+- **`src/lib/costs/events.ts`** — PAN-236 adds optional TLDR fields to `CostEvent`. We add `requestId?` alongside them. No conflict.
+- **`scripts/record-cost-event.ts`** — PAN-236 adds TLDR metrics capture and attaches `...tldrFields` to the first event in each batch using a `tldrAttachedToFirstEvent` flag. Our requestId dedup goes *before* the TLDR attachment in the loop. After dedup, TLDR metrics attach to the first *surviving* (non-duplicate) event, which is correct behavior.
+
+**Implementation note**: Rebase on main after PAN-236 merges before starting work. The `record-cost-event.ts` loop now has a TLDR block that must be preserved.
+
+## Architecture
+
+### Current Flow (broken)
+```
+PostToolUse → heartbeat-hook → flock → record-cost-event.ts
+  → reads transcript from byte offset
+  → processes ALL assistant messages with usage (including dupes)
+  → appends cost events (duplicates included)
+  → saves byte offset
 ```
 
-### 3. Attach metrics when recording cost events
-In the cost recording flow, call `getTldrMetrics()` to snapshot and attach TLDR counters, then reset accumulators (delta tracking, not cumulative).
-
-### 4. Surface in agent status
-Add TLDR metrics to agent status response used by `pan status` and dashboard.
+### Fixed Flow
+```
+PostToolUse → heartbeat-hook → flock → record-cost-event.ts
+  → reads transcript from byte offset
+  → loads persisted requestId set from state/{sessionId}.seen
+  → processes assistant messages, SKIPPING already-seen requestIds
+  → appends cost events (no duplicates, TLDR metrics on first surviving event)
+  → saves byte offset AND updated requestId set
+```
 
 ## Files to Modify
 
-- `src/lib/tldr-daemon.ts` — Add metrics accumulator and exports
-- `src/lib/costs/events.ts` — Extend CostEvent interface
-- `src/lib/costs/index.ts` — Wire metrics into cost event recording
-- `src/lib/agents.ts` — Include TLDR metrics in agent status
-- `scripts/record-cost-event.js` — Attach TLDR metrics when recording
+| File | Change | Difficulty |
+|------|--------|-----------|
+| `scripts/record-cost-event.ts` | Add requestId dedup + persist seen set (work with PAN-236's TLDR block) | medium |
+| `src/lib/costs/events.ts` | Add `requestId?` to CostEvent (after PAN-236's TLDR fields), upgrade deduplicateEvents() | medium |
+| `src/lib/costs/__tests__/events.test.ts` | Update dedup tests for requestId-based logic | simple |
+| `src/lib/costs/index.ts` | Re-export updated types (if needed) | trivial |
 
-## Current Status
+## Risks
 
-**IN PROGRESS** — Starting implementation.
-
-## Remaining Work
-
-1. Read and understand existing code
-2. Add TldrSessionMetrics interface and accumulator to tldr-daemon.ts
-3. Extend CostEvent interface
-4. Wire metrics into cost recording
-5. Surface in agent status
-6. Add tests
-7. Commit and push
+- **requestId availability**: Verified — all assistant entries in the transcript have `requestId`. The field has been present in Claude Code transcripts since at least the current format.
+- **Persisted seen-set growth**: Bounded per session. Sessions have finite lifetimes and the set only tracks requestIds, not full events. Can prune on session end.
+- **Backward compatibility**: `requestId` is optional on `CostEvent` — older events without it are unaffected. The upgraded `deduplicateEvents()` falls back to timestamp heuristic for events missing `requestId`.
+- **PAN-236 interaction**: TLDR metrics attachment uses a `tldrAttachedToFirstEvent` flag. With dedup, fewer events survive per batch, but the flag still attaches to the first survivor. No behavioral change needed.
