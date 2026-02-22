@@ -75,6 +75,21 @@ if (existsSync(stateFile)) {
   } catch { /* start from 0 */ }
 }
 
+// Load persisted seen requestIds to guard against crash-before-write duplicates (PAN-238)
+// Claude Code's transcript can have multiple entries per requestId — we emit exactly one event per requestId.
+const seenFile = join(stateDir, `${sessionId}.seen`);
+const seenRequestIds = new Set<string>();
+if (existsSync(seenFile)) {
+  try {
+    const seenContent = readFileSync(seenFile, 'utf-8').trim();
+    if (seenContent) {
+      for (const id of seenContent.split('\n')) {
+        if (id.trim()) seenRequestIds.add(id.trim());
+      }
+    }
+  } catch { /* start fresh */ }
+}
+
 // Read only NEW content from the transcript (efficient for large files)
 let fd: number;
 try {
@@ -153,6 +168,15 @@ for (const line of lines) {
       continue;
     }
 
+    // Skip already-seen requestIds — transcript has multiple entries per API request (PAN-238)
+    const requestId = entry.requestId;
+    if (requestId) {
+      if (seenRequestIds.has(requestId)) {
+        continue; // Duplicate entry for this request — already emitted a cost event
+      }
+      seenRequestIds.add(requestId);
+    }
+
     const usage = entry.message.usage;
     const model: string = entry.message.model || 'claude-sonnet-4';
 
@@ -216,6 +240,7 @@ for (const line of lines) {
       cacheRead: cacheReadTokens,
       cacheWrite: cacheWriteTokens,
       cost,
+      ...(requestId ? { requestId } : {}),
       ...tldrFields,
     });
   } catch {
@@ -223,7 +248,10 @@ for (const line of lines) {
   }
 }
 
-// Save new byte offset for next invocation
+// Save new byte offset and seen requestIds for next invocation
 writeFileSync(stateFile, String(stat.size), 'utf-8');
+if (seenRequestIds.size > 0) {
+  writeFileSync(seenFile, Array.from(seenRequestIds).join('\n') + '\n', 'utf-8');
+}
 
 process.exit(0);
