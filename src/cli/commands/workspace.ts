@@ -444,11 +444,8 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
         spinner.text = 'Starting Docker containers...';
         try {
           const composeDir = join(composeFile, '..');
-          // Construct project name from project name and feature folder
-          const projectPrefix = (projectName || 'workspace').toLowerCase().replace(/\s+/g, '-');
-          const composeProject = `${projectPrefix}-${folderName}`;
-          // Use -p for project name (unique container names) and -f for compose file
-          await execAsync(`docker compose -p "${composeProject}" -f "${composeFile}" up -d --build`, {
+          // Don't pass -p: the compose file's `name:` field is the authority
+          await execAsync(`docker compose -f "${composeFile}" up -d --build`, {
             cwd: composeDir,
             encoding: 'utf-8',
             timeout: 300000,
