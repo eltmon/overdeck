@@ -622,16 +622,14 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml'),
     ];
 
-    // Construct docker-compose project name from project config and feature name
-    const projectPrefix = projectConfig.name?.toLowerCase().replace(/\s+/g, '-') || 'workspace';
-    const composeProject = `${projectPrefix}-feature-${featureName}`;
-
     for (const composePath of composeLocations) {
       if (existsSync(composePath)) {
         try {
-          // Use -p for project name (unique container names) and -f for compose file
-          await execAsync(`docker compose -p "${composeProject}" -f "${composePath}" up -d --build`, { cwd: dirname(composePath), timeout: 300000 });
-          result.steps.push(`Started containers from ${basename(composePath)} (project: ${composeProject})`);
+          // Don't pass -p: the compose file's `name:` field is the authority.
+          // Passing -p with a different value creates a second Docker project
+          // on container restart, splitting services onto separate networks.
+          await execAsync(`docker compose -f "${composePath}" up -d --build`, { cwd: dirname(composePath), timeout: 300000 });
+          result.steps.push(`Started containers from ${basename(composePath)}`);
         } catch (error) {
           result.errors.push(`Failed to start containers: ${error}`);
         }
@@ -686,10 +684,6 @@ export async function stopWorkspaceDocker(
     steps: [],
   };
 
-  // Construct docker-compose project name (must match what was used at startup)
-  const projectPrefix = projectName.toLowerCase().replace(/\s+/g, '-') || 'workspace';
-  const composeProject = `${projectPrefix}-feature-${featureName}`;
-
   // Find all compose files in devcontainer directory (some projects use multiple)
   const devcontainerDir = join(workspacePath, '.devcontainer');
   const composeFiles: string[] = [];
@@ -724,11 +718,13 @@ export async function stopWorkspaceDocker(
       const fileFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
       const cwd = existsSync(devcontainerDir) ? devcontainerDir : workspacePath;
 
-      await execAsync(`docker compose -p "${composeProject}" ${fileFlags} down -v --remove-orphans`, {
+      // Don't pass -p: let the compose file's `name:` field determine the project.
+      // This must match what was used at startup to target the correct containers.
+      await execAsync(`docker compose ${fileFlags} down -v --remove-orphans`, {
         cwd,
         timeout: 60000,
       });
-      result.steps.push(`Stopped Docker containers (project: ${composeProject}, ${composeFiles.length} compose files)`);
+      result.steps.push(`Stopped Docker containers (${composeFiles.length} compose files)`);
     } catch (error: any) {
       // Log but don't fail — containers might not be running
       result.steps.push(`Docker cleanup attempted (${error.message?.split('\n')[0] || 'containers may not be running'})`);

@@ -4876,10 +4876,10 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
   for (const [displayName, suffixes] of Object.entries(containerMap)) {
     for (const suffix of suffixes) {
       checks.push(
-        // New naming: ${projectName}-feature-${issueLower}-${suffix}-1
-        { displayName, containerName: `mind-your-now-feature-${issueLower}-${suffix}-1` },
-        // Legacy naming patterns
+        // Canonical: compose file name field (basename of project path)
         { displayName, containerName: `myn-feature-${issueLower}-${suffix}-1` },
+        // Legacy: derived from projectConfig.name (before -p flag removal)
+        { displayName, containerName: `mind-your-now-feature-${issueLower}-${suffix}-1` },
         { displayName, containerName: `feature-${issueLower}-${suffix}-1` },
         { displayName, containerName: `${issueLower}-${suffix}-1` },
       );
