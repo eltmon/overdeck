@@ -39,6 +39,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [BUILD.md](./BUILD.md) | Build pipeline, esbuild config, `__dirname` resolution, prompt template copying |
 | [ARCHITECTURE-CACHING.md](./ARCHITECTURE-CACHING.md) | Dashboard API caching, real-time push, and rate limit management |
 | [DNS_SETUP.md](./DNS_SETUP.md) | Local DNS resolution for development |
 | [cost-tracking.md](./cost-tracking.md) | Event-sourced cost tracking system |
@@ -51,6 +52,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [TESTING.md](./TESTING.md) | Testing guide: test suites, Playwright conventions, `data-testid` patterns |
 | [E2E_TEST_PLAN.md](./E2E_TEST_PLAN.md) | End-to-end test plan and coverage |
 | [TESTING-PROVIDERS.md](./TESTING-PROVIDERS.md) | Provider testing guide |
 
@@ -108,6 +110,8 @@
 - **"handoff"** / **"handoffs"** → SPECIALIST_WORKFLOW.md
 - **"stuck detection"** → AGENTS.md, SPECIALIST_WORKFLOW.md
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
+- **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
+- **"deacon"** / **"health monitor"** → SPECIALIST_WORKFLOW.md (Deacon Health Monitor section)
 - **"rollback"** / **"revert"** / **"ORIG_HEAD"** → PRD-CLOISTER.md
 - **"baseline"** / **"test baseline"** → PRD-CLOISTER.md
 - **"review pipeline"** / **"specialist pipeline"** → PRD-CLOISTER.md, SPECIALIST_WORKFLOW.md
@@ -130,10 +134,17 @@
 - **"socket.io"** / **"real-time"** / **"push"** → ARCHITECTURE-CACHING.md
 - **"ETag"** / **"304"** / **"backoff"** → ARCHITECTURE-CACHING.md
 
+### Build & Development
+- **"build"** / **"esbuild"** / **"tsup"** / **"vite"** → BUILD.md
+- **"__dirname"** / **"bundled server"** / **"prompt template"** → BUILD.md
+- **"dist"** / **"production build"** → BUILD.md
+
 ### Testing
-- **"test"** / **"testing"** → E2E_TEST_PLAN.md, TESTING-PROVIDERS.md
+- **"test"** / **"testing"** → TESTING.md, E2E_TEST_PLAN.md, TESTING-PROVIDERS.md
 - **"E2E"** / **"end-to-end"** → E2E_TEST_PLAN.md
 - **"coverage"** → E2E_TEST_PLAN.md
+- **"playwright"** / **"data-testid"** / **"smoke test"** → TESTING.md
+- **"test-agent"** / **"test specialist"** → TESTING.md, SPECIALIST_WORKFLOW.md
 
 ### Development
 - **"skills"** → README.md, CLAUDE.md
