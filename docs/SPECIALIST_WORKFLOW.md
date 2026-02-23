@@ -56,6 +56,52 @@ Worker agents (issue-specific agents like `agent-pan-42`) submit work to special
 └─────────────────────────────┘
 ```
 
+## Planning → Implementation Transition
+
+When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the system transitions from planning phase to implementation phase:
+
+### Lifecycle
+
+```
+1. Planning agent writes:
+   .planning/
+   ├── STATE.md              # Decisions, approach, remaining work
+   ├── PLANNING_PROMPT.md    # Planning agent's instructions (DO NOT READ during implementation)
+   ├── discussions/           # Discovery conversation transcripts
+   ├── notes/                 # Research notes
+   └── transcripts/           # Session transcripts
+
+2. User clicks "Start Agent" → POST /api/agents
+
+3. Dashboard server:
+   a. Stops planning agent (marks state as 'stopped', stoppedReason: 'work-agent-started')
+   b. Commits .planning/ artifacts to git
+   c. Archives PLANNING_PROMPT.md → PLANNING_PROMPT.md.archived (PAN-250)
+   d. Determines phase: .planning/ exists → 'implementation', otherwise → 'exploration'
+   e. Spawns work agent via `pan work issue <ID> --phase implementation`
+
+4. Work agent reads .planning/STATE.md and implements remaining work
+```
+
+### Why PLANNING_PROMPT.md Is Archived
+
+`PLANNING_PROMPT.md` contains the planning agent's instructions, including "STOP and tell the user: Planning complete." If a work agent finds and reads this file, it follows the planning instructions instead of implementing — re-running discovery and outputting "Planning complete" (PAN-250).
+
+The archive step (`renameSync → .archived`) prevents this while preserving the file in git history for debugging.
+
+### Agent Environment Variables
+
+All agents spawned by Panopticon receive these environment variables:
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `PANOPTICON_AGENT_ID` | `agent-min-693` | Agent identifier for heartbeat, status, messaging |
+| `PANOPTICON_ISSUE_ID` | `MIN-693` | Issue being worked on |
+| `PANOPTICON_SESSION_TYPE` | `implementation` / `planning` / `exploration` | Current phase |
+| `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` | `false` | Disables suggested prompts for autonomous agents (PAN-251) |
+
+Provider-specific variables (`BASE_URL`, `AUTH_TOKEN`) are also injected based on the model's provider configuration.
+
 ## Worker Agent Integration
 
 ### Step 1: Complete Implementation
