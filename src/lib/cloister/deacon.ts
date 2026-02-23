@@ -49,6 +49,8 @@ import {
   getTmuxSessionName,
   isRunning,
   initializeSpecialist,
+  wakeSpecialist,
+  clearSessionId,
   checkSpecialistQueue,
   getNextSpecialistTask,
   wakeSpecialistWithTask,
@@ -1182,28 +1184,42 @@ export async function runPatrol(): Promise<PatrolResult> {
       const killResult = await forceKillSpecialist(specialist.name, state);
       actions.push(`Force-killed ${specialist.name}: ${killResult.message}`);
 
-      // Auto-restart if specialist was initialized
+      // Auto-restart after force-kill (PAN-246: use wakeSpecialist, not initializeSpecialist)
+      // Clear session ID so we get a fresh session, not a stale resume of the old context
       if (killResult.success) {
-        console.log(`[deacon] Auto-restarting ${specialist.name}...`);
-        const initResult = await initializeSpecialist(specialist.name);
-        if (initResult.success) {
+        console.log(`[deacon] Auto-restarting ${specialist.name} with fresh session...`);
+        clearSessionId(specialist.name);
+        const wakeResult = await wakeSpecialist(specialist.name, '', {
+          waitForReady: true,
+          startIfNotRunning: true,
+        });
+        if (wakeResult.success) {
           actions.push(`Auto-restarted ${specialist.name}`);
           addLog('action', `Auto-restarted ${specialist.name}`, state.patrolCycle);
         } else {
-          actions.push(`Failed to restart ${specialist.name}: ${initResult.message}`);
-          addLog('error', `Failed to restart ${specialist.name}: ${initResult.message}`, state.patrolCycle);
+          actions.push(`Failed to restart ${specialist.name}: ${wakeResult.message}`);
+          addLog('error', `Failed to restart ${specialist.name}: ${wakeResult.message}`, state.patrolCycle);
         }
       }
     } else if (!result.wasRunning && !result.inCooldown) {
       // Specialist should be running but isn't - auto-start
-      console.log(`[deacon] ${specialist.name} not running, auto-starting...`);
-      const initResult = await initializeSpecialist(specialist.name);
-      if (initResult.success) {
+      // PAN-246: Use wakeSpecialist instead of initializeSpecialist.
+      // initializeSpecialist rejects with 'already_initialized' if session file exists
+      // (even when tmux session is dead), causing an infinite retry loop.
+      // wakeSpecialist handles both fresh starts and resuming dead sessions.
+      // Clear session ID so we get a fresh session, not a stale resume of the old context.
+      console.log(`[deacon] ${specialist.name} not running, auto-starting with fresh session...`);
+      clearSessionId(specialist.name);
+      const wakeResult = await wakeSpecialist(specialist.name, '', {
+        waitForReady: true,
+        startIfNotRunning: true,
+      });
+      if (wakeResult.success) {
         actions.push(`Auto-started ${specialist.name}`);
         addLog('action', `Auto-started ${specialist.name}`, state.patrolCycle);
-      } else if (initResult.error !== 'already_running') {
-        actions.push(`Failed to start ${specialist.name}: ${initResult.message}`);
-        addLog('error', `Failed to start ${specialist.name}: ${initResult.message}`, state.patrolCycle);
+      } else {
+        actions.push(`Failed to start ${specialist.name}: ${wakeResult.message}`);
+        addLog('error', `Failed to start ${specialist.name}: ${wakeResult.message}`, state.patrolCycle);
       }
     }
 
