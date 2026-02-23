@@ -1,8 +1,12 @@
-import { existsSync, readFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { processEnvBlocks, processIfBlocks, substituteVariables } from '../template.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
+import { loadConfig } from '../config.js';
+import { createTrackerFromConfig } from '../tracker/factory.js';
+import { NotImplementedError } from '../tracker/interface.js';
+import type { TrackerType } from '../tracker/interface.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,6 +44,8 @@ export interface WorkAgentPromptContext {
   projectRoot?: string;
   /** Skip dynamic context gathering (filesystem reads). True for REMOTE/dashboard. */
   skipDynamicContext?: boolean;
+  /** Pre-fetched tracker context (new comments, status). Injected by callers. */
+  trackerContext?: string;
 }
 
 /**
@@ -91,6 +97,7 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
     STITCH_DESIGNS: stitchDesignsStr,
     POLYREPO_CONTEXT: polyrepoContextStr,
     PENDING_FEEDBACK: pendingFeedbackStr,
+    NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
   };
 
   // Processing pipeline: env blocks → if blocks → variable substitution
@@ -136,6 +143,154 @@ function readPendingFeedback(workspacePath: string): string {
   } catch {
     return '';
   }
+}
+
+const COMMENT_BODY_LIMIT = 500;
+const TOTAL_CONTEXT_LIMIT = 2000;
+
+/**
+ * Fetch tracker context (new comments + issue status) since STATE.md was last modified.
+ * Returns a formatted markdown string for injection into the work agent prompt.
+ */
+export async function getTrackerContext(
+  issueId: string,
+  workspacePath: string
+): Promise<string> {
+  let stateMtime: Date | null = null;
+  const statePath = join(workspacePath, '.planning', 'STATE.md');
+  if (existsSync(statePath)) {
+    try {
+      stateMtime = statSync(statePath).mtime;
+    } catch {
+      // Ignore stat errors
+    }
+  }
+
+  let config: ReturnType<typeof loadConfig>;
+  try {
+    config = loadConfig();
+  } catch {
+    return '_Tracker unavailable: could not load configuration. Check tracker settings manually._';
+  }
+
+  const trackersConfig = config.trackers;
+  if (!trackersConfig) {
+    return '';
+  }
+
+  // Try each configured tracker until one can resolve the issue
+  const trackerTypes: TrackerType[] = [trackersConfig.primary];
+  if (trackersConfig.secondary) {
+    trackerTypes.push(trackersConfig.secondary);
+  }
+
+  for (const trackerType of trackerTypes) {
+    try {
+      const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+
+      // Fetch issue and comments in parallel
+      const [issue, allComments] = await Promise.all([
+        tracker.getIssue(issueId),
+        tracker.getComments(issueId).catch((err: unknown) => {
+          // GitLab throws NotImplementedError; treat as no comments
+          if (err instanceof NotImplementedError) return [];
+          throw err;
+        }),
+      ]);
+
+      // Filter to comments newer than STATE.md mtime
+      const newComments = stateMtime
+        ? allComments.filter((c) => new Date(c.createdAt) > stateMtime!)
+        : allComments;
+
+      // Detect reopened: STATE.md exists (has completion history) but issue is open
+      const isReopened =
+        stateMtime !== null &&
+        (issue.state === 'open' || issue.state === 'in_progress');
+
+      // Build the section
+      const lines: string[] = [];
+
+      lines.push('## Tracker Status (Live)');
+      lines.push('');
+
+      const stateLabel = issue.rawState ?? issue.state;
+      if (isReopened) {
+        lines.push(
+          `> **ISSUE REOPENED** — Current state: **${stateLabel}**. This issue was previously worked on. Review the tracker for new instructions before fast-pathing to done.`
+        );
+      } else {
+        lines.push(`**Current state:** ${stateLabel}`);
+      }
+
+      if (newComments.length > 0) {
+        const sinceLabel = stateMtime
+          ? `since STATE.md was last updated (${stateMtime.toISOString().slice(0, 10)})`
+          : 'all comments';
+        lines.push('');
+        lines.push(`**New comments ${sinceLabel}:**`);
+        lines.push('');
+
+        let totalChars = lines.join('\n').length;
+        let truncatedAny = false;
+
+        for (const comment of newComments) {
+          let body = comment.body;
+          let commentTruncated = false;
+          if (body.length > COMMENT_BODY_LIMIT) {
+            body = body.slice(0, COMMENT_BODY_LIMIT) + ' [truncated — read full comment on tracker]';
+            commentTruncated = true;
+            truncatedAny = true;
+          }
+
+          const commentBlock = [
+            `**${comment.author}** (${comment.createdAt.slice(0, 10)}):`,
+            `> ${body.replace(/\n/g, '\n> ')}`,
+            '',
+          ].join('\n');
+
+          if (totalChars + commentBlock.length > TOTAL_CONTEXT_LIMIT) {
+            lines.push('_[Additional comments truncated — check tracker for full history]_');
+            truncatedAny = true;
+            break;
+          }
+
+          lines.push(commentBlock);
+          totalChars += commentBlock.length;
+        }
+
+        if (truncatedAny) {
+          lines.push('');
+          lines.push(`_Check the tracker directly for full comment content: ${issue.url}_`);
+        }
+      } else if (stateMtime) {
+        lines.push('');
+        lines.push('_No new comments since last STATE.md update._');
+      }
+
+      const result = lines.join('\n').trim();
+      // If only "no new comments" and not reopened, return empty to suppress the section
+      if (!isReopened && newComments.length === 0) {
+        return '';
+      }
+      return result;
+    } catch (err: unknown) {
+      // Issue not found in this tracker — try next
+      const message = err instanceof Error ? err.message : String(err);
+      if (
+        message.toLowerCase().includes('not found') ||
+        message.toLowerCase().includes('404') ||
+        message.toLowerCase().includes('no configuration')
+      ) {
+        continue;
+      }
+      // Unexpected error (auth failure, network, etc.) — warn in prompt
+      return `_Tracker unavailable: ${message}. Check tracker status and review any new comments manually._`;
+    }
+  }
+
+  // No tracker resolved the issue
+  return '';
 }
 
 /**

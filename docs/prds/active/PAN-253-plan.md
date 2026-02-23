@@ -79,13 +79,4 @@ Returns:
 
 ## Remaining Work
 
-None. Implementation complete.
-
-## Current Status
-
-All 4 tasks implemented and tested:
-1. `getTrackerContext()` added to `work-agent-prompt.ts` — fetches issue status + new comments since STATE.md mtime, detects reopened issues, handles GitLab NotImplementedError, truncates long content
-2. `NEW_TRACKER_CONTEXT` template section added to `work-agent.md` — placed between PENDING_FEEDBACK and Check Completion Status
-3. LOCAL caller (`issue.ts`) wired — calls `getTrackerContext()` before `buildWorkAgentPrompt()`
-4. REMOTE caller (`server/index.ts`) wired — calls `getTrackerContext()` before building REMOTE prompt
-5. Tests: 14 tests in `tests/lib/cloister/work-agent-prompt.test.ts` — all passing
+Implementation not started.

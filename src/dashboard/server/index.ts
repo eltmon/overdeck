@@ -8008,12 +8008,14 @@ app.post('/api/agents', async (req, res) => {
       await exe.syncAllCredentials(workspaceMetadata.vmName);
 
       // Generate initial prompt for the agent
-      const { buildWorkAgentPrompt } = await import('../../lib/cloister/work-agent-prompt.js');
+      const { buildWorkAgentPrompt, getTrackerContext } = await import('../../lib/cloister/work-agent-prompt.js');
+      const trackerContext = await getTrackerContext(issueId, workspacePath);
       const agentPrompt = buildWorkAgentPrompt({
         issueId,
         env: 'REMOTE',
         workspacePath: '/workspace',
         skipDynamicContext: true,
+        trackerContext,
       });
 
       const state = await spawnRemoteAgent({
