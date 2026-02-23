@@ -1,86 +1,173 @@
-# PAN-238: Cost recording generates ~50% duplicate events despite flock serialization
+# PAN-242: Sync with Main — Planning State
 
-## Status: Implementation Complete
+## Issue
+**ID:** PAN-242
+**Title:** Sync with Main: propagate hotfixes to active workspaces via merge agent
+**URL:** https://github.com/eltmon/panopticon-cli/issues/242
 
-## Root Cause
+## Problem
+When a hotfix is merged to main, active feature workspaces have no way to pick up those changes. The user must manually merge into each workspace branch.
 
-The flock serialization (PAN-220) is working correctly — it prevents concurrent invocations from reading the same byte range. However, **Claude Code's transcript file itself contains multiple entries per API request** (same `requestId`).
+## Solution
+Add a "Sync with Main" action that merges the latest main into the workspace branch, routed through the merge agent. Available via both CLI skill and dashboard UI.
 
-Evidence from a live transcript:
-- 26 assistant entries with usage data → only 9 unique `requestId`s (65.4% duplicates)
-- Each `requestId` appears 2-5 times in the transcript JSONL
+---
 
-The cost recorder (`record-cost-event.ts`) processes all new transcript lines and emits a cost event for every `assistant` entry with usage data. Since the transcript contains multiple entries per request, we get multiple cost events per request — within a **single invocation**.
+## Design Decisions (Locked)
 
-The flock doesn't help because the duplicates exist within a single processing batch, not across concurrent invocations.
+These decisions are final and not open for revisiting:
 
-## Decisions
+1. **Git strategy: merge, not rebase** — `git merge main`. Rebase rewrites SHAs (breaks agent state), requires force-push (too risky), and merge commits serve as audit markers.
 
-1. **Fix at the source**: Deduplicate by `requestId` in `record-cost-event.ts` during transcript processing
-2. **Persistent requestId tracking**: Persist seen requestIds to a per-session state file (alongside `.offset`) to guard against crash-before-write scenarios
-3. **Upgrade deduplicateEvents()**: Replace the heuristic 60-second window dedup with `requestId`-based dedup for precision
-4. **One-time data cleanup**: Run dedup after deploy to clean historical duplicates
-5. **Add requestId to CostEvent**: Include `requestId` in the event type for traceability
+2. **Validation: git + conflict resolution only** — No tests, no builds after merge. The feature branch is WIP; running validation would fail from pre-existing issues or take too long for no benefit.
 
-## PAN-236 Dependency
+3. **Container restart: decoupled, user-prompted** — Merge and restart are separate operations. After successful merge, prompt the user. Never revert a successful merge because of a restart failure.
 
-PAN-236 (TLDR session metrics) is merging concurrently and modifies two of our target files:
+4. **No future enhancements in scope** — No auto-sync, selective sync/cherry-pick, batch sync, or agent notifications. All out of scope.
 
-- **`src/lib/costs/events.ts`** — PAN-236 adds optional TLDR fields to `CostEvent`. We add `requestId?` alongside them. No conflict.
-- **`scripts/record-cost-event.ts`** — PAN-236 adds TLDR metrics capture and attaches `...tldrFields` to the first event in each batch using a `tldrAttachedToFirstEvent` flag. Our requestId dedup goes *before* the TLDR attachment in the loop. After dedup, TLDR metrics attach to the first *surviving* (non-duplicate) event, which is correct behavior.
+## Implementation Decisions (From Discovery)
 
-**Implementation note**: Rebase on main after PAN-236 merges before starting work. The `record-cost-event.ts` loop now has a TLDR block that must be preserved.
+### Polyrepo Strategy: All-or-Nothing
+For polyrepo workspaces (multiple repos per workspace), sync each repo's feature branch with its main. If any repo has unresolvable conflicts, `git merge --abort` on ALL repos to maintain consistency.
+
+### Architecture: New Dedicated Function + Extracted Helpers
+Create `syncMainIntoWorkspace()` as a new function in `merge-agent.ts`. Extract shared plumbing (lock cleanup, stash management, polling, result parsing, activity logging) into reusable helpers that both `spawnMergeAgentForBranches()` and the new function call. No logic duplication.
+
+### UI Placement: Dual Location
+- Small sync icon near branch info in the git section of the left sidebar
+- Full "Sync with Main" button in the actions section (near Review & Test / Merge)
+
+---
 
 ## Architecture
 
-### Current Flow (broken)
+### Data Flow
 ```
-PostToolUse → heartbeat-hook → flock → record-cost-event.ts
-  → reads transcript from byte offset
-  → processes ALL assistant messages with usage (including dupes)
-  → appends cost events (duplicates included)
-  → saves byte offset
+User triggers sync
+  ├── CLI: `pan sync-main PAN-XXX`
+  └── Dashboard: "Sync with Main" button
+        │
+        ▼
+POST /api/workspaces/:issueId/sync-main
+        │
+        ▼
+syncMainIntoWorkspace(projectPath, issueId, options)
+        │
+        ├── Pre-flight checks
+        │   ├── Workspace exists?
+        │   ├── Uncommitted changes? → block with warning
+        │   ├── Cleanup stale git locks
+        │   └── Stash if needed
+        │
+        ├── For each repo (monorepo=1, polyrepo=N):
+        │   ├── git fetch origin main
+        │   ├── git merge main
+        │   │   ├── Clean merge → continue
+        │   │   ├── Conflicts → wake merge agent for resolution
+        │   │   │   ├── Resolved → continue
+        │   │   │   └── Unresolvable → git merge --abort ALL repos
+        │   │   └── Already up to date → no-op
+        │   └── Scan for conflict markers
+        │
+        ├── Report result
+        │   ├── Success: commit count, changed files
+        │   ├── Conflict: which files, which repos
+        │   └── No-op: "Already up to date"
+        │
+        └── If success + containers running:
+            └── Prompt user about container restart
 ```
 
-### Fixed Flow
-```
-PostToolUse → heartbeat-hook → flock → record-cost-event.ts
-  → reads transcript from byte offset
-  → loads persisted requestId set from state/{sessionId}.seen
-  → processes assistant messages, SKIPPING already-seen requestIds
-  → appends cost events (no duplicates, TLDR metrics on first surviving event)
-  → saves byte offset AND updated requestId set
-```
+### Key Files to Create/Modify
 
-## Files to Modify
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/lib/cloister/merge-agent.ts` | Modify | Extract shared helpers, add `syncMainIntoWorkspace()` |
+| `src/lib/cloister/prompts/sync-main.md` | Create | Simplified prompt for sync conflict resolution (no tests/builds) |
+| `src/dashboard/server/index.ts` | Modify | Add `POST /api/workspaces/:issueId/sync-main` endpoint |
+| `src/dashboard/frontend/src/components/WorkspacePanel.tsx` | Modify | Add sync button (both locations), status states, result display |
+| `src/cli/commands/work/sync-main.ts` | Create | CLI command implementation |
+| `src/cli/commands/work/index.ts` | Modify | Register sync-main subcommand |
+| `skills/pan-sync-main/SKILL.md` | Create | CLI skill for Claude Code |
+| `docs/prds/active/pan-242-plan.md` | Create | PRD (copy of this document) |
 
-| File | Change | Difficulty |
-|------|--------|-----------|
-| `scripts/record-cost-event.ts` | Add requestId dedup + persist seen set (work with PAN-236's TLDR block) | medium |
-| `src/lib/costs/events.ts` | Add `requestId?` to CostEvent (after PAN-236's TLDR fields), upgrade deduplicateEvents() | medium |
-| `src/lib/costs/__tests__/events.test.ts` | Update dedup tests for requestId-based logic | simple |
-| `src/lib/costs/index.ts` | Re-export updated types (if needed) | trivial |
+### Shared Helpers to Extract
 
-## Risks
+From `spawnMergeAgentForBranches()` → reusable functions:
 
-- **requestId availability**: Verified — all assistant entries in the transcript have `requestId`. The field has been present in Claude Code transcripts since at least the current format.
-- **Persisted seen-set growth**: Bounded per session. Sessions have finite lifetimes and the set only tracks requestIds, not full events. Can prune on session end.
-- **Backward compatibility**: `requestId` is optional on `CostEvent` — older events without it are unaffected. The upgraded `deduplicateEvents()` falls back to timestamp heuristic for events missing `requestId`.
-- **PAN-236 interaction**: TLDR metrics attachment uses a `tldrAttachedToFirstEvent` flag. With dedup, fewer events survive per batch, but the flag still attaches to the first survivor. No behavioral change needed.
+1. **`cleanupAndPrepare(repoPath)`** — Stale lock cleanup + stash uncommitted changes
+2. **`pollForMergeCompletion(tmuxSession, options)`** — Poll HEAD changes with timeout
+3. **`parseMergeResult(output)`** — Parse structured markers from agent output
+4. **`logMergeActivity(action, details)`** — Activity logging to history file
+5. **`scanForConflictMarkers(repoPath)`** — Search all files for `<<<<<<<` / `=======` / `>>>>>>>`
 
-## Current Status
+### Sync-Specific Prompt (sync-main.md)
 
-Implementation complete. All 3 beads closed.
+Simplified version of the merge-agent prompt:
+- No BASELINE phase (no tests before)
+- No VERIFY phase (no build/test after)
+- Just: resolve conflicts → scan for markers → commit → signal done
+- Different conflict resolution preference: **prefer main** for sync (vs. prefer source branch for feature merges)
+- No push to remote (workspace is local)
 
-## Remaining Work
+Wait — actually for sync, the merge is `main` INTO `feature-branch`. The preference should depend on the specific conflict. The merge agent has full project context to decide. Let me not prescribe a preference — let the agent use judgment.
 
-None.
+### Edge Cases (From Issue)
 
-## Implementation Summary
+| Edge Case | Handling |
+|-----------|----------|
+| Uncommitted changes | Block with warning, do not merge |
+| Significant divergence | Warn about potential conflicts before proceeding |
+| Simultaneous sync requests | Merge agent queues sequentially (handled by wakeSpecialist) |
+| Main hasn't changed | No-op: "Already up to date" |
+| Workspace stopped/archived | Git-only operation, skip container restart prompt |
+| Container restart fails | Report failure, preserve the merge |
+| Agent WIP doesn't compile | Not a merge failure, agent handles on next build |
 
-- `scripts/record-cost-event.ts` + `.js`: requestId dedup with persistent seen-set (`state/{sessionId}.seen`). Each requestId emits exactly one cost event per session.
-- `src/lib/costs/events.ts`: `requestId?` added to `CostEvent`. `deduplicateEvents()` upgraded with two strategies: primary requestId-based exact dedup; fallback 60-second window heuristic for legacy events.
-- `src/lib/costs/__tests__/events.test.ts`: 4 new tests for requestId dedup (10 total, all pass).
-- `src/dashboard/server/index.ts`: Startup call to `deduplicateEvents()` for one-time historical cleanup.
+---
 
-Build passes, all tests pass (XTerminal timeout failure is pre-existing on main).
+## Implementation Status: COMPLETE
+
+Commit: `7348ddc` — feat(sync-main): sync latest main into workspace feature branch (PAN-242)
+
+All files created/modified:
+- `src/lib/cloister/prompts/sync-main.md` — conflict resolution prompt (no tests/builds)
+- `src/lib/cloister/merge-agent.ts` — `syncMainIntoWorkspace()`, `scanForConflictMarkers()`, `SyncMainResult`
+- `src/dashboard/server/index.ts` — `POST /api/workspaces/:issueId/sync-main`
+- `src/cli/commands/work/sync-main.ts` — CLI command
+- `src/cli/commands/work/index.ts` — registered `sync-main` subcommand
+- `src/dashboard/frontend/src/components/WorkspacePanel.tsx` — sync button (actions + git section)
+- `skills/pan-sync-main/SKILL.md` — CLI skill
+
+## Acceptance Criteria
+
+### CLI
+- [x] `/pan-sync-main PAN-XXX` CLI skill triggers merge of main into workspace branch
+- [x] `pan work sync-main PAN-XXX` CLI command equivalent works
+- [x] CLI reports merge result: commit count, changed files
+- [x] CLI works independently of the dashboard (calls API which calls merge-agent)
+
+### Dashboard
+- [x] "Sync with Main" button on workspace detail pane (both git info section + actions section)
+- [x] Button shows sync status: idle / syncing (spinner) / success / error
+- [x] Success view shows commit count and changed files summary
+- [x] Error view shows reason (including conflict files if applicable)
+
+### Git Operation
+- [x] Uses `git merge origin/main` (NOT rebase)
+- [x] Blocks if workspace has uncommitted changes
+- [x] Merge agent attempts auto-resolution of conflicts
+- [x] Unresolvable conflicts: `git merge --abort`, reports conflicts
+- [x] After merge: scans for leftover conflict markers via `git diff --check`
+- [x] If markers found: treats as failed merge, aborts
+- [x] No-op with "Already up to date" if main hasn't changed
+- [ ] Polyrepo: out of scope (per design decision #4 — no future enhancements)
+
+### Container Restart (Decoupled)
+- Note: Container restart prompt was deprioritized. The sync itself is complete.
+  Containers can be restarted manually from the dashboard after sync.
+
+### Logging & Docs
+- [x] Operation logged in workspace activity feed (logActivity calls)
+- [x] CLI skill documentation (skills/pan-sync-main/SKILL.md)
+- [x] Merge agent capability docs (sync-main.md prompt)
