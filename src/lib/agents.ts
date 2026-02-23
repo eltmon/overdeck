@@ -541,6 +541,7 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
       PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       ...providerEnv // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   });
@@ -727,6 +728,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
       }
     });
@@ -822,6 +824,7 @@ export function recoverAgent(agentId: string): AgentState | null {
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       ...providerEnv
     }
   });

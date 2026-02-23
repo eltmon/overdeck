@@ -253,6 +253,7 @@ ${context.issueId ? `**Issue ID**: ${context.issueId}` : ''}
     env: {
       PANOPTICON_CONVOY_ID: convoy.id,
       PANOPTICON_CONVOY_ROLE: role,
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
     },
   });
 

@@ -115,6 +115,9 @@
 - **"rollback"** / **"revert"** / **"ORIG_HEAD"** → PRD-CLOISTER.md
 - **"baseline"** / **"test baseline"** → PRD-CLOISTER.md
 - **"review pipeline"** / **"specialist pipeline"** → PRD-CLOISTER.md, SPECIALIST_WORKFLOW.md
+- **"planning"** / **"planning agent"** / **"PLANNING_PROMPT"** → SPECIALIST_WORKFLOW.md (Planning → Implementation Transition)
+- **"environment variables"** / **"agent env"** → SPECIALIST_WORKFLOW.md (Agent Environment Variables), CONFIGURATION.md
+- **"suggested prompts"** → SPECIALIST_WORKFLOW.md (Agent Environment Variables)
 
 ### Infrastructure
 - **"workspace"** / **"workspaces"** → README.md, PRD-REMOTE-WORKSPACES.md

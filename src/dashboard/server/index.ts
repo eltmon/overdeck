@@ -7983,6 +7983,20 @@ app.post('/api/agents', async (req, res) => {
       }
     }
 
+    // Archive PLANNING_PROMPT.md so the work agent doesn't find and follow
+    // conflicting planning instructions (PAN-250). The planning prompt tells
+    // agents to "STOP and say planning complete" — if a work agent reads it,
+    // it re-plans instead of implementing.
+    const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');
+    if (existsSync(planningPromptPath)) {
+      try {
+        renameSync(planningPromptPath, planningPromptPath + '.archived');
+        console.log(`[start-agent] Archived PLANNING_PROMPT.md for ${issueId}`);
+      } catch (archiveErr) {
+        console.warn(`[start-agent] Could not archive PLANNING_PROMPT.md: ${archiveErr}`);
+      }
+    }
+
     // For REMOTE workspaces, spawn agent on remote VM
     if (isRemote && workspaceMetadata) {
       console.log(`[start-agent] Spawning REMOTE agent for ${issueId} on ${workspaceMetadata.vmName}`);
