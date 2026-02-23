@@ -12,6 +12,7 @@ import { readFile, readdir } from 'fs/promises';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
+import { crc32 } from 'node:zlib';
 import { Server as SocketIOServer } from 'socket.io';
 import { CacheService } from './services/cache-service.js';
 import { IssueDataService } from './services/issue-data-service.js';
@@ -5909,6 +5910,202 @@ app.post('/api/workspaces/:issueId/containers/:containerName/:action', async (re
   } catch (error: any) {
     console.error(`Error ${action}ing container:`, error);
     res.status(500).json({ error: `Failed to ${action} container: ${error.message}` });
+  }
+});
+
+// Refresh workspace database from seed file
+app.post('/api/workspaces/:issueId/refresh-db', async (req, res) => {
+  const { issueId } = req.params;
+
+  // Resolve project config from issue prefix
+  const teamPrefix = extractTeamPrefix(issueId);
+  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+  if (!projectConfig) {
+    return res.status(404).json({ error: `No project found for issue prefix: ${issueId}` });
+  }
+
+  const dbConfig = projectConfig.workspace?.database;
+  if (!dbConfig?.seed_file) {
+    return res.status(400).json({ error: 'No seed_file configured in projects.yaml database config' });
+  }
+
+  // Resolve seed file path (relative to project root)
+  const seedFile = join(projectConfig.path, dbConfig.seed_file);
+  if (!existsSync(seedFile)) {
+    return res.status(400).json({ error: `Seed file not found: ${seedFile}` });
+  }
+
+  // Flyway baseline lives in same directory as seed
+  const flywayFile = join(dirname(seedFile), 'zzz-flyway-workspace-baseline.sql');
+  if (!existsSync(flywayFile)) {
+    return res.status(400).json({ error: `Flyway baseline not found: ${flywayFile}` });
+  }
+
+  // Derive container names from feature folder
+  const issueLower = issueId.toLowerCase();
+  const featureFolder = `feature-${issueLower}`;
+
+  // Find workspace path
+  const workspacesDir = projectConfig.workspace?.workspaces_dir || 'workspaces';
+  const workspacePath = join(projectConfig.path, workspacesDir, featureFolder);
+
+  if (!existsSync(workspacePath)) {
+    return res.status(404).json({ error: `Workspace not found: ${featureFolder}` });
+  }
+
+  // Find compose file to get project name
+  const composePaths = [
+    join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
+    join(workspacePath, 'docker-compose.yml'),
+    join(workspacePath, 'docker-compose.yaml'),
+  ];
+  let composeFile: string | null = null;
+  for (const cp of composePaths) {
+    if (existsSync(cp)) {
+      composeFile = cp;
+      break;
+    }
+  }
+
+  if (!composeFile) {
+    return res.status(404).json({ error: 'No docker-compose file found in workspace' });
+  }
+
+  try {
+    // Get compose project name
+    const { stdout: projectNameOut } = await execAsync(
+      `docker compose -f "${composeFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+      { encoding: 'utf-8' }
+    );
+    const projectName = projectNameOut.trim();
+
+    if (!projectName) {
+      return res.status(500).json({ error: 'Could not determine docker compose project name' });
+    }
+
+    const pgContainer = `${projectName}-postgres-1`;
+    const apiContainer = `${projectName}-api-1`;
+
+    console.log(`[refresh-db] Starting DB refresh for ${issueId} (project: ${projectName})`);
+
+    // Step 1: Stop API container
+    console.log(`[refresh-db] Stopping API container: ${apiContainer}`);
+    try {
+      await execAsync(`docker stop "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 });
+    } catch {
+      console.log(`[refresh-db] API container not running or already stopped`);
+    }
+
+    // Step 2: Terminate connections + drop/recreate DB
+    console.log(`[refresh-db] Dropping and recreating database...`);
+    await execAsync(
+      `docker exec "${pgContainer}" psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'myn' AND pid <> pg_backend_pid();"`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    await execAsync(
+      `docker exec "${pgContainer}" psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS myn;"`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    await execAsync(
+      `docker exec "${pgContainer}" psql -U postgres -d postgres -c "CREATE DATABASE myn OWNER postgres;"`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+
+    // Step 3: Load seed file
+    console.log(`[refresh-db] Loading seed file: ${seedFile}`);
+    await execAsync(
+      `docker exec -i "${pgContainer}" psql -U postgres -d myn < "${seedFile}"`,
+      { encoding: 'utf-8', timeout: 600000 }
+    );
+
+    // Step 4: Load flyway baseline
+    console.log(`[refresh-db] Loading flyway baseline: ${flywayFile}`);
+    await execAsync(
+      `docker exec -i "${pgContainer}" psql -U postgres -d myn < "${flywayFile}"`,
+      { encoding: 'utf-8', timeout: 60000 }
+    );
+
+    // Step 4.5: Sync Flyway checksums with local migration files
+    // The baseline contains production checksums, but feature branches may have
+    // modified migration files (e.g., V105 idempotency changes). Recompute CRC32
+    // from the workspace's local files so Flyway validation passes on startup.
+    const migrationsRelPath = projectConfig.workspace?.database?.migrations?.path;
+    if (migrationsRelPath) {
+      const migrationsDir = join(workspacePath, migrationsRelPath);
+      if (existsSync(migrationsDir)) {
+        console.log(`[refresh-db] Syncing Flyway checksums from ${migrationsDir}`);
+        const migrationFiles = readdirSync(migrationsDir)
+          .filter(f => /^V\d+__.*\.sql$/.test(f));
+
+        const updates: string[] = [];
+        for (const file of migrationFiles) {
+          const version = file.match(/^V(\d+)__/)?.[1];
+          if (!version) continue;
+
+          let content = readFileSync(join(migrationsDir, file));
+          // Strip UTF-8 BOM
+          if (content[0] === 0xEF && content[1] === 0xBB && content[2] === 0xBF) {
+            content = content.slice(3);
+          }
+          // Flyway strips all line endings before computing CRC32:
+          // split on \r?\n, join with no separator, then CRC32
+          const lines = content.toString('utf-8').split(/\r?\n/);
+          const checksum = crc32(Buffer.from(lines.join(''), 'utf-8')) | 0;
+
+          updates.push(
+            `UPDATE flyway_schema_history SET checksum = ${checksum} WHERE version = '${version}' AND checksum IS NOT NULL;`
+          );
+        }
+
+        if (updates.length > 0) {
+          const tmpSql = `/tmp/flyway-checksum-sync-${Date.now()}.sql`;
+          writeFileSync(tmpSql, updates.join('\n'));
+          try {
+            const { stdout } = await execAsync(
+              `docker exec -i "${pgContainer}" psql -U postgres -d myn < "${tmpSql}"`,
+              { encoding: 'utf-8', timeout: 30000 }
+            );
+            const updatedCount = (stdout.match(/UPDATE \d+/g) || [])
+              .reduce((sum, m) => sum + parseInt(m.replace('UPDATE ', ''), 10), 0);
+            console.log(`[refresh-db] Synced ${migrationFiles.length} migration checksums (${updatedCount} rows updated)`);
+          } finally {
+            try { unlinkSync(tmpSql); } catch {}
+          }
+        }
+      }
+    }
+
+    // Step 5: Start API container
+    console.log(`[refresh-db] Starting API container: ${apiContainer}`);
+    try {
+      await execAsync(`docker start "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 });
+    } catch {
+      console.log(`[refresh-db] Could not start API container (may need manual start)`);
+    }
+
+    // Step 6: Get customer count to verify
+    let customerCount = 0;
+    try {
+      const { stdout } = await execAsync(
+        `docker exec "${pgContainer}" psql -U postgres -d myn -t -A -c "SELECT count(*) FROM customer;"`,
+        { encoding: 'utf-8', timeout: 10000 }
+      );
+      customerCount = parseInt(stdout.trim(), 10) || 0;
+    } catch {
+      // Table may not exist yet if migrations haven't run
+    }
+
+    console.log(`[refresh-db] DB refresh complete for ${issueId}: ${customerCount} customers`);
+
+    res.json({
+      success: true,
+      message: `Database refreshed successfully`,
+      customerCount,
+    });
+  } catch (error: any) {
+    console.error(`[refresh-db] Error refreshing DB for ${issueId}:`, error);
+    res.status(500).json({ error: `Failed to refresh database: ${error.message}` });
   }
 });
 
