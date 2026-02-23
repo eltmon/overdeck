@@ -21,6 +21,7 @@ import { shadowCommand } from './shadow.js';
 import { syncCommand } from './sync.js';
 import { refreshCommand } from './refresh.js';
 import { tldrCommand } from './tldr.js';
+import { syncMainCommand } from './sync-main.js';
 
 export function registerWorkCommands(program: Command): void {
   const work = program
@@ -197,6 +198,11 @@ export function registerWorkCommands(program: Command): void {
     .action((action, workspace, options) => {
       tldrCommand(action || 'status', workspace, options);
     });
+
+  work
+    .command('sync-main <id>')
+    .description('Sync latest main into workspace feature branch (merge, not rebase)')
+    .action(syncMainCommand);
 }
 
 // Re-export individual commands for direct use
