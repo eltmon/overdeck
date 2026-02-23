@@ -53,7 +53,7 @@
     "build:scripts": "esbuild scripts/record-cost-event.ts --bundle --platform=node --format=esm --outfile=scripts/record-cost-event.js",
     "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
     "build:dashboard:frontend": "cd src/dashboard/frontend && npm run build",
-    "build:dashboard:server": "cd src/dashboard/server && npm run build",
+    "build:dashboard:server": "cd src/dashboard/server && npm run build && mkdir -p ../../../dist/dashboard/prompts && cp ../../lib/cloister/prompts/*.md ../../../dist/dashboard/prompts/",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "test": "vitest --run --no-file-parallelism && cd src/dashboard/frontend && npm test",
