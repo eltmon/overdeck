@@ -24,7 +24,7 @@ import { loadSettings, saveSettings, validateSettings, getAvailableModels, isAnt
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getOptimalDefaultsApi } from '../../lib/settings-api.js';
 import { loadConfig as loadYamlConfig } from '../../lib/config-yaml.js';
 import { generateRouterConfig, writeRouterConfig } from '../../lib/router-config.js';
-import { spawnMergeAgentForBranches } from '../../lib/cloister/merge-agent.js';
+import { spawnMergeAgentForBranches, syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../lib/health-filtering.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
@@ -6626,6 +6626,70 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
       success: false,
       error: error.message,
       autoRequeueCount: newCount,
+    });
+  }
+});
+
+// Sync main into workspace: merges origin/main into the workspace's feature branch.
+// Available at any time — does not require review/test to have passed.
+// Blocks if workspace has uncommitted changes. Never pushes to remote.
+app.post('/api/workspaces/:issueId/sync-main', async (req, res) => {
+  const { issueId } = req.params;
+
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+
+  // Only supported for local workspaces
+  const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+  if (workspaceInfo.isRemote) {
+    return res.status(400).json({
+      success: false,
+      error: 'Sync with Main is not supported for remote workspaces',
+    });
+  }
+
+  const workspacePath = workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+  if (!existsSync(workspacePath)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Workspace does not exist',
+    });
+  }
+
+  console.log(`[sync-main] Starting sync for ${issueId} at ${workspacePath}`);
+
+  try {
+    const result = await syncMainIntoWorkspace(workspacePath, issueId);
+
+    if (result.success) {
+      if (result.alreadyUpToDate) {
+        return res.json({
+          success: true,
+          alreadyUpToDate: true,
+          message: 'Already up to date with main',
+        });
+      }
+      return res.json({
+        success: true,
+        commitCount: result.commitCount || 0,
+        changedFiles: result.changedFiles || [],
+        message: `Synced ${result.commitCount || 0} commit(s) from main`,
+      });
+    } else {
+      const status = result.reason?.includes('uncommitted') ? 400 : 500;
+      return res.status(status).json({
+        success: false,
+        error: result.reason || 'Sync failed',
+        conflictFiles: result.conflictFiles,
+      });
+    }
+  } catch (error: any) {
+    console.error(`[sync-main] Unexpected error for ${issueId}:`, error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Unexpected error during sync',
     });
   }
 });

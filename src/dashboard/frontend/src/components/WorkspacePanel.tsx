@@ -4,6 +4,7 @@ import {
   X,
   XCircle,
   GitBranch,
+  GitMerge,
   Folder,
   Terminal,
   Copy,
@@ -554,6 +555,30 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     },
   });
 
+  const syncMainMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/sync-main`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Sync failed');
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    },
+  });
+
+  const handleSyncMain = () => {
+    if (confirm(`Sync main into ${issueId}?\n\nThis will:\n- Fetch and merge the latest main into the feature branch\n- Use the merge agent to resolve any conflicts\n\nWorkspace must have no uncommitted changes.`)) {
+      syncMainMutation.mutate();
+    }
+  };
+
   const handleCleanWorkspace = () => {
     if (confirm(`Clean and recreate corrupted workspace for ${issueId}?\n\nThis will:\n- Remove the corrupted workspace directory\n- Create a fresh workspace`)) {
       cleanMutation.mutate();
@@ -756,7 +781,20 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-content">
                 <GitBranch className="w-3 h-3" />
-                <span className="font-mono">{agent.git.branch}</span>
+                <span className="font-mono flex-1">{agent.git.branch}</span>
+                <button
+                  onClick={handleSyncMain}
+                  disabled={syncMainMutation.isPending || agent.git.uncommittedFiles > 0}
+                  title={agent.git.uncommittedFiles > 0 ? 'Commit changes before syncing' : 'Sync with main'}
+                  className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-surface-overlay/50 text-content-subtle rounded hover:bg-surface-overlay hover:text-content disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {syncMainMutation.isPending ? (
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  ) : (
+                    <GitMerge className="w-2.5 h-2.5" />
+                  )}
+                  Sync
+                </button>
               </div>
               {agent.git.uncommittedFiles > 0 && (
                 <div className="text-yellow-400 text-[10px] ml-4">
@@ -1245,6 +1283,20 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               </span>
             )}
 
+            {/* Sync with Main button */}
+            <button
+              onClick={handleSyncMain}
+              disabled={syncMainMutation.isPending}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-surface-overlay/50 text-content-subtle rounded hover:bg-surface-overlay hover:text-content disabled:opacity-50"
+            >
+              {syncMainMutation.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <GitMerge className="w-3 h-3" />
+              )}
+              {syncMainMutation.isPending ? 'Syncing...' : 'Sync with Main'}
+            </button>
+
             {/* Review & Test button - available anytime to (re-)run the cycle */}
             <button
               onClick={handleReview}
@@ -1339,6 +1391,20 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               {closeMutation.error instanceof Error
                 ? closeMutation.error.message
                 : 'Failed to close'}
+            </div>
+          )}
+          {syncMainMutation.isError && (
+            <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded mt-2">
+              {syncMainMutation.error instanceof Error
+                ? syncMainMutation.error.message
+                : 'Sync with main failed'}
+            </div>
+          )}
+          {syncMainMutation.isSuccess && syncMainMutation.data && (
+            <div className="text-xs text-green-400 bg-green-900/20 px-2 py-1 rounded mt-2">
+              {syncMainMutation.data.alreadyUpToDate
+                ? 'Already up to date with main'
+                : `Synced ${syncMainMutation.data.commitCount ?? 0} commit(s) from main`}
             </div>
           )}
         </div>
