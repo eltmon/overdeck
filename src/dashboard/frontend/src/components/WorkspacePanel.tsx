@@ -1286,8 +1286,9 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
             {/* Sync with Main button */}
             <button
               onClick={handleSyncMain}
-              disabled={syncMainMutation.isPending}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-surface-overlay/50 text-content-subtle rounded hover:bg-surface-overlay hover:text-content disabled:opacity-50"
+              disabled={syncMainMutation.isPending || (agent?.git?.uncommittedFiles ?? 0) > 0}
+              title={(agent?.git?.uncommittedFiles ?? 0) > 0 ? 'Commit changes before syncing with main' : 'Sync latest main into this workspace'}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-surface-overlay/50 text-content-subtle rounded hover:bg-surface-overlay hover:text-content disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {syncMainMutation.isPending ? (
                 <Loader2 className="w-3 h-3 animate-spin" />

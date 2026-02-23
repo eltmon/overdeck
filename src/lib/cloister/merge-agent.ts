@@ -1206,7 +1206,7 @@ export interface SyncMainResult {
 /**
  * Scan workspace for leftover git conflict markers (async)
  */
-async function scanForConflictMarkers(projectPath: string): Promise<string[]> {
+export async function scanForConflictMarkers(projectPath: string): Promise<string[]> {
   try {
     // git diff --check exits non-zero and prints filenames when conflict markers exist
     const { stdout } = await execAsync('git diff --check 2>&1 || true', {
@@ -1265,7 +1265,7 @@ export async function syncMainIntoWorkspace(
         console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`);
         logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
       }
-      if (lockCleanup.errors.some((e: any) => e.error.includes('Git processes are running'))) {
+      if (lockCleanup.errors.some((e: { file: string; error: string }) => e.error.includes('Git processes are running'))) {
         const message = 'Git processes are still running — cannot safely start sync';
         console.error(`[sync-main] ${message}`);
         logActivity('sync_main_blocked', message);
