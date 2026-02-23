@@ -1231,7 +1231,7 @@ export async function scanForConflictMarkers(projectPath: string): Promise<strin
  * it returns immediately. If conflicts arise, the merge-agent specialist is woken
  * to resolve them. The merge is never pushed — this is a local workspace operation.
  *
- * Blocks if the workspace has uncommitted changes (agent must commit or stash first).
+ * Auto-commits any uncommitted changes before merging (with safety verification).
  */
 export async function syncMainIntoWorkspace(
   projectPath: string,
@@ -1240,17 +1240,39 @@ export async function syncMainIntoWorkspace(
   console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
   logActivity('sync_main_start', `Starting sync for ${issueId}`);
 
-  // Pre-flight: block on uncommitted changes
+  // Pre-flight: auto-commit uncommitted changes before merge
   try {
     const { stdout: statusOut } = await execAsync('git status --porcelain', {
       cwd: projectPath,
       encoding: 'utf-8',
     });
     if (statusOut.trim()) {
-      const message = 'Workspace has uncommitted changes. Commit or stash them before syncing with main.';
-      console.error(`[sync-main] ${message}`);
-      logActivity('sync_main_blocked', message);
-      return { success: false, reason: message };
+      console.log(`[sync-main] Uncommitted changes detected, auto-committing...`);
+      logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
+      try {
+        await execAsync('git add -A && git commit -m "WIP: auto-commit before sync with main"', {
+          cwd: projectPath,
+          encoding: 'utf-8',
+        });
+        console.log(`[sync-main] Auto-commit successful`);
+      } catch (commitErr: any) {
+        const message = `Failed to auto-commit uncommitted changes: ${commitErr.message}`;
+        console.error(`[sync-main] ${message}`);
+        logActivity('sync_main_blocked', message);
+        return { success: false, reason: message };
+      }
+
+      // Verify commit succeeded — abort if uncommitted changes still exist
+      const { stdout: postCommitStatus } = await execAsync('git status --porcelain', {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+      if (postCommitStatus.trim()) {
+        const message = 'Uncommitted changes remain after auto-commit — aborting sync';
+        console.error(`[sync-main] ${message}`);
+        logActivity('sync_main_blocked', message);
+        return { success: false, reason: message };
+      }
     }
   } catch (error: any) {
     return { success: false, reason: `Failed to check git status: ${error.message}` };

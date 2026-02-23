@@ -574,11 +574,27 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
   });
 
   const handleSyncMain = () => {
-    if (confirm(`Sync main into ${issueId}?\n\nThis will:\n- Fetch and merge the latest main into the feature branch\n- Use the merge agent to resolve any conflicts\n\nWorkspace must have no uncommitted changes.`)) {
+    if (confirm(`Sync main into ${issueId}?\n\nThis will:\n- Auto-commit any uncommitted changes\n- Fetch and merge the latest main into the feature branch\n- Use the merge agent to resolve any conflicts`)) {
       syncMainMutation.mutate();
     }
   };
 
+  const refreshDbMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/refresh-db`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to refresh database');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+    },
+  });
   const handleCleanWorkspace = () => {
     if (confirm(`Clean and recreate corrupted workspace for ${issueId}?\n\nThis will:\n- Remove the corrupted workspace directory\n- Create a fresh workspace`)) {
       cleanMutation.mutate();
@@ -689,9 +705,9 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
 
   return (
     <>
-      <div className="flex h-full bg-surface-raised border-l border-divider">
+      <div className="flex h-full bg-surface-raised border-l border-divider" data-testid="workspace-panel">
         {/* Left sidebar - Workspace info */}
-        <div className="w-64 border-r border-divider flex flex-col overflow-y-auto">
+        <div className="w-64 border-r border-divider flex flex-col overflow-y-auto" data-testid="workspace-sidebar">
           {/* Header */}
           <div className="px-3 py-2 border-b border-divider">
             {agent ? (
@@ -776,7 +792,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
 
         {/* Git Status */}
         {agent?.git && (
-          <div className="px-3 py-2 border-b border-divider text-xs">
+          <div className="px-3 py-2 border-b border-divider text-xs" data-testid="git-status">
             <div className="text-content-muted uppercase tracking-wider mb-2">Git Status</div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-content">
@@ -784,8 +800,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                 <span className="font-mono flex-1">{agent.git.branch}</span>
                 <button
                   onClick={handleSyncMain}
-                  disabled={syncMainMutation.isPending || agent.git.uncommittedFiles > 0}
-                  title={agent.git.uncommittedFiles > 0 ? 'Commit changes before syncing' : 'Sync with main'}
+                  disabled={syncMainMutation.isPending}
+                  title={agent.git.uncommittedFiles > 0 ? 'Will auto-commit changes before syncing' : 'Sync with main'}
                   className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-surface-overlay/50 text-content-subtle rounded hover:bg-surface-overlay hover:text-content disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {syncMainMutation.isPending ? (
@@ -1156,7 +1172,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
         )}
 
         {/* Actions */}
-        <div className="px-3 py-2 border-b border-divider">
+        <div className="px-3 py-2 border-b border-divider" data-testid="workspace-actions">
           <div className="text-xs text-content-muted uppercase tracking-wider mb-2">Actions</div>
           {/* Server-side pending operation status */}
           {workspace?.pendingOperation?.type === 'approve' && workspace.pendingOperation.status === 'running' && (
@@ -1263,6 +1279,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
             {/* MERGE button - only shows when review+test passed AND not already merged */}
             {reviewStatus?.readyForMerge && reviewStatus?.mergeStatus !== 'merged' && (
               <button
+                data-testid="merge-btn"
                 onClick={handleMerge}
                 disabled={mergeMutation.isPending || reviewStatus?.mergeStatus === 'merging'}
                 className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-content rounded hover:bg-green-500 disabled:opacity-50 font-medium"
@@ -1285,9 +1302,10 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
 
             {/* Sync with Main button */}
             <button
+              data-testid="sync-with-main-btn"
               onClick={handleSyncMain}
-              disabled={syncMainMutation.isPending || (agent?.git?.uncommittedFiles ?? 0) > 0}
-              title={(agent?.git?.uncommittedFiles ?? 0) > 0 ? 'Commit changes before syncing with main' : 'Sync latest main into this workspace'}
+              disabled={syncMainMutation.isPending}
+              title={(agent?.git?.uncommittedFiles ?? 0) > 0 ? 'Will auto-commit changes before syncing with main' : 'Sync latest main into this workspace'}
               className="flex items-center gap-1 px-2 py-1 text-xs bg-surface-overlay/50 text-content-subtle rounded hover:bg-surface-overlay hover:text-content disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {syncMainMutation.isPending ? (
@@ -1300,6 +1318,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
 
             {/* Review & Test button - available anytime to (re-)run the cycle */}
             <button
+              data-testid="review-test-btn"
               onClick={handleReview}
               disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
               className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 ${
@@ -1766,6 +1785,24 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               <Square className="w-3 h-3" />
               Stop
             </button>
+            {containerMenu.containerName === 'postgres' && (
+              <>
+                <div className="border-t border-divider my-1" />
+                <button
+                  onClick={() => {
+                    if (confirm('Drop and reload database from seed file?\n\nThis will:\n- Stop the API container\n- Drop the existing database\n- Reload from seed-cleaned.sql\n- Restart the API\n\nAll workspace data will be replaced.')) {
+                      refreshDbMutation.mutate();
+                      setContainerMenu(null);
+                    }
+                  }}
+                  disabled={refreshDbMutation.isPending}
+                  className="w-full text-left px-3 py-1.5 text-xs text-amber-400 hover:bg-surface-overlay flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Database className="w-3 h-3" />
+                  {refreshDbMutation.isPending ? 'Refreshing DB...' : 'Refresh DB'}
+                </button>
+              </>
+            )}
           </>
         ) : (
           <button
