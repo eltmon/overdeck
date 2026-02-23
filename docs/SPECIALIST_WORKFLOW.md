@@ -444,16 +444,105 @@ cat ~/.panopticon/specialists/merge-agent/history.jsonl | tail -1 | jq
 
 Review agent logs for specific errors.
 
+## Sync with Main (PAN-242)
+
+The merge-agent also handles syncing active workspaces with the latest `main` branch. This propagates hotfixes and other changes from main into feature branches without interrupting in-progress work.
+
+### How It Works
+
+1. **User clicks "Sync with Main"** in the dashboard (Board view → workspace detail → ACTIONS section) or runs `pan work sync-main <ISSUE-ID>`
+2. **Auto-commit**: Any uncommitted changes in the workspace are automatically committed (`WIP: auto-commit before sync with main`) with post-commit verification
+3. **Fetch + merge**: `git fetch origin main` followed by `git merge origin/main`
+4. **Clean merge**: If no conflicts, returns immediately with commit count and changed files
+5. **Conflicts**: If conflicts arise, the merge-agent specialist is woken with the `sync-main.md` prompt template containing the conflict file list. The sync endpoint polls until conflicts are resolved (up to 15 minutes)
+
+### Design Decisions
+
+- **Merge, not rebase**: Merge preserves history and requires no force-push. Feature branches squash-merge to main anyway, so merge commits don't pollute the final history.
+- **Auto-commit before sync**: Instead of blocking on uncommitted changes, the system auto-commits a WIP snapshot. This prevents data loss if the merge introduces complex conflicts.
+- **Never revert a successful merge**: If post-merge operations (container restart, etc.) fail, the git merge stands. The merge and downstream operations are decoupled.
+- **Polyrepo**: For polyrepo workspaces (MYN), sync runs against each sub-repo independently (all-or-nothing).
+
+### API
+
+```
+POST /api/workspaces/:issueId/sync-main
+
+Response (success):
+{ "success": true, "commitCount": 49, "changedFiles": [...], "message": "Synced 49 commit(s) from main" }
+
+Response (already up to date):
+{ "success": true, "alreadyUpToDate": true, "message": "Already up to date with main" }
+
+Response (error):
+{ "success": false, "error": "...", "conflictFiles": [...] }
+```
+
+### CLI
+
+```bash
+pan work sync-main PAN-143
+```
+
+## Prompt Templates
+
+Each specialist uses a Markdown prompt template that gets populated with runtime context (workspace path, branch, issue ID, etc.) before being sent to Claude Code.
+
+### Template Location
+
+- **Source**: `src/lib/cloister/prompts/`
+- **Runtime (built)**: `dist/dashboard/prompts/`
+
+The build pipeline copies `*.md` from source to dist (see [BUILD.md](./BUILD.md#specialist-prompt-templates)).
+
+### Available Templates
+
+| Template | Used by | Purpose |
+|----------|---------|---------|
+| `work-agent.md` | Work agents | Implementation task instructions |
+| `review-agent.md` | review-agent | Code review checklist and criteria |
+| `test-agent.md` | test-agent | Test execution and baseline comparison |
+| `merge-agent.md` | merge-agent | PR merge and conflict resolution |
+| `sync-main.md` | merge-agent | Sync-from-main conflict resolution |
+
+### Template Variables
+
+Templates use `{{variable}}` syntax replaced at runtime:
+
+- `{{projectPath}}` — workspace directory
+- `{{workspaceBranch}}` — current feature branch name
+- `{{issueId}}` — issue identifier (PAN-143, MIN-678, etc.)
+- `{{conflictFiles}}` — list of files with merge conflicts (sync-main only)
+
+### Adding a New Template
+
+1. Create `src/lib/cloister/prompts/your-template.md`
+2. Use `{{variable}}` placeholders for runtime context
+3. Load in your code: `join(__dirname, 'prompts', 'your-template.md')`
+4. Replace variables: `template.replace(/{{variable}}/g, value)`
+5. The build pipeline automatically copies new `.md` files to `dist/dashboard/prompts/`
+
+## Deacon Health Monitor
+
+The deacon patrols specialists every 30 seconds and handles recovery:
+
+- **Heartbeat checks**: Specialists write heartbeat files; deacon checks staleness
+- **Stuck detection**: 3 consecutive stale heartbeats → force-kill + restart with fresh session
+- **Dead specialist recovery**: Uses `wakeSpecialist()` with `clearSessionId()` to start fresh (not `initializeSpecialist()` which rejects for existing sessions — see PAN-246)
+- **No backoff yet**: Deacon retries indefinitely (PAN-247 tracks adding backoff/escalation)
+
 ## Future Enhancements
 
 - External PR selection (select PRs from repo, not just Panopticon-created)
 - Multiple merge agents per repository
 - Webhook integration (GitHub webhooks trigger specialists)
-- Specialist health monitoring and auto-restart
+- Deacon backoff/escalation for repeated failures (PAN-247)
 - Queue dashboard UI
 
 ## Related Documentation
 
+- [BUILD.md](./BUILD.md) - Build pipeline and prompt template copying
+- [TESTING.md](./TESTING.md) - Test suites and Playwright conventions
 - [FPP Hooks System](../src/lib/hooks.ts) - Queue implementation
 - [Cloister Configuration](../src/lib/cloister/config.ts) - Config schema
 - [Specialist Registry](../src/lib/cloister/specialists.ts) - Registry management
