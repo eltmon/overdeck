@@ -1,0 +1,145 @@
+# Planning Session: PAN-253
+
+## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
+
+**YOU ARE IN PLANNING MODE. DO NOT:**
+- Write or modify any code files (except STATE.md)
+- Run implementation commands (npm install, docker compose, make, etc.)
+- Create actual features or functionality
+- Start implementing the solution
+
+**YOU SHOULD ONLY:**
+- Ask clarifying questions (use AskUserQuestion tool)
+- Explore the codebase to understand context (read files, grep)
+- Generate planning artifacts:
+  - STATE.md (decisions, approach, architecture)
+  - Beads tasks (via `bd create`)
+  - PRD file at `docs/prds/active/{issue-id}-plan.md` (copy of STATE.md, required for dashboard)
+- Present options and tradeoffs for the user to decide
+
+When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
+
+---
+
+## Issue Details
+- **ID:** PAN-253
+- **Title:** Inject new tracker comments into work agent prompt on restart
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/253
+
+## Description
+## Problem
+
+When an agent is restarted on a reopened issue, it reads `.planning/STATE.md`, sees "Implementation complete", and immediately signals done — because it has no awareness of tracker activity (comments, status changes) that occurred after STATE.md was last updated.
+
+**Real example:** MIN-693 was marked Done by an agent that fixed symptoms but not the root cause. A Linear comment was added explaining the issue was reopened and what actually needs fixing. Clicking "Start Agent" would cause the agent to read STATE.md → see "complete" → immediately `pan work done` again, never seeing the reopening comment.
+
+Currently the work agent prompt only reads local files (STATE.md, `.planning/feedback/`, beads). It has zero visibility into tracker state.
+
+## Solution
+
+When building the work agent prompt, fetch the issue's recent tracker activity and inject any comments/status changes that occurred **after** STATE.md's last modified time.
+
+### Implementation
+
+1. **In `buildWorkAgentPrompt()` or the start-agent endpoint** (`src/dashboard/server/index.ts` ~line 8072):
+   - Get STATE.md's `mtime` (or `0` if no STATE.md)
+   - Call `tracker.getComments(issueId)` — already exists in the tracker abstraction (`src/lib/tracker/interface.ts:156`)
+   - Call `tracker.getIssue(issueId)` to get current status
+   - Filter comments where `createdAt > state.md mtime`
+   - If the issue was reopened (status changed from Done/Closed back to open/in_progress), flag that explicitly
+
+2. **Add a new template variable** `NEW_TRACKER_CONTEXT` to the prompt:
+   ```markdown
+   {{#if NEW_TRACKER_CONTEXT}}
+   ## New Tracker Activity (Since Last Session)
+
+   **IMPORTANT: The issue has new activity since your last session. Read carefully before checking completion status.**
+
+   {{NEW_TRACKER_CONTEXT}}
+   {{/if}}
+   ```
+   Place this BEFORE the "Check Completion Status FIRST" section so the agent sees it before fast-pathing to done.
+
+3. **Include in the context**:
+   - Current issue status (especially if reopened)
+   - New comments with author and timestamp
+   - Truncate very long comments to first ~500 chars to save tokens
+
+### Tracker support
+
+The `IssueTracker` interface already has:
+- `getIssue(id)` → returns `state`, `title`, `description`
+- `getComments(issueId)` → returns `Comment[]` with `body`, `author`, `createdAt`
+
+Works for Linear (MIN-xxx), GitHub (PAN-xxx), and GitLab — all implement the same interface.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/lib/cloister/work-agent-prompt.ts` | Add tracker context gathering (new function) |
+| `src/lib/cloister/prompts/work-agent.md` | Add `NEW_TRACKER_CONTEXT` template section |
+| `src/dashboard/server/index.ts` | Pass tracker context to prompt builder (if not done in prompt builder itself) |
+
+## Key References
+
+- Tracker interface: `src/lib/tracker/interface.ts` (Comment type line 69, getComments line 156)
+- Linear implementation: `src/lib/tracker/linear.ts:169` (getComments)
+- GitHub implementation: `src/lib/tracker/github.ts` (getComments)
+- Work agent prompt builder: `src/lib/cloister/work-agent-prompt.ts`
+- Work agent template: `src/lib/cloister/prompts/work-agent.md`
+- Start-agent endpoint: `src/dashboard/server/index.ts` ~line 8072
+
+---
+
+## Your Mission
+
+You are a planning agent conducting a **discovery session** for this issue.
+
+### Phase 1: Understand Context
+1. Read the codebase to understand relevant files and patterns
+2. Identify what subsystems/files this issue affects
+3. Note any existing patterns we should follow
+
+### Phase 2: Discovery Conversation
+Use AskUserQuestion tool to ask contextual questions:
+- What's the scope? What's explicitly OUT of scope?
+- Any technical constraints or preferences?
+- What does "done" look like?
+- Are there edge cases we need to handle?
+
+### Difficulty Estimation
+
+For each sub-task, estimate difficulty using this rubric:
+
+| Level | When to Use | Model |
+|-------|-------------|-------|
+| `trivial` | Typo, comment, formatting only | haiku |
+| `simple` | Bug fix, single file, obvious change | haiku |
+| `medium` | New feature, 3-5 files, standard patterns | sonnet |
+| `complex` | Refactor, migration, 6+ files, some risk | sonnet |
+| `expert` | Architecture, security, performance, high risk | opus |
+
+Consider these factors:
+- **Files to modify**: 1-2 (simple), 3-5 (medium), 6+ (complex/expert)
+- **Cross-cutting**: None (simple), Some (medium), Many (complex/expert)
+- **Risk level**: Low (simple), Medium (medium), High (expert)
+- **Domain knowledge**: Standard (simple), Research needed (medium), Deep expertise (expert)
+
+When creating beads tasks, include difficulty labels:
+```bash
+bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -d "Description"
+```
+
+### Phase 3: Generate Artifacts (NO CODE!)
+When discovery is complete:
+1. Create STATE.md with decisions made
+2. Copy STATE.md to PRD at `docs/prds/active/{issue-id}-plan.md` (required for dashboard)
+3. Create beads tasks with dependencies using `bd create` (include difficulty:LEVEL labels)
+4. Summarize the plan and STOP
+
+**IMPORTANT:** Create the PRD file BEFORE creating beads tasks.
+
+**Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
+
+Start by exploring the codebase to understand the context, then begin the discovery conversation.

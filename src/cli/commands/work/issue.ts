@@ -431,6 +431,7 @@ function findProjectRoot(issueId?: string, labels: string[] = []): string {
 
 import {
   buildWorkAgentPrompt,
+  getTrackerContext,
   readPlanningContext,
   readBeadsTasks,
 } from '../../../lib/cloister/work-agent-prompt.js';
@@ -577,7 +578,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     spinner.text = 'Building agent prompt with planning context...';
-    const prompt = buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot });
+    const trackerContext = await getTrackerContext(id, workspace);
+    const prompt = buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
 
     spinner.text = 'Spawning agent...';
 

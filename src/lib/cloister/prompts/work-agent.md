@@ -127,6 +127,10 @@ Specialist agents have left feedback that you MUST address:
 {{PENDING_FEEDBACK}}
 {{/if}}
 
+{{#if NEW_TRACKER_CONTEXT}}
+{{NEW_TRACKER_CONTEXT}}
+{{/if}}
+
 ## CRITICAL: Check Completion Status FIRST
 
 **Before doing ANY work, perform these checks in order:**
