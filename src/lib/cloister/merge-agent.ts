@@ -1190,3 +1190,269 @@ Report any issues or conflicts you encountered.`;
     reason: 'Timeout waiting for merge-agent specialist to complete merge (5 minutes)',
   };
 }
+
+/**
+ * Result of syncing main into a workspace branch
+ */
+export interface SyncMainResult {
+  success: boolean;
+  alreadyUpToDate?: boolean;
+  commitCount?: number;
+  changedFiles?: string[];
+  conflictFiles?: string[];
+  reason?: string;
+}
+
+/**
+ * Scan workspace for leftover git conflict markers (async)
+ */
+async function scanForConflictMarkers(projectPath: string): Promise<string[]> {
+  try {
+    // git diff --check exits non-zero and prints filenames when conflict markers exist
+    const { stdout } = await execAsync('git diff --check 2>&1 || true', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    const files = stdout
+      .split('\n')
+      .filter(line => line.includes('leftover conflict marker'))
+      .map(line => line.split(':')[0].trim())
+      .filter(f => f.length > 0);
+    return [...new Set(files)];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Sync the latest main branch into a workspace's feature branch.
+ *
+ * This performs a `git merge origin/main` in the workspace. If the merge is clean
+ * it returns immediately. If conflicts arise, the merge-agent specialist is woken
+ * to resolve them. The merge is never pushed — this is a local workspace operation.
+ *
+ * Blocks if the workspace has uncommitted changes (agent must commit or stash first).
+ */
+export async function syncMainIntoWorkspace(
+  projectPath: string,
+  issueId: string,
+): Promise<SyncMainResult> {
+  console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
+  logActivity('sync_main_start', `Starting sync for ${issueId}`);
+
+  // Pre-flight: block on uncommitted changes
+  try {
+    const { stdout: statusOut } = await execAsync('git status --porcelain', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    if (statusOut.trim()) {
+      const message = 'Workspace has uncommitted changes. Commit or stash them before syncing with main.';
+      console.error(`[sync-main] ${message}`);
+      logActivity('sync_main_blocked', message);
+      return { success: false, reason: message };
+    }
+  } catch (error: any) {
+    return { success: false, reason: `Failed to check git status: ${error.message}` };
+  }
+
+  // Clean up stale git lock files
+  try {
+    const lockCleanup = await cleanupStaleLocks(projectPath);
+    if (lockCleanup.found.length > 0) {
+      console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
+      if (lockCleanup.removed.length > 0) {
+        console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`);
+        logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
+      }
+      if (lockCleanup.errors.some((e: any) => e.error.includes('Git processes are running'))) {
+        const message = 'Git processes are still running — cannot safely start sync';
+        console.error(`[sync-main] ${message}`);
+        logActivity('sync_main_blocked', message);
+        return { success: false, reason: message };
+      }
+    }
+  } catch (lockErr: any) {
+    console.warn(`[sync-main] Lock cleanup warning: ${lockErr.message} (continuing)`);
+  }
+
+  // Fetch latest main
+  try {
+    console.log(`[sync-main] Fetching origin/main...`);
+    await execAsync('git fetch origin main', { cwd: projectPath, encoding: 'utf-8' });
+  } catch (error: any) {
+    return { success: false, reason: `Failed to fetch origin/main: ${error.message}` };
+  }
+
+  // Attempt the merge
+  let mergeOutput = '';
+  let hasConflicts = false;
+  try {
+    const result = await execAsync('git merge origin/main', { cwd: projectPath, encoding: 'utf-8' });
+    mergeOutput = (result.stdout || '') + (result.stderr || '');
+  } catch (error: any) {
+    mergeOutput = (error.stdout || '') + (error.stderr || '');
+    hasConflicts = true;
+  }
+
+  // Already up to date?
+  if (mergeOutput.includes('Already up to date') || mergeOutput.includes('Already up-to-date')) {
+    console.log(`[sync-main] Already up to date`);
+    logActivity('sync_main_noop', `${issueId} already up to date with main`);
+    return { success: true, alreadyUpToDate: true };
+  }
+
+  if (!hasConflicts) {
+    // Clean merge — collect stats
+    console.log(`[sync-main] Clean merge completed`);
+    logActivity('sync_main_success', `Clean merge of main into ${issueId}`);
+
+    let changedFiles: string[] = [];
+    let commitCount = 0;
+    try {
+      const { stdout: diffFiles } = await execAsync(
+        'git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD',
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      changedFiles = diffFiles.trim().split('\n').filter(f => f.length > 0);
+    } catch { /* non-fatal */ }
+    try {
+      const { stdout: logOut } = await execAsync(
+        'git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""',
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      commitCount = logOut.trim().split('\n').filter(l => l.length > 0).length;
+    } catch { /* non-fatal */ }
+
+    return { success: true, commitCount, changedFiles };
+  }
+
+  // Conflict case — delegate to merge-agent specialist
+  const conflictFiles = await getConflictFiles(projectPath);
+  console.log(`[sync-main] ${conflictFiles.length} conflict(s), waking merge-agent...`);
+  logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
+
+  const workspaceBranch = await execAsync('git branch --show-current', { cwd: projectPath, encoding: 'utf-8' })
+    .then(r => r.stdout.trim())
+    .catch(() => `feature/${issueId.toLowerCase()}`);
+
+  // Build prompt from template
+  const promptPath = join(__dirname, 'prompts', 'sync-main.md');
+  let taskPrompt: string;
+  try {
+    const template = readFileSync(promptPath, 'utf-8');
+    taskPrompt = template
+      .replace(/{{projectPath}}/g, projectPath)
+      .replace(/{{workspaceBranch}}/g, workspaceBranch)
+      .replace(/{{issueId}}/g, issueId)
+      .replace(/{{conflictFiles}}/g, conflictFiles.map(f => `- ${f}`).join('\n'));
+  } catch (templateErr: any) {
+    console.error(`[sync-main] Could not load sync-main.md template: ${templateErr.message}`);
+    logActivity('sync_main_error', `Template load failed: ${templateErr.message}`);
+    try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch {}
+    return { success: false, conflictFiles, reason: 'Internal error: sync-main prompt template not found' };
+  }
+
+  // Wake the merge-agent specialist
+  const wakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
+    waitForReady: true,
+    startIfNotRunning: true,
+    issueId,
+  });
+
+  if (!wakeResult.success) {
+    try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch {}
+    const message = `Failed to wake merge-agent specialist: ${wakeResult.message}`;
+    console.error(`[sync-main] ${message}`);
+    logActivity('sync_main_error', message);
+    return { success: false, conflictFiles, reason: message };
+  }
+
+  console.log(`[sync-main] Specialist woken, waiting for conflict resolution...`);
+  logActivity('sync_main_agent_woken', `Agent resolving ${conflictFiles.length} conflict(s) for ${issueId}`);
+
+  // Poll tmux output for MERGE_RESULT markers
+  const tmuxSession = getTmuxSessionName('merge-agent');
+  const startTime = Date.now();
+  const POLL_INTERVAL = 5000;
+  const SYNC_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+  let lastOutput = '';
+
+  while (Date.now() - startTime < SYNC_TIMEOUT_MS) {
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+
+    const output = await captureTmuxOutput(tmuxSession);
+    if (output !== lastOutput) {
+      lastOutput = output;
+      const hasStructured = output.includes('MERGE_RESULT:');
+      const lowerOutput = output.toLowerCase();
+      const hasHumanReadable =
+        lowerOutput.includes('merge task complete') ||
+        lowerOutput.includes('successfully merged') ||
+        lowerOutput.includes('merge complete') ||
+        lowerOutput.includes('merge failed') ||
+        lowerOutput.includes('merge task failed');
+
+      if (hasStructured || hasHumanReadable) {
+        const agentResult = parseAgentOutput(output);
+
+        if (agentResult.success) {
+          // Verify no leftover conflict markers
+          const remaining = await scanForConflictMarkers(projectPath);
+          if (remaining.length > 0) {
+            try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch {}
+            const msg = `Agent reported success but ${remaining.length} conflict marker(s) remain in: ${remaining.join(', ')}`;
+            console.error(`[sync-main] ${msg}`);
+            logActivity('sync_main_markers_remain', msg);
+            return { success: false, conflictFiles, reason: msg };
+          }
+
+          console.log(`[sync-main] ✓ Conflicts resolved by agent`);
+          logActivity('sync_main_success', `Merge agent resolved conflicts for ${issueId}`);
+
+          // Collect stats
+          let changedFiles: string[] = [];
+          let commitCount = 0;
+          try {
+            const { stdout: diffFiles } = await execAsync(
+              'git diff --name-only ORIG_HEAD HEAD',
+              { cwd: projectPath, encoding: 'utf-8' },
+            );
+            changedFiles = diffFiles.trim().split('\n').filter(f => f.length > 0);
+            const { stdout: logOut } = await execAsync(
+              'git log ORIG_HEAD..HEAD --oneline',
+              { cwd: projectPath, encoding: 'utf-8' },
+            );
+            commitCount = logOut.trim().split('\n').filter(l => l.length > 0).length;
+          } catch { /* non-fatal */ }
+
+          return { success: true, commitCount, changedFiles };
+        } else {
+          // Agent failed — ensure merge is aborted
+          try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch {}
+          console.log(`[sync-main] ✗ Agent could not resolve conflicts`);
+          logActivity('sync_main_agent_failed', `Agent failed to resolve conflicts for ${issueId}`);
+          return {
+            success: false,
+            conflictFiles,
+            reason: agentResult.reason || 'Merge agent could not resolve conflicts',
+          };
+        }
+      }
+    }
+
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    if (elapsed % 30 === 0) {
+      console.log(`[sync-main] Still waiting for agent... (${elapsed}s elapsed)`);
+    }
+  }
+
+  // Timeout
+  try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch {}
+  logActivity('sync_main_timeout', `Sync timed out for ${issueId}`);
+  return {
+    success: false,
+    conflictFiles,
+    reason: `Timeout: merge agent did not complete within ${SYNC_TIMEOUT_MS / 60000} minutes`,
+  };
+}
