@@ -4,7 +4,7 @@ import inquirer from 'inquirer';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { LinearClient, Issue } from '@linear/sdk';
+import { LinearClient } from '@linear/sdk';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getTrackerContext } from '../../../lib/cloister/work-agent-prompt.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
@@ -15,7 +15,7 @@ interface ReopenOptions {
   reason?: string;
 }
 
-interface LinearComment {
+export interface LinearComment {
   id: string;
   body: string;
   author: string;
@@ -55,7 +55,7 @@ async function fetchIssueWithComments(
     throw new Error(`Issue not found: ${issueId}`);
   }
 
-  const linearIssue = results.nodes[0] as unknown as Issue;
+  const linearIssue = results.nodes[0];
   const state = await linearIssue.state;
 
   // Fetch comments
@@ -125,7 +125,7 @@ async function transitionToInProgress(client: LinearClient, issueId: string): Pr
 /**
  * Format comments for display
  */
-function formatComments(comments: LinearComment[]): string {
+export function formatComments(comments: LinearComment[]): string {
   if (comments.length === 0) {
     return 'No comments';
   }
@@ -142,8 +142,11 @@ function formatComments(comments: LinearComment[]): string {
 
 /**
  * Find the local workspace path for an issue.
+ *
+ * @param issueId - Issue identifier (e.g., "PAN-256")
+ * @param startDir - Directory to begin upward search from (defaults to process.cwd())
  */
-function findLocalWorkspace(issueId: string): string | null {
+export function findLocalWorkspace(issueId: string, startDir?: string): string | null {
   const normalizedId = issueId.toLowerCase();
 
   // Try project registry first
@@ -153,8 +156,8 @@ function findLocalWorkspace(issueId: string): string | null {
     if (existsSync(workspacePath)) return workspacePath;
   }
 
-  // Fall back to searching upward from cwd
-  let dir = process.cwd();
+  // Fall back to searching upward from startDir (or cwd)
+  let dir = startDir ?? process.cwd();
   for (let i = 0; i < 10; i++) {
     const workspacesDir = join(dir, 'workspaces');
     if (existsSync(workspacesDir)) {
@@ -319,9 +322,10 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
     console.log(chalk.dim('Start the agent to resume implementation:'));
     console.log(`  pan work ${id}`);
     console.log('');
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (spinner.isSpinning) spinner.fail();
-    console.error(chalk.red(`Error: ${error.message}`));
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }

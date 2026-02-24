@@ -12,9 +12,8 @@ import {
   saveReviewStatuses,
   type ReviewStatus,
 } from '../dashboard/server/review-status.js';
-import { checkSpecialistQueue, completeSpecialistTask } from './cloister/specialists.js';
+import { checkSpecialistQueue, completeSpecialistTask, type SpecialistType } from './cloister/specialists.js';
 
-type SpecialistType = 'review-agent' | 'test-agent' | 'merge-agent';
 const SPECIALIST_NAMES: SpecialistType[] = ['review-agent', 'test-agent', 'merge-agent'];
 
 export interface ReopenResult {
@@ -105,8 +104,7 @@ export function reopenWorkspaceState(
     const queue = checkSpecialistQueue(specialistName);
     let removed = 0;
     for (const item of queue.items) {
-      const itemIssueId =
-        (item.payload as Record<string, unknown>)?.issueId as string | undefined;
+      const itemIssueId = item.payload.issueId;
       if (itemIssueId && itemIssueId.toUpperCase() === issueId.toUpperCase()) {
         if (completeSpecialistTask(specialistName, item.id)) {
           removed++;
