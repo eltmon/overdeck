@@ -43,6 +43,9 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
       setMessage('');
       setTimeout(() => refetch(), 500);
     },
+    onError: (error) => {
+      console.error('Failed to send message:', error);
+    },
   });
 
   useEffect(() => {

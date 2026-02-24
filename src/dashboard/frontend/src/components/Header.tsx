@@ -1,4 +1,4 @@
-import { Eye, LayoutGrid, Users, Terminal, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, Search } from 'lucide-react';
+import { Eye, LayoutGrid, Users, Terminal, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, Search, Cpu, Activity } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { useTheme } from '../hooks/useTheme';
 
@@ -13,6 +13,8 @@ const NAV_ITEMS = [
   { id: 'activity' as Tab, label: 'Activity', icon: Terminal },
   { id: 'metrics' as Tab, label: 'Metrics', icon: BarChart3 },
   { id: 'costs' as Tab, label: 'Costs', icon: DollarSign },
+  { id: 'skills' as Tab, label: 'Skills', icon: Cpu },
+  { id: 'health' as Tab, label: 'Health', icon: Activity },
   { id: 'settings' as Tab, label: 'Settings', icon: Settings },
 ] as const;
 

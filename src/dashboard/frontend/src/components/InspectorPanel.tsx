@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X,
@@ -29,6 +29,7 @@ import {
   ListTodo,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue } from '../types';
 import { BeadsDialog } from './BeadsDialog';
 
@@ -142,6 +143,7 @@ function getFriendlyModelName(fullModel: string): string {
   if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
   if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
   if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus 4';
+  if (fullModel.includes('sonnet-4-6') || fullModel.includes('sonnet-4.6')) return 'Sonnet 4.6';
   if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
   if (fullModel.includes('sonnet-4') || fullModel.includes('sonnet')) return 'Sonnet 4';
   if (fullModel.includes('haiku-4-5') || fullModel.includes('haiku-4.5')) return 'Haiku 4.5';
@@ -152,7 +154,7 @@ function getFriendlyModelName(fullModel: string): string {
 
 function copyToClipboard(text: string): boolean {
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).catch(() => { /* ignore */ });
     return true;
   }
   const textArea = document.createElement('textarea');
@@ -235,6 +237,18 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
   const [containerMenu, setContainerMenu] = useState<{
     x: number; y: number; containerName: string; isRunning: boolean;
   } | null>(null);
+  const containerMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerMenu) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (containerMenuRef.current && !containerMenuRef.current.contains(e.target as Node)) {
+        setContainerMenu(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [containerMenu]);
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
 
@@ -596,7 +610,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
                 <Terminal className="w-3.5 h-3.5" />
               </button>
             )}
-            <button onClick={onClose} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: textSecondary }}>
+            <button onClick={onClose} title="Close inspector" className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: textSecondary }}>
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -1084,6 +1098,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       {/* Container context menu */}
       {containerMenu && (
         <div
+          ref={containerMenuRef}
           className="fixed z-50 border rounded shadow-lg py-1 min-w-[140px]"
           style={{ left: containerMenu.x, top: containerMenu.y, backgroundColor: '#161b26', borderColor: '#232f48' }}
           onClick={(e) => e.stopPropagation()}
@@ -1150,7 +1165,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
               </button>
             </div>
             <div className="overflow-y-auto px-4 py-3 text-xs prose prose-invert prose-sm max-w-none">
-              <ReactMarkdown>{prdContent}</ReactMarkdown>
+              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{prdContent}</ReactMarkdown>
             </div>
           </div>
         </div>

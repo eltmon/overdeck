@@ -51,16 +51,20 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: 
   }, [issueId]);
 
   const openTerminal = useCallback(() => {
-    const newState: PanelState = { ...panelState, panelMode: 'inspector+terminal' };
-    setPanelState(newState);
-    savePanelState(issueId, newState);
-  }, [panelState, issueId]);
+    setPanelState(prev => {
+      const newState: PanelState = { ...prev, panelMode: 'inspector+terminal' };
+      savePanelState(issueId, newState);
+      return newState;
+    });
+  }, [issueId]);
 
   const closeTerminal = useCallback(() => {
-    const newState: PanelState = { ...panelState, panelMode: 'inspector-only' };
-    setPanelState(newState);
-    savePanelState(issueId, newState);
-  }, [panelState, issueId]);
+    setPanelState(prev => {
+      const newState: PanelState = { ...prev, panelMode: 'inspector-only' };
+      savePanelState(issueId, newState);
+      return newState;
+    });
+  }, [issueId]);
 
   if (panelState.panelMode === 'closed') return null;
 
