@@ -41,7 +41,7 @@ const mockIssue: Issue = {
   identifier: 'PAN-999',
   title: 'Test Issue',
   status: 'In Progress',
-  priority: 'Medium',
+  priority: 2,
   labels: [],
   url: 'https://github.com/test/repo/issues/1',
   createdAt: new Date().toISOString(),
@@ -50,13 +50,12 @@ const mockIssue: Issue = {
 
 const mockAgent: Agent = {
   id: 'agent-1',
-  name: 'test-agent',
-  status: 'working',
+  status: 'healthy',
   issueId: 'PAN-999',
-  sessionName: 'test-session',
   model: 'claude-sonnet-4-6',
   startedAt: new Date().toISOString(),
-  restartCount: 0,
+  consecutiveFailures: 0,
+  killCount: 0,
   runtime: 'claude-code',
 };
 

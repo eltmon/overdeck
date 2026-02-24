@@ -33,13 +33,12 @@ function createWrapper() {
 
 const mockAgent: Agent = {
   id: 'agent-123',
-  name: 'pan-999',
-  status: 'working',
+  status: 'healthy',
   issueId: 'PAN-999',
-  sessionName: 'pan-999',
   model: 'claude-sonnet-4-6',
   startedAt: new Date().toISOString(),
-  restartCount: 0,
+  consecutiveFailures: 0,
+  killCount: 0,
   runtime: 'claude-code',
 };
 
@@ -48,7 +47,7 @@ const mockIssue: Issue = {
   identifier: 'PAN-999',
   title: 'Add dark mode support',
   status: 'In Progress',
-  priority: 'High',
+  priority: 1,
   labels: ['frontend', 'ui'],
   url: 'https://github.com/test/repo/issues/1',
   createdAt: new Date().toISOString(),

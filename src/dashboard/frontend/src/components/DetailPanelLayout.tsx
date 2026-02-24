@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+// react-resizable-panels v4 exports: Group, Panel, Separator (NOT PanelGroup/PanelResizeHandle)
+// v4 props: orientation (NOT direction), onLayoutChanged (NOT onLayout)
+// Verified via installed package dist/react-resizable-panels.d.ts
 import { Panel, Group, Separator } from 'react-resizable-panels';
 import { InspectorPanel } from './InspectorPanel';
 import { TerminalPanel } from './TerminalPanel';

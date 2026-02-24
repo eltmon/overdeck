@@ -20,13 +20,12 @@ function createWrapper() {
 
 const mockAgent: Agent = {
   id: 'agent-123',
-  name: 'test-agent',
-  status: 'working',
+  status: 'healthy',
   issueId: 'PAN-999',
-  sessionName: 'test-session',
   model: 'claude-sonnet-4-6',
   startedAt: new Date().toISOString(),
-  restartCount: 0,
+  consecutiveFailures: 0,
+  killCount: 0,
   runtime: 'claude-code',
 };
 
@@ -133,9 +132,11 @@ describe('TerminalPanel', () => {
 
     await waitFor(() => {
       const calls = fetchMock.mock.calls;
-      const messageSent = calls.some(([url, opts]: [string, RequestInit]) =>
-        url.includes('/message') && opts?.body?.toString().includes('Hello agent')
-      );
+      const messageSent = calls.some((call) => {
+        const url = call[0] as string;
+        const opts = call[1] as RequestInit;
+        return url.includes('/message') && opts?.body?.toString().includes('Hello agent');
+      });
       expect(messageSent).toBe(true);
     });
   });
