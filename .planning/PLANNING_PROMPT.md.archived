@@ -1,4 +1,4 @@
-# Planning Session: PAN-253
+# Planning Session: PAN-256
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -22,73 +22,99 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-253
-- **Title:** Inject new tracker comments into work agent prompt on restart
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/253
+- **ID:** PAN-256
+- **Title:** Add reopen-issue command to properly reset workspace state
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/256
 
 ## Description
 ## Problem
 
-When an agent is restarted on a reopened issue, it reads `.planning/STATE.md`, sees "Implementation complete", and immediately signals done — because it has no awareness of tracker activity (comments, status changes) that occurred after STATE.md was last updated.
+When an issue is reopened (set back to In Progress after being marked Done), the dashboard and workspace state are inconsistent:
 
-**Real example:** MIN-693 was marked Done by an agent that fixed symptoms but not the root cause. A Linear comment was added explaining the issue was reopened and what actually needs fixing. Clicking "Start Agent" would cause the agent to read STATE.md → see "complete" → immediately `pan work done` again, never seeing the reopening comment.
+- **Review status** still shows "Passed"
+- **Test status** still shows "Passed"  
+- **Workspace panel** looks identical to when the issue was completed
+- **STATE.md** still says "Implementation complete"
+- **No workflow exists** to reset these states — the user has to manually update STATE.md, tell the agent about comments, etc.
 
-Currently the work agent prompt only reads local files (STATE.md, `.planning/feedback/`, beads). It has zero visibility into tracker state.
+**Real example:** MIN-693 was marked Done by an agent that fixed symptoms but not the root cause. After adding a Linear comment and setting status back to In Progress, clicking "Start Agent" would cause the agent to read STATE.md → see "complete" → immediately `pan work done` again. The dashboard still showed Review: Passed, Tests: Passed with no visual indication the issue was reopened.
 
 ## Solution
 
-When building the work agent prompt, fetch the issue's recent tracker activity and inject any comments/status changes that occurred **after** STATE.md's last modified time.
+Create a `pan reopen <ISSUE-ID>` command (and corresponding dashboard button/API endpoint) that properly resets workspace state for re-work.
 
-### Implementation
+### What `pan reopen` should do:
 
-1. **In `buildWorkAgentPrompt()` or the start-agent endpoint** (`src/dashboard/server/index.ts` ~line 8072):
-   - Get STATE.md's `mtime` (or `0` if no STATE.md)
-   - Call `tracker.getComments(issueId)` — already exists in the tracker abstraction (`src/lib/tracker/interface.ts:156`)
-   - Call `tracker.getIssue(issueId)` to get current status
-   - Filter comments where `createdAt > state.md mtime`
-   - If the issue was reopened (status changed from Done/Closed back to open/in_progress), flag that explicitly
+1. **Reset specialist states** in the dashboard:
+   - Review: Passed → cleared/reset
+   - Test: Passed → cleared/reset
+   - Ready for Merge → cleared
 
-2. **Add a new template variable** `NEW_TRACKER_CONTEXT` to the prompt:
+2. **Update STATE.md** — append a "Reopened" section:
    ```markdown
-   {{#if NEW_TRACKER_CONTEXT}}
-   ## New Tracker Activity (Since Last Session)
-
-   **IMPORTANT: The issue has new activity since your last session. Read carefully before checking completion status.**
-
-   {{NEW_TRACKER_CONTEXT}}
-   {{/if}}
+   ## Reopened — 2026-02-23
+   
+   Issue reopened for additional work. Previous completion was insufficient.
+   See tracker comments for details on what needs to change.
+   
+   ### Previous Status
+   - Review: Passed (2026-02-22)
+   - Tests: Passed (2026-02-22)
+   
+   ### Remaining Work
+   [To be determined from tracker comments]
    ```
-   Place this BEFORE the "Check Completion Status FIRST" section so the agent sees it before fast-pathing to done.
 
-3. **Include in the context**:
-   - Current issue status (especially if reopened)
-   - New comments with author and timestamp
-   - Truncate very long comments to first ~500 chars to save tokens
+3. **Fetch latest tracker comments** and inject context:
+   - Pull comments added after the last STATE.md update
+   - Append them to STATE.md or a feedback file so the agent sees them on restart
+   - This ties into PAN-253 (inject tracker comments into agent prompt)
 
-### Tracker support
+4. **Update tracker status** — set to "In Progress" if not already
 
-The `IssueTracker` interface already has:
-- `getIssue(id)` → returns `state`, `title`, `description`
-- `getComments(issueId)` → returns `Comment[]` with `body`, `author`, `createdAt`
+5. **Preserve history** — don't delete the previous review/test results, just mark them as stale. The "Reopened" section in STATE.md serves as the audit trail.
 
-Works for Linear (MIN-xxx), GitHub (PAN-xxx), and GitLab — all implement the same interface.
+### Dashboard integration
 
-## Files to Modify
+- Add a "Reopen" button to the workspace panel (visible when issue status is Done/Closed or when review/test have passed)
+- Or add it as an action in the issue context menu
+- The button calls `POST /api/workspaces/:issueId/reopen`
 
-| File | Change |
-|------|--------|
-| `src/lib/cloister/work-agent-prompt.ts` | Add tracker context gathering (new function) |
-| `src/lib/cloister/prompts/work-agent.md` | Add `NEW_TRACKER_CONTEXT` template section |
-| `src/dashboard/server/index.ts` | Pass tracker context to prompt builder (if not done in prompt builder itself) |
+### CLI
+
+```bash
+pan reopen MIN-693                    # Reset workspace state for re-work
+pan reopen MIN-693 --reason "..."     # With explicit reason
+```
+
+### Skill/command for agents
+
+Also create a `/reopen` skill so agents or supervisors can trigger this:
+```
+/reopen MIN-693 "Root cause not fixed — sw.ts was never modified"
+```
+
+## Scope
+
+### Must have
+- Reset review/test/merge specialist states
+- Update STATE.md with reopened status
+- Fetch and inject latest tracker comments
+- Dashboard API endpoint
+- CLI command
+
+### Nice to have (lower priority)
+- Preserve full history of open/close cycles in STATE.md
+- Dashboard "Reopen" button in workspace panel
+- `/reopen` skill for agents
+- Audit log of all state transitions
 
 ## Key References
 
-- Tracker interface: `src/lib/tracker/interface.ts` (Comment type line 69, getComments line 156)
-- Linear implementation: `src/lib/tracker/linear.ts:169` (getComments)
-- GitHub implementation: `src/lib/tracker/github.ts` (getComments)
-- Work agent prompt builder: `src/lib/cloister/work-agent-prompt.ts`
-- Work agent template: `src/lib/cloister/prompts/work-agent.md`
-- Start-agent endpoint: `src/dashboard/server/index.ts` ~line 8072
+- Specialist state management: `src/dashboard/server/index.ts` (review/test status endpoints)
+- STATE.md: `workspace/.planning/STATE.md`
+- Tracker comments: PAN-253 (inject tracker comments into prompt)
+- Work agent completion check: `src/lib/cloister/prompts/work-agent.md:130-158`
 
 ---
 
