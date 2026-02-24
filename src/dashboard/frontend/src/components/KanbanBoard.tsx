@@ -763,7 +763,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         {/* Skeleton columns */}
         <div className="flex gap-4 overflow-x-auto pb-4">
           {STATUS_ORDER.map((status) => (
-            <div key={status} className="flex-shrink-0 w-80">
+            <div key={status} className="flex-1 min-w-[220px]">
               <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg`}>
                 <div className="px-4 py-3 border-b border-divider">
                   <div className="flex items-center justify-between">
@@ -1124,7 +1124,7 @@ function DroppableColumn({ status, children }: { status: CanonicalState; childre
   return (
     <div
       ref={setNodeRef}
-      className={`flex-shrink-0 w-80 transition-all ${isOver ? 'scale-[1.02]' : ''}`}
+      className={`flex-1 min-w-[220px] transition-all ${isOver ? 'scale-[1.02]' : ''}`}
     >
       {children}
     </div>
