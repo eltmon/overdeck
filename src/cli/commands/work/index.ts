@@ -153,8 +153,8 @@ export function registerWorkCommands(program: Command): void {
 
   work
     .command('reopen <id>')
-    .description('Reopen a closed/done issue and re-run planning')
-    .option('--skip-plan', 'Skip automatic planning after reopen')
+    .description('Reopen a completed issue for re-work (resets specialist states, moves to In Progress)')
+    .option('--reason <text>', 'Reason for reopening (appended to STATE.md)')
     .option('--json', 'Output as JSON')
     .option('--force', 'Skip confirmation')
     .action(reopenCommand);
