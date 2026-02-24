@@ -521,6 +521,26 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     },
   });
 
+  const reopenMutation = useMutation({
+    mutationFn: async (reason?: string) => {
+      const res = await fetch(`/api/issues/${issueId}/reopen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reopen issue');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+    },
+  });
+
   // Dismiss pending operation error state
   const dismissPendingMutation = useMutation({
     mutationFn: async () => {
@@ -629,6 +649,16 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     if (confirm(`Close ${issueId} without merging? This will:\n- Close the issue (no merge)\n- Stop any running agent\n- Remove the workspace\n(Feature branch is preserved for history)`)) {
       closeMutation.mutate();
     }
+  };
+
+  const handleReopen = () => {
+    const reason = prompt(
+      `Reopen ${issueId} for re-work?\n\nThis will:\n- Move the issue to "In Progress"\n- Reset review/test/merge status to pending\n- Remove any queued specialist tasks\n- Append a "Reopened" section to STATE.md\n\nOptional: enter a reason (or leave blank):`,
+      ''
+    );
+    // prompt returns null if cancelled
+    if (reason === null) return;
+    reopenMutation.mutate(reason || undefined);
   };
 
   const sendMutation = useMutation({
@@ -1357,6 +1387,23 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               )}
               Close (No Merge)
             </button>
+
+            {/* Reopen button - available when any specialist cycle has run (passed, failed, or merged) */}
+            {reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed' || reviewStatus.mergeStatus === 'merged') && (
+              <button
+                data-testid="reopen-btn"
+                onClick={handleReopen}
+                disabled={reopenMutation.isPending}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-900/30 text-purple-400 rounded hover:bg-purple-900/50 disabled:opacity-50"
+              >
+                {reopenMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3 h-3" />
+                )}
+                {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
+              </button>
+            )}
 
             {/* Start Agent / Create Workspace - when no agent or agent is stopped */}
             {(!agent || agent.status === 'stopped') && (
