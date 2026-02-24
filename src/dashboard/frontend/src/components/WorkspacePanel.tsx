@@ -1388,8 +1388,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               Close (No Merge)
             </button>
 
-            {/* Reopen button - available when review/test passed or mergeStatus is merged */}
-            {(reviewStatus?.reviewStatus === 'passed' || reviewStatus?.testStatus === 'passed' || reviewStatus?.mergeStatus === 'merged') && (
+            {/* Reopen button - available when any specialist cycle has run (passed, failed, or merged) */}
+            {reviewStatus && (reviewStatus.reviewStatus === 'passed' || reviewStatus.reviewStatus === 'failed' || reviewStatus.reviewStatus === 'blocked' || reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'failed' || reviewStatus.mergeStatus === 'merged') && (
               <button
                 data-testid="reopen-btn"
                 onClick={handleReopen}

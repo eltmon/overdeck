@@ -10412,7 +10412,7 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
       const { owner, repo, number } = githubCheck;
 
       // Reopen issue if it's closed
-      await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}`, {
+      const reopenRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `token ${ghConfig.token}`,
@@ -10421,6 +10421,12 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
         },
         body: JSON.stringify({ state: 'open' }),
       });
+      if (!reopenRes.ok) {
+        const body = await reopenRes.text().catch(() => '');
+        return res.status(reopenRes.status).json({
+          error: `GitHub API rejected reopen: ${reopenRes.status} ${reopenRes.statusText}. ${body}`.trim(),
+        });
+      }
 
       // Remove 'done' label if present, add 'in-progress'
       await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/done`, {
