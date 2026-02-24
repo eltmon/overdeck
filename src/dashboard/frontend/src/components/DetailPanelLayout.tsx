@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 // react-resizable-panels v4 exports: Group, Panel, Separator (NOT PanelGroup/PanelResizeHandle)
 // v4 props: orientation (NOT direction), onLayoutChanged (NOT onLayout)
 // Verified via installed package dist/react-resizable-panels.d.ts
@@ -12,6 +12,7 @@ type PanelMode = 'closed' | 'inspector-only' | 'inspector+terminal';
 interface PanelState {
   panelMode: PanelMode;
   inspectorDefaultSize: string; // e.g. "35%" of the panel group
+  panelWidth?: number; // outer panel width in px, user-resizable
 }
 
 const DEFAULT_INSPECTOR_SIZE = '35%';
@@ -47,6 +48,7 @@ export interface DetailPanelLayoutProps {
 
 export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: DetailPanelLayoutProps) {
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
+  const [isResizing, setIsResizing] = useState(false);
 
   // Reset panel state when issue changes
   useEffect(() => {
@@ -72,18 +74,51 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: 
   if (panelState.panelMode === 'closed') return null;
 
   const showTerminal = panelState.panelMode === 'inspector+terminal' && !!agent;
+  const defaultWidth = showTerminal ? 760 : 360;
+  const minWidth = showTerminal ? 480 : 280;
+  const maxWidth = 1200;
+  const currentWidth = Math.max(minWidth, Math.min(maxWidth, panelState.panelWidth ?? defaultWidth));
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = currentWidth;
+    let latestWidth = startWidth;
+    setIsResizing(true);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = startX - e.clientX; // dragging left = growing the panel
+      latestWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + delta));
+      setPanelState(prev => ({ ...prev, panelWidth: latestWidth }));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      savePanelState(issueId, { panelWidth: latestWidth });
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   return (
     <div
-      className="flex h-full border-l shrink-0"
+      className="relative flex h-full border-l shrink-0"
       style={{
         borderColor: '#232f48',
-        width: showTerminal ? '760px' : '360px',
-        minWidth: showTerminal ? '480px' : '280px',
-        maxWidth: showTerminal ? '1100px' : '520px',
-        transition: 'width 200ms ease',
+        width: `${currentWidth}px`,
+        transition: isResizing ? 'none' : 'width 200ms ease',
       }}
     >
+      {/* Drag handle on left edge */}
+      <div
+        className="absolute top-0 bottom-0 z-10 hover:bg-[#2769ec]/30 active:bg-[#2769ec]/50 transition-colors"
+        style={{ left: -2, width: 4, cursor: 'col-resize' }}
+        onMouseDown={handleResizeMouseDown}
+      />
+
       {showTerminal ? (
         <Group
           orientation="horizontal"

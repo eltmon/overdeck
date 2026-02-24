@@ -196,3 +196,8 @@ See beads for detailed tasks with dependencies. High-level order:
 8. App.tsx integration (requires 3, 4, 7)
 9. Kanban card Stitch styling
 10. Polish and cleanup
+
+## Specialist Feedback
+
+- **[2026-02-24T05:35Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/006-review-agent-changes-requested.md`
+- **[2026-02-24T05:43Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/007-review-agent-changes-requested.md`
