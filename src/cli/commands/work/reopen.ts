@@ -2,15 +2,17 @@ import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { LinearClient, Issue } from '@linear/sdk';
-import { planCommand } from './plan.js';
+import { reopenWorkspaceState } from '../../../lib/reopen.js';
+import { getTrackerContext } from '../../../lib/cloister/work-agent-prompt.js';
+import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
 interface ReopenOptions {
-  skipPlan?: boolean;
   json?: boolean;
   force?: boolean;
+  reason?: string;
 }
 
 interface LinearComment {
@@ -84,10 +86,9 @@ async function fetchIssueWithComments(
 }
 
 /**
- * Transition issue back to open/backlog state
+ * Transition issue to "In Progress" state (not Backlog)
  */
-async function reopenIssue(client: LinearClient, issueId: string): Promise<void> {
-  // Get the issue and its team
+async function transitionToInProgress(client: LinearClient, issueId: string): Promise<void> {
   const results = await client.searchIssues(issueId, { first: 1 });
   if (results.nodes.length === 0) {
     throw new Error(`Issue not found: ${issueId}`);
@@ -99,22 +100,26 @@ async function reopenIssue(client: LinearClient, issueId: string): Promise<void>
     throw new Error('Could not determine issue team');
   }
 
-  // Get workflow states
   const states = await team.states();
 
-  // Find backlog or unstarted state (prefer backlog)
-  const backlogState = states.nodes.find((s) => s.type === 'backlog');
-  const unstartedState = states.nodes.find((s) => s.type === 'unstarted');
-  const targetState = backlogState || unstartedState;
+  // Prefer "In Progress" state; fall back to any "started" type
+  const inProgressState =
+    states.nodes.find((s) => s.name.toLowerCase() === 'in progress') ||
+    states.nodes.find((s) => s.type === 'started');
 
-  if (!targetState) {
-    throw new Error('No backlog or unstarted state found');
+  if (!inProgressState) {
+    // If no "started" state, at least try backlog/unstarted
+    const backlogState =
+      states.nodes.find((s) => s.type === 'backlog') ||
+      states.nodes.find((s) => s.type === 'unstarted');
+    if (!backlogState) {
+      throw new Error('No suitable state found for transition');
+    }
+    await client.updateIssue(linearIssue.id, { stateId: backlogState.id });
+    return;
   }
 
-  // Update the issue
-  await client.updateIssue(linearIssue.id, {
-    stateId: targetState.id,
-  });
+  await client.updateIssue(linearIssue.id, { stateId: inProgressState.id });
 }
 
 /**
@@ -133,6 +138,35 @@ function formatComments(comments: LinearComment[]): string {
       return `  [${date}] ${c.author}:\n    ${truncatedBody.replace(/\n/g, '\n    ')}`;
     })
     .join('\n\n');
+}
+
+/**
+ * Find the local workspace path for an issue.
+ */
+function findLocalWorkspace(issueId: string): string | null {
+  const normalizedId = issueId.toLowerCase();
+
+  // Try project registry first
+  const resolved = resolveProjectFromIssue(issueId, []);
+  if (resolved) {
+    const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${normalizedId}`);
+    if (existsSync(workspacePath)) return workspacePath;
+  }
+
+  // Fall back to searching upward from cwd
+  let dir = process.cwd();
+  for (let i = 0; i < 10; i++) {
+    const workspacesDir = join(dir, 'workspaces');
+    if (existsSync(workspacesDir)) {
+      const workspacePath = join(workspacesDir, `feature-${normalizedId}`);
+      if (existsSync(workspacePath)) return workspacePath;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return null;
 }
 
 export async function reopenCommand(id: string, options: ReopenOptions = {}): Promise<void> {
@@ -206,7 +240,7 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
         {
           type: 'confirm',
           name: 'proceed',
-          message: `Reopen ${issue.identifier} and run planning?`,
+          message: `Reopen ${issue.identifier} and reset workspace state?`,
           default: true,
         },
       ]);
@@ -217,31 +251,74 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
       }
     }
 
-    // Reopen the issue
-    const reopenSpinner = ora('Transitioning issue to backlog...').start();
-    await reopenIssue(client, id);
-    reopenSpinner.succeed(`Issue ${issue.identifier} reopened`);
+    // Transition the issue to In Progress
+    const transitionSpinner = ora('Transitioning issue to In Progress...').start();
+    await transitionToInProgress(client, id);
+    transitionSpinner.succeed(`Issue ${issue.identifier} moved to In Progress`);
 
     // Add a comment about reopening
     const commentSpinner = ora('Adding reopen comment...').start();
+    const reasonText = options.reason ? ` Reason: ${options.reason}.` : '';
     await client.createComment({
       issueId: issue.id,
-      body: `Issue reopened for re-planning via Panopticon.\n\nPrevious state: ${issue.state}`,
+      body: `Issue reopened for re-work via Panopticon.${reasonText}\n\nPrevious state: ${issue.state}`,
     });
     commentSpinner.succeed('Added reopen comment');
 
-    // Run planning (unless skipped)
-    if (!options.skipPlan) {
+    // Find workspace and reset state
+    const workspacePath = findLocalWorkspace(id);
+    let trackerContext: string | undefined;
+
+    if (workspacePath) {
+      // Fetch tracker context for STATE.md (reuse PAN-253 pattern)
+      try {
+        trackerContext = await getTrackerContext(id, workspacePath);
+      } catch {
+        // Non-fatal: tracker context is best-effort
+      }
+
+      const resetSpinner = ora('Resetting workspace state...').start();
+      const result = reopenWorkspaceState(id, workspacePath, {
+        reason: options.reason,
+        trackerContext,
+      });
+      resetSpinner.succeed('Workspace state reset');
+
       console.log('');
-      console.log(chalk.cyan('Running planning workflow...'));
-      console.log('');
-      await planCommand(id, { force: true });
+      console.log(chalk.bold('Reset summary:'));
+      if (result.previousReviewStatus) {
+        console.log(`  Review: ${chalk.yellow(result.previousReviewStatus)} → ${chalk.green('pending')}`);
+      }
+      if (result.previousTestStatus) {
+        console.log(`  Test:   ${chalk.yellow(result.previousTestStatus)} → ${chalk.green('pending')}`);
+      }
+      if (result.previousMergeStatus) {
+        console.log(`  Merge:  ${chalk.yellow(result.previousMergeStatus)} → ${chalk.green('pending')}`);
+      }
+
+      const queueEntries = Object.entries(result.queueItemsRemoved);
+      if (queueEntries.length > 0) {
+        console.log(`  Queue items removed:`);
+        for (const [specialist, count] of queueEntries) {
+          console.log(`    ${specialist}: ${count} item(s)`);
+        }
+      }
+
+      if (result.stateMdUpdated) {
+        console.log(`  STATE.md updated with Reopened section`);
+      }
     } else {
       console.log('');
-      console.log(chalk.green('Issue reopened. Run planning manually:'));
-      console.log(`  pan work plan ${id}`);
-      console.log('');
+      console.log(chalk.yellow(`  No local workspace found for ${id} — skipping workspace state reset`));
+      console.log(chalk.dim('  Specialist states were not modified.'));
     }
+
+    console.log('');
+    console.log(chalk.green(`✓ ${issue.identifier} reopened and ready for re-work`));
+    console.log('');
+    console.log(chalk.dim('Start the agent to resume implementation:'));
+    console.log(`  pan work ${id}`);
+    console.log('');
   } catch (error: any) {
     if (spinner.isSpinning) spinner.fail();
     console.error(chalk.red(`Error: ${error.message}`));

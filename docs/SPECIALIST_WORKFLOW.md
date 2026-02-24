@@ -577,6 +577,54 @@ The deacon patrols specialists every 30 seconds and handles recovery:
 - **Dead specialist recovery**: Uses `wakeSpecialist()` with `clearSessionId()` to start fresh (not `initializeSpecialist()` which rejects for existing sessions — see PAN-246)
 - **No backoff yet**: Deacon retries indefinitely (PAN-247 tracks adding backoff/escalation)
 
+## Reopening Issues for Re-Work
+
+When an issue is closed or marked done but needs additional work, use the reopen flow to reset specialist state.
+
+### What Reopen Resets
+
+The `pan work reopen <ID>` command (and the dashboard Reopen button) performs these actions atomically:
+
+1. **Tracker transition** — moves the issue to "In Progress" (not Backlog)
+2. **Specialist states** — resets `reviewStatus`, `testStatus`, `mergeStatus` to `pending`
+3. **readyForMerge** — cleared to `false`
+4. **Specialist queues** — removes any stale queue items for the issue from review-agent, test-agent, and merge-agent
+5. **STATE.md** — appends a `## Reopened — <date>` section with:
+   - Previous status and review/test state
+   - Optional reopen reason
+   - Latest tracker comments (reuses PAN-253's `getTrackerContext()` pattern)
+
+### Why "In Progress" and Not Backlog
+
+Previous behavior moved the issue to Backlog and triggered re-planning. This was wrong:
+- The implementation plan in STATE.md is still valid
+- The agent should resume re-work, not replan from scratch
+- Backlog triggers `planCommand()` which overwrites STATE.md progress
+
+The new behavior moves to "In Progress" and lets the agent read the "Reopened" section in STATE.md to understand what changed.
+
+### Preserving History
+
+The `history` array in `review-status.json` retains all previous status transitions. Reopening adds a new entry tagged with the reason. This provides an audit trail for issues that go through multiple review cycles.
+
+### Agent Behavior After Reopen
+
+On restart, the agent reads STATE.md and sees:
+1. A `## Reopened` section (clear signal that fast-path is wrong)
+2. Tracker comments with the new requirements
+3. Previous status of all specialist states
+
+The `getTrackerContext()` function (PAN-253) injects this into the work agent prompt, ensuring the agent never fast-paths to done when reopened.
+
+### Preventing Stale Queue Items
+
+Without reopen clearing queues, specialists might pick up stale items from before the reset:
+- review-agent might re-review old code against old criteria
+- test-agent might run tests on the pre-fix branch
+- merge-agent might try to merge already-done state
+
+The reopen flow calls `completeSpecialistTask()` for all queue items matching the issue ID across all three specialist queues.
+
 ## Future Enhancements
 
 - External PR selection (select PRs from repo, not just Panopticon-created)

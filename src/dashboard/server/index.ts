@@ -10376,11 +10376,14 @@ app.post('/api/issues/:id/reset', async (req, res) => {
 // Reopen a done/closed issue - moves back to Backlog and optionally starts planning
 app.post('/api/issues/:id/reopen', async (req, res) => {
   const { id } = req.params;
-  const { skipPlan = false } = req.body || {};
+  const { reason } = req.body || {};
 
   try {
     const githubCheck = isGitHubIssue(id);
     const issueSource = issueDataService.getIssueSource(id);
+
+    let newState = 'In Progress';
+    let issueIdentifier = id;
 
     if (issueSource === 'rally') {
       // Rally issue - transition back to open state
@@ -10397,15 +10400,45 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
       });
       await tracker.transitionIssue(id, 'open');
       console.log(`Reopened Rally issue ${id}`);
+      issueDataService.invalidateTracker('rally').catch(() => {});
+      newState = 'Open';
+    } else if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+      // GitHub issue - reopen if closed and add in-progress label
+      const ghConfig = getGitHubConfig();
+      if (!ghConfig) {
+        return res.status(400).json({ error: 'GitHub not configured' });
+      }
 
-      res.json({
-        success: true,
-        message: `Issue ${id} reopened`,
-        issueId: id,
-        newState: 'Backlog',
+      const { owner, repo, number } = githubCheck;
+
+      // Reopen issue if it's closed
+      await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `token ${ghConfig.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state: 'open' }),
       });
 
-      issueDataService.invalidateTracker('rally').catch(() => {});
+      // Remove 'done' label if present, add 'in-progress'
+      await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/done`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `token ${ghConfig.token}`, 'Accept': 'application/vnd.github.v3+json' },
+      }).catch(() => {});
+      await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${ghConfig.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ labels: ['in-progress'] }),
+      }).catch(() => {});
+
+      console.log(`Reopened GitHub issue ${id} and set in-progress label`);
+      issueDataService.invalidateTracker('github').catch(() => {});
     } else {
       // Linear issue (default)
       const linearKey = process.env.LINEAR_API_KEY || '';
@@ -10421,35 +10454,75 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
         return res.status(404).json({ error: `Issue ${id} not found` });
       }
 
+      issueIdentifier = issue.identifier;
+
       const team = await issue.team;
       if (!team) {
         return res.status(400).json({ error: 'Could not determine team for issue' });
       }
 
       const states = await team.states();
-      const backlogState = states.nodes.find(s => s.type === 'backlog');
+      // Prefer "In Progress"; fall back to any "started" type, then backlog
+      const targetState =
+        states.nodes.find((s) => s.name.toLowerCase() === 'in progress') ||
+        states.nodes.find((s) => s.type === 'started') ||
+        states.nodes.find((s) => s.type === 'backlog') ||
+        states.nodes.find((s) => s.type === 'unstarted');
 
-      if (!backlogState) {
-        return res.status(400).json({ error: 'Could not find Backlog state for team' });
+      if (!targetState) {
+        return res.status(400).json({ error: 'No suitable state found for transition' });
       }
 
-      await issue.update({ stateId: backlogState.id });
-      console.log(`Reopened issue ${id} - moved to Backlog`);
+      await issue.update({ stateId: targetState.id });
+      newState = targetState.name;
+      console.log(`Reopened issue ${id} - moved to ${newState}`);
+      issueDataService.invalidateTracker('linear').catch(() => {});
+    }
 
-      res.json({
-        success: true,
-        message: `Issue ${id} reopened and moved to Backlog`,
-        issueId: issue.identifier,
-        newState: 'Backlog',
-      });
+    // Reset workspace state (specialist statuses, queue items, STATE.md)
+    const workspaceInfo = getWorkspaceInfoForIssue(id);
+    let resetSummary: Record<string, unknown> | null = null;
 
-      // Invalidate correct tracker cache
-      if (githubCheck.isGitHub) {
-        issueDataService.invalidateTracker('github').catch(() => {});
-      } else {
-        issueDataService.invalidateTracker('linear').catch(() => {});
+    if (workspaceInfo.exists && !workspaceInfo.isRemote && workspaceInfo.localPath) {
+      try {
+        // Fetch tracker context for STATE.md annotation
+        let trackerContext: string | undefined;
+        try {
+          const { getTrackerContext } = await import('../../lib/cloister/work-agent-prompt.js');
+          trackerContext = await getTrackerContext(id, workspaceInfo.localPath);
+        } catch {
+          // Non-fatal
+        }
+
+        const { reopenWorkspaceState } = await import('../../lib/reopen.js');
+        const result = reopenWorkspaceState(id, workspaceInfo.localPath, {
+          reason: typeof reason === 'string' ? reason : undefined,
+          trackerContext,
+        });
+
+        resetSummary = {
+          specialistStatesReset: result.specialistStatesReset,
+          previousReviewStatus: result.previousReviewStatus,
+          previousTestStatus: result.previousTestStatus,
+          previousMergeStatus: result.previousMergeStatus,
+          queueItemsRemoved: result.queueItemsRemoved,
+          stateMdUpdated: result.stateMdUpdated,
+        };
+
+        console.log(`[reopen] Reset workspace state for ${id}`, resetSummary);
+      } catch (resetError: any) {
+        console.error(`[reopen] Failed to reset workspace state for ${id}:`, resetError);
+        // Non-fatal: workspace state reset failure shouldn't block the tracker update
       }
     }
+
+    res.json({
+      success: true,
+      message: `Issue ${id} reopened and moved to ${newState}`,
+      issueId: issueIdentifier,
+      newState,
+      resetSummary,
+    });
   } catch (error: any) {
     console.error('Error reopening issue:', error);
     res.status(500).json({ error: 'Failed to reopen issue: ' + error.message });
