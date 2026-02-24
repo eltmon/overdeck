@@ -906,11 +906,14 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         <div className="flex gap-4 overflow-x-auto pb-4">
           {STATUS_ORDER.map((status) => (
             <DroppableColumn key={status} status={status}>
-              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
-                <div className="px-4 py-3 border-b border-divider">
+              <div
+                className={`border-t-4 ${COLUMN_COLORS[status]} rounded-lg transition-colors`}
+                style={{ backgroundColor: activeDragStatus && activeDragStatus !== status ? 'rgba(22,27,38,0.7)' : '#161b26' }}
+              >
+                <div className="px-4 py-3 border-b" style={{ borderColor: '#232f48' }}>
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
-                    <span className="text-sm text-content-subtle">{grouped[status].length}</span>
+                    <h3 className="font-semibold text-white" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>{COLUMN_TITLES[status]}</h3>
+                    <span className="text-sm" style={{ color: '#92a4c9' }}>{grouped[status].length}</span>
                   </div>
                 </div>
                 <ColumnContent
@@ -1630,11 +1633,12 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
   return (
     <div
       onClick={onSelect}
-      className={`bg-surface-overlay rounded-lg p-3 border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
+      className={`rounded-lg p-3 border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
         isSelected
-          ? 'ring-2 ring-blue-500 bg-gray-650'
-          : 'hover:bg-gray-650'
+          ? 'ring-2 ring-[#2769ec]'
+          : 'hover:brightness-125'
       } ${isRunning ? 'bg-blue-900/20' : ''}`}
+      style={{ backgroundColor: isRunning ? 'rgba(39, 105, 236, 0.15)' : '#232f48' }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">

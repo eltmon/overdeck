@@ -1,24 +1,6 @@
 # PAN-103: Dashboard UI — Progressive Disclosure with Resizable Inspector and Terminal Panels
 
-## Status: IMPLEMENTATION COMPLETE
-
-## Remaining Work
-
-None — all 10 tasks implemented and committed.
-
-## Implementation Summary
-
-Completed all planned work:
-1. Design system: Stitch colors (#101622 bg, #161b26 panels, #232f48 borders, #2769ec primary, #92a4c9 text-secondary), Space Grotesk + Noto Sans fonts, Material Symbols icons
-2. Installed react-resizable-panels v4.6.5
-3. Created Header.tsx — horizontal navbar with logo, CloisterStatusBar, nav items, search, theme toggle
-4. Created MetricsSummaryRow.tsx — compact 6-metric row (Cost, Agents, Stuck, Handoffs, Escalations, Queue)
-5. Created InspectorPanel.tsx — full inspector sidebar extracted from WorkspacePanel with all agent info, git status, actions, mutations
-6. Created TerminalPanel.tsx — terminal logs + status tab + chat input
-7. Created DetailPanelLayout.tsx — orchestrates Inspector + Terminal with react-resizable-panels Group/Panel/Separator
-8. Updated App.tsx — uses new Header and DetailPanelLayout, replaced old WorkspacePanel + resize logic
-9. Updated KanbanBoard.tsx — Stitch card colors (#232f48 bg), column headers with Space Grotesk font
-10. All tests pass (60 frontend, same pre-existing 3 backend failures)
+## Status: PLANNING COMPLETE
 
 ## Summary
 
