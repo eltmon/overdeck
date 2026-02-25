@@ -31,7 +31,7 @@ export interface WorkspaceConfig {
   ports?: Record<string, { range: [number, number] }>;
   docker?: { traefik?: string; compose_template?: string };
   database?: { seed_file?: string; container_name?: string; [key: string]: any };
-  agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; symlinks?: string[] };
+  agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; copy_dirs?: string[]; symlinks?: string[] };
   env?: { template?: string; secrets_file?: string };
   services?: Array<{ name: string; path: string; start_command: string; docker_command?: string; health_url?: string; port?: number }>;
 }

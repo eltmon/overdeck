@@ -81,6 +81,14 @@ export const SOURCE_TRAEFIK_TEMPLATES = join(SOURCE_TEMPLATES_DIR, 'traefik');
 export const SOURCE_SCRIPTS_DIR = join(packageRoot, 'scripts');
 export const SOURCE_SKILLS_DIR = join(packageRoot, 'skills');
 export const SOURCE_DEV_SKILLS_DIR = join(packageRoot, 'dev-skills');
+export const SOURCE_AGENTS_DIR = join(packageRoot, 'agents');
+export const SOURCE_RULES_DIR = join(packageRoot, 'rules');
+
+// Cache directories (where Panopticon keeps its copy of distributed content)
+export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.panopticon/skills/
+export const CACHE_AGENTS_DIR = join(PANOPTICON_HOME, 'agent-definitions');  // separate from agent state
+export const CACHE_RULES_DIR = join(PANOPTICON_HOME, 'rules');
+export const CACHE_MANIFEST = join(PANOPTICON_HOME, '.manifest.json');
 
 /**
  * Detect if running in development mode (from npm link or panopticon repo)
@@ -111,6 +119,8 @@ export const INIT_DIRS = [
   TEMPLATES_DIR,
   CLAUDE_MD_TEMPLATES,
   CERTS_DIR,
+  CACHE_AGENTS_DIR,
+  CACHE_RULES_DIR,
   TRAEFIK_DIR,
   TRAEFIK_DYNAMIC_DIR,
   TRAEFIK_CERTS_DIR,

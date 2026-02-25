@@ -1,7 +1,19 @@
 import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync, readlinkSync, rmSync, copyFileSync, chmodSync, readFileSync, writeFileSync } from 'fs';
-import { join, basename, dirname } from 'path';
+import { join, basename, dirname, relative } from 'path';
 import { homedir } from 'os';
-import { SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR, SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SYNC_TARGET, isDevMode } from './paths.js';
+import {
+  SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR,
+  SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SOURCE_SKILLS_DIR, SOURCE_AGENTS_DIR, SOURCE_RULES_DIR,
+  CACHE_AGENTS_DIR, CACHE_RULES_DIR, CACHE_MANIFEST,
+  SYNC_TARGET, isDevMode,
+} from './paths.js';
+import {
+  buildManifestFromDirectory, writeManifest, readManifest, hashFile,
+  setManifestEntry, collectSourceFiles,
+  type Manifest, type FileStatus,
+  compareFileToManifest,
+} from './manifest.js';
+import { getDevrootPath } from './config.js';
 
 export interface SyncItem {
   name: string;
@@ -14,6 +26,7 @@ export interface SyncPlan {
   skills: SyncItem[];
   commands: SyncItem[];
   agents: SyncItem[];
+  rules: SyncItem[];
   devSkills: SyncItem[];  // Developer-only skills (only synced in dev mode)
 }
 
@@ -49,107 +62,264 @@ export function isPanopticonSymlink(targetPath: string): boolean {
   }
 }
 
+export interface MigrationResult {
+  removedSymlinks: string[];
+  preservedUserContent: string[];
+  errors: string[];
+}
+
 /**
- * Plan what would be synced (dry run)
+ * One-time migration: remove Panopticon-managed symlinks from ~/.claude/.
+ *
+ * Detects symlinks in ~/.claude/skills/ and ~/.claude/agents/ that point to
+ * .panopticon directories. Removes only those symlinks, preserving any
+ * user-created content (real files/directories).
+ *
+ * This is safe to run multiple times — it's a no-op if no symlinks remain.
+ */
+export function migrateFromPersonalSymlinks(): MigrationResult {
+  const claudeDir = join(homedir(), '.claude');
+  const result: MigrationResult = {
+    removedSymlinks: [],
+    preservedUserContent: [],
+    errors: [],
+  };
+
+  for (const subdir of ['skills', 'commands', 'agents']) {
+    const dir = join(claudeDir, subdir);
+    if (!existsSync(dir)) continue;
+
+    try {
+      const entries = readdirSync(dir);
+      for (const entry of entries) {
+        const entryPath = join(dir, entry);
+        try {
+          const stats = lstatSync(entryPath);
+          if (stats.isSymbolicLink()) {
+            const linkTarget = readlinkSync(entryPath);
+            if (linkTarget.includes('.panopticon') || linkTarget.includes('panopticon-cli')) {
+              unlinkSync(entryPath);
+              result.removedSymlinks.push(`${subdir}/${entry}`);
+            } else {
+              // Symlink to somewhere else — leave it
+              result.preservedUserContent.push(`${subdir}/${entry}`);
+            }
+          } else {
+            // Real file/directory — user content, never touch
+            result.preservedUserContent.push(`${subdir}/${entry}`);
+          }
+        } catch (err: any) {
+          result.errors.push(`${subdir}/${entry}: ${err.message}`);
+        }
+      }
+    } catch (err: any) {
+      result.errors.push(`${subdir}: ${err.message}`);
+    }
+  }
+
+  return result;
+}
+
+export interface RefreshCacheResult {
+  skills: { copied: number; total: number };
+  agents: { copied: number; total: number };
+  rules: { copied: number; total: number };
+}
+
+/**
+ * Recursively copy a directory, overwriting existing files.
+ */
+function copyDirectoryRecursive(source: string, dest: string): number {
+  if (!existsSync(source)) return 0;
+
+  mkdirSync(dest, { recursive: true });
+  let count = 0;
+
+  const entries = readdirSync(source, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = join(source, entry.name);
+    const dstPath = join(dest, entry.name);
+    if (entry.isDirectory()) {
+      count += copyDirectoryRecursive(srcPath, dstPath);
+    } else if (entry.isFile()) {
+      copyFileSync(srcPath, dstPath);
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Refresh the ~/.panopticon/ cache from the repo source.
+ *
+ * Always copies (overwrites) skills, agents, and rules from the package's
+ * source directories to the cache. Generates ~/.panopticon/.manifest.json
+ * tracking all cached files.
+ *
+ * This replaces the old "skip if exists" behavior in `pan install`.
+ */
+export function refreshCache(): RefreshCacheResult {
+  const result: RefreshCacheResult = {
+    skills: { copied: 0, total: 0 },
+    agents: { copied: 0, total: 0 },
+    rules: { copied: 0, total: 0 },
+  };
+
+  // Copy skills from repo to cache (always overwrite)
+  if (existsSync(SOURCE_SKILLS_DIR)) {
+    const skillDirs = readdirSync(SOURCE_SKILLS_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory());
+
+    result.skills.total = skillDirs.length;
+    for (const skillDir of skillDirs) {
+      const src = join(SOURCE_SKILLS_DIR, skillDir.name);
+      const dst = join(SKILLS_DIR, skillDir.name);
+      copyDirectoryRecursive(src, dst);
+      result.skills.copied++;
+    }
+  }
+
+  // Copy dev-skills to cache too (in dev mode only)
+  if (isDevMode() && existsSync(SOURCE_DEV_SKILLS_DIR)) {
+    const devSkillDirs = readdirSync(SOURCE_DEV_SKILLS_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory());
+
+    for (const skillDir of devSkillDirs) {
+      const src = join(SOURCE_DEV_SKILLS_DIR, skillDir.name);
+      const dst = join(SKILLS_DIR, skillDir.name);
+      copyDirectoryRecursive(src, dst);
+      result.skills.copied++;
+      result.skills.total++;
+    }
+  }
+
+  // Copy agent definitions from repo to cache
+  if (existsSync(SOURCE_AGENTS_DIR)) {
+    mkdirSync(CACHE_AGENTS_DIR, { recursive: true });
+    const agents = readdirSync(SOURCE_AGENTS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
+
+    result.agents.total = agents.length;
+    for (const agent of agents) {
+      copyFileSync(join(SOURCE_AGENTS_DIR, agent.name), join(CACHE_AGENTS_DIR, agent.name));
+      result.agents.copied++;
+    }
+  }
+
+  // Copy rules from repo to cache (directory may not exist yet)
+  if (existsSync(SOURCE_RULES_DIR)) {
+    const ruleFiles = readdirSync(SOURCE_RULES_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile());
+
+    result.rules.total = ruleFiles.length;
+    for (const rule of ruleFiles) {
+      mkdirSync(CACHE_RULES_DIR, { recursive: true });
+      copyFileSync(join(SOURCE_RULES_DIR, rule.name), join(CACHE_RULES_DIR, rule.name));
+      result.rules.copied++;
+    }
+  }
+
+  // Generate cache manifest
+  const manifest = buildManifestFromDirectory(
+    join(SKILLS_DIR, '..'),  // ~/.panopticon/
+    ['skills', 'agent-definitions', 'rules'],
+    'panopticon',
+  );
+  writeManifest(CACHE_MANIFEST, manifest);
+
+  return result;
+}
+
+/**
+ * Devroot sync item — represents a single file to distribute.
+ */
+export interface DevrootSyncItem {
+  /** Relative path from .claude/ (e.g., "skills/beads/SKILL.md") */
+  relativePath: string;
+  /** Absolute path to source file in cache */
+  sourcePath: string;
+  /** Absolute path to target file at devroot */
+  targetPath: string;
+  /** What action to take */
+  status: FileStatus;
+}
+
+/**
+ * Plan what would be synced to devroot (dry run).
+ * Reads from cache, targets <devroot>/.claude/, uses manifest comparison.
  */
 export function planSync(): SyncPlan {
   const plan: SyncPlan = {
     skills: [],
     commands: [],
     agents: [],
+    rules: [],
     devSkills: [],
   };
 
-  // Plan skills sync
-  if (existsSync(SKILLS_DIR)) {
-    const skills = readdirSync(SKILLS_DIR, { withFileTypes: true })
-      .filter((d) => d.isDirectory());
+  const devrootPath = getDevrootPath();
+  if (!devrootPath) return plan;
 
-    for (const skill of skills) {
-      const sourcePath = join(SKILLS_DIR, skill.name);
-      const targetPath = join(SYNC_TARGET.skills, skill.name);
+  const targetBase = join(devrootPath, '.claude');
+  const manifestPath = join(targetBase, '.panopticon-manifest.json');
+  const manifest = readManifest(manifestPath);
 
-      let status: SyncItem['status'] = 'new';
+  // Plan skills
+  const skillFiles = collectSourceFiles(SKILLS_DIR, 'skills/');
+  for (const file of skillFiles) {
+    const targetFile = join(targetBase, file.relativePath);
+    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
+    const skillName = file.relativePath.split('/')[1] || file.relativePath;
 
-      if (existsSync(targetPath)) {
-        if (isPanopticonSymlink(targetPath)) {
-          status = 'symlink';  // Already managed by us
-        } else {
-          status = 'conflict';  // User content exists
-        }
-      }
+    let syncStatus: SyncItem['status'] = 'new';
+    if (status.action === 'update') syncStatus = 'symlink';  // reusing 'symlink' for "managed, safe to update"
+    else if (status.action === 'modified') syncStatus = 'conflict';
+    else if (status.action === 'user-owned') syncStatus = 'conflict';
 
-      plan.skills.push({ name: skill.name, sourcePath, targetPath, status });
-    }
+    plan.skills.push({
+      name: file.relativePath,
+      sourcePath: file.absolutePath,
+      targetPath: targetFile,
+      status: syncStatus,
+    });
   }
 
-  // Plan dev-skills sync (only in dev mode)
-  if (isDevMode() && existsSync(SOURCE_DEV_SKILLS_DIR)) {
-    const devSkills = readdirSync(SOURCE_DEV_SKILLS_DIR, { withFileTypes: true })
-      .filter((d) => d.isDirectory());
+  // Plan agents
+  const agentFiles = collectSourceFiles(CACHE_AGENTS_DIR, 'agents/');
+  for (const file of agentFiles) {
+    const targetFile = join(targetBase, file.relativePath);
+    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
 
-    for (const skill of devSkills) {
-      const sourcePath = join(SOURCE_DEV_SKILLS_DIR, skill.name);
-      const targetPath = join(SYNC_TARGET.skills, skill.name);
+    let syncStatus: SyncItem['status'] = 'new';
+    if (status.action === 'update') syncStatus = 'symlink';
+    else if (status.action === 'modified') syncStatus = 'conflict';
+    else if (status.action === 'user-owned') syncStatus = 'conflict';
 
-      let status: SyncItem['status'] = 'new';
-
-      if (existsSync(targetPath)) {
-        if (isPanopticonSymlink(targetPath)) {
-          status = 'symlink';  // Already managed by us
-        } else {
-          status = 'conflict';  // User content exists
-        }
-      }
-
-      plan.devSkills.push({ name: skill.name, sourcePath, targetPath, status });
-    }
+    plan.agents.push({
+      name: file.relativePath,
+      sourcePath: file.absolutePath,
+      targetPath: targetFile,
+      status: syncStatus,
+    });
   }
 
-  // Plan commands sync
-  if (existsSync(COMMANDS_DIR)) {
-    const commands = readdirSync(COMMANDS_DIR, { withFileTypes: true })
-      .filter((d) => d.isDirectory());
+  // Plan rules
+  const ruleFiles = collectSourceFiles(CACHE_RULES_DIR, 'rules/');
+  for (const file of ruleFiles) {
+    const targetFile = join(targetBase, file.relativePath);
+    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
 
-    for (const cmd of commands) {
-      const sourcePath = join(COMMANDS_DIR, cmd.name);
-      const targetPath = join(SYNC_TARGET.commands, cmd.name);
+    let syncStatus: SyncItem['status'] = 'new';
+    if (status.action === 'update') syncStatus = 'symlink';
+    else if (status.action === 'modified') syncStatus = 'conflict';
+    else if (status.action === 'user-owned') syncStatus = 'conflict';
 
-      let status: SyncItem['status'] = 'new';
-
-      if (existsSync(targetPath)) {
-        if (isPanopticonSymlink(targetPath)) {
-          status = 'symlink';
-        } else {
-          status = 'conflict';
-        }
-      }
-
-      plan.commands.push({ name: cmd.name, sourcePath, targetPath, status });
-    }
-  }
-
-  // Plan agents sync
-  if (existsSync(AGENTS_DIR)) {
-    const agents = readdirSync(AGENTS_DIR, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
-
-    for (const agent of agents) {
-      const sourcePath = join(AGENTS_DIR, agent.name);
-      const targetPath = join(SYNC_TARGET.agents, agent.name);
-
-      let status: SyncItem['status'] = 'new';
-
-      if (existsSync(targetPath)) {
-        if (isPanopticonSymlink(targetPath)) {
-          status = 'symlink';  // Already managed by us
-        } else {
-          status = 'conflict';  // User content exists
-        }
-      }
-
-      plan.agents.push({ name: agent.name, sourcePath, targetPath, status });
-    }
+    plan.rules.push({
+      name: file.relativePath,
+      sourcePath: file.absolutePath,
+      targetPath: targetFile,
+      status: syncStatus,
+    });
   }
 
   return plan;
@@ -157,128 +327,104 @@ export function planSync(): SyncPlan {
 
 export interface SyncOptions {
   force?: boolean;
+  diff?: boolean;
   dryRun?: boolean;
 }
 
 export interface SyncResult {
   created: string[];
+  updated: string[];
   skipped: string[];
   conflicts: string[];
+  diffs: Array<{ path: string; sourceContent: string; targetContent: string }>;
 }
 
 /**
- * Execute sync to Claude Code
+ * Execute sync to devroot: copy from cache to <devroot>/.claude/.
+ * Uses manifest-based conflict resolution. NEVER touches ~/.claude/.
  */
 export function executeSync(options: SyncOptions = {}): SyncResult {
-  const plan = planSync();
   const result: SyncResult = {
     created: [],
+    updated: [],
     skipped: [],
     conflicts: [],
+    diffs: [],
   };
 
-  // Ensure target directories exist
-  mkdirSync(SYNC_TARGET.skills, { recursive: true });
-  mkdirSync(SYNC_TARGET.commands, { recursive: true });
-  mkdirSync(SYNC_TARGET.agents, { recursive: true });
-
-  // Process skills
-  for (const item of plan.skills) {
-    if (options.dryRun) {
-      if (item.status === 'new' || item.status === 'symlink') {
-        result.created.push(item.name);
-      } else {
-        result.conflicts.push(item.name);
-      }
-      continue;
-    }
-
-    if (item.status === 'conflict' && !options.force) {
-      result.conflicts.push(item.name);
-      continue;
-    }
-
-    // Remove existing if force or if it's our symlink
-    if (existsSync(item.targetPath)) {
-      removeTarget(item.targetPath);
-    }
-
-    // Create symlink
-    symlinkSync(item.sourcePath, item.targetPath);
-    result.created.push(item.name);
+  const devrootPath = getDevrootPath();
+  if (!devrootPath) {
+    return result;
   }
 
-  // Process commands
-  for (const item of plan.commands) {
-    if (options.dryRun) {
-      if (item.status === 'new' || item.status === 'symlink') {
-        result.created.push(item.name);
-      } else {
-        result.conflicts.push(item.name);
+  const targetBase = join(devrootPath, '.claude');
+  const manifestPath = join(targetBase, '.panopticon-manifest.json');
+  const manifest = readManifest(manifestPath);
+
+  // Collect all source files from cache
+  const allFiles = [
+    ...collectSourceFiles(SKILLS_DIR, 'skills/'),
+    ...collectSourceFiles(CACHE_AGENTS_DIR, 'agents/'),
+    ...collectSourceFiles(CACHE_RULES_DIR, 'rules/'),
+  ];
+
+  for (const file of allFiles) {
+    const targetFile = join(targetBase, file.relativePath);
+    const status = compareFileToManifest(targetFile, file.relativePath, manifest);
+
+    switch (status.action) {
+      case 'new': {
+        // File doesn't exist at target — copy it
+        mkdirSync(dirname(targetFile), { recursive: true });
+        copyFileSync(file.absolutePath, targetFile);
+        const hash = hashFile(targetFile);
+        setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
+        result.created.push(file.relativePath);
+        break;
       }
-      continue;
-    }
 
-    if (item.status === 'conflict' && !options.force) {
-      result.conflicts.push(item.name);
-      continue;
-    }
+      case 'update': {
+        // File exists, hash matches manifest — safe to overwrite (user didn't modify)
+        mkdirSync(dirname(targetFile), { recursive: true });
+        copyFileSync(file.absolutePath, targetFile);
+        const hash = hashFile(targetFile);
+        setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
+        result.updated.push(file.relativePath);
+        break;
+      }
 
-    if (existsSync(item.targetPath)) {
-      removeTarget(item.targetPath);
-    }
+      case 'modified': {
+        // File was modified since we placed it
+        if (options.diff) {
+          result.diffs.push({
+            path: file.relativePath,
+            sourceContent: readFileSync(file.absolutePath, 'utf-8'),
+            targetContent: readFileSync(targetFile, 'utf-8'),
+          });
+        }
 
-    symlinkSync(item.sourcePath, item.targetPath);
-    result.created.push(item.name);
+        if (options.force) {
+          mkdirSync(dirname(targetFile), { recursive: true });
+          copyFileSync(file.absolutePath, targetFile);
+          const hash = hashFile(targetFile);
+          setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
+          result.updated.push(file.relativePath);
+        } else {
+          result.conflicts.push(file.relativePath);
+        }
+        break;
+      }
+
+      case 'user-owned': {
+        // User placed this file, never touch it
+        result.skipped.push(file.relativePath);
+        break;
+      }
+    }
   }
 
-  // Process agents
-  for (const item of plan.agents) {
-    if (options.dryRun) {
-      if (item.status === 'new' || item.status === 'symlink') {
-        result.created.push(item.name);
-      } else {
-        result.conflicts.push(item.name);
-      }
-      continue;
-    }
-
-    if (item.status === 'conflict' && !options.force) {
-      result.conflicts.push(item.name);
-      continue;
-    }
-
-    if (existsSync(item.targetPath)) {
-      removeTarget(item.targetPath);
-    }
-
-    symlinkSync(item.sourcePath, item.targetPath);
-    result.created.push(item.name);
-  }
-
-  // Process dev-skills (only in dev mode)
-  for (const item of plan.devSkills) {
-    if (options.dryRun) {
-      if (item.status === 'new' || item.status === 'symlink') {
-        result.created.push(`${item.name} (dev)`);
-      } else {
-        result.conflicts.push(`${item.name} (dev)`);
-      }
-      continue;
-    }
-
-    if (item.status === 'conflict' && !options.force) {
-      result.conflicts.push(`${item.name} (dev)`);
-      continue;
-    }
-
-    if (existsSync(item.targetPath)) {
-      removeTarget(item.targetPath);
-    }
-
-    symlinkSync(item.sourcePath, item.targetPath);
-    result.created.push(`${item.name} (dev)`);
-  }
+  // Write updated manifest
+  writeManifest(manifestPath, manifest);
 
   return result;
 }

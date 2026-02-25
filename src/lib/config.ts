@@ -1,4 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import { parse, stringify } from '@iarna/toml';
 import { CONFIG_FILE } from './paths.js';
 import type { TrackerType } from './tracker/interface.js';
@@ -86,6 +88,10 @@ export interface PanopticonConfig {
     backup_before_sync: boolean;
     auto_sync?: boolean;
     strategy?: 'symlink' | 'copy';
+    /** Parent directory where all projects live (e.g., ~/Projects).
+     *  Skills are placed at <devroot>/.claude/skills/ (project level).
+     *  Set to null or empty string to disable devroot skill placement. */
+    devroot?: string | null;
   };
   trackers: TrackersConfig;
   dashboard: {
@@ -110,6 +116,7 @@ const DEFAULT_CONFIG: PanopticonConfig = {
     backup_before_sync: true,
     auto_sync: false,
     strategy: 'symlink',
+    devroot: '~/Projects',
   },
   trackers: {
     primary: 'linear',
@@ -207,3 +214,25 @@ export function getDashboardApiUrl(): string {
   const port = config.dashboard?.api_port || 3011;
   return `http://localhost:${port}`;
 }
+
+/**
+ * Get the resolved devroot path from config.
+ * Returns null if devroot is disabled (set to null or empty string).
+ * Resolves ~ to home directory and validates the directory exists.
+ */
+export function getDevrootPath(): string | null {
+  const config = loadConfig();
+  const devroot = config.sync?.devroot;
+
+  if (!devroot) return null;
+
+  // Resolve ~ to home directory
+  const resolved = devroot.startsWith('~/')
+    ? join(homedir(), devroot.slice(2))
+    : devroot;
+
+  if (!existsSync(resolved)) return null;
+
+  return resolved;
+}
+

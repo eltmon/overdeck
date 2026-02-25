@@ -19,6 +19,7 @@ import {
 import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
 import { addTunnelIngress, removeTunnelIngress } from './tunnel.js';
 import { createHumeConfig, deleteHumeConfig } from './hume.js';
+import { mergeSkillsIntoWorkspace } from './skills-merge.js';
 
 const execAsync = promisify(exec);
 
@@ -260,7 +261,7 @@ function processTemplates(
 }
 
 /**
- * Create symlinks for shared directories
+ * @deprecated Use copyProjectTemplateDirs instead. Kept for non-.claude paths.
  */
 function createSymlinks(
   sourceDir: string,
@@ -282,6 +283,48 @@ function createSymlinks(
         // Symlink might already exist
       }
     }
+  }
+
+  return steps;
+}
+
+/**
+ * Copy project template directories into workspace (replaces symlinks).
+ * Recursively copies all files from each source directory.
+ */
+function copyProjectTemplateDirs(
+  sourceDir: string,
+  targetDir: string,
+  dirs: string[]
+): string[] {
+  const steps: string[] = [];
+
+  for (const dir of dirs) {
+    const sourcePath = join(sourceDir, dir);
+    const targetPath = join(targetDir, dir);
+
+    if (!existsSync(sourcePath)) continue;
+
+    // Recursively copy all files
+    function copyDir(src: string, dest: string): number {
+      let count = 0;
+      mkdirSync(dest, { recursive: true });
+      const entries = readdirSync(src, { withFileTypes: true });
+      for (const entry of entries) {
+        const srcEntry = join(src, entry.name);
+        const destEntry = join(dest, entry.name);
+        if (entry.isDirectory()) {
+          count += copyDir(srcEntry, destEntry);
+        } else if (entry.isFile()) {
+          copyFileSync(srcEntry, destEntry);
+          count++;
+        }
+      }
+      return count;
+    }
+
+    const count = copyDir(sourcePath, targetPath);
+    steps.push(`Copied ${count} files from project template: ${dir}`);
   }
 
   return steps;
@@ -490,7 +533,14 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
-  // Process agent templates
+  // Install base Panopticon skills/agents/rules from cache
+  const mergeResult = mergeSkillsIntoWorkspace(workspacePath);
+  const mergeTotal = mergeResult.added.length + mergeResult.updated.length;
+  if (mergeTotal > 0) {
+    result.steps.push(`Installed ${mergeTotal} Panopticon files (${mergeResult.added.length} new, ${mergeResult.updated.length} updated)`);
+  }
+
+  // Process agent templates (project template overlay — wins over Panopticon base)
   if (workspaceConfig.agent?.template_dir) {
     const templateDir = join(projectConfig.path, workspaceConfig.agent.template_dir);
 
@@ -503,10 +553,11 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     );
     result.steps.push(...templateSteps);
 
-    // Create symlinks
-    if (workspaceConfig.agent.symlinks) {
-      const symlinkSteps = createSymlinks(templateDir, workspacePath, workspaceConfig.agent.symlinks);
-      result.steps.push(...symlinkSteps);
+    // Copy .claude/ directories from project template (copy_dirs replaces legacy symlinks)
+    const dirsToSync = workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks;
+    if (dirsToSync) {
+      const copySteps = copyProjectTemplateDirs(templateDir, workspacePath, dirsToSync);
+      result.steps.push(...copySteps);
     }
   }
 

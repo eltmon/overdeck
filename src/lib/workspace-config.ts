@@ -49,7 +49,9 @@ export interface AgentTemplateConfig {
     source: string;
     target: string;
   }>;
-  /** Directories to symlink (shared across workspaces) */
+  /** Directories to copy from project template into workspace */
+  copy_dirs?: string[];
+  /** @deprecated Use copy_dirs instead */
   symlinks?: string[];
 }
 

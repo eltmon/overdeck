@@ -67,9 +67,10 @@ program
 
 program
   .command('sync')
-  .description('Sync skills/commands to AI tools')
+  .description('Sync skills/agents/rules to devroot')
   .option('--dry-run', 'Show what would be synced')
-  .option('--force', 'Overwrite without prompts')
+  .option('--force', 'Overwrite files modified since Panopticon installed them')
+  .option('--diff', 'Show diff for modified files')
   .option('--backup-only', 'Only create backup')
   .action(syncCommand);
 
