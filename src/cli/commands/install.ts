@@ -21,6 +21,7 @@ import { getDefaultConfig, saveConfig, loadConfig } from '../../lib/config.js';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
 import { generatePanopticonTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig } from '../../lib/traefik.js';
+import { refreshCache } from '../../lib/sync.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -236,37 +237,17 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
   spinner.succeed('Directories initialized');
 
-  // Step 2b: Install bundled skills to ~/.panopticon/skills/
-  if (existsSync(SOURCE_SKILLS_DIR)) {
-    spinner.start('Installing bundled skills...');
-    try {
-      const skillDirs = readdirSync(SOURCE_SKILLS_DIR, { withFileTypes: true })
-        .filter((d) => d.isDirectory());
-
-      let installed = 0;
-      let skipped = 0;
-
-      for (const skillDir of skillDirs) {
-        const sourcePath = join(SOURCE_SKILLS_DIR, skillDir.name);
-        const destPath = join(SKILLS_DIR, skillDir.name);
-
-        // Only copy if skill doesn't exist (don't overwrite user modifications)
-        if (!existsSync(destPath)) {
-          copyDirectoryRecursive(sourcePath, destPath);
-          installed++;
-        } else {
-          skipped++;
-        }
-      }
-
-      if (installed > 0) {
-        spinner.succeed(`Installed ${installed} skills${skipped > 0 ? ` (${skipped} already exist)` : ''}`);
-      } else {
-        spinner.info(`Skills already installed (${skipped} skills)`);
-      }
-    } catch (error) {
-      spinner.warn(`Failed to install bundled skills: ${error}`);
-    }
+  // Step 2b: Refresh cache — copy all skills/agents/rules from repo to ~/.panopticon/
+  spinner.start('Refreshing skill cache...');
+  try {
+    const cacheResult = refreshCache();
+    const parts = [];
+    if (cacheResult.skills.copied > 0) parts.push(`${cacheResult.skills.copied} skills`);
+    if (cacheResult.agents.copied > 0) parts.push(`${cacheResult.agents.copied} agents`);
+    if (cacheResult.rules.copied > 0) parts.push(`${cacheResult.rules.copied} rules`);
+    spinner.succeed(`Cache refreshed: ${parts.length > 0 ? parts.join(', ') : 'up to date'}`);
+  } catch (error) {
+    spinner.warn(`Failed to refresh cache: ${error}`);
   }
 
   // Step 3: Docker network

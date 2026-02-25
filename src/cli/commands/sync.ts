@@ -6,8 +6,9 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
-import { planSync, executeSync, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
+import { planSync, executeSync, refreshCache, migrateFromPersonalSymlinks, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
 import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
+import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
 
@@ -29,6 +30,7 @@ function checkCommand(cmd: string): boolean {
 interface SyncOptions {
   dryRun?: boolean;
   force?: boolean;
+  diff?: boolean;
   backupOnly?: boolean;
 }
 
@@ -54,36 +56,27 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       console.log('');
     }
 
-    const plan = planSync();
+    const devrootPath = getDevrootPath();
+    console.log(chalk.cyan(`devroot (${devrootPath || 'disabled'}):`));
 
-    console.log(chalk.cyan('claude:'));
-
-    if (plan.skills.length === 0 && plan.commands.length === 0 && plan.agents.length === 0 && plan.devSkills.length === 0) {
-      console.log(chalk.dim('  (nothing to sync)'));
+    if (!devrootPath) {
+      console.log(chalk.dim('  (devroot disabled — set sync.devroot in config)'));
     } else {
-      for (const item of plan.skills) {
-        const icon = item.status === 'conflict' ? chalk.yellow('!') : chalk.green('+');
-        const status = item.status === 'conflict' ? chalk.yellow('[conflict]') : '';
-        console.log(`  ${icon} skill/${item.name} ${status}`);
-      }
+      const plan = planSync();
+      const allItems = [...plan.skills, ...plan.agents, ...plan.rules, ...plan.commands];
 
-      // Show dev-skills with special label
-      for (const item of plan.devSkills) {
-        const icon = item.status === 'conflict' ? chalk.yellow('!') : chalk.magenta('+');
-        const status = item.status === 'conflict' ? chalk.yellow('[conflict]') : chalk.magenta('[dev]');
-        console.log(`  ${icon} skill/${item.name} ${status}`);
-      }
-
-      for (const item of plan.commands) {
-        const icon = item.status === 'conflict' ? chalk.yellow('!') : chalk.green('+');
-        const status = item.status === 'conflict' ? chalk.yellow('[conflict]') : '';
-        console.log(`  ${icon} command/${item.name} ${status}`);
-      }
-
-      for (const item of plan.agents) {
-        const icon = item.status === 'conflict' ? chalk.yellow('!') : chalk.green('+');
-        const status = item.status === 'conflict' ? chalk.yellow('[conflict]') : '';
-        console.log(`  ${icon} agent/${item.name} ${status}`);
+      if (allItems.length === 0) {
+        console.log(chalk.dim('  (nothing to sync)'));
+      } else {
+        for (const item of allItems) {
+          const icon = item.status === 'conflict' ? chalk.yellow('!') :
+                       item.status === 'symlink' ? chalk.blue('↻') :
+                       chalk.green('+');
+          const label = item.status === 'conflict' ? chalk.yellow('[modified]') :
+                        item.status === 'symlink' ? chalk.dim('[update]') :
+                        chalk.green('[new]');
+          console.log(`  ${icon} ${item.name} ${label}`);
+        }
       }
     }
 
@@ -104,6 +97,15 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   const cleanupResult = cleanupLegacyRuntimeSymlinks();
   if (cleanupResult.cleaned.length > 0) {
     console.log(chalk.dim(`Removed ${cleanupResult.total} legacy runtime symlink(s): ${cleanupResult.cleaned.join(', ')}`));
+  }
+
+  // One-time migration: remove Panopticon symlinks from ~/.claude/ (devroot replaces this)
+  const migration = migrateFromPersonalSymlinks();
+  if (migration.removedSymlinks.length > 0) {
+    console.log(chalk.cyan(`Migrated: removed ${migration.removedSymlinks.length} Panopticon symlink(s) from ~/.claude/`));
+    if (migration.preservedUserContent.length > 0) {
+      console.log(chalk.dim(`  Preserved ${migration.preservedUserContent.length} user-created item(s)`));
+    }
   }
 
   const config = loadConfig();
@@ -131,22 +133,59 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  // Execute sync
-  const spinner = ora('Syncing to Claude Code...').start();
+  // Refresh cache from repo source
+  const cacheSpinner = ora('Refreshing cache from repo...').start();
+  const cacheResult = refreshCache();
+  const cacheParts = [];
+  if (cacheResult.skills.copied > 0) cacheParts.push(`${cacheResult.skills.copied} skills`);
+  if (cacheResult.agents.copied > 0) cacheParts.push(`${cacheResult.agents.copied} agents`);
+  if (cacheResult.rules.copied > 0) cacheParts.push(`${cacheResult.rules.copied} rules`);
+  cacheSpinner.succeed(`Cache refreshed: ${cacheParts.length > 0 ? cacheParts.join(', ') : 'up to date'}`);
 
-  const result = executeSync({ force: options.force });
+  // Execute sync to devroot
+  const devrootPath = getDevrootPath();
+  const spinner = ora(`Syncing to devroot (${devrootPath || 'disabled'})...`).start();
 
-  if (result.conflicts.length > 0 && !options.force) {
-    spinner.warn(`Synced ${result.created.length} items, ${result.conflicts.length} conflicts`);
-    console.log('');
-    console.log(chalk.yellow('Conflicts:'));
-    for (const name of result.conflicts) {
-      console.log(chalk.dim(`  - ${name} (use --force to overwrite)`));
-    }
-    console.log('');
-    console.log(chalk.dim('Use --force to overwrite conflicting items.'));
+  if (!devrootPath) {
+    spinner.info('Devroot disabled (set sync.devroot in config to enable)');
   } else {
-    spinner.succeed(`Synced ${result.created.length} items to Claude Code`);
+    const result = executeSync({ force: options.force, diff: options.diff });
+    const totalSynced = result.created.length + result.updated.length;
+
+    // Show diffs if requested
+    if (result.diffs.length > 0) {
+      spinner.info(`Showing diffs for ${result.diffs.length} modified file(s):\n`);
+      for (const d of result.diffs) {
+        console.log(chalk.cyan(`--- ${d.path} (installed)`));
+        console.log(chalk.cyan(`+++ ${d.path} (current on disk)`));
+        // Simple line-by-line diff
+        const sourceLines = d.sourceContent.split('\n');
+        const targetLines = d.targetContent.split('\n');
+        const maxLines = Math.max(sourceLines.length, targetLines.length);
+        for (let i = 0; i < maxLines; i++) {
+          if (sourceLines[i] !== targetLines[i]) {
+            if (targetLines[i] !== undefined) console.log(chalk.red(`- ${targetLines[i]}`));
+            if (sourceLines[i] !== undefined) console.log(chalk.green(`+ ${sourceLines[i]}`));
+          }
+        }
+        console.log('');
+      }
+    }
+
+    if (result.conflicts.length > 0 && !options.force) {
+      spinner.warn(`Synced ${totalSynced} items, ${result.conflicts.length} conflicts`);
+      console.log('');
+      console.log(chalk.yellow('Modified since Panopticon installed:'));
+      for (const name of result.conflicts) {
+        console.log(chalk.dim(`  - ${name}`));
+      }
+      console.log('');
+      console.log(chalk.dim('Use --force to overwrite, --diff to see changes.'));
+    } else if (result.skipped.length > 0) {
+      spinner.succeed(`Synced ${totalSynced} items to devroot (${result.skipped.length} user-owned skipped)`);
+    } else {
+      spinner.succeed(`Synced ${totalSynced} items to devroot`);
+    }
   }
 
   // Sync hooks (bin scripts)

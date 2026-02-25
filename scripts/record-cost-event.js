@@ -56,6 +56,11 @@ var SOURCE_TRAEFIK_TEMPLATES = join(SOURCE_TEMPLATES_DIR, "traefik");
 var SOURCE_SCRIPTS_DIR = join(packageRoot, "scripts");
 var SOURCE_SKILLS_DIR = join(packageRoot, "skills");
 var SOURCE_DEV_SKILLS_DIR = join(packageRoot, "dev-skills");
+var SOURCE_AGENTS_DIR = join(packageRoot, "agents");
+var SOURCE_RULES_DIR = join(packageRoot, "rules");
+var CACHE_AGENTS_DIR = join(PANOPTICON_HOME, "agent-definitions");
+var CACHE_RULES_DIR = join(PANOPTICON_HOME, "rules");
+var CACHE_MANIFEST = join(PANOPTICON_HOME, ".manifest.json");
 
 // src/lib/cost.ts
 var DEFAULT_PRICING = [

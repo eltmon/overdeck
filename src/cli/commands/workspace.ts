@@ -5,7 +5,8 @@ import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSyn
 import { join, basename } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
-import { mergeSkillsIntoWorkspace } from '../../lib/skills-merge.js';
+import { mergeSkillsIntoWorkspace, applyProjectTemplateOverlay } from '../../lib/skills-merge.js';
+import { listRunningAgents } from '../../lib/agents.js';
 import {
   resolveProjectFromIssue,
   hasProjects,
@@ -134,7 +135,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .command('create <issueId>')
     .description('Create workspace for issue')
     .option('--dry-run', 'Show what would be created')
-    .option('--no-skills', 'Skip skills symlink setup')
+    .option('--no-skills', 'Skip skills/agents installation')
     .option('--labels <labels>', 'Comma-separated labels for routing (e.g., docs,marketing)')
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .option('--docker', 'Start Docker containers after workspace creation')
@@ -181,6 +182,12 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--force', 'Force removal even with uncommitted changes')
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .action(destroyCommand);
+
+  workspace
+    .command('update <issueId>')
+    .description('Update skills/agents/rules in an existing workspace')
+    .option('--force', 'Overwrite user-modified files')
+    .action(updateCommand);
 }
 
 interface CreateOptions {
@@ -416,11 +423,10 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     const claudeMd = generateClaudeMd(projectRoot, variables);
     writeFileSync(join(workspacePath, 'CLAUDE.md'), claudeMd);
 
-    // Merge skills (unless disabled)
-    let skillsResult = { added: [] as string[], skipped: [] as string[] };
+    // Merge skills, agents, and rules (unless disabled)
+    let skillsResult = { added: [] as string[], updated: [] as string[], skipped: [] as string[], overlayed: [] as string[] };
     if (options.skills !== false) {
-      spinner.text = 'Merging skills...';
-      mkdirSync(join(workspacePath, '.claude', 'skills'), { recursive: true });
+      spinner.text = 'Merging skills and agents...';
       skillsResult = mergeSkillsIntoWorkspace(workspacePath);
     }
 
@@ -471,10 +477,14 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     console.log('');
 
     if (options.skills !== false) {
-      console.log(chalk.bold('Skills:'));
-      console.log(`  Added:   ${skillsResult.added.length} Panopticon skills`);
+      const totalMerged = skillsResult.added.length + skillsResult.updated.length;
+      console.log(chalk.bold('Skills & Agents:'));
+      console.log(`  Installed: ${totalMerged} files (${skillsResult.added.length} new, ${skillsResult.updated.length} updated)`);
       if (skillsResult.skipped.length > 0) {
-        console.log(`  Skipped: ${chalk.dim(skillsResult.skipped.join(', '))}`);
+        console.log(`  Skipped:   ${chalk.dim(skillsResult.skipped.join(', '))}`);
+      }
+      if (skillsResult.overlayed.length > 0) {
+        console.log(`  Overlayed: ${skillsResult.overlayed.length} project template files`);
       }
       console.log('');
     }
@@ -1361,6 +1371,86 @@ async function destroyRemoteWorkspace(
     if (!options.force) {
       console.log(chalk.dim('  Tip: Use --force to forcefully clean up'));
     }
+    process.exit(1);
+  }
+}
+
+interface UpdateOptions {
+  force?: boolean;
+}
+
+async function updateCommand(issueId: string, options: UpdateOptions): Promise<void> {
+  const spinner = ora('Updating workspace skills...').start();
+
+  try {
+    const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const folderName = `feature-${normalizedId}`;
+
+    // Resolve project and workspace path
+    const teamPrefix = extractTeamPrefix(issueId);
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+    if (!projectConfig) {
+      spinner.fail(`No project found for issue ${issueId}`);
+      process.exit(1);
+    }
+
+    const workspaceConfig = projectConfig.workspace;
+    const workspacesDir = join(projectConfig.path, workspaceConfig?.workspaces_dir || 'workspaces');
+    const workspacePath = join(workspacesDir, folderName);
+
+    if (!existsSync(workspacePath)) {
+      spinner.fail(`Workspace not found: ${workspacePath}`);
+      process.exit(1);
+    }
+
+    // Check if an agent is running in this workspace
+    const runningAgents = listRunningAgents();
+    const agentInWorkspace = runningAgents.find(
+      a => a.workspace === workspacePath && a.tmuxActive && a.status === 'running'
+    );
+
+    if (agentInWorkspace && !options.force) {
+      spinner.fail(`Agent ${agentInWorkspace.id} is running in this workspace`);
+      console.log(chalk.dim('  Use --force to update anyway, or stop the agent first.'));
+      process.exit(1);
+    }
+
+    if (agentInWorkspace) {
+      spinner.warn(`Agent ${agentInWorkspace.id} is running — updating anyway (--force)`);
+    }
+
+    // Merge skills, agents, and rules
+    spinner.text = 'Merging skills and agents...';
+    const result = mergeSkillsIntoWorkspace(workspacePath);
+
+    // Apply project template overlay if configured
+    if (workspaceConfig?.agent?.template_dir && (workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks)) {
+      spinner.text = 'Applying project template overlay...';
+      const templateDir = join(projectConfig.path, workspaceConfig.agent.template_dir);
+      const overlayed = applyProjectTemplateOverlay(workspacePath, templateDir);
+      result.overlayed = overlayed;
+    }
+
+    const totalMerged = result.added.length + result.updated.length;
+    spinner.succeed(`Updated workspace: ${totalMerged} files (${result.added.length} new, ${result.updated.length} updated)`);
+
+    if (result.skipped.length > 0) {
+      console.log(chalk.dim(`  Skipped: ${result.skipped.length} files`));
+      for (const s of result.skipped.slice(0, 5)) {
+        console.log(chalk.dim(`    - ${s}`));
+      }
+      if (result.skipped.length > 5) {
+        console.log(chalk.dim(`    ... and ${result.skipped.length - 5} more`));
+      }
+    }
+
+    if (result.overlayed.length > 0) {
+      console.log(chalk.cyan(`  Overlayed: ${result.overlayed.length} project template files`));
+    }
+
+  } catch (error: any) {
+    spinner.fail(`Failed to update workspace: ${error.message}`);
     process.exit(1);
   }
 }
