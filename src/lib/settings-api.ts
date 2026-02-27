@@ -21,9 +21,8 @@ import { MODEL_CAPABILITIES, getModelCapability } from './model-capabilities.js'
  */
 export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
   return {
-    // High-complexity phases - Opus 4.6 for deep analysis and planning
+    // High-complexity phases - Opus 4.6 for deep analysis
     'issue-agent:exploration': 'claude-opus-4-6',
-    'issue-agent:planning': 'claude-opus-4-6',
 
     // Implementation phases - Kimi K2.5 for excellent coding at great value
     'issue-agent:implementation': 'kimi-k2.5',
