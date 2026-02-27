@@ -7736,7 +7736,7 @@ app.post('/api/agents', async (req, res) => {
       return res.status(409).json({
         error: `Planning agent is still running for ${issueId}. Kill the planning session first or wait for it to complete.`,
         planningSession,
-        hint: 'Use "Complete Planning" or "Abort Planning" to end the planning session before starting work.',
+        hint: 'Planning phase has been removed. Kill the planning tmux session manually if needed.',
       });
     }
   } catch (tmuxErr) {
@@ -7780,7 +7780,7 @@ app.post('/api/agents', async (req, res) => {
         // No PRD at all and no workspace - block agent start
         return res.status(422).json({
           error: `No PRD found for ${issueId}. Run planning first to create a PRD before starting work.`,
-          hint: 'Use "Start Planning" to create a plan/PRD, then "Complete Planning" before starting the work agent.',
+          hint: 'Planning phase has been removed. Create a PRD manually in docs/prds/active/ before starting work.',
           issueId,
         });
       }

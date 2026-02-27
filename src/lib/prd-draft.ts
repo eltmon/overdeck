@@ -6,7 +6,7 @@
  * promoted to workspace .planning/PRD.md when implementation begins.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, renameSync, statSync } from 'fs';
 import { join, basename } from 'path';
 import { PRD_DRAFTS_DIR, PRD_PUBLISHED_DIR } from './paths.js';
 
@@ -112,7 +112,7 @@ export function deletePRDDraft(issueId: string): boolean {
 
   try {
     // Move to a deleted folder for safety
-    const deletedDir = join(PRDS_DIR, 'deleted');
+    const deletedDir = join(PRD_DRAFTS_DIR, 'deleted');
     if (!existsSync(deletedDir)) {
       mkdirSync(deletedDir, { recursive: true });
     }
@@ -139,11 +139,11 @@ export function getPRDDraftInfo(issueId: string): {
     return { exists: false };
   }
 
-  const stats = readFileSync(path);
+  const stats = statSync(path);
   return {
     exists: true,
     path,
-    size: stats.length,
-    modified: new Date(), // Note: We'd need fs.statSync for real mtime
+    size: stats.size,
+    modified: stats.mtime,
   };
 }

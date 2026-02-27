@@ -1,0 +1,224 @@
+/**
+ * Tests for PRD Draft management
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+
+describe('prd-draft', () => {
+  let tempDir: string;
+  let originalPanopticonHome: string | undefined;
+
+  beforeEach(() => {
+    // Create temp directory for isolated tests
+    tempDir = mkdtempSync(join(tmpdir(), 'pan-prd-test-'));
+
+    // Override PANOPTICON_HOME for this test
+    originalPanopticonHome = process.env.PANOPTICON_HOME;
+    process.env.PANOPTICON_HOME = tempDir;
+
+    // Clear module cache to reload with new env var
+    vi.resetModules();
+
+    // Create the drafts directory structure
+    mkdirSync(join(tempDir, 'docs', 'prds', 'drafts'), { recursive: true });
+  });
+
+  afterEach(() => {
+    // Restore original env var
+    if (originalPanopticonHome) {
+      process.env.PANOPTICON_HOME = originalPanopticonHome;
+    } else {
+      delete process.env.PANOPTICON_HOME;
+    }
+
+    // Clean up temp directory
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  describe('getPRDDraftPath', () => {
+    it('should return correct path for issue ID', async () => {
+      const { getPRDDraftPath } = await import('../../src/lib/prd-draft.js');
+      const path = getPRDDraftPath('PAN-123');
+
+      expect(path).toContain('PAN-123.md');
+      expect(path).toContain('drafts');
+    });
+
+    it('should uppercase the issue ID', async () => {
+      const { getPRDDraftPath } = await import('../../src/lib/prd-draft.js');
+      const path = getPRDDraftPath('pan-456');
+
+      expect(path).toContain('PAN-456.md');
+    });
+  });
+
+  describe('hasPRDDraft', () => {
+    it('should return false when draft does not exist', async () => {
+      const { hasPRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      expect(hasPRDDraft('PAN-NONEXISTENT')).toBe(false);
+    });
+
+    it('should return true when draft exists', async () => {
+      const { hasPRDDraft, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      writePRDDraft('PAN-123', '# Test PRD');
+
+      expect(hasPRDDraft('PAN-123')).toBe(true);
+    });
+  });
+
+  describe('readPRDDraft', () => {
+    it('should return null when draft does not exist', async () => {
+      const { readPRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      expect(readPRDDraft('PAN-NONEXISTENT')).toBeNull();
+    });
+
+    it('should return content when draft exists', async () => {
+      const { readPRDDraft, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      const content = '# Test PRD\n\nThis is a test.';
+      writePRDDraft('PAN-123', content);
+
+      expect(readPRDDraft('PAN-123')).toBe(content);
+    });
+  });
+
+  describe('writePRDDraft', () => {
+    it('should create draft file', async () => {
+      const { writePRDDraft, hasPRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      writePRDDraft('PAN-123', '# Test PRD');
+
+      expect(hasPRDDraft('PAN-123')).toBe(true);
+    });
+
+    it('should return the file path', async () => {
+      const { writePRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      const path = writePRDDraft('PAN-123', '# Test PRD');
+
+      expect(path).toContain('PAN-123.md');
+    });
+
+    it('should overwrite existing draft', async () => {
+      const { writePRDDraft, readPRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      writePRDDraft('PAN-123', '# Original');
+      writePRDDraft('PAN-123', '# Updated');
+
+      expect(readPRDDraft('PAN-123')).toBe('# Updated');
+    });
+  });
+
+  describe('listPRDDrafts', () => {
+    it('should return empty array when no drafts exist', async () => {
+      const { listPRDDrafts } = await import('../../src/lib/prd-draft.js');
+
+      expect(listPRDDrafts()).toEqual([]);
+    });
+
+    it('should return list of draft issue IDs', async () => {
+      const { listPRDDrafts, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      writePRDDraft('PAN-123', '# Test 1');
+      writePRDDraft('PAN-456', '# Test 2');
+
+      const drafts = listPRDDrafts();
+      expect(drafts).toHaveLength(2);
+      expect(drafts).toContain('PAN-123');
+      expect(drafts).toContain('PAN-456');
+    });
+  });
+
+  describe('deletePRDDraft', () => {
+    it('should return false when draft does not exist', async () => {
+      const { deletePRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      expect(deletePRDDraft('PAN-NONEXISTENT')).toBe(false);
+    });
+
+    it('should delete existing draft and return true', async () => {
+      const { deletePRDDraft, writePRDDraft, hasPRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      writePRDDraft('PAN-123', '# Test PRD');
+      const result = deletePRDDraft('PAN-123');
+
+      expect(result).toBe(true);
+      expect(hasPRDDraft('PAN-123')).toBe(false);
+    });
+
+    it('should move draft to deleted folder', async () => {
+      const { deletePRDDraft, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+      const { PRD_DRAFTS_DIR } = await import('../../src/lib/paths.js');
+
+      writePRDDraft('PAN-123', '# Test PRD');
+      deletePRDDraft('PAN-123');
+
+      const deletedDir = join(PRD_DRAFTS_DIR, 'deleted');
+      const files = await import('fs').then(fs => fs.readdirSync(deletedDir));
+      expect(files.some(f => f.startsWith('PAN-123-'))).toBe(true);
+    });
+  });
+
+  describe('getPRDDraftInfo', () => {
+    it('should return exists false when draft does not exist', async () => {
+      const { getPRDDraftInfo } = await import('../../src/lib/prd-draft.js');
+
+      const info = getPRDDraftInfo('PAN-NONEXISTENT');
+
+      expect(info.exists).toBe(false);
+      expect(info.path).toBeUndefined();
+      expect(info.size).toBeUndefined();
+      expect(info.modified).toBeUndefined();
+    });
+
+    it('should return correct info for existing draft', async () => {
+      const { getPRDDraftInfo, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+
+      const content = '# Test PRD\nSome content here';
+      writePRDDraft('PAN-123', content);
+
+      const info = getPRDDraftInfo('PAN-123');
+
+      expect(info.exists).toBe(true);
+      expect(info.path).toContain('PAN-123.md');
+      expect(info.size).toBe(content.length);
+      expect(info.modified).toBeInstanceOf(Date);
+      expect(info.modified!.getTime()).toBeLessThanOrEqual(Date.now());
+    });
+  });
+
+  describe('promotePRDToWorkspace', () => {
+    it('should return error when draft does not exist', async () => {
+      const { promotePRDToWorkspace } = await import('../../src/lib/prd-draft.js');
+
+      const result = promotePRDToWorkspace('PAN-NONEXISTENT', tempDir);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No PRD draft found');
+    });
+
+    it('should copy draft to workspace planning directory', async () => {
+      const { promotePRDToWorkspace, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+      const { existsSync, readFileSync } = await import('fs');
+
+      const content = '# Test PRD\n\nPromoted content';
+      writePRDDraft('PAN-123', content);
+
+      const workspaceDir = join(tempDir, 'workspace');
+      mkdirSync(join(workspaceDir, '.planning'), { recursive: true });
+
+      const result = promotePRDToWorkspace('PAN-123', workspaceDir);
+
+      expect(result.success).toBe(true);
+      const prdPath = join(workspaceDir, '.planning', 'PRD.md');
+      expect(existsSync(prdPath)).toBe(true);
+      expect(readFileSync(prdPath, 'utf-8')).toBe(content);
+    });
+  });
+});
