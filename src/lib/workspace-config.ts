@@ -182,6 +182,8 @@ export interface WorkspaceConfig {
   tunnel?: TunnelConfig;
   /** Hume EVI config management for workspace lifecycle */
   hume?: HumeConfig;
+  /** PRD directory path (relative to project path, default: 'docs/prds') */
+  prdDir?: string;
 }
 
 export interface TestsConfig {

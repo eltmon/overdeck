@@ -41,9 +41,6 @@ export function getCanonicalStatus(status: string | undefined): string {
   if (normalized === 'done' || normalized === 'completed' || normalized === 'closed') {
     return 'done';
   }
-  if (normalized === 'planning' || normalized === 'in planning' || normalized === 'planned' || normalized === 'discovery') {
-    return 'planning';
-  }
   if (normalized === 'canceled' || normalized === 'cancelled' || normalized === 'duplicate' || normalized === "won't do" || normalized === 'wontfix') {
     return 'canceled';
   }
@@ -81,8 +78,6 @@ function mapGitHubStateToCanonical(state: string, labels: string[]): string {
   if (labelNames.some(l => l === 'done' || l.includes('completed'))) return 'in_review';
   if (labelNames.some(l => l.includes('in review') || l.includes('in-review') || l.includes('review') || l.includes('qa'))) return 'in_review';
   if (labelNames.some(l => l.includes('in progress') || l.includes('in-progress') || l.includes('wip'))) return 'in_progress';
-  if (labelNames.some(l => l.includes('planning') || l.includes('discovery'))) return 'planning';
-  if (labelNames.some(l => l === 'planned')) return 'planned';
   if (labelNames.some(l => l.includes('backlog') || l.includes('icebox'))) return 'backlog';
   if (labelNames.some(l => l.includes('todo') || l.includes('ready'))) return 'todo';
 
@@ -528,8 +523,6 @@ export class IssueDataService {
           title: issue.title,
           description: issue.body || '',
           status: canonicalStatus === 'todo' ? 'Todo' :
-                  canonicalStatus === 'planning' ? 'In Planning' :
-                  canonicalStatus === 'planned' ? 'Planned' :
                   canonicalStatus === 'in_progress' ? 'In Progress' :
                   canonicalStatus === 'in_review' ? 'In Review' :
                   canonicalStatus === 'done' ? 'Done' :
