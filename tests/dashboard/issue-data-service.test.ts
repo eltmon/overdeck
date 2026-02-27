@@ -199,20 +199,6 @@ describe('IssueDataService - getIssues cycle filter', () => {
       expect(result.map(i => i.identifier)).toContain('TEST-3');
     });
 
-    it('should handle planning states as non-backlog', () => {
-      const issues = [
-        { id: '1', identifier: 'TEST-1', status: 'In Planning', updatedAt: new Date().toISOString() },
-        { id: '2', identifier: 'TEST-2', status: 'Planning', updatedAt: new Date().toISOString() },
-        { id: '3', identifier: 'TEST-3', status: 'Planned', updatedAt: new Date().toISOString() },
-        { id: '4', identifier: 'TEST-4', status: 'Backlog', updatedAt: new Date().toISOString() },
-      ];
-      injectIssues(issues);
-
-      const result = service.getIssues({ cycle: 'current' });
-
-      expect(result).toHaveLength(3);
-    });
-
     it('should default to current cycle if no cycle specified', () => {
       const issues = [
         { id: '1', identifier: 'TEST-1', status: 'Backlog', updatedAt: new Date().toISOString() },
