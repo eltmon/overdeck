@@ -1457,7 +1457,7 @@ app.post('/api/issues/:id/plan', async (req, res) => {
 
       // Commit and push PRD immediately so it's preserved in the repo (PAN-47)
       try {
-        await execAsync(`git add docs/prds/active/${issue.identifier.toLowerCase()}-plan.md`, {
+        await execAsync(`git add ${join('docs', 'prds', 'active', `${issue.identifier.toLowerCase()}-plan.md`)}`, {
           cwd: projectPath,
           encoding: 'utf-8'
         });
@@ -7437,7 +7437,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 
         // Commit the PRD move
         try {
-          await execAsync(`git add docs/prds && git commit -m "docs: move ${issueId} PRD to completed"`, {
+          await execAsync(`git add ${join('docs', 'prds')} && git commit -m "docs: move ${issueId} PRD to completed"`, {
             cwd: projectPath,
             encoding: 'utf-8'
           });
@@ -8760,7 +8760,7 @@ app.post('/api/issues/:id/reset', async (req, res) => {
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
       const ghConfig = getGitHubConfig();
       if (ghConfig) {
-        const labelsToRemove = ['in-progress', 'planning', 'planned', 'review-ready'];
+        const labelsToRemove = ['in-progress', 'review-ready'];
         for (const label of labelsToRemove) {
           try {
             await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/${encodeURIComponent(label)}`, {
@@ -9395,7 +9395,7 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
       // GitHub: remove planning-related labels
       const config = getGitHubConfig();
       if (config) {
-        const labelsToRemove = ['planning', 'planned', 'in-progress', 'review-ready'];
+        const labelsToRemove = ['in-progress', 'review-ready'];
         for (const label of labelsToRemove) {
           try {
             await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/${label}`, {
@@ -9440,8 +9440,7 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
               // Remove labels
               const labels = await issue.labels();
               const labelsToRemove = labels.nodes.filter(l =>
-                l.name.toLowerCase() === 'review ready' ||
-                l.name.toLowerCase() === 'planning'
+                l.name.toLowerCase() === 'review ready'
               );
               if (labelsToRemove.length > 0) {
                 const currentLabelIds = labels.nodes.map(l => l.id);

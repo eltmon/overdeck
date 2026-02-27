@@ -271,8 +271,8 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
 
   // 1. Move PRD from active to completed
   try {
-    const activePrdPath = join(projectPath, 'docs/prds/active', `${issueId.toLowerCase()}-plan.md`);
-    const completedPrdPath = join(projectPath, 'docs/prds/completed', `${issueId.toLowerCase()}-plan.md`);
+    const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueId.toLowerCase()}-plan.md`);
+    const completedPrdPath = join(projectPath, 'docs', 'prds', 'completed', `${issueId.toLowerCase()}-plan.md`);
 
     if (existsSync(activePrdPath)) {
       // Ensure completed directory exists
@@ -320,12 +320,8 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
       console.warn(`[merge-agent] Could not close PR: ${err}`);
     }
 
-    // Update issue labels and close the issue
+    // Close the issue (labels cleaned up by done.ts workflow)
     try {
-      await execAsync(`gh issue edit ${issueNum} --remove-label "in-progress" --add-label "done" 2>/dev/null || true`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      });
       await execAsync(`gh issue close ${issueNum} --repo eltmon/panopticon-cli --comment "Merged to main" 2>/dev/null || true`, {
         cwd: projectPath,
         encoding: 'utf-8',
