@@ -37,11 +37,20 @@ import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig, findProjectByTeam, extractTeamPrefix } from '../../lib/projects.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
+import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
+import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
+import {
+  PROJECT_DOCS_SUBDIR,
+  PROJECT_PRDS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
+  PROJECT_PRDS_PLANNED_SUBDIR,
+  PROJECT_PRDS_COMPLETED_SUBDIR,
+} from '../../lib/paths.js';
 import type { Issue } from '../frontend/src/types.js';
 
 // Read package version once at startup — version never changes at runtime
@@ -907,50 +916,6 @@ async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestio
   return getPendingQuestions(jsonlPath);
 }
 
-// Map GitHub issue state + labels to canonical state
-function mapGitHubStateToCanonical(state: string, labels: string[]): string {
-  // Handle both API lowercase and gh CLI uppercase
-  const stateLower = state.toLowerCase();
-
-  // Closed issues are always done (regardless of labels)
-  if (stateLower === 'closed') {
-    return 'done';
-  }
-
-  // For open issues, check labels for workflow state
-  // Order matters: more progressed states take precedence
-  const labelNames = labels.map(l => l.toLowerCase());
-
-  // Most progressed states first
-  // "done" label on OPEN issues = work complete, pending merge/closure → in_review
-  // (actual "done" status only for CLOSED issues, handled above)
-  if (labelNames.some(l => l === 'done' || l.includes('completed'))) {
-    return 'in_review';
-  }
-  if (labelNames.some(l => l.includes('in review') || l.includes('in-review') || l.includes('review') || l.includes('qa'))) {
-    return 'in_review';
-  }
-  if (labelNames.some(l => l.includes('in progress') || l.includes('in-progress') || l.includes('wip'))) {
-    return 'in_progress';
-  }
-  // Early workflow stages
-  if (labelNames.some(l => l.includes('planning') || l.includes('discovery'))) {
-    return 'planning';
-  }
-  if (labelNames.some(l => l === 'planned')) {
-    return 'planned';
-  }
-  if (labelNames.some(l => l.includes('backlog') || l.includes('icebox'))) {
-    return 'backlog';
-  }
-  if (labelNames.some(l => l.includes('todo') || l.includes('ready'))) {
-    return 'todo';
-  }
-
-  // Default open issues to todo
-  return 'todo';
-}
-
 // Fetch GitHub issues using gh CLI for better auth
 async function fetchGitHubIssues(): Promise<any[]> {
   const config = getGitHubConfig();
@@ -1041,8 +1006,6 @@ async function fetchGitHubIssues(): Promise<any[]> {
           title: issue.title,
           description: issue.body || '',
           status: canonicalStatus === 'todo' ? 'Todo' :
-                  canonicalStatus === 'planning' ? 'In Planning' :
-                  canonicalStatus === 'planned' ? 'Planned' :
                   canonicalStatus === 'in_progress' ? 'In Progress' :
                   canonicalStatus === 'in_review' ? 'In Review' :
                   canonicalStatus === 'done' ? 'Done' :
@@ -1457,14 +1420,14 @@ app.post('/api/issues/:id/plan', async (req, res) => {
     let prdPath: string | undefined;
     let prdCommitted = false;
     try {
-      const prdDir = join(projectPath, 'docs', 'prds', 'active');
+      const prdDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR);
       mkdirSync(prdDir, { recursive: true });
       prdPath = join(prdDir, `${issue.identifier.toLowerCase()}-plan.md`);
       writeSync(prdPath, stateContent.join('\n'));
 
       // Commit and push PRD immediately so it's preserved in the repo (PAN-47)
       try {
-        await execAsync(`git add docs/prds/active/${issue.identifier.toLowerCase()}-plan.md`, {
+        await execAsync(`git add ${join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issue.identifier.toLowerCase()}-plan.md`)}`, {
           cwd: projectPath,
           encoding: 'utf-8'
         });
@@ -1897,7 +1860,7 @@ app.get('/api/agents', async (_req, res) => {
           workspace: state.workspace || null,
           workspaceLocation,
           git: gitStatus,
-          type: isPlanning ? 'planning' : 'agent',
+          type: 'agent',
           hasPendingQuestion: pendingQuestions.length > 0 || isIdle,
           pendingQuestionCount: pendingQuestions.length,
           contextPercent,
@@ -1932,7 +1895,7 @@ app.get('/api/agents', async (_req, res) => {
             workspaceLocation: 'remote',
             vmName: state.vmName,
             git: null,
-            type: isPlanning ? 'planning' : 'agent',
+            type: 'agent',
             hasPendingQuestion: false,
             pendingQuestionCount: 0,
             remote: true,
@@ -1997,7 +1960,7 @@ app.get('/api/agents', async (_req, res) => {
             workspace: state.workspace || null,
             workspaceLocation: 'local',
             git: null,
-            type: isPlanning ? 'planning' : 'agent',
+            type: 'agent',
             hasPendingQuestion: false,
             pendingQuestionCount: 0,
           });
@@ -2027,7 +1990,7 @@ app.get('/api/agents', async (_req, res) => {
           workspace: state.workspace || null,
           workspaceLocation: 'local',
           git: null,
-          type: isPlanning ? 'planning' : ('agent' as const),
+          type: 'agent',
           hasPendingQuestion: false,
           pendingQuestionCount: 0,
           message: state.message || 'Starting...',
@@ -7429,8 +7392,8 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 
     // 8.5. Move PRD from active to completed (preserve documentation)
     try {
-      const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
-      const completedDir = join(projectPath, 'docs', 'prds', 'completed');
+      const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
+      const completedDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR);
       const completedPrdPath = join(completedDir, `${issueLower}-plan.md`);
 
       if (existsSync(activePrdPath)) {
@@ -7444,7 +7407,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 
         // Commit the PRD move
         try {
-          await execAsync(`git add docs/prds && git commit -m "docs: move ${issueId} PRD to completed"`, {
+          await execAsync(`git add ${join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR)} && git commit -m "docs: move ${issueId} PRD to completed"`, {
             cwd: projectPath,
             encoding: 'utf-8'
           });
@@ -7499,12 +7462,6 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
           method: 'DELETE',
           headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
         }).catch(() => {});
-
-        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-          method: 'POST',
-          headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({ labels: ['done'] }),
-        });
 
         // Close the issue
         await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}`, {
@@ -7721,52 +7678,6 @@ app.post('/api/agents', async (req, res) => {
   const workspaceMetadata = loadWorkspaceMetadata(issueId);
   const isRemote = workspaceMetadata?.location === 'remote';
 
-  // SAFEGUARD: Check if planning agent is still running
-  // Never start work agent while planning agent is active - they'll conflict
-  const planningSession = `planning-${issueLower}`;
-  try {
-    let planningStillRunning = false;
-
-    if (isRemote && workspaceMetadata?.vmName) {
-      // Check on remote VM
-      const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-      const exe = createExeProvider({ infraVm: workspaceMetadata.infraVm });
-      const result = await exe.ssh(workspaceMetadata.vmName, `tmux list-sessions -F '#{session_name}' 2>/dev/null || true`);
-      planningStillRunning = result.stdout.split('\n').includes(planningSession);
-    } else {
-      // Check locally
-      const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
-      planningStillRunning = sessions.split('\n').includes(planningSession);
-    }
-
-    if (planningStillRunning) {
-      console.warn(`[start-agent] BLOCKED: Planning agent still running for ${issueId}${isRemote ? ' (remote)' : ''}`);
-      return res.status(409).json({
-        error: `Planning agent is still running for ${issueId}. Kill the planning session first or wait for it to complete.`,
-        planningSession,
-        hint: 'Use "Complete Planning" or "Abort Planning" to end the planning session before starting work.',
-      });
-    }
-  } catch (tmuxErr) {
-    // If tmux check fails, log but continue (fail-open)
-    console.warn(`[start-agent] Could not check for planning session: ${tmuxErr}`);
-  }
-
-  // Mark planning agent state as stopped since we're transitioning to work agent
-  const planningStateFile = join(homedir(), '.panopticon', 'agents', planningSession, 'state.json');
-  if (existsSync(planningStateFile)) {
-    try {
-      const planningState = JSON.parse(readFileSync(planningStateFile, 'utf-8'));
-      planningState.status = 'stopped';
-      planningState.stoppedAt = new Date().toISOString();
-      planningState.stoppedReason = 'work-agent-started';
-      writeFileSync(planningStateFile, JSON.stringify(planningState, null, 2));
-      console.log(`[start-agent] Marked planning agent ${planningSession} as stopped`);
-    } catch (stateErr) {
-      console.warn(`[start-agent] Could not update planning state: ${stateErr}`);
-    }
-  }
-
   try {
     // Extract prefix from issue ID (e.g., "MIN" from "MIN-645")
     const issuePrefix = issueId.split('-')[0];
@@ -7777,25 +7688,29 @@ app.post('/api/agents', async (req, res) => {
     // However, if a workspace already exists, the work is already underway —
     // don't block restarts/resets on PRD checks.
     const workspaceExists = existsSync(join(projectPath, 'workspaces', `feature-${issueLower}`));
-    const prdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
+    const prdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
     const hasPrd = existsSync(prdPath);
-    if (!hasPrd && !workspaceExists) {
+    // Also check for PRD drafts (pre-workspace PRDs)
+    const hasDraftPrd = hasPRDDraft(issueId);
+    if (!hasPrd && !hasDraftPrd && !workspaceExists) {
       console.warn(`[start-agent] WARNING: No PRD found for ${issueId} at ${prdPath}`);
       // Check if there's a completed PRD (issue was already worked on before)
-      const completedPrdPath = join(projectPath, 'docs', 'prds', 'completed', `${issueLower}-plan.md`);
+      const completedPrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`);
       const hasCompletedPrd = existsSync(completedPrdPath);
       if (!hasCompletedPrd) {
         // No PRD at all and no workspace - block agent start
         return res.status(422).json({
-          error: `No PRD found for ${issueId}. Run planning first to create a PRD before starting work.`,
-          hint: 'Use "Start Planning" to create a plan/PRD, then "Complete Planning" before starting the work agent.',
+          error: `No PRD found for ${issueId}. Create a PRD before starting work.`,
+          hint: 'Use "pan work plan" to create a PRD draft, then start work.',
           issueId,
         });
       }
       // Has completed PRD - allow (re-work scenario)
       console.log(`[start-agent] Found completed PRD for ${issueId}, allowing agent start (re-work scenario)`);
-    } else if (!hasPrd && workspaceExists) {
+    } else if (!hasPrd && !hasDraftPrd && workspaceExists) {
       console.log(`[start-agent] No PRD for ${issueId} but workspace exists — allowing restart`);
+    } else if (hasDraftPrd && !workspaceExists) {
+      console.log(`[start-agent] Found PRD draft for ${issueId}`);
     }
 
     // Ensure workspace exists — create it if missing (e.g. after deep-wipe)
@@ -7815,6 +7730,16 @@ app.post('/api/agents', async (req, res) => {
           error: `Failed to create workspace for ${issueId}: ${(wsErr as Error).message}`,
           hint: 'Try creating the workspace manually: pan workspace create ' + issueId + ' --local',
         });
+      }
+    }
+
+    // If PRD draft exists, promote it to workspace
+    if (hasDraftPrd && !hasPrd) {
+      const promoteResult = promotePRDToWorkspace(issueId, workspacePath);
+      if (promoteResult.success) {
+        console.log(`[start-agent] Promoted PRD draft to workspace for ${issueId}`);
+      } else {
+        console.warn(`[start-agent] Could not promote PRD draft: ${promoteResult.error}`);
       }
     }
 
@@ -8337,1780 +8262,33 @@ async function fetchGitHubIssue(owner: string, repo: string, number: number): Pr
   return response.json();
 }
 
-// Add "planning" label to GitHub issue
-async function addGitHubPlanningLabel(owner: string, repo: string, number: number): Promise<void> {
-  const config = getGitHubConfig();
-  if (!config) throw new Error('GitHub not configured');
 
-  // First, try to create the label if it doesn't exist
-  try {
-    await fetch(`https://api.github.com/repos/${owner}/${repo}/labels`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `token ${config.token}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'Panopticon-Dashboard',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: 'planning',
-        color: 'a855f7', // Purple
-        description: 'Issue is in planning/discovery phase',
-      }),
-    });
-  } catch {
-    // Label might already exist, that's fine
-  }
-
-  // Add the label to the issue
-  await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `token ${config.token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Panopticon-Dashboard',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ labels: ['planning'] }),
-  });
-}
-
-// Start planning for an issue - moves to "In Planning", creates workspace, spawns planning agent
-app.post('/api/issues/:id/start-planning', async (req, res) => {
-  const { id } = req.params;
-  const { skipWorkspace = false, startDocker = false, workspaceLocation = 'local', shadowMode = false } = req.body;
-  console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
-
-  try {
-    // Check if a work agent is already running for this issue
-    // Don't allow planning when execution is in progress
-    const issueLowerForCheck = id.toLowerCase();
-    try {
-      const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
-      const workAgentSession = sessions
-        .trim()
-        .split('\n')
-        .find(s => s === `agent-${issueLowerForCheck}`);
-
-      if (workAgentSession) {
-        return res.status(409).json({
-          error: `Cannot start planning: work agent already running for ${id.toUpperCase()}`,
-          hint: 'Stop the agent first or use the terminal view to interact with it',
-          existingSession: workAgentSession,
-        });
-      }
-    } catch (tmuxError) {
-      // tmux not running or error checking - continue with planning
-      console.log('[start-planning] Could not check existing agents:', tmuxError);
-    }
-
-    // Check if this is a GitHub issue
-    const githubCheck = isGitHubIssue(id);
-
-    let issue: {
-      id: string;
-      identifier: string;
-      title: string;
-      description: string;
-      url: string;
-      source: 'linear' | 'github';
-    };
-    let newStateName = 'In Planning';
-
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-      // Handle GitHub issue
-      const ghIssue = await fetchGitHubIssue(githubCheck.owner, githubCheck.repo, githubCheck.number);
-
-      // Find the prefix for this repo
-      const config = getGitHubConfig()!;
-      const repoConfig = config.repos.find(r => r.owner === githubCheck.owner && r.repo === githubCheck.repo);
-      const prefix = repoConfig?.prefix || githubCheck.repo.toUpperCase();
-
-      issue = {
-        id: `github-${githubCheck.owner}-${githubCheck.repo}-${githubCheck.number}`,
-        identifier: `${prefix}-${githubCheck.number}`,
-        title: ghIssue.title,
-        description: ghIssue.body || '',
-        url: ghIssue.html_url,
-        source: 'github',
-      };
-
-      // Add "planning" label to GitHub issue
-      console.log(`[start-planning] Fetched GitHub issue, adding planning label...`);
-      await addGitHubPlanningLabel(githubCheck.owner, githubCheck.repo, githubCheck.number);
-      newStateName = 'Planning (label added)';
-      console.log(`[start-planning] GitHub issue setup complete`);
-
-    } else {
-      // Handle Linear issue
-      const apiKey = getLinearApiKey();
-      if (!apiKey) {
-        return res.status(500).json({ error: 'LINEAR_API_KEY not configured' });
-      }
-
-      // 1. Fetch issue details
-      const issueQuery = `
-        query GetIssue($id: String!) {
-          issue(id: $id) {
-            id
-            identifier
-            title
-            description
-            url
-            state { id name }
-            team { id key }
-          }
-        }
-      `;
-
-      const issueResponse = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({ query: issueQuery, variables: { id } }),
-      });
-      const issueJson = await issueResponse.json();
-      if (issueJson.errors) throw new Error(issueJson.errors[0]?.message || 'GraphQL error');
-      const linearIssue = issueJson.data?.issue;
-
-      if (!linearIssue) {
-        return res.status(404).json({ error: 'Issue not found' });
-      }
-
-      // 2. Find "In Planning" state for this team
-      const statesQuery = `
-        query GetTeamStates($teamId: String!) {
-          team(id: $teamId) {
-            states {
-              nodes {
-                id
-                name
-                type
-              }
-            }
-          }
-        }
-      `;
-
-      const statesResponse = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({ query: statesQuery, variables: { teamId: linearIssue.team.id } }),
-      });
-      const statesJson = await statesResponse.json();
-      if (statesJson.errors) throw new Error(statesJson.errors[0]?.message || 'GraphQL error');
-
-      const states = statesJson.data?.team?.states?.nodes || [];
-      const planningState = states.find((s: any) =>
-        s.name.toLowerCase().includes('planning') ||
-        s.name.toLowerCase() === 'planned'
-      );
-
-      if (!planningState) {
-        return res.status(400).json({
-          error: 'No "In Planning" state found in Linear. Please add it to your team workflow.',
-          hint: 'Go to Linear → Settings → Teams → Workflow → Add "In Planning" under Started',
-        });
-      }
-
-      // 3. Move issue to "In Planning" state
-      const updateMutation = `
-        mutation UpdateIssue($id: String!, $stateId: String!) {
-          issueUpdate(id: $id, input: { stateId: $stateId }) {
-            success
-            issue {
-              id
-              identifier
-              state { name }
-            }
-          }
-        }
-      `;
-
-      const updateResponse = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': apiKey,
-        },
-        body: JSON.stringify({
-          query: updateMutation,
-          variables: { id: linearIssue.id, stateId: planningState.id },
-        }),
-      });
-      const updateJson = await updateResponse.json();
-      if (updateJson.errors) throw new Error(updateJson.errors[0]?.message || 'Failed to update issue');
-
-      issue = {
-        id: linearIssue.id,
-        identifier: linearIssue.identifier,
-        title: linearIssue.title,
-        description: linearIssue.description || '',
-        url: linearIssue.url,
-        source: 'linear',
-      };
-      newStateName = planningState.name;
-    }
-
-    // 4. Create workspace (git worktree) if not skipped
-    const prefix = issue.identifier.split('-')[0];
-
-    // Use the unified project registry (YAML + legacy JSON) to find the project path
-    let projectPath: string;
-    if (issue.source === 'github' && githubCheck.owner && githubCheck.repo) {
-      // For GitHub issues, check local path config
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || getProjectPath(undefined, prefix);
-    } else {
-      projectPath = getProjectPath(undefined, prefix);
-    }
-    const issueLower = issue.identifier.toLowerCase();
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-    let workspaceCreated = false;
-    let workspaceError: string | undefined;
-    let existingRemoteWorkspace: any = null;
-
-    // Check for existing remote workspace FIRST (before trying to create)
-    console.log(`[start-planning] Checking for existing workspace, location=${workspaceLocation}`);
-    if (workspaceLocation === 'remote') {
-      try {
-        const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
-        console.log(`[start-planning] Loading workspace metadata for ${issue.identifier}...`);
-        existingRemoteWorkspace = loadWorkspaceMetadata(issue.identifier);
-        if (existingRemoteWorkspace) {
-          console.log(`[start-planning] Found existing remote workspace: ${existingRemoteWorkspace.vmName}`);
-          workspaceCreated = true; // Remote workspace already exists
-        } else {
-          console.log(`[start-planning] No existing remote workspace found`);
-        }
-      } catch (err) {
-        console.log('[start-planning] Could not check for existing remote workspace:', err);
-      }
-    }
-
-    if (!skipWorkspace && !workspaceCreated) {
-      try {
-        // Check if workspace needs to be created
-        // A workspace with only .planning is incomplete (from a failed previous attempt)
-        const workspaceNeedsCreation = !existsSync(workspacePath) ||
-          (existsSync(workspacePath) && readdirSync(workspacePath).every(f => f === '.planning'));
-
-        if (workspaceNeedsCreation) {
-          // Create workspace using pan workspace create
-          const dockerFlag = startDocker ? ' --docker' : '';
-          const locationFlag = workspaceLocation === 'remote' ? ' --remote' : ' --local';
-          const createCmd = `pan workspace create ${issue.identifier}${locationFlag}${dockerFlag}`;
-          const activityId = Date.now().toString();
-          logActivity({
-            id: activityId,
-            timestamp: new Date().toISOString(),
-            command: createCmd,
-            status: 'running',
-            output: [],
-          });
-
-          // Run pan workspace create (may call custom workspace_command for complex projects)
-          // With --docker, containers start in background (up to 5 min timeout for builds)
-          await execAsync(createCmd, {
-            cwd: projectPath,
-            encoding: 'utf-8',
-            timeout: startDocker ? 300000 : 120000, // 5 min with docker, 2 min without
-          });
-          workspaceCreated = true;
-
-          // If we just created a remote workspace, reload the metadata
-          if (workspaceLocation === 'remote') {
-            try {
-              const { loadWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
-              existingRemoteWorkspace = loadWorkspaceMetadata(issue.identifier);
-              if (existingRemoteWorkspace) {
-                console.log(`[start-planning] Remote workspace created: ${existingRemoteWorkspace.vmName}`);
-              }
-            } catch (err) {
-              console.log('[start-planning] Could not load new remote workspace metadata:', err);
-            }
-          }
-
-          const successMsg = startDocker
-            ? 'Workspace created, Docker containers starting in background'
-            : 'Workspace created successfully';
-          appendActivityOutput(activityId, successMsg);
-        } else {
-          workspaceCreated = true; // Already exists
-        }
-      } catch (err: any) {
-        workspaceError = err.message;
-        console.error('Workspace creation error:', err);
-      }
-    }
-
-    // 5. Spawn planning agent (local tmux or remote VM)
-    const sessionName = `planning-${issueLower}`;
-    let planningAgentStarted = false;
-    let planningAgentError: string | undefined;
-    let isRemotePlanning = false;
-
-    // Use existing remote workspace metadata if we already loaded it
-    let remoteWorkspaceMetadata: any = existingRemoteWorkspace;
-    if (workspaceLocation === 'remote' && workspaceCreated && remoteWorkspaceMetadata) {
-      // Verify VM exists AND /workspace is properly set up (has .git directory)
-      console.log(`[start-planning] Verifying remote workspace on ${remoteWorkspaceMetadata.vmName}...`);
-      try {
-        const { stdout } = await execAsync(
-          `ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ${remoteWorkspaceMetadata.vmName}.exe.xyz "test -d /workspace/.git && echo 'ready' || echo 'not-ready'"`,
-          { timeout: 15000 }
-        );
-        if (stdout.trim() === 'ready') {
-          isRemotePlanning = true;
-          console.log(`[start-planning] Remote workspace verified on VM: ${remoteWorkspaceMetadata.vmName}`);
-        } else {
-          throw new Error('Workspace /workspace/.git not found');
-        }
-      } catch (vmCheckErr: any) {
-        console.log(`[start-planning] Remote workspace not ready on ${remoteWorkspaceMetadata.vmName}: ${vmCheckErr.message}`);
-        // Workspace not properly set up - clear stale metadata and recreate
-        remoteWorkspaceMetadata = null;
-        workspaceCreated = false;
-        // Remove stale workspace metadata so workspace create runs
-        try {
-          const { deleteWorkspaceMetadata } = await import('../../lib/remote/workspace-metadata.js');
-          deleteWorkspaceMetadata(issue.identifier);
-          console.log(`[start-planning] Cleared stale workspace metadata, will recreate workspace`);
-        } catch {
-          // Ignore cleanup errors
-        }
-        // Also clear stale agent state if exists
-        const staleAgentDir = join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`);
-        if (existsSync(staleAgentDir)) {
-          await execAsync(`rm -rf "${staleAgentDir}"`, { encoding: 'utf-8' });
-          console.log(`[start-planning] Cleared stale agent state: ${staleAgentDir}`);
-        }
-      }
-    }
-
-    try {
-      // Kill existing planning session if any
-      // IMPORTANT: Always kill LOCAL session first to prevent WebSocket connecting to stale local session
-      // when starting a remote agent (see PAN-105 terminal sync bug)
-      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
-
-      // Also kill remote session if we're starting a remote agent
-      if (isRemotePlanning && remoteWorkspaceMetadata) {
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteWorkspaceMetadata.infraVm });
-        await exe.ssh(remoteWorkspaceMetadata.vmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
-      }
-
-      // Create planning prompt file - store IN workspace if exists (for git-backed planning)
-      // For remote workspaces, we'll write to the remote VM later
-      const planningDir = workspaceCreated && !isRemotePlanning
-        ? join(workspacePath, '.planning')
-        : join(projectPath, '.planning', issueLower);
-      if (!existsSync(planningDir)) {
-        mkdirSync(planningDir, { recursive: true });
-      }
-
-      // Initialize .planning subdirectories for Mission Control
-      for (const subdir of ['transcripts', 'discussions', 'notes']) {
-        const subdirPath = join(planningDir, subdir);
-        if (!existsSync(subdirPath)) {
-          mkdirSync(subdirPath, { recursive: true });
-        }
-      }
-
-      // Initialize Shadow Engineering if enabled
-      if (shadowMode) {
-        const inferencePath = join(planningDir, 'INFERENCE.md');
-        if (!existsSync(inferencePath)) {
-          writeFileSync(inferencePath, `# Inference Document - ${id.toUpperCase()}\n\n*This document is maintained by the Shadow Engineering Monitoring Agent.*\n\n## Status\n\nAwaiting initial artifact analysis.\n`, 'utf-8');
-          console.log(`[start-planning] Shadow Engineering: Initialized INFERENCE.md`);
-        }
-      }
-
-      // Clear stale STATE.md and .planning-complete from previous planning session (start fresh)
-      // This prevents new planning agents from seeing old state and thinking work is done
-      const staleStatePath = join(planningDir, 'STATE.md');
-      if (existsSync(staleStatePath)) {
-        console.log(`[start-planning] Clearing stale STATE.md from previous session`);
-        await execAsync(`rm -f "${staleStatePath}"`, { encoding: 'utf-8' });
-      }
-      const staleMarkerPath = join(planningDir, '.planning-complete');
-      if (existsSync(staleMarkerPath)) {
-        console.log(`[start-planning] Clearing stale .planning-complete marker from previous session`);
-        await execAsync(`rm -f "${staleMarkerPath}"`, { encoding: 'utf-8' });
-      }
-
-      const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-
-      // Get project config for structure context
-      const teamPrefix = extractTeamPrefix(issue.identifier);
-      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
-
-      // Generate project structure context for polyrepos
-      let projectStructureSection = '';
-      if (projectConfig?.workspace?.type === 'polyrepo' && projectConfig.workspace.repos) {
-        const repos = projectConfig.workspace.repos;
-        projectStructureSection = `
-## Project Structure (Polyrepo)
-
-**IMPORTANT:** This project uses a **polyrepo** structure. The workspace root is NOT a git repository.
-Each subdirectory is a separate git worktree:
-
-| Directory | Purpose |
-|-----------|---------|
-${repos.map(r => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join('\n')}
-
-**Git operations:**
-- Run \`git status\`, \`git log\`, etc. INSIDE the subdirectories (e.g., \`cd fe && git status\`)
-- The workspace root (\`${workspacePath}\`) has no \`.git\` directory
-- Each subdirectory has its own branch: \`${repos[0]?.branch_prefix || 'feature/'}${issue.identifier.toLowerCase()}\`
-
-`;
-      }
-
-      const planningPrompt = `# Planning Session: ${issue.identifier}
-
-## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
-
-**YOU ARE IN PLANNING MODE. DO NOT:**
-- Write or modify any code files (except STATE.md)
-- Run implementation commands (npm install, docker compose, make, etc.)
-- Create actual features or functionality
-- Start implementing the solution
-
-**YOU SHOULD ONLY:**
-- Ask clarifying questions (use AskUserQuestion tool)
-- Explore the codebase to understand context (read files, grep)
-- Generate planning artifacts:
-  - STATE.md (decisions, approach, architecture)
-  - Beads tasks (via \`bd create\`)
-  - PRD file at \`docs/prds/active/{issue-id}-plan.md\` (copy of STATE.md, required for dashboard)
-- Present options and tradeoffs for the user to decide
-
-When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
-
----
-
-## Issue Details
-- **ID:** ${issue.identifier}
-- **Title:** ${issue.title}
-- **URL:** ${issue.url}
-
-## Description
-${issue.description || 'No description provided'}
-${projectStructureSection}
----
-
-## Your Mission
-
-You are a planning agent conducting a **discovery session** for this issue.
-
-### Phase 1: Understand Context
-1. Read the codebase to understand relevant files and patterns
-2. Identify what subsystems/files this issue affects
-3. Note any existing patterns we should follow
-
-### Phase 2: Discovery Conversation
-Use AskUserQuestion tool to ask contextual questions:
-- What's the scope? What's explicitly OUT of scope?
-- Any technical constraints or preferences?
-- What does "done" look like?
-- Are there edge cases we need to handle?
-
-### Difficulty Estimation
-
-For each sub-task, estimate difficulty using this rubric:
-
-| Level | When to Use | Model |
-|-------|-------------|-------|
-| \`trivial\` | Typo, comment, formatting only | haiku |
-| \`simple\` | Bug fix, single file, obvious change | haiku |
-| \`medium\` | New feature, 3-5 files, standard patterns | sonnet |
-| \`complex\` | Refactor, migration, 6+ files, some risk | sonnet |
-| \`expert\` | Architecture, security, performance, high risk | opus |
-
-Consider these factors:
-- **Files to modify**: 1-2 (simple), 3-5 (medium), 6+ (complex/expert)
-- **Cross-cutting**: None (simple), Some (medium), Many (complex/expert)
-- **Risk level**: Low (simple), Medium (medium), High (expert)
-- **Domain knowledge**: Standard (simple), Research needed (medium), Deep expertise (expert)
-
-When creating beads tasks, include difficulty labels:
-\`\`\`bash
-bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -d "Description"
-\`\`\`
-
-### Phase 3: Generate Artifacts (NO CODE!)
-When discovery is complete:
-1. Create STATE.md with decisions made
-2. Copy STATE.md to PRD at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
-3. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
-4. Summarize the plan and STOP
-
-**IMPORTANT:** Create the PRD file BEFORE creating beads tasks.
-
-**Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
-
-Start by exploring the codebase to understand the context, then begin the discovery conversation.
-`;
-
-      // Get planning agent model from settings
-      const agentSettings = loadSettings();
-      const planningModel = agentSettings.models.planning_agent;
-      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-      await execAsync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
-
-      if (isRemotePlanning && remoteWorkspaceMetadata) {
-        // ===== REMOTE PLANNING AGENT =====
-        console.log(`[start-planning] Spawning remote planning agent on ${remoteWorkspaceMetadata.vmName}`);
-
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteWorkspaceMetadata.infraVm });
-        const vmName = remoteWorkspaceMetadata.vmName;
-
-        // Sync all credentials before spawning (tokens may have expired)
-        console.log(`[start-planning] Syncing credentials to ${vmName}...`);
-        await exe.syncAllCredentials(vmName);
-
-        // Also write planning prompt LOCALLY for debugging and consistency
-        console.log(`[start-planning] Writing planning prompt locally to ${planningPromptPath}`);
-        writeFileSync(planningPromptPath, planningPrompt);
-
-        // Install bd (beads CLI) on remote if not present
-        console.log(`[start-planning] Ensuring bd (beads CLI) is available on ${vmName}...`);
-        const bdInstalled = await exe.installBeads(vmName);
-        if (!bdInstalled) {
-          console.warn(`[start-planning] bd installation failed on ${vmName} - beads tasks may not work`);
-        }
-
-        // Initialize beads on remote workspace
-        console.log(`[start-planning] Initializing beads on ${vmName}...`);
-        await exe.initBeads(vmName, '/workspace');
-
-        // Write planning prompt to remote VM
-        const remotePlanningDir = '/workspace/.planning';
-        const remotePlanningPromptPath = `${remotePlanningDir}/PLANNING_PROMPT.md`;
-
-        console.log(`[start-planning] Step 1: mkdir -p ${remotePlanningDir}`);
-        await exe.ssh(vmName, `mkdir -p ${remotePlanningDir}`);
-        console.log(`[start-planning] Step 1 complete`);
-
-        // Clear stale STATE.md on remote
-        console.log(`[start-planning] Step 2: rm -f STATE.md`);
-        await exe.ssh(vmName, `rm -f ${remotePlanningDir}/STATE.md`);
-        console.log(`[start-planning] Step 2 complete`);
-
-        // Write planning prompt to remote using base64 to avoid heredoc escaping issues
-        console.log(`[start-planning] Step 3: write planning prompt`);
-        const promptBase64 = Buffer.from(planningPrompt).toString('base64');
-        await exe.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${remotePlanningPromptPath}`);
-        console.log(`[start-planning] Step 3 complete`);
-
-        // Create launcher script on remote
-        const initMessage = `Please read the planning prompt file at ${remotePlanningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
-        const remotePromptFile = `/workspace/.panopticon/prompts/${sessionName}.txt`;
-        const remoteLauncherScript = `/workspace/.panopticon/prompts/${sessionName}-launcher.sh`;
-
-        console.log(`[start-planning] Step 4: create launcher files`);
-        await exe.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
-
-        // Write init message using base64
-        const initMsgBase64 = Buffer.from(initMessage).toString('base64');
-        await exe.ssh(vmName, `echo '${initMsgBase64}' | base64 -d > ${remotePromptFile}`);
-
-        // Write launcher script using base64
-        const launcherContent = `#!/bin/bash
-# Set terminal environment for proper rendering
-export TERM=xterm-256color
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-export COLORTERM=truecolor
-export PATH="/usr/local/bin:\$PATH"
-export PANOPTICON_AGENT_ID="${sessionName}"
-export PANOPTICON_ISSUE_ID="${issue.identifier}"
-export PANOPTICON_SESSION_TYPE="planning"
-
-cd /workspace
-prompt=$(cat "${remotePromptFile}")
-exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
-`;
-        const launcherBase64 = Buffer.from(launcherContent).toString('base64');
-        await exe.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${remoteLauncherScript}`);
-        console.log(`[start-planning] Step 4 complete`);
-        await exe.ssh(vmName, `chmod +x ${remoteLauncherScript}`);
-
-        // Step 5: Configure Claude Code for autonomous operation (bypass permissions + skip onboarding)
-        console.log(`[start-planning] Step 5: configure Claude Code`);
-        await exe.configureClaudeCode(vmName);
-        console.log(`[start-planning] Step 5 complete`);
-
-        // Step 5.1: Copy essential skills to remote VM
-        console.log(`[start-planning] Step 5.1: copy skills to ${vmName}`);
-        await exe.copySkillsToVm(vmName);
-        console.log(`[start-planning] Step 5.1 complete`);
-
-        // Step 5.5: Configure tmux for proper terminal handling
-        console.log(`[start-planning] Step 5.5: configure tmux`);
-        const tmuxConf = `
-# Panopticon tmux settings for proper terminal rendering
-set -g default-terminal "xterm-256color"
-set -ga terminal-overrides ",xterm-256color:Tc"
-set -g mouse on
-set -s escape-time 0
-`;
-        const tmuxConfBase64 = Buffer.from(tmuxConf).toString('base64');
-        await exe.ssh(vmName, `grep -q "Panopticon tmux settings" ~/.tmux.conf 2>/dev/null || echo '${tmuxConfBase64}' | base64 -d >> ~/.tmux.conf`);
-        console.log(`[start-planning] Step 5.5 complete`);
-
-        // Start tmux session on remote VM with proper terminal settings
-        const tmuxResult = await exe.ssh(vmName, `TERM=xterm-256color tmux new-session -d -s ${sessionName} -c /workspace "bash '${remoteLauncherScript}'"`);
-
-        if (tmuxResult.exitCode !== 0) {
-          throw new Error(`Failed to start remote planning agent: ${tmuxResult.stderr}`);
-        }
-
-        // Resize remote tmux window
-        await exe.ssh(vmName, `tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null || true`);
-
-        // Write agent state file with remote info
-        writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
-          id: sessionName,
-          issueId: issue.identifier,
-          workspace: '/workspace',
-          runtime: 'claude',
-          model: planningModel,
-          status: 'running',
-          startedAt: new Date().toISOString(),
-          type: 'planning',
-          location: 'remote',
-          vmName: vmName,
-          infraVm: remoteWorkspaceMetadata.infraVm,
-        }, null, 2));
-
-        console.log(`Started remote planning agent ${sessionName} on ${vmName}`);
-
-      } else {
-        // ===== LOCAL PLANNING AGENT =====
-        writeFileSync(planningPromptPath, planningPrompt);
-
-        // Determine working directory — use devroot so planning agent has access to .claude/ skills.
-        // Falls back to workspace if created, then project root.
-        const { findDevrootForProject } = await import('../../lib/config.js');
-        const baseDir = workspaceCreated ? workspacePath : projectPath;
-        const agentCwd = findDevrootForProject(baseDir);
-
-        // Pre-trust the agent cwd in Claude Code to avoid the workspace trust prompt
-        try {
-          const { preTrustDirectory } = await import('../../lib/workspace-manager.js');
-          preTrustDirectory(agentCwd);
-        } catch { /* non-fatal */ }
-
-        // Start tmux session with Claude Code for planning (interactive TUI mode)
-        // Use a launcher script to safely pass the prompt (avoids shell escaping issues)
-        const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
-        const agentCmd = getAgentCommand(planningModel);
-
-        // Write a launcher script that safely passes the prompt
-        const launcherScript = join(agentStateDir, 'launcher.sh');
-        const promptFile = join(agentStateDir, 'init-prompt.txt');
-        writeFileSync(promptFile, initMessage);
-
-        // Build the command - use 'claude' directly for Anthropic models, 'claude-code-router' for others
-        // Add --dangerously-skip-permissions to bypass the trust prompt for automated agents
-        const cmdWithArgs = agentCmd.args.length > 0
-          ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
-          : `${agentCmd.command} --dangerously-skip-permissions`;
-
-        writeFileSync(launcherScript, `#!/bin/bash
-export PANOPTICON_AGENT_ID="${sessionName}"
-export PANOPTICON_ISSUE_ID="${issue.identifier}"
-export PANOPTICON_SESSION_TYPE="planning"
-cd "${agentCwd}"
-prompt=$(cat "${promptFile}")
-exec ${cmdWithArgs} "$prompt"
-`, { mode: 0o755 });
-
-        // Ensure tmux is running before starting session
-        await ensureTmuxRunning();
-        await execAsync(`tmux new-session -d -s ${sessionName} -c "${agentCwd}" "bash '${launcherScript}'"`, { encoding: 'utf-8' });
-
-        // Write agent state file so QuestionDialog can find the JSONL path
-        writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
-          id: sessionName,
-          issueId: issue.identifier,
-          workspace: agentCwd,
-          runtime: isAnthropicModel(planningModel) ? 'claude' : 'claude-code-router',
-          model: planningModel,
-          status: 'running',
-          startedAt: new Date().toISOString(),
-          type: 'planning',
-          location: 'local',
-        }, null, 2));
-
-        // Resize the tmux window to be wide enough for Claude's TUI
-        try {
-          await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
-        } catch {
-          // Ignore resize errors
-        }
-
-        console.log(`Started local planning agent ${sessionName} with initial prompt`);
-      }
-
-      planningAgentStarted = true;
-    } catch (err: any) {
-      planningAgentError = err.message;
-      console.error('Planning agent error:', err);
-    }
-
-    res.json({
-      success: true,
-      issue: {
-        id: issue.id,
-        identifier: issue.identifier,
-        title: issue.title,
-        newState: newStateName,
-        source: issue.source,
-      },
-      workspace: {
-        created: workspaceCreated,
-        path: workspacePath,
-        error: workspaceError,
-      },
-      planningAgent: {
-        started: planningAgentStarted,
-        sessionName: planningAgentStarted ? sessionName : undefined,
-        error: planningAgentError,
-      },
-    });
-  } catch (error: any) {
-    console.error('Error starting planning:', error);
-    res.status(500).json({ error: 'Failed to start planning: ' + error.message });
-  }
-});
-
-// Get planning session status
+// Get planning session status - DEPRECATED: Planning phase has been removed
 app.get('/api/planning/:issueId/status', async (req, res) => {
-  const { issueId } = req.params;
-  const sessionName = `planning-${issueId.toLowerCase()}`;
-  const issueLower = issueId.toLowerCase();
-  const issuePrefix = issueId.split('-')[0];
-  const projectPath = getProjectPath(undefined, issuePrefix);
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-  try {
-    // Check agent state to see if this is a remote session
-    let isRemote = false;
-    let vmName = '';
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-    const stateFile = join(agentStateDir, 'state.json');
-
-    try {
-      if (existsSync(stateFile)) {
-        const stateContent = readFileSync(stateFile, 'utf-8');
-        const state = JSON.parse(stateContent);
-        if (state.location === 'remote' && state.vmName) {
-          isRemote = true;
-          vmName = state.vmName;
-        }
-      }
-    } catch (err) {
-      // Ignore - will check locally
-    }
-
-    // Check if tmux session exists (local or remote)
-    let sessionExists = false;
-    if (isRemote && vmName) {
-      try {
-        const { stdout } = await execAsync(`ssh -A -o ConnectTimeout=5 ${vmName}.exe.xyz "tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''"`, { timeout: 10000 });
-        const sessions = stdout.trim().split('\n').filter(Boolean);
-        sessionExists = sessions.includes(sessionName);
-      } catch (err) {
-        // SSH failed - session might still exist but VM unreachable
-        console.log(`[planning status] SSH to ${vmName} failed:`, err);
-      }
-    } else {
-      const { stdout: sessionsOutput } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
-        encoding: 'utf-8',
-      });
-      const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
-      sessionExists = sessions.includes(sessionName);
-    }
-
-    // Check if planning artifacts exist
-    const planningDirInWorkspace = join(workspacePath, '.planning');
-    const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-    const planningDir = existsSync(planningDirInWorkspace) ? planningDirInWorkspace :
-                        existsSync(legacyPlanningDir) ? legacyPlanningDir : null;
-
-    const hasStateFile = planningDir ? existsSync(join(planningDir, 'STATE.md')) : false;
-    const hasPromptFile = planningDir ? existsSync(join(planningDir, 'PLANNING_PROMPT.md')) : false;
-
-    // Planning is only "completed" if explicitly marked via the .planning-complete marker file.
-    // This prevents false positives when STATE.md from a prior session contains "Status: Complete"
-    // but the user never clicked Done in the dialog (e.g. after a crash or deep-wipe).
-    const hasCompletionMarker = planningDir ? existsSync(join(planningDir, '.planning-complete')) : false;
-
-    // Use only the marker file — never STATE.md regex — as the completion signal.
-    const planningCompleted = hasCompletionMarker;
-
-    res.json({
-      active: sessionExists,
-      sessionName,
-      workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
-      planningCompleted,
-      hasStateFile,
-      hasPromptFile,
-      hasCompletionMarker,
-      isRemote,
-      vmName: isRemote ? vmName : undefined,
-    });
-  } catch (error: any) {
-    res.json({
-      active: false,
-      sessionName,
-      workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
-      planningCompleted: false,
-      error: error.message,
-    });
-  }
+  res.status(410).json({ error: 'Planning phase has been removed. Use direct agent execution instead.' });
 });
 
-// Send message to planning session - sends input to the EXISTING interactive session
-// This keeps the Claude session alive for back-and-forth conversation
-app.post('/api/planning/:issueId/message', async (req, res) => {
-  const { issueId } = req.params;
-  const { message } = req.body;
-  const sessionName = `planning-${issueId.toLowerCase()}`;
-  const issueLower = issueId.toLowerCase();
-
-  if (!message) {
-    return res.status(400).json({ error: 'Message required' });
-  }
-
-  try {
-    // Find planning directory and workspace - check workspace first, then legacy
-    const githubCheck = isGitHubIssue(issueId);
-    let projectPath = '';
-    let planningDir = '';
-    let workspacePath = '';
-
-    // Determine project path
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    } else {
-      // Linear issue - check common paths
-      const possiblePaths = [
-        join(homedir(), 'projects', 'panopticon'),
-        join(homedir(), 'projects', 'myn'),
-      ];
-      for (const p of possiblePaths) {
-        // Check workspace first
-        if (existsSync(join(p, 'workspaces', `feature-${issueLower}`, '.planning'))) {
-          projectPath = p;
-          break;
-        }
-        // Then legacy
-        if (existsSync(join(p, '.planning', issueLower))) {
-          projectPath = p;
-          break;
-        }
-      }
-    }
-
-    if (!projectPath) {
-      return res.status(404).json({ error: 'Could not find project path' });
-    }
-
-    // Check workspace planning first (git-backed)
-    workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const workspacePlanningDir = join(workspacePath, '.planning');
-    const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-
-    if (existsSync(workspacePlanningDir)) {
-      planningDir = workspacePlanningDir;
-    } else if (existsSync(legacyPlanningDir)) {
-      planningDir = legacyPlanningDir;
-    } else {
-      return res.status(404).json({ error: 'Planning directory not found', sessionEnded: true });
-    }
-
-    // Check if agent state file indicates remote session
-    let isRemote = false;
-    let vmName = '';
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-    const stateFile = join(agentStateDir, 'state.json');
-
-    try {
-      if (existsSync(stateFile)) {
-        const stateContent = readFileSync(stateFile, 'utf-8');
-        const state = JSON.parse(stateContent);
-        if (state.location === 'remote' && state.vmName) {
-          isRemote = true;
-          vmName = state.vmName;
-        }
-      }
-    } catch (err) {
-      // Ignore - will check locally
-    }
-
-    // Check if the session is still alive
-    let sessionExists = false;
-    if (isRemote && vmName) {
-      try {
-        const { stdout } = await execAsync(`ssh -A -o ConnectTimeout=5 ${vmName}.exe.xyz "tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''"`, { timeout: 10000 });
-        const sessions = stdout.trim().split('\n').filter(Boolean);
-        sessionExists = sessions.includes(sessionName);
-      } catch (err) {
-        console.log(`[planning message] SSH to ${vmName} failed:`, err);
-      }
-    } else {
-      try {
-        const { stdout: sessionsOutput } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
-          encoding: 'utf-8',
-        });
-        const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
-        sessionExists = sessions.includes(sessionName);
-      } catch (e) {
-        // No sessions
-      }
-    }
-
-    // If session exists, send the message directly to it using tmux send-keys
-    if (sessionExists) {
-      // Write message to a temp file to avoid shell escaping issues
-      const messageFile = join(planningDir, 'user-message.txt');
-      writeFileSync(messageFile, message);
-
-      if (isRemote && vmName) {
-        // For remote sessions, we need to copy the message file and use send-keys
-        // First, write to remote
-        const exe = await import('../lib/exe.js');
-        const remoteMessagePath = `/workspace/.planning/user-message.txt`;
-        await exe.ssh(vmName, `mkdir -p /workspace/.planning && cat > ${remoteMessagePath} << 'PANOPTICON_MSG_EOF'
-${message}
-PANOPTICON_MSG_EOF`);
-
-        // Send keys to remote tmux - type the message content
-        // Use tmux load-buffer to safely handle special characters
-        await exe.ssh(vmName, `tmux load-buffer ${remoteMessagePath} && tmux paste-buffer -t ${sessionName}`);
-        await exe.ssh(vmName, `tmux send-keys -t ${sessionName} Enter`);
-      } else {
-        // Local session - use tmux send-keys with load-buffer for safe character handling
-        await execAsync(`tmux load-buffer "${messageFile}"`, { encoding: 'utf-8' });
-        await execAsync(`tmux paste-buffer -t ${sessionName}`, { encoding: 'utf-8' });
-        await execAsync(`tmux send-keys -t ${sessionName} Enter`, { encoding: 'utf-8' });
-      }
-
-      res.json({ success: true, sessionName, message: 'Message sent to active session' });
-      return;
-    }
-
-    // Session doesn't exist - need to restart it in INTERACTIVE mode (not --print)
-    console.log(`[planning message] Session ${sessionName} not found, starting new interactive session`);
-
-    // Read previous output to get context for continuation
-    const outputFile = join(planningDir, 'output.jsonl');
-    let conversationLog = '';
-    if (existsSync(outputFile)) {
-      const content = readFileSync(outputFile, 'utf-8');
-      const lines = content.split('\n').filter(line => line.trim());
-      const logParts: string[] = [];
-
-      for (const line of lines) {
-        try {
-          const json = JSON.parse(line);
-
-          // Assistant messages (text and tool uses)
-          if (json.type === 'assistant' && json.message?.content) {
-            for (const block of json.message.content) {
-              if (block.type === 'text') {
-                logParts.push(`**Assistant:**\n${block.text}`);
-              } else if (block.type === 'tool_use') {
-                const input = block.input || {};
-                // Skip reads of CONTINUATION_PROMPT.md
-                if (block.name === 'Read' && input.file_path?.includes('CONTINUATION_PROMPT.md')) {
-                  continue;
-                }
-                let toolInfo = `**Tool: ${block.name}**`;
-                if (block.name === 'Read' && input.file_path) {
-                  toolInfo += `\nFile: ${input.file_path}`;
-                } else if (block.name === 'Bash' && input.command) {
-                  toolInfo += `\nCommand: ${input.command.slice(0, 200)}${input.command.length > 200 ? '...' : ''}`;
-                } else if (block.name === 'Grep' && input.pattern) {
-                  toolInfo += `\nPattern: ${input.pattern}`;
-                } else if (block.name === 'Task' && input.description) {
-                  toolInfo += `\nTask: ${input.description}`;
-                }
-                logParts.push(toolInfo);
-              }
-            }
-          }
-
-          // Tool results
-          if (json.type === 'user' && json.message?.content) {
-            for (const block of json.message.content) {
-              if (block.type === 'tool_result' && block.content) {
-                const resultText = typeof block.content === 'string'
-                  ? block.content
-                  : JSON.stringify(block.content);
-                if (resultText.includes('# Continuation of Planning Session:')) {
-                  continue;
-                }
-                if (resultText.trim()) {
-                  logParts.push(`**Tool Result:**\n\`\`\`\n${resultText}\n\`\`\``);
-                }
-              }
-            }
-          }
-        } catch (e) {}
-      }
-      conversationLog = logParts.join('\n\n');
-    }
-
-    // Create continuation prompt
-    const continuationPromptPath = join(planningDir, 'CONTINUATION_PROMPT.md');
-    const continuationPrompt = `# Continuation of Planning Session: ${issueId.toUpperCase()}
-
-## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
-
-**YOU ARE IN PLANNING MODE. DO NOT:**
-- Write or modify any code files
-- Run implementation commands (npm install, docker, etc.)
-- Create actual features or functionality
-
-**YOU SHOULD ONLY:**
-- Ask clarifying questions
-- Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, Beads tasks via \`bd create\`, PRD at \`docs/prds/active/{issue-id}-plan.md\`)
-- Present options and tradeoffs
-
----
-
-## Previous Conversation
-
-${conversationLog}
-
----
-
-## User's Response
-
-${message}
-
----
-
-## Your Task
-
-Continue the PLANNING session. Do NOT implement anything.
-`;
-
-    writeFileSync(continuationPromptPath, continuationPrompt);
-
-    // Determine working directory — use devroot so planning agent has access to .claude/ skills
-    const { findDevrootForProject } = await import('../../lib/config.js');
-    const baseDir = existsSync(workspacePath) ? workspacePath : projectPath;
-    const agentCwd = findDevrootForProject(baseDir);
-
-    // Pre-trust the agent cwd in Claude Code to avoid the workspace trust prompt
-    try {
-      const { preTrustDirectory } = await import('../../lib/workspace-manager.js');
-      preTrustDirectory(agentCwd);
-    } catch { /* non-fatal */ }
-
-    // Backup old output for the new session
-    if (existsSync(outputFile)) {
-      const backupPath = join(planningDir, `output-${Date.now()}.jsonl`);
-      renameSync(outputFile, backupPath);
-    }
-
-    // Get planning agent model from settings and start INTERACTIVE session (no --print)
-    const msgSettings = loadSettings();
-    const msgPlanningModel = msgSettings.models.planning_agent;
-    const msgAgentCmd = getAgentCommand(msgPlanningModel);
-    const msgCmdWithArgs = msgAgentCmd.args.length > 0
-      ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} --dangerously-skip-permissions`
-      : `${msgAgentCmd.command} --dangerously-skip-permissions`;
-
-    // Create launcher script for safe prompt handling (same as initial planning start)
-    const launcherScript = join(agentStateDir, 'continuation-launcher.sh');
-    mkdirSync(agentStateDir, { recursive: true });
-
-    writeFileSync(launcherScript, `#!/bin/bash
-cd "${agentCwd}"
-exec ${msgCmdWithArgs} "Please read the continuation prompt at ${continuationPromptPath} and continue the planning session."
-`, { mode: 0o755 });
-
-    await ensureTmuxRunning();
-    await execAsync(`tmux new-session -d -s ${sessionName} -c "${agentCwd}" "bash '${launcherScript}'"`, { encoding: 'utf-8' });
-
-    // Resize window for Claude TUI
-    try {
-      await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
-    } catch {
-      // Ignore resize errors
-    }
-
-    res.json({ success: true, sessionName, message: 'Planning session restarted in interactive mode' });
-  } catch (error: any) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ error: 'Failed to send message: ' + error.message });
-  }
+// Send message to planning session - DEPRECATED (Planning phase removed in PAN-275)
+app.post('/api/planning/:issueId/message', async (_req, res) => {
+  res.status(410).json({ error: 'Planning phase has been removed. Use direct agent execution instead.' });
 });
 
-// Stop planning session (kills tmux session)
-app.delete('/api/planning/:issueId', async (req, res) => {
-  const { issueId } = req.params;
-  const sessionName = `planning-${issueId.toLowerCase()}`;
-
-  try {
-    // Kill tmux session
-    await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
-
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to stop planning: ' + error.message });
-  }
+// Stop planning session - DEPRECATED (Planning phase removed in PAN-275)
+app.delete('/api/planning/:issueId', async (_req, res) => {
+  res.status(410).json({ error: 'Planning phase has been removed. Use direct agent execution instead.' });
 });
 
-// Remove "planning" label from GitHub issue
-async function removeGitHubPlanningLabel(owner: string, repo: string, number: number): Promise<void> {
-  const config = getGitHubConfig();
-  if (!config) throw new Error('GitHub not configured');
-
-  await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planning`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `token ${config.token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'Panopticon-Dashboard',
-    },
-  });
-}
+// DEPRECATED: Planning phase has been removed
 
 
-// Abort planning - reverts state to Todo and kills session
+// Abort planning - DEPRECATED: Planning phase has been removed
 app.post('/api/issues/:id/abort-planning', async (req, res) => {
-  const { id } = req.params;
-  const { deleteWorkspace } = req.body || {};
-
-  try {
-    // Check if this is a GitHub issue
-    const githubCheck = isGitHubIssue(id);
-
-    let revertedState = 'Todo';
-    let issueIdentifier: string | undefined; // e.g., "MIN-665"
-    let sessionName: string; // Will be set based on identifier
-
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-      // GitHub: set identifier from the ID (which is like "PAN-123")
-      issueIdentifier = id;
-      sessionName = `planning-${id.toLowerCase()}`;
-
-      // GitHub: remove "planning" label
-      try {
-        await removeGitHubPlanningLabel(githubCheck.owner, githubCheck.repo, githubCheck.number);
-        revertedState = 'Todo (label removed)';
-      } catch (err) {
-        // Label might not exist, that's fine
-        console.log('Could not remove planning label:', err);
-      }
-    } else {
-      // Linear: move back to Todo state
-      const apiKey = getLinearApiKey();
-      if (apiKey) {
-        // Fetch issue to get team and identifier
-        const issueQuery = `
-          query GetIssue($id: String!) {
-            issue(id: $id) {
-              id
-              identifier
-              team { id }
-            }
-          }
-        `;
-
-        const issueResponse = await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': apiKey,
-          },
-          body: JSON.stringify({ query: issueQuery, variables: { id } }),
-        });
-        const issueJson = await issueResponse.json();
-        const issue = issueJson.data?.issue;
-
-        if (issue) {
-          // Store the issue identifier for workspace deletion and session name
-          issueIdentifier = issue.identifier;
-          sessionName = `planning-${issue.identifier.toLowerCase()}`;
-
-          // Find "Todo" state for this team
-          const statesQuery = `
-            query GetTeamStates($teamId: String!) {
-              team(id: $teamId) {
-                states {
-                  nodes {
-                    id
-                    name
-                    type
-                  }
-                }
-              }
-            }
-          `;
-
-          const statesResponse = await fetch('https://api.linear.app/graphql', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': apiKey,
-            },
-            body: JSON.stringify({ query: statesQuery, variables: { teamId: issue.team.id } }),
-          });
-          const statesJson = await statesResponse.json();
-          const states = statesJson.data?.team?.states?.nodes || [];
-
-          // Find Todo/Unstarted state
-          const todoState = states.find((s: any) =>
-            s.name.toLowerCase() === 'todo' ||
-            s.name.toLowerCase() === 'to do' ||
-            s.type === 'unstarted'
-          );
-
-          if (todoState) {
-            // Move issue to Todo
-            const updateMutation = `
-              mutation UpdateIssue($id: String!, $stateId: String!) {
-                issueUpdate(id: $id, input: { stateId: $stateId }) {
-                  success
-                  issue { state { name } }
-                }
-              }
-            `;
-
-            await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': apiKey,
-              },
-              body: JSON.stringify({
-                query: updateMutation,
-                variables: { id: issue.id, stateId: todoState.id },
-              }),
-            });
-            revertedState = todoState.name;
-          }
-        }
-      }
-    }
-
-    // Kill the tmux session (try both possible session names if needed)
-    if (sessionName) {
-      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
-    }
-    // Also try with UUID-based session name (fallback)
-    await execAsync(`tmux kill-session -t planning-${id.toLowerCase()} 2>/dev/null || true`, { encoding: 'utf-8' });
-
-    // Clean up agent state files to prevent stale "running" status
-    // Note: issueIdentifier is the human-readable ID (e.g., "MIN-665"), not the Linear UUID
-    const agentStateDir = sessionName ? join(homedir(), '.panopticon', 'agents', sessionName) : null;
-    const workAgentStateDir = issueIdentifier
-      ? join(homedir(), '.panopticon', 'agents', `agent-${issueIdentifier.toLowerCase()}`)
-      : join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
-
-    console.log(`[abort-planning] Cleanup paths: sessionName=${sessionName}, issueIdentifier=${issueIdentifier}`);
-    console.log(`[abort-planning] agentStateDir=${agentStateDir}, exists=${agentStateDir ? existsSync(agentStateDir) : 'null'}`);
-    console.log(`[abort-planning] workAgentStateDir=${workAgentStateDir}, exists=${existsSync(workAgentStateDir)}`);
-
-    try {
-      if (agentStateDir && existsSync(agentStateDir)) {
-        rmSync(agentStateDir, { recursive: true, force: true });
-        console.log(`[abort-planning] ✓ Cleaned up planning agent state: ${agentStateDir}`);
-      }
-      if (existsSync(workAgentStateDir)) {
-        rmSync(workAgentStateDir, { recursive: true, force: true });
-        console.log(`[abort-planning] ✓ Cleaned up work agent state: ${workAgentStateDir}`);
-      }
-    } catch (cleanupErr) {
-      console.log('[abort-planning] Warning: Could not clean up agent state:', cleanupErr);
-    }
-
-    // Clean up legacy planning directory (outside workspace, in project root)
-    // This exists when planning started before workspace creation or workspace was skipped
-    if (issueIdentifier) {
-      try {
-        // Find project path to locate legacy planning dir
-        let projectPath: string | undefined;
-        const prefix = issueIdentifier.split('-')[0].toUpperCase();
-
-        // For GitHub issues, use GitHub local paths
-        if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-          const localPaths = getGitHubLocalPaths();
-          projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
-        }
-
-        // For Linear issues or if GitHub path not found, check projects.yaml
-        if (!projectPath) {
-          const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
-          if (existsSync(projectsYamlPath)) {
-            const yaml = await import('js-yaml');
-            const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
-            for (const [, config] of Object.entries(projectsConfig.projects || {})) {
-              const projConfig = config as any;
-              // Check for Linear team match
-              if (projConfig.linear_team?.toUpperCase() === prefix) {
-                projectPath = projConfig.path;
-                break;
-              }
-              // Check for GitHub issue_tracker with matching prefix (for PAN-* etc.)
-              if (projConfig.issue_tracker === 'github' && projConfig.repo) {
-                // Match by checking if the repo config uses this prefix
-                const repoPrefix = projConfig.repo.split('/')[1]?.toUpperCase().slice(0, 3);
-                if (prefix === 'PAN' && projConfig.repo.includes('panopticon')) {
-                  projectPath = projConfig.path;
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        if (projectPath) {
-          const legacyPlanningDir = join(projectPath, '.planning', issueIdentifier.toLowerCase());
-          if (existsSync(legacyPlanningDir)) {
-            rmSync(legacyPlanningDir, { recursive: true, force: true });
-            console.log(`[abort-planning] ✓ Cleaned up legacy planning dir: ${legacyPlanningDir}`);
-          }
-        }
-      } catch (planningCleanupErr) {
-        console.log('[abort-planning] Warning: Could not clean up legacy planning dir:', planningCleanupErr);
-      }
-    }
-
-    // Optionally delete the workspace
-    let workspaceDeleted = false;
-    let workspaceError: string | undefined;
-
-    if (deleteWorkspace) {
-      try {
-        // Find the workspace path - check GitHub or Linear project mapping
-        let projectPath: string | undefined;
-
-        if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-          const localPaths = getGitHubLocalPaths();
-          projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
-        } else if (issueIdentifier) {
-          // For Linear issues, use the identifier to find the project path
-          // Check project mappings
-          const mappingsPath = join(homedir(), '.panopticon', 'project-mappings.json');
-          if (existsSync(mappingsPath)) {
-            const mappings = JSON.parse(readFileSync(mappingsPath, 'utf-8'));
-            // Try to match by issue prefix (e.g., MIN-123 -> MIN)
-            const prefix = issueIdentifier.split('-')[0];
-            const mapping = mappings.find((m: any) => m.linearPrefix?.toUpperCase() === prefix.toUpperCase());
-            if (mapping) {
-              projectPath = mapping.localPath;
-            }
-          }
-
-          // Also check projects.yaml
-          if (!projectPath) {
-            const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
-            if (existsSync(projectsYamlPath)) {
-              try {
-                const yaml = await import('js-yaml');
-                const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
-                const prefix = issueIdentifier.split('-')[0].toUpperCase();
-
-                for (const [, config] of Object.entries(projectsConfig.projects || {})) {
-                  const projConfig = config as any;
-                  if (projConfig.linear_team?.toUpperCase() === prefix) {
-                    projectPath = projConfig.path;
-                    break;
-                  }
-                }
-              } catch {
-                // Ignore YAML errors
-              }
-            }
-          }
-        }
-
-        if (projectPath && issueIdentifier) {
-          // Try both naming conventions: feature-{identifier} and just {identifier}
-          const featureWorkspacePath = join(projectPath, 'workspaces', `feature-${issueIdentifier.toLowerCase()}`);
-          const plainWorkspacePath = join(projectPath, 'workspaces', issueIdentifier.toLowerCase());
-          const workspacePath = existsSync(featureWorkspacePath) ? featureWorkspacePath : plainWorkspacePath;
-
-          if (existsSync(workspacePath)) {
-            // Check for custom workspace_remove_command in projects.yaml
-            const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
-            let customRemoveCmd: string | undefined;
-
-            if (existsSync(projectsYamlPath)) {
-              try {
-                const yaml = await import('js-yaml');
-                const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
-                const prefix = issueIdentifier.split('-')[0].toLowerCase();
-
-                // Find project by linear_team prefix
-                for (const [, config] of Object.entries(projectsConfig.projects || {})) {
-                  const projConfig = config as any;
-                  if (projConfig.linear_team?.toLowerCase() === prefix && projConfig.workspace_remove_command) {
-                    customRemoveCmd = projConfig.workspace_remove_command;
-                    break;
-                  }
-                }
-              } catch (yamlErr) {
-                console.log('Could not parse projects.yaml:', yamlErr);
-              }
-            }
-
-            if (customRemoveCmd) {
-              // Use custom remove command (legacy)
-              const featureName = issueIdentifier.toLowerCase();
-              await execAsync(`${customRemoveCmd} ${featureName}`, {
-                cwd: projectPath,
-                encoding: 'utf-8',
-                timeout: 60000, // 1 minute timeout
-              });
-              workspaceDeleted = true;
-            } else {
-              // Use pan workspace destroy command (handles polyrepo, Docker cleanup, etc.)
-              const featureName = issueIdentifier.toLowerCase();
-              await execAsync(`pan workspace destroy ${featureName} --force`, {
-                cwd: projectPath,
-                encoding: 'utf-8',
-                timeout: 120000, // 2 minute timeout for Docker cleanup
-                maxBuffer: 10 * 1024 * 1024, // 10MB buffer for verbose Docker output
-              });
-              workspaceDeleted = true;
-            }
-          } else {
-            workspaceError = 'Workspace not found';
-          }
-        } else {
-          workspaceError = 'Could not determine project path';
-        }
-      } catch (err: any) {
-        workspaceError = err.message;
-        console.error('Error deleting workspace:', err);
-      }
-    }
-
-    res.json({
-      success: true,
-      issueId: id,
-      revertedState,
-      sessionKilled: true,
-      workspaceDeleted,
-      workspacePreserved: !deleteWorkspace && !workspaceDeleted,
-      workspaceError,
-    });
-  } catch (error: any) {
-    console.error('Error aborting planning:', error);
-    res.status(500).json({ error: 'Failed to abort planning: ' + error.message });
-  }
+  res.status(410).json({ error: 'Planning phase has been removed. Use direct agent execution instead.' });
 });
 
-// Complete planning - move issue to "Planned" state
+// Complete planning - DEPRECATED: Planning phase has been removed
 app.post('/api/issues/:id/complete-planning', async (req, res) => {
-  const { id } = req.params;
-  const sessionName = `planning-${id.toLowerCase()}`;
-  const issueLower = id.toLowerCase();
-
-  try {
-    // Check if this was a remote planning session
-    let isRemotePlanning = false;
-    let remoteVmName: string | null = null;
-    let remoteInfraVm: string | null = null;
-
-    try {
-      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-
-      // Check agent state.json for remote info
-      const stateJsonPath = join(agentStateDir, 'state.json');
-      if (existsSync(stateJsonPath)) {
-        const agentState = JSON.parse(readFileSync(stateJsonPath, 'utf-8'));
-        if (agentState.location === 'remote' && agentState.vmName) {
-          isRemotePlanning = true;
-          remoteVmName = agentState.vmName;
-          remoteInfraVm = agentState.infraVm;
-          console.log(`[complete-planning] Detected remote planning session on ${remoteVmName}`);
-        }
-      }
-
-      // Also check legacy remote-workspace.json path
-      if (!isRemotePlanning) {
-        const remoteMetadataPath = join(agentStateDir, 'remote-workspace.json');
-        if (existsSync(remoteMetadataPath)) {
-          const remoteMetadata = JSON.parse(readFileSync(remoteMetadataPath, 'utf-8'));
-          if (remoteMetadata.vmName) {
-            isRemotePlanning = true;
-            remoteVmName = remoteMetadata.vmName;
-            remoteInfraVm = remoteMetadata.infraVm;
-            console.log(`[complete-planning] Detected remote planning session on ${remoteVmName}`);
-          }
-        }
-      }
-    } catch (err) {
-      // Not a remote session, continue with local flow
-      console.log(`[complete-planning] Could not detect remote session: ${err}`);
-    }
-
-    // Kill any running planning session (local)
-    try {
-      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
-    } catch (e) {
-      // Session might not exist
-    }
-
-    // Also kill remote session if applicable
-    if (isRemotePlanning && remoteVmName) {
-      try {
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteInfraVm || undefined });
-        await exe.ssh(remoteVmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
-        console.log(`[complete-planning] Killed remote tmux session on ${remoteVmName}`);
-      } catch (err) {
-        console.log(`[complete-planning] Could not kill remote session: ${err}`);
-      }
-    }
-
-    // Find planning directory and commit/push
-    const githubCheck = isGitHubIssue(id);
-    let projectPath = '';
-    let planningDir = '';
-
-    // Determine project path
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    } else {
-      // Linear issue - check common paths
-      const possiblePaths = [
-        join(homedir(), 'projects', 'panopticon'),
-        join(homedir(), 'projects', 'myn'),
-      ];
-      for (const p of possiblePaths) {
-        // Check workspace first
-        if (existsSync(join(p, 'workspaces', `feature-${issueLower}`, '.planning'))) {
-          projectPath = p;
-          break;
-        }
-        // Then legacy
-        if (existsSync(join(p, '.planning', issueLower))) {
-          projectPath = p;
-          break;
-        }
-      }
-    }
-
-    // For remote planning, sync beads from remote VM first
-    let gitPushed = false;
-    let beadsSynced = false;
-
-    if (isRemotePlanning && remoteVmName) {
-      console.log(`[complete-planning] Syncing beads from remote VM ${remoteVmName}...`);
-      try {
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteInfraVm || undefined });
-
-        // Sync beads on remote (export to JSONL), commit, and push
-        const syncResult = await exe.syncBeadsToGit(remoteVmName, '/workspace', `Complete planning for ${id}`);
-        beadsSynced = syncResult;
-
-        if (syncResult) {
-          console.log(`[complete-planning] Remote beads synced and pushed`);
-
-          // Now pull locally to get the changes
-          if (projectPath) {
-            const localGitRoot = join(projectPath, 'workspaces', `feature-${issueLower}`);
-            if (existsSync(localGitRoot)) {
-              console.log(`[complete-planning] Pulling remote changes to local workspace...`);
-              try {
-                await execAsync(`git pull --rebase`, { cwd: localGitRoot, encoding: 'utf-8', timeout: 30000 });
-                console.log(`[complete-planning] Local workspace updated`);
-
-                // Import beads locally
-                try {
-                  await execAsync(`bd sync --import 2>/dev/null || true`, { cwd: localGitRoot, encoding: 'utf-8', timeout: 10000 });
-                  console.log(`[complete-planning] Local beads imported`);
-                } catch (importErr) {
-                  console.log(`[complete-planning] Beads import skipped (may not have local bd)`);
-                }
-              } catch (pullErr: any) {
-                console.warn(`[complete-planning] Git pull failed: ${pullErr.message}`);
-              }
-            }
-          }
-          gitPushed = true; // Remote already pushed
-        }
-      } catch (remoteErr: any) {
-        console.error(`[complete-planning] Remote sync failed: ${remoteErr.message}`);
-        // Continue with local flow as fallback
-      }
-    }
-
-    // Local git handling (for local planning or as fallback)
-    if (projectPath && !gitPushed) {
-      const workspacePlanningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
-      const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-
-      if (existsSync(workspacePlanningDir)) {
-        planningDir = workspacePlanningDir;
-      } else if (existsSync(legacyPlanningDir)) {
-        planningDir = legacyPlanningDir;
-      }
-
-      if (planningDir) {
-        try {
-          // Get the git root (workspace or project root)
-          const gitRoot = planningDir.includes('/workspaces/')
-            ? join(projectPath, 'workspaces', `feature-${issueLower}`)
-            : projectPath;
-
-          // Run bd sync locally first to export beads to JSONL
-          try {
-            await execAsync(`bd sync 2>/dev/null || true`, { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 });
-          } catch (bdErr) {
-            // bd might not be installed or .beads might not exist
-          }
-
-          // Write .planning-complete marker so the status endpoint knows planning is done.
-          // This is the sole completion signal — STATE.md alone is not sufficient.
-          writeFileSync(join(planningDir, '.planning-complete'), '', 'utf-8');
-          console.log(`[complete-planning] Wrote .planning-complete marker`);
-
-          // Git add planning and beads directories
-          await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
-          // Also add .beads/ if it exists (planning may create beads tasks)
-          if (existsSync(join(gitRoot, '.beads'))) {
-            await execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
-          }
-
-          // Check if there are changes to commit
-          try {
-            await execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' });
-            // No changes to commit
-          } catch (diffErr) {
-            // There are changes, commit them
-            await execAsync(`git commit -m "Complete planning for ${id}"`, { cwd: gitRoot, encoding: 'utf-8' });
-          }
-
-          // Push to remote (non-blocking to avoid freezing dashboard)
-          // Spawn in background - don't await
-          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-          pushChild.unref();
-          gitPushed = true;
-          console.log(`[complete-planning] Git push started in background for ${id}`);
-        } catch (gitErr) {
-          console.error('Git commit/push failed:', gitErr);
-          // Continue even if git fails
-        }
-      }
-    }
-
-    // Update issue state (Linear or GitHub)
-    let newState = 'Planned';
-
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-      // GitHub: Remove "planning" label, add "planned" label
-      const config = getGitHubConfig();
-      if (config) {
-        try {
-          // Remove planning label
-          await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/planning`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `token ${config.token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'User-Agent': 'Panopticon-Dashboard',
-            },
-          });
-        } catch (e) {}
-
-        try {
-          // Add planned label
-          await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `token ${config.token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'User-Agent': 'Panopticon-Dashboard',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ labels: ['planned'] }),
-          });
-        } catch (e) {}
-      }
-    } else {
-      // Linear: Update to "Planned" state
-      const apiKey = getLinearApiKey();
-      if (apiKey) {
-        // First, get the issue to find its team
-        const issueQuery = `query { issue(id: "${id}") { id team { id states { nodes { id name } } } } }`;
-        const issueRes = await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': apiKey,
-          },
-          body: JSON.stringify({ query: issueQuery }),
-        });
-        const issueData = await issueRes.json();
-        const issue = issueData.data?.issue;
-
-        if (issue) {
-          // Find "Planned" state or fall back to first available state after "In Planning"
-          const states = issue.team?.states?.nodes || [];
-          let plannedState = states.find((s: any) => s.name === 'Planned');
-          if (!plannedState) {
-            plannedState = states.find((s: any) => s.name === 'Ready');
-          }
-          if (!plannedState) {
-            plannedState = states.find((s: any) => s.name === 'Todo');
-          }
-
-          if (plannedState) {
-            const updateMutation = `mutation { issueUpdate(id: "${issue.id}", input: { stateId: "${plannedState.id}" }) { success issue { state { name } } } }`;
-            const updateRes = await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': apiKey,
-              },
-              body: JSON.stringify({ query: updateMutation }),
-            });
-            const updateData = await updateRes.json();
-            newState = updateData.data?.issueUpdate?.issue?.state?.name || 'Planned';
-          }
-        }
-      }
-    }
-
-    res.json({
-      success: true,
-      issueId: id,
-      newState,
-      gitPushed,
-      message: gitPushed
-        ? 'Planning complete and pushed to git - ready for execution'
-        : 'Planning complete - ready for execution',
-    });
-  } catch (error: any) {
-    console.error('Error completing planning:', error);
-    res.status(500).json({ error: 'Failed to complete planning: ' + error.message });
-  }
+  res.status(410).json({ error: 'Planning phase has been removed. Use direct agent execution instead.' });
 });
 
 // Reset an issue - kills agents (local+remote), resets Linear status to Todo
@@ -10213,7 +8391,7 @@ app.post('/api/issues/:id/reset', async (req, res) => {
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
       const ghConfig = getGitHubConfig();
       if (ghConfig) {
-        const labelsToRemove = ['in-progress', 'planning', 'planned', 'review-ready'];
+        const labelsToRemove = ['in-progress', 'review-ready'];
         for (const label of labelsToRemove) {
           try {
             await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/${encodeURIComponent(label)}`, {
@@ -10459,7 +8637,7 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
   const { targetStatus, syncToTracker = false } = req.body || {};
 
   // Validate targetStatus (CanonicalState)
-  const validStatuses = ['backlog', 'todo', 'planning', 'in_progress', 'in_review', 'done'];
+  const validStatuses = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
   if (!targetStatus || !validStatuses.includes(targetStatus)) {
     return res.status(400).json({ error: `Invalid targetStatus. Must be one of: ${validStatuses.join(', ')}` });
   }
@@ -10472,7 +8650,6 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
     const canonicalToIssueState: Record<string, 'open' | 'in_progress' | 'closed'> = {
       backlog: 'open',
       todo: 'open',
-      planning: 'in_progress',
       in_progress: 'in_progress',
       in_review: 'in_progress',
       done: 'closed',
@@ -10490,8 +8667,33 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
     // If syncToTracker is true, update the actual tracker
     if (syncToTracker) {
       if (githubCheck.isGitHub) {
-        // GitHub issues don't support sync to tracker in this implementation
-        console.log(`GitHub issue ${id} - skipping tracker sync`);
+        // GitHub: update labels using cleanupWorkflowLabels
+        try {
+          const config = getGitHubConfig();
+          if (config) {
+            const [owner, repo] = [githubCheck.owner, githubCheck.repo];
+            const number = parseInt(id.split('-')[1], 10);
+
+            // Get current labels
+            const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+              headers: { 'Authorization': `token ${config.token}`, 'Accept': 'application/vnd.github.v3+json' },
+            });
+            const currentLabels = labelsRes.ok ? (await labelsRes.json()).map((l: any) => l.name) : [];
+
+            // Clean up workflow labels
+            const targetLabels = cleanupWorkflowLabels(currentLabels, targetStatus);
+
+            // Update labels
+            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+              method: 'PUT',
+              headers: { 'Authorization': `token ${config.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ labels: targetLabels }),
+            });
+            console.log(`Synced GitHub issue ${id} labels for state: ${targetStatus}`);
+          }
+        } catch (githubErr: any) {
+          console.error(`GitHub label sync failed for ${id}:`, githubErr.message);
+        }
       } else if (issueSource === 'rally') {
         // Sync to Rally tracker
         const rallyConfig = getRallyConfig();
@@ -10536,7 +8738,6 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
         const stateTypeMap: Record<string, string> = {
           backlog: 'backlog',
           todo: 'unstarted',
-          planning: 'started',
           in_progress: 'started',
           in_review: 'started',
           done: 'completed',
@@ -10847,10 +9048,10 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
 
     // 6. Reset issue state and remove labels (Linear or GitHub)
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-      // GitHub: remove planning-related labels
+      // GitHub: remove workflow labels
       const config = getGitHubConfig();
       if (config) {
-        const labelsToRemove = ['planning', 'planned', 'in-progress', 'review-ready'];
+        const labelsToRemove = ['in-progress', 'review-ready'];
         for (const label of labelsToRemove) {
           try {
             await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/${label}`, {
@@ -10895,8 +9096,7 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
               // Remove labels
               const labels = await issue.labels();
               const labelsToRemove = labels.nodes.filter(l =>
-                l.name.toLowerCase() === 'review ready' ||
-                l.name.toLowerCase() === 'planning'
+                l.name.toLowerCase() === 'review ready'
               );
               if (labelsToRemove.length > 0) {
                 const currentLabelIds = labels.nodes.map(l => l.id);
@@ -12822,7 +11022,7 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
           const stateMd = readFileSync(stateMdPath, 'utf-8');
           const statStat = statSync(stateMdPath);
           sections.push({
-            type: 'planning',
+            type: 'legacy',
             sessionId: `planning-${issueLower}-state`,
             model: 'unknown',
             startedAt: statStat.birthtime?.toISOString() || statStat.mtime.toISOString(),
@@ -13024,7 +11224,7 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
 
     if (!existsSync(planningDir)) {
       // No workspace .planning dir - still check docs/prds/active/ for PRD
-      const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
+      const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
       if (existsSync(activePrdPath)) result.prd = readFileSync(activePrdPath, 'utf-8');
       return res.json(result);
     }
@@ -13049,9 +11249,9 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
 
     // Check docs/prds/ subdirectories for PRD files matching the issue (higher priority than STATE.md)
     if (!result.prd) {
-      const prdsDir = join(projectPath, 'docs', 'prds');
+      const prdsDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR);
       if (existsSync(prdsDir)) {
-        for (const subdir of ['active', 'planned', 'completed']) {
+        for (const subdir of [PROJECT_PRDS_ACTIVE_SUBDIR, PROJECT_PRDS_PLANNED_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR]) {
           const subdirPath = join(prdsDir, subdir);
           if (!existsSync(subdirPath)) continue;
           const files = readdirSync(subdirPath).filter(f => f.toLowerCase().includes(issueLower) && f.endsWith('.md'));

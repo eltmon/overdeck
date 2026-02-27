@@ -98,7 +98,6 @@ const MODEL_COLORS = {
 
 const TRIGGER_LABELS: Record<string, string> = {
   stuck_escalation: 'Stuck Escalation',
-  planning_complete: 'Planning Complete',
   test_failure: 'Test Failure',
   task_complete: 'Task Complete',
   manual: 'Manual',
@@ -106,7 +105,6 @@ const TRIGGER_LABELS: Record<string, string> = {
 
 const TRIGGER_COLORS: Record<string, string> = {
   stuck_escalation: 'text-red-400',
-  planning_complete: 'text-green-400',
   test_failure: 'text-orange-400',
   task_complete: 'text-blue-400',
   manual: 'text-content-subtle',

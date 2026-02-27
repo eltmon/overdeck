@@ -14,7 +14,6 @@ vi.mock('../../src/lib/settings.js', () => ({
         test_agent: 'claude-haiku-4-5',
         merge_agent: 'claude-sonnet-4-5',
       },
-      planning_agent: 'claude-opus-4-6',
       complexity: {
         trivial: 'claude-haiku-4-5',
         simple: 'claude-haiku-4-5',
@@ -76,7 +75,6 @@ describe('config-migration', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -105,7 +103,6 @@ describe('config-migration', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -136,7 +133,6 @@ describe('config-migration', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-haiku-4-5',
           },
-          planning_agent: 'claude-haiku-4-5',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -164,7 +160,6 @@ describe('config-migration', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -191,7 +186,6 @@ describe('config-migration', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',

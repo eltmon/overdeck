@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../../lib/projects.js';
+import { hasPRDDraft, getPRDDraftPath } from '../../../lib/prd-draft.js';
 
 /**
  * Get Linear API key from environment or config file
@@ -563,10 +564,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       // Show what context would be included
       const planningContext = readPlanningContext(workspace);
       const beadsTasks = readBeadsTasks(workspace, projectRoot, id);
+      const hasPreWorkspacePRD = hasPRDDraft(id);
       console.log('');
       console.log(chalk.bold('Context:'));
       console.log(`  Planning:   ${planningContext ? 'Found (.planning/STATE.md)' : 'None'}`);
       console.log(`  Beads:      ${beadsTasks.length} tasks`);
+      if (hasPreWorkspacePRD) {
+        console.log(`  Pre-workspace PRD: ${chalk.green('✓')} ${getPRDDraftPath(id)}`);
+      }
       return;
     }
 

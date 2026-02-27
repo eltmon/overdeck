@@ -9,6 +9,12 @@ import { promisify } from 'util';
 import { ComplexityLevel } from '../../../lib/cloister/complexity.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { createShadowState } from '../../../lib/shadow-state.js';
+import { hasPRDDraft, getPRDDraftPath } from '../../../lib/prd-draft.js';
+import {
+  PROJECT_DOCS_SUBDIR,
+  PROJECT_PRDS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
+} from '../../../lib/paths.js';
 
 const execAsync = promisify(exec);
 
@@ -66,13 +72,18 @@ async function findPRDFiles(issueId: string): Promise<string[]> {
   const found: string[] = [];
   const cwd = process.cwd();
 
+  // Check pre-workspace PRD drafts first
+  if (hasPRDDraft(issueId)) {
+    found.push(getPRDDraftPath(issueId));
+  }
+
   const searchPaths = [
-    'docs/prds/active',
-    'docs/prds/planned',
-    'docs/prds',
-    'docs/prd',
-    'prds',
-    'docs',
+    join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR),
+    join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, 'planned'),
+    join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR),
+    join(PROJECT_DOCS_SUBDIR, 'prd'),
+    PROJECT_PRDS_SUBDIR,
+    PROJECT_DOCS_SUBDIR,
   ];
 
   const issueIdLower = issueId.toLowerCase();
@@ -578,7 +589,7 @@ async function createBeadsTasks(issue: LinearIssue, tasks: PlanTask[]): Promise<
  */
 function copyToPRDDirectory(issue: LinearIssue, stateContent: string): string | null {
   const cwd = process.cwd();
-  const prdDir = join(cwd, 'docs', 'prds', 'active');
+  const prdDir = join(cwd, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR);
 
   try {
     mkdirSync(prdDir, { recursive: true });

@@ -92,7 +92,6 @@ export interface ModelSelectionConfig {
     merge_agent: 'opus' | 'sonnet' | 'haiku';
     review_agent: 'opus' | 'sonnet' | 'haiku';
     test_agent: 'opus' | 'sonnet' | 'haiku';
-    planning_agent: 'opus' | 'sonnet' | 'haiku';
   };
 }
 
@@ -100,11 +99,6 @@ export interface ModelSelectionConfig {
  * Handoff trigger configuration
  */
 export interface HandoffTriggersConfig {
-  planning_complete?: {
-    enabled: boolean;
-    from_model: 'opus' | 'sonnet' | 'haiku';
-    to_model: 'opus' | 'sonnet' | 'haiku';
-  };
   stuck_escalation?: {
     enabled: boolean;
     haiku_to_sonnet_minutes: number;
@@ -234,16 +228,10 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       merge_agent: 'sonnet',
       review_agent: 'sonnet',
       test_agent: 'haiku',
-      planning_agent: 'opus',
     },
   },
   handoffs: {
     auto_triggers: {
-      planning_complete: {
-        enabled: true,
-        from_model: 'opus',
-        to_model: 'sonnet',
-      },
       stuck_escalation: {
         enabled: true,
         haiku_to_sonnet_minutes: 10,

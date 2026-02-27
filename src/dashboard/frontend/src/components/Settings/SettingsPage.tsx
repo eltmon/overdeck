@@ -83,7 +83,6 @@ const AGENT_CATEGORIES: AgentCategory[] = [
     icon: 'list_alt',
     agents: [
       { id: 'issue-agent:exploration' as WorkTypeId, name: 'Exploration', icon: 'search', description: 'Codebase discovery' },
-      { id: 'issue-agent:planning' as WorkTypeId, name: 'Planning', icon: 'event_note', description: 'Implementation design' },
       { id: 'issue-agent:implementation' as WorkTypeId, name: 'Implementation', icon: 'code', description: 'Write the code' },
       { id: 'issue-agent:testing' as WorkTypeId, name: 'Testing', icon: 'science', description: 'Write & run tests' },
       { id: 'issue-agent:documentation' as WorkTypeId, name: 'Documentation', icon: 'description', description: 'Update docs' },
@@ -126,7 +125,6 @@ const AGENT_CATEGORIES: AgentCategory[] = [
       { id: 'prd-agent' as WorkTypeId, name: 'PRD Agent', icon: 'article', description: 'Product requirements' },
       { id: 'decomposition-agent' as WorkTypeId, name: 'Decomposition', icon: 'account_tree', description: 'Break down epics' },
       { id: 'triage-agent' as WorkTypeId, name: 'Triage', icon: 'filter_list', description: 'Prioritize issues' },
-      { id: 'planning-agent' as WorkTypeId, name: 'Planning', icon: 'event', description: 'Sprint planning' },
       { id: 'status-review' as WorkTypeId, name: 'Status Review', icon: 'assessment', description: 'AI status reviews (executive-facing)' },
     ],
   },

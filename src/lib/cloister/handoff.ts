@@ -96,7 +96,7 @@ export async function performHandoff(
  */
 function detectHandoffMethod(agentId: string): HandoffMethod {
   // Specialists use specialist-wake (context-preserving resume)
-  const specialists = ['merge-agent', 'review-agent', 'test-agent', 'planning-agent'];
+  const specialists = ['merge-agent', 'review-agent', 'test-agent'];
   if (specialists.some(s => agentId.includes(s))) {
     return 'specialist-wake';
   }
@@ -307,7 +307,7 @@ async function waitForIdle(agentId: string, timeoutMs: number): Promise<boolean>
  * @returns Specialist name or null
  */
 function extractSpecialistName(agentId: string): string | null {
-  const specialists = ['merge-agent', 'review-agent', 'test-agent', 'planning-agent'];
+  const specialists = ['merge-agent', 'review-agent', 'test-agent'];
   for (const specialist of specialists) {
     if (agentId.includes(specialist.replace('-agent', ''))) {
       return specialist;

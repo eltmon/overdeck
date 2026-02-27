@@ -340,10 +340,8 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
         )}
         {sections.map((section, index) => {
           // Map section type to cost stage key(s)
-          // Planning includes exploration sub-stage; work maps to implementation
           const stageKeys: Record<string, string[]> = {
             work: ['implementation'],
-            planning: ['planning', 'exploration'],
             review: ['review'],
             test: ['test'],
             merge: ['merge'],

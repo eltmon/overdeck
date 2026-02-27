@@ -12,7 +12,6 @@ const AGENT_DEFINITIONS = {
     description: 'Main worker that handles issues end-to-end',
     phases: [
       { id: 'issue-agent:exploration' as WorkTypeId, name: 'Exploration' },
-      { id: 'issue-agent:planning' as WorkTypeId, name: 'Planning' },
       { id: 'issue-agent:implementation' as WorkTypeId, name: 'Implementation' },
       { id: 'issue-agent:testing' as WorkTypeId, name: 'Testing' },
       { id: 'issue-agent:documentation' as WorkTypeId, name: 'Documentation' },
@@ -110,12 +109,6 @@ const AGENT_DEFINITIONS = {
     icon: 'sort',
     description: 'Prioritizes and triages issues',
     workType: 'triage-agent' as WorkTypeId,
-  },
-  planningAgent: {
-    name: 'Planning Agent',
-    icon: 'route',
-    description: 'Explores and plans approach',
-    workType: 'planning-agent' as WorkTypeId,
   },
 
   // CLI contexts
@@ -341,7 +334,7 @@ export function AgentCardsPanel({
           Pre-work Agents
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {(['prdAgent', 'decompositionAgent', 'triageAgent', 'planningAgent'] as const).map((key) => {
+          {(['prdAgent', 'decompositionAgent', 'triageAgent'] as const).map((key) => {
             const agent = AGENT_DEFINITIONS[key];
             const { model, isOverride } = getModel(agent.workType);
             return (

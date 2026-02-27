@@ -23,7 +23,6 @@ const execAsync = promisify(exec);
  */
 export type TriggerType =
   | 'stuck_escalation'
-  | 'planning_complete'
   | 'test_failure'
   | 'task_complete'
   | 'manual';
@@ -126,99 +125,6 @@ export function checkStuckEscalation(
     type: 'stuck_escalation',
     reason: `Agent stuck but threshold not reached (${Math.round(minutesSinceActivity)} minutes)`,
     confidence: 'medium',
-  };
-}
-
-/**
- * Check if planning phase is complete
- *
- * Multi-signal detection:
- * 1. Primary: Beads task with "plan" in title is closed
- * 2. Secondary: PRD file created at docs/prds/active/{issue}-plan.md
- * 3. Tertiary: Agent used ExitPlanMode tool (if detectable)
- *
- * @param agentId - Agent ID
- * @param workspace - Workspace path
- * @param issueId - Issue ID
- * @param config - Cloister configuration
- * @returns Trigger detection result
- */
-export async function checkPlanningComplete(
-  agentId: string,
-  workspace: string,
-  issueId: string,
-  config?: CloisterConfig
-): Promise<TriggerDetection> {
-  const conf = config || loadCloisterConfig();
-
-  // Get planning complete config
-  const planningConfig = conf.handoffs?.auto_triggers?.planning_complete;
-  if (!planningConfig?.enabled) {
-    return {
-      triggered: false,
-      type: 'planning_complete',
-      reason: 'Planning complete detection disabled in config',
-      confidence: 'high',
-    };
-  }
-
-  const signals: string[] = [];
-  let signalCount = 0;
-
-  // Signal 1: Check for closed beads task with "plan" in title
-  try {
-    const { stdout: output } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
-      encoding: 'utf-8',
-    });
-    const tasks = JSON.parse(output);
-    const planTask = tasks.find((t: any) =>
-      t.title.toLowerCase().includes('plan') ||
-      t.labels?.includes('planning')
-    );
-    if (planTask) {
-      signals.push(`Beads planning task closed: ${planTask.id}`);
-      signalCount++;
-    }
-  } catch (error) {
-    // Beads not available or error querying
-  }
-
-  // Signal 2: Check for PRD file
-  const prdPath = join(workspace, `docs/prds/active/${issueId.toLowerCase()}-plan.md`);
-  if (existsSync(prdPath)) {
-    signals.push('PRD file exists');
-    signalCount++;
-  }
-
-  // Signal 3: Check for ExitPlanMode usage (TODO: requires hook integration)
-  // This would require reading the session JSONL and checking for ExitPlanMode tool use
-  // Skipping for now
-
-  // Trigger if we have at least 2 signals
-  if (signalCount >= 2) {
-    return {
-      triggered: true,
-      type: 'planning_complete',
-      reason: `Planning complete detected: ${signals.join(', ')}`,
-      suggestedModel: planningConfig.to_model,
-      confidence: 'high',
-    };
-  }
-
-  if (signalCount === 1) {
-    return {
-      triggered: false,
-      type: 'planning_complete',
-      reason: `Planning possibly complete (${signals.join(', ')}) but need more signals`,
-      confidence: 'medium',
-    };
-  }
-
-  return {
-    triggered: false,
-    type: 'planning_complete',
-    reason: 'No planning completion signals detected',
-    confidence: 'high',
   };
 }
 
@@ -419,9 +325,6 @@ export async function checkAllTriggers(
   // Check each trigger type
   const stuckCheck = checkStuckEscalation(health, currentModel, config);
   if (stuckCheck.triggered) triggers.push(stuckCheck);
-
-  const planningCheck = await checkPlanningComplete(agentId, workspace, issueId, config);
-  if (planningCheck.triggered) triggers.push(planningCheck);
 
   const testCheck = checkTestFailure(workspace, currentModel, config);
   if (testCheck.triggered) triggers.push(testCheck);
