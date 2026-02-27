@@ -1889,7 +1889,7 @@ app.get('/api/agents', async (_req, res) => {
           workspace: state.workspace || null,
           workspaceLocation,
           git: gitStatus,
-          type: isPlanning ? 'planning' : 'agent',
+          type: 'agent',
           hasPendingQuestion: pendingQuestions.length > 0 || isIdle,
           pendingQuestionCount: pendingQuestions.length,
           contextPercent,
@@ -1924,7 +1924,7 @@ app.get('/api/agents', async (_req, res) => {
             workspaceLocation: 'remote',
             vmName: state.vmName,
             git: null,
-            type: isPlanning ? 'planning' : 'agent',
+            type: 'agent',
             hasPendingQuestion: false,
             pendingQuestionCount: 0,
             remote: true,
@@ -1989,7 +1989,7 @@ app.get('/api/agents', async (_req, res) => {
             workspace: state.workspace || null,
             workspaceLocation: 'local',
             git: null,
-            type: isPlanning ? 'planning' : 'agent',
+            type: 'agent',
             hasPendingQuestion: false,
             pendingQuestionCount: 0,
           });
@@ -2019,7 +2019,7 @@ app.get('/api/agents', async (_req, res) => {
           workspace: state.workspace || null,
           workspaceLocation: 'local',
           git: null,
-          type: isPlanning ? 'planning' : ('agent' as const),
+          type: 'agent',
           hasPendingQuestion: false,
           pendingQuestionCount: 0,
           message: state.message || 'Starting...',
@@ -11352,7 +11352,7 @@ app.get('/api/mission-control/activity/:issueId', async (req, res) => {
           const stateMd = readFileSync(stateMdPath, 'utf-8');
           const statStat = statSync(stateMdPath);
           sections.push({
-            type: 'planning',
+            type: 'legacy',
             sessionId: `planning-${issueLower}-state`,
             model: 'unknown',
             startedAt: statStat.birthtime?.toISOString() || statStat.mtime.toISOString(),
