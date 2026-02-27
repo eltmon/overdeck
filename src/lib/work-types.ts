@@ -28,11 +28,6 @@ export const WORK_TYPES = {
     category: 'issue-agent',
     description: 'Exploring codebase and understanding requirements',
   },
-  'issue-agent:planning': {
-    phase: 'planning',
-    category: 'issue-agent',
-    description: 'Planning implementation approach and architecture',
-  },
   'issue-agent:implementation': {
     phase: 'implementation',
     category: 'issue-agent',

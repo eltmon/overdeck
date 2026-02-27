@@ -42,12 +42,6 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
     { skill: 'synthesis', weight: 0.3 }, // Understanding structure
   ],
 
-  'issue-agent:planning': [
-    { skill: 'planning', weight: 0.5 }, // Primary skill
-    { skill: 'code-review', weight: 0.2 }, // Understanding existing code
-    { skill: 'synthesis', weight: 0.3 }, // Combining requirements
-  ],
-
   'issue-agent:implementation': [
     { skill: 'code-generation', weight: 0.6 }, // Primary skill
     { skill: 'debugging', weight: 0.2 }, // Avoiding bugs
