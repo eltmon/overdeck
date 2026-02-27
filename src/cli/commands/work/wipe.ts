@@ -45,7 +45,6 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
 
   // 1. Kill tmux sessions
   const sessionPatterns = [
-    `planning-${issueLower}`,
     `agent-${issueLower}`,
   ];
 
@@ -99,7 +98,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   } else {
     // No workspace metadata - still check agent state for remote info (fallback)
-    const agentIds = [`planning-${issueLower}`, `agent-${issueLower}`];
+    const agentIds = [`agent-${issueLower}`];
     for (const agentId of agentIds) {
       const state = getAgentState(agentId) as any;
       if (state?.location === 'remote' && state?.vmName) {
@@ -125,7 +124,6 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
 
   // 3. Clean up agent state directories
   const agentDirs = [
-    join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`),
     join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`),
   ];
 
@@ -158,17 +156,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 5. Clean up legacy planning directory
-  if (projectPath) {
-    const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-    if (existsSync(legacyPlanningDir)) {
-      rmSync(legacyPlanningDir, { recursive: true, force: true });
-      cleanupLog.push(`Deleted legacy planning dir: ${legacyPlanningDir}`);
-      console.log(chalk.green(`  ✓ Deleted legacy planning dir`));
-    }
-  }
-
-  // 6. Delete workspace if requested
+  // 5. Delete workspace if requested
   if (options.workspace && projectPath) {
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (existsSync(workspacePath)) {
@@ -192,25 +180,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 7. Reset GitHub issue labels (remove planning label)
-  // Check if this looks like a GitHub issue (PAN-XXX format where PAN repo exists)
-  try {
-    const ghLabelResult = await execAsync(
-      `gh issue edit ${issueId.split('-')[1] || issueId} --repo eltmon/panopticon-cli --remove-label "planning" 2>&1`,
-      { timeout: 10000 }
-    );
-    if (!ghLabelResult.stderr?.includes('not found')) {
-      cleanupLog.push('Removed GitHub planning label');
-      console.log(chalk.green('  ✓ Removed GitHub planning label'));
-    }
-  } catch (ghErr: any) {
-    // Not a GitHub issue or label doesn't exist - that's fine
-    if (!ghErr.message?.includes('not found') && !ghErr.message?.includes('Could not find')) {
-      console.log(chalk.gray(`  - GitHub label cleanup skipped: ${ghErr.message?.split('\n')[0] || 'not a GitHub issue'}`));
-    }
-  }
-
-  // 8. Reset Linear issue (if LINEAR_API_KEY is available)
+  // 6. Reset Linear issue (if LINEAR_API_KEY is available)
   const linearKey = process.env.LINEAR_API_KEY;
   if (linearKey) {
     try {
@@ -233,8 +203,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
           // Remove labels
           const labels = await issue.labels();
           const labelsToRemove = labels.nodes.filter(l =>
-            l.name.toLowerCase() === 'review ready' ||
-            l.name.toLowerCase() === 'planning'
+            l.name.toLowerCase() === 'review ready'
           );
           if (labelsToRemove.length > 0) {
             const currentLabelIds = labels.nodes.map(l => l.id);

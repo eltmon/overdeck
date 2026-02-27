@@ -37,7 +37,7 @@ export function registerWorkCommands(program: Command): void {
     .option('--no-shadow', 'Disable shadow mode (override config/env settings)')
     .option('--remote', 'Use remote workspace (exe.dev)')
     .option('--local', 'Use local workspace (explicit override)')
-    .option('--phase <phase>', 'Work phase for model routing (exploration/planning/implementation/documentation)')
+    .option('--phase <phase>', 'Work phase for model routing (exploration/implementation/documentation/review-response)')
     .action(issueCommand);
 
   work
