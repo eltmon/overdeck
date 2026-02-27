@@ -18,7 +18,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, Sparkles, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
@@ -58,7 +58,6 @@ function DifficultyBadge({ level }: { level: ComplexityLevel }) {
 // Agent type icons for badges
 const AGENT_ICONS: Record<string, string> = {
   work: '🤖',
-  planning: '📋',
   review: '👁️',
   test: '🧪',
   merge: '🔀'
@@ -70,7 +69,7 @@ function AgentBadge({
   name,
   isConflict
 }: {
-  type: 'work' | 'planning' | 'review' | 'test' | 'merge';
+  type: 'work' | 'review' | 'test' | 'merge';
   name: string;
   isConflict: boolean;
 }) {
@@ -159,7 +158,6 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
   const grouped: Record<string, Issue[]> = {
     backlog: [],
     todo: [],
-    planning: [],      // NEW: Planning column
     in_progress: [],
     in_review: [],
     done: [],
@@ -315,7 +313,6 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
                       shadowState === 'closed' ? 'Done' :
                       shadowState === 'done' ? 'Done' :
                       shadowState === 'in_review' ? 'In Review' :
-                      shadowState === 'planning' ? 'Planning' :
                       shadowState;
 
   // Check if they're actually different
@@ -496,7 +493,6 @@ export function ListIssueRow({
   const statusColor = canonical === 'done' ? 'bg-green-400' :
                       canonical === 'in_review' ? 'bg-pink-400' :
                       canonical === 'in_progress' ? 'bg-yellow-400' :
-                      canonical === 'planning' ? 'bg-purple-400' :
                       canonical === 'todo' ? 'bg-blue-400' :
                       'bg-gray-500';
 
@@ -625,7 +621,6 @@ export function ListIssueRow({
 const COLUMN_COLORS: Record<string, string> = {
   backlog: 'border-divider-strong',
   todo: 'border-blue-600',
-  planning: 'border-purple-600',   // NEW: Purple for planning
   in_progress: 'border-yellow-500',
   in_review: 'border-pink-500',
   done: 'border-green-500',
@@ -634,7 +629,6 @@ const COLUMN_COLORS: Record<string, string> = {
 const COLUMN_TITLES: Record<string, string> = {
   backlog: 'Backlog',
   todo: 'To Do',
-  planning: 'Planning',            // NEW: Planning column
   in_progress: 'In Progress',
   in_review: 'In Review',
   done: 'Done',
@@ -1195,7 +1189,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         />
       )}
 
-      {/* Beads Dialog - view tasks created during planning */}
+      {/* Beads Dialog - view tasks for issue */}
       {beadsDialogIssue && (
         <BeadsDialog
           issue={beadsDialogIssue}
@@ -1246,11 +1240,8 @@ function ColumnContent({
 
   const renderIssueCard = (issue: Issue) => {
     const issueIdLower = issue.identifier.toLowerCase();
-    const planningAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'planning'
-    );
     const workAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type !== 'planning'
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'agent'
     );
     const issueSpecialists = specialists.filter(
       (s) => s.currentIssue?.toLowerCase() === issueIdLower
@@ -1260,7 +1251,6 @@ function ColumnContent({
       <DraggableCardWrapper key={issue.id} issue={issue}>
         <IssueCard
           issue={issue}
-          planningAgent={planningAgent}
           workAgent={workAgent}
           specialists={issueSpecialists}
           cost={issueCosts[issue.identifier.toLowerCase()]}
@@ -1659,7 +1649,6 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
 
 interface IssueCardProps {
   issue: Issue;
-  planningAgent?: Agent;
   workAgent?: Agent;
   specialists?: SpecialistAgent[];
   cost?: IssueCost;
@@ -1669,19 +1658,15 @@ interface IssueCardProps {
   onViewBeads?: (issue: Issue) => void;
 }
 
-function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
+function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
   const queryClient = useQueryClient();
 
   // Determine which agent is relevant based on issue status
-  const isPlanning = STATUS_LABELS[issue.status] === 'planning';
-  const activeAgent = isPlanning ? planningAgent : workAgent;
+  const activeAgent = workAgent;
   const isRunning = activeAgent && activeAgent.status !== 'dead' && activeAgent.status !== 'stopped';
 
   // For display in terminal viewer, use the active agent
   const agent = activeAgent;
-
-  const [showAbortConfirm, setShowAbortConfirm] = useState(false);
-  const [deleteWorkspace, setDeleteWorkspace] = useState(false);
 
   // Check if issue has "Review Ready" label (agent completed work)
   // Don't show on terminal states — "ready for review" is meaningless once done/canceled
@@ -1790,28 +1775,6 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
     onPlan();
   };
 
-  // Abort planning mutation
-  const abortPlanningMutation = useMutation({
-    mutationFn: async (options: { deleteWorkspace: boolean }) => {
-      const res = await fetch(`/api/issues/${issue.identifier}/abort-planning`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteWorkspace: options.deleteWorkspace }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to abort planning');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      setShowAbortConfirm(false);
-      setDeleteWorkspace(false);
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-    },
-  });
-
   // Deep wipe mutation - completely resets issue state
   const deepWipeMutation = useMutation({
     mutationFn: async (options: { deleteWorkspace: boolean }) => {
@@ -1827,30 +1790,11 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
       return res.json();
     },
     onSuccess: (data) => {
-      setShowAbortConfirm(false);
-      setDeleteWorkspace(false);
       queryClient.invalidateQueries({ queryKey: ['issues'] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       console.log('Deep wipe completed:', data.cleanupLog);
     },
   });
-
-  const handleAbortClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowAbortConfirm(true);
-  };
-
-  const handleAbortConfirm = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    abortPlanningMutation.mutate({ deleteWorkspace });
-  };
-
-  const handleAbortCancel = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowAbortConfirm(false);
-    setDeleteWorkspace(false);
-  };
-
 
   return (
     <div
@@ -1898,20 +1842,13 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
             {(() => {
               const badges = [];
               // Conflict detection: multiple agents working on same issue
-              const hasConflict = ((!!workAgent || !!planningAgent) && specialists.length > 0) ||
-                                  (!!workAgent && !!planningAgent) ||
+              const hasConflict = (!!workAgent && specialists.length > 0) ||
                                   specialists.length > 1;
 
               if (workAgent) {
                 badges.push({
                   type: 'work' as const,
                   name: 'work' // Don't show issue ID - it's already displayed in the card header
-                });
-              }
-              if (planningAgent) {
-                badges.push({
-                  type: 'planning' as const,
-                  name: 'plan' // Don't show issue ID - it's already displayed in the card header
                 });
               }
               for (const spec of specialists) {
@@ -1965,12 +1902,8 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
               <span
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Open planning dialog for planning agents, otherwise select for terminal view
-                  if (agent.type === 'planning') {
-                    onPlan();
-                  } else {
-                    onSelect();
-                  }
+                  // Select for terminal view
+                  onSelect();
                 }}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-content animate-pulse cursor-pointer hover:bg-amber-500"
                 title={`Agent is waiting for user input - click to respond (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
@@ -2024,17 +1957,15 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
 
       {/* Action buttons for running agents */}
       {isRunning && (
-        <div className={`flex items-center gap-3 mt-3 pt-3 border-t ${agent?.type === 'planning' ? 'border-purple-600/50' : 'border-divider-strong'}`}>
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong">
           <button
-            onClick={agent?.type === 'planning' ? handlePlan : handleWatch}
+            onClick={handleWatch}
             className={`flex items-center gap-1 text-xs transition-colors ${
-              agent?.type === 'planning'
-                ? 'text-purple-400 hover:text-purple-300'
-                : isSelected ? 'text-blue-400' : 'text-content-subtle hover:text-content'
+              isSelected ? 'text-blue-400' : 'text-content-subtle hover:text-content'
             }`}
           >
-            {agent?.type === 'planning' ? <Sparkles className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            {agent?.type === 'planning' ? 'Continue Planning' : 'Watch'}
+            <Eye className="w-3.5 h-3.5" />
+            Watch
           </button>
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
@@ -2127,88 +2058,6 @@ function IssueCard({ issue, planningAgent, workAgent, specialists = [], cost, is
         </div>
       )}
 
-      {/* Planning items: Continue planning or start execution */}
-      {!isRunning && STATUS_LABELS[issue.status] === 'planning' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-purple-600/50 flex-wrap">
-          <button
-            onClick={handlePlan}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Resume Planning
-          </button>
-          <button
-            onClick={() => onViewBeads && onViewBeads(issue)}
-            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
-            title="View tasks created during planning"
-          >
-            <List className="w-3.5 h-3.5" />
-            Tasks
-          </button>
-          <button
-            onClick={handleStartAgent}
-            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            <Play className="w-3.5 h-3.5" />
-            Start Agent
-          </button>
-          <button
-            onClick={handleAbortClick}
-            disabled={abortPlanningMutation.isPending}
-            className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50"
-            title="Return to Todo"
-          >
-            <X className="w-3.5 h-3.5" />
-            {abortPlanningMutation.isPending ? 'Aborting...' : 'Abort'}
-          </button>
-        </div>
-      )}
-
-      {/* Abort confirmation panel */}
-      {showAbortConfirm && (
-        <div className="mt-3 pt-3 border-t border-orange-600/50 bg-orange-950/30 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
-          <p className="text-xs text-orange-300 mb-2">Abort planning and return to Backlog?</p>
-          <label className="flex items-center gap-2 text-xs text-content-subtle mb-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={deleteWorkspace}
-              onChange={(e) => setDeleteWorkspace(e.target.checked)}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded border-divider-strong bg-surface-overlay text-orange-500 focus:ring-orange-500"
-            />
-            Also delete workspace (git worktree)
-          </label>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={handleAbortCancel}
-              className="px-2 py-1 text-xs text-content-subtle hover:text-content transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAbortConfirm}
-              disabled={abortPlanningMutation.isPending || deepWipeMutation.isPending}
-              className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-500 text-content rounded transition-colors disabled:opacity-50"
-            >
-              {abortPlanningMutation.isPending ? 'Aborting...' : 'Abort'}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm(`Deep wipe ${issue.identifier}? This will:\n• Kill all agents\n• Delete all state\n• Reset to Backlog\n• Remove labels${deleteWorkspace ? '\n• Delete workspace' : ''}`)) {
-                  deepWipeMutation.mutate({ deleteWorkspace });
-                }
-              }}
-              disabled={abortPlanningMutation.isPending || deepWipeMutation.isPending}
-              className="px-2 py-1 text-xs bg-red-700 hover:bg-red-600 text-content rounded transition-colors disabled:opacity-50"
-              title="Complete reset - kills agents, deletes state, resets Linear"
-            >
-              {deepWipeMutation.isPending ? 'Wiping...' : '🔥 Deep Wipe'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
@@ -2289,7 +2138,7 @@ function ReopenSection({ issue }: { issue: Issue }) {
 
   const handleReopen = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Reopen ${issue.identifier} and start planning?`)) {
+    if (confirm(`Reopen ${issue.identifier}?`)) {
       reopenMutation.mutate();
     }
   };

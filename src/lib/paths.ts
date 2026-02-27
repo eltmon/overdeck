@@ -90,6 +90,19 @@ export const CACHE_AGENTS_DIR = join(PANOPTICON_HOME, 'agent-definitions');  // 
 export const CACHE_RULES_DIR = join(PANOPTICON_HOME, 'rules');
 export const CACHE_MANIFEST = join(PANOPTICON_HOME, '.manifest.json');
 
+// Pre-workspace PRD directory (for PRDs created before workspace exists)
+export const DOCS_DIR = join(PANOPTICON_HOME, 'docs');
+export const PRDS_DIR = join(DOCS_DIR, 'prds');
+export const PRD_DRAFTS_DIR = join(PRDS_DIR, 'drafts');
+export const PRD_PUBLISHED_DIR = join(PRDS_DIR, 'published');
+
+// Project-relative docs paths (subdirectory names for project-level docs)
+export const PROJECT_DOCS_SUBDIR = 'docs';
+export const PROJECT_PRDS_SUBDIR = 'prds';
+export const PROJECT_PRDS_ACTIVE_SUBDIR = 'active';
+export const PROJECT_PRDS_PLANNED_SUBDIR = 'planned';
+export const PROJECT_PRDS_COMPLETED_SUBDIR = 'completed';
+
 /**
  * Detect if running in development mode (from npm link or panopticon repo)
  *
@@ -124,4 +137,8 @@ export const INIT_DIRS = [
   TRAEFIK_DIR,
   TRAEFIK_DYNAMIC_DIR,
   TRAEFIK_CERTS_DIR,
+  DOCS_DIR,
+  PRDS_DIR,
+  PRD_DRAFTS_DIR,
+  PRD_PUBLISHED_DIR,
 ];

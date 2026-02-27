@@ -8,25 +8,15 @@ interface KillOptions {
 }
 
 export async function killCommand(id: string, options: KillOptions): Promise<void> {
-  // Support both "agent-xxx" and "planning-xxx" prefixes, or just the issue ID
+  // Support "agent-xxx" prefix, or just the issue ID
   let agentId = id;
-  if (!id.startsWith('agent-') && !id.startsWith('planning-')) {
+  if (!id.startsWith('agent-')) {
     agentId = `agent-${id.toLowerCase()}`;
   }
 
-  // Check if exists (try both agent- and planning- prefixes)
-  let state = getAgentState(agentId) as any;
-  let isRunning = sessionExists(agentId);
-
-  // If not found with agent- prefix, try planning- prefix
-  if (!state && !isRunning && agentId.startsWith('agent-')) {
-    const planningId = agentId.replace('agent-', 'planning-');
-    state = getAgentState(planningId) as any;
-    isRunning = sessionExists(planningId);
-    if (state || isRunning) {
-      agentId = planningId;
-    }
-  }
+  // Check if exists
+  const state = getAgentState(agentId) as any;
+  const isRunning = sessionExists(agentId);
 
   if (!state && !isRunning) {
     console.log(chalk.yellow(`Agent ${agentId} not found.`));

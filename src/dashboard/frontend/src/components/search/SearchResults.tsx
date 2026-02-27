@@ -29,7 +29,6 @@ const PRIORITY_COLORS: Record<number, string> = {
 const STATUS_COLORS: Record<string, string> = {
   backlog: 'bg-surface-emphasis',
   todo: 'bg-blue-600',
-  planning: 'bg-purple-600',
   in_progress: 'bg-yellow-600',
   in_review: 'bg-pink-600',
   done: 'bg-green-600',

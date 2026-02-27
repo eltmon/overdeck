@@ -13,7 +13,14 @@ const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-import { PANOPTICON_HOME } from '../paths.js';
+import {
+  PANOPTICON_HOME,
+  PROJECT_DOCS_SUBDIR,
+  PROJECT_PRDS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
+  PROJECT_PRDS_COMPLETED_SUBDIR,
+} from '../paths.js';
+import { cleanupWorkflowLabels } from '../../core/state-mapping.js';
 import {
   getSessionId,
   recordWake,
@@ -271,8 +278,8 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
 
   // 1. Move PRD from active to completed
   try {
-    const activePrdPath = join(projectPath, 'docs/prds/active', `${issueId.toLowerCase()}-plan.md`);
-    const completedPrdPath = join(projectPath, 'docs/prds/completed', `${issueId.toLowerCase()}-plan.md`);
+    const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueId.toLowerCase()}-plan.md`);
+    const completedPrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR, `${issueId.toLowerCase()}-plan.md`);
 
     if (existsSync(activePrdPath)) {
       // Ensure completed directory exists
@@ -320,17 +327,52 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
       console.warn(`[merge-agent] Could not close PR: ${err}`);
     }
 
-    // Update issue labels and close the issue
+    // Clean up workflow labels before closing the issue
     try {
-      await execAsync(`gh issue edit ${issueNum} --remove-label "in-progress" --add-label "done" 2>/dev/null || true`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      });
+      // Get current labels using gh CLI
+      const { stdout: labelsJson } = await execAsync(
+        `gh issue view ${issueNum} --repo eltmon/panopticon-cli --json labels --jq '.labels[].name' 2>/dev/null || echo ""`,
+        { cwd: projectPath, encoding: 'utf-8' }
+      );
+      const currentLabels = labelsJson.trim().split('\n').filter(Boolean);
+
+      // Clean up workflow labels for done state
+      const targetLabels = cleanupWorkflowLabels(currentLabels, 'done');
+
+      // Update labels using gh CLI
+      // Remove workflow labels that shouldn't be on a done issue
+      const workflowLabelsToRemove = currentLabels.filter(
+        label => !targetLabels.includes(label)
+      );
+      for (const label of workflowLabelsToRemove) {
+        await execAsync(
+          `gh issue edit ${issueNum} --repo eltmon/panopticon-cli --remove-label "${label}" 2>/dev/null || true`,
+          { cwd: projectPath, encoding: 'utf-8' }
+        );
+      }
+
+      // Add target labels that are missing
+      const labelsToAdd = targetLabels.filter(
+        label => !currentLabels.includes(label)
+      );
+      for (const label of labelsToAdd) {
+        await execAsync(
+          `gh issue edit ${issueNum} --repo eltmon/panopticon-cli --add-label "${label}" 2>/dev/null || true`,
+          { cwd: projectPath, encoding: 'utf-8' }
+        );
+      }
+      console.log(`[merge-agent] ✓ Cleaned up workflow labels for issue #${issueNum}`);
+    } catch (err) {
+      console.warn(`[merge-agent] Could not clean up labels: ${err}`);
+    }
+
+    // Close the issue
+    try {
       await execAsync(`gh issue close ${issueNum} --repo eltmon/panopticon-cli --comment "Merged to main" 2>/dev/null || true`, {
         cwd: projectPath,
         encoding: 'utf-8',
       });
-      console.log(`[merge-agent] ✓ Updated and closed GitHub issue #${issueNum}`);
+      console.log(`[merge-agent] ✓ Closed GitHub issue #${issueNum}`);
       logActivity('issue_closed', `Closed GitHub issue #${issueNum} after merge`);
     } catch (err) {
       console.warn(`[merge-agent] Could not close GitHub issue: ${err}`);

@@ -86,28 +86,6 @@ export const CODE_REVIEW_TEMPLATE: ConvoyTemplate = {
 };
 
 /**
- * Planning Template
- *
- * Uses a single planning agent for codebase exploration and plan creation.
- * This is a simpler template demonstrating single-agent convoy usage.
- */
-export const PLANNING_TEMPLATE: ConvoyTemplate = {
-  name: 'planning',
-  description: 'Codebase exploration and planning',
-  agents: [
-    {
-      role: 'planner',
-      subagent: 'planning-agent',
-      parallel: false,
-    },
-  ],
-  config: {
-    outputDir: '.claude/planning',
-    timeout: 900000, // 15 minutes
-  },
-};
-
-/**
  * Triage Template
  *
  * Triages multiple issues in parallel.
@@ -151,7 +129,6 @@ export const HEALTH_MONITOR_TEMPLATE: ConvoyTemplate = {
  */
 export const CONVOY_TEMPLATES: Record<string, ConvoyTemplate> = {
   'code-review': CODE_REVIEW_TEMPLATE,
-  'planning': PLANNING_TEMPLATE,
   'triage': TRIAGE_TEMPLATE,
   'health-monitor': HEALTH_MONITOR_TEMPLATE,
 };

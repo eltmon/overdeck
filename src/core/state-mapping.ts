@@ -9,7 +9,6 @@
 export type CanonicalState =
   | 'backlog'
   | 'todo'
-  | 'planning'
   | 'in_progress'
   | 'in_review'
   | 'done'
@@ -29,7 +28,6 @@ export interface CanonicalStateDefinition {
 export const CANONICAL_STATES: CanonicalStateDefinition[] = [
   { name: 'backlog', type: 'backlog', description: 'Ideas and future work', color: '#6b7280' },
   { name: 'todo', type: 'unstarted', description: 'Prioritized and ready', color: '#3b82f6' },
-  { name: 'planning', type: 'started', description: 'Discovery phase with human', color: '#9333ea' },
   { name: 'in_progress', type: 'started', description: 'Agent executing', color: '#eab308' },
   { name: 'in_review', type: 'started', description: 'PR awaiting review', color: '#ec4899' },
   { name: 'done', type: 'completed', description: 'Work complete', color: '#22c55e' },
@@ -39,7 +37,6 @@ export const CANONICAL_STATES: CanonicalStateDefinition[] = [
 export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
   backlog: 'backlog',
   todo: 'unstarted',
-  planning: 'started',
   in_progress: 'started',
   in_review: 'started',
   done: 'completed',
@@ -47,15 +44,7 @@ export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
 };
 
 // Strategy for handling missing states
-export type MissingStateStrategy = 'auto_create' | 'use_fallback' | 'error';
-
-// Fallback configuration
-export interface FallbackConfig {
-  type: 'labels' | 'custom_field';
-  prefix?: string;            // e.g., "pan:" for pan:planning label
-  autoCreateLabels?: boolean;
-  labelColors?: Record<string, string>;
-}
+export type MissingStateStrategy = 'auto_create' | 'error';
 
 // Auto-create configuration for a specific state
 export interface AutoCreateStateConfig {
@@ -68,7 +57,6 @@ export interface AutoCreateStateConfig {
 export interface TrackerStateMapping {
   stateMap: Record<CanonicalState, string | { status: string; label?: string | null }>;
   missingStateStrategy: MissingStateStrategy;
-  fallback: FallbackConfig;
   autoCreateConfig?: Record<string, AutoCreateStateConfig>;
   // Tracker-specific options
   projectBoard?: {
@@ -95,53 +83,30 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
       stateMap: {
         backlog: 'Backlog',
         todo: 'Todo',
-        planning: 'In Planning',
         in_progress: 'In Progress',
         in_review: 'In Review',
         done: 'Done',
         canceled: 'Canceled',
       },
       missingStateStrategy: 'auto_create',
-      fallback: {
-        type: 'labels',
-        prefix: 'pan:',
-      },
-      autoCreateConfig: {
-        planning: {
-          type: 'started',
-          color: '#9333ea',
-          positionAfter: 'Todo',
-        },
-      },
     },
 
     github: {
       stateMap: {
         backlog: { status: 'open', label: null },
         todo: { status: 'open', label: null },
-        planning: { status: 'open', label: 'planning' },
         in_progress: { status: 'open', label: 'in-progress' },
         in_review: { status: 'open', label: 'in-review' },
         done: { status: 'closed', label: null },
         canceled: { status: 'closed', label: 'wontfix' },
       },
-      missingStateStrategy: 'use_fallback',
-      fallback: {
-        type: 'labels',
-        autoCreateLabels: true,
-        labelColors: {
-          planning: '9333ea',
-          'in-progress': 'fbbf24',
-          'in-review': 'ec4899',
-        },
-      },
+      missingStateStrategy: 'error',
       projectBoard: {
         enabled: true,
         name: 'Panopticon',
         columnMap: {
           backlog: 'Backlog',
           todo: 'Todo',
-          planning: 'In Planning',
           in_progress: 'In Progress',
           in_review: 'Review',
           done: 'Done',
@@ -154,51 +119,36 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
       stateMap: {
         backlog: { status: 'opened', label: 'backlog' },
         todo: { status: 'opened', label: 'todo' },
-        planning: { status: 'opened', label: 'planning' },
         in_progress: { status: 'opened', label: 'in-progress' },
         in_review: { status: 'opened', label: 'in-review' },
         done: { status: 'closed', label: null },
         canceled: { status: 'closed', label: 'wontfix' },
       },
-      missingStateStrategy: 'use_fallback',
-      fallback: {
-        type: 'labels',
-        autoCreateLabels: true,
-      },
+      missingStateStrategy: 'error',
     },
 
     jira: {
       stateMap: {
         backlog: 'Backlog',
         todo: 'To Do',
-        planning: 'In Planning',
         in_progress: 'In Progress',
         in_review: 'In Review',
         done: 'Done',
         canceled: 'Canceled',
       },
-      missingStateStrategy: 'use_fallback', // Can't auto-create in Jira
-      fallback: {
-        type: 'labels',
-        prefix: 'pan-',
-      },
+      missingStateStrategy: 'error', // Can't auto-create in Jira
     },
 
     trello: {
       stateMap: {
         backlog: 'Backlog',
         todo: 'To Do',
-        planning: 'Planning',
         in_progress: 'Doing',
         in_review: 'Review',
         done: 'Done',
         canceled: 'Archived',
       },
       missingStateStrategy: 'auto_create', // Trello lists are easy to create
-      fallback: {
-        type: 'labels',
-        prefix: '',
-      },
     },
   },
 };
@@ -261,7 +211,6 @@ export function trackerStateToCanonical(
   const lower = trackerState.toLowerCase();
   if (lower.includes('backlog') || lower.includes('triage')) return 'backlog';
   if (lower.includes('todo') || lower.includes('ready') || lower.includes('unstarted')) return 'todo';
-  if (lower.includes('planning') || lower.includes('discovery')) return 'planning';
   if (lower.includes('progress') || lower.includes('started') || lower.includes('active')) return 'in_progress';
   if (lower.includes('review') || lower.includes('qa') || lower.includes('testing')) return 'in_review';
   if (lower.includes('done') || lower.includes('complete') || lower.includes('closed')) return 'done';
@@ -286,4 +235,137 @@ export function canonicalToTrackerState(
   } else {
     return mapped.label || mapped.status;
   }
+}
+
+/**
+ * Workflow labels that should be removed during state transitions
+ */
+export const WORKFLOW_LABELS = [
+  'in-progress',
+  'in progress',
+  'in-review',
+  'in review',
+  'review-ready',
+  'review ready',
+  'planned',
+  'planning',
+];
+
+/**
+ * Get the target workflow label for a canonical state
+ */
+export function getStateLabel(state: CanonicalState): string | null {
+  switch (state) {
+    case 'in_progress':
+      return 'in-progress';
+    case 'in_review':
+      return 'in-review';
+    case 'done':
+      return 'done';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Map GitHub issue state + labels to canonical state.
+ * This function handles the GitHub-specific mapping where issues have both
+ * a state (open/closed) and workflow labels.
+ *
+ * @param state - GitHub issue state ('open' or 'closed')
+ * @param labels - Array of label names on the issue
+ * @returns Canonical state string
+ */
+export function mapGitHubStateToCanonical(state: string, labels: string[]): CanonicalState {
+  // Handle both API lowercase and gh CLI uppercase
+  const stateLower = state.toLowerCase();
+
+  // Closed issues are always done (regardless of labels)
+  if (stateLower === 'closed') {
+    return 'done';
+  }
+
+  // For open issues, check labels for workflow state
+  // Order matters: more progressed states take precedence
+  const labelNames = labels.map(l => l.toLowerCase());
+
+  // Most progressed states first
+  // "done" label on OPEN issues = work complete, pending merge/closure → in_review
+  // (actual "done" status only for CLOSED issues, handled above)
+  if (labelNames.some(l => l === 'done' || l.includes('completed'))) {
+    return 'in_review';
+  }
+  if (labelNames.some(l => l.includes('in review') || l.includes('in-review') || l.includes('review') || l.includes('qa'))) {
+    return 'in_review';
+  }
+  if (labelNames.some(l => l.includes('in progress') || l.includes('in-progress') || l.includes('wip'))) {
+    return 'in_progress';
+  }
+  // Early workflow stages
+  if (labelNames.some(l => l.includes('backlog') || l.includes('icebox'))) {
+    return 'backlog';
+  }
+  if (labelNames.some(l => l.includes('todo') || l.includes('ready'))) {
+    return 'todo';
+  }
+
+  // Default open issues to todo
+  return 'todo';
+}
+
+/**
+ * Get the target state name for a Linear team.
+ * Uses the DEFAULT_STATE_MAPPINGS to find the Linear state name.
+ *
+ * @param canonicalState - The canonical state to map
+ * @returns The Linear state name (e.g., 'In Review')
+ */
+export function getLinearStateName(canonicalState: CanonicalState): string {
+  const mapping = DEFAULT_STATE_MAPPINGS.trackers.linear;
+  const mapped = mapping.stateMap[canonicalState];
+  return typeof mapped === 'string' ? mapped : canonicalState;
+}
+
+/**
+ * Find a Linear workflow state by name in a team.
+ * Returns null if not found.
+ *
+ * @param states - Array of Linear workflow states from the SDK
+ * @param stateName - The state name to find
+ * @returns The matching state or null
+ */
+export function findLinearStateByName(states: any[], stateName: string): any | null {
+  // Try exact match first
+  const exactMatch = states.find(s => s.name === stateName);
+  if (exactMatch) return exactMatch;
+
+  // Try case-insensitive match
+  const lowerName = stateName.toLowerCase();
+  return states.find(s => s.name.toLowerCase() === lowerName) || null;
+}
+
+/**
+ * Clean up workflow labels during state transitions.
+ * Removes all workflow labels, then adds the label matching the target state (if any).
+ *
+ * @param currentLabels - Array of current label names
+ * @param targetState - The canonical state being transitioned to
+ * @returns Array of label names after cleanup
+ */
+export function cleanupWorkflowLabels(
+  currentLabels: string[],
+  targetState: CanonicalState
+): string[] {
+  // Remove all workflow labels
+  const cleaned = currentLabels.filter(
+    label => !WORKFLOW_LABELS.includes(label.toLowerCase())
+  );
+
+  // Add the label matching the target state (if applicable)
+  const targetLabel = getStateLabel(targetState);
+  if (targetLabel && !cleaned.includes(targetLabel)) {
+    cleaned.push(targetLabel);
+  }
+
+  return cleaned;
 }

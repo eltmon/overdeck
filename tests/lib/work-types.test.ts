@@ -13,15 +13,14 @@ import {
 
 describe('work-types', () => {
   describe('WORK_TYPES registry', () => {
-    it('should have exactly 23 work types', () => {
+    it('should have exactly 21 work types', () => {
       const workTypes = Object.keys(WORK_TYPES);
-      expect(workTypes).toHaveLength(23);
+      expect(workTypes).toHaveLength(21);
     });
 
     it('should have all issue-agent phases', () => {
       const phases = [
         'issue-agent:exploration',
-        'issue-agent:planning',
         'issue-agent:implementation',
         'issue-agent:testing',
         'issue-agent:documentation',
@@ -80,7 +79,6 @@ describe('work-types', () => {
         'prd-agent',
         'decomposition-agent',
         'triage-agent',
-        'planning-agent',
       ];
 
       preWork.forEach((agent) => {
@@ -117,9 +115,9 @@ describe('work-types', () => {
   });
 
   describe('getAllWorkTypes', () => {
-    it('should return all 23 work type IDs', () => {
+    it('should return all 21 work type IDs', () => {
       const allTypes = getAllWorkTypes();
-      expect(allTypes).toHaveLength(23);
+      expect(allTypes).toHaveLength(21);
     });
 
     it('should return an array of strings', () => {
@@ -145,9 +143,9 @@ describe('work-types', () => {
   });
 
   describe('getWorkTypesByCategory', () => {
-    it('should return 6 issue-agent types', () => {
+    it('should return 5 issue-agent types', () => {
       const types = getWorkTypesByCategory('issue-agent');
-      expect(types).toHaveLength(6);
+      expect(types).toHaveLength(5);
     });
 
     it('should return 3 specialist types', () => {
@@ -165,9 +163,9 @@ describe('work-types', () => {
       expect(types).toHaveLength(4);
     });
 
-    it('should return 4 pre-work types', () => {
+    it('should return 3 pre-work types', () => {
       const types = getWorkTypesByCategory('pre-work');
-      expect(types).toHaveLength(4);
+      expect(types).toHaveLength(3);
     });
 
     it('should return 2 CLI types', () => {
@@ -294,11 +292,11 @@ describe('work-types', () => {
   describe('category distribution', () => {
     it('should have correct count per category', () => {
       const categories: Record<WorkTypeCategory, number> = {
-        'issue-agent': 6,
+        'issue-agent': 5,
         specialist: 3,
         subagent: 4,
         convoy: 4,
-        'pre-work': 4,
+        'pre-work': 3,
         cli: 2,
       };
 
@@ -308,7 +306,7 @@ describe('work-types', () => {
       });
     });
 
-    it('should sum to exactly 23 work types', () => {
+    it('should sum to exactly 21 work types', () => {
       const categories: WorkTypeCategory[] = [
         'issue-agent',
         'specialist',
@@ -322,7 +320,7 @@ describe('work-types', () => {
         return sum + getWorkTypesByCategory(category).length;
       }, 0);
 
-      expect(total).toBe(23);
+      expect(total).toBe(21);
     });
   });
 });

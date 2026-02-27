@@ -92,7 +92,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
             <div className="text-content-muted text-center py-8">
               <List className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p>No tasks created yet</p>
-              <p className="text-xs mt-2">Tasks will appear here once the planning agent creates them using beads.</p>
+              <p className="text-xs mt-2">Tasks will appear here once created using beads.</p>
             </div>
           )}
 

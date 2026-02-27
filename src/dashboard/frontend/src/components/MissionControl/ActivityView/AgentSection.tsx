@@ -21,7 +21,6 @@ interface AgentSectionProps {
 }
 
 const TYPE_STYLES: Record<string, string> = {
-  planning: styles.typePlanning,
   work: styles.typeWork,
   review: styles.typeReview,
   test: styles.typeTest,
@@ -36,7 +35,6 @@ const STATUS_STYLES: Record<string, string> = {
 
 // Left border accent colors per section type
 const TYPE_ACCENT_COLORS: Record<string, string> = {
-  planning: '#3B82F6',
   work: '#10B981',
   review: '#F59E0B',
   test: '#6366F1',

@@ -28,11 +28,6 @@ export const WORK_TYPES = {
     category: 'issue-agent',
     description: 'Exploring codebase and understanding requirements',
   },
-  'issue-agent:planning': {
-    phase: 'planning',
-    category: 'issue-agent',
-    description: 'Planning implementation approach and architecture',
-  },
   'issue-agent:implementation': {
     phase: 'implementation',
     category: 'issue-agent',
@@ -116,10 +111,6 @@ export const WORK_TYPES = {
   'triage-agent': {
     category: 'pre-work',
     description: 'Prioritizes and triages issues',
-  },
-  'planning-agent': {
-    category: 'pre-work',
-    description: 'Explores and plans implementation approach',
   },
 
   // CLI contexts (2)

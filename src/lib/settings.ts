@@ -27,7 +27,6 @@ export type ComplexityModels = {
 // All model configuration
 export interface ModelsConfig {
   specialists: SpecialistModels;
-  planning_agent: ModelId;
   status_review: ModelId;
   complexity: ComplexityModels;
 }
@@ -54,7 +53,6 @@ const DEFAULT_SETTINGS: SettingsConfig = {
       test_agent: 'claude-sonnet-4-6',
       merge_agent: 'claude-sonnet-4-6',
     },
-    planning_agent: 'claude-opus-4-6',
     status_review: 'claude-opus-4-6',
     complexity: {
       trivial: 'claude-haiku-4-5',
@@ -165,11 +163,6 @@ export function validateSettings(settings: SettingsConfig): string | null {
   const specialists = settings.models.specialists;
   if (!specialists.review_agent || !specialists.test_agent || !specialists.merge_agent) {
     return 'Missing specialist agent model configuration';
-  }
-
-  // Validate planning agent
-  if (!settings.models.planning_agent) {
-    return 'Missing planning_agent configuration';
   }
 
   // Validate complexity levels

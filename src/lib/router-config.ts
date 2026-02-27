@@ -99,11 +99,6 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
     model: settings.models.specialists.merge_agent,
   };
 
-  // Planning agent
-  router['planning-agent'] = {
-    model: settings.models.planning_agent,
-  };
-
   // Complexity-based routing (for backward compatibility)
   router['complexity-trivial'] = {
     model: settings.models.complexity.trivial,

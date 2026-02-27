@@ -61,6 +61,10 @@ var SOURCE_RULES_DIR = join(packageRoot, "rules");
 var CACHE_AGENTS_DIR = join(PANOPTICON_HOME, "agent-definitions");
 var CACHE_RULES_DIR = join(PANOPTICON_HOME, "rules");
 var CACHE_MANIFEST = join(PANOPTICON_HOME, ".manifest.json");
+var DOCS_DIR = join(PANOPTICON_HOME, "docs");
+var PRDS_DIR = join(DOCS_DIR, "prds");
+var PRD_DRAFTS_DIR = join(PRDS_DIR, "drafts");
+var PRD_PUBLISHED_DIR = join(PRDS_DIR, "published");
 
 // src/lib/cost.ts
 var DEFAULT_PRICING = [

@@ -7,6 +7,7 @@ import { homedir } from 'os';
 import { AGENTS_DIR } from '../../../lib/paths.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { updateShadowState } from '../../../lib/shadow-state.js';
+import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../../core/state-mapping.js';
 
 interface DoneOptions {
   comment?: string;
@@ -44,48 +45,17 @@ async function updateLinearToInReview(apiKey: string, issueIdentifier: string, c
 
     if (!issue) return false;
 
-    // Find the In Review state
+    // Find the In Review state using state mapping
     const states = await team.states();
-    const inReviewState = states.nodes.find((s) => s.name === 'In Review');
+    const targetStateName = getLinearStateName('in_review');
+    const targetState = findLinearStateByName(states.nodes, targetStateName);
 
-    if (!inReviewState) {
-      // Fallback: try to find any state with "review" in the name
-      const reviewState = states.nodes.find((s) =>
-        s.name.toLowerCase().includes('review')
-      );
-      if (!reviewState) return false;
-
-      await issue.update({ stateId: reviewState.id });
-    } else {
-      await issue.update({ stateId: inReviewState.id });
+    if (!targetState) {
+      console.error(`Linear state "${targetStateName}" not found in team`);
+      return false;
     }
 
-    // Add "Review Ready" label to indicate agent completed work
-    const labels = await team.labels();
-    let reviewReadyLabel = labels.nodes.find((l) => l.name === 'Review Ready');
-
-    // Create the label if it doesn't exist
-    if (!reviewReadyLabel) {
-      const created = await client.createIssueLabel({
-        teamId: team.id,
-        name: 'Review Ready',
-        color: '#22c55e', // Green
-        description: 'Agent has completed work and is ready for human review',
-      });
-      if (created.issueLabel) {
-        reviewReadyLabel = await created.issueLabel;
-      }
-    }
-
-    // Add label to issue (preserving existing labels)
-    if (reviewReadyLabel) {
-      const existingLabels = await issue.labels();
-      const labelIds = existingLabels.nodes.map((l) => l.id);
-      if (!labelIds.includes(reviewReadyLabel.id)) {
-        labelIds.push(reviewReadyLabel.id);
-        await issue.update({ labelIds });
-      }
-    }
+    await issue.update({ stateId: targetState.id });
 
     // Add completion comment if provided
     if (comment) {
@@ -135,15 +105,19 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
       'Content-Type': 'application/json',
     };
 
-    // Remove "in-progress" label
-    await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/in-progress`, {
-      method: 'DELETE', headers,
-    }).catch(() => {});
+    // Get current labels
+    const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+      headers,
+    });
+    const currentLabels = labelsRes.ok ? (await labelsRes.json()).map((l: any) => l.name) : [];
 
-    // Add "in-review" label
+    // Clean up workflow labels and get target labels for in_review state
+    const targetLabels = cleanupWorkflowLabels(currentLabels, 'in_review');
+
+    // Update labels (set all at once to replace)
     await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      method: 'POST', headers,
-      body: JSON.stringify({ labels: ['in-review'] }),
+      method: 'PUT', headers,
+      body: JSON.stringify({ labels: targetLabels }),
     });
 
     // Add completion comment
