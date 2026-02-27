@@ -90,3 +90,4 @@ This issue completes the kanban board redesign started in PAN-273. PAN-273 only 
 - **[2026-02-27T08:28Z] test-agent → FAILED** — `.planning/feedback/009-test-agent-failed.md`
 - **[2026-02-27T13:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/010-review-agent-changes-requested.md`
 - **[2026-02-27T13:21Z] test-agent → FAILED** — `.planning/feedback/011-test-agent-failed.md`
+- **[2026-02-27T16:22Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/012-review-agent-changes-requested.md`

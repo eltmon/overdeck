@@ -340,18 +340,24 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
       const targetLabels = cleanupWorkflowLabels(currentLabels, 'done');
 
       // Update labels using gh CLI
-      if (targetLabels.length === 0) {
-        // Remove all labels
-        for (const label of currentLabels) {
-          await execAsync(
-            `gh issue edit ${issueNum} --repo eltmon/panopticon-cli --remove-label "${label}" 2>/dev/null || true`,
-            { cwd: projectPath, encoding: 'utf-8' }
-          );
-        }
-      } else {
-        // Set new labels (gh CLI doesn't support setting all at once, so we use the API)
+      // Remove workflow labels that shouldn't be on a done issue
+      const workflowLabelsToRemove = currentLabels.filter(
+        label => !targetLabels.includes(label)
+      );
+      for (const label of workflowLabelsToRemove) {
         await execAsync(
-          `gh api repos/eltmon/panopticon-cli/issues/${issueNum} -X PATCH -f labels='${JSON.stringify(targetLabels)}' 2>/dev/null || true`,
+          `gh issue edit ${issueNum} --repo eltmon/panopticon-cli --remove-label "${label}" 2>/dev/null || true`,
+          { cwd: projectPath, encoding: 'utf-8' }
+        );
+      }
+
+      // Add target labels that are missing
+      const labelsToAdd = targetLabels.filter(
+        label => !currentLabels.includes(label)
+      );
+      for (const label of labelsToAdd) {
+        await execAsync(
+          `gh issue edit ${issueNum} --repo eltmon/panopticon-cli --add-label "${label}" 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' }
         );
       }
