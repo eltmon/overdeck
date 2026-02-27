@@ -100,11 +100,6 @@ export interface ModelSelectionConfig {
  * Handoff trigger configuration
  */
 export interface HandoffTriggersConfig {
-  planning_complete?: {
-    enabled: boolean;
-    from_model: 'opus' | 'sonnet' | 'haiku';
-    to_model: 'opus' | 'sonnet' | 'haiku';
-  };
   stuck_escalation?: {
     enabled: boolean;
     haiku_to_sonnet_minutes: number;
@@ -239,11 +234,6 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   },
   handoffs: {
     auto_triggers: {
-      planning_complete: {
-        enabled: true,
-        from_model: 'opus',
-        to_model: 'sonnet',
-      },
       stuck_escalation: {
         enabled: true,
         haiku_to_sonnet_minutes: 10,
