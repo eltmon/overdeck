@@ -927,6 +927,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     return issues.filter(issue => issue.project && selectedProjects.has(issue.project.id));
   }, [issues, selectedProjects]);
 
+  // Group by labels for list view - MUST be before any conditional returns (Rules of Hooks)
+  const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
+
   const toggleProject = (projectId: string) => {
     setSelectedProjects(prev => {
       const next = new Set(prev);
@@ -995,7 +998,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }
 
   const grouped = groupByStatus(filteredIssues);
-  const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
 
   return (
     <div className="space-y-4">
