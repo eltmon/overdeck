@@ -13,6 +13,7 @@
 
 import { Octokit } from '@octokit/rest';
 import type { Server as SocketIOServer } from 'socket.io';
+import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
@@ -63,25 +64,6 @@ interface TrackerState {
   lastFetchedIssues: any[];
   lastError: string | null;
   lastFetchedAt: string | null;
-}
-
-/**
- * Map GitHub issue state + labels to canonical dashboard status string.
- */
-function mapGitHubStateToCanonical(state: string, labels: string[]): string {
-  const stateLower = state.toLowerCase();
-
-  if (stateLower === 'closed') return 'done';
-
-  const labelNames = labels.map(l => l.toLowerCase());
-
-  if (labelNames.some(l => l === 'done' || l.includes('completed'))) return 'in_review';
-  if (labelNames.some(l => l.includes('in review') || l.includes('in-review') || l.includes('review') || l.includes('qa'))) return 'in_review';
-  if (labelNames.some(l => l.includes('in progress') || l.includes('in-progress') || l.includes('wip'))) return 'in_progress';
-  if (labelNames.some(l => l.includes('backlog') || l.includes('icebox'))) return 'backlog';
-  if (labelNames.some(l => l.includes('todo') || l.includes('ready'))) return 'todo';
-
-  return 'todo';
 }
 
 /**

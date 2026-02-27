@@ -13,7 +13,13 @@ const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-import { PANOPTICON_HOME } from '../paths.js';
+import {
+  PANOPTICON_HOME,
+  PROJECT_DOCS_SUBDIR,
+  PROJECT_PRDS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
+  PROJECT_PRDS_COMPLETED_SUBDIR,
+} from '../paths.js';
 import {
   getSessionId,
   recordWake,
@@ -271,8 +277,8 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
 
   // 1. Move PRD from active to completed
   try {
-    const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueId.toLowerCase()}-plan.md`);
-    const completedPrdPath = join(projectPath, 'docs', 'prds', 'completed', `${issueId.toLowerCase()}-plan.md`);
+    const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueId.toLowerCase()}-plan.md`);
+    const completedPrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR, `${issueId.toLowerCase()}-plan.md`);
 
     if (existsSync(activePrdPath)) {
       // Ensure completed directory exists

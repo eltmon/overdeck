@@ -7,7 +7,7 @@ import { homedir } from 'os';
 import { AGENTS_DIR } from '../../../lib/paths.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { updateShadowState } from '../../../lib/shadow-state.js';
-import { cleanupWorkflowLabels, WORKFLOW_LABELS } from '../../../core/state-mapping.js';
+import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../../core/state-mapping.js';
 
 interface DoneOptions {
   comment?: string;
@@ -45,21 +45,17 @@ async function updateLinearToInReview(apiKey: string, issueIdentifier: string, c
 
     if (!issue) return false;
 
-    // Find the In Review state
+    // Find the In Review state using state mapping
     const states = await team.states();
-    const inReviewState = states.nodes.find((s) => s.name === 'In Review');
+    const targetStateName = getLinearStateName('in_review');
+    const targetState = findLinearStateByName(states.nodes, targetStateName);
 
-    if (!inReviewState) {
-      // Fallback: try to find any state with "review" in the name
-      const reviewState = states.nodes.find((s) =>
-        s.name.toLowerCase().includes('review')
-      );
-      if (!reviewState) return false;
-
-      await issue.update({ stateId: reviewState.id });
-    } else {
-      await issue.update({ stateId: inReviewState.id });
+    if (!targetState) {
+      console.error(`Linear state "${targetStateName}" not found in team`);
+      return false;
     }
+
+    await issue.update({ stateId: targetState.id });
 
     // Add completion comment if provided
     if (comment) {
