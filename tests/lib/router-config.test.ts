@@ -281,34 +281,6 @@ describe('router-config', () => {
       expect(config.router['specialist-merge-agent'].model).toBe('gemini-3-flash-preview');
     });
 
-    it('should map planning agent to configured model', async () => {
-      const { generateRouterConfig } = await import('../../src/lib/router-config.js');
-
-      const settings: SettingsConfig = {
-        models: {
-          specialists: {
-            review_agent: 'claude-sonnet-4-5',
-            test_agent: 'claude-haiku-4-5',
-            merge_agent: 'claude-sonnet-4-5',
-          },
-          complexity: {
-            trivial: 'claude-haiku-4-5',
-            simple: 'claude-haiku-4-5',
-            medium: 'claude-sonnet-4-5',
-            complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
-          },
-        },
-        api_keys: {
-          openai: 'sk-test-key',
-        },
-      };
-
-      const config = generateRouterConfig(settings);
-
-      // Planning agent removed - no assertion needed
-    });
-
     it('should map complexity levels to configured models', async () => {
       const { generateRouterConfig } = await import('../../src/lib/router-config.js');
 

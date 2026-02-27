@@ -1420,14 +1420,14 @@ app.post('/api/issues/:id/plan', async (req, res) => {
     let prdPath: string | undefined;
     let prdCommitted = false;
     try {
-      const prdDir = join(projectPath, 'docs', 'prds', 'active');
+      const prdDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR);
       mkdirSync(prdDir, { recursive: true });
       prdPath = join(prdDir, `${issue.identifier.toLowerCase()}-plan.md`);
       writeSync(prdPath, stateContent.join('\n'));
 
       // Commit and push PRD immediately so it's preserved in the repo (PAN-47)
       try {
-        await execAsync(`git add ${join('docs', 'prds', 'active', `${issue.identifier.toLowerCase()}-plan.md`)}`, {
+        await execAsync(`git add ${join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issue.identifier.toLowerCase()}-plan.md`)}`, {
           cwd: projectPath,
           encoding: 'utf-8'
         });
@@ -7392,8 +7392,8 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 
     // 8.5. Move PRD from active to completed (preserve documentation)
     try {
-      const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
-      const completedDir = join(projectPath, 'docs', 'prds', 'completed');
+      const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
+      const completedDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR);
       const completedPrdPath = join(completedDir, `${issueLower}-plan.md`);
 
       if (existsSync(activePrdPath)) {
@@ -7407,7 +7407,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 
         // Commit the PRD move
         try {
-          await execAsync(`git add ${join('docs', 'prds')} && git commit -m "docs: move ${issueId} PRD to completed"`, {
+          await execAsync(`git add ${join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR)} && git commit -m "docs: move ${issueId} PRD to completed"`, {
             cwd: projectPath,
             encoding: 'utf-8'
           });
@@ -7462,12 +7462,6 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
           method: 'DELETE',
           headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
         }).catch(() => {});
-
-        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-          method: 'POST',
-          headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({ labels: ['done'] }),
-        });
 
         // Close the issue
         await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}`, {
@@ -7684,52 +7678,6 @@ app.post('/api/agents', async (req, res) => {
   const workspaceMetadata = loadWorkspaceMetadata(issueId);
   const isRemote = workspaceMetadata?.location === 'remote';
 
-  // SAFEGUARD: Check if planning agent is still running
-  // Never start work agent while planning agent is active - they'll conflict
-  const planningSession = `planning-${issueLower}`;
-  try {
-    let planningStillRunning = false;
-
-    if (isRemote && workspaceMetadata?.vmName) {
-      // Check on remote VM
-      const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-      const exe = createExeProvider({ infraVm: workspaceMetadata.infraVm });
-      const result = await exe.ssh(workspaceMetadata.vmName, `tmux list-sessions -F '#{session_name}' 2>/dev/null || true`);
-      planningStillRunning = result.stdout.split('\n').includes(planningSession);
-    } else {
-      // Check locally
-      const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
-      planningStillRunning = sessions.split('\n').includes(planningSession);
-    }
-
-    if (planningStillRunning) {
-      console.warn(`[start-agent] BLOCKED: Planning agent still running for ${issueId}${isRemote ? ' (remote)' : ''}`);
-      return res.status(409).json({
-        error: `Planning agent is still running for ${issueId}. Kill the planning session first or wait for it to complete.`,
-        planningSession,
-        hint: 'Planning phase has been removed. Kill the planning tmux session manually if needed.',
-      });
-    }
-  } catch (tmuxErr) {
-    // If tmux check fails, log but continue (fail-open)
-    console.warn(`[start-agent] Could not check for planning session: ${tmuxErr}`);
-  }
-
-  // Mark planning agent state as stopped since we're transitioning to work agent
-  const planningStateFile = join(homedir(), '.panopticon', 'agents', planningSession, 'state.json');
-  if (existsSync(planningStateFile)) {
-    try {
-      const planningState = JSON.parse(readFileSync(planningStateFile, 'utf-8'));
-      planningState.status = 'stopped';
-      planningState.stoppedAt = new Date().toISOString();
-      planningState.stoppedReason = 'work-agent-started';
-      writeFileSync(planningStateFile, JSON.stringify(planningState, null, 2));
-      console.log(`[start-agent] Marked planning agent ${planningSession} as stopped`);
-    } catch (stateErr) {
-      console.warn(`[start-agent] Could not update planning state: ${stateErr}`);
-    }
-  }
-
   try {
     // Extract prefix from issue ID (e.g., "MIN" from "MIN-645")
     const issuePrefix = issueId.split('-')[0];
@@ -7740,14 +7688,14 @@ app.post('/api/agents', async (req, res) => {
     // However, if a workspace already exists, the work is already underway —
     // don't block restarts/resets on PRD checks.
     const workspaceExists = existsSync(join(projectPath, 'workspaces', `feature-${issueLower}`));
-    const prdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
+    const prdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
     const hasPrd = existsSync(prdPath);
     // Also check for PRD drafts (pre-workspace PRDs)
     const hasDraftPrd = hasPRDDraft(issueId);
     if (!hasPrd && !hasDraftPrd && !workspaceExists) {
       console.warn(`[start-agent] WARNING: No PRD found for ${issueId} at ${prdPath}`);
       // Check if there's a completed PRD (issue was already worked on before)
-      const completedPrdPath = join(projectPath, 'docs', 'prds', 'completed', `${issueLower}-plan.md`);
+      const completedPrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`);
       const hasCompletedPrd = existsSync(completedPrdPath);
       if (!hasCompletedPrd) {
         // No PRD at all and no workspace - block agent start
@@ -8320,301 +8268,14 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
   res.status(410).json({ error: 'Planning phase has been removed. Use direct agent execution instead.' });
 });
 
-// Send message to planning session - sends input to the EXISTING interactive session
-// This keeps the Claude session alive for back-and-forth conversation
-app.post('/api/planning/:issueId/message', async (req, res) => {
-  const { issueId } = req.params;
-  const { message } = req.body;
-  const sessionName = `planning-${issueId.toLowerCase()}`;
-  const issueLower = issueId.toLowerCase();
-
-  if (!message) {
-    return res.status(400).json({ error: 'Message required' });
-  }
-
-  try {
-    // Find planning directory and workspace - check workspace first, then legacy
-    const githubCheck = isGitHubIssue(issueId);
-    let projectPath = '';
-    let planningDir = '';
-    let workspacePath = '';
-
-    // Determine project path
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    } else {
-      // Linear issue - check common paths
-      const possiblePaths = [
-        join(homedir(), 'projects', 'panopticon'),
-        join(homedir(), 'projects', 'myn'),
-      ];
-      for (const p of possiblePaths) {
-        // Check workspace first
-        if (existsSync(join(p, 'workspaces', `feature-${issueLower}`, '.planning'))) {
-          projectPath = p;
-          break;
-        }
-        // Then legacy
-        if (existsSync(join(p, '.planning', issueLower))) {
-          projectPath = p;
-          break;
-        }
-      }
-    }
-
-    if (!projectPath) {
-      return res.status(404).json({ error: 'Could not find project path' });
-    }
-
-    // Check workspace planning first (git-backed)
-    workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const workspacePlanningDir = join(workspacePath, '.planning');
-    const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-
-    if (existsSync(workspacePlanningDir)) {
-      planningDir = workspacePlanningDir;
-    } else if (existsSync(legacyPlanningDir)) {
-      planningDir = legacyPlanningDir;
-    } else {
-      return res.status(404).json({ error: 'Planning directory not found', sessionEnded: true });
-    }
-
-    // Check if agent state file indicates remote session
-    let isRemote = false;
-    let vmName = '';
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-    const stateFile = join(agentStateDir, 'state.json');
-
-    try {
-      if (existsSync(stateFile)) {
-        const stateContent = readFileSync(stateFile, 'utf-8');
-        const state = JSON.parse(stateContent);
-        if (state.location === 'remote' && state.vmName) {
-          isRemote = true;
-          vmName = state.vmName;
-        }
-      }
-    } catch (err) {
-      // Ignore - will check locally
-    }
-
-    // Check if the session is still alive
-    let sessionExists = false;
-    if (isRemote && vmName) {
-      try {
-        const { stdout } = await execAsync(`ssh -A -o ConnectTimeout=5 ${vmName}.exe.xyz "tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''"`, { timeout: 10000 });
-        const sessions = stdout.trim().split('\n').filter(Boolean);
-        sessionExists = sessions.includes(sessionName);
-      } catch (err) {
-        console.log(`[planning message] SSH to ${vmName} failed:`, err);
-      }
-    } else {
-      try {
-        const { stdout: sessionsOutput } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
-          encoding: 'utf-8',
-        });
-        const sessions = sessionsOutput.trim().split('\n').filter(Boolean);
-        sessionExists = sessions.includes(sessionName);
-      } catch (e) {
-        // No sessions
-      }
-    }
-
-    // If session exists, send the message directly to it using tmux send-keys
-    if (sessionExists) {
-      // Write message to a temp file to avoid shell escaping issues
-      const messageFile = join(planningDir, 'user-message.txt');
-      writeFileSync(messageFile, message);
-
-      if (isRemote && vmName) {
-        // For remote sessions, we need to copy the message file and use send-keys
-        // First, write to remote
-        const exe = await import('../lib/exe.js');
-        const remoteMessagePath = `/workspace/.planning/user-message.txt`;
-        await exe.ssh(vmName, `mkdir -p /workspace/.planning && cat > ${remoteMessagePath} << 'PANOPTICON_MSG_EOF'
-${message}
-PANOPTICON_MSG_EOF`);
-
-        // Send keys to remote tmux - type the message content
-        // Use tmux load-buffer to safely handle special characters
-        await exe.ssh(vmName, `tmux load-buffer ${remoteMessagePath} && tmux paste-buffer -t ${sessionName}`);
-        await exe.ssh(vmName, `tmux send-keys -t ${sessionName} Enter`);
-      } else {
-        // Local session - use tmux send-keys with load-buffer for safe character handling
-        await execAsync(`tmux load-buffer "${messageFile}"`, { encoding: 'utf-8' });
-        await execAsync(`tmux paste-buffer -t ${sessionName}`, { encoding: 'utf-8' });
-        await execAsync(`tmux send-keys -t ${sessionName} Enter`, { encoding: 'utf-8' });
-      }
-
-      res.json({ success: true, sessionName, message: 'Message sent to active session' });
-      return;
-    }
-
-    // Session doesn't exist - need to restart it in INTERACTIVE mode (not --print)
-    console.log(`[planning message] Session ${sessionName} not found, starting new interactive session`);
-
-    // Read previous output to get context for continuation
-    const outputFile = join(planningDir, 'output.jsonl');
-    let conversationLog = '';
-    if (existsSync(outputFile)) {
-      const content = readFileSync(outputFile, 'utf-8');
-      const lines = content.split('\n').filter(line => line.trim());
-      const logParts: string[] = [];
-
-      for (const line of lines) {
-        try {
-          const json = JSON.parse(line);
-
-          // Assistant messages (text and tool uses)
-          if (json.type === 'assistant' && json.message?.content) {
-            for (const block of json.message.content) {
-              if (block.type === 'text') {
-                logParts.push(`**Assistant:**\n${block.text}`);
-              } else if (block.type === 'tool_use') {
-                const input = block.input || {};
-                // Skip reads of CONTINUATION_PROMPT.md
-                if (block.name === 'Read' && input.file_path?.includes('CONTINUATION_PROMPT.md')) {
-                  continue;
-                }
-                let toolInfo = `**Tool: ${block.name}**`;
-                if (block.name === 'Read' && input.file_path) {
-                  toolInfo += `\nFile: ${input.file_path}`;
-                } else if (block.name === 'Bash' && input.command) {
-                  toolInfo += `\nCommand: ${input.command.slice(0, 200)}${input.command.length > 200 ? '...' : ''}`;
-                } else if (block.name === 'Grep' && input.pattern) {
-                  toolInfo += `\nPattern: ${input.pattern}`;
-                } else if (block.name === 'Task' && input.description) {
-                  toolInfo += `\nTask: ${input.description}`;
-                }
-                logParts.push(toolInfo);
-              }
-            }
-          }
-
-          // Tool results
-          if (json.type === 'user' && json.message?.content) {
-            for (const block of json.message.content) {
-              if (block.type === 'tool_result' && block.content) {
-                const resultText = typeof block.content === 'string'
-                  ? block.content
-                  : JSON.stringify(block.content);
-                if (resultText.includes('# Continuation of Planning Session:')) {
-                  continue;
-                }
-                if (resultText.trim()) {
-                  logParts.push(`**Tool Result:**\n\`\`\`\n${resultText}\n\`\`\``);
-                }
-              }
-            }
-          }
-        } catch (e) {}
-      }
-      conversationLog = logParts.join('\n\n');
-    }
-
-    // Create continuation prompt
-    const continuationPromptPath = join(planningDir, 'CONTINUATION_PROMPT.md');
-    const continuationPrompt = `# Continuation of Planning Session: ${issueId.toUpperCase()}
-
-## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
-
-**YOU ARE IN PLANNING MODE. DO NOT:**
-- Write or modify any code files
-- Run implementation commands (npm install, docker, etc.)
-- Create actual features or functionality
-
-**YOU SHOULD ONLY:**
-- Ask clarifying questions
-- Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, Beads tasks via \`bd create\`, PRD at \`${PROJECT_DOCS_SUBDIR}/${PROJECT_PRDS_SUBDIR}/${PROJECT_PRDS_ACTIVE_SUBDIR}/{issue-id}-plan.md\`)
-- Present options and tradeoffs
-
----
-
-## Previous Conversation
-
-${conversationLog}
-
----
-
-## User's Response
-
-${message}
-
----
-
-## Your Task
-
-Continue the PLANNING session. Do NOT implement anything.
-`;
-
-    writeFileSync(continuationPromptPath, continuationPrompt);
-
-    // Determine working directory — use devroot so planning agent has access to .claude/ skills
-    const { findDevrootForProject } = await import('../../lib/config.js');
-    const baseDir = existsSync(workspacePath) ? workspacePath : projectPath;
-    const agentCwd = findDevrootForProject(baseDir);
-
-    // Pre-trust the agent cwd in Claude Code to avoid the workspace trust prompt
-    try {
-      const { preTrustDirectory } = await import('../../lib/workspace-manager.js');
-      preTrustDirectory(agentCwd);
-    } catch { /* non-fatal */ }
-
-    // Backup old output for the new session
-    if (existsSync(outputFile)) {
-      const backupPath = join(planningDir, `output-${Date.now()}.jsonl`);
-      renameSync(outputFile, backupPath);
-    }
-
-    // Get planning agent model from settings and start INTERACTIVE session (no --print)
-    const msgSettings = loadSettings();
-    const msgPlanningModel = msgSettings.models.planning_agent;
-    const msgAgentCmd = getAgentCommand(msgPlanningModel);
-    const msgCmdWithArgs = msgAgentCmd.args.length > 0
-      ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} --dangerously-skip-permissions`
-      : `${msgAgentCmd.command} --dangerously-skip-permissions`;
-
-    // Create launcher script for safe prompt handling (same as initial planning start)
-    const launcherScript = join(agentStateDir, 'continuation-launcher.sh');
-    mkdirSync(agentStateDir, { recursive: true });
-
-    writeFileSync(launcherScript, `#!/bin/bash
-cd "${agentCwd}"
-exec ${msgCmdWithArgs} "Please read the continuation prompt at ${continuationPromptPath} and continue the planning session."
-`, { mode: 0o755 });
-
-    await ensureTmuxRunning();
-    await execAsync(`tmux new-session -d -s ${sessionName} -c "${agentCwd}" "bash '${launcherScript}'"`, { encoding: 'utf-8' });
-
-    // Resize window for Claude TUI
-    try {
-      await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
-    } catch {
-      // Ignore resize errors
-    }
-
-    res.json({ success: true, sessionName, message: 'Planning session restarted in interactive mode' });
-  } catch (error: any) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ error: 'Failed to send message: ' + error.message });
-  }
+// Send message to planning session - DEPRECATED (Planning phase removed in PAN-275)
+app.post('/api/planning/:issueId/message', async (_req, res) => {
+  res.status(410).json({ error: 'Planning phase has been removed. Use direct agent execution instead.' });
 });
 
-// Stop planning session (kills tmux session)
-app.delete('/api/planning/:issueId', async (req, res) => {
-  const { issueId } = req.params;
-  const sessionName = `planning-${issueId.toLowerCase()}`;
-
-  try {
-    // Kill tmux session
-    await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
-
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to stop planning: ' + error.message });
-  }
+// Stop planning session - DEPRECATED (Planning phase removed in PAN-275)
+app.delete('/api/planning/:issueId', async (_req, res) => {
+  res.status(410).json({ error: 'Planning phase has been removed. Use direct agent execution instead.' });
 });
 
 // DEPRECATED: Planning phase has been removed
@@ -9006,8 +8667,33 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
     // If syncToTracker is true, update the actual tracker
     if (syncToTracker) {
       if (githubCheck.isGitHub) {
-        // GitHub issues don't support sync to tracker in this implementation
-        console.log(`GitHub issue ${id} - skipping tracker sync`);
+        // GitHub: update labels using cleanupWorkflowLabels
+        try {
+          const config = getGitHubConfig();
+          if (config) {
+            const [owner, repo] = [githubCheck.owner, githubCheck.repo];
+            const number = parseInt(id.split('-')[1], 10);
+
+            // Get current labels
+            const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+              headers: { 'Authorization': `token ${config.token}`, 'Accept': 'application/vnd.github.v3+json' },
+            });
+            const currentLabels = labelsRes.ok ? (await labelsRes.json()).map((l: any) => l.name) : [];
+
+            // Clean up workflow labels
+            const targetLabels = cleanupWorkflowLabels(currentLabels, targetStatus);
+
+            // Update labels
+            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+              method: 'PUT',
+              headers: { 'Authorization': `token ${config.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ labels: targetLabels }),
+            });
+            console.log(`Synced GitHub issue ${id} labels for state: ${targetStatus}`);
+          }
+        } catch (githubErr: any) {
+          console.error(`GitHub label sync failed for ${id}:`, githubErr.message);
+        }
       } else if (issueSource === 'rally') {
         // Sync to Rally tracker
         const rallyConfig = getRallyConfig();

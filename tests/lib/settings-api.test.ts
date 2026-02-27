@@ -188,9 +188,7 @@ describe('settings-api', () => {
             zai: false,
             kimi: false,
           },
-          overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
-          },
+          overrides: {},
           gemini_thinking_level: 4,
         },
         api_keys: {
@@ -208,9 +206,8 @@ describe('settings-api', () => {
       const callArgs = vi.mocked(writeFileSync).mock.calls[0];
       const yamlContent = callArgs[1] as string;
       // Note: preset was removed from the API
-      expect(yamlContent).toContain('anthropic: true');
+            expect(yamlContent).toContain('anthropic: true');
       expect(yamlContent).toContain('openai: true');
-      expect(yamlContent).toContain('issue-agent:planning: claude-opus-4-6');
       expect(yamlContent).toContain('openai: sk-test-123');
       expect(yamlContent).toContain('gemini_thinking_level: 4');
     });

@@ -20,6 +20,7 @@ import {
   PROJECT_PRDS_ACTIVE_SUBDIR,
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../paths.js';
+import { cleanupWorkflowLabels } from '../../core/state-mapping.js';
 import {
   getSessionId,
   recordWake,
@@ -326,13 +327,46 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
       console.warn(`[merge-agent] Could not close PR: ${err}`);
     }
 
-    // Close the issue (labels cleaned up by done.ts workflow)
+    // Clean up workflow labels before closing the issue
+    try {
+      // Get current labels using gh CLI
+      const { stdout: labelsJson } = await execAsync(
+        `gh issue view ${issueNum} --repo eltmon/panopticon-cli --json labels --jq '.labels[].name' 2>/dev/null || echo ""`,
+        { cwd: projectPath, encoding: 'utf-8' }
+      );
+      const currentLabels = labelsJson.trim().split('\n').filter(Boolean);
+
+      // Clean up workflow labels for done state
+      const targetLabels = cleanupWorkflowLabels(currentLabels, 'done');
+
+      // Update labels using gh CLI
+      if (targetLabels.length === 0) {
+        // Remove all labels
+        for (const label of currentLabels) {
+          await execAsync(
+            `gh issue edit ${issueNum} --repo eltmon/panopticon-cli --remove-label "${label}" 2>/dev/null || true`,
+            { cwd: projectPath, encoding: 'utf-8' }
+          );
+        }
+      } else {
+        // Set new labels (gh CLI doesn't support setting all at once, so we use the API)
+        await execAsync(
+          `gh api repos/eltmon/panopticon-cli/issues/${issueNum} -X PATCH -f labels='${JSON.stringify(targetLabels)}' 2>/dev/null || true`,
+          { cwd: projectPath, encoding: 'utf-8' }
+        );
+      }
+      console.log(`[merge-agent] ✓ Cleaned up workflow labels for issue #${issueNum}`);
+    } catch (err) {
+      console.warn(`[merge-agent] Could not clean up labels: ${err}`);
+    }
+
+    // Close the issue
     try {
       await execAsync(`gh issue close ${issueNum} --repo eltmon/panopticon-cli --comment "Merged to main" 2>/dev/null || true`, {
         cwd: projectPath,
         encoding: 'utf-8',
       });
-      console.log(`[merge-agent] ✓ Updated and closed GitHub issue #${issueNum}`);
+      console.log(`[merge-agent] ✓ Closed GitHub issue #${issueNum}`);
       logActivity('issue_closed', `Closed GitHub issue #${issueNum} after merge`);
     } catch (err) {
       console.warn(`[merge-agent] Could not close GitHub issue: ${err}`);
