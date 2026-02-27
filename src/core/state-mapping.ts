@@ -44,15 +44,7 @@ export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
 };
 
 // Strategy for handling missing states
-export type MissingStateStrategy = 'auto_create' | 'use_fallback' | 'error';
-
-// Fallback configuration
-export interface FallbackConfig {
-  type: 'labels' | 'custom_field';
-  prefix?: string;            // e.g., "pan:" for pan:in-progress label
-  autoCreateLabels?: boolean;
-  labelColors?: Record<string, string>;
-}
+export type MissingStateStrategy = 'auto_create' | 'error';
 
 // Auto-create configuration for a specific state
 export interface AutoCreateStateConfig {
@@ -65,7 +57,6 @@ export interface AutoCreateStateConfig {
 export interface TrackerStateMapping {
   stateMap: Record<CanonicalState, string | { status: string; label?: string | null }>;
   missingStateStrategy: MissingStateStrategy;
-  fallback: FallbackConfig;
   autoCreateConfig?: Record<string, AutoCreateStateConfig>;
   // Tracker-specific options
   projectBoard?: {
@@ -98,10 +89,6 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         canceled: 'Canceled',
       },
       missingStateStrategy: 'auto_create',
-      fallback: {
-        type: 'labels',
-        prefix: 'pan:',
-      },
     },
 
     github: {
@@ -113,15 +100,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         done: { status: 'closed', label: null },
         canceled: { status: 'closed', label: 'wontfix' },
       },
-      missingStateStrategy: 'use_fallback',
-      fallback: {
-        type: 'labels',
-        autoCreateLabels: true,
-        labelColors: {
-          'in-progress': 'fbbf24',
-          'in-review': 'ec4899',
-        },
-      },
+      missingStateStrategy: 'error',
       projectBoard: {
         enabled: true,
         name: 'Panopticon',
@@ -145,11 +124,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         done: { status: 'closed', label: null },
         canceled: { status: 'closed', label: 'wontfix' },
       },
-      missingStateStrategy: 'use_fallback',
-      fallback: {
-        type: 'labels',
-        autoCreateLabels: true,
-      },
+      missingStateStrategy: 'error',
     },
 
     jira: {
@@ -161,11 +136,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         done: 'Done',
         canceled: 'Canceled',
       },
-      missingStateStrategy: 'use_fallback', // Can't auto-create in Jira
-      fallback: {
-        type: 'labels',
-        prefix: 'pan-',
-      },
+      missingStateStrategy: 'error', // Can't auto-create in Jira
     },
 
     trello: {
@@ -178,10 +149,6 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         canceled: 'Archived',
       },
       missingStateStrategy: 'auto_create', // Trello lists are easy to create
-      fallback: {
-        type: 'labels',
-        prefix: '',
-      },
     },
   },
 };
