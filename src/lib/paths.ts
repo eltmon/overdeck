@@ -96,6 +96,13 @@ export const PRDS_DIR = join(DOCS_DIR, 'prds');
 export const PRD_DRAFTS_DIR = join(PRDS_DIR, 'drafts');
 export const PRD_PUBLISHED_DIR = join(PRDS_DIR, 'published');
 
+// Project-relative docs paths (subdirectory names for project-level docs)
+export const PROJECT_DOCS_SUBDIR = 'docs';
+export const PROJECT_PRDS_SUBDIR = 'prds';
+export const PROJECT_PRDS_ACTIVE_SUBDIR = 'active';
+export const PROJECT_PRDS_PLANNED_SUBDIR = 'planned';
+export const PROJECT_PRDS_COMPLETED_SUBDIR = 'completed';
+
 /**
  * Detect if running in development mode (from npm link or panopticon repo)
  *

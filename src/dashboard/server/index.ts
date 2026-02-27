@@ -37,12 +37,20 @@ import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
 import { resolveProjectFromIssue, listProjects, hasProjects, ProjectConfig, findProjectByTeam, extractTeamPrefix } from '../../lib/projects.js';
 import { stopWorkspaceDocker } from '../../lib/workspace-manager.js';
+import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
 import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
+import {
+  PROJECT_DOCS_SUBDIR,
+  PROJECT_PRDS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
+  PROJECT_PRDS_PLANNED_SUBDIR,
+  PROJECT_PRDS_COMPLETED_SUBDIR,
+} from '../../lib/paths.js';
 import type { Issue } from '../frontend/src/types.js';
 
 // Read package version once at startup — version never changes at runtime
@@ -906,44 +914,6 @@ async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestio
   const jsonlPath = await getAgentJsonlPath(agentId);
   if (!jsonlPath) return [];
   return getPendingQuestions(jsonlPath);
-}
-
-// Map GitHub issue state + labels to canonical state
-function mapGitHubStateToCanonical(state: string, labels: string[]): string {
-  // Handle both API lowercase and gh CLI uppercase
-  const stateLower = state.toLowerCase();
-
-  // Closed issues are always done (regardless of labels)
-  if (stateLower === 'closed') {
-    return 'done';
-  }
-
-  // For open issues, check labels for workflow state
-  // Order matters: more progressed states take precedence
-  const labelNames = labels.map(l => l.toLowerCase());
-
-  // Most progressed states first
-  // "done" label on OPEN issues = work complete, pending merge/closure → in_review
-  // (actual "done" status only for CLOSED issues, handled above)
-  if (labelNames.some(l => l === 'done' || l.includes('completed'))) {
-    return 'in_review';
-  }
-  if (labelNames.some(l => l.includes('in review') || l.includes('in-review') || l.includes('review') || l.includes('qa'))) {
-    return 'in_review';
-  }
-  if (labelNames.some(l => l.includes('in progress') || l.includes('in-progress') || l.includes('wip'))) {
-    return 'in_progress';
-  }
-  // Early workflow stages
-  if (labelNames.some(l => l.includes('backlog') || l.includes('icebox'))) {
-    return 'backlog';
-  }
-  if (labelNames.some(l => l.includes('todo') || l.includes('ready'))) {
-    return 'todo';
-  }
-
-  // Default open issues to todo
-  return 'todo';
 }
 
 // Fetch GitHub issues using gh CLI for better auth
@@ -8557,7 +8527,7 @@ PANOPTICON_MSG_EOF`);
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, Beads tasks via \`bd create\`, PRD at \`docs/prds/active/{issue-id}-plan.md\`)
+- Generate planning artifacts (STATE.md, Beads tasks via \`bd create\`, PRD at \`${PROJECT_DOCS_SUBDIR}/${PROJECT_PRDS_SUBDIR}/${PROJECT_PRDS_ACTIVE_SUBDIR}/{issue-id}-plan.md\`)
 - Present options and tradeoffs
 
 ---
@@ -9392,7 +9362,7 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
 
     // 6. Reset issue state and remove labels (Linear or GitHub)
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-      // GitHub: remove planning-related labels
+      // GitHub: remove workflow labels
       const config = getGitHubConfig();
       if (config) {
         const labelsToRemove = ['in-progress', 'review-ready'];
@@ -11568,7 +11538,7 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
 
     if (!existsSync(planningDir)) {
       // No workspace .planning dir - still check docs/prds/active/ for PRD
-      const activePrdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
+      const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
       if (existsSync(activePrdPath)) result.prd = readFileSync(activePrdPath, 'utf-8');
       return res.json(result);
     }
@@ -11593,9 +11563,9 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
 
     // Check docs/prds/ subdirectories for PRD files matching the issue (higher priority than STATE.md)
     if (!result.prd) {
-      const prdsDir = join(projectPath, 'docs', 'prds');
+      const prdsDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR);
       if (existsSync(prdsDir)) {
-        for (const subdir of ['active', 'planned', 'completed']) {
+        for (const subdir of [PROJECT_PRDS_ACTIVE_SUBDIR, PROJECT_PRDS_PLANNED_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR]) {
           const subdirPath = join(prdsDir, subdir);
           if (!existsSync(subdirPath)) continue;
           const files = readdirSync(subdirPath).filter(f => f.toLowerCase().includes(issueLower) && f.endsWith('.md'));

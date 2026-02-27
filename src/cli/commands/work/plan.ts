@@ -10,6 +10,11 @@ import { ComplexityLevel } from '../../../lib/cloister/complexity.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { createShadowState } from '../../../lib/shadow-state.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../../lib/prd-draft.js';
+import {
+  PROJECT_DOCS_SUBDIR,
+  PROJECT_PRDS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
+} from '../../../lib/paths.js';
 
 const execAsync = promisify(exec);
 
@@ -584,7 +589,7 @@ async function createBeadsTasks(issue: LinearIssue, tasks: PlanTask[]): Promise<
  */
 function copyToPRDDirectory(issue: LinearIssue, stateContent: string): string | null {
   const cwd = process.cwd();
-  const prdDir = join(cwd, 'docs', 'prds', 'active');
+  const prdDir = join(cwd, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR);
 
   try {
     mkdirSync(prdDir, { recursive: true });

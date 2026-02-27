@@ -268,6 +268,83 @@ export function getStateLabel(state: CanonicalState): string | null {
 }
 
 /**
+ * Map GitHub issue state + labels to canonical state.
+ * This function handles the GitHub-specific mapping where issues have both
+ * a state (open/closed) and workflow labels.
+ *
+ * @param state - GitHub issue state ('open' or 'closed')
+ * @param labels - Array of label names on the issue
+ * @returns Canonical state string
+ */
+export function mapGitHubStateToCanonical(state: string, labels: string[]): CanonicalState {
+  // Handle both API lowercase and gh CLI uppercase
+  const stateLower = state.toLowerCase();
+
+  // Closed issues are always done (regardless of labels)
+  if (stateLower === 'closed') {
+    return 'done';
+  }
+
+  // For open issues, check labels for workflow state
+  // Order matters: more progressed states take precedence
+  const labelNames = labels.map(l => l.toLowerCase());
+
+  // Most progressed states first
+  // "done" label on OPEN issues = work complete, pending merge/closure → in_review
+  // (actual "done" status only for CLOSED issues, handled above)
+  if (labelNames.some(l => l === 'done' || l.includes('completed'))) {
+    return 'in_review';
+  }
+  if (labelNames.some(l => l.includes('in review') || l.includes('in-review') || l.includes('review') || l.includes('qa'))) {
+    return 'in_review';
+  }
+  if (labelNames.some(l => l.includes('in progress') || l.includes('in-progress') || l.includes('wip'))) {
+    return 'in_progress';
+  }
+  // Early workflow stages
+  if (labelNames.some(l => l.includes('backlog') || l.includes('icebox'))) {
+    return 'backlog';
+  }
+  if (labelNames.some(l => l.includes('todo') || l.includes('ready'))) {
+    return 'todo';
+  }
+
+  // Default open issues to todo
+  return 'todo';
+}
+
+/**
+ * Get the target state name for a Linear team.
+ * Uses the DEFAULT_STATE_MAPPINGS to find the Linear state name.
+ *
+ * @param canonicalState - The canonical state to map
+ * @returns The Linear state name (e.g., 'In Review')
+ */
+export function getLinearStateName(canonicalState: CanonicalState): string {
+  const mapping = DEFAULT_STATE_MAPPINGS.trackers.linear;
+  const mapped = mapping.stateMap[canonicalState];
+  return typeof mapped === 'string' ? mapped : canonicalState;
+}
+
+/**
+ * Find a Linear workflow state by name in a team.
+ * Returns null if not found.
+ *
+ * @param states - Array of Linear workflow states from the SDK
+ * @param stateName - The state name to find
+ * @returns The matching state or null
+ */
+export function findLinearStateByName(states: any[], stateName: string): any | null {
+  // Try exact match first
+  const exactMatch = states.find(s => s.name === stateName);
+  if (exactMatch) return exactMatch;
+
+  // Try case-insensitive match
+  const lowerName = stateName.toLowerCase();
+  return states.find(s => s.name.toLowerCase() === lowerName) || null;
+}
+
+/**
  * Clean up workflow labels during state transitions.
  * Removes all workflow labels, then adds the label matching the target state (if any).
  *
