@@ -6,7 +6,6 @@ export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi';
 export type WorkTypeId =
   // Issue agent phases
   | 'issue-agent:exploration'
-  | 'issue-agent:planning'
   | 'issue-agent:implementation'
   | 'issue-agent:testing'
   | 'issue-agent:documentation'
@@ -29,7 +28,6 @@ export type WorkTypeId =
   | 'prd-agent'
   | 'decomposition-agent'
   | 'triage-agent'
-  | 'planning-agent'
   // CLI contexts
   | 'cli:interactive'
   | 'cli:quick-command';
@@ -96,7 +94,6 @@ export type WorkTypeCategory =
 export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
   'issue-agent': [
     { id: 'issue-agent:exploration', category: 'issue-agent', displayName: 'Exploration' },
-    { id: 'issue-agent:planning', category: 'issue-agent', displayName: 'Planning' },
     { id: 'issue-agent:implementation', category: 'issue-agent', displayName: 'Implementation' },
     { id: 'issue-agent:testing', category: 'issue-agent', displayName: 'Testing' },
     { id: 'issue-agent:documentation', category: 'issue-agent', displayName: 'Documentation' },
@@ -123,7 +120,6 @@ export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
     { id: 'prd-agent', category: 'pre-work', displayName: 'PRD Agent' },
     { id: 'decomposition-agent', category: 'pre-work', displayName: 'Decomposition Agent' },
     { id: 'triage-agent', category: 'pre-work', displayName: 'Triage Agent' },
-    { id: 'planning-agent', category: 'pre-work', displayName: 'Planning Agent' },
   ],
   'cli': [
     { id: 'cli:interactive', category: 'cli', displayName: 'Interactive' },
