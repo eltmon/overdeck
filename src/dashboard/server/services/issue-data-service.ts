@@ -222,6 +222,23 @@ export class IssueDataService {
       });
     }
 
+    // Apply cycle filter
+    const cycle = options?.cycle ?? 'current';
+    if (cycle === 'current') {
+      // Current cycle: exclude Backlog items, only show active cycle work
+      allIssues = allIssues.filter(issue => {
+        const status = issue.status?.toLowerCase() || '';
+        return status !== 'backlog';
+      });
+    } else if (cycle === 'backlog') {
+      // Backlog view: only show Backlog items
+      allIssues = allIssues.filter(issue => {
+        const status = issue.status?.toLowerCase() || '';
+        return status === 'backlog';
+      });
+    }
+    // cycle === 'all': no additional filtering, show everything
+
     // Sort by updatedAt
     allIssues.sort((a, b) =>
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
