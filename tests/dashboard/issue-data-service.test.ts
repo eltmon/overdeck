@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { IssueDataService } from '../../src/dashboard/server/services/issue-data-service.js';
+import { IssueDataService, getCanonicalStatus } from '../../src/dashboard/server/services/issue-data-service.js';
 import { CacheService } from '../../src/dashboard/server/services/cache-service.js';
 
 // Mock dependencies
@@ -9,6 +9,55 @@ vi.mock('../../src/dashboard/server/services/tracker-config.js', () => ({
   getRallyConfig: vi.fn(() => null),
   validateRallyConfig: vi.fn(() => ({ warnings: [] })),
 }));
+
+describe('getCanonicalStatus', () => {
+  it('should map undefined to backlog', () => {
+    expect(getCanonicalStatus(undefined)).toBe('backlog');
+  });
+
+  it('should map Backlog/Triage/Unknown to backlog', () => {
+    expect(getCanonicalStatus('Backlog')).toBe('backlog');
+    expect(getCanonicalStatus('Triage')).toBe('backlog');
+    expect(getCanonicalStatus('Unknown')).toBe('backlog');
+    expect(getCanonicalStatus('BACKLOG')).toBe('backlog');
+  });
+
+  it('should map todo states', () => {
+    expect(getCanonicalStatus('Todo')).toBe('todo');
+    expect(getCanonicalStatus('To Do')).toBe('todo');
+    expect(getCanonicalStatus('Ready')).toBe('todo');
+    expect(getCanonicalStatus('Unstarted')).toBe('todo');
+  });
+
+  it('should map in-progress states', () => {
+    expect(getCanonicalStatus('In Progress')).toBe('in_progress');
+    expect(getCanonicalStatus('Started')).toBe('in_progress');
+    expect(getCanonicalStatus('Active')).toBe('in_progress');
+  });
+
+  it('should map review states', () => {
+    expect(getCanonicalStatus('In Review')).toBe('in_review');
+    expect(getCanonicalStatus('Review')).toBe('in_review');
+    expect(getCanonicalStatus('QA')).toBe('in_review');
+  });
+
+  it('should map done states', () => {
+    expect(getCanonicalStatus('Done')).toBe('done');
+    expect(getCanonicalStatus('Completed')).toBe('done');
+    expect(getCanonicalStatus('Closed')).toBe('done');
+  });
+
+  it('should map canceled states', () => {
+    expect(getCanonicalStatus('Canceled')).toBe('canceled');
+    expect(getCanonicalStatus('Cancelled')).toBe('canceled');
+    expect(getCanonicalStatus('Duplicate')).toBe('canceled');
+    expect(getCanonicalStatus("Won't Do")).toBe('canceled');
+  });
+
+  it('should default unknown states to backlog', () => {
+    expect(getCanonicalStatus('FooBarBaz')).toBe('backlog');
+  });
+});
 
 describe('IssueDataService - getIssues cycle filter', () => {
   let service: IssueDataService;

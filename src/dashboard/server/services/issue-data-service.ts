@@ -17,17 +17,11 @@ import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 
-// Status mapping to canonical backlog states (same as STATUS_LABELS in frontend)
-const BACKLOG_STATES = new Set([
-  'backlog', 'triage', 'unknown',
-  'Backlog', 'Triage', 'Unknown',
-]);
-
 /**
  * Map a raw status string to its canonical state.
- * Returns 'backlog' if the status maps to a backlog state.
+ * Exported for testing.
  */
-function getCanonicalStatus(status: string | undefined): string {
+export function getCanonicalStatus(status: string | undefined): string {
   if (!status) return 'backlog';
   const normalized = status.toLowerCase();
   // Direct backlog mappings
