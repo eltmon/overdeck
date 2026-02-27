@@ -536,6 +536,12 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
     claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`;
   }
 
+  // Pre-trust workspace directory in Claude Code to avoid the trust prompt
+  try {
+    const { preTrustDirectory } = await import('./workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
+    preTrustDirectory(options.workspace);
+  } catch { /* non-fatal */ }
+
   createSession(agentId, options.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: agentId,

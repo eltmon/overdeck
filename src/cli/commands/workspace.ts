@@ -533,14 +533,41 @@ async function listCommand(options: ListOptions): Promise<void> {
     }> = [];
 
     for (const { key, config } of projects) {
-      if (!existsSync(join(config.path, '.git'))) {
-        continue;
-      }
+      // For polyrepo projects, list worktrees from each sub-repo
+      const isPolyrepo = config.workspace?.type === 'polyrepo' && config.workspace?.repos;
+      const workspaces: ReturnType<typeof listWorktrees> = [];
 
-      const worktrees = listWorktrees(config.path);
-      const workspaces = worktrees.filter(
-        (w) => w.path.includes('/workspaces/') || w.path.includes('\\workspaces\\')
-      );
+      if (isPolyrepo && config.workspace?.repos) {
+        // Polyrepo: scan each configured repo for worktrees
+        for (const repo of config.workspace.repos) {
+          const repoPath = join(config.path, repo.path);
+          if (!existsSync(join(repoPath, '.git'))) continue;
+          const repoWorktrees = listWorktrees(repoPath);
+          for (const wt of repoWorktrees) {
+            if (wt.path.includes('/workspaces/') || wt.path.includes('\\workspaces\\')) {
+              // Deduplicate: polyrepo workspaces share a parent dir (e.g., feature-min-697/fe, feature-min-697/api)
+              // Use the parent workspace dir as the canonical path
+              const parts = wt.path.split('/workspaces/');
+              if (parts.length > 1) {
+                const workspaceDir = parts[1].split('/')[0]; // e.g., "feature-min-697"
+                const canonicalPath = join(config.path, 'workspaces', workspaceDir);
+                if (!workspaces.some(w => w.path === canonicalPath)) {
+                  workspaces.push({ ...wt, path: canonicalPath });
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // Monorepo: scan project root
+        if (!existsSync(join(config.path, '.git'))) continue;
+        const worktrees = listWorktrees(config.path);
+        for (const wt of worktrees) {
+          if (wt.path.includes('/workspaces/') || wt.path.includes('\\workspaces\\')) {
+            workspaces.push(wt);
+          }
+        }
+      }
 
       if (workspaces.length > 0) {
         allWorkspaces.push({

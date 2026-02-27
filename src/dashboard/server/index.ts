@@ -209,7 +209,63 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
     });
   }
 
+  // Update Linear status to "In Review" when readyForMerge transitions to true
+  if (becameReadyForMerge) {
+    updateLinearIssueStatus(issueId, 'In Review').catch(err => {
+      console.error(`[status] Error updating Linear to In Review for ${issueId}:`, err);
+    });
+  }
+
   return updated;
+}
+
+/**
+ * Update a Linear issue's status (state) by name.
+ * No-op for GitHub issues (PAN-*) or if LINEAR_API_KEY is not set.
+ */
+async function updateLinearIssueStatus(issueId: string, statusName: string): Promise<void> {
+  if (issueId.toUpperCase().startsWith('PAN-')) return;
+
+  const linearApiKey = getLinearApiKey();
+  if (!linearApiKey) {
+    console.warn(`[status] LINEAR_API_KEY not set, cannot update ${issueId} to ${statusName}`);
+    return;
+  }
+
+  const getIssueQuery = `
+    query GetIssue($id: String!) {
+      issue(id: $id) {
+        id
+        team { states { nodes { id name type } } }
+      }
+    }
+  `;
+  const issueResponse = await fetch('https://api.linear.app/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': linearApiKey },
+    body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
+  });
+  const issueJson = await issueResponse.json() as any;
+  const states = issueJson.data?.issue?.team?.states?.nodes || [];
+  const linearId = issueJson.data?.issue?.id;
+  const targetState = states.find((s: any) => s.name.toLowerCase() === statusName.toLowerCase());
+
+  if (!linearId || !targetState) {
+    console.warn(`[status] Could not find Linear issue or "${statusName}" state for ${issueId}`);
+    return;
+  }
+
+  const updateMutation = `
+    mutation UpdateIssue($id: String!, $stateId: String!) {
+      issueUpdate(id: $id, input: { stateId: $stateId }) { success }
+    }
+  `;
+  await fetch('https://api.linear.app/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': linearApiKey },
+    body: JSON.stringify({ query: updateMutation, variables: { id: linearId, stateId: targetState.id } }),
+  });
+  console.log(`[status] Updated ${issueId} to ${statusName} in Linear`);
 }
 
 /**
@@ -334,60 +390,9 @@ async function closeIssueAfterMerge(issueId: string): Promise<void> {
       });
       console.log(`[merge] GitHub issue #${issueNumber} closed`);
     } else {
-      // Linear issue - update to Done state via GraphQL API
+      // Linear issue - update to Done state
       console.log(`[merge] Moving Linear issue ${issueId} to Done...`);
-
-      const linearApiKey = process.env.LINEAR_API_KEY;
-      if (!linearApiKey) {
-        console.warn(`[merge] LINEAR_API_KEY not set, cannot auto-close Linear issue ${issueId}`);
-        return;
-      }
-
-      // First, get the issue to find its team and the Done state
-      const issueQuery = `query { issue(id: "${issueId}") { id team { id states { nodes { id name type } } } } }`;
-      const issueRes = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': linearApiKey,
-        },
-        body: JSON.stringify({ query: issueQuery }),
-      });
-
-      if (!issueRes.ok) {
-        throw new Error(`Linear API error: ${issueRes.status}`);
-      }
-
-      const issueData = await issueRes.json() as any;
-      const states = issueData.data?.issue?.team?.states?.nodes || [];
-      const doneState = states.find((s: any) => s.type === 'completed' || s.name === 'Done');
-
-      if (!doneState) {
-        console.warn(`[merge] Could not find Done state for Linear issue ${issueId}`);
-        return;
-      }
-
-      // Update the issue to Done state
-      const updateMutation = `mutation { issueUpdate(id: "${issueId}", input: { stateId: "${doneState.id}" }) { success } }`;
-      const updateRes = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': linearApiKey,
-        },
-        body: JSON.stringify({ query: updateMutation }),
-      });
-
-      if (!updateRes.ok) {
-        throw new Error(`Linear API update error: ${updateRes.status}`);
-      }
-
-      const updateData = await updateRes.json() as any;
-      if (updateData.data?.issueUpdate?.success) {
-        console.log(`[merge] Linear issue ${issueId} moved to Done`);
-      } else {
-        console.warn(`[merge] Linear update returned success=false for ${issueId}`);
-      }
+      await updateLinearIssueStatus(issueId, 'Done');
     }
   } catch (error: unknown) {
     // Log but don't fail the merge - closing is a nice-to-have
@@ -6552,47 +6557,9 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       return res.status(400).json({ error: 'Workspace does not exist' });
     }
 
-    // 1b. Update Linear issue to "In Review" status
-    const linearApiKey = process.env.LINEAR_API_KEY;
-    if (linearApiKey && !issueId.toUpperCase().startsWith('PAN-')) {
-      try {
-        const getIssueQuery = `
-          query GetIssue($id: String!) {
-            issue(id: $id) {
-              id
-              state { id name type }
-              team { states { nodes { id name type } } }
-            }
-          }
-        `;
-        const issueResponse = await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': linearApiKey },
-          body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
-        });
-        const issueJson = await issueResponse.json();
-        const states = issueJson.data?.issue?.team?.states?.nodes || [];
-        const linearId = issueJson.data?.issue?.id;
-        const inReviewState = states.find((s: any) => s.name.toLowerCase() === 'in review' || s.name.toLowerCase() === 'review');
-
-        if (linearId && inReviewState) {
-          const updateMutation = `
-            mutation UpdateIssue($id: String!, $stateId: String!) {
-              issueUpdate(id: $id, input: { stateId: $stateId }) { success }
-            }
-          `;
-          await fetch('https://api.linear.app/graphql', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': linearApiKey },
-            body: JSON.stringify({ query: updateMutation, variables: { id: linearId, stateId: inReviewState.id } }),
-          });
-          console.log(`[review] Updated ${issueId} to In Review in Linear`);
-        }
-      } catch (linearError) {
-        console.error('[review] Error updating Linear to In Review:', linearError);
-        // Non-fatal - continue with review
-      }
-    }
+    // Note: Linear status is NOT updated here. "In Review" is set when
+    // readyForMerge becomes true (after both review and test pass), not
+    // when the review-agent starts.
 
     // 2. Push the feature branch to remote first
     try {
@@ -7547,75 +7514,9 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
         });
       }
     } else if (apiKey) {
-      // Linear issue - transition through proper states: In Progress → In Review → Done
+      // Linear issue - move to Done
       try {
-        const getIssueQuery = `
-          query GetIssue($id: String!) {
-            issue(id: $id) {
-              id
-              state { id name type }
-              team { states { nodes { id name type } } }
-            }
-          }
-        `;
-        const issueResponse = await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-          body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
-        });
-        const issueJson = await issueResponse.json();
-        const states = issueJson.data?.issue?.team?.states?.nodes || [];
-        const currentState = issueJson.data?.issue?.state;
-        const linearId = issueJson.data?.issue?.id;
-
-        // Find the states we need
-        const inProgressState = states.find((s: any) => s.name.toLowerCase() === 'in progress')
-          || states.find((s: any) => s.type === 'started' && !['in planning', 'in review'].includes(s.name.toLowerCase()));
-        const inReviewState = states.find((s: any) => s.name.toLowerCase() === 'in review' || s.name.toLowerCase() === 'review');
-        const doneState = states.find((s: any) => s.type === 'completed' || s.name.toLowerCase() === 'done');
-
-        const updateMutation = `
-          mutation UpdateIssue($id: String!, $stateId: String!) {
-            issueUpdate(id: $id, input: { stateId: $stateId }) { success }
-          }
-        `;
-
-        if (linearId) {
-          // Transition through states properly
-          // If still in Planning/Backlog, move to In Progress first
-          if (currentState?.type === 'backlog' || currentState?.type === 'unstarted') {
-            if (inProgressState) {
-              await fetch('https://api.linear.app/graphql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-                body: JSON.stringify({ query: updateMutation, variables: { id: linearId, stateId: inProgressState.id } }),
-              });
-              console.log(`Updated ${issueId} to In Progress`);
-              await new Promise(resolve => setTimeout(resolve, 500)); // Brief delay between transitions
-            }
-          }
-
-          // Move to In Review
-          if (inReviewState) {
-            await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-              body: JSON.stringify({ query: updateMutation, variables: { id: linearId, stateId: inReviewState.id } }),
-            });
-            console.log(`Updated ${issueId} to In Review`);
-            await new Promise(resolve => setTimeout(resolve, 500)); // Brief delay between transitions
-          }
-
-          // Finally move to Done
-          if (doneState) {
-            await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-              body: JSON.stringify({ query: updateMutation, variables: { id: linearId, stateId: doneState.id } }),
-            });
-            console.log(`Updated ${issueId} to Done`);
-          }
-        }
+        await updateLinearIssueStatus(issueId, 'Done');
       } catch (linearError) {
         console.error('Error updating Linear:', linearError);
       }
@@ -8812,7 +8713,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         ? join(workspacePath, '.planning')
         : join(projectPath, '.planning', issueLower);
       if (!existsSync(planningDir)) {
-        await execAsync(`mkdir -p "${planningDir}"`, { encoding: 'utf-8' });
+        mkdirSync(planningDir, { recursive: true });
       }
 
       // Initialize .planning subdirectories for Mission Control
@@ -9098,8 +8999,17 @@ set -s escape-time 0
         // ===== LOCAL PLANNING AGENT =====
         writeFileSync(planningPromptPath, planningPrompt);
 
-        // Determine working directory - use workspace if created, otherwise project root
-        const agentCwd = workspaceCreated ? workspacePath : projectPath;
+        // Determine working directory — use devroot so planning agent has access to .claude/ skills.
+        // Falls back to workspace if created, then project root.
+        const { findDevrootForProject } = await import('../../lib/config.js');
+        const baseDir = workspaceCreated ? workspacePath : projectPath;
+        const agentCwd = findDevrootForProject(baseDir);
+
+        // Pre-trust the agent cwd in Claude Code to avoid the workspace trust prompt
+        try {
+          const { preTrustDirectory } = await import('../../lib/workspace-manager.js');
+          preTrustDirectory(agentCwd);
+        } catch { /* non-fatal */ }
 
         // Start tmux session with Claude Code for planning (interactive TUI mode)
         // Use a launcher script to safely pass the prompt (avoids shell escaping issues)
@@ -9128,7 +9038,7 @@ exec ${cmdWithArgs} "$prompt"
 
         // Ensure tmux is running before starting session
         await ensureTmuxRunning();
-        await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
+        await execAsync(`tmux new-session -d -s ${sessionName} -c "${agentCwd}" "bash '${launcherScript}'"`, { encoding: 'utf-8' });
 
         // Write agent state file so QuestionDialog can find the JSONL path
         writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
@@ -9503,8 +9413,16 @@ Continue the PLANNING session. Do NOT implement anything.
 
     writeFileSync(continuationPromptPath, continuationPrompt);
 
-    // Determine working directory
-    const agentCwd = existsSync(workspacePath) ? workspacePath : projectPath;
+    // Determine working directory — use devroot so planning agent has access to .claude/ skills
+    const { findDevrootForProject } = await import('../../lib/config.js');
+    const baseDir = existsSync(workspacePath) ? workspacePath : projectPath;
+    const agentCwd = findDevrootForProject(baseDir);
+
+    // Pre-trust the agent cwd in Claude Code to avoid the workspace trust prompt
+    try {
+      const { preTrustDirectory } = await import('../../lib/workspace-manager.js');
+      preTrustDirectory(agentCwd);
+    } catch { /* non-fatal */ }
 
     // Backup old output for the new session
     if (existsSync(outputFile)) {
@@ -9530,7 +9448,7 @@ exec ${msgCmdWithArgs} "Please read the continuation prompt at ${continuationPro
 `, { mode: 0o755 });
 
     await ensureTmuxRunning();
-    await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
+    await execAsync(`tmux new-session -d -s ${sessionName} -c "${agentCwd}" "bash '${launcherScript}'"`, { encoding: 'utf-8' });
 
     // Resize window for Claude TUI
     try {

@@ -689,8 +689,52 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
+  // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt
+  try {
+    preTrustDirectory(workspacePath);
+    result.steps.push('Pre-trusted workspace in Claude Code');
+  } catch {
+    // Non-fatal — agent can still work, user will just see trust prompt
+  }
+
   result.success = result.errors.length === 0;
   return result;
+}
+
+/**
+ * Pre-register a directory as trusted in Claude Code's ~/.claude.json.
+ * This prevents the "Quick safety check: Is this a project you created or one you trust?" prompt
+ * when agents are spawned in dynamically-created workspace directories.
+ */
+export function preTrustDirectory(dirPath: string): void {
+  const claudeJsonPath = join(homedir(), '.claude.json');
+  if (!existsSync(claudeJsonPath)) return;
+
+  const data = JSON.parse(readFileSync(claudeJsonPath, 'utf8'));
+  if (!data.projects) data.projects = {};
+
+  // Only add if not already present
+  if (data.projects[dirPath]) {
+    if (!data.projects[dirPath].hasTrustDialogAccepted) {
+      data.projects[dirPath].hasTrustDialogAccepted = true;
+      writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf8');
+    }
+    return;
+  }
+
+  data.projects[dirPath] = {
+    allowedTools: [],
+    mcpContextUris: [],
+    mcpServers: {},
+    enabledMcpjsonServers: [],
+    disabledMcpjsonServers: [],
+    hasTrustDialogAccepted: true,
+    projectOnboardingSeenCount: 0,
+    hasClaudeMdExternalIncludesApproved: false,
+    hasClaudeMdExternalIncludesWarningShown: false,
+  };
+
+  writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf8');
 }
 
 export interface WorkspaceRemoveOptions {

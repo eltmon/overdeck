@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname, parse as parsePath } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from '@iarna/toml';
 import { CONFIG_FILE } from './paths.js';
@@ -234,5 +234,31 @@ export function getDevrootPath(): string | null {
   if (!existsSync(resolved)) return null;
 
   return resolved;
+}
+
+/**
+ * Find the devroot for a given project path.
+ * Tries config first, then walks up from projectPath looking for .claude/ directory.
+ * Returns the project path itself as last resort.
+ */
+export function findDevrootForProject(projectPath: string): string {
+  // 1. Explicit config takes priority
+  const configured = getDevrootPath();
+  if (configured) return configured;
+
+  // 2. Walk up from project path to find nearest .claude/ directory
+  let dir = projectPath;
+  const root = parsePath(dir).root;
+  while (dir !== root && dir !== homedir()) {
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    if (existsSync(join(parent, '.claude'))) {
+      return parent;
+    }
+    dir = parent;
+  }
+
+  // 3. Fallback to project path itself
+  return projectPath;
 }
 
