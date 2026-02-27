@@ -236,3 +236,59 @@ export function canonicalToTrackerState(
     return mapped.label || mapped.status;
   }
 }
+
+/**
+ * Workflow labels that should be removed during state transitions
+ */
+export const WORKFLOW_LABELS = [
+  'in-progress',
+  'in progress',
+  'in-review',
+  'in review',
+  'review-ready',
+  'review ready',
+  'planned',
+  'planning',
+];
+
+/**
+ * Get the target workflow label for a canonical state
+ */
+export function getStateLabel(state: CanonicalState): string | null {
+  switch (state) {
+    case 'in_progress':
+      return 'in-progress';
+    case 'in_review':
+      return 'in-review';
+    case 'done':
+      return 'done';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Clean up workflow labels during state transitions.
+ * Removes all workflow labels, then adds the label matching the target state (if any).
+ *
+ * @param currentLabels - Array of current label names
+ * @param targetState - The canonical state being transitioned to
+ * @returns Array of label names after cleanup
+ */
+export function cleanupWorkflowLabels(
+  currentLabels: string[],
+  targetState: CanonicalState
+): string[] {
+  // Remove all workflow labels
+  const cleaned = currentLabels.filter(
+    label => !WORKFLOW_LABELS.includes(label.toLowerCase())
+  );
+
+  // Add the label matching the target state (if applicable)
+  const targetLabel = getStateLabel(targetState);
+  if (targetLabel && !cleaned.includes(targetLabel)) {
+    cleaned.push(targetLabel);
+  }
+
+  return cleaned;
+}
