@@ -7,6 +7,7 @@ import { homedir } from 'os';
 import { AGENTS_DIR } from '../../../lib/paths.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { updateShadowState } from '../../../lib/shadow-state.js';
+import { cleanupWorkflowLabels, WORKFLOW_LABELS } from '../../../core/state-mapping.js';
 
 interface DoneOptions {
   comment?: string;
@@ -108,15 +109,19 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
       'Content-Type': 'application/json',
     };
 
-    // Remove "in-progress" label
-    await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/in-progress`, {
-      method: 'DELETE', headers,
-    }).catch(() => {});
+    // Get current labels
+    const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+      headers,
+    });
+    const currentLabels = labelsRes.ok ? (await labelsRes.json()).map((l: any) => l.name) : [];
 
-    // Add "in-review" label
+    // Clean up workflow labels and get target labels for in_review state
+    const targetLabels = cleanupWorkflowLabels(currentLabels, 'in_review');
+
+    // Update labels (set all at once to replace)
     await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-      method: 'POST', headers,
-      body: JSON.stringify({ labels: ['in-review'] }),
+      method: 'PUT', headers,
+      body: JSON.stringify({ labels: targetLabels }),
     });
 
     // Add completion comment
