@@ -22,6 +22,7 @@ import { syncCommand } from './sync.js';
 import { refreshCommand } from './refresh.js';
 import { tldrCommand } from './tldr.js';
 import { syncMainCommand } from './sync-main.js';
+import { listStatesCommand, cleanupStatesCommand } from './linear-states.js';
 
 export function registerWorkCommands(program: Command): void {
   const work = program
@@ -203,6 +204,20 @@ export function registerWorkCommands(program: Command): void {
     .command('sync-main <id>')
     .description('Sync latest main into workspace feature branch (merge, not rebase)')
     .action(syncMainCommand);
+
+  work
+    .command('linear-states')
+    .description('Manage Linear workflow states')
+    .option('-t, --team <team>', 'Team key (default: MIN)')
+    .action((options) => listStatesCommand(options));
+
+  work
+    .command('linear-cleanup')
+    .description('Clean up Linear custom states (archive old states)')
+    .option('-t, --team <team>', 'Team key (default: MIN)')
+    .option('-s, --state <state>', 'State name to archive (default: Planning)')
+    .option('--dry-run', 'Show what would be archived without making changes')
+    .action((options) => cleanupStatesCommand(options));
 }
 
 // Re-export individual commands for direct use

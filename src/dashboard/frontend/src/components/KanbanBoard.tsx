@@ -58,7 +58,6 @@ function DifficultyBadge({ level }: { level: ComplexityLevel }) {
 // Agent type icons for badges
 const AGENT_ICONS: Record<string, string> = {
   work: '🤖',
-  planning: '📋',
   review: '👁️',
   test: '🧪',
   merge: '🔀'
@@ -70,7 +69,7 @@ function AgentBadge({
   name,
   isConflict
 }: {
-  type: 'work' | 'planning' | 'review' | 'test' | 'merge';
+  type: 'work' | 'review' | 'test' | 'merge';
   name: string;
   isConflict: boolean;
 }) {
@@ -1669,9 +1668,6 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
   // For display in terminal viewer, use the active agent
   const agent = activeAgent;
 
-  const [showAbortConfirm, setShowAbortConfirm] = useState(false);
-  const [deleteWorkspace, setDeleteWorkspace] = useState(false);
-
   // Check if issue has "Review Ready" label (agent completed work)
   // Don't show on terminal states — "ready for review" is meaningless once done/canceled
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
@@ -1794,25 +1790,11 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
       return res.json();
     },
     onSuccess: (data) => {
-      setShowAbortConfirm(false);
-      setDeleteWorkspace(false);
       queryClient.invalidateQueries({ queryKey: ['issues'] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       console.log('Deep wipe completed:', data.cleanupLog);
     },
   });
-
-  const handleAbortConfirm = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    deepWipeMutation.mutate({ deleteWorkspace });
-  };
-
-  const handleAbortCancel = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowAbortConfirm(false);
-    setDeleteWorkspace(false);
-  };
-
 
   return (
     <div
@@ -2073,51 +2055,6 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
             {deepWipeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             {deepWipeMutation.isPending ? 'Wiping...' : 'Reset'}
           </button>
-        </div>
-      )}
-
-      {/* Abort confirmation panel */}
-      {showAbortConfirm && (
-        <div className="mt-3 pt-3 border-t border-orange-600/50 bg-orange-950/30 -mx-3 -mb-3 px-3 pb-3 rounded-b-lg">
-          <p className="text-xs text-orange-300 mb-2">Reset and return to Backlog?</p>
-          <label className="flex items-center gap-2 text-xs text-content-subtle mb-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={deleteWorkspace}
-              onChange={(e) => setDeleteWorkspace(e.target.checked)}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded border-divider-strong bg-surface-overlay text-orange-500 focus:ring-orange-500"
-            />
-            Also delete workspace (git worktree)
-          </label>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={handleAbortCancel}
-              className="px-2 py-1 text-xs text-content-subtle hover:text-content transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAbortConfirm}
-              disabled={deepWipeMutation.isPending}
-              className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-500 text-content rounded transition-colors disabled:opacity-50"
-            >
-              {deepWipeMutation.isPending ? 'Resetting...' : 'Reset'}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm(`Deep wipe ${issue.identifier}? This will:\n• Kill all agents\n• Delete all state\n• Reset to Backlog\n• Remove labels${deleteWorkspace ? '\n• Delete workspace' : ''}`)) {
-                  deepWipeMutation.mutate({ deleteWorkspace });
-                }
-              }}
-              disabled={deepWipeMutation.isPending}
-              className="px-2 py-1 text-xs bg-red-700 hover:bg-red-600 text-content rounded transition-colors disabled:opacity-50"
-              title="Complete reset - kills agents, deletes state, resets Linear"
-            >
-              {deepWipeMutation.isPending ? 'Wiping...' : '🔥 Deep Wipe'}
-            </button>
-          </div>
         </div>
       )}
 

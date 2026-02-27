@@ -9,6 +9,7 @@ import { promisify } from 'util';
 import { ComplexityLevel } from '../../../lib/cloister/complexity.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { createShadowState } from '../../../lib/shadow-state.js';
+import { hasPRDDraft, getPRDDraftPath } from '../../../lib/prd-draft.js';
 
 const execAsync = promisify(exec);
 
@@ -65,6 +66,11 @@ function getLinearApiKey(): string | null {
 async function findPRDFiles(issueId: string): Promise<string[]> {
   const found: string[] = [];
   const cwd = process.cwd();
+
+  // Check pre-workspace PRD drafts first
+  if (hasPRDDraft(issueId)) {
+    found.push(getPRDDraftPath(issueId));
+  }
 
   const searchPaths = [
     'docs/prds/active',

@@ -92,7 +92,6 @@ export interface ModelSelectionConfig {
     merge_agent: 'opus' | 'sonnet' | 'haiku';
     review_agent: 'opus' | 'sonnet' | 'haiku';
     test_agent: 'opus' | 'sonnet' | 'haiku';
-    planning_agent: 'opus' | 'sonnet' | 'haiku';
   };
 }
 
@@ -229,7 +228,6 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       merge_agent: 'sonnet',
       review_agent: 'sonnet',
       test_agent: 'haiku',
-      planning_agent: 'opus',
     },
   },
   handoffs: {
