@@ -85,7 +85,6 @@ export interface Skill {
 export type CanonicalState =
   | 'backlog'
   | 'todo'
-  | 'planning'      // NEW: Human + AI discovery phase
   | 'in_progress'
   | 'in_review'
   | 'done'
@@ -97,7 +96,6 @@ export type IssueStatus = CanonicalState;
 export const STATUS_ORDER: CanonicalState[] = [
   'backlog',
   'todo',
-  'planning',       // NEW: Between todo and in_progress
   'in_progress',
   'in_review',
   'done'
@@ -115,12 +113,6 @@ export const STATUS_LABELS: Record<string, CanonicalState> = {
   'To Do': 'todo',
   'Ready': 'todo',
   'Unstarted': 'todo',
-
-  // Planning states (NEW)
-  'In Planning': 'planning',
-  'Planning': 'planning',
-  'Planned': 'planning',       // Linear Project status name
-  'Discovery': 'planning',
 
   // In Progress states
   'In Progress': 'in_progress',
@@ -152,7 +144,6 @@ export type StateType = 'backlog' | 'unstarted' | 'started' | 'completed' | 'can
 export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
   backlog: 'backlog',
   todo: 'unstarted',
-  planning: 'started',
   in_progress: 'started',
   in_review: 'started',
   done: 'completed',

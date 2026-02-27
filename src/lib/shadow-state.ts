@@ -34,7 +34,7 @@ export interface ShadowHistoryEntry {
 /**
  * Canonical state for Kanban column placement
  */
-export type CanonicalState = 'backlog' | 'todo' | 'planning' | 'in_progress' | 'in_review' | 'done';
+export type CanonicalState = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
 
 /**
  * Shadow state for an issue

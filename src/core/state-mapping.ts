@@ -9,7 +9,6 @@
 export type CanonicalState =
   | 'backlog'
   | 'todo'
-  | 'planning'
   | 'in_progress'
   | 'in_review'
   | 'done'
@@ -29,7 +28,6 @@ export interface CanonicalStateDefinition {
 export const CANONICAL_STATES: CanonicalStateDefinition[] = [
   { name: 'backlog', type: 'backlog', description: 'Ideas and future work', color: '#6b7280' },
   { name: 'todo', type: 'unstarted', description: 'Prioritized and ready', color: '#3b82f6' },
-  { name: 'planning', type: 'started', description: 'Discovery phase with human', color: '#9333ea' },
   { name: 'in_progress', type: 'started', description: 'Agent executing', color: '#eab308' },
   { name: 'in_review', type: 'started', description: 'PR awaiting review', color: '#ec4899' },
   { name: 'done', type: 'completed', description: 'Work complete', color: '#22c55e' },
@@ -39,7 +37,6 @@ export const CANONICAL_STATES: CanonicalStateDefinition[] = [
 export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
   backlog: 'backlog',
   todo: 'unstarted',
-  planning: 'started',
   in_progress: 'started',
   in_review: 'started',
   done: 'completed',
@@ -52,7 +49,7 @@ export type MissingStateStrategy = 'auto_create' | 'use_fallback' | 'error';
 // Fallback configuration
 export interface FallbackConfig {
   type: 'labels' | 'custom_field';
-  prefix?: string;            // e.g., "pan:" for pan:planning label
+  prefix?: string;            // e.g., "pan:" for pan:in-progress label
   autoCreateLabels?: boolean;
   labelColors?: Record<string, string>;
 }
@@ -95,7 +92,6 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
       stateMap: {
         backlog: 'Backlog',
         todo: 'Todo',
-        planning: 'In Planning',
         in_progress: 'In Progress',
         in_review: 'In Review',
         done: 'Done',
@@ -106,20 +102,12 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         type: 'labels',
         prefix: 'pan:',
       },
-      autoCreateConfig: {
-        planning: {
-          type: 'started',
-          color: '#9333ea',
-          positionAfter: 'Todo',
-        },
-      },
     },
 
     github: {
       stateMap: {
         backlog: { status: 'open', label: null },
         todo: { status: 'open', label: null },
-        planning: { status: 'open', label: 'planning' },
         in_progress: { status: 'open', label: 'in-progress' },
         in_review: { status: 'open', label: 'in-review' },
         done: { status: 'closed', label: null },
@@ -130,7 +118,6 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         type: 'labels',
         autoCreateLabels: true,
         labelColors: {
-          planning: '9333ea',
           'in-progress': 'fbbf24',
           'in-review': 'ec4899',
         },
@@ -141,7 +128,6 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
         columnMap: {
           backlog: 'Backlog',
           todo: 'Todo',
-          planning: 'In Planning',
           in_progress: 'In Progress',
           in_review: 'Review',
           done: 'Done',
@@ -154,7 +140,6 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
       stateMap: {
         backlog: { status: 'opened', label: 'backlog' },
         todo: { status: 'opened', label: 'todo' },
-        planning: { status: 'opened', label: 'planning' },
         in_progress: { status: 'opened', label: 'in-progress' },
         in_review: { status: 'opened', label: 'in-review' },
         done: { status: 'closed', label: null },
@@ -171,7 +156,6 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
       stateMap: {
         backlog: 'Backlog',
         todo: 'To Do',
-        planning: 'In Planning',
         in_progress: 'In Progress',
         in_review: 'In Review',
         done: 'Done',
@@ -188,7 +172,6 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
       stateMap: {
         backlog: 'Backlog',
         todo: 'To Do',
-        planning: 'Planning',
         in_progress: 'Doing',
         in_review: 'Review',
         done: 'Done',
@@ -261,7 +244,6 @@ export function trackerStateToCanonical(
   const lower = trackerState.toLowerCase();
   if (lower.includes('backlog') || lower.includes('triage')) return 'backlog';
   if (lower.includes('todo') || lower.includes('ready') || lower.includes('unstarted')) return 'todo';
-  if (lower.includes('planning') || lower.includes('discovery')) return 'planning';
   if (lower.includes('progress') || lower.includes('started') || lower.includes('active')) return 'in_progress';
   if (lower.includes('review') || lower.includes('qa') || lower.includes('testing')) return 'in_review';
   if (lower.includes('done') || lower.includes('complete') || lower.includes('closed')) return 'done';
