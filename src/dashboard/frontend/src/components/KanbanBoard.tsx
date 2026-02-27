@@ -86,7 +86,7 @@ function AgentBadge({
 }
 
 // Cost data for an issue
-interface IssueCost {
+export interface IssueCost {
   issueId: string;
   totalCost: number;
   tokenCount: number;
@@ -203,7 +203,7 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
  * Issues with multiple labels appear in each label group.
  * Issues with no labels go into an 'Uncategorized' group.
  */
-function groupByLabels(issues: Issue[]): Record<string, Issue[]> {
+export function groupByLabels(issues: Issue[]): Record<string, Issue[]> {
   const grouped: Record<string, Issue[]> = {};
   const uncategorized: Issue[] = [];
 
@@ -472,7 +472,7 @@ function CompactChildCard({
 }
 
 // List view row — compact row for list view grouped by labels
-function ListIssueRow({
+export function ListIssueRow({
   issue,
   agents,
   specialists,
