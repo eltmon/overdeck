@@ -934,12 +934,6 @@ function mapGitHubStateToCanonical(state: string, labels: string[]): string {
     return 'in_progress';
   }
   // Early workflow stages
-  if (labelNames.some(l => l.includes('planning') || l.includes('discovery'))) {
-    return 'planning';
-  }
-  if (labelNames.some(l => l === 'planned')) {
-    return 'planned';
-  }
   if (labelNames.some(l => l.includes('backlog') || l.includes('icebox'))) {
     return 'backlog';
   }
@@ -1041,8 +1035,6 @@ async function fetchGitHubIssues(): Promise<any[]> {
           title: issue.title,
           description: issue.body || '',
           status: canonicalStatus === 'todo' ? 'Todo' :
-                  canonicalStatus === 'planning' ? 'In Planning' :
-                  canonicalStatus === 'planned' ? 'Planned' :
                   canonicalStatus === 'in_progress' ? 'In Progress' :
                   canonicalStatus === 'in_review' ? 'In Review' :
                   canonicalStatus === 'done' ? 'Done' :
@@ -10459,7 +10451,7 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
   const { targetStatus, syncToTracker = false } = req.body || {};
 
   // Validate targetStatus (CanonicalState)
-  const validStatuses = ['backlog', 'todo', 'planning', 'in_progress', 'in_review', 'done'];
+  const validStatuses = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
   if (!targetStatus || !validStatuses.includes(targetStatus)) {
     return res.status(400).json({ error: `Invalid targetStatus. Must be one of: ${validStatuses.join(', ')}` });
   }
@@ -10472,7 +10464,6 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
     const canonicalToIssueState: Record<string, 'open' | 'in_progress' | 'closed'> = {
       backlog: 'open',
       todo: 'open',
-      planning: 'in_progress',
       in_progress: 'in_progress',
       in_review: 'in_progress',
       done: 'closed',
@@ -10536,7 +10527,6 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
         const stateTypeMap: Record<string, string> = {
           backlog: 'backlog',
           todo: 'unstarted',
-          planning: 'started',
           in_progress: 'started',
           in_review: 'started',
           done: 'completed',
