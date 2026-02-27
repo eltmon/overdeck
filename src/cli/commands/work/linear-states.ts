@@ -78,6 +78,25 @@ async function archiveCustomState(apiKey: string, teamKey: string, stateName: st
     return false;
   }
 
+  // Find issues in this state and migrate them before archiving
+  const issuesInState = await client.issues({ filter: { state: { id: { eq: targetState.id } } } });
+  if (issuesInState.nodes.length > 0) {
+    // Determine target state based on current state name
+    const targetStateName = stateName.toLowerCase().includes('review') ? 'In Progress' : 'Todo';
+    const targetStateObj = states.nodes.find((s: any) => s.name === targetStateName);
+
+    if (targetStateObj) {
+      console.log(chalk.blue(`Migrating ${issuesInState.nodes.length} issues from "${stateName}" to "${targetStateName}"...`));
+      for (const issue of issuesInState.nodes) {
+        try {
+          await client.updateIssue(issue.id, { stateId: targetStateObj.id });
+        } catch (err: any) {
+          console.log(chalk.yellow(`Failed to move issue ${issue.identifier}: ${err.message}`));
+        }
+      }
+    }
+  }
+
   // Archive the state by updating it (Linear uses archive mutation for states)
   // Note: The Linear SDK may not expose archive directly, so we use the raw client
   const archiveMutation = `
