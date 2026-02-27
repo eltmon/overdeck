@@ -78,12 +78,12 @@ async function findPRDFiles(issueId: string): Promise<string[]> {
   }
 
   const searchPaths = [
-    'docs/prds/active',
-    'docs/prds/planned',
-    'docs/prds',
-    'docs/prd',
-    'prds',
-    'docs',
+    join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR),
+    join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, 'planned'),
+    join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR),
+    join(PROJECT_DOCS_SUBDIR, 'prd'),
+    PROJECT_PRDS_SUBDIR,
+    PROJECT_DOCS_SUBDIR,
   ];
 
   const issueIdLower = issueId.toLowerCase();
