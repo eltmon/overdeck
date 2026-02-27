@@ -49,10 +49,10 @@ describe('work-type-router', () => {
         };
 
         const router = new WorkTypeRouter(config);
-        const result = router.getModel('issue-agent:planning');
+        const result = router.getModel('issue-agent:exploration');
 
         expect(result.model).toBeTruthy();
-        expect(result.workType).toBe('issue-agent:planning');
+        expect(result.workType).toBe('issue-agent:exploration');
         expect(result.source).toBe('smart');
         expect(result.usedFallback).toBe(false);
       });
@@ -62,13 +62,13 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
+            'issue-agent:exploration': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
 
         const router = new WorkTypeRouter(config);
-        const result = router.getModel('issue-agent:planning');
+        const result = router.getModel('issue-agent:exploration');
 
         expect(result.model).toBe('claude-opus-4-6');
         expect(result.source).toBe('override');
@@ -130,7 +130,7 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const workTypes: WorkTypeId[] = [
           'issue-agent:exploration',
-          'issue-agent:planning',
+          'issue-agent:exploration',
           'specialist-review-agent',
           'subagent:explore',
           'convoy:security-reviewer',
@@ -156,7 +156,7 @@ describe('work-type-router', () => {
         };
 
         const router = new WorkTypeRouter(config);
-        const modelId = router.getModelId('issue-agent:planning');
+        const modelId = router.getModelId('issue-agent:exploration');
 
         expect(typeof modelId).toBe('string');
         expect(modelId).toBeTruthy();
@@ -169,13 +169,13 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
+            'issue-agent:exploration': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
 
         const router = new WorkTypeRouter(config);
-        expect(router.hasOverride('issue-agent:planning')).toBe(true);
+        expect(router.hasOverride('issue-agent:exploration')).toBe(true);
       });
 
       it('should return false when no override exists', () => {
@@ -187,7 +187,7 @@ describe('work-type-router', () => {
         };
 
         const router = new WorkTypeRouter(config);
-        expect(router.hasOverride('issue-agent:planning')).toBe(false);
+        expect(router.hasOverride('issue-agent:exploration')).toBe(false);
       });
     });
 
@@ -216,7 +216,7 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
+            'issue-agent:exploration': 'claude-opus-4-6',
             'convoy:security-reviewer': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
@@ -225,7 +225,7 @@ describe('work-type-router', () => {
         const router = new WorkTypeRouter(config);
         const overrides = router.getOverrides();
 
-        expect(overrides['issue-agent:planning']).toBe('claude-opus-4-6');
+        expect(overrides['issue-agent:exploration']).toBe('claude-opus-4-6');
         expect(overrides['convoy:security-reviewer']).toBe('claude-opus-4-6');
       });
 
@@ -234,7 +234,7 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic']),
           apiKeys: {},
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
+            'issue-agent:exploration': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -284,7 +284,7 @@ describe('work-type-router', () => {
           enabledProviders: new Set<ModelProvider>(['anthropic', 'openai']),
           apiKeys: { openai: 'sk-test' },
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
+            'issue-agent:exploration': 'claude-opus-4-6',
           },
           geminiThinkingLevel: 3,
         };
@@ -341,7 +341,7 @@ describe('work-type-router', () => {
 
     describe('getModelId (global)', () => {
       it('should use global router', () => {
-        const modelId = getModelId('issue-agent:planning');
+        const modelId = getModelId('issue-agent:exploration');
         expect(typeof modelId).toBe('string');
         expect(modelId).toBeTruthy();
       });
@@ -350,7 +350,7 @@ describe('work-type-router', () => {
     describe('hasOverride (global)', () => {
       it('should use global router', () => {
         // Default config has no overrides
-        const hasIt = hasOverride('issue-agent:planning');
+        const hasIt = hasOverride('issue-agent:exploration');
         expect(typeof hasIt).toBe('boolean');
       });
     });
@@ -370,13 +370,13 @@ describe('work-type-router', () => {
         enabledProviders: new Set<ModelProvider>(['anthropic']),
         apiKeys: {},
         overrides: {
-          'issue-agent:planning': 'claude-opus-4-6',
+          'issue-agent:exploration': 'claude-opus-4-6',
         },
         geminiThinkingLevel: 3,
       };
 
       const router = new WorkTypeRouter(config);
-      const result = router.getModel('issue-agent:planning');
+      const result = router.getModel('issue-agent:exploration');
 
       expect(result.model).toBe('claude-opus-4-6');
       expect(result.source).toBe('override');

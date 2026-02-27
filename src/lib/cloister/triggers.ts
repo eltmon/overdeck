@@ -130,7 +130,6 @@ export function checkStuckEscalation(
 
 /**
  * Check if test failures should trigger escalation
- * Check if test failures should trigger escalation
  *
  * Aggressive escalation: Any test failure from Haiku escalates to Sonnet
  * Reasoning: Haiku is for simple tasks - if tests fail, the task isn't simple

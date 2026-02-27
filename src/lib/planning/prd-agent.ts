@@ -18,10 +18,11 @@ export interface PRDSection {
 
 export interface PRDGenerationOptions {
   issueId: string;
-  workspace: string;
+  workspace?: string;  // Optional - if not provided, saves to pre-workspace drafts
   title: string;
   description?: string;
   outputPath?: string;
+  preWorkspace?: boolean;  // If true, saves to ~/.panopticon/docs/prds/drafts/
 }
 
 export interface PRDDocument {
@@ -41,19 +42,24 @@ export interface PRDDocument {
  * 4. Save to .planning/PRD.md
  */
 export async function generatePRD(options: PRDGenerationOptions): Promise<string> {
-  const { issueId, workspace, title, description, outputPath } = options;
+  const { issueId, workspace, title, description, outputPath, preWorkspace } = options;
 
-  // Determine output location
-  const planningDir = join(workspace, '.planning');
-  mkdirSync(planningDir, { recursive: true });
+  let prdPath: string;
 
-  const prdPath = outputPath || join(planningDir, 'PRD.md');
-
-  // Create initial PRD structure
-  const prdContent = generatePRDTemplate(issueId, title, description);
-
-  // Write initial PRD
-  writeFileSync(prdPath, prdContent);
+  if (outputPath) {
+    // Explicit output path takes precedence
+    prdPath = outputPath;
+  } else if (preWorkspace || !workspace) {
+    // Save to pre-workspace drafts directory
+    const { writePRDDraft } = await import('../prd-draft.js');
+    prdPath = writePRDDraft(issueId, generatePRDTemplate(issueId, title, description));
+  } else {
+    // Save to workspace .planning directory
+    const planningDir = join(workspace, '.planning');
+    mkdirSync(planningDir, { recursive: true });
+    prdPath = join(planningDir, 'PRD.md');
+    writeFileSync(prdPath, generatePRDTemplate(issueId, title, description));
+  }
 
   // Spawn PRD agent to expand and refine
   // Note: This is a library function - actual spawning would be done by CLI

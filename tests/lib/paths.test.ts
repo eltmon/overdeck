@@ -20,6 +20,14 @@ import {
   TRAEFIK_DIR,
   TRAEFIK_DYNAMIC_DIR,
   TRAEFIK_CERTS_DIR,
+  BIN_DIR,
+  HEARTBEATS_DIR,
+  CACHE_AGENTS_DIR,
+  CACHE_RULES_DIR,
+  DOCS_DIR,
+  PRDS_DIR,
+  PRD_DRAFTS_DIR,
+  PRD_PUBLISHED_DIR,
 } from '../../src/lib/paths.js';
 
 describe('paths', () => {
@@ -93,10 +101,18 @@ describe('paths', () => {
       expect(INIT_DIRS).toContain(TRAEFIK_DIR);
       expect(INIT_DIRS).toContain(TRAEFIK_DYNAMIC_DIR);
       expect(INIT_DIRS).toContain(TRAEFIK_CERTS_DIR);
+      expect(INIT_DIRS).toContain(BIN_DIR);
+      expect(INIT_DIRS).toContain(HEARTBEATS_DIR);
+      expect(INIT_DIRS).toContain(CACHE_AGENTS_DIR);
+      expect(INIT_DIRS).toContain(CACHE_RULES_DIR);
+      expect(INIT_DIRS).toContain(DOCS_DIR);
+      expect(INIT_DIRS).toContain(PRDS_DIR);
+      expect(INIT_DIRS).toContain(PRD_DRAFTS_DIR);
+      expect(INIT_DIRS).toContain(PRD_PUBLISHED_DIR);
     });
 
     it('should have correct number of directories', () => {
-      expect(INIT_DIRS.length).toBe(14);
+      expect(INIT_DIRS.length).toBe(20);
     });
   });
 });

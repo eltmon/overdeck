@@ -40,7 +40,6 @@ describe('settings', () => {
       expect(defaults.models.specialists.review_agent).toBe('claude-opus-4-6');
       expect(defaults.models.specialists.test_agent).toBe('claude-sonnet-4-6');
       expect(defaults.models.specialists.merge_agent).toBe('claude-sonnet-4-6');
-      expect(defaults.models.planning_agent).toBe('claude-opus-4-6');
       expect(defaults.api_keys).toEqual({});
     });
 
@@ -120,7 +119,6 @@ describe('settings', () => {
 
       // Other values should be defaults per DEFAULT_SETTINGS
       expect(loaded.models.specialists.review_agent).toBe('claude-opus-4-6');
-      expect(loaded.models.planning_agent).toBe('claude-opus-4-6');
       expect(loaded.models.complexity.trivial).toBe('claude-haiku-4-5');
     });
 
@@ -215,7 +213,6 @@ describe('settings', () => {
 
       // Other sections should be defaults per DEFAULT_SETTINGS
       expect(loaded.models.specialists.review_agent).toBe('claude-opus-4-6');
-      expect(loaded.models.planning_agent).toBe('claude-opus-4-6');
     });
   });
 
@@ -308,7 +305,6 @@ describe('settings', () => {
             review_agent: 'claude-sonnet-4-5',
             // Missing test_agent and merge_agent
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -324,32 +320,6 @@ describe('settings', () => {
       expect(error).toBe('Missing specialist agent model configuration');
     });
 
-    it('should detect missing planning_agent', async () => {
-      const { validateSettings } = await import('../../src/lib/settings.js');
-
-      const invalidSettings: any = {
-        models: {
-          specialists: {
-            review_agent: 'claude-sonnet-4-5',
-            test_agent: 'claude-haiku-4-5',
-            merge_agent: 'claude-sonnet-4-5',
-          },
-          // Missing planning_agent
-          complexity: {
-            trivial: 'claude-haiku-4-5',
-            simple: 'claude-haiku-4-5',
-            medium: 'claude-sonnet-4-5',
-            complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
-          },
-        },
-        api_keys: {},
-      };
-
-      const error = validateSettings(invalidSettings);
-      expect(error).toBe('Missing planning_agent configuration');
-    });
-
     it('should detect missing complexity configuration', async () => {
       const { validateSettings } = await import('../../src/lib/settings.js');
 
@@ -360,7 +330,6 @@ describe('settings', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           // Missing complexity
         },
         api_keys: {},
@@ -380,7 +349,6 @@ describe('settings', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -405,7 +373,6 @@ describe('settings', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
