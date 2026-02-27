@@ -42,6 +42,7 @@ import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parser
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
+import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
 import type { Issue } from '../frontend/src/types.js';
 
 // Read package version once at startup — version never changes at runtime
@@ -7771,7 +7772,9 @@ app.post('/api/agents', async (req, res) => {
     const workspaceExists = existsSync(join(projectPath, 'workspaces', `feature-${issueLower}`));
     const prdPath = join(projectPath, 'docs', 'prds', 'active', `${issueLower}-plan.md`);
     const hasPrd = existsSync(prdPath);
-    if (!hasPrd && !workspaceExists) {
+    // Also check for PRD drafts (pre-workspace PRDs)
+    const hasDraftPrd = hasPRDDraft(issueId);
+    if (!hasPrd && !hasDraftPrd && !workspaceExists) {
       console.warn(`[start-agent] WARNING: No PRD found for ${issueId} at ${prdPath}`);
       // Check if there's a completed PRD (issue was already worked on before)
       const completedPrdPath = join(projectPath, 'docs', 'prds', 'completed', `${issueLower}-plan.md`);
@@ -7779,15 +7782,17 @@ app.post('/api/agents', async (req, res) => {
       if (!hasCompletedPrd) {
         // No PRD at all and no workspace - block agent start
         return res.status(422).json({
-          error: `No PRD found for ${issueId}. Run planning first to create a PRD before starting work.`,
-          hint: 'Planning phase has been removed. Create a PRD manually in docs/prds/active/ before starting work.',
+          error: `No PRD found for ${issueId}. Create a PRD before starting work.`,
+          hint: 'Use "pan work plan" to create a PRD draft, then start work.',
           issueId,
         });
       }
       // Has completed PRD - allow (re-work scenario)
       console.log(`[start-agent] Found completed PRD for ${issueId}, allowing agent start (re-work scenario)`);
-    } else if (!hasPrd && workspaceExists) {
+    } else if (!hasPrd && !hasDraftPrd && workspaceExists) {
       console.log(`[start-agent] No PRD for ${issueId} but workspace exists — allowing restart`);
+    } else if (hasDraftPrd && !workspaceExists) {
+      console.log(`[start-agent] Found PRD draft for ${issueId}`);
     }
 
     // Ensure workspace exists — create it if missing (e.g. after deep-wipe)
@@ -7807,6 +7812,16 @@ app.post('/api/agents', async (req, res) => {
           error: `Failed to create workspace for ${issueId}: ${(wsErr as Error).message}`,
           hint: 'Try creating the workspace manually: pan workspace create ' + issueId + ' --local',
         });
+      }
+    }
+
+    // If PRD draft exists, promote it to workspace
+    if (hasDraftPrd && !hasPrd) {
+      const promoteResult = promotePRDToWorkspace(issueId, workspacePath);
+      if (promoteResult.success) {
+        console.log(`[start-agent] Promoted PRD draft to workspace for ${issueId}`);
+      } else {
+        console.warn(`[start-agent] Could not promote PRD draft: ${promoteResult.error}`);
       }
     }
 
