@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { readFileSync, existsSync } from 'fs';
-import { join, homedir } from 'os';
+import { homedir } from 'os';
+import { join } from 'path';
 
 function getLinearApiKey(): string | null {
   const envFile = join(homedir(), '.panopticon.env');
