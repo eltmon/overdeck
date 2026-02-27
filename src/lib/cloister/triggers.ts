@@ -326,9 +326,6 @@ export async function checkAllTriggers(
   const stuckCheck = checkStuckEscalation(health, currentModel, config);
   if (stuckCheck.triggered) triggers.push(stuckCheck);
 
-  const planningCheck = await checkPlanningComplete(agentId, workspace, issueId, config);
-  if (planningCheck.triggered) triggers.push(planningCheck);
-
   const testCheck = checkTestFailure(workspace, currentModel, config);
   if (testCheck.triggered) triggers.push(testCheck);
 

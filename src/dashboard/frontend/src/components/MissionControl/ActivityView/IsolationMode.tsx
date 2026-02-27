@@ -17,7 +17,6 @@ interface IsolationModeProps {
 }
 
 const TYPE_STYLES: Record<string, string> = {
-  planning: styles.typePlanning,
   work: styles.typeWork,
   review: styles.typeReview,
   test: styles.typeTest,

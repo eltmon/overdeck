@@ -116,7 +116,7 @@ export interface AgentState {
   sessionId?: string; // For resuming sessions after handoff
 
   // Work type system (PAN-118)
-  phase?: 'exploration' | 'planning' | 'implementation' | 'testing' | 'documentation' | 'review-response';
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response';
   workType?: WorkTypeId; // Current work type ID
 }
 
@@ -335,10 +335,10 @@ export interface SpawnOptions {
   model?: string;
   prompt?: string;
   difficulty?: ComplexityLevel;
-  agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'planning-agent' | 'work-agent';
+  agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
 
   // Work type system (PAN-118)
-  phase?: 'exploration' | 'planning' | 'implementation' | 'testing' | 'documentation' | 'review-response';
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response';
   workType?: WorkTypeId; // Explicit work type ID (overrides phase-based detection)
 }
 
@@ -376,9 +376,6 @@ function determineModel(options: SpawnOptions): string {
 
     // Map specialist agent type to work type ID
     if (options.agentType && options.agentType !== 'work-agent') {
-      if (options.agentType === 'planning-agent') {
-        return getModelId('planning-agent');
-      }
       // Specialists: review-agent, test-agent, merge-agent
       const workType: WorkTypeId = `specialist-${options.agentType}` as WorkTypeId;
       return getModelId(workType);

@@ -105,22 +105,6 @@ describe('agent spawning with work types', () => {
       expect(state.model).toMatch(/gemini|sonnet|haiku/i);
     });
 
-    it('should spawn planning phase with correct work type', async () => {
-      const options: SpawnOptions = {
-        issueId: 'PAN-TEST-2',
-        workspace: '/tmp/test-workspace',
-        phase: 'planning',
-      };
-
-      const state = await spawnAgent(options);
-
-      expect(state.id).toBe('agent-pan-test-2');
-      expect(state.phase).toBe('planning');
-      expect(state.model).toBeDefined();
-      // Planning should use stronger model
-      expect(state.model).toMatch(/opus|pro|sonnet/i);
-    });
-
     it('should spawn implementation phase with correct work type', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-3',
@@ -191,19 +175,6 @@ describe('agent spawning with work types', () => {
       expect(state.id).toBe('agent-pan-test-7');
       expect(state.model).toBeDefined();
     });
-
-    it('should spawn planning agent with correct work type', async () => {
-      const options: SpawnOptions = {
-        issueId: 'PAN-TEST-8',
-        workspace: '/tmp/test-workspace',
-        agentType: 'planning-agent',
-      };
-
-      const state = await spawnAgent(options);
-
-      expect(state.id).toBe('agent-pan-test-8');
-      expect(state.model).toBeDefined();
-    });
   });
 
   describe('explicit model override', () => {
@@ -211,7 +182,7 @@ describe('agent spawning with work types', () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-9',
         workspace: '/tmp/test-workspace',
-        phase: 'planning', // Would normally get a strong model
+        phase: 'implementation', // Would normally get a strong model
         model: 'claude-haiku-4', // But we force a different one
       };
 
@@ -219,7 +190,7 @@ describe('agent spawning with work types', () => {
 
       expect(state.id).toBe('agent-pan-test-9');
       expect(state.model).toBe('claude-haiku-4');
-      expect(state.phase).toBe('planning');
+      expect(state.phase).toBe('implementation');
     });
   });
 

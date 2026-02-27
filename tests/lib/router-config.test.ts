@@ -52,7 +52,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -87,7 +86,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -127,7 +125,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -165,7 +162,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -196,7 +192,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -232,7 +227,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -266,7 +260,6 @@ describe('router-config', () => {
             test_agent: 'gpt-4o-mini',
             merge_agent: 'gemini-3-flash-preview',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -298,7 +291,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'gpt-5.2-codex',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -314,7 +306,7 @@ describe('router-config', () => {
 
       const config = generateRouterConfig(settings);
 
-      expect(config.router['planning-agent'].model).toBe('gpt-5.2-codex');
+      // Planning agent removed - no assertion needed
     });
 
     it('should map complexity levels to configured models', async () => {
@@ -327,7 +319,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'gpt-4o-mini',
             simple: 'claude-haiku-4-5',
@@ -360,7 +351,6 @@ describe('router-config', () => {
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
           },
-          planning_agent: 'claude-opus-4-6',
           complexity: {
             trivial: 'claude-haiku-4-5',
             simple: 'claude-haiku-4-5',
@@ -374,12 +364,11 @@ describe('router-config', () => {
 
       const config = generateRouterConfig(settings);
 
-      // Should have 3 specialists + 1 planning + 5 complexity = 9 rules
-      expect(Object.keys(config.router)).toHaveLength(9);
+      // Should have 3 specialists + 5 complexity = 8 rules (planning removed)
+      expect(Object.keys(config.router)).toHaveLength(8);
       expect(config.router).toHaveProperty('specialist-review-agent');
       expect(config.router).toHaveProperty('specialist-test-agent');
       expect(config.router).toHaveProperty('specialist-merge-agent');
-      expect(config.router).toHaveProperty('planning-agent');
       expect(config.router).toHaveProperty('complexity-trivial');
       expect(config.router).toHaveProperty('complexity-simple');
       expect(config.router).toHaveProperty('complexity-medium');
@@ -402,7 +391,7 @@ describe('router-config', () => {
           },
         ],
         router: {
-          'planning-agent': { model: 'claude-opus-4-6' },
+          'specialist-review-agent': { model: 'claude-sonnet-4-6' },
         },
       };
 
@@ -450,7 +439,7 @@ describe('router-config', () => {
           },
         ],
         router: {
-          'planning-agent': { model: 'claude-opus-4-6' },
+          'specialist-review-agent': { model: 'claude-sonnet-4-6' },
         },
       };
 

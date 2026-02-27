@@ -64,7 +64,6 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
 // Work type to required capabilities mapping
 export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
   'issue-agent:exploration': ['reasoning', 'large-context'],
-  'issue-agent:planning': ['reasoning', 'code'],
   'issue-agent:implementation': ['code', 'reasoning', 'agentic'],
   'issue-agent:testing': ['code', 'reasoning'],
   'issue-agent:documentation': ['reasoning'],
@@ -83,7 +82,6 @@ export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
   'prd-agent': ['reasoning'],
   'decomposition-agent': ['reasoning'],
   'triage-agent': ['fast', 'reasoning'],
-  'planning-agent': ['reasoning', 'code'],
   'cli:interactive': ['reasoning', 'code'],
   'cli:quick-command': ['fast'],
 };
@@ -91,7 +89,6 @@ export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
 // Work type display names
 export const WORK_TYPE_NAMES: Record<string, string> = {
   'issue-agent:exploration': 'Exploration Phase',
-  'issue-agent:planning': 'Planning Phase',
   'issue-agent:implementation': 'Implementation Phase',
   'issue-agent:testing': 'Testing Phase',
   'issue-agent:documentation': 'Documentation Phase',
@@ -110,7 +107,6 @@ export const WORK_TYPE_NAMES: Record<string, string> = {
   'prd-agent': 'PRD Agent',
   'decomposition-agent': 'Decomposition Agent',
   'triage-agent': 'Triage Agent',
-  'planning-agent': 'Planning Agent',
   'cli:interactive': 'CLI Interactive',
   'cli:quick-command': 'CLI Quick Command',
 };

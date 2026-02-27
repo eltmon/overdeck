@@ -112,10 +112,6 @@ export const WORK_TYPES = {
     category: 'pre-work',
     description: 'Prioritizes and triages issues',
   },
-  'planning-agent': {
-    category: 'pre-work',
-    description: 'Explores and plans implementation approach',
-  },
 
   // CLI contexts (2)
   'cli:interactive': {
