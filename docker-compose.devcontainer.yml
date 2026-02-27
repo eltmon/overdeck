@@ -1,0 +1,151 @@
+# Panopticon Dashboard Dev Container
+# Feature workspace: feature-pan-273
+# URLs:
+#   Frontend: https://feature-pan-273.pan.localhost
+#   API: https://api-feature-pan-273.pan.localhost
+
+services:
+  # Combined dev container for VS Code attach
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    volumes:
+      - ../:/workspaces/panopticon:cached
+      - npm-cache:/home/node/.npm
+    command: sleep infinity
+    networks:
+      - devnet
+      - panopticon
+
+  # Init service: runs npm install once for all workspaces
+  # Frontend and server depend on this completing successfully
+  # Also verifies critical deps resolve to prevent Vite CPU runaway
+  init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    working_dir: /workspaces/panopticon
+    command: >
+      sh -c "
+        echo '📦 Installing dependencies...' &&
+        npm install &&
+        echo '✅ npm install complete' &&
+        echo '🔍 Verifying critical dependencies resolve...' &&
+        node -e \"
+          const deps = ['react', 'react-dom', 'vite'];
+          const missing = deps.filter(d => { try { require.resolve(d); return false; } catch { return true; } });
+          if (missing.length) { console.error('❌ Missing deps:', missing.join(', ')); process.exit(1); }
+          console.log('✅ All critical deps resolve');
+        \" &&
+        echo '🎉 Init complete'
+      "
+    volumes:
+      - ../:/workspaces/panopticon:cached
+      - npm-cache:/home/node/.npm
+      # Shadow ALL node_modules to avoid host permission conflicts
+      - root-node-modules:/workspaces/panopticon/node_modules
+      - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
+      - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
+      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
+    networks:
+      - devnet
+
+  # Frontend (Vite dev server with HMR)
+  # NOTE: Vite config uses port 3010, not default 5173
+  # Mounts entire project because npm workspaces hoists binaries to root node_modules
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    working_dir: /workspaces/panopticon/src/dashboard/frontend
+    command: sh -c "npm run dev -- --host 0.0.0.0"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+    volumes:
+      # Mount entire project so npm workspaces can find hoisted binaries
+      - ../:/workspaces/panopticon:cached
+      - npm-cache:/home/node/.npm
+      # Shadow ALL node_modules to avoid host permission conflicts
+      - root-node-modules:/workspaces/panopticon/node_modules
+      - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
+      - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
+      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
+    environment:
+      - CI=true
+      - VITE_API_URL=https://api-feature-pan-273.pan.localhost
+    networks:
+      - devnet
+      - panopticon
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pan-fe-feature-pan-273.rule=Host(`feature-pan-273.pan.localhost`)"
+      - "traefik.http.routers.pan-fe-feature-pan-273.entrypoints=websecure"
+      - "traefik.http.routers.pan-fe-feature-pan-273.tls=true"
+      - "traefik.http.services.pan-fe-feature-pan-273.loadbalancer.server.port=3010"
+
+  # Backend API server (with watch mode)
+  # NOTE: Server imports from ../../lib/ which needs root node_modules
+  # We mount the entire project and shadow only dashboard node_modules
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: node
+    working_dir: /workspaces/panopticon/src/dashboard/server
+    command: sh -c "npm run dev"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+    volumes:
+      # Mount entire project so ../../lib/ imports work
+      - ../:/workspaces/panopticon:cached
+      - npm-cache:/home/node/.npm
+      # Shadow ALL node_modules to avoid host permission conflicts
+      # (npm workspaces will try to hoist/install to all workspace node_modules)
+      - root-node-modules:/workspaces/panopticon/node_modules
+      - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
+      - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
+      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
+      # Mount required host paths for workspace/agent management
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${HOME}/.panopticon:/home/node/.panopticon
+      - ${HOME}/projects:/home/node/projects:ro
+    environment:
+      - NODE_ENV=development
+      - PORT=3011
+      - LINEAR_API_KEY=${LINEAR_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    networks:
+      - devnet
+      - panopticon
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pan-api-feature-pan-273.rule=Host(`api-feature-pan-273.pan.localhost`)"
+      - "traefik.http.routers.pan-api-feature-pan-273.entrypoints=websecure"
+      - "traefik.http.routers.pan-api-feature-pan-273.tls=true"
+      - "traefik.http.services.pan-api-feature-pan-273.loadbalancer.server.port=3011"
+
+volumes:
+  npm-cache:
+  root-node-modules:
+  frontend-node-modules:
+  server-node-modules:
+  packages-shared-node-modules:
+
+networks:
+  devnet:
+  panopticon:
+    external: true

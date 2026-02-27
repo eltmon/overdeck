@@ -17,6 +17,39 @@ import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 
+/**
+ * Map a raw status string to its canonical state.
+ * Exported for testing.
+ */
+export function getCanonicalStatus(status: string | undefined): string {
+  if (!status) return 'backlog';
+  const normalized = status.toLowerCase();
+  // Direct backlog mappings
+  if (normalized === 'backlog' || normalized === 'triage' || normalized === 'unknown') {
+    return 'backlog';
+  }
+  // Other canonical states
+  if (normalized === 'todo' || normalized === 'to do' || normalized === 'ready' || normalized === 'unstarted') {
+    return 'todo';
+  }
+  if (normalized === 'in progress' || normalized === 'started' || normalized === 'active') {
+    return 'in_progress';
+  }
+  if (normalized === 'in review' || normalized === 'review' || normalized === 'qa' || normalized === 'testing') {
+    return 'in_review';
+  }
+  if (normalized === 'done' || normalized === 'completed' || normalized === 'closed') {
+    return 'done';
+  }
+  if (normalized === 'planning' || normalized === 'in planning' || normalized === 'planned' || normalized === 'discovery') {
+    return 'planning';
+  }
+  if (normalized === 'canceled' || normalized === 'cancelled' || normalized === 'duplicate' || normalized === "won't do" || normalized === 'wontfix') {
+    return 'canceled';
+  }
+  return 'backlog'; // Default fallback
+}
+
 // Poll intervals (ms)
 const POLL_INTERVALS = {
   github:  { default: 30_000, min: 15_000, max: 300_000 },
@@ -221,6 +254,23 @@ export class IssueDataService {
         return false;
       });
     }
+
+    // Apply cycle filter using canonical status mapping
+    const cycle = options?.cycle ?? 'current';
+    if (cycle === 'current') {
+      // Current cycle: exclude Backlog items (including Triage, Unknown), only show active cycle work
+      allIssues = allIssues.filter(issue => {
+        const canonical = getCanonicalStatus(issue.status);
+        return canonical !== 'backlog';
+      });
+    } else if (cycle === 'backlog') {
+      // Backlog view: only show Backlog items (including Triage, Unknown)
+      allIssues = allIssues.filter(issue => {
+        const canonical = getCanonicalStatus(issue.status);
+        return canonical === 'backlog';
+      });
+    }
+    // cycle === 'all': no additional filtering, show everything
 
     // Sort by updatedAt
     allIssues.sort((a, b) =>

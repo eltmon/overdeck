@@ -86,7 +86,7 @@ function AgentBadge({
 }
 
 // Cost data for an issue
-interface IssueCost {
+export interface IssueCost {
   issueId: string;
   totalCost: number;
   tokenCount: number;
@@ -196,6 +196,46 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
   }
 
   return grouped;
+}
+
+/**
+ * Group issues by their labels for list view.
+ * Issues with multiple labels appear in each label group.
+ * Issues with no labels go into an 'Uncategorized' group.
+ */
+export function groupByLabels(issues: Issue[]): Record<string, Issue[]> {
+  const grouped: Record<string, Issue[]> = {};
+  const uncategorized: Issue[] = [];
+
+  for (const issue of issues) {
+    const labels = issue.labels || [];
+
+    if (labels.length === 0) {
+      uncategorized.push(issue);
+    } else {
+      for (const label of labels) {
+        if (!grouped[label]) {
+          grouped[label] = [];
+        }
+        grouped[label].push(issue);
+      }
+    }
+  }
+
+  // Add uncategorized group if there are any
+  if (uncategorized.length > 0) {
+    grouped['Uncategorized'] = uncategorized;
+  }
+
+  // Sort groups by label name
+  const sorted: Record<string, Issue[]> = {};
+  Object.keys(grouped)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(key => {
+      sorted[key] = grouped[key];
+    });
+
+  return sorted;
 }
 
 /**
@@ -427,6 +467,157 @@ function CompactChildCard({
       {hasAgent && (
         <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" title="Agent running" />
       )}
+    </div>
+  );
+}
+
+// List view row — compact row for list view grouped by labels
+export function ListIssueRow({
+  issue,
+  agents,
+  specialists,
+  issueCosts,
+  selectedIssue,
+  onSelectIssue,
+  onPlan,
+}: {
+  issue: Issue;
+  agents: Agent[];
+  specialists: SpecialistAgent[];
+  issueCosts: Record<string, IssueCost>;
+  selectedIssue: string | null | undefined;
+  onSelectIssue: (id: string | null) => void;
+  onPlan: (issue: Issue) => void;
+}) {
+  const isSelected = selectedIssue === issue.id;
+  const canonical = STATUS_LABELS[issue.status] || 'backlog';
+
+  // Status indicator color
+  const statusColor = canonical === 'done' ? 'bg-green-400' :
+                      canonical === 'in_review' ? 'bg-pink-400' :
+                      canonical === 'in_progress' ? 'bg-yellow-400' :
+                      canonical === 'planning' ? 'bg-purple-400' :
+                      canonical === 'todo' ? 'bg-blue-400' :
+                      'bg-gray-500';
+
+  // Get cost for this issue
+  const cost = issueCosts[issue.identifier.toLowerCase()];
+
+  // Check for running agents
+  const issueIdLower = issue.identifier.toLowerCase();
+  const activeAgent = agents.find(
+    a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead'
+  );
+  const isRunning = !!activeAgent;
+
+  // Check for specialists
+  const issueSpecialists = specialists.filter(
+    s => s.currentIssue?.toLowerCase() === issueIdLower
+  );
+
+  // Parse difficulty from labels
+  const difficulty = parseDifficultyLabel(issue.labels || []);
+
+  return (
+    <div
+      onClick={() => onSelectIssue(isSelected ? null : issue.id)}
+      className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-overlay/50 transition-colors cursor-pointer ${
+        isSelected ? 'bg-surface-overlay' : ''
+      }`}
+    >
+      {/* Status indicator */}
+      <span className={`w-2 h-2 rounded-full shrink-0 ${statusColor}`} title={canonical} />
+
+      {/* Issue identifier */}
+      <a
+        href={issue.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="text-xs text-content-subtle hover:text-blue-400 shrink-0 font-mono"
+      >
+        {issue.identifier}
+      </a>
+
+      {/* Title */}
+      <span className="text-sm text-content-body truncate flex-1 min-w-0">{issue.title}</span>
+
+      {/* Priority indicator */}
+      {issue.priority === 1 && <span className="text-xs text-red-400 font-medium shrink-0">Urgent</span>}
+      {issue.priority === 2 && <span className="text-xs text-orange-400 font-medium shrink-0">High</span>}
+
+      {/* Difficulty badge */}
+      {difficulty && (
+        <DifficultyBadge level={difficulty} />
+      )}
+
+      {/* Cost */}
+      {cost && cost.totalCost > 0 && (
+        <span className={`text-xs px-1.5 py-0.5 rounded ${getCostColor(cost.totalCost)}`}>
+          {formatCost(cost.totalCost)}
+        </span>
+      )}
+
+      {/* Assignee */}
+      {issue.assignee && (
+        <span className="text-xs text-content-subtle flex items-center gap-1 shrink-0">
+          <User className="w-3 h-3" />
+          {issue.assignee.name.split(' ')[0]}
+        </span>
+      )}
+
+      {/* Running agent indicator */}
+      {isRunning && (
+        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" title="Agent running" />
+      )}
+
+      {/* Specialist indicators */}
+      {issueSpecialists.map(s => (
+        <span key={s.name} className="text-xs text-blue-400 shrink-0" title={`${s.displayName} specialist`}>
+          {s.name === 'review-agent' ? '👁️' : s.name === 'test-agent' ? '🧪' : s.name === 'merge-agent' ? '🔀' : '🤖'}
+        </span>
+      ))}
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-1 shrink-0">
+        {/* Plan/Start button for backlog/todo items */}
+        {!isRunning && (canonical === 'backlog' || canonical === 'todo') && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlan(issue);
+            }}
+            className="p-1 text-content-subtle hover:text-blue-400 transition-colors"
+            title="Plan issue"
+          >
+            <Play className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* View button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectIssue(issue.id);
+          }}
+          className="p-1 text-content-subtle hover:text-content transition-colors"
+          title="View details"
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </button>
+
+        {/* External link */}
+        <a
+          href={issue.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="p-1 text-content-subtle hover:text-content transition-colors"
+          title="Open in tracker"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
     </div>
   );
 }
@@ -736,6 +927,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     return issues.filter(issue => issue.project && selectedProjects.has(issue.project.id));
   }, [issues, selectedProjects]);
 
+  // Group by labels for list view - MUST be before any conditional returns (Rules of Hooks)
+  const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
+
   const toggleProject = (projectId: string) => {
     setSelectedProjects(prev => {
       const next = new Set(prev);
@@ -896,43 +1090,74 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         )}
       </div>
 
-      {/* Kanban columns with DnD */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {STATUS_ORDER.map((status) => (
-            <DroppableColumn key={status} status={status}>
-              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
-                <div className="px-4 py-3 border-b border-divider">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
-                    <span className="text-sm text-content-subtle">{grouped[status].length}</span>
-                  </div>
+      {/* All Issues - List View (grouped by labels) */}
+      {cycleFilter === 'all' ? (
+        <div className="space-y-6 overflow-y-auto pb-4">
+          {Object.entries(groupedByLabels).map(([label, labelIssues]) => (
+            <div key={label} className="bg-surface-raised rounded-lg">
+              <div className="px-4 py-3 border-b border-divider">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-blue-400" />
+                  <h3 className="font-semibold text-content">{label}</h3>
+                  <span className="text-sm text-content-subtle">({labelIssues.length})</span>
                 </div>
-                <ColumnContent
-                  issues={grouped[status]}
-                  agents={agents}
-                  specialists={specialists}
-                  issueCosts={issueCosts}
-                  selectedIssue={selectedIssue}
-                  onSelectIssue={onSelectIssue}
-                  onPlan={setPlanDialogIssue}
-                  onViewBeads={setBeadsDialogIssue}
-                />
               </div>
-            </DroppableColumn>
+              <div className="divide-y divide-divider">
+                {labelIssues.map((issue) => (
+                  <ListIssueRow
+                    key={issue.id}
+                    issue={issue}
+                    agents={agents}
+                    specialists={specialists}
+                    issueCosts={issueCosts}
+                    selectedIssue={selectedIssue}
+                    onSelectIssue={onSelectIssue}
+                    onPlan={setPlanDialogIssue}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
+      ) : (
+        /* Kanban columns with DnD (for current and backlog views) */
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {STATUS_ORDER.map((status) => (
+              <DroppableColumn key={status} status={status}>
+                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
+                  <div className="px-4 py-3 border-b border-divider">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
+                      <span className="text-sm text-content-subtle">{grouped[status].length}</span>
+                    </div>
+                  </div>
+                  <ColumnContent
+                    issues={grouped[status]}
+                    agents={agents}
+                    specialists={specialists}
+                    issueCosts={issueCosts}
+                    selectedIssue={selectedIssue}
+                    onSelectIssue={onSelectIssue}
+                    onPlan={setPlanDialogIssue}
+                    onViewBeads={setBeadsDialogIssue}
+                  />
+                </div>
+              </DroppableColumn>
+            ))}
+          </div>
 
-        {/* Drag Overlay - Ghost card following cursor */}
-        <DragOverlay dropAnimation={dropAnimation}>
-          {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
-        </DragOverlay>
-      </DndContext>
+          {/* Drag Overlay - Ghost card following cursor */}
+          <DragOverlay dropAnimation={dropAnimation}>
+            {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       {/* Undo Toast */}
       <UndoToast
