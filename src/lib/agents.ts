@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -566,7 +566,7 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
 
   // For non-planner agents, find the planner's session path for parent linking
   if (options.phase && options.phase !== 'planning') {
-    const plannerAgentId = `agent-${options.issueId.toLowerCase()}-planning`;
+    const plannerAgentId = `agent-${options.issueId.toLowerCase()}`;
     const plannerState = getAgentState(plannerAgentId);
     if (plannerState?.sageoxSessionPath) {
       sageoxEnv.PAN_PARENT_SESSION = plannerState.sageoxSessionPath;
@@ -1092,6 +1092,3 @@ async function captureSageoxSessionPath(agentId: string, projectRoot: string): P
 
   throw new Error(`Could not find SageOx session for ${agentId} after ${maxAttempts * delayMs}ms`);
 }
-
-// Import statSync for file modification time checking
-import { statSync } from 'fs';
