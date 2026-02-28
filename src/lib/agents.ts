@@ -546,13 +546,30 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
     preTrustDirectory(options.workspace);
   } catch { /* non-fatal */ }
 
+  // Build SageOx environment variables for session linking
+  const sageoxEnv: Record<string, string> = {
+    OX_PROJECT_ROOT: '/home/eltmon/Projects/panopticon-cli',
+  };
+
+  // Add issue tracking for multi-agent pipelines
+  if (options.issueId) {
+    sageoxEnv.PAN_ISSUE_ID = options.issueId;
+  }
+  if (options.phase) {
+    sageoxEnv.PAN_PHASE = options.phase;
+  }
+  // TODO: Capture parent session path from planner for subagent linking
+  // This requires reading the planner's session path from its state
+  // and passing it to subsequent agents (worker, reviewer, tester, merger)
+
   createSession(agentId, options.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
       PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
-      ...providerEnv // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
+      ...providerEnv, // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
+      ...sageoxEnv // Add SageOx environment variables
     }
   });
 
