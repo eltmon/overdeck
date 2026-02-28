@@ -266,7 +266,7 @@ program
           }
 
           console.log(chalk.dim('Starting Traefik...'));
-          execSync('docker-compose up -d', {
+          execSync('docker compose up -d', {
             cwd: traefikDir,
             stdio: 'pipe',
           });
@@ -440,7 +440,7 @@ program
       if (existsSync(traefikDir)) {
         console.log(chalk.dim('Stopping Traefik...'));
         try {
-          execSync('docker-compose down', {
+          execSync('docker compose down', {
             cwd: traefikDir,
             stdio: 'pipe',
           });

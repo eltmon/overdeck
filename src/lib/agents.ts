@@ -11,7 +11,7 @@ import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
 import { loadSettings, type ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
-import { getProviderForModel, getProviderEnv, requiresRouter } from './providers.js';
+import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, requiresRouter } from './providers.js';
 import { loadConfig } from './config.js';
 import { createTrackerFromConfig } from './tracker/factory.js';
 import type { TrackerType } from './tracker/interface.js';
@@ -517,6 +517,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Get provider-specific environment variables (BASE_URL, AUTH_TOKEN)
   const providerEnv = getProviderEnvForModel(selectedModel);
 
+  // For credential-file providers (e.g. Kimi Code Plan), configure apiKeyHelper
+  // so Claude Code can refresh short-lived tokens dynamically
+  const provider = getProviderForModel(selectedModel as ModelId);
+  if (provider.authType === 'credential-file') {
+    setupCredentialFileAuth(provider, options.workspace);
+  }
+
   // Create tmux session and start claude
   // For prompts with special shell characters, use a launcher script to safely pass the prompt
   // The script reads the file into a variable, which bash then safely expands
@@ -726,6 +733,14 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // Get provider env for the agent's model (reads latest API key from settings)
     const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
 
+    // For credential-file providers, ensure apiKeyHelper is configured
+    if (agentState.model) {
+      const provider = getProviderForModel(agentState.model as ModelId);
+      if (provider.authType === 'credential-file') {
+        setupCredentialFileAuth(provider, agentState.workspace);
+      }
+    }
+
     // Create new tmux session with resume command
     const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
     createSession(normalizedId, agentState.workspace, claudeCmd, {
@@ -821,6 +836,14 @@ export function recoverAgent(agentId: string): AgentState | null {
 
   // Get provider env for the agent's model (reads latest API key from settings)
   const providerEnv = state.model ? getProviderEnvForModel(state.model) : {};
+
+  // For credential-file providers, ensure apiKeyHelper is configured
+  if (state.model) {
+    const provider = getProviderForModel(state.model as ModelId);
+    if (provider.authType === 'credential-file') {
+      setupCredentialFileAuth(provider, state.workspace);
+    }
+  }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
   const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
