@@ -279,4 +279,74 @@ describe('agent spawning with work types', () => {
       );
     });
   });
+
+  describe('SageOx environment variables', () => {
+    beforeEach(async () => {
+      // Reset the sessionExists mock to return false for these tests
+      const { sessionExists } = await import('../../src/lib/tmux.js');
+      vi.mocked(sessionExists).mockReturnValue(false);
+    });
+
+    it('should pass OX_PROJECT_ROOT to createSession', async () => {
+      const { createSession } = await import('../../src/lib/tmux.js');
+
+      const options: SpawnOptions = {
+        issueId: 'PAN-SAGOX-1',
+        workspace: '/tmp/test-workspace',
+        phase: 'implementation',
+      };
+
+      await spawnAgent(options);
+
+      // Verify createSession was called with SageOx env vars
+      expect(createSession).toHaveBeenCalled();
+      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const envArg = callArgs[3]?.env as Record<string, string>;
+
+      expect(envArg.OX_PROJECT_ROOT).toBe('/home/eltmon/Projects/panopticon-cli');
+    });
+
+    it('should pass PAN_ISSUE_ID and PAN_PHASE for multi-agent pipeline', async () => {
+      const { createSession } = await import('../../src/lib/tmux.js');
+
+      const options: SpawnOptions = {
+        issueId: 'PAN-SAGOX-2',
+        workspace: '/tmp/test-workspace',
+        phase: 'review',
+      };
+
+      await spawnAgent(options);
+
+      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const envArg = callArgs[3]?.env as Record<string, string>;
+
+      expect(envArg.PAN_ISSUE_ID).toBe('PAN-SAGOX-2');
+      expect(envArg.PAN_PHASE).toBe('review');
+    });
+
+    it('should include SageOx vars alongside existing env vars', async () => {
+      const { createSession } = await import('../../src/lib/tmux.js');
+
+      const options: SpawnOptions = {
+        issueId: 'PAN-SAGOX-3',
+        workspace: '/tmp/test-workspace',
+        phase: 'planning',
+      };
+
+      await spawnAgent(options);
+
+      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const envArg = callArgs[3]?.env as Record<string, string>;
+
+      // Check existing Panopticon vars are still present
+      expect(envArg.PANOPTICON_AGENT_ID).toBe('agent-pan-sagox-3');
+      expect(envArg.PANOPTICON_ISSUE_ID).toBe('PAN-SAGOX-3');
+      expect(envArg.PANOPTICON_SESSION_TYPE).toBe('planning');
+
+      // Check SageOx vars are present
+      expect(envArg.OX_PROJECT_ROOT).toBe('/home/eltmon/Projects/panopticon-cli');
+      expect(envArg.PAN_ISSUE_ID).toBe('PAN-SAGOX-3');
+      expect(envArg.PAN_PHASE).toBe('planning');
+    });
+  });
 });
