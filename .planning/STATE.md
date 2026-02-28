@@ -1,93 +1,78 @@
-# Agent State: PAN-275
+# Agent State: PAN-278
 
 ## Issue Details
 
-- **ID:** PAN-275
-- **Title:** Complete kanban board redesign: remove planning state, label cleanup, pre-workspace PRDs
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/275
+- **ID:** PAN-278
+- **Title:** SageOx Integration — Fork PR + Panopticon Wiring
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/278
 
 ## Summary
 
-This issue completes the kanban board redesign started in PAN-273. PAN-273 only implemented Phase 2 (backlog filtering + list view). This issue implements the remaining phases:
+This issue implements the SageOx fork PR to enable session capture for Panopticon agents. The PR adds support for:
 
-1. **Phase 1:** Remove "Planning" canonical state (~20 files)
-2. **Phase 2:** Hide Backlog from Current cycle view (DONE in PAN-273)
-3. **Phase 3:** Pre-Workspace PRD directory
-4. **Phase 4:** Clean up Linear custom states (MIN team)
-5. **Phase 5:** Label cleanup
+1. **Devroot workflow** - Enable SageOx to find project root when Claude Code starts from a parent directory
+2. **Auto-record mode** - Combine context injection with session recording in one command
+3. **Multi-agent pipeline** - Link sessions by external issue ID for full issue lifecycle visibility
 
-## Current Status
+## Implementation Status
 
-- Phase 2 (Backlog filtering) was completed in PAN-273
-- All other phases need to be implemented
+### Changes to SageOx (fork PR)
 
-## Files to Modify
+| Change | File | Status |
+|--------|------|--------|
+| OX_PROJECT_ROOT env var | `internal/config/project_config.go` | ✅ Done |
+| OX_PROJECT_ROOT in duplicate function | `cmd/ox/agent.go` | ✅ Done |
+| --project flag | `cmd/ox/agent_prime.go` | ✅ Done |
+| --auto-record flag | `cmd/ox/agent_prime.go` | ✅ Done |
+| --issue flag | `cmd/ox/agent_prime.go` | ✅ Done |
+| --title flag | `cmd/ox/agent_prime.go` | ✅ Done |
+| --parent-session flag | `cmd/ox/agent_prime.go` | ✅ Done |
+| ExternalIssueID in RecordingState | `internal/session/recording.go` | ✅ Done |
+| ExternalIssueID in StartRecordingOptions | `internal/session/recording.go` | ✅ Done |
 
-### Phase 1: Core State Types
-- `src/core/state-mapping.ts` - Remove from CanonicalState, CANONICAL_STATES, STATE_TYPE_MAP, DEFAULT_STATE_MAPPINGS, trackerStateToCanonical()
-- `src/dashboard/frontend/src/types.ts` - Remove from CanonicalState, STATUS_ORDER, STATUS_LABELS, STATE_TYPE_MAP
-- `src/lib/shadow-state.ts` - Remove from CanonicalState
+### Key Implementation Details
 
-### Phase 2: Dashboard Server
-- `src/dashboard/server/index.ts` - Remove start-planning, complete-planning endpoints; update move-status
-- `src/dashboard/server/services/issue-data-service.ts` - Remove planning mappings
+1. **OX_PROJECT_ROOT env var**: Both `FindProjectRoot()` functions now check for `OX_PROJECT_ROOT` environment variable before walking up from CWD. This enables devroot workflows where Claude Code starts from `~/Projects/` (parent of repos).
 
-### Phase 3: Frontend Components
-- `src/dashboard/frontend/src/components/KanbanBoard.tsx` - Remove planning column
-- `src/dashboard/frontend/src/components/PlanDialog.tsx` - Remove planning flow
-- `src/dashboard/frontend/src/components/HandoffsPage.tsx` - Remove planning_complete
+2. **--project flag**: Added to `ox agent prime` with precedence: --project > OX_PROJECT_ROOT > walk-up discovery.
 
-### Phase 4: Cloister System
-- `src/lib/cloister/triggers.ts` - Remove planning_complete trigger
-- `src/lib/cloister/config.ts` - Remove planning_complete config
-- `src/lib/work-types.ts` - Remove planning work types
-- `src/lib/settings.ts` - Remove planning_agent config
+3. **--auto-record flag**: When set, forces session recording start regardless of config. Combines context injection + recording in one call.
 
-### Phase 5: CLI Commands
-- `src/cli/commands/work/wipe.ts` - Remove planning label cleanup
-- `src/cli/commands/work/done.ts` - Update label logic
+4. **--issue, --title, --parent-session flags**: Enable multi-agent pipeline linking. All sessions for an issue (planner → worker → reviewer → tester → merger) can be grouped and browsed on sageox.ai.
 
-### Phase 6: Pre-Workspace PRD Directory
-- Create `docs/prds/drafts/` directory convention
-- Update planning agent to write to drafts/
-- On workspace creation, copy draft PRD to .planning/
-- Update PRD enforcement to check drafts/
+5. **ExternalIssueID field**: Added to both `RecordingState` and `StartRecordingOptions` structs for persistent issue tracking.
 
-### Phase 7: Label Cleanup
-- Remove dead labels: planning, planned, done, review-ready
-- Add auto-cleanup on state transitions
-- Consolidate duplicate mapGitHubStateToCanonical() logic
-- Unify pan work done across trackers
+### Usage Examples
 
-### Phase 8: Tests
-- `tests/e2e/handoff-planning-complete.test.ts`
-- `tests/integration/agent-spawning.test.ts`
-- `tests/lib/router-config.test.ts`
+**Human PRD session from devroot:**
+```bash
+OX_PROJECT_ROOT=/home/eltmon/Projects/panopticon-cli ox agent prime --auto-record
+```
 
-### Phase 9: Linear Custom States
-- Remove "In Planning" custom state from MIN team
-- Remove "In Review" custom state from MIN team
-- Migrate existing issues
+**Panopticon agent session:**
+```bash
+ox agent prime --auto-record --issue PAN-279 --title "PAN-279: Implementation" --parent-session /path/to/planner/session
+```
 
-## Acceptance Criteria
+### Remaining Work
 
-- [ ] Kanban board shows exactly 4 columns: Todo, In Progress, In Review, Done
-- [ ] No references to "planning" as a canonical state anywhere in the codebase
-- [ ] All tests pass (no new failures vs main baseline)
-- [ ] Label state transitions are clean — no stale labels left behind
-- [ ] PRDs can be created before a workspace exists
+- [ ] Add tests for OX_PROJECT_ROOT in FindProjectRoot()
+- [ ] Add tests for --project flag
+- [ ] Add tests for --auto-record flag
+- [ ] Update CLAUDE.md documentation in SageOx repo
+- [ ] Submit PR to upstream SageOx repo
 
 ## References
 
-- PRD: `docs/prds/completed/pan-273-plan.md`
-- Design doc: `docs/KANBAN-MODEL.md`
-- Prior work: PAN-273 / PR #274
+- PRD: `docs/prds/active/PAN-277-plan.md` (same as PAN-278)
+- SageOx fork: `/home/eltmon/Projects/sageox-ox/`
+- Upstream: https://github.com/sageox/ox.git
+- Fork: git@github.com:eltmon/ox.git
 
-## Specialist Feedback
+## Notes
 
-- **[2026-02-27T07:22Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/007-review-agent-changes-requested.md`
-- **[2026-02-27T08:14Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/008-review-agent-changes-requested.md`
-- **[2026-02-27T08:28Z] test-agent → FAILED** — `.planning/feedback/009-test-agent-failed.md`
-- **[2026-02-27T13:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/010-review-agent-changes-requested.md`
-- **[2026-02-27T13:21Z] test-agent → FAILED** — `.planning/feedback/011-test-agent-failed.md`
-- **[2026-02-27T16:22Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/012-review-agent-changes-requested.md`
+The SageOx repository is located at `/home/eltmon/Projects/sageox-ox/` and is configured with:
+- origin: https://github.com/sageox/ox.git (upstream)
+- fork: git@github.com:eltmon/ox.git (personal fork for PR)
+
+All changes have been made to the local SageOx fork. The next step is to commit these changes and submit a PR to upstream.
