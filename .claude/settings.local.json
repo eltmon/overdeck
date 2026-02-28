@@ -1,3 +1,53 @@
 {
-  "apiKeyHelper": "/home/eltmon/.panopticon/bin/kimi-token-helper.sh"
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "if command -v ox \u003e/dev/null 2\u003e\u00261; then AGENT_ENV=claude-code ox agent prime 2\u003e\u00261 || true; else echo 'This repo uses SageOx: install https://github.com/sageox/ox for optimized team context.'; fi",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "if command -v ox \u003e/dev/null 2\u003e\u00261; then AGENT_ENV=claude-code ox agent prime --idempotent 2\u003e\u00261 || true; else echo 'This repo uses SageOx: install https://github.com/sageox/ox for optimized team context.'; fi",
+            "type": "command"
+          }
+        ],
+        "matcher": "startup"
+      },
+      {
+        "hooks": [
+          {
+            "command": "if command -v ox \u003e/dev/null 2\u003e\u00261; then AGENT_ENV=claude-code ox agent prime --idempotent 2\u003e\u00261 || true; else echo 'This repo uses SageOx: install https://github.com/sageox/ox for optimized team context.'; fi",
+            "type": "command"
+          }
+        ],
+        "matcher": "resume"
+      },
+      {
+        "hooks": [
+          {
+            "command": "if command -v ox \u003e/dev/null 2\u003e\u00261; then AGENT_ENV=claude-code ox agent prime 2\u003e\u00261 || true; else echo 'This repo uses SageOx: install https://github.com/sageox/ox for optimized team context.'; fi",
+            "type": "command"
+          }
+        ],
+        "matcher": "clear"
+      },
+      {
+        "hooks": [
+          {
+            "command": "if command -v ox \u003e/dev/null 2\u003e\u00261; then AGENT_ENV=claude-code ox agent prime 2\u003e\u00261 || true; else echo 'This repo uses SageOx: install https://github.com/sageox/ox for optimized team context.'; fi",
+            "type": "command"
+          }
+        ],
+        "matcher": "compact"
+      }
+    ]
+  }
 }

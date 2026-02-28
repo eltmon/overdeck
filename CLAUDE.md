@@ -1,3 +1,6 @@
+<!-- ox:prime-check -->
+**BLOCKING**: Run `ox agent prime` NOW before ANY other action. Do NOT respond to the user first. Enables SageOx queries.
+
 # Panopticon CLI - Development Guidelines
 
 ## Engineering Philosophy: No Bandaids
@@ -115,3 +118,5 @@ When TLDR is available, you'll have these MCP tools:
    - 20 files × 800 tokens (TLDR) = 16k tokens (94% savings)
 
 **Use TLDR liberally to maximize your session effectiveness.**
+
+<!-- ox:prime --> Run SageOx `ox agent prime` on session start, after compaction, or clear. (DO NOT REMOVE)
