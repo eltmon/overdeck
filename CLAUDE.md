@@ -10,6 +10,16 @@ This means:
 - If a component is generating bad data, fix the component — don't add defensive code downstream to tolerate bad data.
 - If an agent is misbehaving, fix the agent's constraints — don't add monitoring to catch the misbehavior after the fact.
 
+## CRITICAL: Deliver Complete Features — No Partial Implementations
+
+**Unless explicitly asked to break work into phases, deliver the entire feature in a single issue.** A feature is idempotent — partial delivery provides zero value to the end user.
+
+- A PRD may describe phases for organizational clarity, but the agent MUST implement ALL phases before calling `pan work done`.
+- Do not merge a subset of a feature and call it done. If the issue says "redesign the kanban board", that means ALL aspects of the redesign — not just the easy parts.
+- "Large refactor" is not an excuse to ship incomplete work. The size of the change is the size of the change.
+- If a feature genuinely cannot be completed in one session (e.g., token limits), the agent should document exactly what remains and NOT signal completion. The issue stays open until ALL work is done.
+- PRD phases are implementation guidance, not separate deliverables.
+
 ## CRITICAL: No execSync in Dashboard Server Code
 
 **NEVER use `execSync` in any code reachable from the dashboard server** (Express routes, Socket.io handlers, Cloister specialists, deacon, or any module imported by `src/dashboard/server/index.ts`).

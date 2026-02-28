@@ -16,7 +16,7 @@ import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-pa
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import { loadSettings, type ModelId } from '../settings.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
-import { getProviderForModel, getProviderEnv } from '../providers.js';
+import { getProviderForModel, getProviderEnv, setupCredentialFileAuth } from '../providers.js';
 import { sendKeysAsync } from '../tmux.js';
 
 const execAsync = promisify(exec);
@@ -538,6 +538,12 @@ export async function spawnEphemeralSpecialist(
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
     const providerEnv = getProviderEnvForModel(model);
     const envFlags = buildTmuxEnvFlags(providerEnv);
+
+    // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh
+    const providerConfig = getProviderForModel(model as ModelId);
+    if (providerConfig.authType === 'credential-file') {
+      setupCredentialFileAuth(providerConfig, cwd);
+    }
 
     // Permission flags based on specialist type
     const permissionFlags = specialistType === 'merge-agent'
@@ -1385,6 +1391,12 @@ Say: "I am the ${name} specialist, ready and waiting for tasks."`;
     const providerEnv = getProviderEnvForModel(model);
     const envFlags = buildTmuxEnvFlags(providerEnv);
 
+    // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh
+    const providerCfg = getProviderForModel(model as ModelId);
+    if (providerCfg.authType === 'credential-file') {
+      setupCredentialFileAuth(providerCfg, cwd);
+    }
+
     // Write identity prompt and launcher script to avoid shell escaping issues
     const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
     await execAsync(`mkdir -p "${agentDir}"`, { encoding: 'utf-8' });
@@ -1558,6 +1570,12 @@ export async function wakeSpecialist(
       // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
       const providerEnv = getProviderEnvForModel(model);
       const envFlags = buildTmuxEnvFlags(providerEnv);
+
+      // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh
+      const provCfg = getProviderForModel(model as ModelId);
+      if (provCfg.authType === 'credential-file') {
+        setupCredentialFileAuth(provCfg, cwd);
+      }
 
       // merge-agent needs full bypass to handle git stash drop, reset, etc.
       const permissionFlags = name === 'merge-agent'
