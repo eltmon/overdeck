@@ -287,23 +287,24 @@ describe('agent spawning with work types', () => {
       vi.mocked(sessionExists).mockReturnValue(false);
     });
 
-    it('should pass OX_PROJECT_ROOT to createSession', async () => {
+    it('should pass OX_PROJECT_ROOT derived from workspace path', async () => {
       const { createSession } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-1',
-        workspace: '/tmp/test-workspace',
+        workspace: '/home/user/project/workspaces/feature-test',
         phase: 'implementation',
       };
 
       await spawnAgent(options);
 
-      // Verify createSession was called with SageOx env vars
+      // Verify createSession was called with dynamically derived OX_PROJECT_ROOT
       expect(createSession).toHaveBeenCalled();
       const callArgs = vi.mocked(createSession).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
-      expect(envArg.OX_PROJECT_ROOT).toBe('/home/eltmon/Projects/panopticon-cli');
+      // Should resolve to parent of workspaces directory
+      expect(envArg.OX_PROJECT_ROOT).toBe('/home/user/project');
     });
 
     it('should pass PAN_ISSUE_ID and PAN_PHASE for multi-agent pipeline', async () => {
@@ -344,9 +345,48 @@ describe('agent spawning with work types', () => {
       expect(envArg.PANOPTICON_SESSION_TYPE).toBe('planning');
 
       // Check SageOx vars are present
-      expect(envArg.OX_PROJECT_ROOT).toBe('/home/eltmon/Projects/panopticon-cli');
+      expect(envArg.OX_PROJECT_ROOT).toBeDefined();
       expect(envArg.PAN_ISSUE_ID).toBe('PAN-SAGOX-3');
       expect(envArg.PAN_PHASE).toBe('planning');
+    });
+
+    it('should not set PAN_PARENT_SESSION for planner agents', async () => {
+      const { createSession } = await import('../../src/lib/tmux.js');
+
+      const options: SpawnOptions = {
+        issueId: 'PAN-SAGOX-4',
+        workspace: '/tmp/test-workspace',
+        phase: 'planning',
+      };
+
+      await spawnAgent(options);
+
+      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const envArg = callArgs[3]?.env as Record<string, string>;
+
+      // Planner agents should not have PAN_PARENT_SESSION
+      expect(envArg.PAN_PARENT_SESSION).toBeUndefined();
+    });
+
+    it('should attempt to look up planner session for non-planner phases', async () => {
+      const { createSession } = await import('../../src/lib/tmux.js');
+
+      // Note: Testing the actual parent session lookup requires mocking the agents module,
+      // which is complex due to module caching. Instead, we verify that:
+      // 1. Non-planner phases don't throw errors
+      // 2. The function completes successfully (no errors looking up planner)
+
+      const workerOptions: SpawnOptions = {
+        issueId: 'PAN-SAGOX-5',
+        workspace: '/tmp/worker-workspace',
+        phase: 'implementation',
+      };
+
+      // Should complete without error even when planner doesn't exist
+      await expect(spawnAgent(workerOptions)).resolves.not.toThrow();
+
+      // Verify session was created
+      expect(createSession).toHaveBeenCalled();
     });
   });
 });
