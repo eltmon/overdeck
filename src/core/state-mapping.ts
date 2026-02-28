@@ -181,7 +181,7 @@ export interface TrackerStateCheckResult {
   missingStates: CanonicalState[];
   recommendations: {
     state: CanonicalState;
-    action: 'create' | 'use_fallback' | 'skip';
+    action: 'create' | 'skip';
     details: string;
   }[];
 }

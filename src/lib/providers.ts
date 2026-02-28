@@ -6,6 +6,8 @@
  * - Router providers: Require claude-code-router for API translation
  */
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './settings.js';
 
 export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'zai';
@@ -20,11 +22,22 @@ export type ProviderCompatibility = 'direct' | 'router';
 /**
  * Provider configuration
  */
+/**
+ * Auth type for direct providers:
+ * - static: Use a long-lived API key passed via ANTHROPIC_AUTH_TOKEN (default)
+ * - credential-file: Use apiKeyHelper to read a fresh token from a credential file.
+ *   Used for providers like Kimi Code Plan whose JWT tokens expire every ~15 minutes.
+ */
+export type ProviderAuthType = 'static' | 'credential-file';
+
 export interface ProviderConfig {
   name: ProviderName;
   displayName: string;
   compatibility: ProviderCompatibility;
   baseUrl?: string; // For direct providers
+  authType?: ProviderAuthType; // Defaults to 'static'
+  credentialFile?: string; // Path to credential file (for 'credential-file' auth)
+  credentialHelper?: string; // Script that reads credential file and prints token
   models: ModelId[];
   tested: boolean; // Whether compatibility has been verified
   description: string;
@@ -48,9 +61,12 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
     baseUrl: 'https://api.kimi.com/coding/',
+    authType: 'credential-file',
+    credentialFile: '~/.kimi/credentials/kimi-code.json',
+    credentialHelper: '~/.panopticon/bin/kimi-token-helper.sh',
     models: [], // Kimi uses same model names as Anthropic
     tested: true,
-    description: 'Anthropic-compatible API, tested 2026-01-28',
+    description: 'Anthropic-compatible API via Kimi Code Plan (OAuth token refresh)',
   },
 
   zai: {
@@ -160,8 +176,17 @@ export function getProviderEnv(
     }
 
     if (provider.name !== 'anthropic') {
-      // Non-Anthropic providers need auth token
-      env.ANTHROPIC_AUTH_TOKEN = apiKey;
+      if (provider.authType === 'credential-file') {
+        // Credential-file providers use apiKeyHelper for dynamic token refresh.
+        // We still need an initial ANTHROPIC_AUTH_TOKEN for the first request,
+        // but apiKeyHelper (configured via setupCredentialFileAuth) will keep it fresh.
+        env.ANTHROPIC_AUTH_TOKEN = apiKey;
+        // Refresh token every 60 seconds (kimi-cli refreshes credential file automatically)
+        env.CLAUDE_CODE_API_KEY_HELPER_TTL_MS = '60000';
+      } else {
+        // Static providers use a long-lived API key
+        env.ANTHROPIC_AUTH_TOKEN = apiKey;
+      }
     }
 
     // Z.AI recommends longer timeout
@@ -177,4 +202,36 @@ export function getProviderEnv(
       ANTHROPIC_AUTH_TOKEN: 'router-managed',
     };
   }
+}
+
+/**
+ * For credential-file providers (e.g. Kimi Code Plan), configure Claude Code's
+ * apiKeyHelper in the workspace settings so tokens are refreshed dynamically.
+ *
+ * This writes to .claude/settings.local.json in the workspace directory.
+ * Must be called before spawning the agent.
+ */
+export function setupCredentialFileAuth(provider: ProviderConfig, workspacePath: string): void {
+  if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
+
+  const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
+  const claudeDir = join(workspacePath, '.claude');
+  const settingsPath = join(claudeDir, 'settings.local.json');
+
+  if (!existsSync(claudeDir)) {
+    mkdirSync(claudeDir, { recursive: true });
+  }
+
+  // Read existing settings or start fresh
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+    } catch { /* start fresh */ }
+  }
+
+  // Set the apiKeyHelper to our token reader script
+  settings.apiKeyHelper = helperPath;
+
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }

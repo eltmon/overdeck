@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
+import { join, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -11,7 +11,7 @@ import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
 import { loadSettings, type ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
-import { getProviderForModel, getProviderEnv, requiresRouter } from './providers.js';
+import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, requiresRouter } from './providers.js';
 import { loadConfig } from './config.js';
 import { createTrackerFromConfig } from './tracker/factory.js';
 import type { TrackerType } from './tracker/interface.js';
@@ -118,6 +118,9 @@ export interface AgentState {
   // Work type system (PAN-118)
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response';
   workType?: WorkTypeId; // Current work type ID
+
+  // SageOx session tracking (PAN-278)
+  sageoxSessionPath?: string; // Path to SageOx session folder for parent linking
 }
 
 export function getAgentDir(agentId: string): string {
@@ -517,6 +520,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Get provider-specific environment variables (BASE_URL, AUTH_TOKEN)
   const providerEnv = getProviderEnvForModel(selectedModel);
 
+  // For credential-file providers (e.g. Kimi Code Plan), configure apiKeyHelper
+  // so Claude Code can refresh short-lived tokens dynamically
+  const provider = getProviderForModel(selectedModel as ModelId);
+  if (provider.authType === 'credential-file') {
+    setupCredentialFileAuth(provider, options.workspace);
+  }
+
   // Create tmux session and start claude
   // For prompts with special shell characters, use a launcher script to safely pass the prompt
   // The script reads the file into a variable, which bash then safely expands
@@ -539,13 +549,38 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
     preTrustDirectory(options.workspace);
   } catch { /* non-fatal */ }
 
+  // Build SageOx environment variables for session linking
+  // Derive project root from workspace path: <project-root>/workspaces/<branch>
+  const projectRoot = resolve(options.workspace, '..', '..');
+  const sageoxEnv: Record<string, string> = {
+    OX_PROJECT_ROOT: projectRoot,
+  };
+
+  // Add issue tracking for multi-agent pipelines
+  if (options.issueId) {
+    sageoxEnv.PAN_ISSUE_ID = options.issueId;
+  }
+  if (options.phase) {
+    sageoxEnv.PAN_PHASE = options.phase;
+  }
+
+  // For non-planner agents, find the planner's session path for parent linking
+  if (options.phase && options.phase !== 'planning') {
+    const plannerAgentId = `agent-${options.issueId.toLowerCase()}`;
+    const plannerState = getAgentState(plannerAgentId);
+    if (plannerState?.sageoxSessionPath) {
+      sageoxEnv.PAN_PARENT_SESSION = plannerState.sageoxSessionPath;
+    }
+  }
+
   createSession(agentId, options.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
       PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
-      ...providerEnv // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
+      ...providerEnv, // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
+      ...sageoxEnv // Add SageOx environment variables
     }
   });
 
@@ -561,6 +596,13 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
   if (!options.agentType || options.agentType === 'work-agent') {
     transitionIssueToInProgress(options.issueId).catch((err) => {
       console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
+    });
+  }
+
+  // For planner agents, capture SageOx session path after it becomes available
+  if (options.phase === 'planning') {
+    captureSageoxSessionPath(agentId, projectRoot).catch((err) => {
+      console.warn(`[agents] Could not capture SageOx session path: ${err.message}`);
     });
   }
 
@@ -726,6 +768,14 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // Get provider env for the agent's model (reads latest API key from settings)
     const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
 
+    // For credential-file providers, ensure apiKeyHelper is configured
+    if (agentState.model) {
+      const provider = getProviderForModel(agentState.model as ModelId);
+      if (provider.authType === 'credential-file') {
+        setupCredentialFileAuth(provider, agentState.workspace);
+      }
+    }
+
     // Create new tmux session with resume command
     const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
     createSession(normalizedId, agentState.workspace, claudeCmd, {
@@ -821,6 +871,14 @@ export function recoverAgent(agentId: string): AgentState | null {
 
   // Get provider env for the agent's model (reads latest API key from settings)
   const providerEnv = state.model ? getProviderEnvForModel(state.model) : {};
+
+  // For credential-file providers, ensure apiKeyHelper is configured
+  if (state.model) {
+    const provider = getProviderForModel(state.model as ModelId);
+    if (provider.authType === 'credential-file') {
+      setupCredentialFileAuth(provider, state.workspace);
+    }
+  }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
   const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
@@ -966,4 +1024,71 @@ function writeTaskCache(agentId: string, issueId: string): void {
       updated_at: new Date().toISOString()
     }, null, 2)
   );
+}
+
+/**
+ * Capture SageOx session path for a planner agent.
+ * This is used for parent-child session linking in multi-agent pipelines.
+ * Subsequent agents (worker, reviewer, tester, merger) will use this path
+ * as their PAN_PARENT_SESSION to link their sessions to the planner's session.
+ */
+async function captureSageoxSessionPath(agentId: string, projectRoot: string): Promise<void> {
+  // Wait for SageOx session to be created by the hook (up to 10 seconds)
+  const sessionsDir = join(projectRoot, '.sageox', 'sessions');
+  let attempts = 0;
+  const maxAttempts = 20;
+  const delayMs = 500;
+
+  while (attempts < maxAttempts) {
+    // Check if sessions directory exists
+    if (existsSync(sessionsDir)) {
+      // Find the most recent session directory for this agent
+      const sessions = readdirSync(sessionsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => ({
+          name: d.name,
+          path: join(sessionsDir, d.name),
+          mtime: existsSync(join(sessionsDir, d.name, '.recording.json'))
+            ? readFileSync(join(sessionsDir, d.name, '.recording.json'), 'utf-8')
+            : null
+        }))
+        .filter(s => {
+          // Check if this session belongs to our agent
+          if (!s.mtime) return false;
+          try {
+            const state = JSON.parse(s.mtime);
+            return state.agent_id === agentId || state.AgentID === agentId;
+          } catch {
+            return false;
+          }
+        })
+        .sort((a, b) => {
+          // Sort by modification time (newest first)
+          const aTime = existsSync(join(a.path, '.recording.json'))
+            ? (statSync(join(a.path, '.recording.json')).mtimeMs || 0)
+            : 0;
+          const bTime = existsSync(join(b.path, '.recording.json'))
+            ? (statSync(join(b.path, '.recording.json')).mtimeMs || 0)
+            : 0;
+          return bTime - aTime;
+        });
+
+      if (sessions.length > 0) {
+        // Update agent state with SageOx session path
+        const state = getAgentState(agentId);
+        if (state) {
+          state.sageoxSessionPath = sessions[0].path;
+          saveAgentState(state);
+          console.log(`[agents] Captured SageOx session path for ${agentId}: ${sessions[0].path}`);
+          return;
+        }
+      }
+    }
+
+    // Wait before retrying
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    attempts++;
+  }
+
+  throw new Error(`Could not find SageOx session for ${agentId} after ${maxAttempts * delayMs}ms`);
 }
