@@ -100,3 +100,7 @@ The SageOx repository is located at `/home/eltmon/Projects/sageox-ox/` and is co
 - fork: git@github.com:eltmon/ox.git (personal fork for PR)
 
 All changes have been made to the local SageOx fork and pushed. The Panopticon wiring is complete with tests.
+
+## Specialist Feedback
+
+- **[2026-02-28T09:02Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/014-review-agent-changes-requested.md`
