@@ -1135,7 +1135,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
             </div>
             <div className="flex flex-wrap gap-1.5">
               {Object.entries(workspace.containers).map(([name, status]) => {
-                const isStarting = (startContainersMutation.isPending || containersStarting) && !status.running && !status.status?.startsWith('exited');
+                const isStarting = (startContainersMutation.isPending || containersStarting) && !status.running;
                 const isControlling = containerControlMutation.isPending && containerMenu?.containerName === name;
                 const isFailed = status.status?.startsWith('exited') && !status.running;
                 return (

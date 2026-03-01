@@ -33,6 +33,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-beads', 'Skip beads CLI installation')
     .option('--skip-router', 'Skip claude-code-router installation')
+    .option('--skip-sageox', 'Skip SageOx CLI installation')
     .action(installCommand);
 }
 
@@ -43,6 +44,7 @@ interface InstallOptions {
   skipDocker?: boolean;
   skipBeads?: boolean;
   skipRouter?: boolean;
+  skipSageox?: boolean;
 }
 
 interface PrereqResult {
@@ -134,13 +136,13 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'apt install tmux / brew install tmux',
   });
 
-  // mkcert (optional but recommended)
+  // mkcert (optional but recommended - will be auto-installed)
   const hasMkcert = checkCommand('mkcert');
   results.push({
     name: 'mkcert',
     passed: hasMkcert,
-    message: hasMkcert ? 'installed' : 'not found (optional)',
-    fix: 'brew install mkcert / apt install mkcert',
+    message: hasMkcert ? 'installed' : 'not found (will auto-install)',
+    fix: 'Download from https://github.com/FiloSottile/mkcert/releases',
   });
 
   // Beads CLI (optional - will be auto-installed)
@@ -169,6 +171,15 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'npm install -g @musistudio/claude-code-router',
   });
 
+  // SageOx CLI (optional - will be auto-installed)
+  const hasOx = checkCommand('ox');
+  results.push({
+    name: 'SageOx CLI (ox)',
+    passed: hasOx,
+    message: hasOx ? 'installed' : 'not found (will auto-install)',
+    fix: 'curl -sL https://github.com/eltmon/ox/releases/download/latest/ox-linux-amd64 -o ~/.local/bin/ox && chmod +x ~/.local/bin/ox',
+  });
+
   // jq (JSON processor — used by statusline, beads, merge-agent, review-agent, dashboard)
   const hasJq = checkCommand('jq');
   results.push({
@@ -190,7 +201,7 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
   return {
     results,
     // mkcert, ttyd, beads, and claude-code-router are optional (will be auto-installed or skipped)
-    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)' && r.name !== 'claude-code-router').every((r) => r.passed),
+    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)' && r.name !== 'claude-code-router' && r.name !== 'SageOx CLI (ox)').every((r) => r.passed),
   };
 }
 
@@ -261,9 +272,32 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   }
 
-  // Step 4: mkcert setup
+  // Step 4: mkcert setup (auto-install if missing)
   if (!options.skipMkcert && !options.minimal) {
-    const hasMkcert = checkCommand('mkcert');
+    let hasMkcert = checkCommand('mkcert');
+    if (!hasMkcert) {
+      spinner.start('Installing mkcert...');
+      try {
+        const plat = detectPlatform();
+        if (plat === 'darwin') {
+          execSync('brew install mkcert', { stdio: 'pipe', timeout: 120000 });
+          spinner.succeed('mkcert installed via Homebrew');
+        } else {
+          const binDir = join(homedir(), '.local', 'bin');
+          mkdirSync(binDir, { recursive: true });
+          const mkcertPath = join(binDir, 'mkcert');
+          const arch = process.arch === 'x64' ? 'amd64' : process.arch;
+          execSync(`curl -sL "https://github.com/FiloSottile/mkcert/releases/latest/download/mkcert-v1.4.4-linux-${arch}" -o "${mkcertPath}" && chmod +x "${mkcertPath}"`, {
+            stdio: 'pipe',
+            timeout: 60000,
+          });
+          spinner.succeed(`mkcert installed to ${mkcertPath}`);
+        }
+        hasMkcert = checkCommand('mkcert');
+      } catch {
+        spinner.warn('mkcert auto-install failed - install manually from https://github.com/FiloSottile/mkcert/releases');
+      }
+    }
     if (hasMkcert) {
       spinner.start('Setting up mkcert CA...');
       try {
@@ -427,6 +461,33 @@ async function installCommand(options: InstallOptions): Promise<void> {
       }
     } else {
       spinner.info('claude-code-router already installed');
+    }
+  }
+
+  // Step 5d: Install SageOx CLI (team context capture)
+  if (options.skipSageox) {
+    spinner.info('Skipping SageOx installation (--skip-sageox)');
+  } else {
+    const hasOxNow = checkCommand('ox');
+    if (!hasOxNow) {
+      spinner.start('Installing SageOx CLI (ox)...');
+      try {
+        const binDir = join(homedir(), '.local', 'bin');
+        mkdirSync(binDir, { recursive: true });
+        const oxPath = join(binDir, 'ox');
+        const arch = process.arch === 'x64' ? 'amd64' : process.arch;
+        const plat = detectPlatform();
+        const platform = plat === 'darwin' ? 'darwin' : 'linux';
+        execSync(`curl -sL "https://github.com/eltmon/ox/releases/download/latest/ox-${platform}-${arch}" -o "${oxPath}" && chmod +x "${oxPath}"`, {
+          stdio: 'pipe',
+          timeout: 60000,
+        });
+        spinner.succeed(`SageOx CLI installed to ${oxPath}`);
+      } catch {
+        spinner.warn('SageOx installation failed - install manually from https://github.com/eltmon/ox/releases');
+      }
+    } else {
+      spinner.info('SageOx CLI already installed');
     }
   }
 
