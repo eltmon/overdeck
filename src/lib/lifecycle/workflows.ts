@@ -1,0 +1,369 @@
+/**
+ * Lifecycle workflows — Compose atomic operations into complete workflows.
+ *
+ * approve()  — Post-merge: archive + close + teardown + compact-beads
+ * close()    — Simple close: close-issue + teardown
+ * closeOut() — Full ceremony: verify-merged + archive + teardown + close + label + clear-status
+ * deepWipe() — Destructive: teardown(deleteBranches) + delete agent state + reset issue
+ */
+
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { PANOPTICON_HOME } from '../paths.js';
+import type {
+  LifecycleContext,
+  WorkflowResult,
+  StepResult,
+  ApproveOptions,
+  DeepWipeOptions,
+  ArchiveOptions,
+} from './types.js';
+import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
+import { archivePlanning, findWorkspacePath } from './archive-planning.js';
+import { closeIssue, type CloseIssueOptions } from './close-issue.js';
+import { teardownWorkspace } from './teardown-workspace.js';
+import { compactBeads } from './compact-beads.js';
+
+const execAsync = promisify(exec);
+
+/**
+ * Build a WorkflowResult from collected steps.
+ */
+function buildResult(
+  workflow: WorkflowResult['workflow'],
+  issueId: string,
+  steps: StepResult[],
+  startTime: number,
+): WorkflowResult {
+  return {
+    workflow,
+    issueId,
+    success: steps.every(s => s.success),
+    steps,
+    duration: Date.now() - startTime,
+  };
+}
+
+/**
+ * approve() — Post-merge lifecycle.
+ *
+ * 1. Archive planning artifacts (PRD move + .planning/ preservation)
+ * 2. Close issue on tracker
+ * 3. Teardown workspace
+ * 4. Compact beads
+ * 5. Clear review status
+ *
+ * Note: The actual merge step is NOT included here — the merge-agent
+ * handles merge validation. This workflow runs AFTER merge completes.
+ */
+export async function approve(
+  ctx: LifecycleContext,
+  opts: ApproveOptions & CloseIssueOptions & ArchiveOptions = {},
+): Promise<WorkflowResult> {
+  const start = Date.now();
+  const allSteps: StepResult[] = [];
+
+  // 1. Archive planning
+  const archiveSteps = await archivePlanning(ctx, opts);
+  allSteps.push(...archiveSteps);
+
+  // If archive failed, stop — don't destroy unarchived artifacts
+  const archiveFailed = archiveSteps.some(s => !s.success && !s.skipped);
+  if (archiveFailed) {
+    allSteps.push(stepFailed('approve:abort', 'Stopped — archiving failed, workspace preserved'));
+    return buildResult('approve', ctx.issueId, allSteps, start);
+  }
+
+  // 2. Close issue
+  const closeSteps = await closeIssue(ctx, {
+    tracker: opts.tracker,
+    comment: 'Merged to main via Panopticon lifecycle',
+    applyLabel: true,
+  });
+  allSteps.push(...closeSteps);
+
+  // 3. Teardown workspace
+  const teardownSteps = await teardownWorkspace(ctx);
+  allSteps.push(...teardownSteps);
+
+  // 4. Compact beads (non-blocking — failure doesn't affect workflow success)
+  if (!opts.skipBeadsCompaction) {
+    const beadsResult = await compactBeads(ctx);
+    allSteps.push(beadsResult);
+  }
+
+  // 5. Clear review status
+  const clearResult = await clearReviewStatusStep(ctx.issueId);
+  allSteps.push(clearResult);
+
+  return buildResult('approve', ctx.issueId, allSteps, start);
+}
+
+/**
+ * close() — Simple issue close with teardown.
+ *
+ * Used when an issue is being closed without merge (canceled, won't-do, etc.)
+ * Does NOT archive workspace artifacts.
+ *
+ * 1. Close issue on tracker
+ * 2. Teardown workspace
+ * 3. Clear review status
+ */
+export async function close(
+  ctx: LifecycleContext,
+  opts: CloseIssueOptions = {},
+): Promise<WorkflowResult> {
+  const start = Date.now();
+  const allSteps: StepResult[] = [];
+
+  // 1. Close issue
+  const closeSteps = await closeIssue(ctx, {
+    tracker: opts.tracker,
+    reason: opts.reason,
+    applyLabel: false,
+  });
+  allSteps.push(...closeSteps);
+
+  // 2. Teardown workspace
+  const teardownSteps = await teardownWorkspace(ctx);
+  allSteps.push(...teardownSteps);
+
+  // 3. Clear review status
+  const clearResult = await clearReviewStatusStep(ctx.issueId);
+  allSteps.push(clearResult);
+
+  return buildResult('close', ctx.issueId, allSteps, start);
+}
+
+/**
+ * closeOut() — Full close-out ceremony.
+ *
+ * This is the human-gated verification and cleanup workflow.
+ * Replaces the monolithic executeCloseOut() function.
+ *
+ * 1. Verify branch merged (hard fail if not — must pass before any cleanup)
+ * 2. Move PRD + archive workspace artifacts (hard fail if archiving fails)
+ * 3. Clean up workspace (tmux, TLDR, Docker, worktree)
+ * 4. Clean up agent state
+ * 5. Close issue on tracker
+ * 6. Apply closed-out label
+ * 7. Clear review status
+ */
+export async function closeOut(
+  ctx: LifecycleContext,
+  opts: CloseIssueOptions & ArchiveOptions = {},
+): Promise<WorkflowResult> {
+  const start = Date.now();
+  const allSteps: StepResult[] = [];
+
+  // 1. Verify branch merged (hard fail — must pass before we archive or clean up)
+  const mergeVerify = await verifyBranchMerged(ctx);
+  allSteps.push(mergeVerify);
+  if (!mergeVerify.success && !mergeVerify.skipped) {
+    return buildResult('close-out', ctx.issueId, allSteps, start);
+  }
+
+  // 2. Move PRD + archive workspace artifacts
+  const archiveSteps = await archivePlanning(ctx, opts);
+  allSteps.push(...archiveSteps);
+
+  // Hard fail on archive failure — don't destroy unarchived artifacts
+  const archiveFailed = archiveSteps.some(s => !s.success && !s.skipped);
+  if (archiveFailed) {
+    allSteps.push(stepFailed('close-out:abort', 'Stopped — archiving failed, workspace preserved'));
+    return buildResult('close-out', ctx.issueId, allSteps, start);
+  }
+
+  // 4+5. Teardown workspace + agent state
+  const teardownSteps = await teardownWorkspace(ctx);
+  allSteps.push(...teardownSteps);
+
+  // 6+7. Close issue + apply label
+  const closeSteps = await closeIssue(ctx, {
+    tracker: opts.tracker,
+    comment: 'Closed via close-out ceremony',
+    applyLabel: true,
+  });
+  allSteps.push(...closeSteps);
+
+  // 8. Clear review status
+  const clearResult = await clearReviewStatusStep(ctx.issueId);
+  allSteps.push(clearResult);
+
+  return buildResult('close-out', ctx.issueId, allSteps, start);
+}
+
+/**
+ * deepWipe() — Destructive cleanup for abandoned workspaces.
+ *
+ * 1. Teardown workspace (with branch deletion)
+ * 2. (Optional) Reset issue to backlog/open
+ * 3. Clear review status
+ */
+export async function deepWipe(
+  ctx: LifecycleContext,
+  opts: DeepWipeOptions = {},
+): Promise<WorkflowResult> {
+  const start = Date.now();
+  const allSteps: StepResult[] = [];
+  const { deleteWorkspace = true, deleteBranches = true, resetIssue = true } = opts;
+
+  // 1. Teardown workspace (aggressive — delete branches, project-specific cleanup)
+  const teardownSteps = await teardownWorkspace(ctx, {
+    deleteWorkspace,
+    deleteBranches,
+    workspaceConfig: opts.workspaceConfig,
+    projectName: opts.projectName,
+  });
+  allSteps.push(...teardownSteps);
+
+  // 2. Reset issue to open/backlog
+  if (resetIssue) {
+    const resetResult = await resetIssueToBacklog(ctx);
+    allSteps.push(resetResult);
+  }
+
+  // 3. Clear review status
+  const clearResult = await clearReviewStatusStep(ctx.issueId);
+  allSteps.push(clearResult);
+
+  return buildResult('deep-wipe', ctx.issueId, allSteps, start);
+}
+
+// --- Internal helpers ---
+
+/**
+ * Verify feature branch is merged into main.
+ */
+async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
+  const step = 'close-out:verify-merged';
+  const issueLower = ctx.issueId.toLowerCase();
+  const branchName = `feature/${issueLower}`;
+
+  try {
+    // Check if branch exists locally
+    const { stdout: branchExists } = await execAsync(
+      `git branch --list "${branchName}" 2>/dev/null || true`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+
+    if (branchExists.trim()) {
+      // Branch exists — check for unmerged commits
+      const { stdout: unmerged } = await execAsync(
+        `git log main..${branchName} --oneline 2>/dev/null || true`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      if (unmerged.trim()) {
+        const count = unmerged.trim().split('\n').length;
+        return stepFailed(step, `${count} unmerged commit(s) on ${branchName}. Merge before closing out.`);
+      }
+      return stepOk(step, ['All commits merged to main']);
+    }
+
+    // Check remote
+    const { stdout: remoteBranch } = await execAsync(
+      `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
+      { cwd: ctx.projectPath, encoding: 'utf-8' },
+    );
+
+    if (remoteBranch.trim()) {
+      await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
+      const { stdout: remoteUnmerged } = await execAsync(
+        `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      if (remoteUnmerged.trim()) {
+        const count = remoteUnmerged.trim().split('\n').length;
+        return stepFailed(step, `${count} unmerged commit(s) on remote ${branchName}.`);
+      }
+      return stepOk(step, ['Remote branch fully merged']);
+    }
+
+    // No branch at all — assume squash-merged and branch deleted
+    return stepOk(step, ['Branch already cleaned up (squash-merged)']);
+  } catch (err) {
+    return stepFailed(step, `Could not verify merge: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Reset issue back to open/backlog state (for deep-wipe).
+ */
+async function resetIssueToBacklog(ctx: LifecycleContext): Promise<StepResult> {
+  const step = 'deep-wipe:reset-issue';
+  try {
+    if (ctx.github) {
+      const { owner, repo, number } = ctx.github;
+      await execAsync(
+        `gh issue reopen ${number} --repo ${owner}/${repo}`,
+        { encoding: 'utf-8' },
+      );
+      return stepOk(step, [`Reopened GitHub issue #${number}`]);
+    }
+
+    // Linear: reopen to backlog
+    const linearApiKey = getLinearApiKey();
+    if (linearApiKey) {
+      const { LinearClient } = await import('@linear/sdk');
+      const client = new LinearClient({ apiKey: linearApiKey });
+      const issueNum = parseInt(ctx.issueId.split('-').pop() || '0', 10);
+      const teamKey = ctx.issueId.split('-')[0].toUpperCase();
+      const results = await client.issues({
+        filter: {
+          number: { eq: issueNum },
+          team: { key: { eq: teamKey } },
+        },
+        first: 1,
+      });
+      if (results.nodes.length > 0) {
+        const issue = results.nodes[0];
+        const team = await issue.team;
+        if (team) {
+          const states = await team.states();
+          const backlogState = states.nodes.find(s => s.type === 'backlog') ||
+            states.nodes.find(s => s.name === 'Backlog');
+          if (backlogState) {
+            await issue.update({ stateId: backlogState.id });
+          }
+        }
+      }
+      return stepOk(step, [`Reset Linear issue ${ctx.issueId} to Backlog`]);
+    }
+
+    return stepSkipped(step, ['No tracker available to reset issue']);
+  } catch (err) {
+    return stepFailed(step, `Failed to reset issue: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Clear review status for an issue.
+ */
+async function clearReviewStatusStep(issueId: string): Promise<StepResult> {
+  const step = 'clear-review-status';
+  try {
+    const { clearReviewStatus } = await import('../review-status.js');
+    clearReviewStatus(issueId.toUpperCase());
+    return stepOk(step, ['Review status cleared']);
+  } catch {
+    // Fallback: direct file manipulation
+    try {
+      const statusFile = join(PANOPTICON_HOME, 'review-status.json');
+      if (existsSync(statusFile)) {
+        const data = JSON.parse(readFileSync(statusFile, 'utf-8'));
+        const upperKey = issueId.toUpperCase();
+        if (data[upperKey]) {
+          delete data[upperKey];
+          const { writeFileSync } = await import('fs');
+          writeFileSync(statusFile, JSON.stringify(data, null, 2));
+        }
+      }
+      return stepOk(step, ['Review status cleared (direct)']);
+    } catch (innerErr) {
+      return stepSkipped(step, [`Failed to clear review status (non-fatal): ${(innerErr as Error).message}`]);
+    }
+  }
+}
+

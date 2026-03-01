@@ -1762,7 +1762,7 @@ Use the send-feedback-to-agent skill to report findings back to the issue agent.
             console.log(`[specialist] review-agent: stale branch detected for ${task.issueId} — 0 files changed vs main`);
 
             // Auto-complete the review: set reviewStatus to passed
-            const { setReviewStatus } = await import('../../dashboard/server/review-status.js');
+            const { setReviewStatus } = await import('../review-status.js');
             setReviewStatus(task.issueId.toUpperCase(), {
               reviewStatus: 'passed',
               reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',

@@ -249,6 +249,7 @@ export const WORKFLOW_LABELS = [
   'review ready',
   'planned',
   'planning',
+  'closed-out',
 ];
 
 /**
@@ -290,6 +291,10 @@ export function mapGitHubStateToCanonical(state: string, labels: string[]): Cano
   const labelNames = labels.map(l => l.toLowerCase());
 
   // Most progressed states first
+  // needs-close-out = merged work reopened for close-out ceremony → done column
+  if (labelNames.some(l => l === 'needs-close-out')) {
+    return 'done';
+  }
   // "done" label on OPEN issues = work complete, pending merge/closure → in_review
   // (actual "done" status only for CLOSED issues, handled above)
   if (labelNames.some(l => l === 'done' || l.includes('completed'))) {

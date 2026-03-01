@@ -301,7 +301,22 @@ function migrateAgent(agentDir: string, stats: MigrationStats): void {
   let sessionDir: string | null = null;
 
   if (context.workspace) {
-    sessionDir = getSessionDir(context.workspace);
+    // GUARD: Reject broad parent directories that contain multiple projects.
+    // Planning agents sometimes have workspace set to a parent dir like /home/user/Projects
+    // instead of a specific workspace. Using such a path would attribute ALL sessions from
+    // every project to a single issue, causing massive cost inflation.
+    const isSpecificWorkspace = context.workspace.includes('workspaces/feature-') ||
+      context.workspace.includes(`/${context.issueId.toLowerCase()}`) ||
+      context.workspace.includes(`/${context.issueId.toUpperCase()}`);
+
+    if (isSpecificWorkspace) {
+      sessionDir = getSessionDir(context.workspace);
+    } else {
+      stats.warnings.push({
+        file: stateFile,
+        message: `Skipped broad workspace path "${context.workspace}" for ${context.issueId} (would attribute unrelated sessions)`,
+      });
+    }
   }
 
   // Fallback: scan Claude projects directory for matching session dirs

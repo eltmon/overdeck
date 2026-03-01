@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { execSync } from 'child_process';
 import { existsSync, readdirSync, statSync, symlinkSync, mkdirSync } from 'fs';
+import { homedir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
@@ -236,6 +237,43 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       routerSpinner.succeed('claude-code-router installed');
     } catch (error) {
       routerSpinner.warn('Failed to install claude-code-router - run: npm install -g @musistudio/claude-code-router');
+    }
+  }
+
+  // Check and install mkcert if missing
+  if (!checkCommand('mkcert')) {
+    const mkcertSpinner = ora('Installing mkcert...').start();
+    try {
+      const binDir = join(homedir(), '.local', 'bin');
+      mkdirSync(binDir, { recursive: true });
+      const mkcertPath = join(binDir, 'mkcert');
+      const arch = process.arch === 'x64' ? 'amd64' : process.arch;
+      execSync(`curl -sL "https://github.com/FiloSottile/mkcert/releases/latest/download/mkcert-v1.4.4-linux-${arch}" -o "${mkcertPath}" && chmod +x "${mkcertPath}"`, {
+        stdio: 'pipe',
+        timeout: 60000,
+      });
+      mkcertSpinner.succeed('mkcert installed');
+    } catch {
+      mkcertSpinner.warn('Failed to install mkcert - run: https://github.com/FiloSottile/mkcert/releases');
+    }
+  }
+
+  // Check and install SageOx CLI if missing
+  if (!checkCommand('ox')) {
+    const oxSpinner = ora('Installing SageOx CLI (ox)...').start();
+    try {
+      const binDir = join(homedir(), '.local', 'bin');
+      mkdirSync(binDir, { recursive: true });
+      const oxPath = join(binDir, 'ox');
+      const arch = process.arch === 'x64' ? 'amd64' : process.arch;
+      const platform = process.platform === 'darwin' ? 'darwin' : 'linux';
+      execSync(`curl -sL "https://github.com/eltmon/ox/releases/download/latest/ox-${platform}-${arch}" -o "${oxPath}" && chmod +x "${oxPath}"`, {
+        stdio: 'pipe',
+        timeout: 60000,
+      });
+      oxSpinner.succeed('SageOx CLI installed');
+    } catch {
+      oxSpinner.warn('Failed to install SageOx CLI - see: https://github.com/eltmon/ox/releases');
     }
   }
 

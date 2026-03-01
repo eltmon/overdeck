@@ -18,7 +18,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
@@ -154,7 +154,7 @@ async function fetchSpecialists(): Promise<SpecialistAgent[]> {
   return data.specialists ?? data;
 }
 
-function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
+function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<string, Issue[]> {
   const grouped: Record<string, Issue[]> = {
     backlog: [],
     todo: [],
@@ -164,6 +164,10 @@ function groupByStatus(issues: Issue[]): Record<string, Issue[]> {
   };
 
   for (const issue of issues) {
+    // Skip closed-out issues unless explicitly included
+    if (!showClosedOut && issue.labels?.some(l => l.toLowerCase() === 'closed-out')) {
+      continue;
+    }
     // Use targetCanonicalState if available (explicit column from drag-drop)
     // Otherwise fall back to shadowStatus mapping, then tracker status
     let status: string;
@@ -234,6 +238,37 @@ export function groupByLabels(issues: Issue[]): Record<string, Issue[]> {
     });
 
   return sorted;
+}
+
+/**
+ * Group issues by project for the backlog list view.
+ */
+function groupByProject(issues: Issue[]): { name: string; color?: string; issues: Issue[] }[] {
+  const projectMap = new Map<string, { name: string; color?: string; issues: Issue[] }>();
+  const noProject: Issue[] = [];
+
+  for (const issue of issues) {
+    if (issue.project) {
+      const existing = projectMap.get(issue.project.id);
+      if (existing) {
+        existing.issues.push(issue);
+      } else {
+        projectMap.set(issue.project.id, {
+          name: issue.project.name,
+          color: issue.project.color,
+          issues: [issue],
+        });
+      }
+    } else {
+      noProject.push(issue);
+    }
+  }
+
+  const groups = Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  if (noProject.length > 0) {
+    groups.push({ name: 'No Project', issues: noProject });
+  }
+  return groups;
 }
 
 /**
@@ -923,6 +958,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   // Group by labels for list view - MUST be before any conditional returns (Rules of Hooks)
   const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
+  const groupedByProject = useMemo(() => groupByProject(filteredIssues), [filteredIssues]);
 
   const toggleProject = (projectId: string) => {
     setSelectedProjects(prev => {
@@ -950,7 +986,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
         {/* Skeleton columns */}
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {STATUS_ORDER.map((status) => (
+          {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
             <div key={status} className="flex-shrink-0 w-80">
               <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg`}>
                 <div className="px-4 py-3 border-b border-divider">
@@ -991,7 +1027,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     );
   }
 
-  const grouped = groupByStatus(filteredIssues);
+  const grouped = groupByStatus(filteredIssues, includeCompleted);
 
   return (
     <div className="space-y-4">
@@ -1026,7 +1062,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             onChange={(e) => setIncludeCompleted(e.target.checked)}
             className="w-4 h-4 rounded border-divider-strong bg-surface-raised text-blue-600 focus:ring-blue-500 focus:ring-offset-surface"
           />
-          <span className="text-sm text-content-subtle">Include completed</span>
+          <span className="text-sm text-content-subtle">Include closed-out</span>
         </label>
 
         {/* Refresh button */}
@@ -1113,8 +1149,45 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             </div>
           ))}
         </div>
+      ) : cycleFilter === 'backlog' ? (
+        /* Backlog - List View (grouped by project) */
+        <div className="space-y-6 overflow-y-auto pb-4">
+          {groupedByProject.map((group) => (
+            <div key={group.name} className="bg-surface-raised rounded-lg">
+              <div className="px-4 py-3 border-b border-divider">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: group.color || '#6b7280' }}
+                  />
+                  <h3 className="font-semibold text-content">{group.name}</h3>
+                  <span className="text-sm text-content-subtle">({group.issues.length})</span>
+                </div>
+              </div>
+              <div className="divide-y divide-divider">
+                {group.issues.map((issue) => (
+                  <ListIssueRow
+                    key={issue.id}
+                    issue={issue}
+                    agents={agents}
+                    specialists={specialists}
+                    issueCosts={issueCosts}
+                    selectedIssue={selectedIssue}
+                    onSelectIssue={onSelectIssue}
+                    onPlan={setPlanDialogIssue}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+          {groupedByProject.length === 0 && (
+            <div className="text-center py-12 text-content-subtle">
+              No backlog items
+            </div>
+          )}
+        </div>
       ) : (
-        /* Kanban columns with DnD (for current and backlog views) */
+        /* Kanban columns with DnD (current view - 4 columns, no backlog) */
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -1122,7 +1195,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {STATUS_ORDER.map((status) => (
+            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
               <DroppableColumn key={status} status={status}>
                 <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
                   <div className="px-4 py-3 border-b border-divider">
@@ -1919,6 +1992,26 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
               const difficulty = parseDifficultyLabel(issue.labels);
               return difficulty ? <DifficultyBadge level={difficulty} /> : null;
             })()}
+            {/* Merged badge — prominent indicator for verified merges on Done cards */}
+            {issue.mergeStatus === 'merged' && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-green-900/60 text-green-300 border border-green-500/40 uppercase tracking-wide"
+                title="Branch verified merged into main"
+              >
+                <GitMerge className="w-3 h-3" />
+                Merged
+              </span>
+            )}
+            {/* Needs close-out badge - amber indicator for reopened issues needing review */}
+            {issue.labels?.some(l => l.toLowerCase() === 'needs-close-out') && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-900/60 text-amber-400 border border-amber-600/40"
+                title="Reopened for close-out review — verify this work is complete, then click Close Out"
+              >
+                <AlertTriangle className="w-3 h-3" />
+                Needs Review
+              </span>
+            )}
             {/* Cost badge */}
             {cost && cost.totalCost > 0 && (
               <span
@@ -1942,7 +2035,7 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
           </span>
         )}
         {(issue.labels || [])
-          .filter((label) => typeof label === 'string' && label.toLowerCase() !== 'review ready') // Hide Review Ready (has prominent badge)
+          .filter((label) => typeof label === 'string' && label.toLowerCase() !== 'review ready' && label.toLowerCase() !== 'needs-close-out') // Hide badges shown separately
           .slice(0, 2)
           .map((label) => (
             <span
@@ -2106,9 +2199,17 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
         </div>
       )}
 
-      {/* Done/In Review items - Reopen option */}
-      {!isRunning && (STATUS_LABELS[issue.status] === 'done' || STATUS_LABELS[issue.status] === 'in_review') && (
+      {/* In Review items - Reopen option */}
+      {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
         <ReopenSection issue={issue} />
+      )}
+
+      {/* Done items - Reopen + Close Out */}
+      {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30">
+          <ReopenSection issue={issue} inline />
+          <CloseOutSection issue={issue} />
+        </div>
       )}
 
     </div>
@@ -2116,7 +2217,7 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
 }
 
 // Reopen section for Done/In Review items
-function ReopenSection({ issue }: { issue: Issue }) {
+function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
   const queryClient = useQueryClient();
 
   const reopenMutation = useMutation({
@@ -2138,13 +2239,13 @@ function ReopenSection({ issue }: { issue: Issue }) {
 
   const handleReopen = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Reopen ${issue.identifier}?`)) {
+    if (confirm(`Reopen ${issue.identifier} for re-work?\n\nThis will move it back to In Progress.`)) {
       reopenMutation.mutate();
     }
   };
 
-  return (
-    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30">
+  const content = (
+    <>
       <button
         onClick={handleReopen}
         disabled={reopenMutation.isPending}
@@ -2160,6 +2261,63 @@ function ReopenSection({ issue }: { issue: Issue }) {
       {reopenMutation.isError && (
         <span className="text-xs text-red-400">{(reopenMutation.error as Error).message}</span>
       )}
+    </>
+  );
+
+  if (inline) return content;
+
+  return (
+    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30">
+      {content}
     </div>
+  );
+}
+
+// Close-out section for Done items
+function CloseOutSection({ issue }: { issue: Issue }) {
+  const queryClient = useQueryClient();
+
+  const closeOutMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${issue.identifier}/close-out`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Close-out failed');
+      }
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ['issues'] });
+    },
+  });
+
+  const handleCloseOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`Close out ${issue.identifier}?\n\nThis will:\n• Verify branch is merged\n• Archive workspace artifacts\n• Clean up agent state\n• Close issue on tracker\n• Apply closed-out label`)) {
+      closeOutMutation.mutate();
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleCloseOut}
+        disabled={closeOutMutation.isPending}
+        className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
+      >
+        {closeOutMutation.isPending ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        ) : (
+          <CheckCheck className="w-3.5 h-3.5" />
+        )}
+        {closeOutMutation.isPending ? 'Closing out...' : 'Close Out'}
+      </button>
+      {closeOutMutation.isError && (
+        <span className="text-xs text-red-400">{(closeOutMutation.error as Error).message}</span>
+      )}
+    </>
   );
 }
