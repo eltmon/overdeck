@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Brain, XCircle, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useConfirm } from './DialogProvider';
 
 interface ProjectSpecialistMetadata {
   runCount: number;
@@ -97,6 +98,7 @@ interface ProjectSpecialistCardProps {
 function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
   const [expanded, setExpanded] = useState(false);
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   const { data: runs } = useQuery({
     queryKey: ['specialist-runs', specialist.projectKey, specialist.specialistType],
@@ -119,9 +121,9 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
     },
   });
 
-  const handleTerminate = (e: React.MouseEvent) => {
+  const handleTerminate = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Terminate ${specialist.specialistType} for ${specialist.projectKey}?`)) {
+    if (await confirm({ title: 'Terminate Specialist', message: `Terminate ${specialist.specialistType} for ${specialist.projectKey}?`, variant: 'destructive', confirmLabel: 'Terminate' })) {
       terminateMutation.mutate();
     }
   };
