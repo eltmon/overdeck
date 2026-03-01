@@ -1,6 +1,6 @@
 # PAN-288: Dashboard - Separate Canceled Issues from Done
 
-## Status: IN PROGRESS
+## Status: COMPLETE - Ready for Merge
 
 ## Issue
 Canceled issues (Canceled, Duplicate, Won't Do) are currently lumped into the Done column on the kanban board. This makes Done misleading.
@@ -38,3 +38,18 @@ Treat canceled issues like Backlog issues: give them their own filter view and e
 - [ ] Canceled view shows issues in a list with dimmed/strikethrough styling
 - [ ] "Include closed-out" toggle does NOT resurface canceled issues in Done
 - [ ] Existing Done column only shows truly completed issues
+
+## Specialist Feedback
+
+- **[2026-03-01T16:32Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/016-review-agent-changes-requested.md`
+  - Issue: Missing tests for `groupByCanceledType()` function
+  - Fixed: Added 8 comprehensive test cases covering all status variants
+
+- **[2026-03-01T16:35Z] review-agent → PASSED** — All code and tests approved
+
+- **[2026-03-01T16:37Z] test-agent → PASSED** — Zero new regressions, 1358 tests pass
+  - 14 pre-existing failures on main (migration.test.ts, session-rotation.test.ts, skills-merge.test.ts)
+  - All PAN-288 changes verified working
+
+## PR
+- https://github.com/eltmon/panopticon-cli/pull/289
