@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, X } from 'lucide-react';
+import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
 import {
   ModelOverrideModal,
@@ -156,6 +157,7 @@ function getModelDisplay(modelId?: string): string {
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
+  const showAlert = useAlert();
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -281,7 +283,7 @@ export function SettingsPage() {
       setFormData(newFormData);
     } catch (error) {
       console.error('Failed to fetch optimal defaults:', error);
-      alert('Failed to load optimal defaults: ' + (error as Error).message);
+      showAlert({ message: 'Failed to load optimal defaults: ' + (error as Error).message, variant: 'error' });
     }
   };
 

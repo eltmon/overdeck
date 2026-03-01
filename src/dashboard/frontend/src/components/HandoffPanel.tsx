@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, AlertCircle } from 'lucide-react';
 import { useHandoffSuggestion } from '../hooks/useHandoffData';
+import { useConfirm, useAlert } from './DialogProvider';
 
 interface HandoffPanelProps {
   agentId: string;
@@ -27,6 +28,8 @@ const MODEL_COLORS = {
 export function HandoffPanel({ agentId }: HandoffPanelProps) {
   const { data: suggestion, isLoading } = useHandoffSuggestion(agentId);
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const showAlert = useAlert();
 
   const handoffMutation = useMutation({
     mutationFn: ({ toModel, reason }: { toModel: string; reason?: string }) =>
@@ -34,22 +37,22 @@ export function HandoffPanel({ agentId }: HandoffPanelProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['handoff-suggestion', agentId] });
-      alert('Handoff completed successfully');
+      showAlert({ message: 'Handoff completed successfully', variant: 'success' });
     },
     onError: (error: Error) => {
-      alert(`Handoff failed: ${error.message}`);
+      showAlert({ message: `Handoff failed: ${error.message}`, variant: 'error' });
     },
   });
 
-  const handleHandoff = (toModel: string) => {
-    if (confirm(`Hand off ${agentId} to ${toModel}?`)) {
+  const handleHandoff = async (toModel: string) => {
+    if (await confirm({ title: 'Confirm Handoff', message: `Hand off ${agentId} to ${toModel}?`, confirmLabel: 'Hand Off' })) {
       handoffMutation.mutate({ toModel, reason: 'Manual handoff from dashboard' });
     }
   };
 
-  const handleAutoHandoff = () => {
+  const handleAutoHandoff = async () => {
     if (!suggestion?.suggestedModel) return;
-    if (confirm(`${suggestion.reason}\n\nProceed with handoff to ${suggestion.suggestedModel}?`)) {
+    if (await confirm({ title: 'Confirm Handoff', message: `${suggestion.reason}\n\nProceed with handoff to ${suggestion.suggestedModel}?`, confirmLabel: 'Hand Off' })) {
       handoffMutation.mutate({
         toModel: suggestion.suggestedModel,
         reason: suggestion.reason,
