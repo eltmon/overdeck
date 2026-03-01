@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Brain, Cpu, RotateCcw, Loader2, Play, Square, Clock, AlertCircle, CheckCircle2, Activity } from 'lucide-react';
 import { SpecialistAgentCard, type SpecialistAgent, type IssueInfo } from './SpecialistAgentCard';
 import { IssueAgentCard, type IssueAgent, type CloisterHealth } from './IssueAgentCard';
+import { useConfirm, useAlert } from './DialogProvider';
 
 interface CloisterHealthResponse {
   agents: CloisterHealth[];
@@ -118,6 +119,8 @@ async function resetAllSpecialists(): Promise<void> {
 
 export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const showAlert = useAlert();
   const { data: agents, isLoading: agentsLoading, error: agentsError } = useQuery({
     queryKey: ['agents'],
     queryFn: fetchAgents,
@@ -175,12 +178,12 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to reset specialists: ${error.message}`);
+      showAlert({ message: `Failed to reset specialists: ${error.message}`, variant: 'error' });
     },
   });
 
-  const handleResetAll = () => {
-    if (confirm('Reset ALL specialist agents?\n\nThis will kill any running specialists and clear their session files.')) {
+  const handleResetAll = async () => {
+    if (await confirm({ title: 'Reset Specialists', message: 'Reset ALL specialist agents?\n\nThis will kill any running specialists and clear their session files.', variant: 'destructive', confirmLabel: 'Reset All' })) {
       resetAllMutation.mutate();
     }
   };
