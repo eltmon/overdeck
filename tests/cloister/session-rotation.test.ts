@@ -23,6 +23,7 @@ vi.mock('../../src/lib/agents.js', () => ({
 
 vi.mock('../../src/lib/cloister/specialists.js', () => ({
   getTmuxSessionName: vi.fn((name: string) => `specialist-${name}`),
+  setSessionId: vi.fn(),
 }));
 
 // Hoist the exec mock so it's available inside vi.mock factory
@@ -75,7 +76,7 @@ describe('session-rotation', () => {
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('SESSION_ROTATION_THRESHOLD', () => {

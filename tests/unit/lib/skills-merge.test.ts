@@ -38,7 +38,7 @@ describe('skills-merge', () => {
       expect(content).toBe('# Some other gitignore\nnode_modules\ndist\n');
     });
 
-    it('should not modify file without duplicates', () => {
+    it('should remove Panopticon section entirely (skills are copies now)', () => {
       const gitignorePath = join(testDir, '.gitignore');
       const originalContent = `# User content
 node_modules
@@ -51,12 +51,18 @@ release
       writeFileSync(gitignorePath, originalContent);
 
       const result = cleanupGitignore(gitignorePath);
-      expect(result.cleaned).toBe(false);
+      expect(result.cleaned).toBe(true);
       expect(result.duplicatesRemoved).toBe(0);
-      expect(result.entriesAfter).toBe(3);
+      expect(result.entriesAfter).toBe(0);
+
+      // Verify content no longer has Panopticon section
+      const content = readFileSync(gitignorePath, 'utf-8');
+      expect(content).not.toContain('# Panopticon-managed symlinks');
+      expect(content).toContain('# User content');
+      expect(content).toContain('node_modules');
     });
 
-    it('should remove duplicate entries', () => {
+    it('should remove entire Panopticon section including duplicates', () => {
       const gitignorePath = join(testDir, '.gitignore');
       const duplicatedContent = `# User content
 node_modules
@@ -74,20 +80,18 @@ bug-fix
 
       const result = cleanupGitignore(gitignorePath);
       expect(result.cleaned).toBe(true);
-      expect(result.duplicatesRemoved).toBe(3); // beads, feature-work, release appear twice
-      expect(result.entriesAfter).toBe(4); // beads, bug-fix, feature-work, release (sorted)
+      expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
+      expect(result.entriesAfter).toBe(0); // Entire section removed
 
-      // Verify content
+      // Verify content no longer has Panopticon section
       const content = readFileSync(gitignorePath, 'utf-8');
-      expect(content).toContain('# Panopticon-managed symlinks (not committed)');
-      expect(content).toContain('beads');
-      expect(content).toContain('bug-fix');
-      expect(content).toContain('feature-work');
-      expect(content).toContain('release');
+      expect(content).not.toContain('# Panopticon-managed symlinks');
+      expect(content).not.toContain('beads');
+      expect(content).not.toContain('bug-fix');
 
-      // Should only have one Panopticon header
-      const matches = content.match(/# Panopticon-managed symlinks/g);
-      expect(matches?.length).toBe(1);
+      // User content should be preserved
+      expect(content).toContain('# User content');
+      expect(content).toContain('node_modules');
     });
 
     it('should preserve user content before Panopticon section', () => {
@@ -111,18 +115,24 @@ feature-work
 
       const result = cleanupGitignore(gitignorePath);
       expect(result.cleaned).toBe(true);
-      expect(result.duplicatesRemoved).toBe(1);
+      expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
 
       const newContent = readFileSync(gitignorePath, 'utf-8');
+      // User content preserved
       expect(newContent).toContain('# IDE files');
       expect(newContent).toContain('.idea/');
       expect(newContent).toContain('.vscode/');
       expect(newContent).toContain('# Build artifacts');
       expect(newContent).toContain('dist/');
       expect(newContent).toContain('node_modules/');
+
+      // Panopticon section removed
+      expect(newContent).not.toContain('# Panopticon-managed symlinks');
+      expect(newContent).not.toContain('beads');
+      expect(newContent).not.toContain('feature-work');
     });
 
-    it('should sort entries alphabetically', () => {
+    it('should remove entire section (sorting no longer applicable)', () => {
       const gitignorePath = join(testDir, '.gitignore');
       const content = `# Panopticon-managed symlinks (not committed)
 zebra
@@ -131,27 +141,18 @@ middle
 `;
       writeFileSync(gitignorePath, content);
 
-      // Call it once to normalize (no duplicates but will sort)
       const result = cleanupGitignore(gitignorePath);
-      // No duplicates, so not cleaned
-      expect(result.cleaned).toBe(false);
-
-      // Add duplicates to trigger cleanup
-      writeFileSync(gitignorePath, `# Panopticon-managed symlinks (not committed)
-zebra
-alpha
-middle
-zebra
-`);
-      const result2 = cleanupGitignore(gitignorePath);
-      expect(result2.cleaned).toBe(true);
+      expect(result.cleaned).toBe(true);
+      expect(result.entriesAfter).toBe(0);
 
       const newContent = readFileSync(gitignorePath, 'utf-8');
-      const lines = newContent.split('\n').filter(l => l.trim() && !l.startsWith('#'));
-      expect(lines).toEqual(['alpha', 'middle', 'zebra']);
+      expect(newContent).not.toContain('# Panopticon-managed symlinks');
+      expect(newContent).not.toContain('zebra');
+      expect(newContent).not.toContain('alpha');
+      expect(newContent).not.toContain('middle');
     });
 
-    it('should handle severely duplicated content (like the real bug)', () => {
+    it('should handle severely duplicated content by removing entire section', () => {
       const gitignorePath = join(testDir, '.gitignore');
       // Simulate what the old bug produced - multiple identical sections
       const skills = ['beads', 'bug-fix', 'code-review', 'feature-work', 'refactor', 'release'];
@@ -167,18 +168,21 @@ zebra
 
       const result = cleanupGitignore(gitignorePath);
       expect(result.cleaned).toBe(true);
-      expect(result.duplicatesRemoved).toBe(skills.length * 4); // 4 extra copies
-      expect(result.entriesAfter).toBe(skills.length);
+      expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
+      expect(result.entriesAfter).toBe(0); // Entire section removed
 
-      // Verify only one section remains
+      // Verify no Panopticon section remains
       const newContent = readFileSync(gitignorePath, 'utf-8');
       const headerMatches = newContent.match(/# Panopticon-managed symlinks/g);
-      expect(headerMatches?.length).toBe(1);
+      expect(headerMatches).toBeNull();
 
-      // Verify each skill appears exactly once
+      // Verify user content is preserved
+      expect(newContent).toContain('# User content');
+      expect(newContent).toContain('node_modules');
+
+      // Verify no skills remain
       for (const skill of skills) {
-        const skillMatches = newContent.match(new RegExp(`^${skill}$`, 'gm'));
-        expect(skillMatches?.length).toBe(1);
+        expect(newContent).not.toContain(skill);
       }
     });
   });
@@ -198,8 +202,14 @@ skill2
 
       const result = cleanupWorkspaceGitignore(workspacePath);
       expect(result.cleaned).toBe(true);
-      expect(result.duplicatesRemoved).toBe(1);
-      expect(result.entriesAfter).toBe(2);
+      expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
+      expect(result.entriesAfter).toBe(0); // Entire section removed
+
+      // Verify section is removed
+      const content = readFileSync(gitignorePath, 'utf-8');
+      expect(content).not.toContain('# Panopticon-managed symlinks');
+      expect(content).not.toContain('skill1');
+      expect(content).not.toContain('skill2');
     });
 
     it('should handle missing workspace', () => {
