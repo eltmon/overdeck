@@ -2134,20 +2134,7 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
             {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
             {startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (confirm(`Deep wipe ${issue.identifier}? This will clean up any stale state:\n• Kill agents\n• Delete agent state\n• Delete workspace & branches`)) {
-                deepWipeMutation.mutate({ deleteWorkspace: true });
-              }
-            }}
-            disabled={deepWipeMutation.isPending}
-            className="flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors disabled:opacity-50"
-            title="Clean up stale workspace, branches, and state"
-          >
-            {deepWipeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-            {deepWipeMutation.isPending ? 'Wiping...' : 'Reset'}
-          </button>
+          <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
         </div>
       )}
 
@@ -2196,23 +2183,48 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
             <Undo className="w-3.5 h-3.5" />
             Reset
           </button>
+          <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
         </div>
       )}
 
-      {/* In Review items - Reopen option */}
+      {/* In Review items - Reopen + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
-        <ReopenSection issue={issue} />
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+          <ReopenSection issue={issue} inline />
+          <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
+        </div>
       )}
 
-      {/* Done items - Reopen + Close Out */}
+      {/* Done items - Reopen + Close Out + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30">
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30 flex-wrap">
           <ReopenSection issue={issue} inline />
           <CloseOutSection issue={issue} />
+          <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
         </div>
       )}
 
     </div>
+  );
+}
+
+// Deep wipe button - available from any issue state
+function DeepWipeButton({ issue, deepWipeMutation }: { issue: Issue; deepWipeMutation: any }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        if (confirm(`Deep wipe ${issue.identifier}? This will clean up ALL state:\n\n• Kill agents\n• Delete agent state\n• Delete workspace & branches\n• Reset issue to Todo/Open\n\nThis is irreversible.`)) {
+          deepWipeMutation.mutate({ deleteWorkspace: true });
+        }
+      }}
+      disabled={deepWipeMutation.isPending}
+      className="flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors disabled:opacity-50 ml-auto"
+      title="Deep wipe: delete workspace, branches, agent state — start completely fresh"
+    >
+      {deepWipeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+      {deepWipeMutation.isPending ? 'Wiping...' : 'Wipe'}
+    </button>
   );
 }
 
