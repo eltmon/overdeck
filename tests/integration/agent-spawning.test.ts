@@ -281,30 +281,74 @@ describe('agent spawning with work types', () => {
   });
 
   describe('SageOx environment variables', () => {
+    let sageoxProjectRoot: string;
+    let sageoxWorkspace: string;
+
     beforeEach(async () => {
       // Reset the sessionExists mock to return false for these tests
       const { sessionExists } = await import('../../src/lib/tmux.js');
       vi.mocked(sessionExists).mockReturnValue(false);
+
+      // Create a project structure with .sageox/ so SageOx vars are injected
+      // Workspace path resolves to projectRoot via resolve(workspace, '..', '..')
+      sageoxProjectRoot = join(tmpdir(), `pan-sageox-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      sageoxWorkspace = join(sageoxProjectRoot, 'workspaces', 'feature-test');
+      mkdirSync(join(sageoxProjectRoot, '.sageox'), { recursive: true });
+      mkdirSync(sageoxWorkspace, { recursive: true });
     });
 
-    it('should pass OX_PROJECT_ROOT derived from workspace path', async () => {
+    afterEach(() => {
+      if (existsSync(sageoxProjectRoot)) {
+        rmSync(sageoxProjectRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('should pass OX_PROJECT_ROOT when .sageox/ exists', async () => {
       const { createSession } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-1',
-        workspace: '/home/user/project/workspaces/feature-test',
+        workspace: sageoxWorkspace,
         phase: 'implementation',
       };
 
       await spawnAgent(options);
 
-      // Verify createSession was called with dynamically derived OX_PROJECT_ROOT
       expect(createSession).toHaveBeenCalled();
       const callArgs = vi.mocked(createSession).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
-      // Should resolve to parent of workspaces directory
-      expect(envArg.OX_PROJECT_ROOT).toBe('/home/user/project');
+      expect(envArg.OX_PROJECT_ROOT).toBe(sageoxProjectRoot);
+    });
+
+    it('should NOT set SageOx vars when .sageox/ does not exist', async () => {
+      const { createSession } = await import('../../src/lib/tmux.js');
+
+      // Use a workspace path that resolves to a project root without .sageox/
+      const noSageoxRoot = join(tmpdir(), `pan-nosageox-${Date.now()}`);
+      const noSageoxWorkspace = join(noSageoxRoot, 'workspaces', 'feature-test');
+      mkdirSync(noSageoxWorkspace, { recursive: true });
+
+      const options: SpawnOptions = {
+        issueId: 'PAN-SAGOX-NO',
+        workspace: noSageoxWorkspace,
+        phase: 'implementation',
+      };
+
+      await spawnAgent(options);
+
+      const callArgs = vi.mocked(createSession).mock.calls[0];
+      const envArg = callArgs[3]?.env as Record<string, string>;
+
+      // SageOx vars should NOT be present
+      expect(envArg.OX_PROJECT_ROOT).toBeUndefined();
+      expect(envArg.PAN_ISSUE_ID).toBeUndefined();
+      expect(envArg.PAN_PHASE).toBeUndefined();
+
+      // Panopticon vars should still be present
+      expect(envArg.PANOPTICON_AGENT_ID).toBe('agent-pan-sagox-no');
+
+      rmSync(noSageoxRoot, { recursive: true, force: true });
     });
 
     it('should pass PAN_ISSUE_ID and PAN_PHASE for multi-agent pipeline', async () => {
@@ -312,7 +356,7 @@ describe('agent spawning with work types', () => {
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-2',
-        workspace: '/tmp/test-workspace',
+        workspace: sageoxWorkspace,
         phase: 'review',
       };
 
@@ -330,7 +374,7 @@ describe('agent spawning with work types', () => {
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-3',
-        workspace: '/tmp/test-workspace',
+        workspace: sageoxWorkspace,
         phase: 'planning',
       };
 
@@ -345,7 +389,7 @@ describe('agent spawning with work types', () => {
       expect(envArg.PANOPTICON_SESSION_TYPE).toBe('planning');
 
       // Check SageOx vars are present
-      expect(envArg.OX_PROJECT_ROOT).toBeDefined();
+      expect(envArg.OX_PROJECT_ROOT).toBe(sageoxProjectRoot);
       expect(envArg.PAN_ISSUE_ID).toBe('PAN-SAGOX-3');
       expect(envArg.PAN_PHASE).toBe('planning');
     });
@@ -355,7 +399,7 @@ describe('agent spawning with work types', () => {
 
       const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-4',
-        workspace: '/tmp/test-workspace',
+        workspace: sageoxWorkspace,
         phase: 'planning',
       };
 
@@ -371,19 +415,14 @@ describe('agent spawning with work types', () => {
     it('should attempt to look up planner session for non-planner phases', async () => {
       const { createSession } = await import('../../src/lib/tmux.js');
 
-      // Note: Testing the actual parent session lookup requires mocking the agents module,
-      // which is complex due to module caching. Instead, we verify that:
-      // 1. Non-planner phases don't throw errors
-      // 2. The function completes successfully (no errors looking up planner)
-
-      const workerOptions: SpawnOptions = {
+      const options: SpawnOptions = {
         issueId: 'PAN-SAGOX-5',
-        workspace: '/tmp/worker-workspace',
+        workspace: sageoxWorkspace,
         phase: 'implementation',
       };
 
       // Should complete without error even when planner doesn't exist
-      await expect(spawnAgent(workerOptions)).resolves.not.toThrow();
+      await expect(spawnAgent(options)).resolves.not.toThrow();
 
       // Verify session was created
       expect(createSession).toHaveBeenCalled();

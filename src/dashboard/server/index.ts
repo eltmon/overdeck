@@ -383,31 +383,11 @@ Auto-created PR for ${issueId}
 }
 
 /**
- * Close an issue after successful merge
- * Handles both GitHub issues (PAN-*) and Linear issues
+ * Post-merge hook — issue stays open, awaiting human close-out ceremony.
+ * Previously this closed issues automatically; now it just logs.
  */
-async function closeIssueAfterMerge(issueId: string): Promise<void> {
-  try {
-    // Check if it's a GitHub issue (PAN-* prefix)
-    if (issueId.toUpperCase().startsWith('PAN-')) {
-      const issueNumber = issueId.replace(/^PAN-/i, '');
-      console.log(`[merge] Closing GitHub issue #${issueNumber}...`);
-
-      // Use gh CLI to close the issue
-      await execAsync(`gh issue close ${issueNumber} --repo eltmon/panopticon-cli --comment "Merged to main"`, {
-        encoding: 'utf-8',
-      });
-      console.log(`[merge] GitHub issue #${issueNumber} closed`);
-    } else {
-      // Linear issue - update to Done state
-      console.log(`[merge] Moving Linear issue ${issueId} to Done...`);
-      await updateLinearIssueStatus(issueId, 'Done');
-    }
-  } catch (error: unknown) {
-    // Log but don't fail the merge - closing is a nice-to-have
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[merge] Failed to close issue ${issueId}:`, message);
-  }
+function onMergeComplete(issueId: string): void {
+  console.log(`[merge] Issue ${issueId} merged. Awaiting human close-out.`);
 }
 
 // ============================================================================
@@ -1125,6 +1105,8 @@ app.get('/api/issues', (req, res) => {
       cycle: req.query.cycle as string,
       includeCompleted: req.query.includeCompleted === 'true',
     });
+    // mergeStatus augmentation is now in IssueDataService.getIssues()
+    // so both REST and socket.io pushes include it
     res.json(issues);
   } catch (error: any) {
     console.error('Error fetching issues:', error);
@@ -4827,10 +4809,49 @@ app.get('/api/agents/:id/cost', (req, res) => {
   }
 });
 
+// Extract COMPOSE_PROJECT_NAME from workspace dev script.
+// The dev script sets e.g. COMPOSE_PROJECT_NAME="panopticon-${FEATURE_FOLDER}" or "myn-${FEATURE_FOLDER}".
+// Returns the resolved name (e.g. "panopticon-feature-pan-282") or a fallback based on feature folder.
+function getComposeProjectName(issueId: string, projectPath?: string): string {
+  const issueLower = issueId.toLowerCase();
+  const featureFolder = `feature-${issueLower}`;
+
+  // Try to find workspace dev script and parse COMPOSE_PROJECT_NAME
+  if (projectPath) {
+    const devScriptPaths = [
+      join(projectPath, 'workspaces', featureFolder, '.devcontainer', 'dev'),
+      join(projectPath, 'workspaces', featureFolder, 'dev'),
+    ];
+    for (const devPath of devScriptPaths) {
+      try {
+        if (existsSync(devPath)) {
+          const content = readFileSync(devPath, 'utf-8');
+          // Match: export COMPOSE_PROJECT_NAME="prefix-${FEATURE_FOLDER}"
+          const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+          if (match) {
+            return `${match[1]}${featureFolder}`;
+          }
+          // Match: export COMPOSE_PROJECT_NAME="literal-value"
+          const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
+          if (literalMatch) {
+            return literalMatch[1];
+          }
+        }
+      } catch {
+        // Fall through to fallback
+      }
+    }
+  }
+
+  // Fallback: use feature folder as filter (will match any project prefix)
+  return featureFolder;
+}
+
 // Get container status for workspace
 // Get container status (ASYNC - non-blocking)
-async function getContainerStatusAsync(issueId: string): Promise<Record<string, { running: boolean; uptime: string | null; status?: string }>> {
+async function getContainerStatusAsync(issueId: string, projectPath?: string): Promise<Record<string, { running: boolean; uptime: string | null; status?: string }>> {
   const issueLower = issueId.toLowerCase();
+  const composeName = getComposeProjectName(issueId, projectPath);
   const containerMap: Record<string, string[]> = {
     'frontend': ['frontend', 'fe'],
     'api': ['api'],
@@ -4839,16 +4860,14 @@ async function getContainerStatusAsync(issueId: string): Promise<Record<string, 
     // Note: 'dev' is a script (./dev), not a container - don't check for it
   };
 
-  // Build all possible container patterns
-  // Project names are slugified (e.g., "Mind Your Now" -> "mind-your-now")
+  // Build container patterns from resolved compose project name + fallbacks
   const checks: Array<{ displayName: string; containerName: string }> = [];
   for (const [displayName, suffixes] of Object.entries(containerMap)) {
     for (const suffix of suffixes) {
       checks.push(
-        // Canonical: compose file name field (basename of project path)
-        { displayName, containerName: `myn-feature-${issueLower}-${suffix}-1` },
-        // Legacy: derived from projectConfig.name (before -p flag removal)
-        { displayName, containerName: `mind-your-now-feature-${issueLower}-${suffix}-1` },
+        // Primary: resolved from workspace dev script
+        { displayName, containerName: `${composeName}-${suffix}-1` },
+        // Fallback: bare feature folder
         { displayName, containerName: `feature-${issueLower}-${suffix}-1` },
         { displayName, containerName: `${issueLower}-${suffix}-1` },
       );
@@ -5129,7 +5148,7 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
   const [git, repoGit, containers, mrUrl, sessionsResult, paneResult] = await Promise.all([
     getGitStatusAsync(workspacePath),
     getRepoGitStatusAsync(workspacePath),
-    hasDocker ? getContainerStatusAsync(issueId) : Promise.resolve(null),
+    hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
     getMrUrlAsync(issueId, workspacePath),
     execAsync('tmux list-sessions 2>/dev/null || echo ""').catch(() => ({ stdout: '' })),
     execAsync(`tmux capture-pane -t "${agentSession}" -p 2>/dev/null | tail -50`).catch(() => ({ stdout: '' })),
@@ -5719,6 +5738,41 @@ app.post('/api/workspaces/:issueId/start', async (req, res) => {
     return res.status(400).json({ error: 'Docker is not running. Start Docker Desktop first.' });
   }
 
+  // Pre-start: if postgres is already running, verify Flyway health before starting API.
+  // After a reboot, postgres often survives but flyway_schema_history may be corrupted.
+  // Repairing now prevents the API from crash-looping during ./dev all.
+  if (projectConfig?.workspace?.database?.migrations?.type === 'flyway') {
+    try {
+      const composePaths = [
+        join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
+        join(workspacePath, 'docker-compose.yml'),
+      ];
+      let compFile: string | undefined;
+      for (const cp of composePaths) {
+        if (existsSync(cp)) { compFile = cp; break; }
+      }
+      if (compFile) {
+        const { stdout: pnOut } = await execAsync(
+          `docker compose -f "${compFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+          { encoding: 'utf-8' }
+        );
+        const composeName = pnOut.trim();
+        if (composeName) {
+          const pgContainer = `${composeName}-postgres-1`;
+          const result = await repairFlywayIfNeeded(
+            issueId, pgContainer, 'myn', projectConfig, workspacePath
+          );
+          if (result.repaired) {
+            console.log(`[workspace/start] Pre-start Flyway repair: ${result.message}`);
+          }
+        }
+      }
+    } catch (preCheckErr: any) {
+      // Non-fatal: postgres may not be running yet, ./dev all will start it
+      console.log(`[workspace/start] Pre-start Flyway check skipped: ${preCheckErr.message}`);
+    }
+  }
+
   try {
     const activityId = Date.now().toString();
 
@@ -5761,7 +5815,69 @@ app.post('/api/workspaces/:issueId/start', async (req, res) => {
 
     child.on('close', (code) => {
       appendActivityOutput(activityId, `[${new Date().toISOString()}] ./dev all exited with code ${code}`);
-      updateActivity(activityId, { status: code === 0 ? 'completed' : 'failed' });
+
+      if (code !== 0 && projectConfig?.workspace?.database?.migrations?.type === 'flyway') {
+        // Check if API container failed due to Flyway issues and auto-repair
+        (async () => {
+          try {
+            // Find the API container name
+            const composePaths = [
+              join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
+              join(workspacePath, 'docker-compose.yml'),
+            ];
+            let composeFile: string | undefined;
+            for (const cp of composePaths) {
+              if (existsSync(cp)) { composeFile = cp; break; }
+            }
+            if (!composeFile) return;
+
+            const { stdout: pnOut } = await execAsync(
+              `docker compose -f "${composeFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+              { encoding: 'utf-8' }
+            );
+            const composeName = pnOut.trim();
+            if (!composeName) return;
+
+            const apiContainer = `${composeName}-api-1`;
+            const pgContainer = `${composeName}-postgres-1`;
+
+            // Check if API container exited with Flyway error
+            const { stdout: apiStatus } = await execAsync(
+              `docker ps -a --filter "name=^${apiContainer}$" --format "{{.Status}}" 2>/dev/null`,
+              { encoding: 'utf-8' }
+            );
+            if (!apiStatus.trim().startsWith('Exited')) return;
+
+            const { stdout: logs } = await execAsync(
+              `docker logs --tail 50 "${apiContainer}" 2>&1 || true`,
+              { encoding: 'utf-8', timeout: 10000 }
+            );
+            if (!logs.toLowerCase().includes('flyway')) return;
+
+            appendActivityOutput(activityId, '');
+            appendActivityOutput(activityId, '=== Detected Flyway failure — attempting auto-repair ===');
+
+            const result = await repairFlywayIfNeeded(
+              issueId, pgContainer, 'myn', projectConfig, workspacePath,
+              (msg) => appendActivityOutput(activityId, `[flyway-repair] ${msg}`)
+            );
+
+            if (result.repaired) {
+              appendActivityOutput(activityId, `[flyway-repair] Restarting API container...`);
+              await execAsync(`docker start "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 });
+              appendActivityOutput(activityId, `[flyway-repair] API container restarted successfully`);
+              updateActivity(activityId, { status: 'completed' });
+              return;
+            }
+          } catch (repairErr: any) {
+            appendActivityOutput(activityId, `[flyway-repair] Auto-repair failed: ${repairErr.message}`);
+          }
+
+          updateActivity(activityId, { status: 'failed' });
+        })();
+      } else {
+        updateActivity(activityId, { status: code === 0 ? 'completed' : 'failed' });
+      }
     });
 
     child.on('error', (err) => {
@@ -5852,6 +5968,25 @@ app.post('/api/workspaces/:issueId/containers/:containerName/:action', async (re
     );
     const projectName = projectNameOut.trim();
 
+    // Pre-start Flyway repair for API containers
+    if (containerName.toLowerCase() === 'api' && ['start', 'restart'].includes(action)) {
+      const teamPrefix = extractTeamPrefix(issueId);
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+      if (projectConfig?.workspace?.database?.migrations?.type === 'flyway' && projectName) {
+        const pgContainer = `${projectName}-postgres-1`;
+        try {
+          const result = await repairFlywayIfNeeded(
+            issueId, pgContainer, 'myn', projectConfig, workspacePath!
+          );
+          if (result.repaired) {
+            console.log(`[container-control] ${result.message}`);
+          }
+        } catch (repairErr: any) {
+          console.warn(`[container-control] Flyway pre-check failed (non-fatal): ${repairErr.message}`);
+        }
+      }
+    }
+
     // Try each possible service name
     let success = false;
     let lastError = '';
@@ -5880,6 +6015,134 @@ app.post('/api/workspaces/:issueId/containers/:containerName/:action', async (re
     res.status(500).json({ error: `Failed to ${action} container: ${error.message}` });
   }
 });
+
+/**
+ * Repair corrupted Flyway schema_history without dropping the database.
+ *
+ * After a system crash or incomplete Docker initdb, flyway_schema_history can end up
+ * with too few rows (e.g., only V1 baseline). When the API starts, Flyway tries to
+ * re-run migrations against tables that already exist from the seed data, causing a
+ * crash-loop. This function detects the corruption and reloads the baseline + syncs
+ * checksums from workspace migration files.
+ *
+ * Safe to call multiple times — the baseline file starts with DROP TABLE IF EXISTS.
+ */
+async function repairFlywayIfNeeded(
+  issueId: string,
+  pgContainer: string,
+  dbName: string,
+  projectConfig: any,
+  workspacePath: string,
+  log?: (msg: string) => void
+): Promise<{ repaired: boolean; message: string }> {
+  const emit = log || ((msg: string) => console.log(`[flyway-repair] ${msg}`));
+
+  // Check postgres is running
+  try {
+    await execAsync(`docker exec "${pgContainer}" pg_isready -U postgres`, { encoding: 'utf-8', timeout: 5000 });
+  } catch {
+    return { repaired: false, message: 'Postgres container not ready, skipping Flyway check' };
+  }
+
+  // Check flyway_schema_history row count
+  let rowCount = 0;
+  try {
+    const { stdout } = await execAsync(
+      `docker exec "${pgContainer}" psql -U postgres -d ${dbName} -t -A -c "SELECT count(*) FROM flyway_schema_history;"`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    rowCount = parseInt(stdout.trim(), 10) || 0;
+  } catch {
+    // Table doesn't exist or DB doesn't exist — needs repair
+    rowCount = 0;
+  }
+
+  // If row count is reasonable (>= 10), schema_history is fine
+  if (rowCount >= 10) {
+    return { repaired: false, message: `Flyway schema_history has ${rowCount} entries, no repair needed` };
+  }
+
+  emit(`Flyway schema_history has only ${rowCount} entries — repairing`);
+
+  // Resolve baseline file path (same directory as seed file)
+  const seedRelPath = projectConfig.workspace?.database?.seed_file;
+  if (!seedRelPath) {
+    return { repaired: false, message: 'No seed_file configured, cannot locate Flyway baseline' };
+  }
+
+  const seedFile = join(projectConfig.path, seedRelPath);
+  const flywayFile = join(dirname(seedFile), 'zzz-flyway-workspace-baseline.sql');
+  if (!existsSync(flywayFile)) {
+    return { repaired: false, message: `Flyway baseline not found: ${flywayFile}` };
+  }
+
+  // Load baseline
+  emit(`Loading Flyway baseline from ${flywayFile}`);
+  await execAsync(
+    `docker exec -i "${pgContainer}" psql -U postgres -d ${dbName} < "${flywayFile}"`,
+    { encoding: 'utf-8', timeout: 60000 }
+  );
+
+  // Sync checksums from workspace migration files
+  const migrationsRelPath = projectConfig.workspace?.database?.migrations?.path;
+  if (migrationsRelPath) {
+    const migrationsDir = join(workspacePath, migrationsRelPath);
+    if (existsSync(migrationsDir)) {
+      emit(`Syncing Flyway checksums from workspace migrations`);
+      const migrationFiles = readdirSync(migrationsDir)
+        .filter(f => /^V\d+__.*\.sql$/.test(f));
+
+      const updates: string[] = [];
+      for (const file of migrationFiles) {
+        const version = file.match(/^V(\d+)__/)?.[1];
+        if (!version) continue;
+
+        let content = readFileSync(join(migrationsDir, file));
+        // Strip UTF-8 BOM
+        if (content[0] === 0xEF && content[1] === 0xBB && content[2] === 0xBF) {
+          content = content.slice(3);
+        }
+        // Flyway strips all line endings before computing CRC32:
+        // split on \r?\n, join with no separator, then CRC32
+        const lines = content.toString('utf-8').split(/\r?\n/);
+        const checksum = crc32(Buffer.from(lines.join(''), 'utf-8')) | 0;
+
+        updates.push(
+          `UPDATE flyway_schema_history SET checksum = ${checksum} WHERE version = '${version}' AND checksum IS NOT NULL;`
+        );
+      }
+
+      if (updates.length > 0) {
+        const tmpSql = `/tmp/flyway-checksum-sync-${Date.now()}.sql`;
+        writeFileSync(tmpSql, updates.join('\n'));
+        try {
+          const { stdout } = await execAsync(
+            `docker exec -i "${pgContainer}" psql -U postgres -d ${dbName} < "${tmpSql}"`,
+            { encoding: 'utf-8', timeout: 30000 }
+          );
+          const updatedCount = (stdout.match(/UPDATE \d+/g) || [])
+            .reduce((sum, m) => sum + parseInt(m.replace('UPDATE ', ''), 10), 0);
+          emit(`Synced ${migrationFiles.length} migration checksums (${updatedCount} rows updated)`);
+        } finally {
+          try { unlinkSync(tmpSql); } catch {}
+        }
+      }
+    }
+  }
+
+  // Verify repair
+  try {
+    const { stdout } = await execAsync(
+      `docker exec "${pgContainer}" psql -U postgres -d ${dbName} -t -A -c "SELECT count(*) FROM flyway_schema_history;"`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    const newCount = parseInt(stdout.trim(), 10) || 0;
+    emit(`Repair complete: flyway_schema_history now has ${newCount} entries (was ${rowCount})`);
+    return { repaired: true, message: `Repaired Flyway schema_history: ${rowCount} → ${newCount} entries` };
+  } catch (err: any) {
+    return { repaired: false, message: `Repair may have failed: ${err.message}` };
+  }
+}
 
 // Refresh workspace database from seed file
 app.post('/api/workspaces/:issueId/refresh-db', async (req, res) => {
@@ -5987,62 +6250,14 @@ app.post('/api/workspaces/:issueId/refresh-db', async (req, res) => {
       { encoding: 'utf-8', timeout: 600000 }
     );
 
-    // Step 4: Load flyway baseline
-    console.log(`[refresh-db] Loading flyway baseline: ${flywayFile}`);
-    await execAsync(
-      `docker exec -i "${pgContainer}" psql -U postgres -d myn < "${flywayFile}"`,
-      { encoding: 'utf-8', timeout: 60000 }
+    // Step 4 + 4.5: Load flyway baseline + sync checksums
+    // Uses shared repairFlywayIfNeeded which handles both baseline loading and
+    // checksum sync from workspace migration files
+    const repairResult = await repairFlywayIfNeeded(
+      issueId, pgContainer, 'myn', projectConfig, workspacePath,
+      (msg) => console.log(`[refresh-db] ${msg}`)
     );
-
-    // Step 4.5: Sync Flyway checksums with local migration files
-    // The baseline contains production checksums, but feature branches may have
-    // modified migration files (e.g., V105 idempotency changes). Recompute CRC32
-    // from the workspace's local files so Flyway validation passes on startup.
-    const migrationsRelPath = projectConfig.workspace?.database?.migrations?.path;
-    if (migrationsRelPath) {
-      const migrationsDir = join(workspacePath, migrationsRelPath);
-      if (existsSync(migrationsDir)) {
-        console.log(`[refresh-db] Syncing Flyway checksums from ${migrationsDir}`);
-        const migrationFiles = readdirSync(migrationsDir)
-          .filter(f => /^V\d+__.*\.sql$/.test(f));
-
-        const updates: string[] = [];
-        for (const file of migrationFiles) {
-          const version = file.match(/^V(\d+)__/)?.[1];
-          if (!version) continue;
-
-          let content = readFileSync(join(migrationsDir, file));
-          // Strip UTF-8 BOM
-          if (content[0] === 0xEF && content[1] === 0xBB && content[2] === 0xBF) {
-            content = content.slice(3);
-          }
-          // Flyway strips all line endings before computing CRC32:
-          // split on \r?\n, join with no separator, then CRC32
-          const lines = content.toString('utf-8').split(/\r?\n/);
-          const checksum = crc32(Buffer.from(lines.join(''), 'utf-8')) | 0;
-
-          updates.push(
-            `UPDATE flyway_schema_history SET checksum = ${checksum} WHERE version = '${version}' AND checksum IS NOT NULL;`
-          );
-        }
-
-        if (updates.length > 0) {
-          const tmpSql = `/tmp/flyway-checksum-sync-${Date.now()}.sql`;
-          writeFileSync(tmpSql, updates.join('\n'));
-          try {
-            const { stdout } = await execAsync(
-              `docker exec -i "${pgContainer}" psql -U postgres -d myn < "${tmpSql}"`,
-              { encoding: 'utf-8', timeout: 30000 }
-            );
-            const updatedCount = (stdout.match(/UPDATE \d+/g) || [])
-              .reduce((sum, m) => sum + parseInt(m.replace('UPDATE ', ''), 10), 0);
-            console.log(`[refresh-db] Synced ${migrationFiles.length} migration checksums (${updatedCount} rows updated)`);
-          } finally {
-            try { unlinkSync(tmpSql); } catch {}
-          }
-        }
-      }
-    }
+    console.log(`[refresh-db] Flyway setup: ${repairResult.message}`);
 
     // Step 5: Start API container
     console.log(`[refresh-db] Starting API container: ${apiContainer}`);
@@ -6418,14 +6633,9 @@ app.post('/api/specialists/done', async (req, res) => {
     }
   }
 
-  // When merge specialist reports success, also close the issue/PR
+  // When merge specialist reports success, log awaiting close-out
   if (specialist === 'merge' && status === 'passed') {
-    try {
-      await closeIssueAfterMerge(normalizedIssueId);
-      console.log(`[specialists/done] Closed issue/PR for ${normalizedIssueId} after merge`);
-    } catch (err) {
-      console.warn(`[specialists/done] Failed to close issue after merge: ${err}`);
-    }
+    onMergeComplete(normalizedIssueId);
   }
 
   res.json({
@@ -6904,7 +7114,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       completePendingOperation(issueId, null);
 
       // Close the issue
-      await closeIssueAfterMerge(issueId);
+      onMergeComplete(issueId);
 
       return res.json({
         success: true,
@@ -7062,7 +7272,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       completePendingOperation(issueId, null);
 
       // Close the issue after successful merge
-      await closeIssueAfterMerge(issueId);
+      onMergeComplete(issueId);
 
       return res.json({
         success: true,
@@ -7098,7 +7308,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       completePendingOperation(issueId, null);
 
       // Close the issue after successful merge
-      await closeIssueAfterMerge(issueId);
+      onMergeComplete(issueId);
 
       return res.json({
         success: true,
@@ -7111,7 +7321,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       completePendingOperation(issueId, null);
 
       // Close the issue after successful merge (even if tests skipped)
-      await closeIssueAfterMerge(issueId);
+      onMergeComplete(issueId);
 
       return res.json({
         success: true,
@@ -7378,120 +7588,38 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
       return res.status(400).json({ error });
     }
 
-    // 8. Stop any running agent
-    const agentId = `agent-${issueLower}`;
-    try {
-      await execAsync(`tmux has-session -t ${agentId} 2>/dev/null && tmux kill-session -t ${agentId}`, {
-        encoding: 'utf-8',
-        shell: '/bin/bash'
-      });
-      console.log(`Stopped agent ${agentId}`);
-    } catch {
-      // Agent not running, that's fine
-    }
+    // 8. Post-merge lifecycle (archive, close, teardown, beads, clear-status)
+    const { approve: lifecycleApprove } = await import('../../lib/lifecycle/index.js');
 
-    // 8.5. Move PRD from active to completed (preserve documentation)
-    try {
-      const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
-      const completedDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR);
-      const completedPrdPath = join(completedDir, `${issueLower}-plan.md`);
+    const ghConfig = getGitHubConfig();
+    const isGitHubIssueFlag = issueId.toUpperCase().startsWith('PAN-');
+    const lifecycleCtx = {
+      issueId,
+      projectPath,
+      ...(isGitHubIssueFlag && ghConfig ? {
+        github: {
+          owner: ghConfig.repos.find(r => r.prefix === 'PAN')?.owner || '',
+          repo: ghConfig.repos.find(r => r.prefix === 'PAN')?.repo || '',
+          number: parseInt(issueId.split('-')[1], 10),
+        },
+      } : {}),
+    };
 
-      if (existsSync(activePrdPath)) {
-        // Ensure completed directory exists
-        if (!existsSync(completedDir)) {
-          mkdirSync(completedDir, { recursive: true });
-        }
-        // Move the PRD
-        renameSync(activePrdPath, completedPrdPath);
-        console.log(`Moved PRD from active to completed: ${issueLower}-plan.md`);
+    const lifecycleResult = await lifecycleApprove(lifecycleCtx);
+    console.log(`[approve] Lifecycle completed for ${issueId}: ${lifecycleResult.steps.filter(s => s.success && !s.skipped).map(s => s.step).join(', ')}`);
 
-        // Commit the PRD move
-        try {
-          await execAsync(`git add ${join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR)} && git commit -m "docs: move ${issueId} PRD to completed"`, {
-            cwd: projectPath,
-            encoding: 'utf-8'
-          });
-          await execAsync('git push origin main', { cwd: projectPath, encoding: 'utf-8' });
-          console.log('Committed and pushed PRD move');
-        } catch (commitErr: any) {
-          // Non-fatal - PRD move is nice to have
-          console.log('Could not commit PRD move (non-fatal):', commitErr.message);
-        }
-      }
-    } catch (prdErr: any) {
-      // Non-fatal - PRD handling shouldn't block approval
-      console.log('PRD move failed (non-fatal):', prdErr.message);
-    }
-
-    // 9. Remove the workspace (git worktree) - ONLY after successful push
-    try {
-      await execAsync(`git worktree remove workspaces/feature-${issueLower} --force`, {
-        cwd: projectPath,
-        encoding: 'utf-8'
-      });
-      console.log(`Removed workspace for ${issueId}`);
-    } catch (wtError: any) {
-      // Log but don't fail - workspace cleanup is non-critical after push
-      console.error('Error removing worktree (non-fatal):', wtError.message);
-    }
-
-    // 10. DISABLED: Keep feature branches for safety during early development
-    // TODO: Re-enable branch cleanup once workflow is battle-tested
-    // try {
-    //   execSync(`git branch -d ${branchName}`, { cwd: projectPath, encoding: 'utf-8', stdio: 'pipe' });
-    //   console.log(`Deleted local branch ${branchName} (remote preserved)`);
-    // } catch (branchError: any) {
-    //   console.log(`Could not delete local branch ${branchName} (may have unmerged commits): ${branchError.message}`);
-    // }
-    console.log(`Keeping local branch ${branchName} for safety (early development mode)`);
-
-    // 6. Update Linear issue to Done (or GitHub label)
-    const apiKey = getLinearApiKey();
-    const isGitHubIssue = issueId.startsWith('PAN-');
-
-    if (isGitHubIssue) {
-      // GitHub issue - add "done" label, remove "in-progress"
-      const ghConfig = getGitHubConfig();
-      if (ghConfig) {
-        const number = parseInt(issueId.split('-')[1], 10);
-        const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
-        const { owner, repo } = repoConfig;
-        const token = ghConfig.token;
-
-        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/in-progress`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
-        }).catch(() => {});
-
-        // Close the issue
-        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}`, {
-          method: 'PATCH',
-          headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state: 'closed' }),
-        });
-      }
-    } else if (apiKey) {
-      // Linear issue - move to Done
-      try {
-        await updateLinearIssueStatus(issueId, 'Done');
-      } catch (linearError) {
-        console.error('Error updating Linear:', linearError);
-      }
-    }
-
-    // For Panopticon issues, run pan sync to distribute new skills/commands/agents
-    if (isGitHubIssue || issueId.toUpperCase().startsWith('PAN-')) {
+    // Panopticon-specific: sync skills (not a lifecycle concern)
+    if (isGitHubIssueFlag) {
       try {
         console.log('Running pan sync for Panopticon issue...');
         await execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 });
         console.log('pan sync completed');
       } catch (syncError: any) {
         console.error('pan sync failed (non-fatal):', syncError.message);
-        // Don't fail the approve - sync failure is non-fatal
       }
     }
 
-    // Record task metrics for the completed work (async to avoid blocking)
+    // Record task metrics for the completed work
     await recordApprovedTask(issueId, workspacePath, 'success');
 
     // Clear pending operation on success
@@ -7499,7 +7627,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 
     res.json({
       success: true,
-      message: `Approved ${issueId}: merged, workspace removed, issue closed${isGitHubIssue || issueId.toUpperCase().startsWith('PAN-') ? ', skills synced' : ''}, metrics recorded`,
+      message: `Approved ${issueId}: ${lifecycleResult.steps.filter(s => s.success && !s.skipped).map(s => s.step).join(', ')}${isGitHubIssueFlag ? ', skills synced' : ''}`,
     });
   } catch (error: any) {
     console.error('Error approving workspace:', error);
@@ -7521,132 +7649,47 @@ app.post('/api/issues/:issueId/close', async (req, res) => {
   const { reason } = req.body;
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
-  const issueLower = issueId.toLowerCase();
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-  const branchName = `feature/${issueLower}`;
 
   try {
+    const { close: closeWorkflow } = await import('../../lib/lifecycle/index.js');
     const githubCheck = isGitHubIssue(issueId);
     const issueSource = issueDataService.getIssueSource(issueId);
-    const apiKey = getLinearApiKey();
 
-    // 1. Close the issue (GitHub via gh CLI, Rally via tracker, Linear via API)
-    if (githubCheck.isGitHub) {
-      const ghConfig = getGitHubConfig();
-      const number = parseInt(issueId.split('-')[1], 10);
-      const repoConfig = ghConfig?.repos.find(r => r.prefix === 'PAN') || ghConfig?.repos[0];
-      const repoPath = repoConfig ? `${repoConfig.owner}/${repoConfig.repo}` : 'eltmon/panopticon-cli';
+    // Build lifecycle context with tracker-specific metadata
+    const ctx: import('../../lib/lifecycle/types.js').LifecycleContext = {
+      issueId,
+      projectPath,
+      ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+        ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+        : {}),
+    };
 
-      try {
-        // Use gh CLI for better auth handling
-        await execAsync(`gh issue close ${number} --repo ${repoPath} --reason completed`, {
-          encoding: 'utf-8',
-          timeout: 30000,
-        });
-        console.log(`Closed GitHub issue ${issueId} via gh CLI`);
-      } catch (ghError: any) {
-        console.error('gh CLI failed, trying API:', ghError.message);
-        // Fallback to API if gh fails
-        if (ghConfig && repoConfig) {
-          await fetch(`https://api.github.com/repos/${repoConfig.owner}/${repoConfig.repo}/issues/${number}`, {
-            method: 'PATCH',
-            headers: { 'Authorization': `token ${ghConfig.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state: 'closed' }),
-          });
-        }
-      }
-    } else if (issueSource === 'rally') {
-      // Rally issue - transition to closed state
+    // Add Rally config if this is a Rally issue
+    if (issueSource === 'rally') {
       const rallyConfig = getRallyConfig();
       if (rallyConfig) {
-        try {
-          const { RallyTracker } = await import('../../lib/tracker/rally.js');
-          const tracker = new RallyTracker({
-            apiKey: rallyConfig.apiKey,
-            server: rallyConfig.server,
-            workspace: rallyConfig.workspace,
-            project: rallyConfig.project,
-          });
-          await tracker.transitionIssue(issueId, 'closed');
-          console.log(`Closed Rally issue ${issueId}`);
-        } catch (rallyErr: any) {
-          console.error(`Rally close failed for ${issueId}:`, rallyErr.message);
-        }
-      }
-    } else if (apiKey) {
-      // Linear issue - update to Done
-      const getIssueQuery = `
-        query GetIssue($id: String!) {
-          issue(id: $id) {
-            id
-            team { states { nodes { id name type } } }
-          }
-        }
-      `;
-      const issueResponse = await fetch('https://api.linear.app/graphql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-        body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
-      });
-      const issueJson = await issueResponse.json();
-      const states = issueJson.data?.issue?.team?.states?.nodes || [];
-      const doneState = states.find((s: any) => s.type === 'completed' || s.name.toLowerCase() === 'done');
-      const linearId = issueJson.data?.issue?.id;
-
-      if (doneState && linearId) {
-        const updateMutation = `
-          mutation UpdateIssue($id: String!, $stateId: String!) {
-            issueUpdate(id: $id, input: { stateId: $stateId }) { success }
-          }
-        `;
-        await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-          body: JSON.stringify({ query: updateMutation, variables: { id: linearId, stateId: doneState.id } }),
-        });
-        console.log(`Updated Linear issue ${issueId} to Done`);
+        ctx.rally = {
+          apiKey: rallyConfig.apiKey,
+          server: rallyConfig.server,
+          workspace: rallyConfig.workspace,
+          project: rallyConfig.project,
+        };
       }
     }
 
-    // 2. Stop any running agent
-    const agentId = `agent-${issueLower}`;
-    try {
-      await execAsync(`tmux has-session -t ${agentId} 2>/dev/null && tmux kill-session -t ${agentId}`, {
-        encoding: 'utf-8',
-        shell: '/bin/bash'
-      });
-      console.log(`Stopped agent ${agentId}`);
-    } catch {
-      // Agent not running, that's fine
-    }
+    const result = await closeWorkflow(ctx, { reason });
 
-    // 3. Clean up workspace if it exists
-    if (existsSync(workspacePath)) {
-      try {
-        await execAsync(`git worktree remove workspaces/feature-${issueLower} --force`, {
-          cwd: projectPath,
-          encoding: 'utf-8'
-        });
-        console.log(`Removed workspace for ${issueId}`);
-      } catch (wtError: any) {
-        console.error('Error removing worktree:', wtError.message);
-      }
-    }
-
-    // 4. Feature branches are preserved for history - do NOT delete them
-    // Users can manually delete branches if needed via: git branch -d <branch>
-
-    // 5. Run pan sync for Panopticon issues
+    // Run pan sync for Panopticon issues (fire-and-forget)
     if (githubCheck.isGitHub) {
-      try {
-        await execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 });
-        console.log('pan sync completed');
-      } catch {}
+      execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 }).catch(() => {});
     }
 
     res.json({
-      success: true,
-      message: `Closed ${issueId}${reason ? ': ' + reason : ''}`,
+      success: result.success,
+      message: result.success
+        ? `Closed ${issueId}${reason ? ': ' + reason : ''}`
+        : `Close failed for ${issueId}`,
+      steps: result.steps,
     });
 
     // Invalidate cache for affected tracker
@@ -8089,7 +8132,7 @@ app.post('/api/agents', async (req, res) => {
 
       if (dockerRunning) {
         containerActivityId = `containers-${Date.now()}`;
-        const featureName = `myn-feature-${issueLower}`;
+        const featureName = getComposeProjectName(issueId, projectPath);
 
         // Quick check: are containers already running and healthy?
         try {
@@ -8524,8 +8567,12 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
         });
       }
 
-      // Remove 'done' label if present, add 'in-progress'
+      // Remove 'done' and 'needs-close-out' labels if present, add 'in-progress'
       await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/done`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `token ${ghConfig.token}`, 'Accept': 'application/vnd.github.v3+json' },
+      }).catch(() => {});
+      await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/needs-close-out`, {
         method: 'DELETE',
         headers: { 'Authorization': `token ${ghConfig.token}`, 'Accept': 'application/vnd.github.v3+json' },
       }).catch(() => {});
@@ -8851,278 +8898,128 @@ app.post('/api/issues/:id/cleanup-workspace', async (req, res) => {
 app.post('/api/issues/:id/deep-wipe', async (req, res) => {
   const { id } = req.params;
   const { deleteWorkspace = false } = req.body || {};
-  const cleanupLog: string[] = [];
 
   try {
-    const issueLower = id.toLowerCase();
+    const { deepWipe } = await import('../../lib/lifecycle/index.js');
+
     const githubCheck = isGitHubIssue(id);
-
-    // 1. Kill all tmux sessions for this issue
-    const sessionPatterns = [
-      `planning-${issueLower}`,
-      `agent-${issueLower}`,
-    ];
-    for (const session of sessionPatterns) {
-      try {
-        await execAsync(`tmux kill-session -t ${session} 2>/dev/null || true`, { encoding: 'utf-8' });
-        cleanupLog.push(`Killed tmux session: ${session}`);
-      } catch (e) {
-        // Session might not exist
-      }
-    }
-
-    // 2. Clean up agent state directories
-    const agentDirs = [
-      join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`),
-      join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`),
-    ];
-    for (const dir of agentDirs) {
-      if (existsSync(dir)) {
-        rmSync(dir, { recursive: true, force: true });
-        cleanupLog.push(`Deleted agent state: ${dir}`);
-      }
-    }
-
-    // 2.5 Clear shadow state for this issue
-    try {
-      const { removeShadowState } = await import('../../lib/shadow-state.js');
-      const shadowResult = removeShadowState(id);
-      if (shadowResult.success) {
-        cleanupLog.push(`Cleared shadow state for ${id}`);
-      }
-    } catch (shadowErr) {
-      // Shadow state might not exist, that's fine
-    }
-
-    // 3. Find project path and config for workspace and planning dir cleanup
-    let projectPath: string | undefined;
-    let projectName: string | undefined;
+    let projectPath = '';
+    let projectName = '';
     let projectConfig: ProjectConfig | null = null;
-    if (!githubCheck.isGitHub) {
+
+    if (githubCheck.isGitHub) {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+      projectName = githubCheck.repo || '';
+    } else {
       const prefix = id.split('-')[0].toUpperCase();
       projectConfig = findProjectByTeam(prefix);
       if (projectConfig) {
         projectPath = projectConfig.path;
         projectName = projectConfig.name;
       }
-    } else {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
-      projectName = githubCheck.repo || (projectPath ? basename(projectPath) : undefined);
     }
 
-    // 4. Clean up legacy planning directory
-    if (projectPath) {
-      const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-      if (existsSync(legacyPlanningDir)) {
-        rmSync(legacyPlanningDir, { recursive: true, force: true });
-        cleanupLog.push(`Deleted legacy planning dir: ${legacyPlanningDir}`);
-      }
-    }
+    const ctx = {
+      issueId: id,
+      projectPath,
+      projectName,
+      ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+        ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+        : {}),
+    };
 
-    // 4b. Clear review/test pipeline status
-    try {
-      clearReviewStatus(id.toUpperCase());
-      cleanupLog.push(`Cleared review status for ${id.toUpperCase()}`);
-    } catch {
-      // Review status might not exist
-    }
+    const result = await deepWipe(ctx, {
+      deleteWorkspace,
+      deleteBranches: deleteWorkspace,
+      resetIssue: true,
+      workspaceConfig: projectConfig?.workspace,
+      projectName,
+    });
 
-    // 4c. Clear .planning-complete marker so the dialog resets to "ready" after a deep-wipe.
-    // When deleteWorkspace=true the whole directory is removed, so we only need this for
-    // the preserve-workspace case.
-    if (!deleteWorkspace && projectPath) {
-      const workspacePlanningMarker = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', '.planning-complete');
-      if (existsSync(workspacePlanningMarker)) {
-        unlinkSync(workspacePlanningMarker);
-        cleanupLog.push(`Cleared .planning-complete marker from workspace`);
-      }
-    }
+    // Invalidate caches
+    issueDataService.invalidateTracker('github').catch(() => {});
+    issueDataService.invalidateTracker('linear').catch(() => {});
 
-    // 5. Optionally delete workspace
-    if (deleteWorkspace && projectPath) {
-      const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-      // 5a. Stop TLDR daemon BEFORE deleting workspace files
-      if (existsSync(workspacePath)) {
-        const venvPath = join(workspacePath, '.venv');
-        if (existsSync(venvPath)) {
-          try {
-            const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
-            const tldrService = getTldrDaemonService(workspacePath, venvPath);
-            await tldrService.stop();
-            cleanupLog.push('Stopped TLDR daemon');
-          } catch (tldrErr) {
-            // Non-fatal - daemon may not be running
-            cleanupLog.push(`TLDR daemon stop warning: ${(tldrErr as Error).message}`);
-          }
-        }
-      }
-
-      // 5b. Stop Docker containers BEFORE deleting workspace files
-      // Compose files live inside the workspace, so they must still exist for this step
-      if (existsSync(workspacePath)) {
-        const dockerResult = await stopWorkspaceDocker(
-          workspacePath,
-          projectName || basename(projectPath),
-          issueLower,
-        );
-        cleanupLog.push(...dockerResult.steps);
-      }
-
-      // 5c. Remove Cloudflare tunnel entries before workspace deletion
-      const wsConfig = projectConfig?.workspace;
-      const featureFolder = `feature-${issueLower}`;
-      const domain = wsConfig?.dns?.domain || 'localhost';
-      const placeholders = {
-        FEATURE_NAME: issueLower,
-        FEATURE_FOLDER: featureFolder,
-        BRANCH_NAME: `feature/${issueLower}`,
-        COMPOSE_PROJECT: `${projectName || 'workspace'}-${featureFolder}`,
-        DOMAIN: domain,
-        PROJECT_NAME: projectName || basename(projectPath),
-        PROJECT_PATH: projectPath,
-        WORKSPACE_PATH: workspacePath,
-      };
-      if (wsConfig?.tunnel) {
-        try {
-          const { removeTunnelIngress } = await import('../../lib/tunnel.js');
-          const tunnelResult = await removeTunnelIngress(wsConfig.tunnel, placeholders);
-          cleanupLog.push(...tunnelResult.steps);
-        } catch (tunnelErr) {
-          cleanupLog.push(`Tunnel cleanup warning: ${(tunnelErr as Error).message}`);
-        }
-      }
-
-      // 5d. Remove Hume EVI config
-      if (wsConfig?.hume) {
-        try {
-          const { deleteHumeConfig } = await import('../../lib/hume.js');
-          const humeResult = await deleteHumeConfig(wsConfig.hume, placeholders);
-          cleanupLog.push(...humeResult.steps);
-        } catch (humeErr) {
-          cleanupLog.push(`Hume cleanup warning: ${(humeErr as Error).message}`);
-        }
-      }
-
-      const branchName = `feature/${issueLower}`;
-      const gitDirs = ['api', 'frontend', 'fe', '.'];
-
-      // Helper to run git commands with timeout (5 seconds for local, 10 for remote)
-      const gitExec = async (cmd: string, timeoutMs = 5000) => {
-        try {
-          await execAsync(cmd, { encoding: 'utf-8', timeout: timeoutMs });
-        } catch (e) {
-          // Command failed or timed out - continue anyway
-        }
-      };
-
-      // Remove git worktrees first
-      for (const gitDir of gitDirs) {
-        const gitPath = join(projectPath, gitDir);
-        if (existsSync(join(gitPath, '.git'))) {
-          // Remove worktree - use prune instead of remove to avoid hangs
-          await gitExec(`cd "${gitPath}" && git worktree prune 2>/dev/null || true`);
-
-          // Also try explicit remove for subdirs
-          const subDirs = ['fe', 'api', 'frontend'];
-          for (const subDir of subDirs) {
-            const subPath = join(workspacePath, subDir);
-            await gitExec(`cd "${gitPath}" && git worktree remove "${subPath}" --force 2>/dev/null || true`);
-          }
-
-          // Delete local branch
-          await gitExec(`cd "${gitPath}" && git branch -D "${branchName}" 2>/dev/null || true`);
-
-          // Delete remote branch (longer timeout for network)
-          await gitExec(`cd "${gitPath}" && git push origin --delete "${branchName}" 2>/dev/null || true`, 10000);
-        }
-      }
-
-      // Delete workspace directory if it still exists
-      if (existsSync(workspacePath)) {
-        rmSync(workspacePath, { recursive: true, force: true });
-      }
-      cleanupLog.push(`Deleted workspace and branches: ${branchName}`);
-    }
-
-    // 6. Reset issue state and remove labels (Linear or GitHub)
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-      // GitHub: remove workflow labels
-      const config = getGitHubConfig();
-      if (config) {
-        const labelsToRemove = ['in-progress', 'review-ready'];
-        for (const label of labelsToRemove) {
-          try {
-            await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/${label}`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `token ${config.token}`,
-                'Accept': 'application/vnd.github.v3+json',
-              },
-            });
-            cleanupLog.push(`Removed GitHub label: ${label}`);
-          } catch (e) {
-            // Label might not exist, that's fine
-          }
-        }
-      }
-    } else {
-      // Linear: reset state and remove labels
-      const linearKey = process.env.LINEAR_API_KEY || '';
-      if (linearKey) {
-        try {
-          const { LinearClient } = await import('@linear/sdk');
-          const client = new LinearClient({ apiKey: linearKey });
-          const issue = await client.issue(id);
-
-          if (issue) {
-            // Get team and Todo state
-            const team = await issue.team;
-            if (team) {
-              const states = await team.states();
-              // Find Todo/Unstarted state (same logic as abort-planning)
-              const todoState = states.nodes.find(s =>
-                s.name.toLowerCase() === 'todo' ||
-                s.name.toLowerCase() === 'to do' ||
-                s.type === 'unstarted'
-              );
-
-              if (todoState) {
-                await issue.update({ stateId: todoState.id });
-                cleanupLog.push(`Reset Linear status to ${todoState.name}`);
-              }
-
-              // Remove labels
-              const labels = await issue.labels();
-              const labelsToRemove = labels.nodes.filter(l =>
-                l.name.toLowerCase() === 'review ready'
-              );
-              if (labelsToRemove.length > 0) {
-                const currentLabelIds = labels.nodes.map(l => l.id);
-                const newLabelIds = currentLabelIds.filter(
-                  lid => !labelsToRemove.some(lr => lr.id === lid)
-                );
-                await issue.update({ labelIds: newLabelIds });
-                cleanupLog.push(`Removed labels: ${labelsToRemove.map(l => l.name).join(', ')}`);
-              }
-            }
-          }
-        } catch (linearErr) {
-          cleanupLog.push(`Linear cleanup warning: ${(linearErr as Error).message}`);
-        }
-      }
-    }
-
-    console.log(`[deep-wipe] Completed for ${id}:`, cleanupLog);
+    console.log(`[deep-wipe] Completed for ${id}:`, result.steps.map(s => s.step));
     res.json({
-      success: true,
+      success: result.success,
       message: `Deep wipe completed for ${id}`,
-      cleanupLog,
+      cleanupLog: result.steps.flatMap(s => s.details || []),
     });
   } catch (error: any) {
     console.error('Error in deep wipe:', error);
-    res.status(500).json({ error: 'Deep wipe failed: ' + error.message, partialLog: cleanupLog });
+    res.status(500).json({ error: 'Deep wipe failed: ' + error.message });
+  }
+});
+
+// Close-out ceremony — human-gated verification and cleanup after merge
+app.post('/api/issues/:id/close-out', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { closeOut } = await import('../../lib/lifecycle/index.js');
+
+    // Resolve project path and GitHub context
+    const githubCheck = isGitHubIssue(id);
+    let projectPath = '';
+
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+    } else {
+      const issuePrefix = id.split('-')[0].toUpperCase();
+      projectPath = getProjectPath(undefined, issuePrefix);
+    }
+
+    if (!projectPath) {
+      return res.status(400).json({ error: `Could not resolve project path for ${id}` });
+    }
+
+    const ctx: import('../../lib/lifecycle/types.js').LifecycleContext = {
+      issueId: id,
+      projectPath,
+      ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+        ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+        : {}),
+    };
+
+    // Add Rally config if this is a Rally issue
+    const issueSource = issueDataService.getIssueSource(id);
+    if (issueSource === 'rally') {
+      const rallyConfig = getRallyConfig();
+      if (rallyConfig) {
+        ctx.rally = {
+          apiKey: rallyConfig.apiKey,
+          server: rallyConfig.server,
+          workspace: rallyConfig.workspace,
+          project: rallyConfig.project,
+        };
+      }
+    }
+
+    const result = await closeOut(ctx);
+
+    if (result.success) {
+      // Invalidate tracker caches so the board refreshes
+      issueDataService.invalidateTracker('github').catch(() => {});
+      issueDataService.invalidateTracker('linear').catch(() => {});
+    }
+
+    // Map WorkflowResult to the legacy response shape for frontend compatibility
+    res.json({
+      success: result.success,
+      issueId: result.issueId,
+      steps: result.steps.map(s => ({
+        name: s.step,
+        status: s.success ? (s.skipped ? 'skipped' : 'passed') : 'failed',
+        message: s.error || (s.details ? s.details.join('; ') : undefined),
+      })),
+      error: result.success ? undefined : result.steps.find(s => !s.success)?.error,
+    });
+  } catch (error: any) {
+    console.error(`[close-out] Error for ${id}:`, error);
+    res.status(500).json({ error: error.message });
   }
 });
 

@@ -22,6 +22,7 @@ import { syncCommand } from './sync.js';
 import { refreshCommand } from './refresh.js';
 import { tldrCommand } from './tldr.js';
 import { syncMainCommand } from './sync-main.js';
+import { closeOutCommand } from './close-out.js';
 import { listStatesCommand, cleanupStatesCommand } from './linear-states.js';
 
 export function registerWorkCommands(program: Command): void {
@@ -204,6 +205,13 @@ export function registerWorkCommands(program: Command): void {
     .command('sync-main <id>')
     .description('Sync latest main into workspace feature branch (merge, not rebase)')
     .action(syncMainCommand);
+
+  work
+    .command('close-out <id>')
+    .description('Close out a completed issue (verify, cleanup, close on tracker)')
+    .option('--force', 'Skip confirmation prompt')
+    .option('--json', 'Output as JSON')
+    .action(closeOutCommand);
 
   work
     .command('linear-states')

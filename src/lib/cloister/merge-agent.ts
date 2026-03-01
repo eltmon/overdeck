@@ -15,12 +15,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import {
   PANOPTICON_HOME,
-  PROJECT_DOCS_SUBDIR,
-  PROJECT_PRDS_SUBDIR,
-  PROJECT_PRDS_ACTIVE_SUBDIR,
-  PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../paths.js';
-import { cleanupWorkflowLabels } from '../../core/state-mapping.js';
+
 import {
   getSessionId,
   recordWake,
@@ -144,72 +140,6 @@ function detectTestCommand(projectPath: string): string {
 }
 
 /**
- * Conditionally compact beads if there are old closed issues
- * Runs as a background task to avoid blocking merge completion
- */
-async function conditionalBeadsCompaction(projectPath: string): Promise<void> {
-  console.log(`[merge-agent] Checking if beads compaction is needed...`);
-
-  try {
-    // Check if bd is available
-    try {
-      await execAsync('which bd', { encoding: 'utf-8' });
-    } catch {
-      console.log(`[merge-agent] bd not available, skipping compaction`);
-      return;
-    }
-
-    // Check if .beads exists
-    const beadsDir = join(projectPath, '.beads');
-    if (!existsSync(beadsDir)) {
-      console.log(`[merge-agent] No .beads directory, skipping compaction`);
-      return;
-    }
-
-    // Check for closed issues older than 30 days
-    const { stdout: oldClosedCount } = await execAsync(
-      `bd list --status closed --json 2>/dev/null | jq '[.[] | select(.closed_at != null) | select((now - (.closed_at | fromdateiso8601)) > (30 * 24 * 60 * 60))] | length' 2>/dev/null || echo "0"`,
-      { cwd: projectPath, encoding: 'utf-8' }
-    );
-
-    const count = parseInt(oldClosedCount.trim(), 10) || 0;
-    if (count === 0) {
-      console.log(`[merge-agent] No old closed beads to compact`);
-      return;
-    }
-
-    console.log(`[merge-agent] Found ${count} closed beads older than 30 days, running compaction...`);
-    logActivity('beads_compaction_start', `Compacting ${count} old closed beads`);
-
-    // Run compaction
-    await execAsync(`bd admin compact --days 30`, { cwd: projectPath, encoding: 'utf-8' });
-
-    // Commit the compacted beads
-    await execAsync(`git add .beads/`, { cwd: projectPath, encoding: 'utf-8' });
-
-    // Check if there are changes to commit
-    try {
-      await execAsync(`git diff --cached --quiet`, { cwd: projectPath, encoding: 'utf-8' });
-      // No changes
-      console.log(`[merge-agent] Compaction complete, no changes to commit`);
-    } catch {
-      // There are changes, commit them
-      await execAsync(
-        `git commit -m "chore: compact beads (remove closed issues > 30 days)"`,
-        { cwd: projectPath, encoding: 'utf-8' }
-      );
-      await execAsync(`git push`, { cwd: projectPath, encoding: 'utf-8' });
-      console.log(`[merge-agent] ✓ Beads compacted and committed`);
-      logActivity('beads_compaction_complete', `Compacted and committed beads cleanup`);
-    }
-  } catch (err: any) {
-    // Non-fatal - log and continue
-    console.warn(`[merge-agent] Beads compaction failed: ${err.message}`);
-    logActivity('beads_compaction_error', `Compaction failed: ${err.message}`);
-  }
-}
-
-/**
  * Notify TLDR daemon to reindex changed files after merge
  */
 async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
@@ -271,127 +201,54 @@ async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Prom
 }
 
 /**
- * Post-merge cleanup: move PRD to completed, update issue status
+ * Post-merge cleanup: move PRD, close PR, report merge, compact beads.
+ *
+ * Does NOT close the issue or tear down the workspace — the human
+ * close-out ceremony handles that separately.
  */
-async function postMergeCleanup(issueId: string, projectPath: string): Promise<void> {
+async function postMergeLifecycle(issueId: string, projectPath: string): Promise<void> {
   console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
 
-  // 1. Move PRD from active to completed
+  // 1. Move PRD from active to completed (via lifecycle module)
   try {
-    const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueId.toLowerCase()}-plan.md`);
-    const completedPrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR, `${issueId.toLowerCase()}-plan.md`);
-
-    if (existsSync(activePrdPath)) {
-      // Ensure completed directory exists
-      const completedDir = dirname(completedPrdPath);
-      if (!existsSync(completedDir)) {
-        mkdirSync(completedDir, { recursive: true });
-      }
-
-      // Move the file using git mv for proper tracking
-      await execAsync(`git mv "${activePrdPath}" "${completedPrdPath}"`, { cwd: projectPath, encoding: 'utf-8' });
-      await execAsync(`git commit -m "Move ${issueId} PRD to completed"`, { cwd: projectPath, encoding: 'utf-8' });
-      await execAsync(`git push`, { cwd: projectPath, encoding: 'utf-8' });
-      console.log(`[merge-agent] ✓ Moved PRD to completed and pushed: ${completedPrdPath}`);
+    const { movePrd } = await import('../lifecycle/archive-planning.js');
+    const prdResult = await movePrd({ issueId, projectPath });
+    if (prdResult.success && !prdResult.skipped) {
+      console.log(`[merge-agent] ✓ ${prdResult.details?.join('; ')}`);
       logActivity('prd_moved', `Moved ${issueId} PRD to completed directory`);
+    } else if (prdResult.skipped) {
+      console.log(`[merge-agent] PRD move skipped: ${prdResult.details?.join('; ')}`);
+    } else {
+      console.warn(`[merge-agent] PRD move failed: ${prdResult.error}`);
     }
   } catch (err) {
     console.warn(`[merge-agent] Could not move PRD: ${err}`);
-    // Non-fatal, continue with cleanup
   }
 
-  // 2. Close the PR on GitHub (the merge was already done locally via git)
-  const isGitHub = issueId.toUpperCase().startsWith('PAN-');
-
-  if (isGitHub) {
-    const issueNum = issueId.replace(/^PAN-/i, '');
-
-    // Close the open PR for this branch (if one exists)
+  // 2. Close the PR on GitHub (via lifecycle module)
+  if (issueId.toUpperCase().startsWith('PAN-')) {
     try {
-      const branchName = `feature/${issueId.toLowerCase()}`;
-      const { stdout: prListRaw } = await execAsync(
-        `gh pr list --repo eltmon/panopticon-cli --head "${branchName}" --state open --json number --jq '.[0].number'`,
-        { cwd: projectPath, encoding: 'utf-8' }
+      const { closeIssue } = await import('../lifecycle/close-issue.js');
+      const issueNum = parseInt(issueId.split('-')[1], 10);
+      const prResults = await closeIssue(
+        {
+          issueId,
+          projectPath,
+          github: { owner: 'eltmon', repo: 'panopticon-cli', number: issueNum },
+        },
+        { labelOnly: true, applyLabel: false },  // Only close PR, don't close issue or apply labels
       );
-      const prNumber = prListRaw.trim();
-      if (prNumber) {
-        // Close the PR with a comment (the merge was already pushed via git)
-        await execAsync(
-          `gh pr close ${prNumber} --repo eltmon/panopticon-cli --comment "Merged to main via Panopticon merge-agent"`,
-          { cwd: projectPath, encoding: 'utf-8' }
-        );
-        console.log(`[merge-agent] ✓ Closed PR #${prNumber} for ${issueId}`);
-        logActivity('pr_closed', `Closed PR #${prNumber} for ${issueId}`);
+      const prResult = prResults.find(r => r.step === 'close-issue:close-pr');
+      if (prResult?.success && !prResult.skipped) {
+        console.log(`[merge-agent] ✓ ${prResult.details?.join('; ')}`);
+        logActivity('pr_closed', prResult.details?.join('; ') || 'PR closed');
       }
     } catch (err) {
       console.warn(`[merge-agent] Could not close PR: ${err}`);
     }
-
-    // Clean up workflow labels before closing the issue
-    try {
-      // Get current labels using gh CLI
-      const { stdout: labelsJson } = await execAsync(
-        `gh issue view ${issueNum} --repo eltmon/panopticon-cli --json labels --jq '.labels[].name' 2>/dev/null || echo ""`,
-        { cwd: projectPath, encoding: 'utf-8' }
-      );
-      const currentLabels = labelsJson.trim().split('\n').filter(Boolean);
-
-      // Clean up workflow labels for done state
-      const targetLabels = cleanupWorkflowLabels(currentLabels, 'done');
-
-      // Update labels using gh CLI
-      // Remove workflow labels that shouldn't be on a done issue
-      const workflowLabelsToRemove = currentLabels.filter(
-        label => !targetLabels.includes(label)
-      );
-      for (const label of workflowLabelsToRemove) {
-        await execAsync(
-          `gh issue edit ${issueNum} --repo eltmon/panopticon-cli --remove-label "${label}" 2>/dev/null || true`,
-          { cwd: projectPath, encoding: 'utf-8' }
-        );
-      }
-
-      // Add target labels that are missing
-      const labelsToAdd = targetLabels.filter(
-        label => !currentLabels.includes(label)
-      );
-      for (const label of labelsToAdd) {
-        await execAsync(
-          `gh issue edit ${issueNum} --repo eltmon/panopticon-cli --add-label "${label}" 2>/dev/null || true`,
-          { cwd: projectPath, encoding: 'utf-8' }
-        );
-      }
-      console.log(`[merge-agent] ✓ Cleaned up workflow labels for issue #${issueNum}`);
-    } catch (err) {
-      console.warn(`[merge-agent] Could not clean up labels: ${err}`);
-    }
-
-    // Close the issue
-    try {
-      await execAsync(`gh issue close ${issueNum} --repo eltmon/panopticon-cli --comment "Merged to main" 2>/dev/null || true`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      });
-      console.log(`[merge-agent] ✓ Closed GitHub issue #${issueNum}`);
-      logActivity('issue_closed', `Closed GitHub issue #${issueNum} after merge`);
-    } catch (err) {
-      console.warn(`[merge-agent] Could not close GitHub issue: ${err}`);
-    }
-  } else {
-    // Linear: use pan CLI to mark as done (if available)
-    try {
-      await execAsync(`pan work done ${issueId} -c "Merged to main" 2>/dev/null || true`, {
-        encoding: 'utf-8',
-      });
-      console.log(`[merge-agent] ✓ Updated Linear issue ${issueId} to Done`);
-      logActivity('issue_updated', `Updated ${issueId} to Done in Linear`);
-    } catch (err) {
-      console.warn(`[merge-agent] Could not update Linear issue: ${err}`);
-    }
   }
 
-  // 3. Update review status to 'merged' via the dashboard API
-  // This ensures the dashboard shows the correct status regardless of how the merge was triggered
+  // 3. Report merge success to dashboard
   try {
     const apiPort = process.env.API_PORT || process.env.PORT || '3011';
     const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
@@ -405,10 +262,20 @@ async function postMergeCleanup(issueId: string, projectPath: string): Promise<v
     console.warn(`[merge-agent] Could not report to dashboard API: ${err}`);
   }
 
-  // 4. Conditionally compact old beads (non-blocking cleanup)
-  await conditionalBeadsCompaction(projectPath);
+  // 4. Compact old beads (via lifecycle module)
+  try {
+    const { compactBeads } = await import('../lifecycle/compact-beads.js');
+    const beadsResult = await compactBeads({ issueId, projectPath });
+    if (beadsResult.success && !beadsResult.skipped) {
+      console.log(`[merge-agent] ✓ ${beadsResult.details?.join('; ')}`);
+      logActivity('beads_compaction_complete', beadsResult.details?.join('; ') || 'Beads compacted');
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Beads compaction failed: ${err}`);
+  }
 
-  console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}`);
+  console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}. Awaiting human close-out.`);
+  logActivity('merge_complete', `Merged ${issueId}. Awaiting human close-out.`);
 }
 
 /**
@@ -778,7 +645,7 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
               logMergeHistory(context, result);
 
               // Run post-merge cleanup (move PRD, update issue status)
-              await postMergeCleanup(context.issueId, context.projectPath);
+              await postMergeLifecycle(context.issueId, context.projectPath);
 
               // Notify TLDR daemon to reindex changed files
               await notifyTldrDaemon(context.projectPath, context.sourceBranch);
@@ -1134,7 +1001,7 @@ Report any issues or conflicts you encountered.`;
                 logActivity('merge_complete', `Merge and validation completed by specialist`);
 
                 // Run post-merge cleanup (move PRD, update issue status)
-                await postMergeCleanup(issueId, projectPath);
+                await postMergeLifecycle(issueId, projectPath);
 
                 // Restore stashed changes
                 if (stashCreated) {
