@@ -23,33 +23,24 @@ export function useConfirmDialog(): ConfirmDialogContextValue {
   return ctx;
 }
 
-const VARIANT_STYLES: Record<DialogVariant, { icon: typeof AlertTriangle; iconColor: string; confirmBg: string; confirmHoverBg: string; bannerBg: string; bannerBorder: string; bannerText: string }> = {
+const VARIANT_STYLES: Record<DialogVariant, { icon: typeof AlertTriangle; iconColor: string; confirmBg: string; confirmHoverBg: string }> = {
   danger: {
     icon: AlertTriangle,
     iconColor: 'text-red-400',
     confirmBg: 'bg-red-600',
     confirmHoverBg: 'hover:bg-red-700',
-    bannerBg: 'bg-red-500/10',
-    bannerBorder: 'border-red-500/30',
-    bannerText: 'text-red-300 dark:text-red-300 light:text-red-700',
   },
   warning: {
     icon: AlertTriangle,
     iconColor: 'text-orange-400',
     confirmBg: 'bg-orange-600',
     confirmHoverBg: 'hover:bg-orange-700',
-    bannerBg: 'bg-orange-500/10',
-    bannerBorder: 'border-orange-500/30',
-    bannerText: 'text-orange-300',
   },
   info: {
     icon: Info,
     iconColor: 'text-blue-400',
     confirmBg: 'bg-blue-600',
     confirmHoverBg: 'hover:bg-blue-700',
-    bannerBg: 'bg-blue-500/10',
-    bannerBorder: 'border-blue-500/30',
-    bannerText: 'text-blue-300',
   },
 };
 
@@ -63,7 +54,11 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
-      setDialogState({ options, resolve });
+      setDialogState((prev) => {
+        // Resolve any pending promise as false to prevent orphaned promises
+        prev?.resolve(false);
+        return { options, resolve };
+      });
     });
   }, []);
 
@@ -84,8 +79,6 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         handleCancel();
-      } else if (e.key === 'Enter') {
-        handleConfirm();
       } else if (e.key === 'Tab') {
         // Simple focus trap
         const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
@@ -115,7 +108,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
     }, 0);
 
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [dialogState, handleCancel, handleConfirm]);
+  }, [dialogState, handleCancel]);
 
   if (!dialogState) {
     return (
