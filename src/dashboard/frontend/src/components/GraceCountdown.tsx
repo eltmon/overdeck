@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pause, Play, XCircle, Clock } from 'lucide-react';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 
 interface GracePeriodState {
   active: boolean;
@@ -41,6 +42,7 @@ async function exitGracePeriod(project: string, type: string): Promise<void> {
 export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownProps) {
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog } = useConfirmDialog();
 
   useEffect(() => {
     if (!gracePeriod.active) return;
@@ -97,10 +99,14 @@ export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownPro
 
   const handlePause = () => pauseMutation.mutate();
   const handleResume = () => resumeMutation.mutate();
-  const handleExit = () => {
-    if (confirm('Terminate specialist immediately?')) {
-      exitMutation.mutate();
-    }
+  const handleExit = async () => {
+    const ok = await confirmDialog({
+      title: 'Terminate specialist?',
+      description: 'This will terminate the specialist immediately.',
+      confirmLabel: 'Terminate',
+      variant: 'destructive',
+    });
+    if (ok) exitMutation.mutate();
   };
 
   const formatTime = (seconds: number) => {

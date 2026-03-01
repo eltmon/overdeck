@@ -51,27 +51,37 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
   const [promptValue, setPromptValue] = useState('');
   const resolveRef = useRef<((value: boolean | string | null) => void) | null>(null);
 
+  const dismissPending = useCallback(() => {
+    if (resolveRef.current) {
+      resolveRef.current(false);
+      resolveRef.current = null;
+    }
+  }, []);
+
   const confirm = useCallback((options: ConfirmDialogOptions): Promise<boolean> => {
+    dismissPending();
     return new Promise((resolve) => {
       resolveRef.current = resolve as (value: boolean | string | null) => void;
       setDialog({ type: 'confirm', options });
     });
-  }, []);
+  }, [dismissPending]);
 
   const alert = useCallback((options: Omit<ConfirmDialogOptions, 'cancelLabel'>): Promise<void> => {
+    dismissPending();
     return new Promise((resolve) => {
       resolveRef.current = () => resolve();
       setDialog({ type: 'alert', options: { ...options, cancelLabel: undefined } });
     });
-  }, []);
+  }, [dismissPending]);
 
   const prompt = useCallback((options: PromptDialogOptions): Promise<string | null> => {
+    dismissPending();
     return new Promise((resolve) => {
       resolveRef.current = resolve as (value: boolean | string | null) => void;
       setPromptValue(options.defaultValue ?? '');
       setDialog({ type: 'prompt', options });
     });
-  }, []);
+  }, [dismissPending]);
 
   const handleConfirm = useCallback(() => {
     if (dialog?.type === 'prompt') {
