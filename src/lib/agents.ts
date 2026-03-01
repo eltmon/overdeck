@@ -549,30 +549,27 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
     preTrustDirectory(options.workspace);
   } catch { /* non-fatal */ }
 
-  // Build SageOx environment variables for session linking (only if project is SageOx-initialized)
+  // Build SageOx environment variables for session linking
   // Derive project root from workspace path: <project-root>/workspaces/<branch>
   const projectRoot = resolve(options.workspace, '..', '..');
-  const sageoxEnabled = existsSync(join(projectRoot, '.sageox'));
-  const sageoxEnv: Record<string, string> = {};
+  const sageoxEnv: Record<string, string> = {
+    OX_PROJECT_ROOT: projectRoot,
+  };
 
-  if (sageoxEnabled) {
-    sageoxEnv.OX_PROJECT_ROOT = projectRoot;
+  // Add issue tracking for multi-agent pipelines
+  if (options.issueId) {
+    sageoxEnv.PAN_ISSUE_ID = options.issueId;
+  }
+  if (options.phase) {
+    sageoxEnv.PAN_PHASE = options.phase;
+  }
 
-    // Add issue tracking for multi-agent pipelines
-    if (options.issueId) {
-      sageoxEnv.PAN_ISSUE_ID = options.issueId;
-    }
-    if (options.phase) {
-      sageoxEnv.PAN_PHASE = options.phase;
-    }
-
-    // For non-planner agents, find the planner's session path for parent linking
-    if (options.phase && options.phase !== 'planning') {
-      const plannerAgentId = `agent-${options.issueId.toLowerCase()}`;
-      const plannerState = getAgentState(plannerAgentId);
-      if (plannerState?.sageoxSessionPath) {
-        sageoxEnv.PAN_PARENT_SESSION = plannerState.sageoxSessionPath;
-      }
+  // For non-planner agents, find the planner's session path for parent linking
+  if (options.phase && options.phase !== 'planning') {
+    const plannerAgentId = `agent-${options.issueId.toLowerCase()}`;
+    const plannerState = getAgentState(plannerAgentId);
+    if (plannerState?.sageoxSessionPath) {
+      sageoxEnv.PAN_PARENT_SESSION = plannerState.sageoxSessionPath;
     }
   }
 
@@ -603,7 +600,7 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
   }
 
   // For planner agents, capture SageOx session path after it becomes available
-  if (sageoxEnabled && options.phase === 'planning') {
+  if (options.phase === 'planning') {
     captureSageoxSessionPath(agentId, projectRoot).catch((err) => {
       console.warn(`[agents] Could not capture SageOx session path: ${err.message}`);
     });
