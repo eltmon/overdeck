@@ -11,7 +11,7 @@ The board has **4 visible columns**:
 | **Todo** | Prioritized work ready to be planned and started |
 | **In Progress** | Agent actively implementing |
 | **In Review** | PR created, specialist review + UAT — stakeholders re-engage here |
-| **Done** | Merged and complete |
+| **Done** | Merged — awaiting human close-out |
 
 **Backlog** exists as a state but is **not a visible column**. Backlog items are accessed via a separate view/filter (see PAN-273).
 
@@ -49,10 +49,17 @@ The board has **4 visible columns**:
                                │     DONE     │               │  (Column 3)  │
                                │  (Column 4)  │               │              │
                                │              │               └──────────────┘
+                               └──────┬───────┘
+                                      │                         Specialists run.
+                                      │ human clicks            Stakeholders do UAT.
+                                      │ "Close Out"             Human review happens.
+                                      ▼
+                               ┌──────────────┐
+                               │  CLOSED OUT  │
+                               │  (hidden)    │
+                               │  Issue closed │
+                               │  on tracker  │
                                └──────────────┘
-                                                                Specialists run.
-                                PRD archived.                   Stakeholders do UAT.
-                                Workspace cleaned up.           Human review happens.
 ```
 
 ## Mental Model: Issue Lifecycle
@@ -91,7 +98,26 @@ The work agent has completed implementation and created a PR. The specialist pip
 
 ### Done
 
-Merged and closed. PRD moves from `docs/prds/active/` to `docs/prds/completed/`. Workspace can be cleaned up.
+Merged but **not yet closed on the tracker**. The issue appears in the Done column, and the PRD moves to `docs/prds/completed/`. The issue stays open until a human runs the **Close-Out Ceremony** (dashboard button or `pan work close-out`), which verifies the merge, archives workspace artifacts, cleans up agent state, closes the issue on the tracker, and applies the `closed-out` label. Closed-out issues are hidden from the board by default (toggle "Include closed-out" to see them).
+
+### Close-Out Ceremony
+
+The close-out ceremony is the final human-gated step in the issue lifecycle. It runs after merge and performs these steps in order:
+
+1. **Verify PRD preserved** — Ensures the PRD is in `docs/prds/completed/`. If it's still in `active/`, moves it. (Warn, don't fail)
+2. **Verify branch merged** — Confirms no unmerged commits exist on the feature branch. (**Hard fail** if unmerged)
+3. **Archive workspace artifacts** — Copies `.planning/feedback/`, `STATE.md`, and `beads/` to `~/.panopticon/archives/{issue}/`
+4. **Clean up workspace** — Kills tmux sessions, stops Docker containers, removes git worktree
+5. **Clean up agent state** — Removes `~/.panopticon/agents/agent-{issue}/` and `planning-{issue}/`
+6. **Close issue on tracker** — GitHub: `gh issue close`. Linear: move to Done state. (**Hard fail**)
+7. **Apply `closed-out` label** — Creates the label if missing (blue `#1d4ed8`), adds to issue
+8. **Clear review status** — Removes from `review-status.json`
+
+**Invocation:**
+- **Dashboard**: Click "Close Out" on a Done card
+- **CLI**: `pan work close-out PAN-XXX` (or `MIN-XXX` for Linear)
+
+If a hard-fail step fails, the ceremony aborts and the issue stays open.
 
 ## Planning is an Activity, Not a State
 
@@ -138,7 +164,8 @@ The 4-column model maps cleanly to all supported trackers:
 | Todo | Todo | open | Defined |
 | In Progress | In Progress | open + `in-progress` label | In-Progress |
 | In Review | In Progress | open + `in-review` label | In-Progress |
-| Done | Done | closed | Completed/Accepted |
+| Done | In Progress (shadow) | open (shadow) | In-Progress (shadow) |
+| Closed Out | Done | closed + `closed-out` label | Completed/Accepted |
 
 Key implications:
 
@@ -175,8 +202,9 @@ Auto-managed by Panopticon on every state transition. Users should never add or 
 |-------|-------|-------------|-------------|
 | `in-progress` | `#fbbf24` (yellow) | Issue moves to In Progress | Moves to In Review or Done |
 | `in-review` | `#ec4899` (pink) | Issue moves to In Review | Moves to Done |
+| `closed-out` | `#1d4ed8` (blue) | Human runs close-out ceremony | Issue reopened |
 
-That's the complete set. Two labels.
+That's the complete set. Three labels.
 
 **Auto-cleanup rule**: On every state transition for GitHub/GitLab issues, Panopticon removes all workflow labels that don't match the target state, then adds the label for the new state (if applicable). This replaces the current approach where cleanup only happens on reopen and deep-wipe.
 

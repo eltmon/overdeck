@@ -23,6 +23,7 @@ var BIN_DIR = join(PANOPTICON_HOME, "bin");
 var BACKUPS_DIR = join(PANOPTICON_HOME, "backups");
 var COSTS_DIR = join(PANOPTICON_HOME, "costs");
 var HEARTBEATS_DIR = join(PANOPTICON_HOME, "heartbeats");
+var ARCHIVES_DIR = join(PANOPTICON_HOME, "archives");
 var TRAEFIK_DIR = join(PANOPTICON_HOME, "traefik");
 var TRAEFIK_DYNAMIC_DIR = join(TRAEFIK_DIR, "dynamic");
 var TRAEFIK_CERTS_DIR = join(TRAEFIK_DIR, "certs");

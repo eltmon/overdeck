@@ -1,0 +1,127 @@
+/**
+ * Shared types for lifecycle operations.
+ *
+ * Every atomic operation returns a StepResult. Workflows compose
+ * multiple operations and return a WorkflowResult.
+ */
+
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+
+export interface StepResult {
+  step: string;
+  success: boolean;
+  skipped: boolean;     // true if operation was a no-op (idempotent)
+  error?: string;
+  details?: string[];   // human-readable log of what was done
+}
+
+export interface WorkflowResult {
+  workflow: 'approve' | 'close' | 'close-out' | 'deep-wipe';
+  issueId: string;
+  success: boolean;     // true only if ALL non-skipped steps succeeded
+  steps: StepResult[];
+  duration: number;     // ms
+}
+
+/** Context shared across lifecycle operations */
+export interface LifecycleContext {
+  issueId: string;
+  projectPath: string;
+  /** Project name (for Docker compose project naming + placeholders) */
+  projectName?: string;
+  /** GitHub issue metadata (populated for PAN- issues) */
+  github?: {
+    owner: string;
+    repo: string;
+    number: number;
+  };
+  /** Rally configuration (populated for Rally-tracked issues) */
+  rally?: {
+    apiKey: string;
+    server?: string;
+    workspace?: string;
+    project?: string;
+  };
+}
+
+/** Options for teardown-workspace */
+export interface TeardownOptions {
+  /** Delete feature branches (local + remote). Default: false */
+  deleteBranches?: boolean;
+  /** Skip Docker container cleanup. Default: false */
+  skipDocker?: boolean;
+  /** Delete workspace directory (worktree + files). Default: true */
+  deleteWorkspace?: boolean;
+  /** Project-specific workspace config for tunnel/Hume cleanup */
+  workspaceConfig?: {
+    tunnel?: any;
+    hume?: any;
+    dns?: { domain?: string };
+  };
+  /** Project name (for Docker compose project naming + placeholders) */
+  projectName?: string;
+}
+
+/** Options for archive-planning */
+export interface ArchiveOptions {
+  /** Push git commits to remote after archiving. Default: true */
+  pushToRemote?: boolean;
+}
+
+/** Options for the approve workflow */
+export interface ApproveOptions {
+  /** Skip the merge step (e.g. if already merged). Default: false */
+  skipMerge?: boolean;
+  /** Skip beads compaction. Default: false */
+  skipBeadsCompaction?: boolean;
+}
+
+/** Options for the deep-wipe workflow */
+export interface DeepWipeOptions {
+  /** Delete workspace directory. Default: true */
+  deleteWorkspace?: boolean;
+  /** Delete git branches (local + remote). Default: true */
+  deleteBranches?: boolean;
+  /** Reset issue to backlog/open state. Default: true */
+  resetIssue?: boolean;
+  /** Project-specific workspace config for tunnel/Hume cleanup */
+  workspaceConfig?: {
+    tunnel?: any;
+    hume?: any;
+    dns?: { domain?: string };
+  };
+  /** Project name (for Docker compose project naming + placeholders) */
+  projectName?: string;
+}
+
+/** Helper to create a successful step result */
+export function stepOk(step: string, details?: string[]): StepResult {
+  return { step, success: true, skipped: false, details };
+}
+
+/** Helper to create a skipped step result */
+export function stepSkipped(step: string, details?: string[]): StepResult {
+  return { step, success: true, skipped: true, details };
+}
+
+/** Helper to create a failed step result */
+export function stepFailed(step: string, error: string, details?: string[]): StepResult {
+  return { step, success: false, skipped: false, error, details };
+}
+
+/**
+ * Get LINEAR_API_KEY from environment or .panopticon.env.
+ * Shared across lifecycle modules.
+ */
+export function getLinearApiKey(): string | null {
+  if (process.env.LINEAR_API_KEY) return process.env.LINEAR_API_KEY;
+  const envFile = join(homedir(), '.panopticon.env');
+  if (existsSync(envFile)) {
+    const content = readFileSync(envFile, 'utf-8');
+    const match = content.match(/LINEAR_API_KEY=(.+)/);
+    if (match) return match[1].trim();
+  }
+  return null;
+}

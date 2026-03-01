@@ -17,6 +17,7 @@ import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
+import { loadReviewStatuses } from '../../../lib/review-status.js';
 
 /**
  * Map a raw status string to its canonical state.
@@ -77,12 +78,6 @@ function mapRallyStateToCanonical(issueState: string): string {
   if (stateLower === 'closed') return 'done';
   // 'open' and anything unrecognized → 'todo'
   return 'todo';
-}
-
-function getOneDayAgo(): Date {
-  const date = new Date();
-  date.setDate(date.getDate() - 1);
-  return date;
 }
 
 export class IssueDataService {
@@ -215,22 +210,7 @@ export class IssueDataService {
       allIssues = allIssues.map(issue => ({ ...issue, shadowStatus: null }));
     }
 
-    // Filter completed issues (only keep last 24h)
-    const includeCompleted = options?.includeCompleted ?? false;
-    if (!includeCompleted) {
-      const oneDayAgoTime = getOneDayAgo().getTime();
-      allIssues = allIssues.filter(issue => {
-        const isDone = issue.status === 'Done' || issue.status === 'Completed' || issue.status === 'Closed';
-        const isCanceled = issue.status === 'Canceled' || issue.status === 'Cancelled';
-
-        if (!isDone && !isCanceled) return true;
-
-        if (issue.completedAt) {
-          return new Date(issue.completedAt).getTime() >= oneDayAgoTime;
-        }
-        return false;
-      });
-    }
+    // Show all completed issues (label-based dismissal will be added later)
 
     // Apply cycle filter using canonical status mapping
     const cycle = options?.cycle ?? 'current';
@@ -248,6 +228,21 @@ export class IssueDataService {
       });
     }
     // cycle === 'all': no additional filtering, show everything
+
+    // Augment with mergeStatus from review-status (used for MERGED badge)
+    try {
+      const reviewStatuses = loadReviewStatuses();
+      allIssues = allIssues.map(issue => {
+        const key = issue.identifier?.toUpperCase();
+        const rs = key ? reviewStatuses[key] : null;
+        if (rs?.mergeStatus) {
+          return { ...issue, mergeStatus: rs.mergeStatus };
+        }
+        return issue;
+      });
+    } catch {
+      // review-status.json may not exist yet
+    }
 
     // Sort by updatedAt
     allIssues.sort((a, b) =>
@@ -464,32 +459,41 @@ export class IssueDataService {
       per_page: 100,
       sort: 'updated' as const,
       direction: 'desc' as const,
-      headers: cachedEtag ? { 'If-None-Match': cachedEtag } : {},
     };
 
-    // For closed issues, only get recently closed ones
+    // Only send If-None-Match when we have a cached ETag
+    if (cachedEtag) {
+      requestParams.headers = { 'If-None-Match': cachedEtag };
+    }
+
+    // Fetch ALL closed issues (no date filter) so Done column is complete after restarts
     if (state === 'closed') {
-      requestParams.since = getOneDayAgo().toISOString();
-      requestParams.per_page = 50;
+      requestParams.per_page = 100;
     }
 
     try {
-      const response = await octokit.issues.listForRepo(requestParams);
+      // Use paginate to fetch ALL pages (not just the first 100)
+      let newEtag: string | undefined;
+      const allData = await octokit.paginate(octokit.issues.listForRepo, requestParams, (response) => {
+        // Extract rate limit from each response
+        const remaining = parseInt(response.headers['x-ratelimit-remaining'] as string);
+        const total = parseInt(response.headers['x-ratelimit-limit'] as string);
+        const resetAt = new Date(parseInt(response.headers['x-ratelimit-reset'] as string) * 1000).toISOString();
 
-      // Extract rate limit from headers
-      const remaining = parseInt(response.headers['x-ratelimit-remaining'] as string);
-      const total = parseInt(response.headers['x-ratelimit-limit'] as string);
-      const resetAt = new Date(parseInt(response.headers['x-ratelimit-reset'] as string) * 1000).toISOString();
+        if (!isNaN(remaining) && !isNaN(total)) {
+          this.cache.updateRateLimit('github', { remaining, total, resetAt });
+        }
 
-      if (!isNaN(remaining) && !isNaN(total)) {
-        this.cache.updateRateLimit('github', { remaining, total, resetAt });
-      }
+        // Store ETag from first page (used for conditional requests on next poll)
+        if (!newEtag && response.headers.etag) {
+          newEtag = response.headers.etag as string;
+        }
 
-      // Store new ETag
-      const newEtag = response.headers.etag as string | undefined;
+        return response.data;
+      });
 
       // Filter out PRs (they have pull_request key)
-      const issues = response.data.filter((issue: any) => !issue.pull_request);
+      const issues = allData.filter((issue: any) => !issue.pull_request);
 
       // Format issues to match dashboard schema
       const formatted = issues.map((issue: any) => {
