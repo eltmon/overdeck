@@ -3,6 +3,8 @@ import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLef
 import { useState } from 'react';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
+import { useConfirmDialog } from './ConfirmDialogProvider';
+import { useNotification } from './NotificationProvider';
 
 export interface IssueAgent {
   id: string;
@@ -149,6 +151,8 @@ export function IssueAgentCard({
   isSelected,
 }: IssueAgentCardProps) {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmDialog();
+  const { notify } = useNotification();
   const [showHandoffPanel, setShowHandoffPanel] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const { data: costData } = useAgentCost(agent.id);
@@ -164,11 +168,10 @@ export function IssueAgentCard({
   const pokeMutation = useMutation({
     mutationFn: () => pokeAgent(agent.id),
     onSuccess: () => {
-      // Show success message briefly
-      alert(`Poked ${agent.id} successfully`);
+      notify({ type: 'success', message: `Poked ${agent.id} successfully` });
     },
     onError: (error: Error) => {
-      alert(`Failed to poke ${agent.id}: ${error.message}`);
+      notify({ type: 'error', message: `Failed to poke ${agent.id}: ${error.message}` });
     },
   });
 
@@ -178,13 +181,13 @@ export function IssueAgentCard({
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to resume ${agent.id}: ${error.message}`);
+      notify({ type: 'error', message: `Failed to resume ${agent.id}: ${error.message}` });
     },
   });
 
-  const handleKill = (e: React.MouseEvent) => {
+  const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Kill agent ${agent.id}?`)) {
+    if (await confirm({ message: `Kill agent ${agent.id}?`, variant: 'danger', title: 'Kill Agent', confirmLabel: 'Kill' })) {
       killMutation.mutate();
     }
   };
