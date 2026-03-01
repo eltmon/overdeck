@@ -584,59 +584,67 @@ ox agent <id> session stop
 Browse at sageox.ai → Panopticon team → Sessions
 ```
 
+## Outcome: Experiment Concluded
+
+### What We Learned
+
+1. **Session capture architecture is sound**: SageOx's approach of using Claude Code hooks for lifecycle events (SessionStart, Stop) combined with JSONL watching is a viable pattern for capturing agent reasoning.
+
+2. **Server-side summarization is the real value**: The structured aha moments, key decisions, and chapter titles from `POST /api/v1/session/summarize` are genuinely useful. This is where SageOx's value proposition lives.
+
+3. **`ox agent prime` injects more than expected**: The prime command returns JSON with `content`, `attribution`, `plan_footer`, and `capture_prior` fields. The `attribution` field instructs agents to add `Co-Authored-By: SageOx <ox@sageox.ai>` to commits. The `plan_footer` injects SageOx branding into plans. The `capture_prior` field requests exfiltration of prior session history. These injection behaviors were not documented and only discovered during code review.
+
+4. **Our primary goal was not fulfilled**: We wanted SageOx to notify us about tradeoffs that working agents made during implementation. While the architecture supports this in theory, in practice the session summaries didn't surface actionable tradeoff information that we couldn't get from reading the code review.
+
+5. **Attribution injection is a dealbreaker**: Having a third-party tool silently instruct AI agents to add co-author credits to git commits, inject branding into plans, and capture session history crosses a trust boundary. These behaviors should be opt-in and clearly documented.
+
+### Decision: Disable SageOx Integration
+
+All SageOx integration has been removed from the Panopticon codebase:
+- Claude Code hooks (settings.local.json) — cleared
+- AGENTS.md directives — removed
+- Agent env vars (agents.ts) — removed
+- CLI installation (install.ts, sync.ts) — removed
+- .sageox/ directory and ox commands — deleted
+- .gitattributes entries — removed
+- Test cases — removed
+- Specialist prompt comments — updated
+
+The fork PR (OX_PROJECT_ROOT, --auto-record, --issue flags) remains in our fork repo and is available to share with the SageOx team. The technical contributions are genuine improvements to their tool.
+
+### Recommendation for Future
+
+If SageOx addresses the prompt injection concerns (makes attribution opt-in, removes capture_prior, documents what prime injects), the integration could be revisited. The multi-agent session linking architecture mapped naturally to Panopticon's specialist pipeline and would be valuable if the trust issues are resolved.
+
 ## Email Draft: Milkana
 
 ```
-Subject: SageOx + Panopticon integration — PR incoming
+Subject: SageOx feedback from Panopticon integration
 
 Hi Milkana,
 
-I've been exploring SageOx for my project Panopticon (open source multi-agent
-orchestrator — github.com/eltmon/panopticon-cli) and I'm really impressed with
-the session capture architecture. The server-side summarization especially —
-the structured aha moments and chapter titles are exactly what I need.
+I spent some real time integrating SageOx into Panopticon (my open source
+multi-agent orchestrator — github.com/eltmon/panopticon-cli). Wanted to share
+what I learned and some contributions.
 
-I have two workflow patterns that need small additions to ox:
+The session capture architecture is really well-designed. The server-side
+summarization — structured aha moments, chapter titles, key decisions — is
+genuinely impressive and is clearly where the product's value lives. Watching
+it process a multi-agent pipeline and produce readable summaries was a great
+experience.
 
-1. DEVROOT WORKFLOW: I launch Claude Code from a parent directory (~/Projects/)
-   rather than from inside individual repos. This breaks FindProjectRoot()
-   since it walks up from CWD and doesn't find .sageox/ in child repos.
+I forked the repo and built a PR that adds OX_PROJECT_ROOT env var support
+(for devroot/multi-repo workflows), --auto-record on ox agent prime (for
+automated agent sessions), and --issue flag for external issue linking. Happy
+to share the PR — the changes are backward-compatible and tested. Even if you
+take the project in a different direction, the devroot support might be useful
+for other multi-repo users.
 
-2. MULTI-AGENT PIPELINES: Panopticon runs 5 agents per issue — planner,
-   worker, reviewer, tester, merger — each in its own Claude Code session.
-   I need sessions to start/stop automatically and be linked by issue ID.
-
-I've forked the repo and have a PR that adds:
-
-• OX_PROJECT_ROOT env var — checked before walk-up in FindProjectRoot().
-  Lets orchestrators explicitly specify the project root.
-
-• --project flag on `ox agent prime` — same thing as a CLI flag.
-  Precedence: --project > OX_PROJECT_ROOT > walk-up (existing).
-
-• --auto-record flag on `ox agent prime` — combines context injection with
-  session recording start in one call. Essential for automated workflows
-  where there's no human to run /ox-session-start.
-
-• --issue flag on session start — tags sessions with an external issue ID
-  (e.g., "PAN-279"). With --parent-session, links all 5 agent sessions for
-  an issue into a parent-child chain using your existing subagent model.
-
-• Session adapter project root hint — so FindSessionFile() can locate JSONL
-  files when CWD differs from the project root.
-
-All changes are backward-compatible. Tests included.
-
-The result: after an issue goes through all 5 agents, I browse sageox.ai and
-see the complete decision trail — why the planner chose this approach, what
-tradeoffs the worker made, what the reviewer flagged, what broke in testing.
-Your existing parent-child session linking + subagent aggregation maps
-perfectly to this.
-
-Same pipeline captures my human planning sessions from devroot too. Two use
-cases, zero additional infrastructure.
-
-Would love to chat more — happy to walk through the PR before submitting.
+We've decided to pause the integration for now — our main use case (surfacing
+agent tradeoff decisions during code review) ended up being served well enough
+by our existing review pipeline. But I'll be following SageOx's development
+closely. The direction is compelling, especially as multi-agent workflows
+become more common.
 
 Best,
 Edward

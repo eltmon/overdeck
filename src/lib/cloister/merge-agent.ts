@@ -100,7 +100,8 @@ function buildMergePrompt(context: MergeConflictContext): string {
     .replace(/\{\{testCommand\}\}/g, context.testCommand || 'skip')
     .replace(/\{\{apiUrl\}\}/g, process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`);
 
-  return prompt;
+  // Wrap in orchestration markers for context delineation
+  return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;
 }
 
 /**

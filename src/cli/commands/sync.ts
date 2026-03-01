@@ -258,25 +258,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  // Check and install SageOx CLI if missing
-  if (!checkCommand('ox')) {
-    const oxSpinner = ora('Installing SageOx CLI (ox)...').start();
-    try {
-      const binDir = join(homedir(), '.local', 'bin');
-      mkdirSync(binDir, { recursive: true });
-      const oxPath = join(binDir, 'ox');
-      const arch = process.arch === 'x64' ? 'amd64' : process.arch;
-      const platform = process.platform === 'darwin' ? 'darwin' : 'linux';
-      execSync(`curl -sL "https://github.com/eltmon/ox/releases/download/latest/ox-${platform}-${arch}" -o "${oxPath}" && chmod +x "${oxPath}"`, {
-        stdio: 'pipe',
-        timeout: 60000,
-      });
-      oxSpinner.succeed('SageOx CLI installed');
-    } catch {
-      oxSpinner.warn('Failed to install SageOx CLI - see: https://github.com/eltmon/ox/releases');
-    }
-  }
-
   // Sync git hooks to all registered projects (branch protection)
   const projects = listProjects();
   if (projects.length > 0 && existsSync(BUNDLED_GIT_HOOKS_DIR)) {
