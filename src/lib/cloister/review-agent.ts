@@ -239,10 +239,10 @@ async function sendFeedbackToWorkAgent(
     body += `\n## Next Steps\n\nCode approved. It will proceed to testing.\n`;
   }
 
-  // Write feedback file to workspace
+  // Write feedback file to workspace (use workspace path, not project root)
   const fileResult = await writeFeedbackFile({
     issueId: context.issueId,
-    workspacePath: context.projectPath,
+    workspacePath: context.workspace,
     specialist: 'review-agent',
     outcome,
     summary: `Review ${result.reviewResult}: ${(result.notes || '').slice(0, 80)}`,

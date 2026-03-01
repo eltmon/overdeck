@@ -102,7 +102,13 @@ async function appendToStateMd(
  * Write specialist feedback to a file in the workspace and update STATE.md.
  */
 export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
-  const workspacePath = opts.workspacePath || resolveWorkspacePath(opts.issueId);
+  // Validate workspacePath — reject project roots (must contain /workspaces/ or have .planning dir)
+  let providedPath = opts.workspacePath;
+  if (providedPath && !existsSync(join(providedPath, '.planning')) && !providedPath.includes('/workspaces/')) {
+    // Looks like a project root, not a workspace — fall back to resolution
+    providedPath = undefined;
+  }
+  const workspacePath = providedPath || resolveWorkspacePath(opts.issueId);
   if (!workspacePath) {
     return { success: false, error: `Workspace not found for ${opts.issueId}` };
   }
