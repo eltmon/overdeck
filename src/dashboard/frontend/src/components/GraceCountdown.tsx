@@ -42,7 +42,7 @@ async function exitGracePeriod(project: string, type: string): Promise<void> {
 export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownProps) {
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const queryClient = useQueryClient();
-  const confirm = useConfirm();
+  const confirmDialog = useConfirm();
 
   useEffect(() => {
     if (!gracePeriod.active) return;
@@ -100,7 +100,7 @@ export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownPro
   const handlePause = () => pauseMutation.mutate();
   const handleResume = () => resumeMutation.mutate();
   const handleExit = async () => {
-    if (await confirm({ message: 'Terminate specialist immediately?', title: 'Terminate Specialist', variant: 'destructive', confirmLabel: 'Terminate' })) {
+    if (await confirmDialog({ message: 'Terminate specialist immediately?', title: 'Terminate Specialist', variant: 'destructive', confirmLabel: 'Terminate' })) {
       exitMutation.mutate();
     }
   };

@@ -24,67 +24,65 @@ export function useAlert(): AlertFn {
   return ctx.alert;
 }
 
-interface PendingConfirm {
-  options: ConfirmDialogOptions;
-  resolve: (value: boolean) => void;
-}
-
-interface PendingAlert {
-  options: AlertDialogOptions;
-  resolve: () => void;
-}
-
 export function DialogProvider({ children }: { children: ReactNode }) {
-  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
-  const [pendingAlert, setPendingAlert] = useState<PendingAlert | null>(null);
+  const [confirmOptions, setConfirmOptions] = useState<ConfirmDialogOptions | null>(null);
+  const [alertOptions, setAlertOptions] = useState<AlertDialogOptions | null>(null);
   const confirmResolveRef = useRef<((value: boolean) => void) | null>(null);
   const alertResolveRef = useRef<(() => void) | null>(null);
 
   const confirm = useCallback<ConfirmFn>((options) => {
+    // Dismiss any pending confirm dialog (resolves false to avoid orphaned promise)
+    if (confirmResolveRef.current) {
+      confirmResolveRef.current(false);
+    }
     return new Promise<boolean>((resolve) => {
       confirmResolveRef.current = resolve;
-      setPendingConfirm({ options, resolve });
+      setConfirmOptions(options);
     });
   }, []);
 
   const alert = useCallback<AlertFn>((options) => {
+    // Dismiss any pending alert dialog (resolves to avoid orphaned promise)
+    if (alertResolveRef.current) {
+      alertResolveRef.current();
+    }
     return new Promise<void>((resolve) => {
       alertResolveRef.current = resolve;
-      setPendingAlert({ options, resolve });
+      setAlertOptions(options);
     });
   }, []);
 
   const handleConfirm = useCallback(() => {
     confirmResolveRef.current?.(true);
     confirmResolveRef.current = null;
-    setPendingConfirm(null);
+    setConfirmOptions(null);
   }, []);
 
   const handleCancel = useCallback(() => {
     confirmResolveRef.current?.(false);
     confirmResolveRef.current = null;
-    setPendingConfirm(null);
+    setConfirmOptions(null);
   }, []);
 
   const handleAlertClose = useCallback(() => {
     alertResolveRef.current?.();
     alertResolveRef.current = null;
-    setPendingAlert(null);
+    setAlertOptions(null);
   }, []);
 
   return (
     <DialogContext.Provider value={{ confirm, alert }}>
       {children}
-      {pendingConfirm && (
+      {confirmOptions && (
         <ConfirmDialog
-          options={pendingConfirm.options}
+          options={confirmOptions}
           onConfirm={handleConfirm}
           onCancel={handleCancel}
         />
       )}
-      {pendingAlert && (
+      {alertOptions && (
         <AlertNoticeDialog
-          options={pendingAlert.options}
+          options={alertOptions}
           onClose={handleAlertClose}
         />
       )}

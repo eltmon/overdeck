@@ -17,3 +17,7 @@ Created a React context-based dialog system with `useConfirm()` and `useAlert()`
 
 ## Remaining Work
 Commit and push.
+
+## Specialist Feedback
+
+- **[2026-03-01T02:33Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`

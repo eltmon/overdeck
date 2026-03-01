@@ -17,6 +17,7 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({ options, onConfirm, onCancel }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -30,8 +31,13 @@ export function ConfirmDialog({ options, onConfirm, onCancel }: ConfirmDialogPro
   const isDestructive = variant === 'destructive';
 
   useEffect(() => {
-    confirmRef.current?.focus();
-  }, []);
+    // Focus Cancel for destructive actions (safety), Confirm for default
+    if (isDestructive) {
+      cancelRef.current?.focus();
+    } else {
+      confirmRef.current?.focus();
+    }
+  }, [isDestructive]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -98,6 +104,7 @@ export function ConfirmDialog({ options, onConfirm, onCancel }: ConfirmDialogPro
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-divider bg-surface/30">
           <button
+            ref={cancelRef}
             onClick={onCancel}
             className="px-4 py-2 rounded text-sm bg-surface-overlay text-content-body hover:bg-surface-emphasis transition-colors"
           >
