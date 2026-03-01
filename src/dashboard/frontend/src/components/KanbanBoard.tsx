@@ -278,7 +278,7 @@ function groupByProject(issues: Issue[]): { name: string; color?: string; issues
  * Group canceled issues by their specific cancellation type.
  * Groups: Canceled, Duplicate, Won't Do
  */
-function groupByCanceledType(issues: Issue[]): { name: string; issues: Issue[] }[] {
+export function groupByCanceledType(issues: Issue[]): { name: string; issues: Issue[] }[] {
   const groups: Record<string, Issue[]> = {
     'Canceled': [],
     'Duplicate': [],
