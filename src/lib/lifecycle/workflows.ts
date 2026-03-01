@@ -296,11 +296,20 @@ async function resetIssueToBacklog(ctx: LifecycleContext): Promise<StepResult> {
   try {
     if (ctx.github) {
       const { owner, repo, number } = ctx.github;
+      // Reopen the issue
       await execAsync(
         `gh issue reopen ${number} --repo ${owner}/${repo}`,
         { encoding: 'utf-8' },
-      );
-      return stepOk(step, [`Reopened GitHub issue #${number}`]);
+      ).catch(() => {});  // May already be open
+      // Remove lifecycle labels
+      const labelsToRemove = ['in-review', 'in-progress', 'Review: Approved', 'Review: Failed', 'ready-for-merge'];
+      for (const label of labelsToRemove) {
+        await execAsync(
+          `gh issue edit ${number} --repo ${owner}/${repo} --remove-label "${label}"`,
+          { encoding: 'utf-8' },
+        ).catch(() => {});  // Label may not exist
+      }
+      return stepOk(step, [`Reset GitHub issue #${number}: reopened and cleared labels`]);
     }
 
     // Linear: reopen to backlog

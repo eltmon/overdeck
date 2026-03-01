@@ -32,6 +32,7 @@ const execAsync = promisify(exec);
  */
 export function findWorkspacePath(projectPath: string, issueLower: string): string | null {
   const candidates = [
+    join(projectPath, 'workspaces', `feature-${issueLower}`),
     join(projectPath, 'workspaces', issueLower),
     join(projectPath, '.worktrees', issueLower),
     join(dirname(projectPath), `feature-${issueLower}`),
