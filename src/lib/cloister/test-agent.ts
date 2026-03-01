@@ -183,7 +183,8 @@ function buildTestPrompt(context: TestContext): string {
     .replace(/\{\{branch\}\}/g, context.branch)
     .replace(/\{\{testCommand\}\}/g, testCommand);
 
-  return prompt;
+  // Wrap in orchestration markers for context delineation
+  return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;
 }
 
 /**

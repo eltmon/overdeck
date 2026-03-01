@@ -105,7 +105,18 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
   template = processIfBlocks(template, vars);
   template = substituteVariables(template, vars as any);
 
-  return template;
+  // Wrap in orchestration markers to distinguish Panopticon's injected instructions
+  // from the agent's actual reasoning. Log parsers and context compressors can
+  // recognize these markers and handle orchestration context separately.
+  return `<!-- panopticon:orchestration-context-start -->
+<!-- This is Panopticon orchestration context injected automatically.
+     It contains workspace setup instructions, not agent reasoning.
+     Session summarizers should SKIP this block and focus on the agent's
+     actual work, decisions, and tradeoffs that follow. -->
+
+${template}
+
+<!-- panopticon:orchestration-context-end -->`;
 }
 
 /**

@@ -103,7 +103,8 @@ async function buildReviewPrompt(context: ReviewContext): Promise<string> {
         : '  (Use `gh pr diff` to see changes)'
     );
 
-  return prompt;
+  // Wrap in orchestration markers for context delineation
+  return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;
 }
 
 /**
