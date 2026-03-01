@@ -53,12 +53,17 @@ function ConfirmDialogContent({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const isDestructive = options.variant === 'destructive';
 
   useEffect(() => {
-    confirmRef.current?.focus();
-  }, []);
+    if (isDestructive) {
+      cancelRef.current?.focus();
+    } else {
+      confirmRef.current?.focus();
+    }
+  }, [isDestructive]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -96,6 +101,7 @@ function ConfirmDialogContent({
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-divider">
           <button
+            ref={cancelRef}
             onClick={onCancel}
             className="px-4 py-2 rounded text-sm bg-surface-overlay text-content-body hover:bg-surface-emphasis transition-colors"
           >
@@ -194,31 +200,48 @@ function AlertDialogContent({
 
 export function DialogProvider({ children }: { children: React.ReactNode }) {
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const pendingRef = useRef<DialogState | null>(null);
+
+  const dismissPending = useCallback(() => {
+    if (pendingRef.current) {
+      pendingRef.current.resolve(false);
+      pendingRef.current = null;
+    }
+  }, []);
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
+    dismissPending();
     return new Promise<boolean>((resolve) => {
-      setDialog({ type: 'confirm', options, resolve });
+      const state: DialogState = { type: 'confirm', options, resolve };
+      pendingRef.current = state;
+      setDialog(state);
     });
-  }, []);
+  }, [dismissPending]);
 
   const alert = useCallback((options: AlertOptions): Promise<void> => {
+    dismissPending();
     return new Promise<void>((resolve) => {
-      setDialog({ type: 'alert', options, resolve: () => resolve() });
+      const state: DialogState = { type: 'alert', options, resolve: () => resolve() };
+      pendingRef.current = state;
+      setDialog(state);
     });
-  }, []);
+  }, [dismissPending]);
 
   const handleConfirm = useCallback(() => {
     dialog?.resolve(true);
+    pendingRef.current = null;
     setDialog(null);
   }, [dialog]);
 
   const handleCancel = useCallback(() => {
     dialog?.resolve(false);
+    pendingRef.current = null;
     setDialog(null);
   }, [dialog]);
 
   const handleAlertClose = useCallback(() => {
     dialog?.resolve(false);
+    pendingRef.current = null;
     setDialog(null);
   }, [dialog]);
 
