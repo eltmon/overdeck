@@ -215,16 +215,22 @@ export class IssueDataService {
     // Apply cycle filter using canonical status mapping
     const cycle = options?.cycle ?? 'current';
     if (cycle === 'current') {
-      // Current cycle: exclude Backlog items (including Triage, Unknown), only show active cycle work
+      // Current cycle: exclude Backlog and Canceled items, only show active cycle work
       allIssues = allIssues.filter(issue => {
         const canonical = getCanonicalStatus(issue.status);
-        return canonical !== 'backlog';
+        return canonical !== 'backlog' && canonical !== 'canceled';
       });
     } else if (cycle === 'backlog') {
       // Backlog view: only show Backlog items (including Triage, Unknown)
       allIssues = allIssues.filter(issue => {
         const canonical = getCanonicalStatus(issue.status);
         return canonical === 'backlog';
+      });
+    } else if (cycle === 'canceled') {
+      // Canceled view: only show Canceled items (Canceled, Duplicate, Won't Do)
+      allIssues = allIssues.filter(issue => {
+        const canonical = getCanonicalStatus(issue.status);
+        return canonical === 'canceled';
       });
     }
     // cycle === 'all': no additional filtering, show everything
