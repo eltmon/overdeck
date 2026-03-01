@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { groupByLabels, ListIssueRow } from './KanbanBoard';
+import { groupByLabels, groupByCanceledType, ListIssueRow } from './KanbanBoard';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -327,5 +327,147 @@ describe('ListIssueRow', () => {
     expect(issueLink).toBeDefined();
     expect(issueLink!.getAttribute('href')).toBe('https://github.com/test/repo/issues/123');
     expect(issueLink!.getAttribute('target')).toBe('_blank');
+  });
+});
+
+describe('groupByCanceledType', () => {
+  const createMockIssue = (id: string, status: string): Issue => ({
+    id,
+    identifier: `TEST-${id}`,
+    title: `Test Issue ${id}`,
+    description: '',
+    status,
+    priority: 3,
+    labels: [],
+    url: `https://test.com/${id}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'github',
+  });
+
+  it('should group canceled status into Canceled group', () => {
+    const issues: Issue[] = [
+      createMockIssue('1', 'canceled'),
+      createMockIssue('2', 'Canceled'),
+      createMockIssue('3', 'cancelled'),
+      createMockIssue('4', 'Cancelled'),
+    ];
+
+    const result = groupByCanceledType(issues);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Canceled');
+    expect(result[0].issues).toHaveLength(4);
+  });
+
+  it('should group duplicate status into Duplicate group', () => {
+    const issues: Issue[] = [
+      createMockIssue('1', 'duplicate'),
+      createMockIssue('2', 'Duplicate'),
+    ];
+
+    const result = groupByCanceledType(issues);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Duplicate');
+    expect(result[0].issues).toHaveLength(2);
+  });
+
+  it("should group won't do/wontfix status into Won't Do group", () => {
+    const issues: Issue[] = [
+      createMockIssue('1', "won't do"),
+      createMockIssue('2', "Won't Do"),
+      createMockIssue('3', 'wontfix'),
+      createMockIssue('4', 'WontFix'),
+    ];
+
+    const result = groupByCanceledType(issues);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("Won't Do");
+    expect(result[0].issues).toHaveLength(4);
+  });
+
+  it('should group unknown canceled status into Other group', () => {
+    const issues: Issue[] = [
+      createMockIssue('1', 'some-unknown-status'),
+      createMockIssue('2', 'invalid'),
+    ];
+
+    const result = groupByCanceledType(issues);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Other');
+    expect(result[0].issues).toHaveLength(2);
+  });
+
+  it('should filter out empty groups', () => {
+    const issues: Issue[] = [
+      createMockIssue('1', 'canceled'),
+      createMockIssue('2', 'duplicate'),
+    ];
+
+    const result = groupByCanceledType(issues);
+
+    // Should only have Canceled and Duplicate groups, no Won't Do or Other
+    expect(result).toHaveLength(2);
+    expect(result.map(g => g.name)).toContain('Canceled');
+    expect(result.map(g => g.name)).toContain('Duplicate');
+    expect(result.map(g => g.name)).not.toContain("Won't Do");
+    expect(result.map(g => g.name)).not.toContain('Other');
+  });
+
+  it('should handle empty issues array', () => {
+    const result = groupByCanceledType([]);
+    expect(result).toHaveLength(0);
+  });
+
+  it('should group mixed canceled types correctly', () => {
+    const issues: Issue[] = [
+      createMockIssue('1', 'canceled'),
+      createMockIssue('2', 'canceled'),
+      createMockIssue('3', 'duplicate'),
+      createMockIssue('4', "won't do"),
+      createMockIssue('5', "won't do"),
+      createMockIssue('6', "won't do"),
+      createMockIssue('7', 'unknown-status'),
+    ];
+
+    const result = groupByCanceledType(issues);
+
+    expect(result).toHaveLength(4);
+
+    const canceledGroup = result.find(g => g.name === 'Canceled');
+    const duplicateGroup = result.find(g => g.name === 'Duplicate');
+    const wontDoGroup = result.find(g => g.name === "Won't Do");
+    const otherGroup = result.find(g => g.name === 'Other');
+
+    expect(canceledGroup?.issues).toHaveLength(2);
+    expect(duplicateGroup?.issues).toHaveLength(1);
+    expect(wontDoGroup?.issues).toHaveLength(3);
+    expect(otherGroup?.issues).toHaveLength(1);
+  });
+
+  it('should return groups in consistent order', () => {
+    const issues: Issue[] = [
+      createMockIssue('1', 'other-status'),
+      createMockIssue('2', "won't do"),
+      createMockIssue('3', 'duplicate'),
+      createMockIssue('4', 'canceled'),
+    ];
+
+    const result = groupByCanceledType(issues);
+
+    // Order should be: Canceled, Duplicate, Won't Do, Other
+    expect(result[0].name).toBe('Canceled');
+    expect(result[1].name).toBe('Duplicate');
+    expect(result[2].name).toBe("Won't Do");
+    expect(result[3].name).toBe('Other');
   });
 });
