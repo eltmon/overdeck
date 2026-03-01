@@ -8427,6 +8427,46 @@ app.post('/api/issues/:id/reset', async (req, res) => {
       // Review status might not exist
     }
 
+    // 4c. Sync workspace feature branch with latest main
+    try {
+      const issuePrefix = extractTeamPrefix(id);
+      const projectPath = getProjectPath(undefined, issuePrefix);
+      const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+      if (existsSync(workspacePath)) {
+        // Fetch latest main and merge into feature branch
+        try {
+          await execAsync('git fetch origin main', { cwd: workspacePath, timeout: 30000 });
+          const { stdout: mergeOut } = await execAsync('git merge origin/main --no-edit', { cwd: workspacePath, timeout: 30000 });
+          if (mergeOut.includes('Already up to date')) {
+            cleanupLog.push('Workspace already up to date with main');
+          } else {
+            cleanupLog.push('Synced workspace feature branch with latest main');
+          }
+        } catch (gitErr: any) {
+          // Merge conflict — abort and log
+          await execAsync('git merge --abort', { cwd: workspacePath }).catch(() => {});
+          cleanupLog.push(`Warning: could not sync workspace with main (merge conflict): ${gitErr.message}`);
+        }
+
+        // Clean .planning/ contents (stale state from previous agent runs)
+        const planningDir = join(workspacePath, '.planning');
+        if (existsSync(planningDir)) {
+          const entries = readdirSync(planningDir);
+          for (const entry of entries) {
+            try {
+              rmSync(join(planningDir, entry), { recursive: true, force: true });
+            } catch {
+              // Best effort
+            }
+          }
+          cleanupLog.push('Cleared .planning/ directory');
+        }
+      }
+    } catch {
+      // Workspace might not exist or project path not resolvable
+    }
+
     // 5. Reset issue status to Todo/Open
     const githubCheck = isGitHubIssue(id);
 
