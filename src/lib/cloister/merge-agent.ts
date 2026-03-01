@@ -850,43 +850,61 @@ TARGET BRANCH: ${targetBranch}
 
 INSTRUCTIONS:
 
-PHASE 1 — BASELINE (before merge):
+PHASE 1 — SYNC & BASELINE (before merge):
 1. cd ${projectPath}
 2. git checkout ${targetBranch}
-3. git pull origin ${targetBranch} --ff-only
-4. Run tests on the CURRENT ${targetBranch} to establish a baseline:
+3. git fetch origin ${targetBranch}
+4. Sync local ${targetBranch} with origin/${targetBranch}:
+   Run: git rev-list --left-right --count ${targetBranch}...origin/${targetBranch}
+   (Output: "LOCAL_AHEAD  REMOTE_AHEAD". If REMOTE_AHEAD > 0, local is behind origin.)
+   If local is behind origin (REMOTE_AHEAD > 0):
+     a. git rebase origin/${targetBranch}
+        (Replays local commits on top of origin — preserves linear history, no merge commits, no data loss)
+     b. If rebase conflicts: abort with git rebase --abort, then report failure:
+        "Cannot sync local ${targetBranch} with origin — rebase conflict. Human intervention needed."
+        Call /api/specialists/done with status "failed" and STOP.
+     c. If rebase succeeds: continue to next step
+   If local is up-to-date or ahead-only (REMOTE_AHEAD = 0): continue to next step
+5. Run tests on the CURRENT ${targetBranch} to establish a baseline:
    - Use the Task tool with subagent_type="Bash" to run: npm test 2>&1 || true
    - Record the number of passing and failing tests as BASELINE_PASS and BASELINE_FAIL
    - This baseline is critical — you will compare post-merge results against it
 
 PHASE 2 — MERGE:
-5. git merge ${sourceBranch}
-6. If conflicts: resolve them intelligently, then git add and git commit
-7. If clean merge: the merge commit is auto-created (or fast-forward)
+6. git merge ${sourceBranch}
+7. If conflicts: resolve them intelligently, then git add and git commit
+8. If clean merge: the merge commit is auto-created (or fast-forward)
 
 PHASE 3 — VERIFY:
-8. Build the project to verify no compile errors:
+9. Build the project to verify no compile errors:
    - Use the Task tool with subagent_type="Bash" to run the build command
    - For Node.js: npm run build
    - Check package.json to determine the right command
-9. Run tests using the Task tool with subagent_type="Bash":
-   - For Node.js: npm test
-   - Record the number of passing and failing tests as MERGE_PASS and MERGE_FAIL
+10. Run tests using the Task tool with subagent_type="Bash":
+    - For Node.js: npm test
+    - Record the number of passing and failing tests as MERGE_PASS and MERGE_FAIL
 
 PHASE 4 — DECIDE:
-10. Compare results:
-    - If build failed: ROLLBACK (go to step 11)
-    - If MERGE_FAIL > BASELINE_FAIL (NEW test failures introduced): ROLLBACK (go to step 11)
-    - If MERGE_FAIL <= BASELINE_FAIL (no new failures): PUSH (go to step 12)
+11. Compare results:
+    - If build failed: ROLLBACK (go to step 12)
+    - If MERGE_FAIL > BASELINE_FAIL (NEW test failures introduced): ROLLBACK (go to step 12)
+    - If MERGE_FAIL <= BASELINE_FAIL (no new failures): PUSH (go to step 13)
     - Pre-existing failures on ${targetBranch} are NOT a reason to rollback
-11. ROLLBACK: git reset --hard ORIG_HEAD
+12. ROLLBACK: git reset --hard ORIG_HEAD
     (ORIG_HEAD is set by git at merge time — always points to pre-merge state)
     Then report failure by calling the Panopticon API:
     curl -s -X POST ${apiUrl}/api/specialists/done \\
       -H "Content-Type: application/json" \\
       -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"<reason for rollback>"}'
     Then STOP.
-12. PUSH: git push origin ${targetBranch}
+13. PUSH: git push origin ${targetBranch}
+    If push is rejected (non-fast-forward / "tip of your current branch is behind"):
+      a. git fetch origin ${targetBranch}
+      b. git rebase origin/${targetBranch}
+         (Replay on top of any new remote commits — safe, no data loss)
+      c. If rebase conflicts: abort with git rebase --abort, ROLLBACK (go to step 12)
+      d. If rebase succeeds: retry git push origin ${targetBranch}
+      e. If push fails again after one retry: ROLLBACK (go to step 12)
     Then report success by calling the Panopticon API:
     curl -s -X POST ${apiUrl}/api/specialists/done \\
       -H "Content-Type: application/json" \\
@@ -903,11 +921,12 @@ WHY USE SUBAGENTS FOR BUILD/TEST:
 DO NOT:
 - Delete the feature branch (locally or remotely)
 - Clean up workspaces
+- Use git push --force or --force-with-lease — NEVER force-push under any circumstances
 - Skip the build step - compile errors after merge are common
 - Skip the baseline test run — without it you cannot distinguish new failures from pre-existing ones
 - Use HEAD~1 for rollback — use ORIG_HEAD which git sets automatically at merge time
 - Run git stash — the TypeScript layer handles stash/restore automatically
-- Do anything beyond the merge, build, test, and push steps above
+- Do anything beyond the sync, merge, build, test, and push steps above
 
 Report any issues or conflicts you encountered.`;
 
