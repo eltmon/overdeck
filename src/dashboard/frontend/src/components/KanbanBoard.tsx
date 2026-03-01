@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import {
   DndContext,
   DragOverlay,
@@ -1733,6 +1734,7 @@ interface IssueCardProps {
 
 function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog, alert: alertDialog } = useConfirmDialog();
 
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
@@ -1789,11 +1791,16 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
     },
   });
 
-  const handleKill = (e: React.MouseEvent) => {
+  const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (agent && confirm(`Kill agent ${agent.id}?`)) {
-      killMutation.mutate(agent.id);
-    }
+    if (!agent) return;
+    const ok = await confirmDialog({
+      title: `Kill agent ${agent.id}?`,
+      description: 'This will stop the running agent process.',
+      confirmLabel: 'Kill',
+      variant: 'destructive',
+    });
+    if (ok) killMutation.mutate(agent.id);
   };
 
   const handleWatch = (e: React.MouseEvent) => {
@@ -1832,15 +1839,26 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
       queryClient.invalidateQueries({ queryKey: ['issues'] });
     },
     onError: (err: Error) => {
-      alert(`Failed to start agent: ${err.message}`);
+      alertDialog({
+        title: 'Failed to start agent',
+        description: err.message,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
-  const handleStartAgent = (e: React.MouseEvent) => {
+  const handleStartAgent = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Start agent for ${issue.identifier}?`)) {
-      startAgentMutation.mutate();
-    }
+    const ok = await confirmDialog({
+      title: `Start agent for ${issue.identifier}?`,
+      description: 'This will launch an autonomous agent to work on this issue.',
+      confirmLabel: 'Start',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (ok) startAgentMutation.mutate();
   };
 
   const handlePlan = (e: React.MouseEvent) => {
@@ -2164,10 +2182,15 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
             Resume Agent
           </button>
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              if (confirm(`Reset ${issue.identifier}?\n\nThis will:\n• Kill any running agents (local and remote)\n• Move the issue back to To Do in Linear\n• Keep the workspace for reference`)) {
-                // Call the reset endpoint
+              const ok = await confirmDialog({
+                title: `Reset ${issue.identifier}?`,
+                description: 'This will:\n- Kill any running agents (local and remote)\n- Move the issue back to To Do in Linear\n- Keep the workspace for reference',
+                confirmLabel: 'Reset',
+                variant: 'destructive',
+              });
+              if (ok) {
                 fetch(`/api/issues/${issue.identifier}/reset`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -2210,13 +2233,19 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
 
 // Deep wipe button - available from any issue state
 function DeepWipeButton({ issue, deepWipeMutation }: { issue: Issue; deepWipeMutation: any }) {
+  const { confirm: confirmDialog } = useConfirmDialog();
+
   return (
     <button
-      onClick={(e) => {
+      onClick={async (e) => {
         e.stopPropagation();
-        if (confirm(`Deep wipe ${issue.identifier}? This will clean up ALL state:\n\n• Kill agents\n• Delete agent state\n• Delete workspace & branches\n• Reset issue to Todo/Open\n\nThis is irreversible.`)) {
-          deepWipeMutation.mutate({ deleteWorkspace: true });
-        }
+        const ok = await confirmDialog({
+          title: `Deep wipe ${issue.identifier}?`,
+          description: 'This will clean up ALL state:\n\n- Kill agents\n- Delete agent state\n- Delete workspace & branches\n- Reset issue to Todo/Open\n\nThis is irreversible.',
+          confirmLabel: 'Wipe',
+          variant: 'destructive',
+        });
+        if (ok) deepWipeMutation.mutate({ deleteWorkspace: true });
       }}
       disabled={deepWipeMutation.isPending}
       className="flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors disabled:opacity-50 ml-auto"
@@ -2231,6 +2260,7 @@ function DeepWipeButton({ issue, deepWipeMutation }: { issue: Issue; deepWipeMut
 // Reopen section for Done/In Review items
 function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog } = useConfirmDialog();
 
   const reopenMutation = useMutation({
     mutationFn: async () => {
@@ -2249,11 +2279,16 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
     },
   });
 
-  const handleReopen = (e: React.MouseEvent) => {
+  const handleReopen = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Reopen ${issue.identifier} for re-work?\n\nThis will move it back to In Progress.`)) {
-      reopenMutation.mutate();
-    }
+    const ok = await confirmDialog({
+      title: `Reopen ${issue.identifier}?`,
+      description: 'This will move it back to In Progress for re-work.',
+      confirmLabel: 'Reopen',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (ok) reopenMutation.mutate();
   };
 
   const content = (
@@ -2288,6 +2323,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
 // Close-out section for Done items
 function CloseOutSection({ issue }: { issue: Issue }) {
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog } = useConfirmDialog();
 
   const closeOutMutation = useMutation({
     mutationFn: async () => {
@@ -2306,11 +2342,16 @@ function CloseOutSection({ issue }: { issue: Issue }) {
     },
   });
 
-  const handleCloseOut = (e: React.MouseEvent) => {
+  const handleCloseOut = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Close out ${issue.identifier}?\n\nThis will:\n• Verify branch is merged\n• Archive workspace artifacts\n• Clean up agent state\n• Close issue on tracker\n• Apply closed-out label`)) {
-      closeOutMutation.mutate();
-    }
+    const ok = await confirmDialog({
+      title: `Close out ${issue.identifier}?`,
+      description: 'This will:\n- Verify branch is merged\n- Archive workspace artifacts\n- Clean up agent state\n- Close issue on tracker\n- Apply closed-out label',
+      confirmLabel: 'Close Out',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (ok) closeOutMutation.mutate();
   };
 
   return (

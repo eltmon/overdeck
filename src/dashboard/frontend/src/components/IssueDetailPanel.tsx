@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import ReactMarkdown from 'react-markdown';
 import {
   X,
@@ -184,6 +185,7 @@ interface CleanPreview {
 
 export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPanelProps) {
   const queryClient = useQueryClient();
+  const { alert: alertDialog } = useConfirmDialog();
   const [copied, setCopied] = useState(false);
   const [copiedPath, setCopiedPath] = useState(false);
   const [showCleanDialog, setShowCleanDialog] = useState(false);
@@ -326,7 +328,13 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
       setShowCleanDialog(false);
       queryClient.invalidateQueries({ queryKey: ['workspace', issue.identifier] });
       if (data.backupPath) {
-        alert(`Workspace backed up to:\n${data.backupPath}\n\nYou can restore files from there after the new workspace is created.`);
+        alertDialog({
+          title: 'Workspace backed up',
+          description: `Backed up to:\n${data.backupPath}\n\nYou can restore files from there after the new workspace is created.`,
+          confirmLabel: 'OK',
+          icon: 'info',
+          variant: 'default',
+        });
       }
     },
   });

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Brain, RotateCcw, Power, XCircle, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown, Play, Activity } from 'lucide-react';
 import { useState } from 'react';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 
 export interface SpecialistAgent {
   name: 'merge-agent' | 'review-agent' | 'test-agent';
@@ -245,6 +246,7 @@ export function SpecialistAgentCard({
   isSelected,
 }: SpecialistAgentCardProps) {
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog, alert: alertDialog } = useConfirmDialog();
   const { data: costData } = useSpecialistCost(specialist.name, specialist.state !== 'uninitialized');
   const { data: queueData } = useSpecialistQueue(specialist.name);
   const { data: activityData } = useActivity(specialist.tmuxSession, specialist.state !== 'uninitialized');
@@ -258,7 +260,13 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to wake ${specialist.displayName}: ${error.message}`);
+      alertDialog({
+        title: 'Wake failed',
+        description: `Failed to wake ${specialist.displayName}: ${error.message}`,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
@@ -268,7 +276,13 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['specialists'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to reset ${specialist.displayName}: ${error.message}`);
+      alertDialog({
+        title: 'Reset failed',
+        description: `Failed to reset ${specialist.displayName}: ${error.message}`,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
@@ -287,7 +301,13 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to resume ${specialist.displayName}: ${error.message}`);
+      alertDialog({
+        title: 'Resume failed',
+        description: `Failed to resume ${specialist.displayName}: ${error.message}`,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
@@ -297,7 +317,13 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['specialist-queue', specialist.name] });
     },
     onError: (error: Error) => {
-      alert(`Failed to remove queue item: ${error.message}`);
+      alertDialog({
+        title: 'Remove failed',
+        description: `Failed to remove queue item: ${error.message}`,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
@@ -307,7 +333,13 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['specialist-queue', specialist.name] });
     },
     onError: (error: Error) => {
-      alert(`Failed to reorder queue: ${error.message}`);
+      alertDialog({
+        title: 'Reorder failed',
+        description: `Failed to reorder queue: ${error.message}`,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
@@ -316,22 +348,26 @@ export function SpecialistAgentCard({
     wakeMutation.mutate();
   };
 
-  const handleReset = (e: React.MouseEvent) => {
+  const handleReset = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (
-      confirm(
-        `Reset ${specialist.displayName}? This will clear the session file and context.`
-      )
-    ) {
-      resetMutation.mutate();
-    }
+    const ok = await confirmDialog({
+      title: `Reset ${specialist.displayName}?`,
+      description: 'This will clear the session file and context.',
+      confirmLabel: 'Reset',
+      variant: 'destructive',
+    });
+    if (ok) resetMutation.mutate();
   };
 
-  const handleKill = (e: React.MouseEvent) => {
+  const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Kill ${specialist.displayName}?`)) {
-      killMutation.mutate();
-    }
+    const ok = await confirmDialog({
+      title: `Kill ${specialist.displayName}?`,
+      description: 'This will stop the specialist agent process.',
+      confirmLabel: 'Kill',
+      variant: 'destructive',
+    });
+    if (ok) killMutation.mutate();
   };
 
   const handleRemoveQueueItem = (e: React.MouseEvent, itemId: string) => {

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import {
   X,
   XCircle,
@@ -257,6 +258,7 @@ function StatusHistory({ history }: { history: StatusHistoryEntry[] }) {
 
 export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: WorkspacePanelProps) {
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog, prompt: promptDialog } = useConfirmDialog();
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'logs' | 'status'>('logs');
@@ -593,10 +595,15 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     },
   });
 
-  const handleSyncMain = () => {
-    if (confirm(`Sync main into ${issueId}?\n\nThis will:\n- Auto-commit any uncommitted changes\n- Fetch and merge the latest main into the feature branch\n- Use the merge agent to resolve any conflicts`)) {
-      syncMainMutation.mutate();
-    }
+  const handleSyncMain = async () => {
+    const ok = await confirmDialog({
+      title: `Sync main into ${issueId}?`,
+      description: 'This will:\n- Auto-commit any uncommitted changes\n- Fetch and merge the latest main into the feature branch\n- Use the merge agent to resolve any conflicts',
+      confirmLabel: 'Sync',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (ok) syncMainMutation.mutate();
   };
 
   const refreshDbMutation = useMutation({
@@ -615,10 +622,14 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
     },
   });
-  const handleCleanWorkspace = () => {
-    if (confirm(`Clean and recreate corrupted workspace for ${issueId}?\n\nThis will:\n- Remove the corrupted workspace directory\n- Create a fresh workspace`)) {
-      cleanMutation.mutate();
-    }
+  const handleCleanWorkspace = async () => {
+    const ok = await confirmDialog({
+      title: `Clean workspace for ${issueId}?`,
+      description: 'This will:\n- Remove the corrupted workspace directory\n- Create a fresh workspace',
+      confirmLabel: 'Clean',
+      variant: 'destructive',
+    });
+    if (ok) cleanMutation.mutate();
   };
 
   const handleStartContainers = () => {
@@ -629,34 +640,51 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     containerizeMutation.mutate();
   };
 
-  const handleReview = () => {
+  const handleReview = async () => {
     const isReReview = reviewStatus?.readyForMerge || reviewStatus?.reviewStatus === 'passed' || reviewStatus?.testStatus === 'passed';
-    const message = isReReview
-      ? `Re-run review & test pipeline for ${issueId}?\n\nThis will reset the current status and:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.`
-      : `Start review & test pipeline for ${issueId}?\n\nThis will:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.`;
-    if (confirm(message)) {
-      reviewMutation.mutate();
-    }
+    const ok = await confirmDialog({
+      title: isReReview ? `Re-run review pipeline for ${issueId}?` : `Start review pipeline for ${issueId}?`,
+      description: isReReview
+        ? 'This will reset the current status and:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.'
+        : 'This will:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.',
+      confirmLabel: isReReview ? 'Re-run' : 'Start',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (ok) reviewMutation.mutate();
   };
 
-  const handleMerge = () => {
-    if (confirm(`Merge ${issueId} to main?\n\nReview and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`)) {
-      mergeMutation.mutate();
-    }
+  const handleMerge = async () => {
+    const ok = await confirmDialog({
+      title: `Merge ${issueId} to main?`,
+      description: 'Review and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace',
+      confirmLabel: 'Merge',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (ok) mergeMutation.mutate();
   };
 
-  const handleClose = () => {
-    if (confirm(`Close ${issueId} without merging? This will:\n- Close the issue (no merge)\n- Stop any running agent\n- Remove the workspace\n(Feature branch is preserved for history)`)) {
-      closeMutation.mutate();
-    }
+  const handleClose = async () => {
+    const ok = await confirmDialog({
+      title: `Close ${issueId} without merging?`,
+      description: 'This will:\n- Close the issue (no merge)\n- Stop any running agent\n- Remove the workspace\n(Feature branch is preserved for history)',
+      confirmLabel: 'Close',
+      variant: 'destructive',
+    });
+    if (ok) closeMutation.mutate();
   };
 
-  const handleReopen = () => {
-    const reason = prompt(
-      `Reopen ${issueId} for re-work?\n\nThis will:\n- Move the issue to "In Progress"\n- Reset review/test/merge status to pending\n- Remove any queued specialist tasks\n- Append a "Reopened" section to STATE.md\n\nOptional: enter a reason (or leave blank):`,
-      ''
-    );
-    // prompt returns null if cancelled
+  const handleReopen = async () => {
+    const reason = await promptDialog({
+      title: `Reopen ${issueId} for re-work?`,
+      description: 'This will:\n- Move the issue to "In Progress"\n- Reset review/test/merge status to pending\n- Remove any queued specialist tasks\n- Append a "Reopened" section to STATE.md',
+      confirmLabel: 'Reopen',
+      variant: 'default',
+      icon: 'info',
+      placeholder: 'Optional: enter a reason (or leave blank)',
+      defaultValue: '',
+    });
     if (reason === null) return;
     reopenMutation.mutate(reason || undefined);
   };
@@ -718,10 +746,15 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     }
   };
 
-  const handleKill = () => {
-    if (agent && confirm(`Kill agent ${agent.id}?`)) {
-      killMutation.mutate();
-    }
+  const handleKill = async () => {
+    if (!agent) return;
+    const ok = await confirmDialog({
+      title: `Kill agent ${agent.id}?`,
+      description: 'This will stop the running agent process.',
+      confirmLabel: 'Kill',
+      variant: 'destructive',
+    });
+    if (ok) killMutation.mutate();
   };
 
   // Format duration
@@ -1836,8 +1869,14 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               <>
                 <div className="border-t border-divider my-1" />
                 <button
-                  onClick={() => {
-                    if (confirm('Drop and reload database from seed file?\n\nThis will:\n- Stop the API container\n- Drop the existing database\n- Reload from seed-cleaned.sql\n- Restart the API\n\nAll workspace data will be replaced.')) {
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: 'Drop and reload database?',
+                      description: 'This will:\n- Stop the API container\n- Drop the existing database\n- Reload from seed-cleaned.sql\n- Restart the API\n\nAll workspace data will be replaced.',
+                      confirmLabel: 'Reload DB',
+                      variant: 'destructive',
+                    });
+                    if (ok) {
                       refreshDbMutation.mutate();
                       setContainerMenu(null);
                     }

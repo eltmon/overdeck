@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play } from 'lucide-react';
 import { useState } from 'react';
 import { useAgentCost } from '../hooks/useHandoffData';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import { HandoffPanel } from './HandoffPanel';
 
 export interface IssueAgent {
@@ -149,6 +150,7 @@ export function IssueAgentCard({
   isSelected,
 }: IssueAgentCardProps) {
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog, alert: alertDialog } = useConfirmDialog();
   const [showHandoffPanel, setShowHandoffPanel] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const { data: costData } = useAgentCost(agent.id);
@@ -164,11 +166,22 @@ export function IssueAgentCard({
   const pokeMutation = useMutation({
     mutationFn: () => pokeAgent(agent.id),
     onSuccess: () => {
-      // Show success message briefly
-      alert(`Poked ${agent.id} successfully`);
+      alertDialog({
+        title: 'Agent poked',
+        description: `Poked ${agent.id} successfully.`,
+        confirmLabel: 'OK',
+        icon: 'info',
+        variant: 'default',
+      });
     },
     onError: (error: Error) => {
-      alert(`Failed to poke ${agent.id}: ${error.message}`);
+      alertDialog({
+        title: 'Poke failed',
+        description: `Failed to poke ${agent.id}: ${error.message}`,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
@@ -178,15 +191,25 @@ export function IssueAgentCard({
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to resume ${agent.id}: ${error.message}`);
+      alertDialog({
+        title: 'Resume failed',
+        description: `Failed to resume ${agent.id}: ${error.message}`,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
-  const handleKill = (e: React.MouseEvent) => {
+  const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Kill agent ${agent.id}?`)) {
-      killMutation.mutate();
-    }
+    const ok = await confirmDialog({
+      title: `Kill agent ${agent.id}?`,
+      description: 'This will stop the running agent process.',
+      confirmLabel: 'Kill',
+      variant: 'destructive',
+    });
+    if (ok) killMutation.mutate();
   };
 
   const handlePoke = (e: React.MouseEvent) => {

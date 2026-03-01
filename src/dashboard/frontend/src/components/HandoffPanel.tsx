@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, AlertCircle } from 'lucide-react';
 import { useHandoffSuggestion } from '../hooks/useHandoffData';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
 
 interface HandoffPanelProps {
   agentId: string;
@@ -27,6 +28,7 @@ const MODEL_COLORS = {
 export function HandoffPanel({ agentId }: HandoffPanelProps) {
   const { data: suggestion, isLoading } = useHandoffSuggestion(agentId);
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog, alert: alertDialog } = useConfirmDialog();
 
   const handoffMutation = useMutation({
     mutationFn: ({ toModel, reason }: { toModel: string; reason?: string }) =>
@@ -34,22 +36,46 @@ export function HandoffPanel({ agentId }: HandoffPanelProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['handoff-suggestion', agentId] });
-      alert('Handoff completed successfully');
+      alertDialog({
+        title: 'Handoff complete',
+        description: 'Handoff completed successfully.',
+        confirmLabel: 'OK',
+        icon: 'info',
+        variant: 'default',
+      });
     },
     onError: (error: Error) => {
-      alert(`Handoff failed: ${error.message}`);
+      alertDialog({
+        title: 'Handoff failed',
+        description: error.message,
+        confirmLabel: 'OK',
+        icon: 'warning',
+        variant: 'default',
+      });
     },
   });
 
-  const handleHandoff = (toModel: string) => {
-    if (confirm(`Hand off ${agentId} to ${toModel}?`)) {
-      handoffMutation.mutate({ toModel, reason: 'Manual handoff from dashboard' });
-    }
+  const handleHandoff = async (toModel: string) => {
+    const ok = await confirmDialog({
+      title: `Hand off ${agentId} to ${toModel}?`,
+      description: 'This will transfer the agent to a different model.',
+      confirmLabel: 'Hand Off',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (ok) handoffMutation.mutate({ toModel, reason: 'Manual handoff from dashboard' });
   };
 
-  const handleAutoHandoff = () => {
+  const handleAutoHandoff = async () => {
     if (!suggestion?.suggestedModel) return;
-    if (confirm(`${suggestion.reason}\n\nProceed with handoff to ${suggestion.suggestedModel}?`)) {
+    const ok = await confirmDialog({
+      title: `Hand off to ${suggestion.suggestedModel}?`,
+      description: suggestion.reason,
+      confirmLabel: 'Proceed',
+      variant: 'default',
+      icon: 'info',
+    });
+    if (ok) {
       handoffMutation.mutate({
         toModel: suggestion.suggestedModel,
         reason: suggestion.reason,
