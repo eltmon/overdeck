@@ -3,6 +3,7 @@ import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLef
 import { useState } from 'react';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
+import { useConfirm, useAlert } from './dialogs';
 
 export interface IssueAgent {
   id: string;
@@ -149,6 +150,8 @@ export function IssueAgentCard({
   isSelected,
 }: IssueAgentCardProps) {
   const queryClient = useQueryClient();
+  const confirmDialog = useConfirm();
+  const alertDialog = useAlert();
   const [showHandoffPanel, setShowHandoffPanel] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const { data: costData } = useAgentCost(agent.id);
@@ -164,11 +167,10 @@ export function IssueAgentCard({
   const pokeMutation = useMutation({
     mutationFn: () => pokeAgent(agent.id),
     onSuccess: () => {
-      // Show success message briefly
-      alert(`Poked ${agent.id} successfully`);
+      alertDialog({ message: `Poked ${agent.id} successfully`, title: 'Agent Poked', variant: 'success' });
     },
     onError: (error: Error) => {
-      alert(`Failed to poke ${agent.id}: ${error.message}`);
+      alertDialog({ message: `Failed to poke ${agent.id}: ${error.message}`, title: 'Poke Failed', variant: 'error' });
     },
   });
 
@@ -178,13 +180,13 @@ export function IssueAgentCard({
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to resume ${agent.id}: ${error.message}`);
+      alertDialog({ message: `Failed to resume ${agent.id}: ${error.message}`, title: 'Resume Failed', variant: 'error' });
     },
   });
 
-  const handleKill = (e: React.MouseEvent) => {
+  const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Kill agent ${agent.id}?`)) {
+    if (await confirmDialog({ message: `Kill agent ${agent.id}?`, title: 'Kill Agent', variant: 'destructive', confirmLabel: 'Kill' })) {
       killMutation.mutate();
     }
   };

@@ -22,6 +22,7 @@ import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, 
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
+import { useConfirm, useAlert } from './dialogs';
 
 // Model name formatting
 function getFriendlyModelName(fullModel: string): string {
@@ -1733,6 +1734,8 @@ interface IssueCardProps {
 
 function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
   const queryClient = useQueryClient();
+  const confirmDialog = useConfirm();
+  const alertDialog = useAlert();
 
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
@@ -1789,9 +1792,9 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
     },
   });
 
-  const handleKill = (e: React.MouseEvent) => {
+  const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (agent && confirm(`Kill agent ${agent.id}?`)) {
+    if (agent && await confirmDialog({ message: `Kill agent ${agent.id}?`, title: 'Kill Agent', variant: 'destructive', confirmLabel: 'Kill' })) {
       killMutation.mutate(agent.id);
     }
   };
@@ -1832,13 +1835,13 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
       queryClient.invalidateQueries({ queryKey: ['issues'] });
     },
     onError: (err: Error) => {
-      alert(`Failed to start agent: ${err.message}`);
+      alertDialog({ message: `Failed to start agent: ${err.message}`, title: 'Start Failed', variant: 'error' });
     },
   });
 
-  const handleStartAgent = (e: React.MouseEvent) => {
+  const handleStartAgent = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Start agent for ${issue.identifier}?`)) {
+    if (await confirmDialog({ message: `Start agent for ${issue.identifier}?`, title: 'Start Agent' })) {
       startAgentMutation.mutate();
     }
   };
@@ -2135,9 +2138,9 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
             {startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
           </button>
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              if (confirm(`Deep wipe ${issue.identifier}? This will clean up any stale state:\n• Kill agents\n• Delete agent state\n• Delete workspace & branches`)) {
+              if (await confirmDialog({ message: `Deep wipe ${issue.identifier}? This will clean up any stale state:\n\n• Kill agents\n• Delete agent state\n• Delete workspace & branches`, title: 'Deep Wipe', variant: 'destructive', confirmLabel: 'Wipe' })) {
                 deepWipeMutation.mutate({ deleteWorkspace: true });
               }
             }}
@@ -2177,9 +2180,9 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
             Resume Agent
           </button>
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              if (confirm(`Reset ${issue.identifier}?\n\nThis will:\n• Kill any running agents (local and remote)\n• Move the issue back to To Do in Linear\n• Keep the workspace for reference`)) {
+              if (await confirmDialog({ message: `Reset ${issue.identifier}?\n\nThis will:\n• Kill any running agents (local and remote)\n• Move the issue back to To Do in Linear\n• Keep the workspace for reference`, title: 'Reset Issue', variant: 'destructive', confirmLabel: 'Reset' })) {
                 // Call the reset endpoint
                 fetch(`/api/issues/${issue.identifier}/reset`, {
                   method: 'POST',
@@ -2219,6 +2222,7 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
 // Reopen section for Done/In Review items
 function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
   const queryClient = useQueryClient();
+  const confirmDialog = useConfirm();
 
   const reopenMutation = useMutation({
     mutationFn: async () => {
@@ -2237,9 +2241,9 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
     },
   });
 
-  const handleReopen = (e: React.MouseEvent) => {
+  const handleReopen = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Reopen ${issue.identifier} for re-work?\n\nThis will move it back to In Progress.`)) {
+    if (await confirmDialog({ message: `Reopen ${issue.identifier} for re-work?\n\nThis will move it back to In Progress.`, title: 'Reopen Issue' })) {
       reopenMutation.mutate();
     }
   };
@@ -2276,6 +2280,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
 // Close-out section for Done items
 function CloseOutSection({ issue }: { issue: Issue }) {
   const queryClient = useQueryClient();
+  const confirmDialog = useConfirm();
 
   const closeOutMutation = useMutation({
     mutationFn: async () => {
@@ -2294,9 +2299,9 @@ function CloseOutSection({ issue }: { issue: Issue }) {
     },
   });
 
-  const handleCloseOut = (e: React.MouseEvent) => {
+  const handleCloseOut = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Close out ${issue.identifier}?\n\nThis will:\n• Verify branch is merged\n• Archive workspace artifacts\n• Clean up agent state\n• Close issue on tracker\n• Apply closed-out label`)) {
+    if (await confirmDialog({ message: `Close out ${issue.identifier}?\n\nThis will:\n• Verify branch is merged\n• Archive workspace artifacts\n• Clean up agent state\n• Close issue on tracker\n• Apply closed-out label`, title: 'Close Out Issue' })) {
       closeOutMutation.mutate();
     }
   };

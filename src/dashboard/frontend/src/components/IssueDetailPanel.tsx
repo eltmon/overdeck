@@ -28,6 +28,7 @@ import {
   Cloud,
   Monitor,
 } from 'lucide-react';
+import { useAlert } from './dialogs';
 
 // Cost data types
 interface SessionCost {
@@ -184,6 +185,7 @@ interface CleanPreview {
 
 export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPanelProps) {
   const queryClient = useQueryClient();
+  const alertDialog = useAlert();
   const [copied, setCopied] = useState(false);
   const [copiedPath, setCopiedPath] = useState(false);
   const [showCleanDialog, setShowCleanDialog] = useState(false);
@@ -326,7 +328,7 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
       setShowCleanDialog(false);
       queryClient.invalidateQueries({ queryKey: ['workspace', issue.identifier] });
       if (data.backupPath) {
-        alert(`Workspace backed up to:\n${data.backupPath}\n\nYou can restore files from there after the new workspace is created.`);
+        alertDialog({ message: `Workspace backed up to:\n${data.backupPath}\n\nYou can restore files from there after the new workspace is created.`, title: 'Workspace Backed Up', variant: 'success' });
       }
     },
   });

@@ -34,6 +34,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { Agent, Issue } from '../types';
 import { BeadsDialog } from './BeadsDialog';
+import { useConfirm } from './dialogs';
 
 interface ContainerStatus {
   running: boolean;
@@ -257,6 +258,7 @@ function StatusHistory({ history }: { history: StatusHistoryEntry[] }) {
 
 export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: WorkspacePanelProps) {
   const queryClient = useQueryClient();
+  const confirmDialog = useConfirm();
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'logs' | 'status'>('logs');
@@ -593,8 +595,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     },
   });
 
-  const handleSyncMain = () => {
-    if (confirm(`Sync main into ${issueId}?\n\nThis will:\n- Auto-commit any uncommitted changes\n- Fetch and merge the latest main into the feature branch\n- Use the merge agent to resolve any conflicts`)) {
+  const handleSyncMain = async () => {
+    if (await confirmDialog({ message: `Sync main into ${issueId}?\n\nThis will:\n- Auto-commit any uncommitted changes\n- Fetch and merge the latest main into the feature branch\n- Use the merge agent to resolve any conflicts`, title: 'Sync Main' })) {
       syncMainMutation.mutate();
     }
   };
@@ -615,8 +617,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
     },
   });
-  const handleCleanWorkspace = () => {
-    if (confirm(`Clean and recreate corrupted workspace for ${issueId}?\n\nThis will:\n- Remove the corrupted workspace directory\n- Create a fresh workspace`)) {
+  const handleCleanWorkspace = async () => {
+    if (await confirmDialog({ message: `Clean and recreate corrupted workspace for ${issueId}?\n\nThis will:\n- Remove the corrupted workspace directory\n- Create a fresh workspace`, title: 'Clean Workspace', variant: 'destructive', confirmLabel: 'Clean & Recreate' })) {
       cleanMutation.mutate();
     }
   };
@@ -629,24 +631,24 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     containerizeMutation.mutate();
   };
 
-  const handleReview = () => {
+  const handleReview = async () => {
     const isReReview = reviewStatus?.readyForMerge || reviewStatus?.reviewStatus === 'passed' || reviewStatus?.testStatus === 'passed';
-    const message = isReReview
+    const msg = isReReview
       ? `Re-run review & test pipeline for ${issueId}?\n\nThis will reset the current status and:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.`
       : `Start review & test pipeline for ${issueId}?\n\nThis will:\n- Run strict code review (review-agent)\n- Run tests (test-agent)\n\nMERGE button will appear when both pass.`;
-    if (confirm(message)) {
+    if (await confirmDialog({ message: msg, title: isReReview ? 'Re-run Review' : 'Start Review' })) {
       reviewMutation.mutate();
     }
   };
 
-  const handleMerge = () => {
-    if (confirm(`Merge ${issueId} to main?\n\nReview and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`)) {
+  const handleMerge = async () => {
+    if (await confirmDialog({ message: `Merge ${issueId} to main?\n\nReview and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`, title: 'Merge to Main', confirmLabel: 'Merge' })) {
       mergeMutation.mutate();
     }
   };
 
-  const handleClose = () => {
-    if (confirm(`Close ${issueId} without merging? This will:\n- Close the issue (no merge)\n- Stop any running agent\n- Remove the workspace\n(Feature branch is preserved for history)`)) {
+  const handleClose = async () => {
+    if (await confirmDialog({ message: `Close ${issueId} without merging? This will:\n- Close the issue (no merge)\n- Stop any running agent\n- Remove the workspace\n(Feature branch is preserved for history)`, title: 'Close Without Merge', variant: 'destructive', confirmLabel: 'Close' })) {
       closeMutation.mutate();
     }
   };
@@ -718,8 +720,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     }
   };
 
-  const handleKill = () => {
-    if (agent && confirm(`Kill agent ${agent.id}?`)) {
+  const handleKill = async () => {
+    if (agent && await confirmDialog({ message: `Kill agent ${agent.id}?`, title: 'Kill Agent', variant: 'destructive', confirmLabel: 'Kill' })) {
       killMutation.mutate();
     }
   };
@@ -1836,8 +1838,8 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               <>
                 <div className="border-t border-divider my-1" />
                 <button
-                  onClick={() => {
-                    if (confirm('Drop and reload database from seed file?\n\nThis will:\n- Stop the API container\n- Drop the existing database\n- Reload from seed-cleaned.sql\n- Restart the API\n\nAll workspace data will be replaced.')) {
+                  onClick={async () => {
+                    if (await confirmDialog({ message: 'Drop and reload database from seed file?\n\nThis will:\n- Stop the API container\n- Drop the existing database\n- Reload from seed-cleaned.sql\n- Restart the API\n\nAll workspace data will be replaced.', title: 'Refresh Database', variant: 'destructive', confirmLabel: 'Refresh DB' })) {
                       refreshDbMutation.mutate();
                       setContainerMenu(null);
                     }

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Brain, RotateCcw, Power, XCircle, Loader2, ChevronDown, ChevronRight, Trash2, MoveUp, MoveDown, Play, Activity } from 'lucide-react';
 import { useState } from 'react';
+import { useConfirm, useAlert } from './dialogs';
 
 export interface SpecialistAgent {
   name: 'merge-agent' | 'review-agent' | 'test-agent';
@@ -245,6 +246,8 @@ export function SpecialistAgentCard({
   isSelected,
 }: SpecialistAgentCardProps) {
   const queryClient = useQueryClient();
+  const confirmDialog = useConfirm();
+  const alertDialog = useAlert();
   const { data: costData } = useSpecialistCost(specialist.name, specialist.state !== 'uninitialized');
   const { data: queueData } = useSpecialistQueue(specialist.name);
   const { data: activityData } = useActivity(specialist.tmuxSession, specialist.state !== 'uninitialized');
@@ -258,7 +261,7 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to wake ${specialist.displayName}: ${error.message}`);
+      alertDialog({ message: `Failed to wake ${specialist.displayName}: ${error.message}`, title: 'Wake Failed', variant: 'error' });
     },
   });
 
@@ -268,7 +271,7 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['specialists'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to reset ${specialist.displayName}: ${error.message}`);
+      alertDialog({ message: `Failed to reset ${specialist.displayName}: ${error.message}`, title: 'Reset Failed', variant: 'error' });
     },
   });
 
@@ -287,7 +290,7 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
     onError: (error: Error) => {
-      alert(`Failed to resume ${specialist.displayName}: ${error.message}`);
+      alertDialog({ message: `Failed to resume ${specialist.displayName}: ${error.message}`, title: 'Resume Failed', variant: 'error' });
     },
   });
 
@@ -297,7 +300,7 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['specialist-queue', specialist.name] });
     },
     onError: (error: Error) => {
-      alert(`Failed to remove queue item: ${error.message}`);
+      alertDialog({ message: `Failed to remove queue item: ${error.message}`, title: 'Remove Failed', variant: 'error' });
     },
   });
 
@@ -307,7 +310,7 @@ export function SpecialistAgentCard({
       queryClient.invalidateQueries({ queryKey: ['specialist-queue', specialist.name] });
     },
     onError: (error: Error) => {
-      alert(`Failed to reorder queue: ${error.message}`);
+      alertDialog({ message: `Failed to reorder queue: ${error.message}`, title: 'Reorder Failed', variant: 'error' });
     },
   });
 
@@ -316,20 +319,16 @@ export function SpecialistAgentCard({
     wakeMutation.mutate();
   };
 
-  const handleReset = (e: React.MouseEvent) => {
+  const handleReset = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (
-      confirm(
-        `Reset ${specialist.displayName}? This will clear the session file and context.`
-      )
-    ) {
+    if (await confirmDialog({ message: `Reset ${specialist.displayName}? This will clear the session file and context.`, title: 'Reset Specialist', variant: 'destructive', confirmLabel: 'Reset' })) {
       resetMutation.mutate();
     }
   };
 
-  const handleKill = (e: React.MouseEvent) => {
+  const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Kill ${specialist.displayName}?`)) {
+    if (await confirmDialog({ message: `Kill ${specialist.displayName}?`, title: 'Kill Specialist', variant: 'destructive', confirmLabel: 'Kill' })) {
       killMutation.mutate();
     }
   };

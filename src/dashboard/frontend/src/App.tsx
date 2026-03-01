@@ -12,6 +12,7 @@ import { ConvoyPanel } from './components/ConvoyPanel';
 import { CloisterStatusBar } from './components/CloisterStatusBar';
 import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
+import { DialogProvider } from './components/dialogs';
 import { MetricsSummary } from './components/MetricsSummary';
 import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
@@ -270,6 +271,7 @@ export default function App() {
   const actualPanelWidth = isExpanded ? 'calc(100% - 300px)' : `${panelWidth}px`;
 
   return (
+    <DialogProvider>
     <div className="h-screen bg-surface flex flex-col overflow-hidden transition-colors duration-150">
       <header className="bg-surface-raised border-b border-divider px-4 py-2 shrink-0">
         <div className="flex items-center gap-3">
@@ -464,5 +466,6 @@ export default function App() {
         includeCompletedFilter={false}
       />
     </div>
+    </DialogProvider>
   );
 }

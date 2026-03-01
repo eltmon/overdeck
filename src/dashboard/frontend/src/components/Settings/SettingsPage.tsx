@@ -11,6 +11,7 @@ import {
   Capability,
   MODELS_BY_PROVIDER,
 } from './AgentCards/ModelOverrideModal';
+import { useAlert } from '../dialogs';
 
 // API Functions
 async function fetchSettings(): Promise<SettingsConfig> {
@@ -156,6 +157,7 @@ function getModelDisplay(modelId?: string): string {
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
+  const alertDialog = useAlert();
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -281,7 +283,7 @@ export function SettingsPage() {
       setFormData(newFormData);
     } catch (error) {
       console.error('Failed to fetch optimal defaults:', error);
-      alert('Failed to load optimal defaults: ' + (error as Error).message);
+      alertDialog({ message: 'Failed to load optimal defaults: ' + (error as Error).message, title: 'Load Failed', variant: 'error' });
     }
   };
 
