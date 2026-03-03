@@ -1,6 +1,6 @@
 ---
 title: Issue Tracker Integration
-description: Connect Linear, GitHub, GitLab, and Rally
+description: Connect GitHub, Linear, GitLab, Jira, and Rally
 ---
 
 # Issue Tracker Integration
@@ -9,23 +9,26 @@ Panopticon integrates with popular issue tracking systems to provide unified pro
 
 ## Supported Trackers
 
-| Tracker | Role | Configuration |
-|---------|------|---------------|
-| **Linear** | Primary tracker | `LINEAR_API_KEY` in `.panopticon.env` |
-| **GitHub Issues** | Secondary tracker | `GITHUB_TOKEN` or `gh auth login` |
-| **GitLab Issues** | Secondary tracker | `glab auth login` |
-| **Rally** | Secondary tracker | `RALLY_API_KEY` in `.panopticon.env` |
+| Tracker | Configuration |
+|---------|---------------|
+| **GitHub Issues** | `GITHUB_TOKEN` or `gh auth login` |
+| **Linear** | `LINEAR_API_KEY` in `.panopticon.env` |
+| **GitLab Issues** | `GITLAB_TOKEN` or `glab auth login` |
+| **Jira** | `JIRA_API_KEY` in `.panopticon.env` |
+| **Rally** | `RALLY_API_KEY` in `.panopticon.env` |
 
-Secondary trackers sync issues to the dashboard alongside Linear issues, allowing unified project management.
+All trackers are equal — configure whichever your projects use. The dashboard displays issues from all configured trackers in a unified Kanban board.
 
 ## Configuration
 
 Create `~/.panopticon.env`:
 
 ```bash
-LINEAR_API_KEY=lin_api_xxxxx
-GITHUB_TOKEN=ghp_xxxxx  # Optional: for GitHub-tracked projects
-RALLY_API_KEY=_xxxxx    # Optional: for Rally as secondary tracker
+GITHUB_TOKEN=ghp_xxxxx     # For GitHub-tracked projects
+LINEAR_API_KEY=lin_api_xxxxx  # For Linear-tracked projects
+GITLAB_TOKEN=glpat-xxxxx  # For GitLab-tracked projects
+JIRA_API_KEY=xxxxx         # For Jira-tracked projects
+RALLY_API_KEY=_xxxxx       # For Rally-tracked projects
 ```
 
 ## Linear Integration

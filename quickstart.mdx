@@ -31,10 +31,7 @@ Panopticon supports local HTTPS via Traefik reverse proxy:
 # Full install (includes Traefik + mkcert for HTTPS)
 pan install
 
-# Add to /etc/hosts (macOS/Linux)
-echo "127.0.0.1 pan.localhost" | sudo tee -a /etc/hosts
-
-# Start with HTTPS
+# Start with HTTPS (pan.localhost auto-resolves, no /etc/hosts needed)
 pan up
 # → Dashboard: https://pan.localhost
 # → Traefik UI: https://traefik.pan.localhost:8080
@@ -44,7 +41,7 @@ pan up
 ```bash
 pan install --minimal
 pan up
-# → Dashboard: http://localhost:3010
+# → Dashboard: http://localhost:3011
 ```
 
 See [Docker & HTTPS Setup](/guides/docker-setup) for detailed DNS configuration (especially for WSL2).
