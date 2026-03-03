@@ -11,7 +11,7 @@
 
 Spawn AI agents from a dashboard. Route tasks to the right model. Review, test, and merge automatically.
 
-<img src="docs/dashboard-overview.png" alt="Panopticon Mission Control" width="800" />
+<img src="docs/screenshot-board.png" alt="Panopticon Kanban Board" width="800" />
 
 </div>
 
@@ -73,18 +73,18 @@ Create a workspace, and Panopticon handles the rest: planning with Opus, impleme
 <div align="center">
 <table>
 <tr>
-<td><img src="docs/screenshot-board.png" alt="Kanban Board" width="400" /></td>
+<td><img src="docs/dashboard-overview.png" alt="Mission Control" width="400" /></td>
 <td><img src="docs/screenshot-agents.png" alt="Agent Management" width="400" /></td>
 </tr>
 <tr>
-<td align="center"><em>Kanban board with issue cards, cost tracking, and agent controls</em></td>
+<td align="center"><em>Mission Control — project tree, activity timeline, specialist pipeline</em></td>
 <td align="center"><em>Cloister Deacon, specialist agents, and issue agent management</em></td>
 </tr>
 <tr>
 <td colspan="2"><img src="docs/screenshot-settings.png" alt="Model Routing Settings" width="800" /></td>
 </tr>
 <tr>
-<td colspan="2" align="center"><em>Capability-based model routing — assign the right model to each task type</em></td>
+<td colspan="2" align="center"><em>Tracker integration and capability-based model routing</em></td>
 </tr>
 </table>
 </div>

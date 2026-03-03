@@ -45,10 +45,14 @@ interface MissionControlProps {
 export function MissionControl({ issues = [] }: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [showBeads, setShowBeads] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(340);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('mc-sidebar-width');
+    return saved ? Number(saved) : 600;
+  });
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
+  const currentWidth = useRef(sidebarWidth);
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['mission-control-projects'],
@@ -104,9 +108,13 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
       const delta = e.clientX - startX.current;
       const newWidth = Math.max(240, Math.min(600, startWidth.current + delta));
       setSidebarWidth(newWidth);
+      currentWidth.current = newWidth;
     };
 
     const handleMouseUp = () => {
+      if (isDragging.current) {
+        localStorage.setItem('mc-sidebar-width', String(currentWidth.current));
+      }
       isDragging.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
