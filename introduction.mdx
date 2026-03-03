@@ -5,139 +5,97 @@ description: 'Multi-agent orchestration for AI coding assistants'
 
 # Panopticon CLI
 
-Multi-agent orchestration for AI coding assistants.
+Spawn AI agents from a dashboard. Route tasks to the right model. Review, test, and merge automatically.
 
-> *"The Panopticon had six sides, one for each of the Founders of Gallifrey..."*
+<img src="/docs/screenshot-board.png" alt="Panopticon Kanban Board" style={{ borderRadius: '8px' }} />
 
-## Overview
+## Why Panopticon?
 
-Panopticon is a unified orchestration layer for AI coding assistants. It works with:
+- **Stop babysitting agents.** Spawn them from a dashboard, monitor progress in real time, and let specialists handle code review, testing, and merging.
+- **Use the right model for the job.** Opus for planning, Sonnet for implementation, Haiku for quick commands — automatic routing based on task type and required capabilities.
+- **Work survives across sessions.** PRDs, state files, beads, and skills persist context so agents don't start from zero every time.
+- **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI.
+
+## How It Works
+
+```
+ Issue         PRD           Agent         Review        Test          Merge
+┌──────┐    ┌──────┐    ┌──────────┐    ┌──────┐    ┌──────┐    ┌──────────┐
+│ Task │ ─► │ Plan │ ─► │ Write    │ ─► │ Code │ ─► │ Run  │ ─► │ PR       │
+│ from │    │ with │    │ code in  │    │ rev. │    │ test │    │ merged   │
+│ any  │    │ Opus │    │ isolated │    │ by   │    │ by   │    │ by       │
+│track-│    │      │    │ worktree │    │ spec-│    │ spec-│    │ spec-    │
+│ er   │    │      │    │          │    │ialist│    │ialist│    │ ialist   │
+└──────┘    └──────┘    └──────────┘    └──────┘    └──────┘    └──────────┘
+ GitHub       Opus        Kimi/Sonnet    Opus        Sonnet       Sonnet
+ Linear                   (routed)
+ GitLab
+ Jira
+ Rally
+```
+
+Create a workspace, and Panopticon handles the rest: planning with Opus, implementation with your configured model, automated code review, test execution, and merge — the only manual step is clicking **MERGE** when you're satisfied.
+
+## Key Features
+
+| Feature | Description |
+|:--------|:------------|
+| **Multi-Agent Orchestration** | Spawn and manage AI agents in tmux sessions via dashboard or CLI |
+| **Cloister Lifecycle Manager** | Automatic model routing, stuck detection, cost tracking, and specialist handoffs |
+| **Mission Control** | 11-view dashboard — project tree, activity feed, kanban board, agent status, costs, metrics, and more |
+| **PRD-Driven Workflow** | Opus writes a PRD before implementation starts; agents are blocked without one |
+| **67+ Universal Skills** | Pre-built skills ship out of the box, synced via `pan sync` — one SKILL.md works across all AI tools |
+| **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Jira, Rally — all from one dashboard |
+| **Multi-Model Routing** | Anthropic, OpenAI, Google, Kimi, Zhipu — route by task type, capability, and budget |
+| **Workspaces** | Git worktree-based feature branches with Docker isolation (local and remote via exe.dev) |
+| **Convoys** | Run parallel agents on related issues with automatic synthesis |
+| **Specialists** | Dedicated review, test, and merge agents — fully automated quality pipeline |
+| **Beads** | Git-backed task tracking that survives context compaction and works offline |
+| **Cost Tracking** | Per-issue, per-stage token costs with dashboard analytics |
+| **Legacy Codebase Support** | AI self-monitoring skills that learn your codebase conventions over time |
+
+## Supported Tools
 
 | Tool | Support |
-|------|---------|
-| **Claude Code** | Full support |
+|:-----|:--------|
+| **Claude Code** | Full support — agent runtime, hooks, skills |
 | **Codex** | Skills sync |
 | **Cursor** | Skills sync |
 | **Gemini CLI** | Skills sync |
 | **Google Antigravity** | Skills sync |
 
-### Features
+## Dashboard Views
 
-- **Multi-agent orchestration** - Spawn and manage multiple AI agents in tmux sessions
-- **Cloister AI Lifecycle Manager** - Automatic model routing, stuck detection, and specialist handoffs
-- **Universal skills** - One SKILL.md format works across all supported tools
-- **Heartbeat Hooks** - Real-time agent activity monitoring via Claude Code hooks
-- **Multi-project support** - YAML-based project registry with label-based issue routing
-- **Health Monitoring** - Deacon-style stuck detection with auto-recovery
-- **Context Engineering** - Structured state management (STATE.md, WORKSPACE.md)
-- **Agent CVs** - Work history tracking for capability-based routing
-- **Google Stitch Integration** - AI-powered UI design with automatic design-to-code workflows
+The dashboard at `https://pan.localhost` provides 11 views:
+
+| View | Purpose |
+|------|---------|
+| **Mission Control** | Project tree + activity timeline — see the full pipeline for any feature |
+| **Board** | Kanban board with cost badges, agent status, and workspace controls |
+| **Agents** | Cloister Deacon, specialist agents, and issue agents with token/cost tracking |
+| **Convoys** | Parallel agent runs with synthesis status |
+| **Handoffs** | Specialist handoff queue and history |
+| **Activity** | Real-time agent command output log |
+| **Metrics** | Runtime comparison and performance analytics |
+| **Costs** | Per-issue, per-stage cost breakdown with daily totals |
+| **Skills** | All available skills with descriptions and sync status |
+| **Health** | System health checks and diagnostics |
+| **Settings** | Model routing, tracker API keys, and project configuration |
+
+<img src="/docs/dashboard-overview.png" alt="Mission Control" style={{ borderRadius: '8px' }} />
 
 ## Quick Start
 
 ```bash
-# Install Panopticon
-npm install -g panopticon-cli
-
-# Install prerequisites and setup
-pan install
-
-# Start the dashboard
-pan up
+npm install -g panopticon-cli && pan install && pan sync && pan up
 ```
 
-Visit [localhost:3010](http://localhost:3010) to see your dashboard.
-
-## Dashboard
-
-Start the dashboard with:
-
-```bash
-pan up
-```
-
-The dashboard provides a comprehensive interface for managing AI agents and workspaces.
-
-### Dashboard Tabs
-
-| Tab | Purpose |
-|-----|---------|
-| **Board** | Kanban view of Linear issues with drag-and-drop status changes |
-| **Agents** | Running agent sessions with terminal output |
-| **Activity** | Real-time `pan` command output log |
-| **Metrics** | Runtime comparison and cost tracking |
-| **Skills** | Available skills and their descriptions |
-| **Health** | System health checks and diagnostics |
-
-### Issue Filtering
-
-The dashboard automatically filters issues to reduce visual clutter:
-
-- **Linear issues** - Shows current cycle issues only
-- **Done column** - Shows items completed in the last 24 hours
-- **Canceled column** - Shows items canceled in the last 24 hours
-
-This filtering applies to both Linear and GitHub issues. Older completed items are excluded from the dashboard but remain in your issue tracker.
-
-### Issue Cards
-
-Issue cards on the Kanban board display:
-
-- **Cost badges** - Color-coded by amount ($0-5 green, $5-20 yellow, $20+ red)
-- **Container status** - Shows if workspace has Docker containers (running/stopped)
-- **Agent status** - Indicates if an agent is currently working on the issue
-- **Workspace status** - Shows if workspace exists, is corrupted, or needs creation
-
-### Workspace Actions
-
-Click an issue card to open the workspace detail panel:
-
-| Button | Action |
-|--------|--------|
-| **Create Workspace** | Creates git worktree for the issue |
-| **Containerize** | Adds Docker containers to an existing workspace |
-| **Start Containers** | Starts stopped Docker containers |
-| **Start Planning** | Opens interactive planning session with AI |
-| **Start Agent** | Spawns autonomous agent in tmux |
-| **Approve & Merge** | Triggers merge-agent to handle PR merge |
-
-### Interactive Planning
-
-The planning dialog provides a real-time terminal for collaborative planning:
-
-- **Discovery questions** - AI asks clarifying questions before implementation
-- **Codebase exploration** - AI reads files and understands patterns
-- **Pull/Push buttons** - Git operations to share planning context with teammates
-- **AskUserQuestion rendering** - Questions from the AI appear as interactive prompts
-
-### Metrics & Cost Tracking
-
-The **Metrics** tab provides insights into AI agent performance and costs:
-
-- **Per-issue cost badges** - See costs directly on Kanban cards (color-coded by amount)
-- **Issue cost breakdown** - Click an issue to see detailed costs by model and session
-- **Runtime comparison** - Compare success rates, duration, and costs across runtimes (Claude, Codex, etc.)
-- **Capability analysis** - See how different task types (feature, bugfix, refactor) perform
-
-Cost data is stored in `~/.panopticon/`:
-- `session-map.json` - Links Claude Code sessions to issues
-- `runtime-metrics.json` - Aggregated runtime performance data
-- `costs/` - Raw cost logs
-
-**API Endpoints:**
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/costs/summary` | Overall cost summary (today/week/month) |
-| `GET /api/costs/by-issue` | Costs grouped by issue |
-| `GET /api/issues/:id/costs` | Cost details for a specific issue |
-| `GET /api/metrics/runtimes` | Runtime comparison metrics |
-| `GET /api/metrics/tasks` | Recent task history |
+Dashboard runs at `https://pan.localhost` (or `http://localhost:3011` if you skip HTTPS setup).
 
 ## Learn More
 
 - [Quick Start Guide](/quickstart) - Installation and setup
 - [Core Concepts](/concepts) - Understanding Panopticon's architecture
 - [CLI Commands](/cli/overview) - All available commands
-- [Features](/features/cloister) - Deep dive into key features
+- [Features](/features/mission-control) - Deep dive into key features
 - [Guides](/guides/legacy-codebases) - Step-by-step guides
