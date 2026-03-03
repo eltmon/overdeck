@@ -15,7 +15,7 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-      "url": "https://github.com/eltmon/panopticon"
+      "url": "https://github.com/eltmon/panopticon-cli"
     }
   ],
   "topbarCtaButton": {
@@ -84,7 +84,7 @@
     ]
   },
   "footerSocials": {
-    "github": "https://github.com/eltmon/panopticon"
+    "github": "https://github.com/eltmon/panopticon-cli"
   },
   "feedback": {
     "thumbsRating": true,
