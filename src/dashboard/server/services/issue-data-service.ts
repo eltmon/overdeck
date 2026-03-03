@@ -23,7 +23,7 @@ import { loadReviewStatuses } from '../../../lib/review-status.js';
  * Map a raw status string to its canonical state.
  * Exported for testing.
  */
-export function getCanonicalStatus(status: string | undefined): string {
+export function getCanonicalStatus(status: string | undefined, stateType?: string): string {
   if (!status) return 'backlog';
   const normalized = status.toLowerCase();
   // Direct backlog mappings
@@ -34,7 +34,7 @@ export function getCanonicalStatus(status: string | undefined): string {
   if (normalized === 'todo' || normalized === 'to do' || normalized === 'ready' || normalized === 'unstarted') {
     return 'todo';
   }
-  if (normalized === 'in progress' || normalized === 'started' || normalized === 'active') {
+  if (normalized === 'in progress' || normalized === 'started' || normalized === 'active' || normalized === 'in planning') {
     return 'in_progress';
   }
   if (normalized === 'in review' || normalized === 'review' || normalized === 'qa' || normalized === 'testing') {
@@ -45,6 +45,18 @@ export function getCanonicalStatus(status: string | undefined): string {
   }
   if (normalized === 'canceled' || normalized === 'cancelled' || normalized === 'duplicate' || normalized === "won't do" || normalized === 'wontfix') {
     return 'canceled';
+  }
+  // Fallback: use Linear stateType if available (handles custom status names)
+  if (stateType) {
+    const typeMap: Record<string, string> = {
+      backlog: 'backlog',
+      unstarted: 'todo',
+      started: 'in_progress',
+      completed: 'done',
+      canceled: 'canceled',
+      cancelled: 'canceled',
+    };
+    if (typeMap[stateType]) return typeMap[stateType];
   }
   return 'backlog'; // Default fallback
 }
@@ -217,13 +229,13 @@ export class IssueDataService {
     if (cycle === 'current') {
       // Current cycle: exclude Backlog items (including Triage, Unknown), only show active cycle work
       allIssues = allIssues.filter(issue => {
-        const canonical = getCanonicalStatus(issue.status);
+        const canonical = getCanonicalStatus(issue.status, issue.stateType);
         return canonical !== 'backlog';
       });
     } else if (cycle === 'backlog') {
       // Backlog view: only show Backlog items (including Triage, Unknown)
       allIssues = allIssues.filter(issue => {
-        const canonical = getCanonicalStatus(issue.status);
+        const canonical = getCanonicalStatus(issue.status, issue.stateType);
         return canonical === 'backlog';
       });
     }

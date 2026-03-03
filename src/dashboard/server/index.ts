@@ -2121,6 +2121,7 @@ app.delete('/api/agents/:id', async (req, res) => {
 
   try {
     stopAgent(id);
+    socketIo.emit('agents:changed', { event: 'stopped', agentId: id });
     res.json({ success: true });
   } catch (error) {
     console.error('Error stopping agent:', error);
@@ -6292,6 +6293,71 @@ app.post('/api/workspaces/:issueId/refresh-db', async (req, res) => {
   }
 });
 
+/**
+ * Immediately process next queued item for a specialist (don't wait for deacon patrol).
+ * Validates items before waking — skips already-handled or merged items.
+ *
+ * @param specialistName - e.g. 'review-agent' or 'test-agent'
+ * @param isStale - optional predicate to skip stale items beyond the default merged check
+ * @param onWake - optional callback after successful wake (e.g. to set testStatus)
+ */
+async function processSpecialistQueueImmediate(
+  specialistName: string,
+  isStale?: (taskStatus: ReviewStatus | null) => boolean,
+  onWake?: (issueId: string) => void,
+): Promise<void> {
+  try {
+    const { checkSpecialistQueue: checkQueue, wakeSpecialistWithTask, completeSpecialistTask: completeTask, getTmuxSessionName } = await import('../../lib/cloister/specialists.js');
+
+    // Only process if specialist is idle
+    const session = getTmuxSessionName(specialistName);
+    const state = getAgentRuntimeState(session);
+    if (state?.state && state.state !== 'idle' && state.state !== 'suspended') return;
+
+    const queue = checkQueue(specialistName);
+    if (!queue.hasWork) return;
+
+    for (const task of queue.items) {
+      const taskIssueId = task.payload?.issueId;
+      if (!taskIssueId) {
+        completeTask(specialistName, task.id);
+        console.log(`[pipeline] Removed ${specialistName} queue item with no issueId`);
+        continue;
+      }
+
+      const taskStatus = getReviewStatus(taskIssueId);
+      if (taskStatus?.mergeStatus === 'merged') {
+        completeTask(specialistName, task.id);
+        console.log(`[pipeline] Skipping stale ${specialistName} queue item: ${taskIssueId} (already merged)`);
+        continue;
+      }
+      if (isStale && isStale(taskStatus)) {
+        completeTask(specialistName, task.id);
+        console.log(`[pipeline] Skipping stale ${specialistName} queue item: ${taskIssueId}`);
+        continue;
+      }
+
+      console.log(`[pipeline] Immediately waking ${specialistName} for next queued task: ${taskIssueId}`);
+      const taskDetails = {
+        issueId: taskIssueId,
+        branch: task.payload.context?.branch,
+        workspace: task.payload.context?.workspace,
+      };
+      const wakeResult = await wakeSpecialistWithTask(specialistName, taskDetails);
+      if (wakeResult.success) {
+        completeTask(specialistName, task.id);
+        if (onWake) onWake(taskIssueId);
+        console.log(`[pipeline] ${specialistName} woken for ${taskIssueId}`);
+      } else {
+        console.error(`[pipeline] Failed to wake ${specialistName} for next task: ${wakeResult.error}`);
+      }
+      break;
+    }
+  } catch (err) {
+    console.error(`[pipeline] Error processing ${specialistName} queue:`, err);
+  }
+}
+
 // Get review status for a workspace
 app.get('/api/workspaces/:issueId/review-status', (req, res) => {
   const { issueId } = req.params;
@@ -6407,59 +6473,23 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
       } catch (err) {
         console.error(`[review-status] Failed to auto-queue test-agent for ${issueId}:`, err);
       }
+
+      // Notify work agent that review passed — prevents polling
+      try {
+        const agentId = `agent-${issueId.toLowerCase()}`;
+        await messageAgent(agentId, `REVIEW PASSED for ${issueId}. Tests have been queued automatically. Do NOT poll or check status — you will be notified when tests complete.`);
+        console.log(`[review-status] Notified ${agentId} that review passed`);
+      } catch (err) {
+        // Agent may not be running — that's fine
+        console.log(`[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`);
+      }
     }
 
     // Immediately process next queued item (don't wait for deacon patrol)
-    // Validate items before waking - skip already-reviewed or merged items
-    const remainingQueue = checkSpecialistQueue('review-agent');
-    if (remainingQueue.hasWork) {
-      const { getNextSpecialistTask, wakeSpecialistWithTask, completeSpecialistTask: completeTask } = await import('../../lib/cloister/specialists.js');
-
-      // Find next VALID task (skip stale items)
-      let validTask = null;
-      for (const task of remainingQueue.items) {
-        const taskIssueId = task.payload?.issueId;
-        if (!taskIssueId) {
-          completeTask('review-agent', task.id);
-          console.log(`[review-status] Removed queue item with no issueId`);
-          continue;
-        }
-
-        // Skip if already reviewed or merged
-        const taskStatus = getReviewStatus(taskIssueId);
-        if (taskStatus?.reviewStatus === 'passed') {
-          completeTask('review-agent', task.id);
-          console.log(`[review-status] Skipping stale queue item: ${taskIssueId} (already reviewed)`);
-          continue;
-        }
-        if (taskStatus?.mergeStatus === 'merged') {
-          completeTask('review-agent', task.id);
-          console.log(`[review-status] Skipping stale queue item: ${taskIssueId} (already merged)`);
-          continue;
-        }
-
-        validTask = task;
-        break;
-      }
-
-      if (validTask) {
-        console.log(`[review-status] Immediately waking review-agent for next queued task: ${validTask.payload.issueId}`);
-        const taskDetails = {
-          issueId: validTask.payload.issueId || '',
-          branch: validTask.payload.context?.branch,
-          workspace: validTask.payload.context?.workspace,
-        };
-        const wakeResult = await wakeSpecialistWithTask('review-agent', taskDetails);
-        if (wakeResult.success) {
-          completeTask('review-agent', validTask.id);
-          console.log(`[review-status] Review-agent woken for ${validTask.payload.issueId}`);
-        } else {
-          console.error(`[review-status] Failed to wake review-agent for next task: ${wakeResult.error}`);
-        }
-      } else {
-        console.log(`[review-status] No valid items remaining in review-agent queue`);
-      }
-    }
+    await processSpecialistQueueImmediate(
+      'review-agent',
+      (s) => s?.reviewStatus === 'passed',
+    );
   }
 
   if (testStatus && ['passed', 'failed', 'skipped'].includes(testStatus)) {
@@ -6507,56 +6537,23 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
       }
     }
 
-    // Immediately process next queued item for test-agent
-    // Validate items before waking - skip already-tested or merged items
-    const remainingTestQueue = checkSpecialistQueue('test-agent');
-    if (remainingTestQueue.hasWork) {
-      const { getNextSpecialistTask, wakeSpecialistWithTask, completeSpecialistTask: completeTask } = await import('../../lib/cloister/specialists.js');
-
-      // Find next VALID task (skip stale items)
-      let validTestTask = null;
-      for (const task of remainingTestQueue.items) {
-        const taskIssueId = task.payload?.issueId;
-        if (!taskIssueId) {
-          completeTask('test-agent', task.id);
-          continue;
-        }
-
-        const taskStatus = getReviewStatus(taskIssueId);
-        if (taskStatus?.testStatus === 'passed') {
-          completeTask('test-agent', task.id);
-          console.log(`[review-status] Skipping stale test queue item: ${taskIssueId} (already tested)`);
-          continue;
-        }
-        if (taskStatus?.mergeStatus === 'merged') {
-          completeTask('test-agent', task.id);
-          console.log(`[review-status] Skipping stale test queue item: ${taskIssueId} (already merged)`);
-          continue;
-        }
-
-        validTestTask = task;
-        break;
-      }
-
-      if (validTestTask) {
-        console.log(`[review-status] Immediately waking test-agent for next queued task: ${validTestTask.payload.issueId}`);
-        const taskDetails = {
-          issueId: validTestTask.payload.issueId || '',
-          branch: validTestTask.payload.context?.branch,
-          workspace: validTestTask.payload.context?.workspace,
-        };
-        const wakeResult = await wakeSpecialistWithTask('test-agent', taskDetails);
-        if (wakeResult.success) {
-          completeTask('test-agent', validTestTask.id);
-          setReviewStatus(validTestTask.payload.issueId, { testStatus: 'testing' });
-          console.log(`[review-status] Test-agent woken for ${validTestTask.payload.issueId}`);
-        } else {
-          console.error(`[review-status] Failed to wake test-agent for next task: ${wakeResult.error}`);
-        }
-      } else {
-        console.log(`[review-status] No valid items remaining in test-agent queue`);
+    // Notify work agent when tests pass — work is complete, no more action needed
+    if (testStatus === 'passed') {
+      try {
+        const agentId = `agent-${issueId.toLowerCase()}`;
+        await messageAgent(agentId, `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete — ready for merge. You may stop working on this issue.`);
+        console.log(`[review-status] Notified ${agentId} that all checks passed`);
+      } catch (err) {
+        console.log(`[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`);
       }
     }
+
+    // Immediately process next queued item for test-agent
+    await processSpecialistQueueImmediate(
+      'test-agent',
+      (s) => s?.testStatus === 'passed',
+      (issueId) => setReviewStatus(issueId, { testStatus: 'testing' }),
+    );
   }
 
   res.json(status);
@@ -6963,6 +6960,62 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
       success: false,
       error: error.message,
       autoRequeueCount: newCount,
+    });
+  }
+});
+
+// Human-initiated pipeline state reset — clears all specialist states, resets circuit breaker,
+// removes from all queues. Does NOT auto-trigger review — the agent or user must explicitly
+// request review (via `pan work done` or `pan work request-review`) when ready.
+app.post('/api/workspaces/:issueId/reset-review', async (req, res) => {
+  const { issueId } = req.params;
+
+  // 1. Validate workspace exists
+  const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+  if (!workspaceInfo.exists) {
+    return res.status(400).json({ success: false, error: 'Workspace does not exist' });
+  }
+
+  console.log(`[reset-review] Human-initiated pipeline reset for ${issueId}`);
+
+  try {
+    // 2. Remove from all specialist queues
+    const { checkSpecialistQueue, completeSpecialistTask } =
+      await import('../../lib/cloister/specialists.js');
+
+    for (const specialist of ['review-agent', 'test-agent', 'merge-agent']) {
+      const queue = checkSpecialistQueue(specialist);
+      for (const item of queue.items) {
+        if (item.payload?.issueId?.toUpperCase() === issueId.toUpperCase()) {
+          completeSpecialistTask(specialist, item.id);
+          console.log(`[reset-review] Removed ${issueId} from ${specialist} queue`);
+        }
+      }
+    }
+
+    // 3. Reset all specialist states + circuit breaker
+    setReviewStatus(issueId, {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      reviewNotes: undefined,
+      testNotes: undefined,
+      mergeNotes: undefined,
+      readyForMerge: false,
+      autoRequeueCount: 0,
+    });
+
+    console.log(`[reset-review] Pipeline state reset for ${issueId} — awaiting agent to request review`);
+
+    return res.json({
+      success: true,
+      message: `Review cycles reset for ${issueId}. Agent can now request review when ready.`,
+    });
+  } catch (error: any) {
+    console.error(`[reset-review] Error:`, error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });
@@ -7894,6 +7947,7 @@ app.post('/api/agents', async (req, res) => {
       });
 
       console.log(`[start-agent] Remote agent spawned for ${issueId}: ${state.id}`);
+      socketIo.emit('agents:changed', { event: 'started', agentId: state.id, issueId });
 
       // Update issue status (GitHub/Linear) - same logic as local
       const apiKey = getLinearApiKey();
@@ -7952,6 +8006,7 @@ app.post('/api/agents', async (req, res) => {
         projectPath
       );
       console.log(`[start-agent] Agent spawned for ${issueId} (containers ready: ${containersOk})`);
+      socketIo.emit('agents:changed', { event: 'started', issueId });
 
       // Update issue status to "In Progress"
       const apiKey = getLinearApiKey();
@@ -8742,7 +8797,13 @@ ${repos.map(r => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join('\n')}
 `;
       }
 
-      const planningPrompt = `# Planning Session: ${issue.identifier}
+      const planningPrompt = `<!-- panopticon:orchestration-context-start -->
+<!-- This is Panopticon orchestration context injected automatically.
+     It contains planning session setup instructions, not agent reasoning.
+     Session summarizers should SKIP this block and focus on the agent's
+     actual work, decisions, and tradeoffs that follow. -->
+
+# Planning Session: ${issue.identifier}
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -8826,6 +8887,8 @@ When discovery is complete:
 **Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
 
 Start by exploring the codebase to understand the context, then begin the discovery conversation.
+
+<!-- panopticon:orchestration-context-end -->
 `;
 
       // Get planning agent model from settings
@@ -13811,6 +13874,25 @@ server.listen(PORT, '0.0.0.0', async () => {
     }
   } catch (error: any) {
     console.error('Failed to auto-start Cloister:', error.message);
+  }
+
+  // Wire pipeline event handler — bridges library state mutations to Socket.io push
+  try {
+    const { setPipelineHandler } = await import('../../lib/pipeline-notifier.js');
+    setPipelineHandler((event) => {
+      if (event.type === 'status_changed') {
+        socketIo.emit('pipeline:status', event.status);
+      }
+      if (event.type === 'task_queued') {
+        // Immediate queue processing — don't wait for deacon patrol
+        processSpecialistQueueImmediate(event.specialist).catch((err) => {
+          console.error(`[pipeline] Failed to process ${event.specialist} queue:`, err);
+        });
+      }
+    });
+    console.log('Pipeline event handler wired (Socket.io push + immediate queue processing)');
+  } catch (error: any) {
+    console.error('Failed to wire pipeline handler:', error.message);
   }
 
   // One-time dedup of historical cost events on startup (PAN-238)

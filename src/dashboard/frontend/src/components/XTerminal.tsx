@@ -401,12 +401,17 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     ws.onclose = (event) => {
       console.log('XTerminal: WebSocket closed', event.code, event.reason);
 
-      if (!shouldReconnect || event.code === 1000) {
+      if (!shouldReconnect) {
         term!.writeln('\r\n\x1b[33m● Session disconnected\x1b[0m');
         onDisconnectRef.current?.();
         return;
       }
 
+      // Always attempt reconnection when shouldReconnect is true, even for
+      // code 1000 (normal close). The server sends 1000 when the PTY exits,
+      // which can happen if the tmux session is killed and recreated during
+      // workspace setup retries. The session may be alive again by the time
+      // we reconnect.
       if (reconnectAttempts.current < maxReconnectAttempts) {
         const delay = getReconnectDelay(reconnectAttempts.current);
         reconnectAttempts.current += 1;

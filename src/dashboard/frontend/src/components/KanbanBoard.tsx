@@ -17,7 +17,7 @@ import {
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core';
-import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
+import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, STATE_TYPE_TO_CANONICAL, CanonicalState } from '../types';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -186,7 +186,7 @@ function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<
                issue.derivedStatus === 'in_progress' ? 'in_progress' :
                STATUS_LABELS[issue.status] || 'backlog';
     } else {
-      status = STATUS_LABELS[issue.status] || 'backlog';
+      status = STATUS_LABELS[issue.status] || (issue.stateType ? STATE_TYPE_TO_CANONICAL[issue.stateType] : undefined) || 'backlog';
     }
     // Handle 'canceled' by putting in done
     if (status === 'canceled') {

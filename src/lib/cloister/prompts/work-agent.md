@@ -125,6 +125,9 @@ The planning agent created UI designs using Google Stitch. Use these assets:
 Specialist agents have left feedback that you MUST address:
 
 {{PENDING_FEEDBACK}}
+
+**After addressing ALL feedback:** commit, push, and run `pan work done {{ISSUE_ID}} -c "Addressed review feedback: <summary>"`.
+This re-submits for review automatically. Do NOT poll specialist APIs or wait for results — the pipeline is event-driven.
 {{/if}}
 
 {{#if NEW_TRACKER_CONTEXT}}
@@ -145,15 +148,10 @@ Specialist agents have left feedback that you MUST address:
 2. Check the "Specialist Feedback" section — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
 3. If remaining work says "None" or "Implementation complete" AND no unaddressed feedback → work is DONE
 {{#env LOCAL}}
-3. If done, check if a specialist is already processing this issue:
-   ```bash
-   curl -s {{API_URL}}/api/specialists | jq .
-   ```
-4. If NO specialist is working on this issue, signal completion immediately:
+3. If done, signal completion immediately:
    ```bash
    pan work done {{ISSUE_ID}} -c "Work already complete from previous session"
    ```
-5. If a specialist IS working on it, exit gracefully - do NOT interfere
 {{/env}}
 {{#env REMOTE}}
 3. If done, commit and push any remaining changes, then stop.
@@ -193,6 +191,8 @@ but STATE.md provides the narrative context and current state that beads alone c
 - Defer work to "future PRs" or "follow-up issues"
 - Say "remaining work documented for later"
 - Declare infrastructure "complete" when tests still fail
+- Poll or `curl` the specialist API in a loop — the pipeline is event-driven, not polling-based
+- Use `sleep` to wait for reviews, tests, or any external process
 {{#env REMOTE}}
 - Stop after completing a subset of tasks to ask "what should I do next?" — just continue to the next task
 - If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed

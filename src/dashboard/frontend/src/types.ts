@@ -13,6 +13,7 @@ export interface Issue {
   title: string;
   description?: string;
   status: string;
+  stateType?: string;  // Linear state type (backlog, unstarted, started, completed, canceled)
   priority: number;
   assignee?: {
     name: string;
@@ -117,6 +118,7 @@ export const STATUS_LABELS: Record<string, CanonicalState> = {
 
   // In Progress states
   'In Progress': 'in_progress',
+  'In Planning': 'in_progress',
   'Started': 'in_progress',
   'Active': 'in_progress',
 
@@ -149,6 +151,16 @@ export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
   in_review: 'started',
   done: 'completed',
   canceled: 'canceled',
+};
+
+// Reverse map: Linear stateType → canonical state (fallback for custom status names)
+export const STATE_TYPE_TO_CANONICAL: Record<string, CanonicalState> = {
+  backlog: 'backlog',
+  unstarted: 'todo',
+  started: 'in_progress',
+  completed: 'done',
+  canceled: 'canceled',
+  cancelled: 'canceled',
 };
 
 // Panopticon's virtual state tracking

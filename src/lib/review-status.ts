@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { notifyPipeline } from './pipeline-notifier.js';
 
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge';
@@ -93,6 +94,8 @@ export function setReviewStatus(
 
   statuses[issueId] = updated;
   saveReviewStatuses(statuses, filePath);
+
+  notifyPipeline({ type: 'status_changed', issueId, status: updated });
 
   return updated;
 }
