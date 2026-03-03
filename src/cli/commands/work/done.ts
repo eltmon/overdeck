@@ -1,18 +1,23 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { saveAgentRuntimeState } from '../../../lib/agents.js';
-import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
+import { existsSync, writeFileSync, readFileSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { AGENTS_DIR } from '../../../lib/paths.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { updateShadowState } from '../../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../../core/state-mapping.js';
 
+const execAsync = promisify(exec);
+
 interface DoneOptions {
   comment?: string;
   noLinear?: boolean;
   shadow?: boolean;
+  force?: boolean;
 }
 
 function getLinearApiKey(): string | null {
@@ -139,6 +144,88 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   // Support both "pan work done MIN-123" and "pan work done agent-min-123"
   const issueId = id.replace(/^agent-/i, '').toUpperCase();
   const agentId = `agent-${issueId.toLowerCase()}`;
+
+  // Pre-flight completion checks (unless --force)
+  if (!options.force) {
+    const { getAgentState } = await import('../../../lib/agents.js');
+    const agentState = getAgentState(agentId);
+    const workspacePath = agentState?.workspace;
+
+    if (workspacePath && existsSync(workspacePath)) {
+      const failures: string[] = [];
+
+      // Check 1: Open beads
+      try {
+        const { stdout } = await execAsync('bd list --status open --limit 0 --json', { cwd: workspacePath });
+        const beads = JSON.parse(stdout);
+        if (Array.isArray(beads) && beads.length > 0) {
+          failures.push(`  Open beads (${beads.length}):`);
+          for (const bead of beads) {
+            const id = bead.id || bead.beadId || '?';
+            const task = bead.task || bead.subject || bead.title || 'untitled';
+            failures.push(`    - ${id} ${task}`);
+          }
+        }
+      } catch {
+        // beads CLI not installed or not a beads workspace — skip check
+      }
+
+      // Check 2: Uncommitted changes
+      // Detect polyrepo (subdirs with .git) vs monorepo (top-level .git)
+      const hasTopLevelGit = existsSync(join(workspacePath, '.git'));
+
+      if (hasTopLevelGit) {
+        // Monorepo — single git status check
+        try {
+          const { stdout } = await execAsync('git status --porcelain', { cwd: workspacePath });
+          if (stdout.trim()) {
+            failures.push('  Uncommitted changes:');
+            for (const line of stdout.trim().split('\n')) {
+              failures.push(`    ${line}`);
+            }
+          }
+        } catch {
+          // git not available or not a repo — skip
+        }
+      } else {
+        // Polyrepo — check each subdir that has a .git file/dir
+        try {
+          const entries = readdirSync(workspacePath, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+            const subPath = join(workspacePath, entry.name);
+            if (!existsSync(join(subPath, '.git'))) continue;
+
+            try {
+              const { stdout } = await execAsync('git status --porcelain', { cwd: subPath });
+              if (stdout.trim()) {
+                failures.push(`  Uncommitted changes in ${entry.name}/:`);
+                for (const line of stdout.trim().split('\n')) {
+                  failures.push(`    ${line}`);
+                }
+              }
+            } catch {
+              // skip this sub-repo
+            }
+          }
+        } catch {
+          // can't read workspace dir — skip
+        }
+      }
+
+      if (failures.length > 0) {
+        console.error(chalk.red(`\n✖ Work completion checks failed for ${issueId}:\n`));
+        for (const line of failures) {
+          console.error(line);
+        }
+        console.error('');
+        console.error(chalk.dim(`  Fix these issues, then run 'pan work done ${issueId}' again.`));
+        console.error(chalk.dim('  Use --force to skip checks.'));
+        console.error('');
+        process.exit(1);
+      }
+    }
+  }
 
   const spinner = ora('Marking work as done...').start();
 

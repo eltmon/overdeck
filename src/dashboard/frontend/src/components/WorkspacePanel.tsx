@@ -30,6 +30,7 @@ import {
   Calendar,
   FileText,
   ListTodo,
+  RotateCcw,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Agent, Issue } from '../types';
@@ -313,7 +314,7 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
       if (!res.ok) throw new Error('Failed to fetch review status');
       return res.json();
     },
-    refetchInterval: 3000, // Check frequently during review
+    refetchInterval: 30000, // Safety net — real-time updates come via Socket.io pipeline:status
   });
 
   // Fetch PRD content
@@ -543,6 +544,25 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     },
   });
 
+  const resetReviewMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/reset-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reset review cycles');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
+      queryClient.invalidateQueries({ queryKey: ['issues'] });
+    },
+  });
+
   // Dismiss pending operation error state
   const dismissPendingMutation = useMutation({
     mutationFn: async () => {
@@ -661,6 +681,16 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
     // prompt returns null if cancelled
     if (reason === null) return;
     reopenMutation.mutate(reason || undefined);
+  };
+
+  const handleResetReview = async () => {
+    if (await confirm({
+      title: 'Reset Review Cycles',
+      message: `Reset all review/test/merge cycles for ${issueId}?\n\nThis will:\n- Clear review, test, and merge status\n- Reset the circuit breaker counter\n- Remove queued specialist tasks\n\nThe agent can then request review when ready.\nTracker status will NOT change.`,
+      confirmLabel: 'Reset Cycles',
+    })) {
+      resetReviewMutation.mutate();
+    }
   };
 
   const sendMutation = useMutation({
@@ -1404,6 +1434,25 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                   <RefreshCw className="w-3 h-3" />
                 )}
                 {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
+              </button>
+            )}
+
+            {/* Reset Review Cycles - available when any specialist has run */}
+            {reviewStatus && (
+              reviewStatus.reviewStatus !== 'pending' ||
+              reviewStatus.testStatus !== 'pending'
+            ) && (
+              <button
+                onClick={handleResetReview}
+                disabled={resetReviewMutation.isPending}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-900/30 text-amber-400 rounded hover:bg-amber-900/50 disabled:opacity-50"
+              >
+                {resetReviewMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3 h-3" />
+                )}
+                {resetReviewMutation.isPending ? 'Resetting...' : 'Reset Reviews'}
               </button>
             )}
 

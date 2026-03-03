@@ -16,6 +16,7 @@ import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
 import { reopenCommand } from './reopen.js';
 import { requestReviewCommand } from './request-review.js';
+import { resetReviewCommand } from './reset-review.js';
 import { wipeCommand } from './wipe.js';
 import { shadowCommand } from './shadow.js';
 import { syncCommand } from './sync.js';
@@ -78,6 +79,7 @@ export function registerWorkCommands(program: Command): void {
     .description('Mark work complete, update Linear to In Review')
     .option('-c, --comment <text>', 'Completion comment for Linear')
     .option('--no-linear', 'Skip Linear status update')
+    .option('--force', 'Skip pre-flight completion checks (open beads, uncommitted changes)')
     .option('--shadow', 'Enable shadow mode (track status locally, don\'t update tracker)')
     .option('--no-shadow', 'Disable shadow mode (override config/env settings)')
     .action(doneCommand);
@@ -166,6 +168,11 @@ export function registerWorkCommands(program: Command): void {
     .description('Request re-review after fixing feedback (max 3 auto-requeues)')
     .option('-m, --message <text>', 'Message for reviewers describing fixes')
     .action(requestReviewCommand);
+
+  work
+    .command('reset-review <id>')
+    .description('Reset all review/test/merge cycles and re-trigger pipeline (human override, no circuit breaker)')
+    .action(resetReviewCommand);
 
   work
     .command('wipe <id>')

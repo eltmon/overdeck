@@ -71,7 +71,7 @@ const DEFAULT_CONFIG: DeaconConfig = {
   pingTimeoutMs: 30_000,           // How long to wait for response
   consecutiveFailures: 3,          // Failures before force-kill
   cooldownMs: 5 * 60_000,          // 5 minutes between force-kills
-  patrolIntervalMs: 30_000,        // Check every 30 seconds
+  patrolIntervalMs: 60_000,        // Safety net — immediate processing happens via pipeline events
   massDeathThreshold: 2,           // Deaths within window triggers alert
   massDeathWindowMs: 60_000,       // 1 minute window for mass death detection
 };

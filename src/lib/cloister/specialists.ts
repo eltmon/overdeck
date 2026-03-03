@@ -18,6 +18,7 @@ import { loadSettings, type ModelId } from '../settings.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth } from '../providers.js';
 import { sendKeysAsync } from '../tmux.js';
+import { notifyPipeline } from '../pipeline-notifier.js';
 
 const execAsync = promisify(exec);
 
@@ -2158,6 +2159,8 @@ export function submitToSpecialistQueue(
   };
 
   const queueItem = pushToHook(specialistName, item);
+
+  notifyPipeline({ type: 'task_queued', specialist: specialistName, issueId: task.issueId });
 
   // Log specialist handoff event
   const handoffEvent = createSpecialistHandoff(

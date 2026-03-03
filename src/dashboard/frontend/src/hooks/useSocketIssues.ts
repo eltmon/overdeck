@@ -46,6 +46,18 @@ export function useSocketIssues(): void {
     // Incremental update (after changes detected by server)
     socket.on('issues:updated', updateIssueQueries);
 
+    // Agent lifecycle events — invalidate agents query for immediate UI updates
+    socket.on('agents:changed', () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    });
+
+    // Pipeline status — real-time review/test/merge status pushed from server
+    socket.on('pipeline:status', (status: any) => {
+      if (status?.issueId) {
+        queryClient.setQueryData(['review-status', status.issueId], status);
+      }
+    });
+
     // Tab visibility: request snapshot on re-focus
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && socket.connected) {

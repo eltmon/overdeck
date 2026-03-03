@@ -47,7 +47,7 @@ type Step = 'checking' | 'ready' | 'starting' | 'planning' | 'complete' | 'error
 // Default for startDocker - can be overridden by localStorage
 const getDefaultStartDocker = (): boolean => {
   const stored = localStorage.getItem('panopticon.planning.startDocker');
-  return stored !== null ? stored === 'true' : true; // Default to true
+  return stored !== null ? stored === 'true' : false; // Default to false — planning agents don't need Docker
 };
 
 // Default for workspace location - can be overridden by localStorage
