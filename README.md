@@ -9,6 +9,10 @@
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/panopticon-cli/pulls)
 
+> *"The Panopticon had six sides, one for each of the Founders of Gallifrey..."*
+>
+> — Classic Doctor Who. The Panopticon was the great hall at the heart of the Time Lord Citadel, where all could be observed. We liked the metaphor.
+
 Spawn AI agents from a dashboard. Route tasks to the right model. Review, test, and merge automatically.
 
 <img src="docs/screenshot-board.png" alt="Panopticon Kanban Board" width="800" />
