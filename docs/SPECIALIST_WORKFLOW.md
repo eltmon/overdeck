@@ -83,6 +83,18 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 4. Work agent reads .planning/STATE.md and implements remaining work
 ```
 
+### Handling Pre-Existing PRDs
+
+A PRD may already exist in `docs/prds/active/` or `docs/prds/drafts/` before the planning agent runs — e.g., written manually or by a previous session. The planning agent handles three cases:
+
+1. **PRD with `<task>` XML tags** (execution-ready): Skip discovery. Use existing tasks directly to create `.planning/STATE.md`, beads, and `config.json`.
+
+2. **Prose PRD** (architecture decisions, requirements, no `<task>` tags): Use as foundation — do NOT redo decisions already made. Run abbreviated discovery to fill gaps, then convert prose into executable `<task>` XML structure. The PRD provides the "what and why"; planning creates the "how and in what order."
+
+3. **No PRD**: Full discovery phase — fetch issue from tracker, ask clarifying questions, create PRD from scratch.
+
+The planning agent should always check for existing PRDs before starting discovery to avoid duplicating work or contradicting decisions already made.
+
 ### Why PLANNING_PROMPT.md Is Archived
 
 `PLANNING_PROMPT.md` contains the planning agent's instructions, including "STOP and tell the user: Planning complete." If a work agent finds and reads this file, it follows the planning instructions instead of implementing — re-running discovery and outputting "Planning complete" (PAN-250).
