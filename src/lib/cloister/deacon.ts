@@ -870,6 +870,14 @@ export async function isAgentActiveInTmux(sessionName: string): Promise<boolean>
 
     for (const pattern of ACTIVE_STATUS_PATTERNS) {
       if (pattern.test(stdout)) {
+        // "Thinking" with a duration over the threshold is NOT active — it's stuck.
+        // Don't let stuck agents masquerade as active.
+        if (/thinking/i.test(stdout)) {
+          const thinkingMs = parseThinkingDuration(stdout);
+          if (thinkingMs !== null && thinkingMs >= STUCK_THINKING_THRESHOLD_MS) {
+            return false; // Stuck, not active
+          }
+        }
         return true;
       }
     }
@@ -878,6 +886,157 @@ export async function isAgentActiveInTmux(sessionName: string): Promise<boolean>
   } catch {
     return false;
   }
+}
+
+// ============================================================================
+// Stuck Work Agent Detection
+// ============================================================================
+
+/**
+ * Thinking duration threshold before an agent is considered stuck.
+ * Claude Code shows "Thinking... (Xm Ys)" in tmux — if the duration
+ * exceeds this threshold with no tool output, the agent is stalled.
+ */
+const STUCK_THINKING_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * Cooldown between stuck-recovery attempts for the same agent.
+ * Prevents spamming Ctrl+C or respawning in a loop.
+ */
+const STUCK_RECOVERY_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Track recovery attempts per agent: agentId -> { lastAttempt, attempts }
+ */
+const stuckRecoveryState: Map<string, { lastAttempt: number; attempts: number }> = new Map();
+
+/**
+ * Parse thinking duration from tmux output.
+ * Claude Code renders: "Thinking… (Xm Ys · ...)" or "· Thinking… (Xm Ys · ...)"
+ * Returns duration in milliseconds, or null if not currently thinking.
+ */
+function parseThinkingDuration(tmuxOutput: string): number | null {
+  // Match patterns like "Thinking… (22m 41s" or "Thinking… (5s"
+  const match = tmuxOutput.match(/[Tt]hinking[^\n]*?\((?:(\d+)m\s*)?(\d+)s/);
+  if (!match) return null;
+
+  const minutes = match[1] ? parseInt(match[1], 10) : 0;
+  const seconds = parseInt(match[2], 10);
+  return (minutes * 60 + seconds) * 1000;
+}
+
+/**
+ * Check for work agents stuck in extended thinking loops.
+ *
+ * Detection: tmux shows "Thinking… (Xm Ys)" where duration > threshold.
+ * Recovery strategy (escalating):
+ *   1. First attempt: Send Escape key to try to cancel thinking
+ *   2. Second attempt: Send Ctrl+C to interrupt
+ *   3. Third attempt: Kill tmux session and respawn via launcher.sh
+ */
+export async function checkStuckWorkAgents(): Promise<string[]> {
+  const actions: string[] = [];
+  const agents = listRunningAgents();
+  const specialists = getEnabledSpecialists();
+  const specialistNames = new Set(specialists.map(s => getTmuxSessionName(s.name)));
+  const now = Date.now();
+
+  for (const agent of agents) {
+    if (!agent.tmuxActive) continue;
+
+    // Only check work agents, not specialists (specialists have their own health checks)
+    const isWorkAgent = agent.id.startsWith('agent-') && !specialistNames.has(agent.id);
+    if (!isWorkAgent) continue;
+
+    // Check cooldown
+    const recovery = stuckRecoveryState.get(agent.id);
+    if (recovery && (now - recovery.lastAttempt) < STUCK_RECOVERY_COOLDOWN_MS) {
+      continue;
+    }
+
+    // Capture tmux output to check for stuck thinking
+    let tmuxOutput: string;
+    try {
+      const { stdout } = await execAsync(
+        `tmux capture-pane -t "${agent.id}" -p -S -10 2>/dev/null || echo ""`,
+        { encoding: 'utf-8' }
+      );
+      tmuxOutput = stdout;
+    } catch {
+      continue;
+    }
+
+    if (!tmuxOutput.trim()) continue;
+
+    // Parse thinking duration
+    const thinkingMs = parseThinkingDuration(tmuxOutput);
+    if (thinkingMs === null || thinkingMs < STUCK_THINKING_THRESHOLD_MS) {
+      // Not thinking, or thinking for an acceptable duration — clear recovery state
+      if (recovery && recovery.attempts > 0) {
+        stuckRecoveryState.delete(agent.id);
+      }
+      continue;
+    }
+
+    const thinkingMinutes = Math.round(thinkingMs / 60000);
+    const attempts = recovery?.attempts ?? 0;
+
+    console.log(`[deacon] Work agent ${agent.id} stuck thinking for ${thinkingMinutes}m (attempt ${attempts + 1})`);
+
+    try {
+      if (attempts === 0) {
+        // First attempt: send Escape to cancel thinking
+        await execAsync(`tmux send-keys -t "${agent.id}" Escape 2>/dev/null || true`);
+        actions.push(`Stuck recovery: sent Escape to ${agent.id} (thinking ${thinkingMinutes}m)`);
+      } else if (attempts === 1) {
+        // Second attempt: send Ctrl+C to interrupt
+        await execAsync(`tmux send-keys -t "${agent.id}" C-c 2>/dev/null || true`);
+        actions.push(`Stuck recovery: sent Ctrl+C to ${agent.id} (thinking ${thinkingMinutes}m)`);
+      } else {
+        // Third+ attempt: kill and respawn
+        const launcherPath = join(AGENTS_DIR, agent.id, 'launcher.sh');
+        const agentState = getAgentState(agent.id);
+        const workspace = agentState?.workspace;
+
+        if (!existsSync(launcherPath) || !workspace) {
+          console.error(`[deacon] Cannot respawn ${agent.id}: missing launcher.sh or workspace`);
+          actions.push(`Stuck recovery failed for ${agent.id}: missing launcher or workspace`);
+          continue;
+        }
+
+        // Kill the stuck tmux session
+        await execAsync(`tmux kill-session -t "${agent.id}" 2>/dev/null || true`);
+
+        // Small delay to let tmux clean up
+        await new Promise(r => setTimeout(r, 1000));
+
+        // Respawn in a new tmux session with the same launcher
+        await execAsync(
+          `tmux new-session -d -s "${agent.id}" -c "${workspace}" "bash ${launcherPath}"`,
+          { encoding: 'utf-8' }
+        );
+
+        // Reset recovery state since we respawned fresh
+        stuckRecoveryState.set(agent.id, { lastAttempt: now, attempts: 0 });
+
+        actions.push(`Stuck recovery: respawned ${agent.id} (was stuck thinking ${thinkingMinutes}m, attempt ${attempts + 1})`);
+        console.log(`[deacon] Respawned stuck work agent ${agent.id}`);
+        continue;
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`[deacon] Stuck recovery failed for ${agent.id}:`, msg);
+      actions.push(`Stuck recovery error for ${agent.id}: ${msg}`);
+    }
+
+    // Track this recovery attempt
+    stuckRecoveryState.set(agent.id, {
+      lastAttempt: now,
+      attempts: attempts + 1,
+    });
+  }
+
+  return actions;
 }
 
 /**
@@ -1303,6 +1462,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const lazyActions = await checkAndCorrectLazyAgents();
   actions.push(...lazyActions);
   for (const a of lazyActions) addLog('action', a, state.patrolCycle);
+
+  // Check for work agents stuck in extended thinking loops
+  const stuckActions = await checkStuckWorkAgents();
+  actions.push(...stuckActions);
+  for (const a of stuckActions) addLog('action', a, state.patrolCycle);
 
   // Periodic agent state cleanup (PAN-154)
   if (Math.random() < 0.003) {
