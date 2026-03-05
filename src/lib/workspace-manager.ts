@@ -5,7 +5,7 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync } from 'fs';
-import { join, dirname, basename } from 'path';
+import { join, dirname, basename, extname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -292,10 +292,15 @@ function createSymlinks(
  * Copy project template directories into workspace (replaces symlinks).
  * Recursively copies all files from each source directory.
  */
+const TEXT_EXTENSIONS = new Set([
+  '.md', '.sh', '.yml', '.yaml', '.json', '.ts', '.js', '.env', '.txt', '.toml', '.template',
+]);
+
 function copyProjectTemplateDirs(
   sourceDir: string,
   targetDir: string,
-  dirs: string[]
+  dirs: string[],
+  placeholders?: TemplatePlaceholders
 ): string[] {
   const steps: string[] = [];
 
@@ -305,7 +310,7 @@ function copyProjectTemplateDirs(
 
     if (!existsSync(sourcePath)) continue;
 
-    // Recursively copy all files
+    // Recursively copy all files, applying placeholder substitution to text files
     function copyDir(src: string, dest: string): number {
       let count = 0;
       mkdirSync(dest, { recursive: true });
@@ -316,7 +321,13 @@ function copyProjectTemplateDirs(
         if (entry.isDirectory()) {
           count += copyDir(srcEntry, destEntry);
         } else if (entry.isFile()) {
-          copyFileSync(srcEntry, destEntry);
+          const ext = extname(entry.name).toLowerCase();
+          if (placeholders && TEXT_EXTENSIONS.has(ext)) {
+            const content = readFileSync(srcEntry, 'utf-8');
+            writeFileSync(destEntry, replacePlaceholders(content, placeholders));
+          } else {
+            copyFileSync(srcEntry, destEntry);
+          }
           count++;
         }
       }
@@ -556,7 +567,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     // Copy .claude/ directories from project template (copy_dirs replaces legacy symlinks)
     const dirsToSync = workspaceConfig.agent.copy_dirs || workspaceConfig.agent.symlinks;
     if (dirsToSync) {
-      const copySteps = copyProjectTemplateDirs(templateDir, workspacePath, dirsToSync);
+      const copySteps = copyProjectTemplateDirs(templateDir, workspacePath, dirsToSync, placeholders);
       result.steps.push(...copySteps);
     }
   }
