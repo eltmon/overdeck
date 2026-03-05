@@ -53,6 +53,24 @@ export {
   type DecompositionOptions,
 } from './decomposition-agent.js';
 
+// Plan Utilities (shared between CLI and dashboard)
+export {
+  findPRDFiles,
+  analyzeComplexity,
+  generateStateContent,
+  generateWorkspaceContent,
+  estimateTaskDifficulty,
+  createBeadsTasks,
+  writePlanFiles,
+  copyToPRDDirectory,
+  executePlan,
+  type PlanIssue,
+  type PlanTask,
+  type DiscoveryDecision,
+  type ComplexityAnalysis,
+  type PlanResult,
+} from './plan-utils.js';
+
 /**
  * Complete pre-work workflow
  *

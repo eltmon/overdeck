@@ -25,7 +25,7 @@ import { loadSettings, saveSettings, validateSettings, getAvailableModels, isAnt
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getOptimalDefaultsApi } from '../../lib/settings-api.js';
 import { loadConfig as loadYamlConfig } from '../../lib/config-yaml.js';
 import { generateRouterConfig, writeRouterConfig } from '../../lib/router-config.js';
-import { spawnMergeAgentForBranches, syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
+import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../lib/health-filtering.js';
 import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
@@ -105,11 +105,20 @@ async function ensureTmuxRunning(): Promise<void> {
       console.error('Failed to start tmux server:', startErr);
     }
   }
-  // Strip Claude Code env vars from tmux global environment so all new
-  // sessions (agents, specialists, convoys) can run Claude Code without
-  // hitting the "nested session" guard. This happens when the tmux server
-  // was started from within a Claude Code session. Idempotent.
-  for (const envVar of ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT']) {
+  // Strip env vars from tmux global environment that should NOT leak into
+  // agent sessions. The tmux server inherits the dashboard's process.env
+  // (which includes all of .panopticon.env), but agents should only receive
+  // explicitly-passed provider-specific vars via createSession().
+  //
+  // Categories stripped:
+  // 1. Claude Code nesting guard vars (CLAUDECODE, CLAUDE_CODE_ENTRYPOINT)
+  // 2. API keys from .panopticon.env that pollute all agent sessions
+  const varsToStrip = [
+    'CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT',
+    'OPENAI_API_KEY', 'LINEAR_API_KEY', 'GITHUB_TOKEN',
+    'ZAI_API_KEY', 'HUME_API_KEY', 'KIMI_API_KEY', 'GOOGLE_API_KEY',
+  ];
+  for (const envVar of varsToStrip) {
     try {
       await execAsync(`tmux set-environment -g -u ${envVar} 2>/dev/null`, { encoding: 'utf-8' });
     } catch {
@@ -1261,6 +1270,7 @@ app.get('/api/issues/:id/analyze', async (req, res) => {
 });
 
 // Create execution plan for an issue
+// Wraps shared planning utilities from src/lib/planning/plan-utils.ts
 app.post('/api/issues/:id/plan', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1310,191 +1320,51 @@ app.post('/api/issues/:id/plan', async (req, res) => {
     const mapping = mappings.find(m => m.linearPrefix.toUpperCase() === prefix.toUpperCase());
     const projectPath = mapping?.localPath || getDefaultProjectPath();
 
-    // Generate STATE.md content
-    const stateContent = [
-      `# Agent State: ${issue.identifier}`,
-      '',
-      `**Last Updated:** ${new Date().toISOString()}`,
-      '',
-      '## Current Position',
-      '',
-      `- **Issue:** ${issue.identifier}`,
-      `- **Title:** ${issue.title}`,
-      `- **Status:** Planning complete, ready for execution`,
-      `- **Linear:** ${issue.url}`,
-      '',
-      '## Decisions Made During Planning',
-      '',
-    ];
+    // Import shared planning utilities (same code path as CLI `pan work plan`)
+    const { findPRDFiles, analyzeComplexity, executePlan } = await import('../../lib/planning/plan-utils.js');
 
-    if (answers && Object.keys(answers).length > 0) {
-      if (answers.scope) stateContent.push(`- **Scope:** ${answers.scope}`);
-      if (answers.approach) stateContent.push(`- **Technical approach:** ${answers.approach}`);
-      if (answers.edgeCases) stateContent.push(`- **Edge cases:** ${answers.edgeCases}`);
-      if (answers.testing && answers.testing.length > 0) stateContent.push(`- **Testing:** ${answers.testing.join(', ')}`);
-      if (answers.outOfScope) stateContent.push(`- **Out of scope:** ${answers.outOfScope}`);
-    } else {
-      stateContent.push('- No specific decisions recorded');
+    // Check for existing PRDs
+    const prdFiles = await findPRDFiles(issue.identifier, projectPath);
+
+    // Analyze complexity
+    const planIssue = {
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      description: issue.description || undefined,
+      url: issue.url,
+    };
+
+    const complexity = analyzeComplexity(planIssue, prdFiles);
+
+    // Convert dashboard answers to decisions format
+    const decisions = [];
+    if (answers) {
+      if (answers.scope) decisions.push({ question: 'Scope', answer: answers.scope });
+      if (answers.approach) decisions.push({ question: 'Technical approach', answer: answers.approach });
+      if (answers.edgeCases) decisions.push({ question: 'Edge cases', answer: answers.edgeCases });
+      if (answers.testing?.length > 0) decisions.push({ question: 'Testing', answer: answers.testing.join(', ') });
+      if (answers.outOfScope) decisions.push({ question: 'Out of scope', answer: answers.outOfScope });
     }
 
-    stateContent.push('');
-    stateContent.push('## Planned Tasks');
-    stateContent.push('');
-
-    for (const task of tasks) {
-      stateContent.push(`- [ ] ${task.name}${task.dependsOn ? ` (after: ${task.dependsOn})` : ''}`);
-    }
-
-    stateContent.push('');
-    stateContent.push('## Blockers/Concerns');
-    stateContent.push('');
-    stateContent.push('- None identified during planning');
-    stateContent.push('');
-    stateContent.push('## Notes');
-    stateContent.push('');
-    stateContent.push('<!-- Add notes as work progresses -->');
-    stateContent.push('');
-
-    // Generate WORKSPACE.md content
-    const workspaceContent = [
-      `# Workspace: ${issue.identifier}`,
-      '',
-      `> ${issue.title}`,
-      '',
-      '## Quick Links',
-      '',
-      `- [Linear Issue](${issue.url})`,
-      '',
-      '## Context Files',
-      '',
-      '- `STATE.md` - Current progress and decisions',
-      '- `WORKSPACE.md` - This file',
-      '',
-      '## Beads',
-      '',
-      'Check current task status:',
-      '```bash',
-      'bd ready  # Next actionable task',
-      `bd list --tag ${issue.identifier}  # All tasks for this issue`,
-      '```',
-      '',
-      '## Agent Instructions',
-      '',
-      '1. Run `bd ready` to get next task',
-      '2. Complete the task following relevant skills',
-      '3. Run `bd close "<task name>" --reason "..."` when done',
-      '4. Update STATE.md with progress',
-      '5. Repeat until all tasks complete',
-      '',
-    ];
-
-    // Write files to .planning directory
-    const { mkdirSync, writeFileSync: writeSync } = require('fs');
-    const planningDir = join(projectPath, '.planning');
-    mkdirSync(planningDir, { recursive: true });
-
-    const statePath = join(planningDir, 'STATE.md');
-    const workspacePath = join(planningDir, 'WORKSPACE.md');
-    writeSync(statePath, stateContent.join('\n'));
-    writeSync(workspacePath, workspaceContent.join('\n'));
-
-    // Copy to PRD directory and commit+push to preserve the plan
-    let prdPath: string | undefined;
-    let prdCommitted = false;
-    try {
-      const prdDir = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR);
-      mkdirSync(prdDir, { recursive: true });
-      prdPath = join(prdDir, `${issue.identifier.toLowerCase()}-plan.md`);
-      writeSync(prdPath, stateContent.join('\n'));
-
-      // Commit and push PRD immediately so it's preserved in the repo (PAN-47)
-      try {
-        await execAsync(`git add ${join(PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issue.identifier.toLowerCase()}-plan.md`)}`, {
-          cwd: projectPath,
-          encoding: 'utf-8'
-        });
-        // Check if there are staged changes (file might already be committed)
-        try {
-          await execAsync(`git diff --cached --quiet`, { cwd: projectPath, encoding: 'utf-8' });
-          // No changes - PRD already committed
-          console.log(`[plan] PRD already committed for ${issue.identifier}`);
-        } catch {
-          // Changes exist, commit them
-          await execAsync(`git commit -m "docs: add ${issue.identifier} PRD to active"`, {
-            cwd: projectPath,
-            encoding: 'utf-8'
-          });
-          // Push in background (non-blocking)
-          const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
-          pushChild.unref();
-          prdCommitted = true;
-          console.log(`[plan] Committed and pushed PRD for ${issue.identifier}`);
-        }
-      } catch (gitErr: any) {
-        console.warn(`[plan] Could not commit PRD (non-fatal): ${gitErr.message}`);
-      }
-    } catch {
-      // PRD copy is optional
-    }
-
-    // Create Beads tasks
-    const beadsResult = { success: false, created: [] as string[], errors: [] as string[] };
-    try {
-      const { stdout: bdPath } = await execAsync('which bd', { encoding: 'utf-8' });
-      if (bdPath.trim()) {
-        const taskIds = new Map<string, string>();
-
-        for (const task of tasks) {
-          const fullName = `${issue.identifier}: ${task.name}`;
-          try {
-            let cmd = `bd create "${fullName.replace(/"/g, '\\"')}" --type task -l "${issue.identifier},linear"`;
-
-            if (task.dependsOn) {
-              const depName = `${issue.identifier}: ${task.dependsOn}`;
-              const depId = taskIds.get(depName);
-              if (depId) {
-                cmd += ` --deps "blocks:${depId}"`;
-              }
-            }
-
-            if (task.description) {
-              cmd += ` -d "${task.description.replace(/"/g, '\\"')}"`;
-            }
-
-            const { stdout: result } = await execAsync(cmd, { encoding: 'utf-8', cwd: projectPath });
-            const idMatch = result.match(/bd-[a-f0-9]+/i) || result.match(/([a-f0-9-]{8,})/i);
-            if (idMatch) {
-              taskIds.set(fullName, idMatch[0]);
-            }
-            beadsResult.created.push(fullName);
-          } catch (error: any) {
-            beadsResult.errors.push(`Failed to create "${task.name}": ${error.message}`);
-          }
-        }
-
-        if (beadsResult.created.length > 0) {
-          try {
-            await execAsync('bd flush', { encoding: 'utf-8', cwd: projectPath });
-          } catch {}
-        }
-
-        beadsResult.success = beadsResult.errors.length === 0;
-      }
-    } catch {
-      beadsResult.errors.push('bd (beads) CLI not found');
-    }
+    // Execute plan using shared utilities (same code path as CLI)
+    const result = await executePlan(planIssue, tasks, decisions, projectPath, {
+      commitAndPush: true,  // Dashboard always commits (PAN-47)
+      prdFiles,
+    });
 
     res.json({
       success: true,
-      complexity: null, // Not re-analyzed
+      complexity,
+      existingPRDs: prdFiles.length > 0 ? prdFiles.map(f => f.replace(projectPath, '.')) : undefined,
       tasks,
       files: {
-        state: statePath.replace(projectPath, '.'),
-        workspace: workspacePath.replace(projectPath, '.'),
-        prd: prdPath ? prdPath.replace(projectPath, '.') : undefined,
+        state: result.files.state.replace(projectPath, '.'),
+        workspace: result.files.workspace.replace(projectPath, '.'),
+        prd: result.files.prd ? result.files.prd.replace(projectPath, '.') : undefined,
       },
-      prdCommitted,
-      beads: beadsResult,
+      prdCommitted: result.prdCommitted,
+      beads: result.beads,
     });
   } catch (error: any) {
     console.error('Error creating plan:', error);
@@ -6876,6 +6746,17 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
   const { message } = req.body; // Optional message for reviewers
 
   const existingStatus = getReviewStatus(issueId);
+
+  // Guard: reject if issue is already merged (stale state from prior cycle)
+  if (existingStatus?.mergeStatus === 'merged') {
+    console.log(`[request-review] Rejecting ${issueId}: already merged`);
+    return res.json({
+      success: false,
+      alreadyMerged: true,
+      message: `${issueId} is already merged. Use Reopen or Reset Reviews first.`,
+    });
+  }
+
   const currentCount = existingStatus?.autoRequeueCount || 0;
 
   // Circuit breaker: max 3 auto-requeues
@@ -7198,11 +7079,11 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
     const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
 
     if (isPolyrepo && projectConfig?.workspace?.repos) {
-      // POLYREPO MERGE: Merge each repo that has changes individually
-      console.log(`[merge] Polyrepo detected for ${issueId}, merging repos individually...`);
+      // POLYREPO MERGE: Use merge-agent per repo (same as monorepo path)
+      console.log(`[merge] Polyrepo detected for ${issueId}, using merge-agent per repo...`);
       const repos = projectConfig.workspace.repos;
       const defaultBranch = projectConfig.workspace.default_branch || 'main';
-      const mergeResults: Array<{ repo: string; success: boolean; message: string }> = [];
+      const mergeResults: Array<{ repo: string; success: boolean; message: string; testsStatus?: string }> = [];
 
       for (const repo of repos) {
         const repoMainPath = join(projectPath, repo.path);
@@ -7243,68 +7124,32 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
           console.log(`[merge] Push note for ${repo.name}: ${pushErr.message}`);
         }
 
-        // Merge in the main repo directory
+        // Spawn merge-agent for this repo
         try {
-          // Fetch latest from remote
-          await execAsync('git fetch origin', { cwd: repoMainPath, encoding: 'utf-8' });
+          const { spawnMergeAgentForBranches } = await import('../../lib/cloister/merge-agent.js');
+          console.log(`[merge] Starting merge-agent for ${repo.name} (${issueId})...`);
+          const mergeResult = await spawnMergeAgentForBranches(
+            repoMainPath,
+            branchName,
+            defaultBranch,
+            issueId
+          );
 
-          // Stash any uncommitted changes
-          let stashed = false;
-          try {
-            const { stdout: statusOut } = await execAsync('git status --porcelain', {
-              cwd: repoMainPath,
-              encoding: 'utf-8',
+          if (mergeResult.success) {
+            console.log(`[merge] merge-agent succeeded for ${repo.name} (tests: ${mergeResult.testsStatus})`);
+            mergeResults.push({
+              repo: repo.name,
+              success: true,
+              message: 'Merged via merge-agent',
+              testsStatus: mergeResult.testsStatus,
             });
-            if (statusOut.trim()) {
-              await execAsync(`git stash push -u -m "Pre-merge stash for ${issueId}"`, {
-                cwd: repoMainPath,
-                encoding: 'utf-8',
-              });
-              stashed = true;
-              console.log(`[merge] Stashed uncommitted changes in ${repo.name}`);
-            }
-          } catch (stashErr: any) {
-            console.warn(`[merge] Stash note for ${repo.name}: ${stashErr.message}`);
-          }
-
-          // Ensure we're on the default branch
-          await execAsync(`git checkout ${defaultBranch}`, { cwd: repoMainPath, encoding: 'utf-8' });
-
-          // Pull latest
-          await execAsync(`git pull origin ${defaultBranch} --ff-only`, {
-            cwd: repoMainPath,
-            encoding: 'utf-8',
-          });
-
-          // Merge the feature branch (use origin/ to ensure we merge pushed code)
-          await execAsync(`git merge origin/${branchName} --no-edit`, {
-            cwd: repoMainPath,
-            encoding: 'utf-8',
-          });
-
-          // Push merged default branch
-          await execAsync(`git push origin ${defaultBranch}`, {
-            cwd: repoMainPath,
-            encoding: 'utf-8',
-          });
-
-          console.log(`[merge] Successfully merged ${branchName} into ${defaultBranch} for ${repo.name}`);
-          mergeResults.push({ repo: repo.name, success: true, message: 'Merged successfully' });
-
-          // Restore stash if we created one
-          if (stashed) {
-            try {
-              await execAsync('git stash pop', { cwd: repoMainPath, encoding: 'utf-8' });
-            } catch {
-              console.warn(`[merge] Could not pop stash in ${repo.name}, it remains stashed`);
-            }
+          } else {
+            const error = mergeResult.notes || 'Merge-agent failed';
+            console.error(`[merge] merge-agent failed for ${repo.name}: ${error}`);
+            mergeResults.push({ repo: repo.name, success: false, message: error });
           }
         } catch (mergeErr: any) {
-          console.error(`[merge] Merge failed for ${repo.name}:`, mergeErr.message);
-          // Abort merge if in progress
-          try {
-            await execAsync('git merge --abort', { cwd: repoMainPath, encoding: 'utf-8' });
-          } catch { /* not in merge state */ }
+          console.error(`[merge] merge-agent error for ${repo.name}:`, mergeErr.message);
           mergeResults.push({ repo: repo.name, success: false, message: mergeErr.message });
         }
       }
@@ -7575,6 +7420,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
     console.log(`[approve] Step 3/3: Waking merge-agent for ${issueId}...`);
 
     try {
+      const { spawnMergeAgentForBranches } = await import('../../lib/cloister/merge-agent.js');
       const mergeResult = await spawnMergeAgentForBranches(
         projectPath,
         branchName,
@@ -10498,12 +10344,22 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
       }
     }
 
+    // Check if agent is currently running
+    const agentId = `agent-${id.toLowerCase()}`;
+    const agentState = getAgentState(agentId);
+    const agentRunning = agentState?.status === 'active' || agentState?.status === 'running';
+    const nextStep = agentRunning
+      ? `Agent is running. Send it context: pan tell ${id} "Issue reopened for re-work. <describe what needs to change>"`
+      : `Start an agent: pan work issue ${id}`;
+
     res.json({
       success: true,
       message: `Issue ${id} reopened and moved to ${newState}`,
       issueId: issueIdentifier,
       newState,
       resetSummary,
+      agentRunning,
+      nextStep,
     });
   } catch (error: any) {
     console.error('Error reopening issue:', error);
