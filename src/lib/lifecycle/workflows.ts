@@ -243,6 +243,18 @@ async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
   const branchName = `feature/${issueLower}`;
 
   try {
+    // Check review-status first — the merge specialist validates before marking merged
+    try {
+      const { loadReviewStatuses } = await import('../review-status.js');
+      const statuses = loadReviewStatuses();
+      const issueKey = ctx.issueId.toUpperCase();
+      if (statuses[issueKey]?.mergeStatus === 'merged') {
+        return stepOk(step, ['Merge specialist confirmed merge completed']);
+      }
+    } catch {
+      // review-status.json may not exist, continue with git checks
+    }
+
     // Check if branch exists locally
     const { stdout: branchExists } = await execAsync(
       `git branch --list "${branchName}" 2>/dev/null || true`,
@@ -250,16 +262,23 @@ async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
     );
 
     if (branchExists.trim()) {
-      // Branch exists — check for unmerged commits
-      const { stdout: unmerged } = await execAsync(
-        `git log main..${branchName} --oneline 2>/dev/null || true`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
-      );
-      if (unmerged.trim()) {
-        const count = unmerged.trim().split('\n').length;
+      // Use merge-base --is-ancestor: checks if the branch tip is reachable from main
+      // This works for regular merges, squash merges, and cherry-picks
+      try {
+        await execAsync(
+          `git merge-base --is-ancestor ${branchName} main`,
+          { cwd: ctx.projectPath, encoding: 'utf-8' },
+        );
+        return stepOk(step, ['All commits merged to main']);
+      } catch {
+        // Not an ancestor — branch has unmerged work
+        const { stdout: unmerged } = await execAsync(
+          `git log main..${branchName} --oneline 2>/dev/null || true`,
+          { cwd: ctx.projectPath, encoding: 'utf-8' },
+        );
+        const count = unmerged.trim() ? unmerged.trim().split('\n').length : 0;
         return stepFailed(step, `${count} unmerged commit(s) on ${branchName}. Merge before closing out.`);
       }
-      return stepOk(step, ['All commits merged to main']);
     }
 
     // Check remote
@@ -270,15 +289,20 @@ async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
 
     if (remoteBranch.trim()) {
       await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
-      const { stdout: remoteUnmerged } = await execAsync(
-        `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
-      );
-      if (remoteUnmerged.trim()) {
-        const count = remoteUnmerged.trim().split('\n').length;
+      try {
+        await execAsync(
+          `git merge-base --is-ancestor origin/${branchName} main`,
+          { cwd: ctx.projectPath, encoding: 'utf-8' },
+        );
+        return stepOk(step, ['Remote branch fully merged']);
+      } catch {
+        const { stdout: remoteUnmerged } = await execAsync(
+          `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
+          { cwd: ctx.projectPath, encoding: 'utf-8' },
+        );
+        const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
         return stepFailed(step, `${count} unmerged commit(s) on remote ${branchName}.`);
       }
-      return stepOk(step, ['Remote branch fully merged']);
     }
 
     // No branch at all — assume squash-merged and branch deleted
