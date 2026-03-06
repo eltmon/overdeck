@@ -17,7 +17,7 @@ import {
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core';
-import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, STATE_TYPE_TO_CANONICAL, CanonicalState } from '../types';
+import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -189,10 +189,12 @@ function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<
     } else {
       status = STATUS_LABELS[issue.status] || (issue.stateType ? STATE_TYPE_TO_CANONICAL[issue.stateType] : undefined) || 'backlog';
     }
-    // Canceled issues go to their own bucket (shown below kanban)
+    // Skip canceled issues - they're shown in a separate filter view, not kanban
     if (status === 'canceled') {
-      grouped.canceled.push(issue);
-    } else if (grouped[status]) {
+      continue;
+    }
+
+    if (grouped[status]) {
       grouped[status].push(issue);
     } else {
       grouped.backlog.push(issue);
@@ -271,6 +273,41 @@ function groupByProject(issues: Issue[]): { name: string; color?: string; issues
     groups.push({ name: 'No Project', issues: noProject });
   }
   return groups;
+}
+
+/**
+ * Group canceled issues by their specific cancellation type.
+ * Groups: Canceled, Duplicate, Won't Do
+ */
+export function groupByCanceledType(issues: Issue[]): { name: string; issues: Issue[] }[] {
+  const groups: Record<string, Issue[]> = {
+    'Canceled': [],
+    'Duplicate': [],
+    "Won't Do": [],
+    'Other': [],
+  };
+
+  for (const issue of issues) {
+    const status = issue.status?.toLowerCase() || '';
+    if (status === 'canceled' || status === 'cancelled') {
+      groups['Canceled'].push(issue);
+    } else if (status === 'duplicate') {
+      groups['Duplicate'].push(issue);
+    } else if (status === "won't do" || status === 'wontfix') {
+      groups["Won't Do"].push(issue);
+    } else {
+      groups['Other'].push(issue);
+    }
+  }
+
+  // Return non-empty groups in a consistent order
+  const result: { name: string; issues: Issue[] }[] = [];
+  if (groups['Canceled'].length > 0) result.push({ name: 'Canceled', issues: groups['Canceled'] });
+  if (groups['Duplicate'].length > 0) result.push({ name: 'Duplicate', issues: groups['Duplicate'] });
+  if (groups["Won't Do"].length > 0) result.push({ name: "Won't Do", issues: groups["Won't Do"] });
+  if (groups['Other'].length > 0) result.push({ name: 'Other', issues: groups['Other'] });
+
+  return result;
 }
 
 /**
@@ -572,8 +609,12 @@ export function ListIssueRow({
         {issue.identifier}
       </a>
 
-      {/* Title */}
-      <span className="text-sm text-content-body truncate flex-1 min-w-0">{issue.title}</span>
+      {/* Title - dimmed/strikethrough for canceled issues */}
+      <span className={`text-sm truncate flex-1 min-w-0 ${
+        canonical === 'canceled'
+          ? 'text-content-muted line-through'
+          : 'text-content-body'
+      }`}>{issue.title}</span>
 
       {/* Priority indicator */}
       {issue.priority === 1 && <span className="text-xs text-red-400 font-medium shrink-0">Urgent</span>}
@@ -961,6 +1002,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Group by labels for list view - MUST be before any conditional returns (Rules of Hooks)
   const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
   const groupedByProject = useMemo(() => groupByProject(filteredIssues), [filteredIssues]);
+  const groupedByCanceledType = useMemo(() => groupByCanceledType(filteredIssues), [filteredIssues]);
 
   const toggleProject = (projectId: string) => {
     setSelectedProjects(prev => {
@@ -1050,7 +1092,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     : 'bg-surface-raised text-content-subtle hover:text-content hover:bg-surface-overlay'
                 }`}
               >
-                {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : cycle === 'backlog' ? 'Backlog' : 'Cancelled'}
+                {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : cycle === 'backlog' ? 'Backlog' : 'Canceled'}
               </button>
             ))}
           </div>
@@ -1189,34 +1231,36 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           )}
         </div>
       ) : cycleFilter === 'canceled' ? (
-        /* Cancelled - List View */
+        /* Canceled - List View (grouped by cancellation type) */
         <div className="space-y-6 overflow-y-auto pb-4">
-          <div className="bg-surface-raised rounded-lg">
-            <div className="px-4 py-3 border-b border-divider">
-              <div className="flex items-center gap-2">
-                <X className="w-4 h-4 text-content-muted" />
-                <h3 className="font-semibold text-content">Cancelled</h3>
-                <span className="text-sm text-content-subtle">({grouped.canceled.length})</span>
+          {groupedByCanceledType.map((group) => (
+            <div key={group.name} className="bg-surface-raised rounded-lg">
+              <div className="px-4 py-3 border-b border-divider">
+                <div className="flex items-center gap-2">
+                  <X className="w-4 h-4 text-red-400" />
+                  <h3 className="font-semibold text-content">{group.name}</h3>
+                  <span className="text-sm text-content-subtle">({group.issues.length})</span>
+                </div>
+              </div>
+              <div className="divide-y divide-divider">
+                {group.issues.map((issue) => (
+                  <ListIssueRow
+                    key={issue.id}
+                    issue={issue}
+                    agents={agents}
+                    specialists={specialists}
+                    issueCosts={issueCosts}
+                    selectedIssue={selectedIssue}
+                    onSelectIssue={onSelectIssue}
+                    onPlan={setPlanDialogIssue}
+                  />
+                ))}
               </div>
             </div>
-            <div className="divide-y divide-divider">
-              {grouped.canceled.map((issue) => (
-                <ListIssueRow
-                  key={issue.id}
-                  issue={issue}
-                  agents={agents}
-                  specialists={specialists}
-                  issueCosts={issueCosts}
-                  selectedIssue={selectedIssue}
-                  onSelectIssue={onSelectIssue}
-                  onPlan={setPlanDialogIssue}
-                />
-              ))}
-            </div>
-          </div>
-          {grouped.canceled.length === 0 && (
+          ))}
+          {groupedByCanceledType.length === 0 && (
             <div className="text-center py-12 text-content-subtle">
-              No cancelled items
+              No canceled issues
             </div>
           )}
         </div>
