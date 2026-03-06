@@ -8297,6 +8297,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       description: string;
       url: string;
       source: 'linear' | 'github';
+      comments?: Array<{ author: string; body: string; createdAt: string }>;
     };
     let newStateName = 'In Planning';
 
@@ -8309,6 +8310,31 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       const repoConfig = config.repos.find(r => r.owner === githubCheck.owner && r.repo === githubCheck.repo);
       const prefix = repoConfig?.prefix || githubCheck.repo.toUpperCase();
 
+      // Fetch comments from GitHub
+      let ghComments: Array<{ author: string; body: string; createdAt: string }> = [];
+      try {
+        const commentsResponse = await fetch(
+          `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/comments?per_page=50`,
+          {
+            headers: {
+              'Authorization': `token ${config.token}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'Panopticon-Dashboard',
+            },
+          }
+        );
+        if (commentsResponse.ok) {
+          const rawComments = await commentsResponse.json() as any[];
+          ghComments = rawComments.map((c: any) => ({
+            author: c.user?.login || 'unknown',
+            body: c.body || '',
+            createdAt: c.created_at,
+          }));
+        }
+      } catch (commentErr: any) {
+        console.log(`[start-planning] Could not fetch GitHub comments: ${commentErr.message}`);
+      }
+
       issue = {
         id: `github-${githubCheck.owner}-${githubCheck.repo}-${githubCheck.number}`,
         identifier: `${prefix}-${githubCheck.number}`,
@@ -8316,10 +8342,11 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         description: ghIssue.body || '',
         url: ghIssue.html_url,
         source: 'github',
+        comments: ghComments.length > 0 ? ghComments : undefined,
       };
 
       // Add "planning" label to GitHub issue
-      console.log(`[start-planning] Fetched GitHub issue, adding planning label...`);
+      console.log(`[start-planning] Fetched GitHub issue${ghComments.length > 0 ? ` with ${ghComments.length} comments` : ''}, adding planning label...`);
       await addGitHubPlanningLabel(githubCheck.owner, githubCheck.repo, githubCheck.number);
       newStateName = 'Planning (label added)';
       console.log(`[start-planning] GitHub issue setup complete`);
@@ -8342,6 +8369,13 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
             url
             state { id name }
             team { id key }
+            comments(first: 50) {
+              nodes {
+                body
+                createdAt
+                user { name displayName }
+              }
+            }
           }
         }
       `;
@@ -8429,6 +8463,13 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       const updateJson = await updateResponse.json();
       if (updateJson.errors) throw new Error(updateJson.errors[0]?.message || 'Failed to update issue');
 
+      // Extract comments from Linear response
+      const linearComments = (linearIssue.comments?.nodes || []).map((c: any) => ({
+        author: c.user?.displayName || c.user?.name || 'unknown',
+        body: c.body || '',
+        createdAt: c.createdAt,
+      }));
+
       issue = {
         id: linearIssue.id,
         identifier: linearIssue.identifier,
@@ -8436,7 +8477,9 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         description: linearIssue.description || '',
         url: linearIssue.url,
         source: 'linear',
+        comments: linearComments.length > 0 ? linearComments : undefined,
       };
+      console.log(`[start-planning] Fetched Linear issue${linearComments.length > 0 ? ` with ${linearComments.length} comments` : ''}`);
       newStateName = planningState.name;
     }
 
@@ -8657,6 +8700,19 @@ ${repos.map(r => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join('\n')}
 `;
       }
 
+      // Build comments section for planning prompt
+      let commentsSection = '';
+      if (issue.comments && issue.comments.length > 0) {
+        const commentLines = issue.comments
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+          .map(c => {
+            const date = c.createdAt.slice(0, 10);
+            const body = c.body.length > 2000 ? c.body.slice(0, 2000) + ' [truncated]' : c.body;
+            return `### ${c.author} (${date}):\n${body}`;
+          });
+        commentsSection = `\n## Issue Comments\n\n**IMPORTANT: Read these comments carefully — they contain context, decisions, and references to previous work.**\n\n${commentLines.join('\n\n---\n\n')}\n`;
+      }
+
       const planningPrompt = `<!-- panopticon:orchestration-context-start -->
 <!-- This is Panopticon orchestration context injected automatically.
      It contains planning session setup instructions, not agent reasoning.
@@ -8693,7 +8749,7 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 
 ## Description
 ${issue.description || 'No description provided'}
-${projectStructureSection}
+${commentsSection}${projectStructureSection}
 ---
 
 ## Your Mission
