@@ -164,13 +164,13 @@ describe('Model Deprecation System', () => {
       const defaults = getOptimalModelDefaults();
 
       // Verify some key work types have current models
-      expect(defaults['issue-agent:planning']).toBeDefined();
+      expect(defaults['issue-agent:exploration']).toBeDefined();
       expect(defaults['issue-agent:implementation']).toBeDefined();
       expect(defaults['specialist-review-agent']).toBeDefined();
 
       // Verify they're not deprecated
       const deprecatedIds = Object.keys(MODEL_DEPRECATIONS);
-      expect(deprecatedIds).not.toContain(defaults['issue-agent:planning']);
+      expect(deprecatedIds).not.toContain(defaults['issue-agent:exploration']);
       expect(deprecatedIds).not.toContain(defaults['issue-agent:implementation']);
     });
   });
