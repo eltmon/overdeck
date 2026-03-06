@@ -207,6 +207,18 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
 
   const updated = setReviewStatusBase(issueId, update);
 
+  // Clear stale pending operations when review/test succeeds.
+  // A prior attempt may have failed (e.g. transient "Workspace does not exist")
+  // and left a failed entry in pending-operations.json. When a retry succeeds,
+  // the stale failure must be cleaned up so the dashboard doesn't show both
+  // "Operation failed" and "Review: Passed" simultaneously.
+  if (update.reviewStatus === 'passed' || update.testStatus === 'passed') {
+    const pendingOp = getPendingOperation(issueId);
+    if (pendingOp?.status === 'failed') {
+      clearPendingOperation(issueId);
+    }
+  }
+
   // Auto-create PR when ready for merge transitions from false to true
   const becameReadyForMerge = updated.readyForMerge && !wasReadyForMerge;
   if (becameReadyForMerge && !updated.prUrl) {
@@ -756,6 +768,7 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
     };
   }
 
+  console.warn(`[workspace] Not found for ${issueId}: resolved projectPath=${projectPath}, checked ${localPath}`);
   return { exists: false, isRemote: false };
 }
 
@@ -10260,6 +10273,142 @@ app.post('/api/issues/:id/reset', async (req, res) => {
       error: error instanceof Error ? error.message : 'Unknown error',
       cleanupLog
     });
+  }
+});
+
+// Cancel an issue - stop agents, move to Canceled, optionally wipe workspace
+app.post('/api/issues/:id/cancel', async (req, res) => {
+  const { id } = req.params;
+  const { wipeWorkspace = false } = req.body || {};
+  const cleanupLog: string[] = [];
+
+  try {
+    const issueLower = id.toLowerCase();
+
+    // 1. Kill tmux sessions
+    for (const session of [`planning-${issueLower}`, `agent-${issueLower}`]) {
+      try {
+        await execAsync(`tmux kill-session -t ${session} 2>/dev/null || true`);
+        cleanupLog.push(`Killed tmux: ${session}`);
+      } catch { /* session might not exist */ }
+    }
+
+    // 2. Clean up agent state directories
+    for (const dir of [
+      join(homedir(), '.panopticon', 'agents', `planning-${issueLower}`),
+      join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`),
+    ]) {
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true });
+        cleanupLog.push(`Deleted agent state: ${dir}`);
+      }
+    }
+
+    // 3. Clear review/pipeline status
+    try {
+      clearReviewStatus(id.toUpperCase());
+      cleanupLog.push(`Cleared review status`);
+    } catch { /* might not exist */ }
+
+    // 4. Clear shadow state
+    try {
+      const { removeShadowState } = await import('../../lib/shadow-state.js');
+      removeShadowState(id);
+      cleanupLog.push(`Cleared shadow state`);
+    } catch { /* might not exist */ }
+
+    // 5. Optionally wipe workspace
+    if (wipeWorkspace) {
+      try {
+        const { deepWipe } = await import('../../lib/lifecycle/index.js');
+        const issuePrefix = extractTeamPrefix(id);
+        const projectPath = getProjectPath(undefined, issuePrefix);
+        const projectConfig = findProjectByTeam(issuePrefix);
+
+        const githubCheck = isGitHubIssue(id);
+        const ctx = {
+          issueId: id,
+          projectPath,
+          projectName: projectConfig?.name || '',
+          ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+            ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+            : {}),
+        };
+
+        const wipeResult = await deepWipe(ctx, {
+          deleteWorkspace: true,
+          deleteBranches: true,
+          resetIssue: false, // we handle status separately below
+          workspaceConfig: projectConfig?.workspace,
+          projectName: projectConfig?.name || '',
+        });
+        cleanupLog.push(...wipeResult.steps.flatMap(s => s.details || []));
+      } catch (wipeErr: any) {
+        cleanupLog.push(`Workspace wipe warning: ${wipeErr.message}`);
+      }
+    }
+
+    // 6. Move issue to Canceled on tracker
+    const githubCheck = isGitHubIssue(id);
+
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+      // GitHub: close with "not planned" reason
+      const ghConfig = getGitHubConfig();
+      if (ghConfig) {
+        try {
+          await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `token ${ghConfig.token}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ state: 'closed', state_reason: 'not_planned' }),
+          });
+          cleanupLog.push(`Closed GitHub issue as not planned`);
+        } catch (ghErr: any) {
+          cleanupLog.push(`GitHub close warning: ${ghErr.message}`);
+        }
+      }
+    } else {
+      // Linear: move to Canceled state
+      const linearApiKey = process.env.LINEAR_API_KEY || '';
+      if (linearApiKey) {
+        try {
+          const { LinearClient } = await import('@linear/sdk');
+          const linearClient = new LinearClient({ apiKey: linearApiKey });
+          const issue = await linearClient.issue(id.toUpperCase());
+
+          if (issue) {
+            const team = await issue.team;
+            if (team) {
+              const states = await team.states();
+              const canceledState = states.nodes.find(s =>
+                s.name.toLowerCase() === 'canceled' ||
+                s.name.toLowerCase() === 'cancelled' ||
+                s.type === 'canceled'
+              );
+              if (canceledState) {
+                await issue.update({ stateId: canceledState.id });
+                cleanupLog.push(`Moved Linear issue to: ${canceledState.name}`);
+              }
+            }
+          }
+        } catch (linearErr: any) {
+          cleanupLog.push(`Linear cancel warning: ${linearErr.message}`);
+        }
+      }
+    }
+
+    // Invalidate caches
+    issueDataService.invalidateTracker('github').catch(() => {});
+    issueDataService.invalidateTracker('linear').catch(() => {});
+
+    console.log(`[cancel] Completed for ${id}:`, cleanupLog);
+    res.json({ success: true, cleanupLog });
+  } catch (error: any) {
+    console.error('[cancel] Failed:', error);
+    res.status(500).json({ success: false, error: error.message, cleanupLog });
   }
 });
 
