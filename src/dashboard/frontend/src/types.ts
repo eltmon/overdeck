@@ -73,6 +73,7 @@ export interface AgentHealth {
   lastPing?: string;
   consecutiveFailures: number;
   killCount: number;
+  contextPercent?: number | null;
 }
 
 export interface Skill {

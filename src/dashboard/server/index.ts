@@ -2263,6 +2263,15 @@ app.get('/api/health/agents', async (_req, res) => {
           return null;
         }
 
+        // Read context usage (non-blocking, best-effort)
+        let contextPercent: number | null = null;
+        try {
+          const ctxFile = join(agentsDir, name, 'context-pct');
+          if (existsSync(ctxFile)) {
+            contextPercent = parseInt(readFileSync(ctxFile, 'utf-8').trim(), 10) || null;
+          }
+        } catch { /* non-fatal */ }
+
         return {
           agentId: name,
           status: healthStatus.status,
@@ -2270,6 +2279,7 @@ app.get('/api/health/agents', async (_req, res) => {
           lastPing: new Date().toISOString(),
           consecutiveFailures: storedHealth.consecutiveFailures,
           killCount: storedHealth.killCount,
+          contextPercent,
         };
       })
     );

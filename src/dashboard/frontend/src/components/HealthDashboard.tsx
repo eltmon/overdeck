@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { AgentHealth } from '../types';
-import { Activity, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, XCircle, Clock, Brain } from 'lucide-react';
 import { TldrServiceStatus } from './TldrServiceStatus';
 
 async function fetchHealth(): Promise<AgentHealth[]> {
@@ -132,6 +132,21 @@ export function HealthDashboard() {
                     {agent.killCount}
                   </span>
                 </div>
+                {agent.contextPercent != null && (
+                  <div className="flex justify-between text-content-subtle">
+                    <span className="flex items-center gap-1">
+                      <Brain className="w-3.5 h-3.5" />
+                      Context:
+                    </span>
+                    <span className={
+                      agent.contextPercent >= 80 ? 'text-red-400' :
+                      agent.contextPercent >= 60 ? 'text-yellow-400' :
+                      'text-green-400'
+                    }>
+                      {agent.contextPercent}%
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );
