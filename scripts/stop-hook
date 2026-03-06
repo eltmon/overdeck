@@ -57,5 +57,12 @@ if [ -x "$SPECIALIST_HOOK" ]; then
   "$SPECIALIST_HOOK" &
 fi
 
+# Chain to work-agent completion detection hook
+# Detects when a work agent forgot to call "pan work done" and nudges it
+WORK_AGENT_HOOK="$HOME/.panopticon/bin/work-agent-stop-hook"
+if [ -x "$WORK_AGENT_HOOK" ]; then
+  "$WORK_AGENT_HOOK" &
+fi
+
 # Always exit successfully
 exit 0
