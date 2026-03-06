@@ -676,7 +676,7 @@ interface KanbanBoardProps {
   onSelectIssue?: (issueId: string | null) => void;
 }
 
-type CycleFilter = 'current' | 'all' | 'backlog';
+type CycleFilter = 'current' | 'all' | 'backlog' | 'canceled';
 
 // Undo history entry
 interface UndoEntry {
@@ -1040,7 +1040,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           <Filter className="w-4 h-4 text-content-subtle" />
           <span className="text-sm text-content-subtle">Cycle:</span>
           <div className="flex rounded-lg overflow-hidden border border-divider-strong">
-            {(['current', 'all', 'backlog'] as CycleFilter[]).map((cycle) => (
+            {(['current', 'all', 'backlog', 'canceled'] as CycleFilter[]).map((cycle) => (
               <button
                 key={cycle}
                 onClick={() => setCycleFilter(cycle)}
@@ -1050,7 +1050,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     : 'bg-surface-raised text-content-subtle hover:text-content hover:bg-surface-overlay'
                 }`}
               >
-                {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : 'Backlog'}
+                {cycle === 'current' ? 'Current' : cycle === 'all' ? 'All' : cycle === 'backlog' ? 'Backlog' : 'Cancelled'}
               </button>
             ))}
           </div>
@@ -1188,73 +1188,76 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             </div>
           )}
         </div>
-      ) : (
-        /* Kanban columns with DnD (current view - 4 columns, no backlog) */
-        <>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
-                <DroppableColumn key={status} status={status}>
-                  <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
-                    <div className="px-4 py-3 border-b border-divider">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
-                        <span className="text-sm text-content-subtle">{grouped[status].length}</span>
-                      </div>
-                    </div>
-                    <ColumnContent
-                      issues={grouped[status]}
-                      agents={agents}
-                      specialists={specialists}
-                      issueCosts={issueCosts}
-                      selectedIssue={selectedIssue}
-                      onSelectIssue={onSelectIssue}
-                      onPlan={setPlanDialogIssue}
-                      onViewBeads={setBeadsDialogIssue}
-                    />
-                  </div>
-                </DroppableColumn>
+      ) : cycleFilter === 'canceled' ? (
+        /* Cancelled - List View */
+        <div className="space-y-6 overflow-y-auto pb-4">
+          <div className="bg-surface-raised rounded-lg">
+            <div className="px-4 py-3 border-b border-divider">
+              <div className="flex items-center gap-2">
+                <X className="w-4 h-4 text-content-muted" />
+                <h3 className="font-semibold text-content">Cancelled</h3>
+                <span className="text-sm text-content-subtle">({grouped.canceled.length})</span>
+              </div>
+            </div>
+            <div className="divide-y divide-divider">
+              {grouped.canceled.map((issue) => (
+                <ListIssueRow
+                  key={issue.id}
+                  issue={issue}
+                  agents={agents}
+                  specialists={specialists}
+                  issueCosts={issueCosts}
+                  selectedIssue={selectedIssue}
+                  onSelectIssue={onSelectIssue}
+                  onPlan={setPlanDialogIssue}
+                />
               ))}
             </div>
-
-            {/* Drag Overlay - Ghost card following cursor */}
-            <DragOverlay dropAnimation={dropAnimation}>
-              {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
-            </DragOverlay>
-          </DndContext>
-
-          {/* Cancelled issues - shown as compact list below kanban */}
-          {grouped.canceled.length > 0 && (
-            <div className="bg-surface-raised rounded-lg mt-2">
-              <div className="px-4 py-2 border-b border-divider">
-                <div className="flex items-center gap-2">
-                  <X className="w-4 h-4 text-content-muted" />
-                  <h3 className="font-semibold text-content-subtle text-sm">Cancelled</h3>
-                  <span className="text-xs text-content-muted">({grouped.canceled.length})</span>
-                </div>
-              </div>
-              <div className="divide-y divide-divider">
-                {grouped.canceled.map((issue) => (
-                  <ListIssueRow
-                    key={issue.id}
-                    issue={issue}
+          </div>
+          {grouped.canceled.length === 0 && (
+            <div className="text-center py-12 text-content-subtle">
+              No cancelled items
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Kanban columns with DnD (current view - 4 columns, no backlog) */
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
+              <DroppableColumn key={status} status={status}>
+                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
+                  <div className="px-4 py-3 border-b border-divider">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
+                      <span className="text-sm text-content-subtle">{grouped[status].length}</span>
+                    </div>
+                  </div>
+                  <ColumnContent
+                    issues={grouped[status]}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
+                    onViewBeads={setBeadsDialogIssue}
                   />
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+                </div>
+              </DroppableColumn>
+            ))}
+          </div>
+
+          {/* Drag Overlay - Ghost card following cursor */}
+          <DragOverlay dropAnimation={dropAnimation}>
+            {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* Undo Toast */}
