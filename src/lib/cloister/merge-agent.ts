@@ -873,8 +873,24 @@ PHASE 1 — SYNC & BASELINE (before merge):
 
 PHASE 2 — MERGE:
 6. git merge ${sourceBranch}
-7. If conflicts: resolve them intelligently, then git add and git commit
-8. If clean merge: the merge commit is auto-created (or fast-forward)
+7. If clean merge: the merge commit is auto-created (or fast-forward). Skip to Phase 3.
+8. If conflicts: resolve them following these steps EXACTLY:
+   a. For each conflicted file, read it, find all \`<<<<<<<\`, \`=======\`, \`>>>>>>>\` markers,
+      and edit the file to resolve the conflict (keeping the correct code from both sides).
+   b. After resolving EACH file, stage it immediately: \`git add <file>\`
+      CRITICAL: You MUST run \`git add\` for every resolved file. Without this, git still
+      considers the file unmerged and the merge commit will fail.
+   c. If you use a subagent to resolve conflicts, the subagent MUST run \`git add <file>\`
+      after editing each file. Include this instruction explicitly in any subagent prompt.
+   d. After all files are resolved and staged, verify no conflict markers remain:
+      \`grep -rn '<<<<<<< ' src/ tests/ --include='*.ts' --include='*.tsx' --include='*.js'\`
+      (Ignore matches in documentation/prompt files that reference markers as examples.)
+   e. If markers remain, resolve them and \`git add\` again.
+   f. Complete the merge: \`git commit --no-edit\` (uses the auto-generated merge message)
+   g. Verify the commit succeeded: \`git log --oneline -1\` should show a merge commit.
+
+   For .planning/ files: accept the source branch version or delete — these are ephemeral.
+   For .claude/settings.local.json: merge both permission entries.
 
 PHASE 3 — VERIFY:
 9. Build the project to verify no compile errors:
