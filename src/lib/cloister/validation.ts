@@ -46,8 +46,10 @@ export interface ValidationFailure {
 export interface ValidationResult {
   /** Overall validation success */
   success: boolean;
-  /** Validation passed */
+  /** Validation passed (or skipped — check `skipped` to distinguish) */
   valid: boolean;
+  /** Validation was skipped (no validation script found) */
+  skipped?: boolean;
   /** Conflict markers detected */
   conflictMarkersFound: boolean;
   /** Build result */
@@ -189,17 +191,18 @@ export async function runMergeValidation(
   // Determine validation script path
   const scriptPath = validationScript || join(projectPath, 'scripts', 'validate-merge.sh');
 
-  // Check if validation script exists
+  // No validation script = skip validation (specialist already ran build + tests)
   if (!existsSync(scriptPath)) {
+    console.log(`[validation] No validation script at ${scriptPath}, skipping (specialist already validated)`);
     return {
-      success: false,
-      valid: false,
+      success: true,
+      valid: true,
+      skipped: true,
       conflictMarkersFound: false,
       buildPassed: null,
       testsPassed: null,
       failures: [],
       output: '',
-      error: `Validation script not found at ${scriptPath}`,
     };
   }
 

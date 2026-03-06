@@ -1016,9 +1016,10 @@ Report any issues or conflicts you encountered.`;
               });
 
               if (validationResult.valid) {
-                // Validation passed
-                console.log(`[merge-agent] ✓ Merge validation passed`);
-                logActivity('merge_complete', `Merge and validation completed by specialist`);
+                // Validation passed (or skipped — specialist already validated)
+                const skipNote = validationResult.skipped ? ' (no validation script, specialist already validated)' : '';
+                console.log(`[merge-agent] ✓ Merge validation passed${skipNote}`);
+                logActivity('merge_complete', `Merge completed by specialist${skipNote}`);
 
                 // Run post-merge cleanup (move PRD, update issue status)
                 await postMergeLifecycle(issueId, projectPath);
