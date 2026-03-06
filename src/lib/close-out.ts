@@ -108,6 +108,7 @@ async function isBranchMerged(
   return { status: 'no-branch', message: 'Branch already cleaned up (squash-merged)' };
 }
 
+
 export interface CloseOutStep {
   name: string;
   status: 'passed' | 'failed' | 'skipped';

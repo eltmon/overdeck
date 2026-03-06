@@ -8335,6 +8335,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         console.log(`[start-planning] Could not fetch GitHub comments: ${commentErr.message}`);
       }
 
+
       issue = {
         id: `github-${githubCheck.owner}-${githubCheck.repo}-${githubCheck.number}`,
         identifier: `${prefix}-${githubCheck.number}`,
@@ -8469,6 +8470,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
         body: c.body || '',
         createdAt: c.createdAt,
       }));
+
 
       issue = {
         id: linearIssue.id,

@@ -255,6 +255,7 @@ async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
       // review-status.json may not exist, continue with git checks
     }
 
+
     // Check if branch exists locally
     const { stdout: branchExists } = await execAsync(
       `git branch --list "${branchName}" 2>/dev/null || true`,
