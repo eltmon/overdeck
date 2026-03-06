@@ -211,6 +211,8 @@ but STATE.md provides the narrative context and current state that beads alone c
 
 **You have unlimited time and context. Use it. Do not be lazy.**
 
+**CRITICAL: NEVER stop working without calling `pan work done`.** If you have remaining tasks, keep going — do NOT end your turn to "wait for input." If ALL tasks are complete, you MUST call `pan work done {{ISSUE_ID}} -c "summary"` as your final action. Ending your turn without either continuing work or calling `pan work done` is a failure state that blocks the entire pipeline.
+
 ## CRITICAL: Work Completion Requirements
 
 **You are NOT done until ALL of these are true:**

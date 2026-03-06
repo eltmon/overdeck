@@ -1317,6 +1317,140 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   return actions;
 }
 
+// Track per-agent cooldowns for first-completion nudges
+const firstCompletionCooldowns = new Map<string, number>();
+const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudging
+const FIRST_COMPLETION_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between nudges
+
+/**
+ * Detect work agents that finished implementation but never called "pan work done".
+ *
+ * This is the Layer 3 safety net. Layer 2 (work-agent-stop-hook) should catch most
+ * cases within seconds of the agent going idle. This catches agents where the stop-hook
+ * failed, was skipped, or where the AI analysis was inconclusive.
+ *
+ * Heuristics: agent is idle for >10 minutes, no completion marker exists, no review
+ * status exists (meaning it never entered the specialist pipeline), and the agent
+ * has committed code (git log shows commits on the feature branch).
+ */
+export async function checkFirstCompletionAgents(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const agents = listRunningAgents();
+    const now = Date.now();
+
+    for (const agent of agents) {
+      // Only check work agents (agent-min-XXX, agent-pan-XXX)
+      // Guard against agents with undefined id (planning agents, test artifacts, etc.)
+      const agentId = agent.id;
+      if (!agentId || !agentId.startsWith('agent-') || !agent.tmuxActive) continue;
+      if (agentId.startsWith('specialist-')) continue;
+
+      // Skip if completion marker already exists
+      const completedFile = join(AGENTS_DIR, agent.id, 'completed');
+      if (existsSync(completedFile)) continue;
+
+      // Check if agent is idle
+      const runtimeState = getAgentRuntimeState(agent.id);
+      if (!runtimeState || runtimeState.state !== 'idle') continue;
+
+      // Check idle duration
+      const lastActivity = new Date(runtimeState.lastActivity);
+      const idleMs = now - lastActivity.getTime();
+      if (idleMs < FIRST_COMPLETION_IDLE_MS) continue;
+
+      // Verify agent is at an idle prompt (not computing/thinking)
+      // Don't use isAgentActiveInTmux here — it checks last 5 lines which may
+      // contain stale tool call names (e.g., "Bash(...)") from prior output.
+      // Instead, check the very last line for the Claude Code idle prompt marker.
+      try {
+        const { stdout: lastLines } = await execAsync(
+          `tmux capture-pane -t "${agent.id}" -p -S -3 2>/dev/null || echo ""`,
+          { encoding: 'utf-8' }
+        );
+        // Check the last few non-empty lines for idle prompt indicators
+        const lines = lastLines.split('\n').filter(l => l.trim().length > 0);
+        const tail = lines.slice(-3).join('\n');
+        // Claude Code shows "❯" prompt and "bypass permissions" status bar when idle
+        const isAtPrompt = /❯/.test(tail) || /bypass permissions/.test(tail) || /Worked for/.test(tail);
+        if (!isAtPrompt) continue; // Agent is actively working
+      } catch {
+        continue;
+      }
+
+      // Check cooldown
+      const lastNudge = firstCompletionCooldowns.get(agent.id);
+      if (lastNudge && (now - lastNudge) < FIRST_COMPLETION_COOLDOWN_MS) continue;
+
+      // Check if this agent already has a review status (meaning it already
+      // went through the pipeline at least once — dead-end detection handles that)
+      const issueId = agent.issueId || agent.id.replace('agent-', '').toUpperCase();
+      const issueKey = issueId.toLowerCase();
+      if (existsSync(REVIEW_STATUS_FILE)) {
+        try {
+          const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+          if (statuses[issueKey]) continue; // Already in pipeline — let dead-end handle it
+        } catch { /* parse error, proceed with check */ }
+      }
+
+      // Check if the agent has commits (sign that work was done)
+      const agentState = getAgentState(agent.id);
+      if (!agentState?.workspace || !existsSync(agentState.workspace)) continue;
+
+      // For polyrepo workspaces, check inside sub-repos (fe/, api/, etc.)
+      // For monorepo workspaces, check the workspace root directly
+      let hasCommits = false;
+      try {
+        const { stdout: gitLog } = await execAsync(
+          'git log --oneline -3 2>/dev/null',
+          { cwd: agentState.workspace }
+        );
+        hasCommits = gitLog.trim().length > 0;
+      } catch {
+        // Workspace root may not be a git repo (polyrepo) — check subdirectories
+        try {
+          const subdirs = readdirSync(agentState.workspace, { withFileTypes: true })
+            .filter(d => d.isDirectory() && !d.name.startsWith('.'));
+          for (const sub of subdirs) {
+            try {
+              const { stdout: subLog } = await execAsync(
+                'git log --oneline -3 2>/dev/null',
+                { cwd: join(agentState.workspace, sub.name) }
+              );
+              if (subLog.trim().length > 0) {
+                hasCommits = true;
+                break;
+              }
+            } catch { /* not a git repo */ }
+          }
+        } catch { /* can't read workspace dir */ }
+      }
+      if (!hasCommits) continue; // No commits — agent may not have started yet
+
+      // All heuristics passed: agent likely forgot pan work done
+      const idleMinutes = Math.round(idleMs / 60000);
+      console.log(`[deacon] First-completion gap detected: ${agent.id} (${issueId}) idle for ${idleMinutes}m with commits but no completion marker`);
+
+      firstCompletionCooldowns.set(agent.id, now);
+
+      try {
+        const nudgeMessage = `You appear to have stopped working without calling "pan work done". If your implementation is complete, run this now:\n\npan work done ${issueId} -c "Implementation complete"\n\nIf you still have remaining tasks, continue working on them.`;
+        await sendKeysAsync(agent.id, nudgeMessage);
+        actions.push(`First-completion nudge: ${agent.id} (idle ${idleMinutes}m)`);
+        console.log(`[deacon] Sent first-completion nudge to ${agent.id}`);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[deacon] Failed to send first-completion nudge to ${agent.id}:`, msg);
+      }
+    }
+  } catch (error: unknown) {
+    console.error('[deacon] Error in first-completion detection:', error);
+  }
+
+  return actions;
+}
+
 /**
  * Run a single patrol cycle
  */
@@ -1457,6 +1591,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const deadEndActions = await checkDeadEndAgents();
   actions.push(...deadEndActions);
   for (const a of deadEndActions) addLog('action', a, state.patrolCycle);
+
+  // Detect work agents that forgot to call "pan work done" (Layer 3 safety net)
+  const firstCompletionActions = await checkFirstCompletionAgents();
+  actions.push(...firstCompletionActions);
+  for (const a of firstCompletionActions) addLog('action', a, state.patrolCycle);
 
   // Check for lazy agent behavior and auto-correct (PAN-80, fixed in PAN-154)
   const lazyActions = await checkAndCorrectLazyAgents();

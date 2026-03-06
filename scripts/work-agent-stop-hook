@@ -1,0 +1,137 @@
+#!/bin/bash
+# ~/.panopticon/bin/work-agent-stop-hook
+# Called when any agent goes idle — detects work agents that forgot "pan work done"
+#
+# Uses a lightweight AI model to analyze the last N lines of terminal output
+# and determine if the agent completed its work but failed to signal completion.
+# If so, sends a nudge message to the agent via tmux.
+#
+# The model used is configurable via PANOPTICON_COMPLETION_CHECK_MODEL env var
+# or defaults to the models.overrides.completion-check-hook setting in config.yaml,
+# falling back to claude-haiku-4-5.
+
+# Don't use set -e - resilient to failures, never break Claude Code execution
+
+# Get agent ID
+if [ -n "$PANOPTICON_AGENT_ID" ]; then
+  AGENT_ID="$PANOPTICON_AGENT_ID"
+elif [ -n "$TMUX" ]; then
+  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
+else
+  exit 0
+fi
+
+# Only run for work agents (agent-min-XXX, agent-pan-XXX, etc.)
+case "$AGENT_ID" in
+  agent-*)
+    # Check it's not a specialist
+    case "$AGENT_ID" in
+      specialist-*) exit 0 ;;
+    esac
+    ;;
+  *)
+    exit 0  # Not a work agent
+    ;;
+esac
+
+# Extract issue ID from agent ID (e.g., "agent-min-725" -> "MIN-725")
+ISSUE_ID=$(echo "$AGENT_ID" | sed 's/^agent-//' | tr '[:lower:]' '[:upper:]')
+
+# Skip if completion marker already exists (agent already called pan work done)
+COMPLETED_FILE="$HOME/.panopticon/agents/$AGENT_ID/completed"
+if [ -f "$COMPLETED_FILE" ]; then
+  exit 0
+fi
+
+# Cooldown: don't nudge more than once per 10 minutes
+NUDGE_FILE="$HOME/.panopticon/agents/$AGENT_ID/.last-completion-nudge"
+if [ -f "$NUDGE_FILE" ]; then
+  LAST_NUDGE=$(cat "$NUDGE_FILE" 2>/dev/null || echo "0")
+  NOW=$(date +%s)
+  ELAPSED=$(( NOW - LAST_NUDGE ))
+  if [ "$ELAPSED" -lt 600 ]; then
+    exit 0  # Too soon since last nudge
+  fi
+fi
+
+# Capture the last 80 lines of terminal output
+OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -80 2>/dev/null || echo "")
+if [ -z "$OUTPUT" ]; then
+  exit 0
+fi
+
+# Quick heuristic pre-check: skip the expensive AI call if the output clearly
+# shows the agent is mid-work (e.g., running tests, editing files, reading)
+if echo "$OUTPUT" | grep -qE '(Reading|Editing|Searching|Running|Compiling|Building|Installing|●.*Bash|●.*Read|●.*Edit|●.*Grep|●.*Write|●.*Glob)' | tail -5 | grep -qE '●'; then
+  exit 0
+fi
+
+# Check if the agent appears to be at an idle prompt (not mid-response)
+if ! echo "$OUTPUT" | tail -10 | grep -qE '(^❯|Worked for)'; then
+  exit 0  # Agent doesn't appear to be at an idle prompt
+fi
+
+# Determine model to use for completion check
+# Priority: env var > config.yaml override > default
+COMPLETION_MODEL="${PANOPTICON_COMPLETION_CHECK_MODEL:-}"
+if [ -z "$COMPLETION_MODEL" ]; then
+  CONFIG_FILE="$HOME/.panopticon/config.yaml"
+  if [ -f "$CONFIG_FILE" ] && command -v grep &> /dev/null; then
+    COMPLETION_MODEL=$(grep 'completion-check-hook:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "")
+  fi
+fi
+COMPLETION_MODEL="${COMPLETION_MODEL:-claude-haiku-4-5}"
+
+# Build the analysis prompt
+ANALYSIS_PROMPT="You are analyzing a work agent's terminal output to determine if it finished its work but forgot to call 'pan work done'.
+
+The agent was working on issue $ISSUE_ID. Here is the last 80 lines of its terminal output:
+
+<terminal_output>
+$OUTPUT
+</terminal_output>
+
+Respond with EXACTLY one of these words (nothing else):
+- FORGOT_COMPLETION — if the agent clearly finished its implementation work (closed beads, committed code, ran tests) but stopped without calling 'pan work done'
+- STILL_WORKING — if the agent appears to have more work to do (mentioned next steps, was mid-task)
+- STOPPED_FOR_INPUT — if the agent stopped because it needs human input or hit a blocker
+- UNCLEAR — if you cannot determine the state"
+
+# Run the analysis using claude CLI (headless, no interactive session)
+RESULT=$(echo "$ANALYSIS_PROMPT" | claude -p --model "$COMPLETION_MODEL" --max-tokens 20 2>/dev/null || echo "UNCLEAR")
+
+# Extract just the verdict (first word of output, strip whitespace)
+VERDICT=$(echo "$RESULT" | tr -d '[:space:]' | head -c 30)
+
+# Log the check
+LOG_DIR="$HOME/.panopticon/logs"
+mkdir -p "$LOG_DIR"
+echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID ($ISSUE_ID) -> $VERDICT (model: $COMPLETION_MODEL)" \
+  >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+
+if [ "$VERDICT" = "FORGOT_COMPLETION" ]; then
+  # Record nudge timestamp for cooldown
+  mkdir -p "$(dirname "$NUDGE_FILE")"
+  date +%s > "$NUDGE_FILE" 2>/dev/null || true
+
+  # Write the nudge message to a temp file and use load-buffer + paste-buffer
+  # (the reliable tmux message delivery pattern from CLAUDE.md)
+  NUDGE_MSG="You stopped without calling pan work done. If your implementation is complete, you MUST run this command now:
+
+pan work done $ISSUE_ID -c \"Implementation complete\"
+
+If you still have remaining tasks, continue working on them. Do NOT stop until all work is done AND you have called pan work done."
+
+  TMPFILE=$(mktemp)
+  echo "$NUDGE_MSG" > "$TMPFILE"
+  tmux load-buffer "$TMPFILE" 2>/dev/null
+  tmux paste-buffer -t "$AGENT_ID" 2>/dev/null
+  sleep 0.3
+  tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
+  rm -f "$TMPFILE"
+
+  echo "[$(date -Iseconds)] work-agent-stop-hook: Sent completion nudge to $AGENT_ID" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+fi
+
+exit 0
