@@ -235,3 +235,24 @@ export function setupCredentialFileAuth(provider: ProviderConfig, workspacePath:
 
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
+
+/**
+ * Clear credential-file auth from workspace settings.
+ *
+ * When switching from a credential-file provider (e.g. Kimi) to a static/plan-based
+ * provider (e.g. Anthropic), the apiKeyHelper must be removed from
+ * .claude/settings.local.json. Otherwise Claude Code will keep using the stale
+ * token helper and fail with "Invalid API key".
+ */
+export function clearCredentialFileAuth(workspacePath: string): void {
+  const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
+  if (!existsSync(settingsPath)) return;
+
+  try {
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+    if (!settings.apiKeyHelper) return; // Nothing to clear
+
+    delete settings.apiKeyHelper;
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  } catch { /* non-fatal */ }
+}

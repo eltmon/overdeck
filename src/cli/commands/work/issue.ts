@@ -592,7 +592,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       issueId: id,
       workspace,
       model: options.model,
-      phase: options.phase as SpawnOptions['phase'],
+      phase: (options.phase || 'implementation') as SpawnOptions['phase'],
       prompt,
     });
 

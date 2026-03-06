@@ -16,11 +16,59 @@ import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-pa
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import { loadSettings, type ModelId } from '../settings.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
-import { getProviderForModel, getProviderEnv, setupCredentialFileAuth } from '../providers.js';
+import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { sendKeysAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Resolve git directories and branch name from a workspace path.
+ * Handles both monorepo (single .git at root) and polyrepo (multiple .git in subdirs).
+ * When task.branch is missing, detects it from the checked-out branch in git repos.
+ */
+async function resolveWorkspaceGitInfo(workspace: string | undefined, taskBranch: string | undefined): Promise<{
+  gitDirs: string[];
+  branch: string;
+  isPolyrepo: boolean;
+}> {
+  const gitDirs: string[] = [];
+  let branch = taskBranch || 'unknown';
+
+  if (!workspace || workspace === 'unknown') {
+    return { gitDirs, branch, isPolyrepo: false };
+  }
+
+  // Detect git directories
+  if (existsSync(join(workspace, '.git'))) {
+    gitDirs.push(workspace);
+  } else {
+    try {
+      const entries = readdirSync(workspace, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && existsSync(join(workspace, entry.name, '.git'))) {
+          gitDirs.push(join(workspace, entry.name));
+        }
+      }
+    } catch {}
+  }
+
+  // Auto-resolve branch from git when not provided
+  if (branch === 'unknown' && gitDirs.length > 0) {
+    try {
+      const { stdout } = await execAsync(
+        `cd "${gitDirs[0]}" && git branch --show-current`,
+        { encoding: 'utf-8', timeout: 5000 }
+      );
+      const detected = stdout.trim();
+      if (detected) {
+        branch = detected;
+      }
+    } catch {}
+  }
+
+  return { gitDirs, branch, isPolyrepo: gitDirs.length > 1 };
+}
 
 /**
  * Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for a model.
@@ -540,10 +588,13 @@ export async function spawnEphemeralSpecialist(
     const providerEnv = getProviderEnvForModel(model);
     const envFlags = buildTmuxEnvFlags(providerEnv);
 
-    // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh
+    // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
+    // For all other providers, clear stale apiKeyHelper from previous runs.
     const providerConfig = getProviderForModel(model as ModelId);
     if (providerConfig.authType === 'credential-file') {
       setupCredentialFileAuth(providerConfig, cwd);
+    } else {
+      clearCredentialFileAuth(cwd);
     }
 
     // Permission flags based on specialist type
@@ -678,14 +729,21 @@ Update status via API:
 - If tests fail: POST with {"testStatus":"failed","testNotes":"..."}`;
       break;
 
-    case 'merge-agent':
+    case 'merge-agent': {
+      const bInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
+      if (bInfo.isPolyrepo) {
+        prompt += `This is a POLYREPO project with ${bInfo.gitDirs.length} repos: ${bInfo.gitDirs.map(d => basename(d)).join(', ')}.
+You must merge each repo separately.\n\n`;
+      }
       prompt += `Your task:
 1. Fetch the latest main branch
-2. Attempt to merge ${task.branch} into main
+2. Attempt to merge ${bInfo.branch} into main
 3. Resolve conflicts intelligently if needed
 4. Run tests to verify merge is clean
-5. Complete merge if tests pass`;
+5. Complete merge if tests pass
+6. NEVER use git push --force`;
       break;
+    }
   }
 
   prompt += `\n\nWhen you complete your task, report your findings and status.`;
@@ -1392,10 +1450,13 @@ Say: "I am the ${name} specialist, ready and waiting for tasks."`;
     const providerEnv = getProviderEnvForModel(model);
     const envFlags = buildTmuxEnvFlags(providerEnv);
 
-    // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh
+    // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
+    // For all other providers, clear stale apiKeyHelper from previous runs.
     const providerCfg = getProviderForModel(model as ModelId);
     if (providerCfg.authType === 'credential-file') {
       setupCredentialFileAuth(providerCfg, cwd);
+    } else {
+      clearCredentialFileAuth(cwd);
     }
 
     // Write identity prompt and launcher script to avoid shell escaping issues
@@ -1572,10 +1633,13 @@ export async function wakeSpecialist(
       const providerEnv = getProviderEnvForModel(model);
       const envFlags = buildTmuxEnvFlags(providerEnv);
 
-      // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh
+      // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
+      // For all other providers, clear stale apiKeyHelper from previous runs.
       const provCfg = getProviderForModel(model as ModelId);
       if (provCfg.authType === 'credential-file') {
         setupCredentialFileAuth(provCfg, cwd);
+      } else {
+        clearCredentialFileAuth(cwd);
       }
 
       // merge-agent needs full bypass to handle git stash drop, reset, etc.
@@ -1698,51 +1762,71 @@ export async function wakeSpecialistWithTask(
   let prompt: string;
 
   switch (name) {
-    case 'merge-agent':
+    case 'merge-agent': {
+      const mergeWorkspace = task.workspace || 'unknown';
+      const mergeInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
+      const mergeBranch = mergeInfo.branch;
+
+      const mergeRepoInstructions = mergeInfo.isPolyrepo
+        ? `\nIMPORTANT: This is a POLYREPO project. There are ${mergeInfo.gitDirs.length} separate git repositories to merge:
+${mergeInfo.gitDirs.map((d, i) => `${i + 1}. ${basename(d)}: ${d}`).join('\n')}
+
+The workspace root is NOT a git repo. You must cd into each subdirectory to run git commands.
+You MUST complete the merge for ALL repos.\n`
+        : '';
+
       prompt = `New merge task for ${task.issueId}:
 
-Branch: ${task.branch || 'unknown'}
-Workspace: ${task.workspace || 'unknown'}
+Branch: ${mergeBranch}
+Workspace: ${mergeWorkspace}
+${mergeInfo.isPolyrepo ? `Polyrepo: git repos in subdirectories: ${mergeInfo.gitDirs.map(d => basename(d)).join(', ')}` : ''}
 ${task.prUrl ? `PR URL: ${task.prUrl}` : ''}
+${mergeRepoInstructions}
+For ${mergeInfo.isPolyrepo ? 'EACH repo' : 'the repo'}, perform these steps:
 
-Your task:
-1. Fetch the latest main branch
-2. Attempt to merge ${task.branch} into main
-3. If conflicts arise, resolve them intelligently based on context
-4. Run the test suite to verify the merge is clean
-5. If tests pass, complete the merge and push
-6. If tests fail, analyze the failures and either fix them or report back
+PHASE 1 — SYNC & BASELINE (before merge):
+1. ${mergeInfo.isPolyrepo ? 'cd into the repo directory' : `cd ${mergeWorkspace}`}
+2. git checkout main
+3. git fetch origin main
+4. Sync local main with origin/main:
+   Run: git rev-list --left-right --count main...origin/main
+   If REMOTE_AHEAD > 0: git rebase origin/main
+   If rebase conflicts: abort and report failure.
+5. Run tests on main to establish a baseline. Record BASELINE_PASS and BASELINE_FAIL.
 
-When done, provide feedback on:
-- Any conflicts encountered and how you resolved them
-- Test results
-- Any patterns you notice that future agents should be aware of
+PHASE 2 — MERGE:
+6. git merge ${mergeBranch} --no-edit
+7. If conflicts: resolve them intelligently, then git add and git commit
+8. If clean merge: the merge commit is auto-created (or fast-forward)
 
-Use the send-feedback-to-agent skill to report findings back to the issue agent.`;
+PHASE 3 — VERIFY:
+9. Run tests again. Record MERGE_PASS and MERGE_FAIL.
+
+PHASE 4 — DECIDE:
+10. Compare results:
+    - If MERGE_FAIL > BASELINE_FAIL (NEW test failures): ROLLBACK with git reset --hard ORIG_HEAD
+    - If MERGE_FAIL <= BASELINE_FAIL (no new failures): PUSH with git push origin main
+    - Pre-existing failures on main are NOT a reason to rollback
+
+PHASE 5 — REPORT:
+11. Call the Panopticon API to report results:
+    curl -s -X POST ${apiUrl}/api/specialists/done \\
+      -H "Content-Type: application/json" \\
+      -d '{"specialist":"merge","issueId":"${task.issueId}","status":"passed|failed","notes":"<summary>"}'
+
+CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.
+CRITICAL: NEVER use git push --force.
+CRITICAL: Do NOT delete the feature branch.`;
       break;
+    }
 
     case 'review-agent': {
       // Pre-check: detect stale branch (0 diff from main) before waking the agent
       const workspace = task.workspace || 'unknown';
 
-      // Resolve git directory — polyrepo workspaces have .git in subdirectories, not at root
-      let gitDirs: string[] = [];
-      if (workspace !== 'unknown') {
-        if (existsSync(join(workspace, '.git'))) {
-          // Monorepo or single-repo workspace — .git at root
-          gitDirs = [workspace];
-        } else {
-          // Polyrepo — find subdirectories that contain .git
-          try {
-            const entries = readdirSync(workspace, { withFileTypes: true });
-            for (const entry of entries) {
-              if (entry.isDirectory() && existsSync(join(workspace, entry.name, '.git'))) {
-                gitDirs.push(join(workspace, entry.name));
-              }
-            }
-          } catch {}
-        }
-      }
+      // Resolve git directories and branch from workspace
+      const reviewGitInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
+      const gitDirs = reviewGitInfo.gitDirs;
       // Use first git dir for pre-check (primary repo), fall back to workspace root
       const gitDir = gitDirs[0] || workspace;
 

@@ -319,8 +319,26 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
     console.log('');
     console.log(chalk.green(`✓ ${issue.identifier} reopened and ready for re-work`));
     console.log('');
-    console.log(chalk.dim('Start the agent to resume implementation:'));
-    console.log(`  pan work ${id}`);
+
+    // Check if agent is currently running and suggest appropriate next step
+    try {
+      const { getAgentState } = await import('../../../lib/agents.js');
+      const agentId = `agent-${id.toLowerCase()}`;
+      const agentState = getAgentState(agentId);
+      const agentRunning = agentState?.status === 'active' || agentState?.status === 'running';
+
+      if (agentRunning) {
+        console.log(chalk.dim('Agent is still running. Send it context about the re-work:'));
+        console.log(`  pan tell ${id} "Issue reopened. <describe what needs to change>"`);
+      } else {
+        console.log(chalk.dim('Start the agent to resume implementation:'));
+        console.log(`  pan work issue ${id}`);
+      }
+    } catch {
+      // Fallback if agent state check fails
+      console.log(chalk.dim('Start the agent to resume implementation:'));
+      console.log(`  pan work issue ${id}`);
+    }
     console.log('');
   } catch (error: unknown) {
     if (spinner.isSpinning) spinner.fail();
