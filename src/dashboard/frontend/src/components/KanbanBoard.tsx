@@ -187,7 +187,7 @@ function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<
                issue.derivedStatus === 'in_progress' ? 'in_progress' :
                STATUS_LABELS[issue.status] || 'backlog';
     } else {
-      status = STATUS_LABELS[issue.status] || (issue.stateType ? STATE_TYPE_TO_CANONICAL[issue.stateType] : undefined) || 'backlog';
+      status = STATUS_LABELS[issue.status] || 'backlog';
     }
     // Skip canceled issues - they're shown in a separate filter view, not kanban
     if (status === 'canceled') {
