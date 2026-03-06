@@ -21,8 +21,92 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from './paths.js';
 import { sessionExists } from './tmux.js';
+import { loadReviewStatuses } from './review-status.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Check if a feature branch has been merged into main.
+ *
+ * Uses `git merge-base --is-ancestor` which correctly handles both
+ * regular merges and squash merges (where commit SHAs differ).
+ * Also checks review-status.json as authoritative — the merge specialist
+ * validates the merge before setting mergeStatus to 'merged'.
+ */
+async function isBranchMerged(
+  branchName: string,
+  projectPath: string,
+): Promise<{ status: 'merged' | 'unmerged' | 'no-branch'; message: string }> {
+  // Check review-status first — the merge specialist validates before marking merged
+  try {
+    const issueId = branchName.replace('feature/', '').toUpperCase();
+    const statuses = loadReviewStatuses();
+    if (statuses[issueId]?.mergeStatus === 'merged') {
+      return { status: 'merged', message: 'Merge specialist confirmed merge completed' };
+    }
+  } catch {
+    // review-status.json may not exist, continue with git checks
+  }
+
+  // Check if branch exists locally
+  const { stdout: branchExists } = await execAsync(
+    `git branch --list "${branchName}" 2>/dev/null || true`,
+    { cwd: projectPath, encoding: 'utf-8' },
+  );
+
+  if (branchExists.trim()) {
+    // Use merge-base --is-ancestor: checks if the branch tip is reachable from main
+    // This works for regular merges, squash merges, and cherry-picks
+    try {
+      await execAsync(
+        `git merge-base --is-ancestor ${branchName} main`,
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      return { status: 'merged', message: 'All commits merged to main' };
+    } catch {
+      // Not an ancestor — branch has unmerged work
+      const { stdout: unmerged } = await execAsync(
+        `git log main..${branchName} --oneline 2>/dev/null || true`,
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      const count = unmerged.trim() ? unmerged.trim().split('\n').length : 0;
+      return {
+        status: 'unmerged',
+        message: `${count} unmerged commit(s) on ${branchName}. Merge before closing out.`,
+      };
+    }
+  }
+
+  // Check remote
+  const { stdout: remoteBranch } = await execAsync(
+    `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
+    { cwd: projectPath, encoding: 'utf-8' },
+  );
+
+  if (remoteBranch.trim()) {
+    await execAsync(`git fetch origin ${branchName}`, { cwd: projectPath }).catch(() => {});
+    try {
+      await execAsync(
+        `git merge-base --is-ancestor origin/${branchName} main`,
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      return { status: 'merged', message: 'Remote branch fully merged' };
+    } catch {
+      const { stdout: remoteUnmerged } = await execAsync(
+        `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      const count = remoteUnmerged.trim() ? remoteUnmerged.trim().split('\n').length : 0;
+      return {
+        status: 'unmerged',
+        message: `${count} unmerged commit(s) on remote ${branchName}.`,
+      };
+    }
+  }
+
+  // No branch at all — assume squash-merged and branch deleted
+  return { status: 'no-branch', message: 'Branch already cleaned up (squash-merged)' };
+}
 
 export interface CloseOutStep {
   name: string;
@@ -106,57 +190,19 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
   // Step 2: Verify branch merged (hard fail)
   try {
     const branchName = `feature/${issueLower}`;
-    // Check if the branch exists locally
-    const { stdout: branchExists } = await execAsync(
-      `git branch --list "${branchName}" 2>/dev/null || true`,
-      { cwd: ctx.projectPath, encoding: 'utf-8' }
-    );
+    const merged = await isBranchMerged(branchName, ctx.projectPath);
 
-    if (branchExists.trim()) {
-      // Branch exists — check for unmerged commits
-      const { stdout: unmerged } = await execAsync(
-        `git log main..${branchName} --oneline 2>/dev/null || true`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' }
-      );
-
-      if (unmerged.trim()) {
-        const commitCount = unmerged.trim().split('\n').length;
-        steps.push({
-          name: 'Verify branch merged',
-          status: 'failed',
-          message: `${commitCount} unmerged commit(s) on ${branchName}. Merge before closing out.`,
-        });
-        return { success: false, issueId: ctx.issueId, steps, error: `Unmerged commits on ${branchName}` };
-      }
-      steps.push({ name: 'Verify branch merged', status: 'passed', message: 'All commits merged to main' });
+    if (merged.status === 'merged') {
+      steps.push({ name: 'Verify branch merged', status: 'passed', message: merged.message });
+    } else if (merged.status === 'no-branch') {
+      steps.push({ name: 'Verify branch merged', status: 'passed', message: merged.message });
     } else {
-      // Branch doesn't exist locally — check remote
-      const { stdout: remoteBranch } = await execAsync(
-        `git ls-remote --heads origin "${branchName}" 2>/dev/null || true`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' }
-      );
-
-      if (remoteBranch.trim()) {
-        // Remote branch exists — fetch and check
-        await execAsync(`git fetch origin ${branchName}`, { cwd: ctx.projectPath }).catch(() => {});
-        const { stdout: remoteUnmerged } = await execAsync(
-          `git log main..origin/${branchName} --oneline 2>/dev/null || true`,
-          { cwd: ctx.projectPath, encoding: 'utf-8' }
-        );
-        if (remoteUnmerged.trim()) {
-          const commitCount = remoteUnmerged.trim().split('\n').length;
-          steps.push({
-            name: 'Verify branch merged',
-            status: 'failed',
-            message: `${commitCount} unmerged commit(s) on remote ${branchName}.`,
-          });
-          return { success: false, issueId: ctx.issueId, steps, error: `Unmerged commits on remote ${branchName}` };
-        }
-        steps.push({ name: 'Verify branch merged', status: 'passed', message: 'Remote branch fully merged' });
-      } else {
-        // No branch at all — assume squash-merged and branch deleted
-        steps.push({ name: 'Verify branch merged', status: 'passed', message: 'Branch already cleaned up (squash-merged)' });
-      }
+      steps.push({
+        name: 'Verify branch merged',
+        status: 'failed',
+        message: merged.message,
+      });
+      return { success: false, issueId: ctx.issueId, steps, error: merged.message };
     }
   } catch (err) {
     steps.push({

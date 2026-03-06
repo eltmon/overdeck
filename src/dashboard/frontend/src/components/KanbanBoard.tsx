@@ -162,6 +162,7 @@ function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<
     in_progress: [],
     in_review: [],
     done: [],
+    canceled: [],
   };
 
   for (const issue of issues) {
@@ -188,9 +189,9 @@ function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<
     } else {
       status = STATUS_LABELS[issue.status] || (issue.stateType ? STATE_TYPE_TO_CANONICAL[issue.stateType] : undefined) || 'backlog';
     }
-    // Handle 'canceled' by putting in done
+    // Canceled issues go to their own bucket (shown below kanban)
     if (status === 'canceled') {
-      grouped.done.push(issue);
+      grouped.canceled.push(issue);
     } else if (grouped[status]) {
       grouped[status].push(issue);
     } else {
@@ -1189,42 +1190,71 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         </div>
       ) : (
         /* Kanban columns with DnD (current view - 4 columns, no backlog) */
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
-              <DroppableColumn key={status} status={status}>
-                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
-                  <div className="px-4 py-3 border-b border-divider">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
-                      <span className="text-sm text-content-subtle">{grouped[status].length}</span>
+        <>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
+                <DroppableColumn key={status} status={status}>
+                  <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors ${activeDragStatus && activeDragStatus !== status ? 'bg-surface-raised/80' : ''}`}>
+                    <div className="px-4 py-3 border-b border-divider">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
+                        <span className="text-sm text-content-subtle">{grouped[status].length}</span>
+                      </div>
                     </div>
+                    <ColumnContent
+                      issues={grouped[status]}
+                      agents={agents}
+                      specialists={specialists}
+                      issueCosts={issueCosts}
+                      selectedIssue={selectedIssue}
+                      onSelectIssue={onSelectIssue}
+                      onPlan={setPlanDialogIssue}
+                      onViewBeads={setBeadsDialogIssue}
+                    />
                   </div>
-                  <ColumnContent
-                    issues={grouped[status]}
+                </DroppableColumn>
+              ))}
+            </div>
+
+            {/* Drag Overlay - Ghost card following cursor */}
+            <DragOverlay dropAnimation={dropAnimation}>
+              {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
+            </DragOverlay>
+          </DndContext>
+
+          {/* Cancelled issues - shown as compact list below kanban */}
+          {grouped.canceled.length > 0 && (
+            <div className="bg-surface-raised rounded-lg mt-2">
+              <div className="px-4 py-2 border-b border-divider">
+                <div className="flex items-center gap-2">
+                  <X className="w-4 h-4 text-content-muted" />
+                  <h3 className="font-semibold text-content-subtle text-sm">Cancelled</h3>
+                  <span className="text-xs text-content-muted">({grouped.canceled.length})</span>
+                </div>
+              </div>
+              <div className="divide-y divide-divider">
+                {grouped.canceled.map((issue) => (
+                  <ListIssueRow
+                    key={issue.id}
+                    issue={issue}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
-                    onViewBeads={setBeadsDialogIssue}
                   />
-                </div>
-              </DroppableColumn>
-            ))}
-          </div>
-
-          {/* Drag Overlay - Ghost card following cursor */}
-          <DragOverlay dropAnimation={dropAnimation}>
-            {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
-          </DragOverlay>
-        </DndContext>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Undo Toast */}
