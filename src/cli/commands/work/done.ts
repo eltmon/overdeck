@@ -354,12 +354,50 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           req.end();
         });
 
-        const result = await reviewReq();
+        let result = await reviewReq();
+
+        // Self-healing: if issue was previously merged, auto-reset and retry
+        if (!result.success && result.alreadyMerged) {
+          console.log(chalk.yellow(`  ⚠ Issue was previously merged. Resetting specialist states for re-review...`));
+
+          const resetReq = () => new Promise<any>((resolve, reject) => {
+            const postData = JSON.stringify({});
+            const req = http.request(
+              `${dashboardUrl}/api/workspaces/${issueId}/reset-review`,
+              { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
+              (res) => {
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => {
+                  try {
+                    resolve(JSON.parse(data));
+                  } catch {
+                    resolve({ success: false, error: 'Invalid response' });
+                  }
+                });
+              }
+            );
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+            req.write(postData);
+            req.end();
+          });
+
+          const resetResult = await resetReq();
+          if (resetResult.success) {
+            console.log(chalk.green(`  ✓ Specialist states reset`));
+            // Retry review
+            result = await reviewReq();
+          } else {
+            console.log(chalk.red(`  ✗ Failed to reset: ${resetResult.error || resetResult.message || 'Unknown error'}`));
+          }
+        }
 
         if (result.success) {
           console.log(chalk.green(`  ✓ Review & test ${result.queued ? 'queued' : 'started'} automatically`));
-        } else {
+        } else if (!result.alreadyMerged) {
           // Don't fail the command if review trigger fails - just inform
+          // (alreadyMerged case already logged above)
           console.log(chalk.yellow(`  ⚠ Auto-review not triggered: ${result.error || result.message || 'Unknown error'}`));
           if (result.alreadyReviewed) {
             console.log(chalk.dim(`    Manual review needed - click "Review and Test" in dashboard`));

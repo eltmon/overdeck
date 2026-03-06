@@ -160,6 +160,7 @@ async function performKillAndSpawn(
       workspace: state.workspace,
       runtime: state.runtime,
       model: options.targetModel,
+      phase: 'implementation',
       prompt,
     });
 

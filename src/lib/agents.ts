@@ -11,7 +11,7 @@ import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
 import { loadSettings, type ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
-import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, requiresRouter } from './providers.js';
+import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresRouter } from './providers.js';
 import { loadConfig } from './config.js';
 import { createTrackerFromConfig } from './tracker/factory.js';
 import type { TrackerType } from './tracker/interface.js';
@@ -519,10 +519,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const providerEnv = getProviderEnvForModel(selectedModel);
 
   // For credential-file providers (e.g. Kimi Code Plan), configure apiKeyHelper
-  // so Claude Code can refresh short-lived tokens dynamically
+  // so Claude Code can refresh short-lived tokens dynamically.
+  // For all other providers, CLEAR any stale apiKeyHelper from previous runs
+  // (e.g. switching from Kimi to Anthropic plan-based auth).
   const provider = getProviderForModel(selectedModel as ModelId);
   if (provider.authType === 'credential-file') {
     setupCredentialFileAuth(provider, options.workspace);
+  } else {
+    clearCredentialFileAuth(options.workspace);
   }
 
   // Create tmux session and start claude
@@ -734,11 +738,14 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // Get provider env for the agent's model (reads latest API key from settings)
     const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
 
-    // For credential-file providers, ensure apiKeyHelper is configured
+    // For credential-file providers, ensure apiKeyHelper is configured.
+    // For all other providers, clear stale apiKeyHelper from previous runs.
     if (agentState.model) {
       const provider = getProviderForModel(agentState.model as ModelId);
       if (provider.authType === 'credential-file') {
         setupCredentialFileAuth(provider, agentState.workspace);
+      } else {
+        clearCredentialFileAuth(agentState.workspace);
       }
     }
 
@@ -838,11 +845,14 @@ export function recoverAgent(agentId: string): AgentState | null {
   // Get provider env for the agent's model (reads latest API key from settings)
   const providerEnv = state.model ? getProviderEnvForModel(state.model) : {};
 
-  // For credential-file providers, ensure apiKeyHelper is configured
+  // For credential-file providers, ensure apiKeyHelper is configured.
+  // For all other providers, clear stale apiKeyHelper from previous runs.
   if (state.model) {
     const provider = getProviderForModel(state.model as ModelId);
     if (provider.authType === 'credential-file') {
       setupCredentialFileAuth(provider, state.workspace);
+    } else {
+      clearCredentialFileAuth(state.workspace);
     }
   }
 
