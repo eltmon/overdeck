@@ -1266,8 +1266,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
 
       // Circuit breaker: don't intervene if already at max requeues
       const autoRequeueCount = status.autoRequeueCount || 0;
-      if (autoRequeueCount >= 3) {
-        console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/3 requeues used)`);
+      if (autoRequeueCount >= 7) {
+        console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/7 requeues used)`);
         continue;
       }
 
@@ -1390,7 +1390,9 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       if (existsSync(REVIEW_STATUS_FILE)) {
         try {
           const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-          if (statuses[issueKey]) continue; // Already in pipeline — let dead-end handle it
+          // Keys are stored in original case (e.g., "MIN-727") — check both cases
+          const hasStatus = statuses[issueKey] || statuses[issueId] || statuses[issueId.toUpperCase()];
+          if (hasStatus) continue; // Already in pipeline — let dead-end handle it
         } catch { /* parse error, proceed with check */ }
       }
 
