@@ -126,27 +126,6 @@ ResourcesPanel → ResourceCard[] → ResourceBar + Sparkline
 3. `src/dashboard/frontend/src/hooks/useSocketIssues.ts` — add `resources:updated` listener
 4. `src/dashboard/frontend/src/types.ts` — add resource/container stat types
 
-## Current Status
-
-**IMPLEMENTATION COMPLETE** — All planned work done in a single session.
-
-### Files Created
-- `src/lib/docker-stats.ts` — DockerStatsCollector class (async, non-blocking)
-- `src/dashboard/frontend/src/components/ResourceBar.tsx` — utilization bar with color thresholds
-- `src/dashboard/frontend/src/components/Sparkline.tsx` — Chart.js inline sparkline
-- `src/dashboard/frontend/src/components/ResourceCard.tsx` — container + agent cards
-- `src/dashboard/frontend/src/components/ContainerDetailPanel.tsx` — slide-out detail panel
-- `src/dashboard/frontend/src/components/ResourcesPanel.tsx` — main panel with grouping/filtering
-- `src/dashboard/frontend/src/hooks/useResourceStats.ts` — socket.io resources:updated listener
-
-### Files Modified
-- `src/dashboard/frontend/src/types.ts` — ContainerStats, ContainerHistory, ResourceGroupBy, ResourcesSnapshot types
-- `src/dashboard/server/index.ts` — DockerStatsCollector import, /api/resources routes, socket emission
-- `src/dashboard/frontend/src/App.tsx` — resources tab added with Server icon
-
-### Remaining Work
-None — implementation complete, build passes, tests unchanged.
-
 ## Out of Scope
 - Host-level system metrics (total RAM, CPU, disk)
 - Container log streaming (just tail on detail view)
@@ -154,8 +133,3 @@ None — implementation complete, build passes, tests unchanged.
 - Persistent metrics storage (all in-memory, lost on server restart)
 - Network I/O charts (just show current values in detail panel)
 - Custom threshold configuration (hardcoded for v1)
-
-## Specialist Feedback
-
-- **[2026-03-07T04:37Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/016-review-agent-changes-requested.md`
-- **[2026-03-07T04:49Z] test-agent → FAILED** — `.planning/feedback/017-test-agent-failed.md`
