@@ -18,7 +18,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
@@ -2070,8 +2070,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
               <span
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Select for terminal view
-                  onSelect();
+                  onPlan();
                 }}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-600 text-content animate-pulse cursor-pointer hover:bg-amber-500"
                 title={`Agent is waiting for user input - click to respond (${agent.pendingQuestionCount || 1} question${(agent.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
@@ -2229,6 +2228,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
             {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
             {startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
           </button>
+          {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
+          {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
+          <CancelButton issue={issue} />
           <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
         </div>
       )}
@@ -2278,6 +2280,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
             <Undo className="w-3.5 h-3.5" />
             Reset
           </button>
+          <CancelButton issue={issue} />
           <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
         </div>
       )}
@@ -2286,6 +2289,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
           <ReopenSection issue={issue} inline />
+          <CancelButton issue={issue} />
           <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
         </div>
       )}
@@ -2320,6 +2324,125 @@ function DeepWipeButton({ issue, deepWipeMutation }: { issue: Issue; deepWipeMut
     >
       {deepWipeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
       {deepWipeMutation.isPending ? 'Wiping...' : 'Wipe'}
+    </button>
+  );
+}
+
+// Cancel button - stop agents, move to Canceled, optionally wipe workspace
+function CancelButton({ issue }: { issue: Issue }) {
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const [isPending, setIsPending] = useState(false);
+
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        // First confirm the cancel
+        if (!await confirm({
+          title: 'Cancel Issue',
+          message: `Cancel ${issue.identifier}?\n\nThis will:\n• Stop any running agents\n• Clean up agent & review state\n• Move issue to Canceled on tracker`,
+          variant: 'destructive',
+          confirmLabel: 'Cancel Issue',
+        })) return;
+
+        // Then ask about workspace cleanup
+        const wipeWorkspace = await confirm({
+          title: 'Delete Workspace?',
+          message: `Also delete the workspace and branches for ${issue.identifier}?\n\nThis removes the git worktree, local & remote feature branches, and all workspace files.\n\nChoose "Keep" to preserve the code for reference.`,
+          confirmLabel: 'Delete Workspace',
+          cancelLabel: 'Keep Workspace',
+          variant: 'destructive',
+        });
+
+        setIsPending(true);
+        try {
+          const res = await fetch(`/api/issues/${issue.identifier}/cancel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wipeWorkspace }),
+          });
+          if (!res.ok) throw new Error('Cancel failed');
+          await queryClient.refetchQueries({ queryKey: ['issues'] });
+          await queryClient.refetchQueries({ queryKey: ['agents'] });
+        } catch (err) {
+          console.error('Cancel failed:', err);
+        } finally {
+          setIsPending(false);
+        }
+      }}
+      disabled={isPending}
+      className="flex items-center gap-1 text-xs text-orange-400/70 hover:text-orange-400 transition-colors disabled:opacity-50"
+      title="Cancel issue — stop agents, move to Canceled on tracker"
+    >
+      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+      {isPending ? 'Canceling...' : 'Cancel'}
+    </button>
+  );
+}
+
+// Move to Backlog button for Todo items
+function BacklogButton({ issue }: { issue: Issue }) {
+  const queryClient = useQueryClient();
+  const [isPending, setIsPending] = useState(false);
+
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        setIsPending(true);
+        try {
+          await fetch(`/api/issues/${issue.identifier}/move-status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'backlog' }),
+          });
+          await queryClient.refetchQueries({ queryKey: ['issues'] });
+        } catch (err) {
+          console.error('Move to backlog failed:', err);
+        } finally {
+          setIsPending(false);
+        }
+      }}
+      disabled={isPending}
+      className="flex items-center gap-1 text-xs text-content-muted hover:text-content-subtle transition-colors disabled:opacity-50"
+      title="Move to Backlog"
+    >
+      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      Backlog
+    </button>
+  );
+}
+
+// Move to Todo button for Backlog items
+function TodoButton({ issue }: { issue: Issue }) {
+  const queryClient = useQueryClient();
+  const [isPending, setIsPending] = useState(false);
+
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        setIsPending(true);
+        try {
+          await fetch(`/api/issues/${issue.identifier}/move-status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'todo' }),
+          });
+          await queryClient.refetchQueries({ queryKey: ['issues'] });
+        } catch (err) {
+          console.error('Move to todo failed:', err);
+        } finally {
+          setIsPending(false);
+        }
+      }}
+      disabled={isPending}
+      className="flex items-center gap-1 text-xs text-content-muted hover:text-content-subtle transition-colors disabled:opacity-50"
+      title="Move to Todo"
+    >
+      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
+      Todo
     </button>
   );
 }

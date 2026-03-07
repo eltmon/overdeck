@@ -98,7 +98,7 @@ The work agent has completed implementation and created a PR. The specialist pip
 
 ### Done
 
-Merged but **not yet closed on the tracker**. The issue appears in the Done column, and the PRD moves to `docs/prds/completed/`. The issue stays open until a human runs the **Close-Out Ceremony** (dashboard button or `pan work close-out`), which verifies the merge, archives workspace artifacts, cleans up agent state, closes the issue on the tracker, and applies the `closed-out` label. Closed-out issues are hidden from the board by default (toggle "Include closed-out" to see them).
+Merged and **moved to Done on the tracker by the merge agent**. The PRD moves to `docs/prds/completed/`. The issue appears in the Done column, where the human can run the **Close-Out Ceremony** (dashboard button or `pan work close-out`) to archive workspace artifacts, clean up agent state, and apply the `closed-out` label. Closed-out issues are hidden from the board by default (toggle "Include closed-out" to see them).
 
 ### Close-Out Ceremony
 
@@ -109,7 +109,7 @@ The close-out ceremony is the final human-gated step in the issue lifecycle. It 
 3. **Archive workspace artifacts** — Copies `.planning/feedback/`, `STATE.md`, and `beads/` to `~/.panopticon/archives/{issue}/`
 4. **Clean up workspace** — Kills tmux sessions, stops Docker containers, removes git worktree
 5. **Clean up agent state** — Removes `~/.panopticon/agents/agent-{issue}/` and `planning-{issue}/`
-6. **Close issue on tracker** — GitHub: `gh issue close`. Linear: move to Done state. (**Hard fail**)
+6. **Close issue on tracker** — Ensures issue is in Done/Closed state (usually already done by merge agent). (**Hard fail**)
 7. **Apply `closed-out` label** — Creates the label if missing (blue `#1d4ed8`), adds to issue
 8. **Clear review status** — Removes from `review-status.json`
 

@@ -202,9 +202,10 @@ async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Prom
 }
 
 /**
- * Post-merge cleanup: move PRD, close PR, report merge, compact beads.
+ * Post-merge cleanup: move PRD, close PR, move issue to Done, report merge, compact beads.
  *
- * Does NOT close the issue or tear down the workspace — the human
+ * Moves the issue to Done on the tracker so it appears in the Done column.
+ * Does NOT tear down the workspace or apply the closed-out label — the human
  * close-out ceremony handles that separately.
  */
 async function postMergeLifecycle(issueId: string, projectPath: string): Promise<void> {
@@ -226,27 +227,45 @@ async function postMergeLifecycle(issueId: string, projectPath: string): Promise
     console.warn(`[merge-agent] Could not move PRD: ${err}`);
   }
 
-  // 2. Close the PR on GitHub (via lifecycle module)
-  if (issueId.toUpperCase().startsWith('PAN-')) {
-    try {
-      const { closeIssue } = await import('../lifecycle/close-issue.js');
+  // 2. Move issue to Done on tracker (so it appears in Done column for close-out)
+  try {
+    const { closeIssue } = await import('../lifecycle/close-issue.js');
+    if (issueId.toUpperCase().startsWith('PAN-')) {
+      // GitHub: close issue + close PR, but don't apply closed-out label
       const issueNum = parseInt(issueId.split('-')[1], 10);
-      const prResults = await closeIssue(
+      const results = await closeIssue(
         {
           issueId,
           projectPath,
           github: { owner: 'eltmon', repo: 'panopticon-cli', number: issueNum },
         },
-        { labelOnly: true, applyLabel: false },  // Only close PR, don't close issue or apply labels
+        { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' },
       );
-      const prResult = prResults.find(r => r.step === 'close-issue:close-pr');
-      if (prResult?.success && !prResult.skipped) {
-        console.log(`[merge-agent] ✓ ${prResult.details?.join('; ')}`);
-        logActivity('pr_closed', prResult.details?.join('; ') || 'PR closed');
+      for (const r of results) {
+        if (r.success && !r.skipped) {
+          console.log(`[merge-agent] ✓ ${r.details?.join('; ')}`);
+          logActivity(r.step, r.details?.join('; ') || r.step);
+        } else if (!r.skipped) {
+          console.warn(`[merge-agent] ✗ ${r.step} failed: ${r.error}`);
+        }
       }
-    } catch (err) {
-      console.warn(`[merge-agent] Could not close PR: ${err}`);
+    } else {
+      // Linear/other trackers: transition to Done, no label
+      const results = await closeIssue(
+        { issueId, projectPath },
+        { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' },
+      );
+      for (const r of results) {
+        if (r.success && !r.skipped) {
+          console.log(`[merge-agent] ✓ ${r.details?.join('; ')}`);
+          logActivity(r.step, r.details?.join('; ') || r.step);
+        } else if (!r.skipped) {
+          console.warn(`[merge-agent] ✗ ${r.step} failed: ${r.error}`);
+        }
+      }
     }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not move issue to Done: ${err}`);
   }
 
   // 3. Report merge success to dashboard
@@ -275,8 +294,8 @@ async function postMergeLifecycle(issueId: string, projectPath: string): Promise
     console.warn(`[merge-agent] Beads compaction failed: ${err}`);
   }
 
-  console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}. Awaiting human close-out.`);
-  logActivity('merge_complete', `Merged ${issueId}. Awaiting human close-out.`);
+  console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}. Issue moved to Done — awaiting close-out.`);
+  logActivity('merge_complete', `Merged ${issueId}. Issue moved to Done — awaiting close-out.`);
 }
 
 /**

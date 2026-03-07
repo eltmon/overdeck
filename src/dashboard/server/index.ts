@@ -405,11 +405,10 @@ Auto-created PR for ${issueId}
 }
 
 /**
- * Post-merge hook — issue stays open, awaiting human close-out ceremony.
- * Previously this closed issues automatically; now it just logs.
+ * Post-merge hook — merge-agent moves issue to Done, then awaits human close-out ceremony.
  */
 function onMergeComplete(issueId: string): void {
-  console.log(`[merge] Issue ${issueId} merged. Awaiting human close-out.`);
+  console.log(`[merge] Issue ${issueId} merged and moved to Done. Awaiting close-out.`);
 }
 
 // ============================================================================
