@@ -18,7 +18,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
@@ -1392,7 +1392,10 @@ function ColumnContent({
   const renderIssueCard = (issue: Issue) => {
     const issueIdLower = issue.identifier.toLowerCase();
     const workAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'agent'
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.type === 'agent' && a.agentPhase !== 'planning'
+    );
+    const planningAgent = agents.find(
+      (a) => a.issueId?.toLowerCase() === issueIdLower && a.agentPhase === 'planning' && a.status !== 'stopped'
     );
     const issueSpecialists = specialists.filter(
       (s) => s.currentIssue?.toLowerCase() === issueIdLower
@@ -1403,6 +1406,7 @@ function ColumnContent({
         <IssueCard
           issue={issue}
           workAgent={workAgent}
+          planningAgent={planningAgent}
           specialists={issueSpecialists}
           cost={issueCosts[issue.identifier.toLowerCase()]}
           isSelected={selectedIssue === issue.identifier}
@@ -1801,6 +1805,7 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
 interface IssueCardProps {
   issue: Issue;
   workAgent?: Agent;
+  planningAgent?: Agent;
   specialists?: SpecialistAgent[];
   cost?: IssueCost;
   isSelected: boolean;
@@ -1809,7 +1814,7 @@ interface IssueCardProps {
   onViewBeads?: (issue: Issue) => void;
 }
 
-function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
+function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -2013,6 +2018,16 @@ function IssueCard({ issue, workAgent, specialists = [], cost, isSelected, onSel
                 <AgentBadge key={i} type={b.type} name={b.name} isConflict={hasConflict} />
               ));
             })()}
+            {/* Planning badge - shows when a planning agent is active for this issue */}
+            {planningAgent && planningAgent.status !== 'stopped' && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-900/50 text-purple-300 animate-pulse"
+                title="Planning agent is active"
+              >
+                <Sparkles className="w-3 h-3" />
+                Planning
+              </span>
+            )}
             {/* Model badge - shows which model the active agent is using */}
             {activeAgent && activeAgent.model && (
               <span

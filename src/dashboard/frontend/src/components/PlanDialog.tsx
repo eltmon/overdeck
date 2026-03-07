@@ -66,6 +66,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
   const [shadowMode, setShadowMode] = useState(false);
+  const [watchPlanning, setWatchPlanning] = useState(false);
   const [showBeadsDialog, setShowBeadsDialog] = useState(false);
 
   // Track if we've actually connected to a planning session in THIS dialog instance
@@ -90,12 +91,17 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     onSuccess: (data) => {
       setResult(data);
       if (data.planningAgent.started) {
-        hasConnectedToSession.current = true;
-        // Invalidate stale status cache BEFORE entering planning step
-        // Without this, the status query returns cached active:false from
-        // the initial check, causing premature 'complete' transition (PAN-213)
-        queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
-        setStep('planning');
+        if (watchPlanning) {
+          hasConnectedToSession.current = true;
+          // Invalidate stale status cache BEFORE entering planning step
+          // Without this, the status query returns cached active:false from
+          // the initial check, causing premature 'complete' transition (PAN-213)
+          queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
+          setStep('planning');
+        } else {
+          // Default: close dialog immediately, planning continues in background
+          onClose();
+        }
       } else if (data.planningAgent.error) {
         setError(data.planningAgent.error);
         setStep('error');
@@ -461,6 +467,20 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         </ul>
                       </div>
 
+                      {/* Watch planning option */}
+                      <label className="flex items-center gap-3 mb-4 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={watchPlanning}
+                          onChange={(e) => setWatchPlanning(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                        />
+                        <span className="text-sm text-content-body">
+                          Stay and watch planning
+                          <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
+                        </span>
+                      </label>
+
                       <div className="flex gap-3">
                         <button
                           onClick={handleAbortPlanning}
@@ -555,7 +575,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       </label>
 
                       {/* Docker option */}
-                      <label className="flex items-center gap-3 mb-6 cursor-pointer">
+                      <label className="flex items-center gap-3 mb-4 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={startDocker}
@@ -568,6 +588,20 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         <span className="text-sm text-content-body">
                           Start Docker containers
                           <span className="text-content-muted ml-1">(dev environment ready for testing)</span>
+                        </span>
+                      </label>
+
+                      {/* Watch planning option */}
+                      <label className="flex items-center gap-3 mb-6 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={watchPlanning}
+                          onChange={(e) => setWatchPlanning(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                        />
+                        <span className="text-sm text-content-body">
+                          Stay and watch planning
+                          <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
                         </span>
                       </label>
 

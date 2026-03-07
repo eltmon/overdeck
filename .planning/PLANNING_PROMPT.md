@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-295
+# Planning Session: PAN-302
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -28,54 +28,40 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-295
-- **Title:** Dashboard: Resources panel with container/agent grid and resource charts
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/295
+- **ID:** PAN-302
+- **Title:** Plan: close dialog after confirming, show INPUT when ready; optional watch checkbox
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/302
 
 ## Description
-## Summary
+## Desired behaviour
 
-Add a Resources panel to the Panopticon dashboard that provides a unified grid view of all Panopticon-managed infrastructure — containers, agents, specialists, and services — with real-time resource monitoring.
+The planning dialog works exactly as it does today for the initial interaction. The change is in what happens **after** the user submits it:
 
-## Requirements
+1. **Dialog closes immediately** after the user confirms — no more watching the workspace creation / agent spin-up process inside the dialog
+2. **Background execution** — workspace creation and the planning agent run in the background as normal
+3. **INPUT when ready** — when the agent has completed discovery and needs user input, the `INPUT` prompt appears exactly as it does today
 
-### Grid View
-- Display all Docker containers (workspace containers, Traefik, etc.) in a card/grid layout
-- Show which issue each container is associated with (e.g., MIN-712 → fe, api, postgres, redis)
-- Container status indicators: running (green), stopped (red), unhealthy (yellow), restarting (orange)
-- Agent status: running, stopped, stuck, planning
-- Specialist status: review-agent, test-agent, merge-agent
+## Optional: watch mode
 
-### Resource Monitoring
-- **Memory usage**: Bar charts per container showing current usage vs limit
-- **CPU usage**: Bar charts or sparklines showing current CPU %
-- **Aggregate view**: Total system memory/CPU usage across all Panopticon containers
-- Real-time updates via WebSocket/Socket.io (poll `docker stats` periodically)
+Add a **checkbox inside the planning dialog** (unchecked by default):
 
-### Interaction
-- Click a container card to see detailed info (logs, env, ports, uptime)
-- Click an agent card to jump to the agent's workspace/terminal view
-- Group by: issue, type (fe/api/db/cache), status
-- Filter: running only, all, by project
+> ☐ Stay and watch planning
 
-### Data Sources
-- `docker stats` for container metrics
-- `pan status` / agent registry for agent state
-- System-level metrics (total RAM, CPU) for context bars
+- **Unchecked (default)**: dialog closes immediately after confirm; user is notified via INPUT when the agent needs them
+- **Checked**: current behaviour is preserved — dialog stays open and the user can watch the agent work in real time
 
-## Design Notes
-- Should feel like a lightweight resource monitor / htop for Panopticon
-- Bar charts should use color gradients (green → yellow → red) based on utilization %
-- Consider sparkline history (last 5 min) if feasible
-- Mobile-friendly grid that collapses to single column
+## Why
 
-## Acceptance Criteria
-- [ ] Resources panel accessible from dashboard nav
-- [ ] All running containers displayed with status badges
-- [ ] Memory and CPU bar charts update in real-time
-- [ ] Containers grouped by issue with clear association
-- [ ] Agent/specialist status shown alongside containers
-- [ ] Click-through to container details or agent terminal
+Most of the time the user doesn't need to watch workspace creation and agent bootstrap. Closing the dialog immediately makes planning feel instant and non-blocking. The checkbox gives power users the option to observe without making it the forced default.
+
+## Acceptance criteria
+
+- [ ] Planning dialog opens and behaves as today for user input
+- [ ] After confirming, dialog closes immediately (unless watch checkbox is checked)
+- [ ] Planning agent and workspace creation proceed in background
+- [ ] INPUT prompt appears when agent is ready for user interaction (unchanged from today)
+- [ ] Dialog contains a checkbox "Stay and watch planning" — unchecked by default
+- [ ] When checkbox is checked, dialog stays open and shows agent output (current behaviour)
 
 ---
 
