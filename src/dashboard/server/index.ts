@@ -44,6 +44,7 @@ import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyConte
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
 import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
+import { DockerStatsCollector } from '../../lib/docker-stats.js';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -2315,6 +2316,102 @@ app.post('/api/health/agents/:id/ping', async (req, res) => {
 
   res.json({ success: true, status: 'healthy', hasOutput: !!health.lastOutput });
 });
+
+// ============== Resources API ==============
+// Lazy singleton — created once server starts (after socketIo is ready)
+let dockerStatsCollector: DockerStatsCollector | null = null;
+
+app.get('/api/resources', async (_req, res) => {
+  try {
+    const containers = dockerStatsCollector ? dockerStatsCollector.getStats() : [];
+
+    // Gather active agents
+    const agentsDir = join(homedir(), '.panopticon', 'agents');
+    const agents: any[] = [];
+    if (existsSync(agentsDir)) {
+      for (const name of readdirSync(agentsDir)) {
+        const stateFile = join(agentsDir, name, 'state.json');
+        if (!existsSync(stateFile)) continue;
+        try {
+          const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+          if (state.status !== 'stopped') agents.push(state);
+        } catch { /* skip */ }
+      }
+    }
+
+    res.json({ containers, agents, updatedAt: new Date().toISOString() });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch resources: ' + error.message });
+  }
+});
+
+app.get('/api/resources/:containerId/history', (_req, res) => {
+  const { containerId } = _req.params;
+  const history = dockerStatsCollector
+    ? dockerStatsCollector.getHistory(containerId)
+    : { timestamps: [], cpuPercent: [], memoryPercent: [] };
+  res.json(history);
+});
+
+app.get('/api/resources/:containerId/details', async (req, res) => {
+  const { containerId } = req.params;
+  try {
+    // Fetch container inspect + logs in parallel
+    const [inspectResult, logsResult] = await Promise.all([
+      execAsync(`docker inspect --format '{{json .}}' "${containerId}" 2>/dev/null`, { encoding: 'utf-8', timeout: 5000 })
+        .catch(() => ({ stdout: 'null' })),
+      execAsync(`docker logs --tail 100 "${containerId}" 2>&1`, { encoding: 'utf-8', timeout: 5000 })
+        .catch(() => ({ stdout: '' })),
+    ]);
+
+    const inspect = JSON.parse(inspectResult.stdout || 'null');
+    if (!inspect) {
+      return res.status(404).json({ error: 'Container not found' });
+    }
+
+    // Parse ports
+    const ports: Array<{ host: string; container: string; protocol: string }> = [];
+    const portBindings = inspect.HostConfig?.PortBindings ?? {};
+    for (const [containerPort, bindings] of Object.entries(portBindings)) {
+      const [port, protocol] = containerPort.split('/');
+      for (const binding of (bindings as any[]) ?? []) {
+        ports.push({ host: binding.HostPort ?? '', container: port ?? '', protocol: protocol ?? 'tcp' });
+      }
+    }
+
+    // Filter env: skip empty lines
+    const env: string[] = (inspect.Config?.Env ?? []).filter((e: string) => e.includes('='));
+
+    const details = {
+      id: inspect.Id?.slice(0, 12) ?? containerId,
+      name: (inspect.Name ?? '').replace(/^\//, ''),
+      image: inspect.Config?.Image ?? '',
+      status: inspect.State?.Status ?? '',
+      created: inspect.Created ?? '',
+      uptime: inspect.State?.Status === 'running' && inspect.State?.StartedAt
+        ? formatUptime(inspect.State.StartedAt)
+        : '',
+      ports,
+      env,
+      logs: logsResult.stdout,
+      networkIn: 0,
+      networkOut: 0,
+    };
+
+    res.json(details);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch container details: ' + error.message });
+  }
+});
+
+function formatUptime(startedAt: string): string {
+  const ms = Date.now() - new Date(startedAt).getTime();
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
 
 // ============== Cloister API ==============
 
@@ -13789,6 +13886,35 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log('IssueDataService started (background polling + socket.io push)');
   } catch (error: any) {
     console.error('Failed to start IssueDataService:', error.message);
+  }
+
+  // Start DockerStatsCollector — emits resources:updated every 5s
+  try {
+    dockerStatsCollector = new DockerStatsCollector();
+    await dockerStatsCollector.start(5000);
+
+    // Emit snapshot on every collection cycle
+    setInterval(async () => {
+      if (!dockerStatsCollector) return;
+      const containers = dockerStatsCollector.getStats();
+      const agentsDir = join(homedir(), '.panopticon', 'agents');
+      const agents: any[] = [];
+      if (existsSync(agentsDir)) {
+        for (const name of readdirSync(agentsDir)) {
+          const stateFile = join(agentsDir, name, 'state.json');
+          if (!existsSync(stateFile)) continue;
+          try {
+            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+            if (state.status !== 'stopped') agents.push(state);
+          } catch { /* skip */ }
+        }
+      }
+      socketIo.emit('resources:updated', { containers, agents, updatedAt: new Date().toISOString() });
+    }, 5000);
+
+    console.log('DockerStatsCollector started (5s polling, resources:updated socket events)');
+  } catch (error: any) {
+    console.error('Failed to start DockerStatsCollector:', error.message);
   }
 
   // Auto-start Cloister if configured

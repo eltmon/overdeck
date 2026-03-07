@@ -1,55 +1,156 @@
-# PAN-288: Dashboard - Separate Canceled Issues from Done
+# PAN-295: Dashboard Resources Panel
 
-## Status: COMPLETE - Ready for Merge
+## Summary
 
-## Issue
-Canceled issues (Canceled, Duplicate, Won't Do) are currently lumped into the Done column on the kanban board. This makes Done misleading.
+Add a Resources panel to the Panopticon dashboard providing a unified grid view of all Panopticon-managed infrastructure (containers, agents, specialists) with real-time resource monitoring via `docker stats`.
 
-## Solution
-Treat canceled issues like Backlog issues: give them their own filter view and exclude them from the kanban board.
+## Decisions
 
-## Tasks
+### Scope
+- **Containers + Agents only** — no host-level system metrics (total RAM/CPU)
+- Show Docker container resource usage (CPU%, memory) alongside agent/specialist status cards
+- All data from `docker stats` and existing agent state files
 
-- [x] **Task 1**: Stop groupByStatus from pushing canceled into Done (panopticon-h1l3) - DONE
-- [x] **Task 2**: Add canceled cycle filter to server-side getIssues (panopticon-rt1k) - DONE
-- [x] **Task 3**: Add Canceled button to cycle filter bar and canceled list view (panopticon-tr1z) - DONE
+### Grid Layout & Grouping
+- **Default grouping: by issue** (e.g., PAN-123 shows its containers + agent together)
+- **Toggleable** via dropdown: group by issue, type (fe/api/db/cache), or status
+- Filter chips: running only, all, by project
 
-## Implementation Plan
+### Polling & Real-Time
+- **5-second polling interval** for `docker stats` on the server
+- Server emits `resources:updated` via Socket.io → TanStack Query cache injection
+- Sparkline history stored in-memory on server (last 5 min = ~60 samples at 5s intervals)
 
-### Changes Overview
+### Sparklines
+- **Included in v1** — Chart.js already a dependency
+- Store rolling 5-minute history per container in server memory
+- Render as small inline sparklines on each container card
 
-1. **KanbanBoard.tsx**:
-   - Update `CycleFilter` type to include 'canceled'
-   - Add 'canceled' button to cycle filter UI
-   - Modify `groupByStatus` to skip canceled issues (like backlog)
-   - Add `groupByStatus` function to group canceled issues by status (canceled/duplicate/won't do)
-   - Add conditional rendering for 'canceled' view (similar to backlog view)
-   - Add dimmed/strikethrough styling for canceled issues in ListIssueRow
+### Container Detail View
+- **Slide-out panel** on container card click
+- Shows: logs (tail), env vars, ports, uptime, resource charts (CPU/mem over time)
+- Reuses existing slide-out panel patterns from workspace panels
 
-2. **issue-data-service.ts**:
-   - Add 'canceled' case to getIssues cycle filter
+### Agent Navigation
+- **Clicking agent card navigates to Agents tab** with that agent selected
+- No duplicate agent detail UI — leverage existing AgentList component
 
-3. **types.ts**: No changes needed - 'canceled' already exists in CanonicalState
+### Resource Bar Thresholds
+- **0-60%**: green (healthy)
+- **60-85%**: yellow (warning)
+- **85%+**: red (critical)
+- Applied to both CPU and memory bar charts via color gradients
 
-## Acceptance Criteria
+### Status Indicators
+- Container: running (green), stopped (red), unhealthy (yellow), restarting (orange)
+- Agent: healthy (green), warning (yellow), stuck (orange), dead (red), stopped (gray)
+- Specialist: sleeping (gray), active (green), uninitialized (dim)
 
-- [ ] Canceled issues no longer appear in the Done column
-- [ ] New "Canceled" filter option in the cycle filter bar (next to Current/All/Backlog)
-- [ ] Canceled view shows issues in a list with dimmed/strikethrough styling
-- [ ] "Include closed-out" toggle does NOT resurface canceled issues in Done
-- [ ] Existing Done column only shows truly completed issues
+## Architecture
 
-## Specialist Feedback
+### Backend (Server)
 
-- **[2026-03-01T16:32Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/016-review-agent-changes-requested.md`
-  - Issue: Missing tests for `groupByCanceledType()` function
-  - Fixed: Added 8 comprehensive test cases covering all status variants
+**New module: `src/lib/docker-stats.ts`**
+- `DockerStatsCollector` class
+- Runs `docker stats --no-stream --format '{{json .}}'` every 5 seconds via `execAsync`
+- Parses CPU%, memory usage/limit, network I/O
+- Maintains rolling 60-sample history per container (5 min at 5s intervals)
+- Correlates containers to issues via naming conventions (existing `getContainerStatusAsync` patterns)
+- Exposes: `getStats()`, `getHistory(containerId)`, `getAggregateStats()`
 
-- **[2026-03-01T16:35Z] review-agent → PASSED** — All code and tests approved
+**New API endpoints in `src/dashboard/server/index.ts`:**
+- `GET /api/resources` — all containers with current stats + agent/specialist status, grouped by issue
+- `GET /api/resources/:containerId/history` — sparkline history for a container
+- `GET /api/resources/:containerId/details` — detailed container info (logs, env, ports)
 
-- **[2026-03-01T16:37Z] test-agent → PASSED** — Zero new regressions, 1358 tests pass
-  - 14 pre-existing failures on main (migration.test.ts, session-rotation.test.ts, skills-merge.test.ts)
-  - All PAN-288 changes verified working
+**New Socket.io event:**
+- `resources:updated` — emitted every 5s with current stats snapshot
 
-## PR
-- https://github.com/eltmon/panopticon-cli/pull/289
+### Frontend
+
+**New component: `src/dashboard/frontend/src/components/ResourcesPanel.tsx`**
+- Main panel component with grouping/filter controls
+- Grid of `ResourceCard` components
+
+**New component: `ResourceCard.tsx`**
+- Container card: name, status badge, CPU bar, memory bar, sparkline
+- Agent card: status, model, issue, context% — clicks navigate to Agents tab
+
+**New component: `ContainerDetailPanel.tsx`**
+- Slide-out panel for container details
+- Tabs: Overview, Logs, Ports/Env
+
+**New component: `ResourceBar.tsx`**
+- Reusable bar chart component with gradient coloring (green→yellow→red)
+
+**New component: `Sparkline.tsx`**
+- Small inline chart using Chart.js line chart (no axes, just the line)
+
+**New hook: `useResourceStats.ts`**
+- Socket.io listener for `resources:updated` events
+- Injects data into TanStack Query cache
+- Fallback 5s polling via `refetchInterval`
+
+**App.tsx changes:**
+- Add `resources` tab with `Server` or `Monitor` icon from lucide-react
+- Route: `/resources`
+
+### Data Flow
+
+```
+docker stats (5s poll)
+    ↓
+DockerStatsCollector (server, in-memory history)
+    ↓
+Socket.io emit('resources:updated', snapshot)
+    ↓
+useResourceStats hook → queryClient.setQueryData(['resources'], data)
+    ↓
+ResourcesPanel → ResourceCard[] → ResourceBar + Sparkline
+```
+
+## Files to Create/Modify
+
+### New Files
+1. `src/lib/docker-stats.ts` — DockerStatsCollector class
+2. `src/dashboard/frontend/src/components/ResourcesPanel.tsx` — main panel
+3. `src/dashboard/frontend/src/components/ResourceCard.tsx` — container/agent cards
+4. `src/dashboard/frontend/src/components/ContainerDetailPanel.tsx` — slide-out detail
+5. `src/dashboard/frontend/src/components/ResourceBar.tsx` — utilization bar
+6. `src/dashboard/frontend/src/components/Sparkline.tsx` — inline sparkline chart
+7. `src/dashboard/frontend/src/hooks/useResourceStats.ts` — socket + query hook
+
+### Modified Files
+1. `src/dashboard/server/index.ts` — new API routes, socket event, DockerStatsCollector init
+2. `src/dashboard/frontend/src/App.tsx` — add resources tab
+3. `src/dashboard/frontend/src/hooks/useSocketIssues.ts` — add `resources:updated` listener
+4. `src/dashboard/frontend/src/types.ts` — add resource/container stat types
+
+## Current Status
+
+**IMPLEMENTATION COMPLETE** — All planned work done in a single session.
+
+### Files Created
+- `src/lib/docker-stats.ts` — DockerStatsCollector class (async, non-blocking)
+- `src/dashboard/frontend/src/components/ResourceBar.tsx` — utilization bar with color thresholds
+- `src/dashboard/frontend/src/components/Sparkline.tsx` — Chart.js inline sparkline
+- `src/dashboard/frontend/src/components/ResourceCard.tsx` — container + agent cards
+- `src/dashboard/frontend/src/components/ContainerDetailPanel.tsx` — slide-out detail panel
+- `src/dashboard/frontend/src/components/ResourcesPanel.tsx` — main panel with grouping/filtering
+- `src/dashboard/frontend/src/hooks/useResourceStats.ts` — socket.io resources:updated listener
+
+### Files Modified
+- `src/dashboard/frontend/src/types.ts` — ContainerStats, ContainerHistory, ResourceGroupBy, ResourcesSnapshot types
+- `src/dashboard/server/index.ts` — DockerStatsCollector import, /api/resources routes, socket emission
+- `src/dashboard/frontend/src/App.tsx` — resources tab added with Server icon
+
+### Remaining Work
+None — implementation complete, build passes, tests unchanged.
+
+## Out of Scope
+- Host-level system metrics (total RAM, CPU, disk)
+- Container log streaming (just tail on detail view)
+- Container management actions (start/stop/restart already exist in workspace panel)
+- Persistent metrics storage (all in-memory, lost on server restart)
+- Network I/O charts (just show current values in detail panel)
+- Custom threshold configuration (hardcoded for v1)
