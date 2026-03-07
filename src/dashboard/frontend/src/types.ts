@@ -62,6 +62,7 @@ export interface Agent {
   workspaceLocation?: 'local' | 'remote';
   git?: GitStatus;
   type?: 'agent';
+  agentPhase?: 'planning' | 'implementation' | 'exploration' | string;
   hasPendingQuestion?: boolean;
   pendingQuestionCount?: number;
 }

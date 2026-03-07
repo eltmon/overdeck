@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
 import { AgentList } from './components/AgentList';
 import { TerminalView } from './components/TerminalView';
@@ -179,6 +179,36 @@ export default function App() {
       setCurrentConfirmation(confirmations[0]);
     }
   }, [confirmations, currentConfirmation]);
+
+  // Track which planning agents have already fired an INPUT toast to avoid spam
+  const notifiedPlanningInputRef = useRef<Set<string>>(new Set());
+
+  // Toast notification when a planning agent needs user input
+  useEffect(() => {
+    const planningAgentsNeedingInput = agents.filter(
+      (a) => a.agentPhase === 'planning' && a.hasPendingQuestion && a.status !== 'stopped'
+    );
+
+    for (const agent of planningAgentsNeedingInput) {
+      const key = `${agent.id}-input`;
+      if (!notifiedPlanningInputRef.current.has(key)) {
+        notifiedPlanningInputRef.current.add(key);
+        toast.info(`Planning agent needs input for ${agent.issueId || agent.id}`, {
+          description: 'The planning agent has a question for you. Open the Plan dialog to respond.',
+          duration: 10000,
+        });
+      }
+    }
+
+    // Clear notifications for agents that no longer need input
+    for (const key of notifiedPlanningInputRef.current) {
+      const agentId = key.replace('-input', '');
+      const agent = agents.find((a) => a.id === agentId);
+      if (!agent || !agent.hasPendingQuestion || agent.status === 'stopped') {
+        notifiedPlanningInputRef.current.delete(key);
+      }
+    }
+  }, [agents]);
 
   // Find agent for selected issue
   const selectedIssueAgent = selectedIssue
