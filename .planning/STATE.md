@@ -154,3 +154,8 @@ None — implementation complete, build passes, tests unchanged.
 - Persistent metrics storage (all in-memory, lost on server restart)
 - Network I/O charts (just show current values in detail panel)
 - Custom threshold configuration (hardcoded for v1)
+
+## Specialist Feedback
+
+- **[2026-03-07T04:37Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/016-review-agent-changes-requested.md`
+- **[2026-03-07T04:49Z] test-agent → FAILED** — `.planning/feedback/017-test-agent-failed.md`
