@@ -5,637 +5,647 @@
     "skills/beads/README.md": {
       "hash": "sha256:def845caaf5bf2b1d1f518f64692eae64c556c0602ff7371895d0b782410d557",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.810Z"
+      "installed_at": "2026-03-07T14:15:53.954Z"
     },
     "skills/beads/SKILL.md": {
       "hash": "sha256:426004ea0f83733e82a8b629ef56f94ad71a282ee6985a529fe0e48178840a97",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.811Z"
+      "installed_at": "2026-03-07T14:15:53.954Z"
     },
     "skills/beads/adr/0001-bd-prime-as-source-of-truth.md": {
       "hash": "sha256:29985565ab384b381d7288f2c01e19e6d06d760c560152a1238151731a35ca91",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.811Z"
+      "installed_at": "2026-03-07T14:15:53.954Z"
     },
     "skills/beads/resources/AGENTS.md": {
       "hash": "sha256:0158c156ffe03858fea3816bc6142cb75133ed54748936a05202b485a02250b5",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.811Z"
+      "installed_at": "2026-03-07T14:15:53.954Z"
     },
     "skills/beads/resources/ASYNC_GATES.md": {
       "hash": "sha256:519c66461cd17a4b6e2b97ae495d75976bf7f171fa87d70f94d1c89d9432f547",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.812Z"
+      "installed_at": "2026-03-07T14:15:53.955Z"
     },
     "skills/beads/resources/BOUNDARIES.md": {
       "hash": "sha256:c35417f6dd787c0dfa6a7676cd7241e5a8c5245ec789dabf0999932336902d76",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.812Z"
+      "installed_at": "2026-03-07T14:15:53.955Z"
     },
     "skills/beads/resources/CHEMISTRY_PATTERNS.md": {
       "hash": "sha256:b131d1d8c7697ae79e08782c68feaf76aa04c251f332d145cfe86390f70c0247",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.813Z"
+      "installed_at": "2026-03-07T14:15:53.955Z"
     },
     "skills/beads/resources/CLI_REFERENCE.md": {
       "hash": "sha256:49bc3fe3372ca1dd5d968b52f7c60497ff3d64ff0140f2d4fff4fd1e7cd0d92c",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.813Z"
+      "installed_at": "2026-03-07T14:15:53.955Z"
     },
     "skills/beads/resources/DEPENDENCIES.md": {
       "hash": "sha256:a9d430aec3c54e3d92e6ac849682ef30569531c229c3e95b88379961fbe63674",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.813Z"
+      "installed_at": "2026-03-07T14:15:53.955Z"
     },
     "skills/beads/resources/INTEGRATION_PATTERNS.md": {
       "hash": "sha256:ad2f6b54ac5378338e8c36111a984e5a65e6dd4d5ee769c005fcef628227be7e",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.813Z"
+      "installed_at": "2026-03-07T14:15:53.955Z"
     },
     "skills/beads/resources/ISSUE_CREATION.md": {
       "hash": "sha256:ff465ed1fb13fbb6c42b42ec15c1bd8fd677c4661237e4fc1675c179f7fca460",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.814Z"
+      "installed_at": "2026-03-07T14:15:53.955Z"
     },
     "skills/beads/resources/MOLECULES.md": {
       "hash": "sha256:6eb7de2e18bacf02b15e28e2031ed5a87dd79a65076f09acd9c7ea0e454eaffe",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.814Z"
+      "installed_at": "2026-03-07T14:15:53.955Z"
     },
     "skills/beads/resources/PATTERNS.md": {
       "hash": "sha256:e7ffef605b8fd5d5bc082564673f6a378a49b47d41fa94d164ed0d1155853d8c",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.814Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/beads/resources/RESUMABILITY.md": {
       "hash": "sha256:8a7db4e967ace1b4f60dc85e3fb2d02f70749a18056fe90c61b2685bb172d7df",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.814Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/beads/resources/STATIC_DATA.md": {
       "hash": "sha256:f49210144ea5b495853307dc49f73c5fb0c6e13ca0e1ba40caf2a0c9c3b11c51",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.814Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/beads/resources/TROUBLESHOOTING.md": {
       "hash": "sha256:4f23341fba3dabd096a471f865bf8b2554ade2ae0ab11b8c2c4368198476b573",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.815Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/beads/resources/WORKFLOWS.md": {
       "hash": "sha256:347ebf5168fba97d68253b957f73aa8baa6305dc132c363a0fd9908441c3323b",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.815Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/beads/resources/WORKTREES.md": {
       "hash": "sha256:508c483b68bfc9f80f8843d616f1d8a22c8e0103f075356944ac743748c64fa5",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.815Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/beads-completion-check/SKILL.md": {
       "hash": "sha256:4241cd68a42aa5a2db3c79ede8b412ac75aa3265d0b4969a6052c6ad7405a2b8",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.815Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/beads-panopticon-guide/SKILL.md": {
       "hash": "sha256:f02b6d6f16a58ab5cb75d10f7add146bcfd87d55f18d050805ab72c0a4fcc932",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.815Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/bug-fix/SKILL.md": {
       "hash": "sha256:97ac1f712fa8fa9bdfd796e896184ee101fc1b0265e07df2694973046317a498",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.816Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/clear-writing/SKILL.md": {
       "hash": "sha256:2c5ec62be6b40cb371e117cd8fa8e48ea7c09155b13be795dc2d58c43cdfa696",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.816Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/clear-writing/references/elements-of-style/01-introductory.md": {
       "hash": "sha256:248b18596fa18cf63605182688565d25d115c859f602068185f6014c26addbfe",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.816Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/clear-writing/references/elements-of-style/02-elementary-rules-of-usage.md": {
       "hash": "sha256:8cead3fc56b54ab5fc22e52c14423182fdce2d9535d4c1dda1f8319cac542027",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.816Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/clear-writing/references/elements-of-style/03-elementary-principles-of-composition.md": {
       "hash": "sha256:12a3e2b0c674198e0d8e157c07875f78b297cd37b78fe39da53739dd70920238",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.816Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/clear-writing/references/elements-of-style/04-a-few-matters-of-form.md": {
       "hash": "sha256:97798760bf856e13ff74c91a3e2cf98b54fb3ffe751fcb3be079d40e0a181fcf",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.817Z"
+      "installed_at": "2026-03-07T14:15:53.956Z"
     },
     "skills/clear-writing/references/elements-of-style/05-words-and-expressions-commonly-misused.md": {
       "hash": "sha256:ce91d216238bc4f78be4c117261f5dab515f0348cd2b04e2df799fa34124cf9b",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.817Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/clear-writing/references/signs-of-ai-writing.md": {
       "hash": "sha256:604037977648f77096804294859ddd85c75225af7721f551edd3f418e3a1d5cd",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.817Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/code-review/SKILL.md": {
       "hash": "sha256:87abf5a75243548a171d7254fa6b75d5e2d457d6880f263ef76b90e15f6d04b5",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.817Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/code-review-performance/SKILL.md": {
       "hash": "sha256:c4280229481fb82aa70c956a05194b0b084ca5c260951582d4bcd6b9c6fd4831",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.818Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/code-review-security/SKILL.md": {
       "hash": "sha256:3eeee03de1fe3244a5ec5b82ef7d8bc2d8896394e9ce53a70b6461b3df672dd5",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.818Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/crash-investigation/SKILL.md": {
       "hash": "sha256:9f2911ca135b83105515f9f5f50ca43325c4cba5f3b8e42a08366871bcabfde7",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.818Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/dependency-update/SKILL.md": {
       "hash": "sha256:e5d156589ce7c4ab9d3f0e4e3e618a6e17735f3e062ad20b17e7f97d5dc7631e",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.819Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/feature-work/SKILL.md": {
       "hash": "sha256:5937f31a03be10e369a1a26cd0dc4d9ba09f9422630bee92352597024fdde8fb",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.819Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/github-cli/SKILL.md": {
       "hash": "sha256:b84338426193d00bd033666dc0b42eee37334fc7ede2df960574148c8c13ff43",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.819Z"
+      "installed_at": "2026-03-07T14:15:53.957Z"
     },
     "skills/incident-response/SKILL.md": {
       "hash": "sha256:8699ae1ff8b0d48c675fb5f38cfc847f81bd2c058f0d71b9cc79b382da174f02",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.819Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/knowledge-capture/SKILL.md": {
       "hash": "sha256:0e4d4de39bad82bcbe7ff5f5579f687fa237eec974c2a567cb1040c0b33f0a40",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.820Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/onboard-codebase/SKILL.md": {
       "hash": "sha256:575599ef4cf086ed42b66bbc8332667c019567a67a03135ba04874f65126af57",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.820Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/opus-plan/SKILL.md": {
       "hash": "sha256:ef95d32188c97df79f52251fe4733e9a04e4c236e9e014bb25b090c29c673722",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.820Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/pan-approve/SKILL.md": {
       "hash": "sha256:a7f189dd1cae3e5e8734e924d1a5838f51292e3e06d18182591c346a3ad42a16",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.821Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/pan-code-review/SKILL.md": {
       "hash": "sha256:f305d2ec6ebe6a717ec91bf6c6e4c03549185a14d678b7e4b48543ca375a2a94",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.821Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/pan-config/SKILL.md": {
       "hash": "sha256:eec99d7fd5aa22ef0d15efbd37fd821c25f71550583515424c4c009183062526",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.821Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/pan-convoy-synthesis/SKILL.md": {
       "hash": "sha256:302df8768b919a0c03858b46721b57e02c8a0f0f651972f200ec1bb1f38bb371",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.822Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/pan-dashboard-restart/skill.md": {
       "hash": "sha256:9dacafd9769561dd20130377da5e734fdcddfbebe451796aea59e6b878949875",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.822Z"
+      "installed_at": "2026-03-07T14:15:53.958Z"
     },
     "skills/pan-diagnose/SKILL.md": {
       "hash": "sha256:670cbcc6070193eb5a3f22de0864531e04df69ac473aa5e97b2825e94d7a09db",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.823Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-docker/SKILL.md": {
       "hash": "sha256:ebf6f5c1d427f1ad37c64a20a7faa8ec03f155ae7f4940dcbdd4b46dda06cbe8",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.823Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-docs/SKILL.md": {
       "hash": "sha256:3fc27ce8e7adcea8803b7b73065950d0b444ee22d0879e148bb8ccf4c02de037",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.824Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-down/SKILL.md": {
       "hash": "sha256:5209ba6d02c227e15d3cb850a5ec16eb53e620951ddc579c7f6403bb4ddddd4c",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.824Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-health/SKILL.md": {
       "hash": "sha256:1fff21a8ea220874b24ac321c85f8fb31e7080f6ae74e05a2939a9121bd07918",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.824Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-help/SKILL.md": {
       "hash": "sha256:5a205ad6a9775e803dd54b0c6ad2502821bbb17080bd8c951c6e7b04643a9674",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.824Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-install/SKILL.md": {
       "hash": "sha256:2b61105663a07cbc3b933bdad382f55d07009c5061176b84a45da3b6e93c569e",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.825Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-issue/SKILL.md": {
       "hash": "sha256:b6c3a9c9f31291fa18429676725ee173eb9d6e9d1e388ff2d0af6c48083154dc",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.825Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-kill/SKILL.md": {
       "hash": "sha256:17c3c63bea2f796a54bad1d76a85a485dd1ea312a4ef1896e7a6aa0a5afadfd7",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.825Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-logs/SKILL.md": {
       "hash": "sha256:138e4b61ba20b18144e07edd88b7907e6188278431867cbf92a912ac6260a267",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.825Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-network/SKILL.md": {
       "hash": "sha256:1b477262abab1d69fffe43b3e54e05c621d2db681ca6aecb517c7f0cd3c2646a",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.825Z"
+      "installed_at": "2026-03-07T14:15:53.959Z"
     },
     "skills/pan-oversee/SKILL.md": {
       "hash": "sha256:7341ae0c6919cb0b6a4ed7edf4f2bebfa4d610a84723705f400fb30151be8023",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.826Z"
+      "installed_at": "2026-03-07T14:15:53.960Z"
     },
     "skills/pan-plan/SKILL.md": {
       "hash": "sha256:dfb6156d7ef9f2a22ca01482447d6ec93690437cdf66d78cd7bbe0b129a8a7ba",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.826Z"
+      "installed_at": "2026-03-07T14:15:53.960Z"
     },
     "skills/pan-projects/SKILL.md": {
       "hash": "sha256:e23d6e84b8ecf4781484dfb422d5910c51626b294482f91086f8004a9b2186da",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.826Z"
+      "installed_at": "2026-03-07T14:15:53.960Z"
     },
     "skills/pan-quickstart/SKILL.md": {
       "hash": "sha256:d83ceebe5dcda5d3ec460004351c076a88f774755fc99f0cca3f64ad8f5db424",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.827Z"
+      "installed_at": "2026-03-07T14:15:53.960Z"
     },
     "skills/pan-reload/SKILL.md": {
       "hash": "sha256:c218fce079230998c016f457e3fcf8de08ca46f72503c8108b991dc6d525871d",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.827Z"
+      "installed_at": "2026-03-07T14:15:53.960Z"
     },
     "skills/pan-reopen/SKILL.md": {
       "hash": "sha256:53d3ead25822bf7fe1781e345613ea1eea9f6bb0e627e6a2cd477246df3c8c92",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.827Z"
+      "installed_at": "2026-03-07T14:15:53.960Z"
     },
     "skills/pan-rescue/SKILL.md": {
       "hash": "sha256:ff5a7cbd0867b3255ff855a8f49786f190e8d3d2e5cdfe033ff3936cd5dbb595",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.828Z"
+      "installed_at": "2026-03-07T14:15:53.960Z"
     },
     "skills/pan-restart/SKILL.md": {
       "hash": "sha256:2c53f35efd01f5c066857457857477e84008fa49b01f928afd7464de40da4322",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.828Z"
+      "installed_at": "2026-03-07T14:15:53.961Z"
     },
     "skills/pan-setup/SKILL.md": {
       "hash": "sha256:deecc13b6e4ee3852850e58676ccaca07de9c345515e2ac8dda4fed7d1401b36",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.828Z"
+      "installed_at": "2026-03-07T14:15:53.961Z"
     },
     "skills/pan-skill-creator/SKILL.md": {
       "hash": "sha256:e9957af4ed4b1a47f431a4af3701c90d7b207891006eef10d85e59fa543eb2fa",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.829Z"
+      "installed_at": "2026-03-07T14:15:53.961Z"
     },
     "skills/pan-skill-creator/references/output-patterns.md": {
       "hash": "sha256:c4eaa338cc610265f8349efaeefe27db503bc5bb1b3484e006801c9f0341360a",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.829Z"
+      "installed_at": "2026-03-07T14:15:53.961Z"
     },
     "skills/pan-skill-creator/references/workflows.md": {
       "hash": "sha256:ea7c7174f9c71085b350dc5509d680752fece1996ec74c78df51abf9995d7f65",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.829Z"
+      "installed_at": "2026-03-07T14:15:53.961Z"
     },
     "skills/pan-skill-creator/scripts/init_skill.py": {
       "hash": "sha256:239c7cd0fa216788d2b309277105b19067ed143a615a68b1d4e8bed5b9263e48",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.829Z"
+      "installed_at": "2026-03-07T14:15:53.961Z"
     },
     "skills/pan-status/SKILL.md": {
       "hash": "sha256:49e12acaed7a9d00c318ca631b44c2e2cfa2692e35eeba006572dc3eab0a3699",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.830Z"
+      "installed_at": "2026-03-07T14:15:53.962Z"
     },
     "skills/pan-subagent-creator/SKILL.md": {
       "hash": "sha256:4406460d5340ccbeb9e8da3f45a1c22659187ec8b03afa7f9ab70ba7d64c1d0e",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.830Z"
+      "installed_at": "2026-03-07T14:15:53.962Z"
     },
     "skills/pan-subagent-creator/assets/validate-readonly-query.sh": {
       "hash": "sha256:e2343cb848f0aa5b98229deadc2cb2b20cf1b65764e98d87eed3be5244b57993",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.830Z"
+      "installed_at": "2026-03-07T14:15:53.962Z"
     },
     "skills/pan-subagent-creator/references/example-agents.md": {
       "hash": "sha256:6cb0d5dd0f595eed34da6584da687f4dda918a9d3a80446e9da2702b232d2049",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.830Z"
+      "installed_at": "2026-03-07T14:15:53.962Z"
     },
     "skills/pan-subagent-creator/scripts/init_agent.py": {
       "hash": "sha256:cf314a20949eed8e26937c277ae4278b7878fa139910f8d157b4fe676d65183d",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.831Z"
+      "installed_at": "2026-03-07T14:15:53.962Z"
     },
     "skills/pan-sync/SKILL.md": {
       "hash": "sha256:2a596190e18cffa060bbc2b8f02cd61589693823bbfc6f09eb6db51716e2ec37",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.831Z"
+      "installed_at": "2026-03-07T14:15:53.962Z"
     },
     "skills/pan-sync-main/SKILL.md": {
       "hash": "sha256:3a8064e5e2bcd38d970b3b5daa049e97df94361fc5070a2a27816cdfb52d201e",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.831Z"
+      "installed_at": "2026-03-07T14:15:53.963Z"
     },
     "skills/pan-tell/SKILL.md": {
       "hash": "sha256:da5ab299a511319aceb7b25bcba9d95f52d1b46d798bcc4c9de19b0cacee73cc",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.831Z"
+      "installed_at": "2026-03-07T14:15:53.963Z"
     },
     "skills/pan-test-config/SKILL.md": {
       "hash": "sha256:0fc118f107b7dfc7e52d997cac444fbf116c113bde04bda92475018d16320527",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.832Z"
+      "installed_at": "2026-03-07T14:15:53.963Z"
     },
     "skills/pan-tldr/SKILL.md": {
       "hash": "sha256:4ddcd4e7e007ada6084e1fda9a1c24581ad7bf8ee4f11652145c0a67efcd453e",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.832Z"
+      "installed_at": "2026-03-07T14:15:53.963Z"
     },
     "skills/pan-tracker/SKILL.md": {
       "hash": "sha256:aae2ed3dd4f118bf98f0619ef15da74e2749f4526b7cd52354179f93bcab2d9c",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.832Z"
+      "installed_at": "2026-03-07T14:15:53.963Z"
     },
     "skills/pan-up/SKILL.md": {
       "hash": "sha256:59fa536251024d3d6d7b8550fb5827d520e53f12707a6aab5ab46873fff7dd8f",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.832Z"
+      "installed_at": "2026-03-07T14:15:53.964Z"
     },
     "skills/pan-workspace-config/SKILL.md": {
       "hash": "sha256:4fccb784748a6c1ca192ecc52421bd019767261309c918defe504d74ac53afd6",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.833Z"
+      "installed_at": "2026-03-07T14:15:53.964Z"
     },
     "skills/react-best-practices/SKILL.md": {
       "hash": "sha256:81bad0edc74bc4969ea6abf75b0f84dd99a0557fb0d52a2f74c06cf0567833e1",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.833Z"
+      "installed_at": "2026-03-07T14:15:53.964Z"
     },
     "skills/refactor/SKILL.md": {
       "hash": "sha256:e735883c27a8ce38459972a13cae3188dbee94e1f5740dc4befe899362159042",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.833Z"
+      "installed_at": "2026-03-07T14:15:53.965Z"
     },
     "skills/refactor-radar/SKILL.md": {
       "hash": "sha256:436592b0a2c50578f150c0be4cda89ea41a4ae30b0444dd9be1ef23d40393eda",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.833Z"
+      "installed_at": "2026-03-07T14:15:53.965Z"
     },
     "skills/release/SKILL.md": {
       "hash": "sha256:b68921296608c3be84c91ebe1c769290fb788617e6f22ec524cc2cebf9e75697",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.834Z"
+      "installed_at": "2026-03-07T14:15:53.965Z"
     },
     "skills/send-feedback-to-agent/SKILL.md": {
       "hash": "sha256:71ebd3e0e95dfb7ff56630f24976b18ab6e84e61434c12820a2552aa2244d563",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.834Z"
+      "installed_at": "2026-03-07T14:15:53.966Z"
     },
     "skills/session-health/SKILL.md": {
       "hash": "sha256:95adba9ecc8961b25287c81409b89656ecde4bc423230dfbfe8ae6782c9ceba5",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.834Z"
+      "installed_at": "2026-03-07T14:15:53.966Z"
     },
     "skills/session-health/scripts/check_sessions.py": {
       "hash": "sha256:7f9ea53feef4317d4c19c2ed6278631ac893df48bc3de655a6e114dd5c28517c",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.834Z"
+      "installed_at": "2026-03-07T14:15:53.966Z"
     },
     "skills/skill-creator/SKILL.md": {
       "hash": "sha256:a9c545ee60a224214e5c360c73df6a923c8ebf4058ea75a7cfe5c5f6debdc2a2",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.834Z"
+      "installed_at": "2026-03-07T14:15:53.966Z"
     },
     "skills/skill-creator/scripts/init_skill.py": {
       "hash": "sha256:0f0263bf350fc2bc104f80e7758a6dd20551fc3c85bfbda9867a7c0a93f9b499",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.836Z"
+      "installed_at": "2026-03-07T14:15:53.967Z"
     },
     "skills/skill-creator/scripts/package_skill.py": {
       "hash": "sha256:8475a7bc886d9d3cda02111c135e82719fd8f3252ed3bcc7aa4f4be2fd522f55",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.836Z"
+      "installed_at": "2026-03-07T14:15:53.967Z"
     },
     "skills/stitch-design-md/README.md": {
       "hash": "sha256:d7876df9858ae65ec54d3eca7e27887ba7c06a0ddaedb23c90f001341c18b33a",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.837Z"
+      "installed_at": "2026-03-07T14:15:53.971Z"
     },
     "skills/stitch-design-md/SKILL.md": {
       "hash": "sha256:eb15f44646528f3a087ce023329ae699c1b6e803662af68338e1eb1c0406b59b",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.838Z"
+      "installed_at": "2026-03-07T14:15:53.971Z"
     },
     "skills/stitch-design-md/examples/DESIGN.md": {
       "hash": "sha256:e856ef5f910f564f3b25a20720e9c74a0691e407e5d0bd8e0abf97b2b7225a24",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.838Z"
+      "installed_at": "2026-03-07T14:15:53.971Z"
     },
     "skills/stitch-react-components/README.md": {
       "hash": "sha256:1016b8df05d3d31e521a1e4845b26114a81070b4211ff90b84edde60959eb15d",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.839Z"
+      "installed_at": "2026-03-07T14:15:53.972Z"
     },
     "skills/stitch-react-components/SKILL.md": {
       "hash": "sha256:f0473659edcdda6edf9aa78fb705c01937196034fac1a76d24b8700b24481c03",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.839Z"
+      "installed_at": "2026-03-07T14:15:53.972Z"
     },
     "skills/stitch-react-components/examples/gold-standard-card.tsx": {
       "hash": "sha256:8b9ef807fe6019e084ca3f3ebb38cf07c6a5f912a9de544bf0c61892809c8f10",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.839Z"
+      "installed_at": "2026-03-07T14:15:53.972Z"
     },
     "skills/stitch-react-components/package-lock.json": {
       "hash": "sha256:db75fd36cd675a30d144138d4711b74429bffca81cb4cd75b866d6cdafd6e4c9",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.839Z"
+      "installed_at": "2026-03-07T14:15:53.972Z"
     },
     "skills/stitch-react-components/package.json": {
       "hash": "sha256:937a3476dceff2386e7828962f926bccdf4f936b4fa727703082ee7d0e8083bd",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.839Z"
+      "installed_at": "2026-03-07T14:15:53.972Z"
     },
     "skills/stitch-react-components/resources/architecture-checklist.md": {
       "hash": "sha256:55c3407f307d557d3bd35eb3d653a18c6b2977f38efc71f6c33192ce37159c32",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.839Z"
+      "installed_at": "2026-03-07T14:15:53.972Z"
     },
     "skills/stitch-react-components/resources/component-template.tsx": {
       "hash": "sha256:9d6edbca16724ebe83084ea8bb4ef0c03cace3c1773ee1b693412ac4efc30579",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.840Z"
+      "installed_at": "2026-03-07T14:15:53.974Z"
     },
     "skills/stitch-react-components/resources/stitch-api-reference.md": {
       "hash": "sha256:f7cd8515705dcff420e40ee69609990b12c5e2c2c1489cea10244f177af31624",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.840Z"
+      "installed_at": "2026-03-07T14:15:53.974Z"
     },
     "skills/stitch-react-components/resources/style-guide.json": {
       "hash": "sha256:9ac47e30d145bba43af7959e70cf1d8b96ba8b0e07a860ef98b1e05d50ced712",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.841Z"
+      "installed_at": "2026-03-07T14:15:53.974Z"
     },
     "skills/stitch-react-components/scripts/fetch-stitch.sh": {
       "hash": "sha256:2b5939b68289d1eca1a616e7c4a4cbe6de09010941bb7756348d75509e5ef0ff",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.841Z"
+      "installed_at": "2026-03-07T14:15:53.974Z"
     },
     "skills/stitch-react-components/scripts/validate.js": {
       "hash": "sha256:62b1eea0ea449168f5eff9c4b3d5ff8ade988f75d1c3e245d3b37a80bcd4249d",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.842Z"
+      "installed_at": "2026-03-07T14:15:53.975Z"
     },
     "skills/stitch-setup/SKILL.md": {
       "hash": "sha256:e6aa4d416b1f928100b4f5713c18704a31376f43ef2914f418d92e55fb232788",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.843Z"
+      "installed_at": "2026-03-07T14:15:53.975Z"
     },
     "skills/test-specialist-workflow/SKILL.md": {
       "hash": "sha256:749376ac235156476a74bfc9d4eb135b108024a6b429e5b0e50347c0b497d6cc",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.844Z"
+      "installed_at": "2026-03-07T14:15:53.975Z"
     },
     "skills/web-design-guidelines/SKILL.md": {
       "hash": "sha256:2d5b9e19c10bdf553082e8140ce656bc83d13c475761a81781eba065d2311c93",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.846Z"
+      "installed_at": "2026-03-07T14:15:53.975Z"
     },
     "skills/work-complete/SKILL.md": {
       "hash": "sha256:40b04cd110c3bc78508d558d633920f3a8cd507b5290239f9e244cd020a52ff5",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.846Z"
+      "installed_at": "2026-03-07T14:15:53.975Z"
     },
     "skills/work-complete/work-complete/SKILL.md": {
       "hash": "sha256:513791e9754e37caf74bbfc723145b5c97585f6be4156740da90aef208821d7e",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.846Z"
+      "installed_at": "2026-03-07T14:15:53.976Z"
     },
     "skills/workspace-status/SKILL.md": {
       "hash": "sha256:5eb49e9f78ba73c7d0d784f3a73b3c67c027867fa53e8b293937eebe08a9085a",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.847Z"
+      "installed_at": "2026-03-07T14:15:53.976Z"
     },
     "agents/code-review-correctness.md": {
       "hash": "sha256:4f8cd91beaac95526a7478d025285652a6820606a877714b548e518fc959f204",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.848Z"
+      "installed_at": "2026-03-07T14:15:53.976Z"
     },
     "agents/code-review-performance.md": {
       "hash": "sha256:0b293c3b0cfc483e24ca79028c7af0b29915c54b3ae2fc7d4505f5c56173cca8",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.848Z"
+      "installed_at": "2026-03-07T14:15:53.977Z"
     },
     "agents/code-review-security.md": {
       "hash": "sha256:27f9777ee4127c8637b5e0c2ea33a8764fcd07f574786f4b6513a1cb73fae23f",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.849Z"
+      "installed_at": "2026-03-07T14:15:53.977Z"
     },
     "agents/code-review-synthesis.md": {
       "hash": "sha256:885e2a9852b16d1079d5908c5c2a17627d4518635e400ab6077208b8badb0c0a",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.850Z"
+      "installed_at": "2026-03-07T14:15:53.977Z"
     },
     "agents/codebase-explorer.md": {
       "hash": "sha256:7ab0001429ee6d4ceb15ae94289ac6fec3bfd121687d3127f4a494e70ced49d3",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.851Z"
+      "installed_at": "2026-03-07T14:15:53.978Z"
     },
     "agents/health-monitor.md": {
       "hash": "sha256:ec7771b0450023d4d49bbc8339c6e63b33b77b3a25b401b104b99921c4ae97c2",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.853Z"
+      "installed_at": "2026-03-07T14:15:53.978Z"
     },
     "agents/planning-agent.md": {
       "hash": "sha256:7449a83b9d98d5b720c02b1ca87a357b6da8a31dbc134c069761ef41bb6eaff4",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.854Z"
+      "installed_at": "2026-03-07T14:15:53.979Z"
     },
     "agents/triage-agent.md": {
       "hash": "sha256:ee8891c56cef69da87da0080458b5610b8dfbff76497d6aafa36c166d5c079c2",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.854Z"
+      "installed_at": "2026-03-07T14:15:53.979Z"
     },
     "rules/async-tmux.md": {
       "hash": "sha256:87f78d5bc0693b140658de82dfae18c9af07b2e5e9aba727680cb88952d5aaa5",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.855Z"
+      "installed_at": "2026-03-07T14:15:53.980Z"
     },
     "rules/no-destructive-requests.md": {
       "hash": "sha256:750470c259fccbecb7d3a2587c5fd60966460d6f6f8210b687d8b20bfe5eb472",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.856Z"
+      "installed_at": "2026-03-07T14:15:53.980Z"
     },
     "rules/no-execsync-server.md": {
       "hash": "sha256:06ac23f2cc30c128ecf5a13fdfd555e5408e91f1dd1e9f81d594d23f5f53e93c",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.856Z"
+      "installed_at": "2026-03-07T14:15:53.980Z"
     },
     "rules/prefer-async.md": {
       "hash": "sha256:27f2112390725410dd720e36d27fe19c1342ef8b7ac1043b138fa20327849f3f",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.857Z"
+      "installed_at": "2026-03-07T14:15:53.980Z"
     },
     "skills/spec-readiness/REPORT-TEMPLATE.md": {
       "hash": "sha256:8f0b17be81c011988970a98c0dce82a93b3c3882165b18d797cb315d81ed7f02",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.836Z"
+      "installed_at": "2026-03-07T14:15:53.968Z"
     },
     "skills/spec-readiness/SCORING-REFERENCE.md": {
       "hash": "sha256:6d8ffc11ac4f775a621323aab268da6fac947a8d00bce6fc560ef6dbb287e8ca",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.836Z"
+      "installed_at": "2026-03-07T14:15:53.970Z"
     },
     "skills/spec-readiness/SKILL.md": {
       "hash": "sha256:9ea7e6e1859eaf3b4c71f6f270edf061b5b61284e9ef416b7fc2ebbc6dc7c66c",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.836Z"
+      "installed_at": "2026-03-07T14:15:53.970Z"
     },
     "skills/spec-readiness-setup/SKILL.md": {
       "hash": "sha256:e9272c155a4bcd1ee7a8bc8e65cfac006eac921448fdd709869fca04bc1fae59",
       "source": "panopticon",
-      "installed_at": "2026-02-28T08:29:34.837Z"
+      "installed_at": "2026-03-07T14:15:53.971Z"
+    },
+    "skills/check-merged/SKILL.md": {
+      "hash": "sha256:fa66002d211f0e33885f66d029bc543946ddf90112c0069d1020ff39967e7d1a",
+      "source": "panopticon",
+      "installed_at": "2026-03-07T14:15:53.956Z"
+    },
+    "skills/hume-evi/SKILL.md": {
+      "hash": "sha256:a5031732ce7670e647162f5c603bbeb7697e886108ab464ae1dc24fca3282f20",
+      "source": "panopticon",
+      "installed_at": "2026-03-07T14:15:53.958Z"
     }
   }
 }
