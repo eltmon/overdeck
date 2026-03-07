@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, Socket } from 'socket.io-client';
+import type { ResourcesSnapshot } from '../types';
 
 let sharedSocket: Socket | null = null;
 let socketRefCount = 0;
@@ -32,7 +33,7 @@ export function useResourceStats(): void {
     const socket = getSharedSocket();
     socketRefCount++;
 
-    const handleUpdate = (snapshot: unknown) => {
+    const handleUpdate = (snapshot: ResourcesSnapshot) => {
       queryClient.setQueryData(['resources'], snapshot);
     };
 

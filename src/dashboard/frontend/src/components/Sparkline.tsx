@@ -38,7 +38,7 @@ export function Sparkline({ data, color = 'rgba(59,130,246,0.8)', height = 32, m
         borderColor: color,
         borderWidth: 1.5,
         fill: true,
-        backgroundColor: color.replace('0.8)', '0.15)').replace(')', ', 0.15)'),
+        backgroundColor: color.replace(/[\d.]+\)$/, '0.15)'),
         pointRadius: 0,
         tension: 0.3,
       }],

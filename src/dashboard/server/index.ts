@@ -2327,13 +2327,13 @@ app.get('/api/resources', async (_req, res) => {
 
     // Gather active agents
     const agentsDir = join(homedir(), '.panopticon', 'agents');
-    const agents: any[] = [];
+    const agents: Record<string, unknown>[] = [];
     if (existsSync(agentsDir)) {
       for (const name of readdirSync(agentsDir)) {
         const stateFile = join(agentsDir, name, 'state.json');
         if (!existsSync(stateFile)) continue;
         try {
-          const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+          const state = JSON.parse(readFileSync(stateFile, 'utf-8')) as Record<string, unknown>;
           if (state.status !== 'stopped') agents.push(state);
         } catch { /* skip */ }
       }
@@ -2345,8 +2345,11 @@ app.get('/api/resources', async (_req, res) => {
   }
 });
 
-app.get('/api/resources/:containerId/history', (_req, res) => {
-  const { containerId } = _req.params;
+app.get('/api/resources/:containerId/history', (req, res) => {
+  const { containerId } = req.params;
+  if (!/^[a-f0-9]{12,64}$/.test(containerId)) {
+    return res.status(400).json({ error: 'Invalid container ID' });
+  }
   const history = dockerStatsCollector
     ? dockerStatsCollector.getHistory(containerId)
     : { timestamps: [], cpuPercent: [], memoryPercent: [] };
@@ -2355,6 +2358,9 @@ app.get('/api/resources/:containerId/history', (_req, res) => {
 
 app.get('/api/resources/:containerId/details', async (req, res) => {
   const { containerId } = req.params;
+  if (!/^[a-f0-9]{12,64}$/.test(containerId)) {
+    return res.status(400).json({ error: 'Invalid container ID' });
+  }
   try {
     // Fetch container inspect + logs in parallel
     const [inspectResult, logsResult] = await Promise.all([
@@ -2374,7 +2380,7 @@ app.get('/api/resources/:containerId/details', async (req, res) => {
     const portBindings = inspect.HostConfig?.PortBindings ?? {};
     for (const [containerPort, bindings] of Object.entries(portBindings)) {
       const [port, protocol] = containerPort.split('/');
-      for (const binding of (bindings as any[]) ?? []) {
+      for (const binding of (bindings as Array<{ HostPort?: string }>) ?? []) {
         ports.push({ host: binding.HostPort ?? '', container: port ?? '', protocol: protocol ?? 'tcp' });
       }
     }
@@ -13898,13 +13904,13 @@ server.listen(PORT, '0.0.0.0', async () => {
       if (!dockerStatsCollector) return;
       const containers = dockerStatsCollector.getStats();
       const agentsDir = join(homedir(), '.panopticon', 'agents');
-      const agents: any[] = [];
+      const agents: Record<string, unknown>[] = [];
       if (existsSync(agentsDir)) {
         for (const name of readdirSync(agentsDir)) {
           const stateFile = join(agentsDir, name, 'state.json');
           if (!existsSync(stateFile)) continue;
           try {
-            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+            const state = JSON.parse(readFileSync(stateFile, 'utf-8')) as Record<string, unknown>;
             if (state.status !== 'stopped') agents.push(state);
           } catch { /* skip */ }
         }
