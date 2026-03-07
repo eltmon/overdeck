@@ -1383,17 +1383,39 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       const lastNudge = firstCompletionCooldowns.get(agent.id);
       if (lastNudge && (now - lastNudge) < FIRST_COMPLETION_COOLDOWN_MS) continue;
 
-      // Check if this agent already has a review status (meaning it already
-      // went through the pipeline at least once — dead-end detection handles that)
+      // HARD GATE: Never nudge agents that have been through the review pipeline.
+      // Check review-status.json — if ANY entry exists for this issue, the agent
+      // has entered the specialist pipeline and must NOT receive a "pan work done" nudge.
+      // (Dead-end detection handles agents stuck in review/test cycles.)
       const issueId = agent.issueId || agent.id.replace('agent-', '').toUpperCase();
       const issueKey = issueId.toLowerCase();
       if (existsSync(REVIEW_STATUS_FILE)) {
         try {
           const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-          // Keys are stored in original case (e.g., "MIN-727") — check both cases
+          // Keys are stored in original case (e.g., "MIN-727") — check all case variants
           const hasStatus = statuses[issueKey] || statuses[issueId] || statuses[issueId.toUpperCase()];
-          if (hasStatus) continue; // Already in pipeline — let dead-end handle it
+          if (hasStatus) {
+            console.log(`[deacon] First-completion gate: skipping ${agent.id} — has review status entry (readyForMerge=${hasStatus.readyForMerge ?? false})`);
+            continue;
+          }
         } catch { /* parse error, proceed with check */ }
+      }
+
+      // HARD GATE: Also check for review feedback files in the workspace.
+      // If a feedback directory exists and is non-empty, a review agent has already
+      // processed this workspace — never send a "pan work done" nudge.
+      const agentStateForGate = getAgentState(agent.id);
+      if (agentStateForGate?.workspace) {
+        const feedbackDir = join(agentStateForGate.workspace, '.planning', 'feedback');
+        if (existsSync(feedbackDir)) {
+          try {
+            const feedbackFiles = readdirSync(feedbackDir);
+            if (feedbackFiles.length > 0) {
+              console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .planning/feedback/`);
+              continue;
+            }
+          } catch { /* can't read feedback dir */ }
+        }
       }
 
       // Check if the agent has commits (sign that work was done)
