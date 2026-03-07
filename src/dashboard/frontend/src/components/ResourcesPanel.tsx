@@ -9,13 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useResourceStats } from '../hooks/useResourceStats';
 import { ContainerCard, AgentCard } from './ResourceCard';
 import { ContainerDetailPanel } from './ContainerDetailPanel';
-import { ContainerStats, ContainerHistory, Agent, ResourceGroupBy } from '../types';
-
-interface ResourcesSnapshot {
-  containers: ContainerStats[];
-  agents: Agent[];
-  updatedAt: string;
-}
+import { ContainerStats, ContainerHistory, Agent, ResourceGroupBy, ResourcesSnapshot } from '../types';
 
 interface ResourceGroup {
   key: string;
