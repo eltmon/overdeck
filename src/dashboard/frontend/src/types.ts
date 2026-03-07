@@ -174,6 +174,33 @@ export interface PanopticonIssueState {
   fallbacksUsed: string[];           // e.g., ["label:planning"]
 }
 
+// Resource monitoring types (PAN-295)
+export interface ContainerStats {
+  id: string;
+  name: string;
+  cpuPercent: number;
+  memoryUsage: number;    // bytes
+  memoryLimit: number;    // bytes
+  memoryPercent: number;
+  networkIn: number;      // bytes
+  networkOut: number;     // bytes
+  status: 'running' | 'stopped' | 'unhealthy' | 'restarting';
+}
+
+export interface ContainerHistory {
+  timestamps: number[];   // unix ms
+  cpuPercent: number[];
+  memoryPercent: number[];
+}
+
+export type ResourceGroupBy = 'issue' | 'type' | 'status';
+
+export interface ResourcesSnapshot {
+  containers: ContainerStats[];
+  agents: Agent[];
+  updatedAt: string;
+}
+
 // State transition result
 export interface StateTransitionResult {
   success: boolean;

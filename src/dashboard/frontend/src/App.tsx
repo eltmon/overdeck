@@ -19,7 +19,8 @@ import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
 import { MissionControl } from './components/MissionControl';
-import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, AlertTriangle } from 'lucide-react';
+import { ResourcesPanel } from './components/ResourcesPanel';
+import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, AlertTriangle, Server } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useTheme } from './hooks/useTheme';
 import { useSocketIssues } from './hooks/useSocketIssues';
@@ -38,12 +39,13 @@ interface TrackerStatus {
   configured: TrackerStatusItem[];
 }
 
-type Tab = 'mission-control' | 'kanban' | 'agents' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
+type Tab = 'mission-control' | 'kanban' | 'agents' | 'resources' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
 const TAB_PATHS: Record<Tab, string> = {
   'mission-control': '/',
   kanban: '/kanban',
   agents: '/agents',
+  resources: '/resources',
   convoys: '/convoys',
   handoffs: '/handoffs',
   activity: '/activity',
@@ -288,6 +290,7 @@ export default function App() {
               { id: 'mission-control', label: 'Mission Control', icon: Compass },
               { id: 'kanban', label: 'Board', icon: LayoutGrid },
               { id: 'agents', label: 'Agents', icon: Users },
+              { id: 'resources', label: 'Resources', icon: Server },
               { id: 'convoys', label: 'Convoys', icon: Users },
               { id: 'handoffs', label: 'Handoffs', icon: ArrowRightLeft },
               { id: 'activity', label: 'Activity', icon: Terminal },
@@ -403,6 +406,16 @@ export default function App() {
               />
               {selectedAgent && <TerminalView agentId={selectedAgent} />}
             </div>
+          </div>
+        )}
+        {activeTab === 'resources' && (
+          <div className="w-full h-full overflow-hidden">
+            <ResourcesPanel
+              onNavigateToAgents={(agentId) => {
+                setSelectedAgent(agentId);
+                setActiveTab('agents');
+              }}
+            />
           </div>
         )}
         {activeTab === 'skills' && (

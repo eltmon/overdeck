@@ -7,10 +7,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    pool: 'forks',
-    poolOptions: {
-      forks: { maxForks: 4 },
-    },
     setupFiles: ['./src/test-setup.ts'],
     include: ['**/__tests__/**/*.test.{ts,tsx}', '**/*.{test,spec}.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/tests/**'], // Exclude Playwright E2E tests
