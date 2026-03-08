@@ -1031,8 +1031,15 @@ Report any issues or conflicts you encountered.`;
         // For fast-forward: message is the original commit message (no "merge" keyword)
         // In BOTH cases, HEAD changing means the merge is done — verify it's pushed
         {
-          // Verify it's pushed
+          // Verify it's pushed — fetch first to refresh stale tracking refs
+          // (the push happens in the merge-agent's tmux session, which may not
+          // update the tracking ref visible to this process)
           try {
+            await execAsync(`git fetch origin ${targetBranch}`, {
+              cwd: projectPath,
+              encoding: 'utf-8',
+              timeout: 10000,
+            }).catch(() => {}); // Non-fatal — fall through to rev-parse
             const { stdout: remoteHeadRaw } = await execAsync(`git rev-parse origin/${targetBranch}`, {
               cwd: projectPath,
               encoding: 'utf-8',
