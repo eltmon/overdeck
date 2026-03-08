@@ -1997,14 +1997,83 @@ curl -s -X POST ${apiUrl}/api/specialists/test-agent/queue -H "Content-Type: app
       break;
     }
 
-    case 'test-agent':
+    case 'test-agent': {
+      // Resolve polyrepo structure and project test config
+      const testWorkspace = task.workspace || 'unknown';
+      const testGitInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
+      const testIsPolyrepo = testGitInfo.isPolyrepo;
+
+      // Look up project test config from projects.yaml
+      const { extractTeamPrefix, findProjectByTeam } = await import('../projects.js');
+      const testTeamPrefix = extractTeamPrefix(task.issueId);
+      const testProjectConfig = testTeamPrefix ? findProjectByTeam(testTeamPrefix) : null;
+      const testConfigs = testProjectConfig?.tests;
+
+      // Build per-repo test commands from projects.yaml config
+      let testCommands = '';
+      let baselineCommands = '';
+      const featureName = task.issueId.toLowerCase();
+      // Derive main workspace path for baseline comparison
+      const mainWorkspacePath = testWorkspace.replace(/workspaces\/feature-[^/]+/, 'workspaces/main');
+      const projectRootPath = testProjectConfig?.path || testWorkspace.replace(/\/workspaces\/.*/, '');
+
+      if (testConfigs && Object.keys(testConfigs).length > 0) {
+        // Use projects.yaml test config — each entry may target a different repo subdirectory
+        const testEntries = Object.entries(testConfigs);
+        const testSuites: string[] = [];
+        const baselineSuites: string[] = [];
+        for (const [name, cfg] of testEntries) {
+          const testDir = testIsPolyrepo
+            ? `${testWorkspace}/${cfg.path}`
+            : (cfg.path === '.' ? testWorkspace : `${testWorkspace}/${cfg.path}`);
+          const baseDir = testIsPolyrepo
+            ? `${mainWorkspacePath}/${cfg.path}`
+            : (cfg.path === '.' ? mainWorkspacePath : `${mainWorkspacePath}/${cfg.path}`);
+          // Fall back to project root for monorepo baseline if main workspace doesn't exist
+          const fallbackDir = cfg.path === '.' ? projectRootPath : `${projectRootPath}/${cfg.path}`;
+          testSuites.push(`echo "\\n=== Test suite: ${name} (${cfg.type}) ===" && cd "${testDir}" && ${cfg.command} 2>&1; echo "EXIT_CODE_${name}: $?"`);
+          baselineSuites.push(`echo "\\n=== Baseline: ${name} (${cfg.type}) ===" && cd "${baseDir}" 2>/dev/null && ${cfg.command} 2>&1 || (cd "${fallbackDir}" 2>/dev/null && ${cfg.command} 2>&1) || echo "BASELINE_SKIP_${name}: could not run baseline"; echo "EXIT_CODE_${name}: $?"`);
+        }
+        testCommands = testSuites.map((cmd, i) => `# Suite ${i + 1}\n${cmd}`).join('\n');
+        baselineCommands = baselineSuites.map((cmd, i) => `# Suite ${i + 1}\n${cmd}`).join('\n');
+      } else if (testIsPolyrepo) {
+        // No projects.yaml config but detected polyrepo — discover test commands per repo
+        const testSuites: string[] = [];
+        const baselineSuites: string[] = [];
+        for (const gitDir of testGitInfo.gitDirs) {
+          const repoName = basename(gitDir);
+          // Auto-detect test runner in each repo
+          testSuites.push(`echo "\\n=== ${repoName} ===" && cd "${gitDir}" && if [ -f pom.xml ]; then ./mvnw test 2>&1; elif [ -f package.json ]; then npm test 2>&1; else echo "No test runner found"; fi; echo "EXIT_CODE_${repoName}: $?"`);
+          const baseDir = `${mainWorkspacePath}/${repoName}`;
+          baselineSuites.push(`echo "\\n=== Baseline: ${repoName} ===" && cd "${baseDir}" 2>/dev/null && if [ -f pom.xml ]; then ./mvnw test 2>&1; elif [ -f package.json ]; then npm test 2>&1; else echo "No test runner found"; fi; echo "EXIT_CODE_${repoName}: $?"`);
+        }
+        testCommands = testSuites.join('\n');
+        baselineCommands = baselineSuites.join('\n');
+      } else {
+        // Monorepo fallback — single test command
+        testCommands = `cd "${testWorkspace}" && npm test 2>&1; echo "EXIT_CODE: $?"`;
+        baselineCommands = `cd "${mainWorkspacePath}" 2>/dev/null && npm test 2>&1 || (cd "${projectRootPath}" && npm test 2>&1); echo "EXIT_CODE: $?"`;
+      }
+
+      // Build test suite summary for the prompt
+      const testConfigSummary = testConfigs
+        ? Object.entries(testConfigs).map(([name, cfg]) => `- **${name}** (${cfg.type}): \`${cfg.command}\` in \`${cfg.path}/\``).join('\n')
+        : testIsPolyrepo
+          ? testGitInfo.gitDirs.map(d => `- **${basename(d)}**: auto-detected`).join('\n')
+          : '- Single test suite at workspace root';
+
       prompt = `New test task for ${task.issueId}:
 
 Branch: ${task.branch || 'unknown'}
-Workspace: ${task.workspace || 'unknown'}
+Workspace: ${testWorkspace}
+${testIsPolyrepo ? `Polyrepo: git repos in subdirectories: ${testGitInfo.gitDirs.map(d => basename(d)).join(', ')}` : ''}
+
+## Test Suites
+
+${testConfigSummary}
 
 Your task:
-1. Run the full test suite — redirect output to file, read only summaries
+1. Run ALL test suites — redirect output to file, read only summaries
 2. If ALL pass, skip baseline and report PASS
 3. If failures, run baseline on main and compare
 4. Only fail for NEW regressions (not pre-existing)
@@ -2018,32 +2087,45 @@ Raw test output from large suites (1000+ tests) WILL fill your context and cause
 ## CRITICAL: Bash Timeout for Test Commands
 
 **ALWAYS use timeout: 300000 (5 minutes) when running test commands.**
+For Maven/Spring Boot tests, use timeout: 600000 (10 minutes) — they take longer.
 
 ## Step 1: Run Feature Branch Tests
 
+${testIsPolyrepo || (testConfigs && Object.keys(testConfigs).length > 1)
+  ? `**Run ALL test suites** — each suite is a separate repo/runner. Redirect ALL output to one file.`
+  : ''}
+
 \`\`\`bash
-cd ${task.workspace || 'unknown'} && npm test 2>&1 > /tmp/test-feature.txt; echo "EXIT_CODE: $?"
-# Use timeout: 300000 for this command
-tail -20 /tmp/test-feature.txt
+(
+${testCommands}
+) > /tmp/test-feature.txt 2>&1
+# Use timeout: ${testConfigs && Object.values(testConfigs).some(c => c.type === 'maven') ? '600000' : '300000'} for this command
+echo "--- Feature test output tail ---"
+tail -40 /tmp/test-feature.txt
+grep "EXIT_CODE" /tmp/test-feature.txt
 \`\`\`
 
 ## Step 2: Check Results
 
-- If ALL tests pass (exit code 0) → skip baseline, go to "Update Status"
-- If failures exist → continue to Step 3
+- If ALL exit codes are 0 → skip baseline, go to "Update Status"
+- If any failures → continue to Step 3
 
 ## Step 3: Baseline Comparison (ONLY if failures found)
 
 \`\`\`bash
-cd ${task.context?.workspace ? task.context.workspace.replace(/workspaces\/feature-[^/]+/, '') : 'unknown'} && npm test 2>&1 > /tmp/test-main.txt; echo "EXIT_CODE: $?"
-# Use timeout: 300000 for this command
-tail -20 /tmp/test-main.txt
+(
+${baselineCommands}
+) > /tmp/test-main.txt 2>&1
+# Use timeout: ${testConfigs && Object.values(testConfigs).some(c => c.type === 'maven') ? '600000' : '300000'} for this command
+echo "--- Baseline test output tail ---"
+tail -40 /tmp/test-main.txt
+grep "EXIT_CODE" /tmp/test-main.txt
 \`\`\`
 
 Then compare failures (targeted, NOT full output):
 \`\`\`bash
-grep -E "FAIL|✗|Error|failed" /tmp/test-feature.txt | head -30
-grep -E "FAIL|✗|Error|failed" /tmp/test-main.txt | head -30
+grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-feature.txt | head -30
+grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-main.txt | head -30
 \`\`\`
 
 Tests that fail on BOTH = pre-existing (don't block). Tests that fail ONLY on feature = NEW regression (block).
@@ -2057,12 +2139,12 @@ You MUST execute the appropriate curl command and verify it succeeds. Do NOT jus
 
 If NO new regressions (tests PASS):
 \`\`\`bash
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any]"}' | jq .
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"passed","testNotes":"[summary including pre-existing failures if any, and which suites were tested]"}' | jq .
 \`\`\`
 
 If NEW regressions found (tests FAIL):
 \`\`\`bash
-curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures only]"}' | jq .
+curl -s -X POST ${apiUrl}/api/workspaces/${task.issueId}/review-status -H "Content-Type: application/json" -d '{"testStatus":"failed","testNotes":"[describe NEW failures only — specify which suite/repo]"}' | jq .
 \`\`\`
 Then use send-feedback-to-agent skill to notify issue agent of NEW failures only.
 
@@ -2072,6 +2154,7 @@ Then use send-feedback-to-agent skill to notify issue agent of NEW failures only
 
 IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
       break;
+    }
 
     default:
       prompt = `Task for ${task.issueId}: Please process this task and report findings.`;
