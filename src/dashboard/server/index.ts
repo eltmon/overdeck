@@ -1707,7 +1707,17 @@ app.get('/api/agents', async (_req, res) => {
           : name.replace('agent-', '').toUpperCase();
 
         // Check for pending AskUserQuestion (agent waiting for user input)
-        const pendingQuestions = await getAgentPendingQuestions(name);
+        // Only consider questions from the CURRENT session — stale JSONL from a wiped
+        // session may contain unanswered questions that no longer apply.
+        let pendingQuestions = await getAgentPendingQuestions(name);
+        if (pendingQuestions.length > 0 && startedAt) {
+          const agentStartTime = new Date(startedAt).getTime();
+          // Filter to only questions that arrived AFTER the agent started
+          pendingQuestions = pendingQuestions.filter(q => {
+            const qTime = new Date(q.timestamp).getTime();
+            return !isNaN(qTime) && qTime >= agentStartTime;
+          });
+        }
 
         // Check runtime state from runtime.json (separate from state.json config)
         const runtimeState = getAgentRuntimeState(name);
@@ -11081,6 +11091,7 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
     issueDataService.invalidateTracker('linear').catch(() => {});
 
     console.log(`[deep-wipe] Completed for ${id}:`, result.steps.map(s => s.step));
+    notifyStateChange(id, 'Todo');
     res.json({
       success: result.success,
       message: `Deep wipe completed for ${id}`,

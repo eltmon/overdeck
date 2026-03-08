@@ -221,7 +221,7 @@ export async function deepWipe(
 
   // 2. Reset issue to open/backlog
   if (resetIssue) {
-    const resetResult = await resetIssueToBacklog(ctx);
+    const resetResult = await resetIssueToTodo(ctx);
     allSteps.push(resetResult);
   }
 
@@ -316,7 +316,7 @@ async function verifyBranchMerged(ctx: LifecycleContext): Promise<StepResult> {
 /**
  * Reset issue back to open/backlog state (for deep-wipe).
  */
-async function resetIssueToBacklog(ctx: LifecycleContext): Promise<StepResult> {
+async function resetIssueToTodo(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'deep-wipe:reset-issue';
   try {
     if (ctx.github) {
@@ -337,7 +337,7 @@ async function resetIssueToBacklog(ctx: LifecycleContext): Promise<StepResult> {
       return stepOk(step, [`Reset GitHub issue #${number}: reopened and cleared labels`]);
     }
 
-    // Linear: reopen to backlog
+    // Linear: reopen to Todo
     const linearApiKey = getLinearApiKey();
     if (linearApiKey) {
       const { LinearClient } = await import('@linear/sdk');
@@ -356,14 +356,14 @@ async function resetIssueToBacklog(ctx: LifecycleContext): Promise<StepResult> {
         const team = await issue.team;
         if (team) {
           const states = await team.states();
-          const backlogState = states.nodes.find(s => s.type === 'backlog') ||
-            states.nodes.find(s => s.name === 'Backlog');
-          if (backlogState) {
-            await issue.update({ stateId: backlogState.id });
+          const todoState = states.nodes.find(s => s.type === 'unstarted' && s.name === 'Todo') ||
+            states.nodes.find(s => s.type === 'unstarted');
+          if (todoState) {
+            await issue.update({ stateId: todoState.id });
           }
         }
       }
-      return stepOk(step, [`Reset Linear issue ${ctx.issueId} to Backlog`]);
+      return stepOk(step, [`Reset Linear issue ${ctx.issueId} to Todo`]);
     }
 
     return stepSkipped(step, ['No tracker available to reset issue']);
