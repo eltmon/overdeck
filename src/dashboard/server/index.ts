@@ -8888,6 +8888,40 @@ ${repos.map(r => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join('\n')}
         commentsSection = `\n## Issue Comments\n\n**IMPORTANT: Read these comments carefully — they contain context, decisions, and references to previous work.**\n\n${commentLines.join('\n\n---\n\n')}\n`;
       }
 
+      // Look for an existing spec file (*-spec.md) in docs/prds/active/
+      // Specs are human-written requirements docs that the planning agent should use as primary input.
+      let specSection = '';
+      const specSearchDirs = [
+        join(workspacePath, 'docs', 'prds', 'active'),  // polyrepo workspace docs worktree
+        join(projectPath, 'docs', 'prds', 'active'),    // monorepo or main project docs
+      ];
+      for (const specDir of specSearchDirs) {
+        if (!existsSync(specDir)) continue;
+        try {
+          const files = readdirSync(specDir);
+          const specFile = files.find(f =>
+            f.toLowerCase().includes(issueLower) && f.endsWith('-spec.md')
+          );
+          if (specFile) {
+            const specContent = readFileSync(join(specDir, specFile), 'utf-8');
+            specSection = `
+## Feature Spec (Human-Written)
+
+**A spec has been written for this feature.** This is your primary input — read it carefully before starting discovery.
+The spec contains requirements, constraints, and design decisions made by the team.
+
+**File:** \`${join(specDir, specFile)}\`
+
+<spec>
+${specContent}
+</spec>
+
+`;
+            break;
+          }
+        } catch { /* ignore read errors */ }
+      }
+
       const planningPrompt = `<!-- panopticon:orchestration-context-start -->
 <!-- This is Panopticon orchestration context injected automatically.
      It contains planning session setup instructions, not agent reasoning.
@@ -8910,7 +8944,7 @@ ${repos.map(r => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join('\n')}
 - Generate planning artifacts:
   - STATE.md (decisions, approach, architecture)
   - Beads tasks (via \`bd create\`)
-  - PRD file at \`docs/prds/active/{issue-id}-plan.md\` (copy of STATE.md, required for dashboard)
+  - Implementation plan at \`docs/prds/active/{issue-id}-plan.md\` (copy of STATE.md, required for dashboard)
 - Present options and tradeoffs for the user to decide
 
 When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
@@ -8924,7 +8958,7 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 
 ## Description
 ${issue.description || 'No description provided'}
-${commentsSection}${projectStructureSection}
+${commentsSection}${specSection}${projectStructureSection}
 ---
 
 ## Your Mission
@@ -8932,9 +8966,10 @@ ${commentsSection}${projectStructureSection}
 You are a planning agent conducting a **discovery session** for this issue.
 
 ### Phase 1: Understand Context
-1. Read the codebase to understand relevant files and patterns
-2. Identify what subsystems/files this issue affects
-3. Note any existing patterns we should follow
+1. **If a spec file was provided above**, read it thoroughly — it's your primary input
+2. Read the codebase to understand relevant files and patterns
+3. Identify what subsystems/files this issue affects
+4. Note any existing patterns we should follow
 
 ### Phase 2: Discovery Conversation
 Use AskUserQuestion tool to ask contextual questions:
@@ -8969,11 +9004,12 @@ bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
 1. Create STATE.md with decisions made
-2. Copy STATE.md to PRD at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
+2. Copy STATE.md to implementation plan at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
 3. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
 4. Summarize the plan and STOP
 
-**IMPORTANT:** Create the PRD file BEFORE creating beads tasks.
+**IMPORTANT:** Create the plan file BEFORE creating beads tasks.
+**NOTE:** \`*-spec.md\` files are human-written specs — do NOT overwrite them. Your output is \`*-plan.md\`.
 
 **Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
 
@@ -9504,7 +9540,7 @@ PANOPTICON_MSG_EOF`);
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, Beads tasks via \`bd create\`, PRD at \`docs/prds/active/{issue-id}-plan.md\`)
+- Generate planning artifacts (STATE.md, Beads tasks via \`bd create\`, implementation plan at \`docs/prds/active/{issue-id}-plan.md\`)
 - Present options and tradeoffs
 
 ---
