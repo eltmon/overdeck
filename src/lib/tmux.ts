@@ -180,6 +180,78 @@ export function capturePane(sessionName: string, lines: number = 50): string {
   }
 }
 
+/**
+ * Capture tmux pane output (async, non-blocking).
+ * MUST be used from the dashboard server and any async context.
+ */
+export async function capturePaneAsync(sessionName: string, lines: number = 50): Promise<string> {
+  try {
+    const { stdout } = await execAsync(`tmux capture-pane -t ${sessionName} -p -S -${lines}`, {
+      encoding: 'utf-8',
+    });
+    return stdout;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Wait for Claude Code to reach its interactive prompt (❯) in a tmux session.
+ * Polls tmux output until the prompt appears or timeout is reached.
+ *
+ * @param sessionName - tmux session name
+ * @param timeoutMs - maximum time to wait (default: 15s for fresh start, use 5s for already-running)
+ * @returns true if prompt detected, false if timed out
+ */
+export async function waitForClaudePrompt(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
+  const start = Date.now();
+  const POLL = 500;
+  while (Date.now() - start < timeoutMs) {
+    const output = await capturePaneAsync(sessionName, 10);
+    // Claude Code shows ❯ when ready for user input.
+    // Check that the LAST non-empty line contains ❯ (not a stale prompt from earlier output).
+    const lines = output.split('\n').filter(l => l.trim());
+    const lastLine = lines[lines.length - 1] || '';
+    if (lastLine.includes('❯')) return true;
+    await new Promise(r => setTimeout(r, POLL));
+  }
+  return false;
+}
+
+/**
+ * Verify that a message sent to Claude was actually received and processing started.
+ * Compares tmux output before and after to detect new activity (tool calls, responses).
+ *
+ * @param sessionName - tmux session name
+ * @param outputBefore - tmux output snapshot taken BEFORE sending the message
+ * @param timeoutMs - maximum time to wait for activity (default: 10s)
+ * @returns true if new activity detected, false if timed out
+ */
+export async function confirmDelivery(
+  sessionName: string,
+  outputBefore: string,
+  timeoutMs: number = 10000,
+): Promise<boolean> {
+  const start = Date.now();
+  const POLL = 1000;
+  const beforeLineCount = outputBefore.split('\n').filter(l => l.trim()).length;
+
+  while (Date.now() - start < timeoutMs) {
+    await new Promise(r => setTimeout(r, POLL));
+    const after = await capturePaneAsync(sessionName, 50);
+    const afterLines = after.split('\n').filter(l => l.trim());
+    const afterLineCount = afterLines.length;
+
+    // Claude is processing if: new output lines appeared (tool calls: ●, results: ⎿, etc.)
+    if (afterLineCount > beforeLineCount + 1) return true;
+
+    // Or if we can see tool invocation markers in the new output
+    const newOutput = afterLines.slice(beforeLineCount).join('\n');
+    if (newOutput.includes('●') || newOutput.includes('⎿') || newOutput.includes('Read')) return true;
+  }
+  return false;
+}
+
 export function getAgentSessions(): TmuxSession[] {
   return listSessions().filter(s => s.name.startsWith('agent-'));
 }
