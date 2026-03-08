@@ -17,7 +17,7 @@ import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-hand
 import { loadSettings, type ModelId } from '../settings.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
-import { sendKeysAsync } from '../tmux.js';
+import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 
 const execAsync = promisify(exec);
@@ -1557,15 +1557,13 @@ async function resetSpecialist(name: SpecialistType): Promise<void> {
   const tmuxSession = getTmuxSessionName(name);
 
   try {
-    // 1. Cancel any pending command with Ctrl+C
+    // 1. Cancel any pending command with Ctrl+C and wait for Claude to return to idle.
+    //    Do NOT send 'cd ~' here — that triggers LLM inference (2-5s) and creates a race:
+    //    the task message arrives while Claude is still processing the cd command and gets lost.
     await execAsync(`tmux send-keys -t "${tmuxSession}" C-c`, { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    // 2. Reset working directory using centralized sendKeys
-    await sendKeysAsync(tmuxSession, 'cd ~');
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    // 3. Clear the prompt buffer with Ctrl+U
+    // 2. Clear any partial input on the prompt line
     await execAsync(`tmux send-keys -t "${tmuxSession}" C-u`, { encoding: 'utf-8' });
     await new Promise(resolve => setTimeout(resolve, 100));
   } catch (error) {
@@ -1663,8 +1661,12 @@ export async function wakeSpecialist(
       );
 
       if (waitForReady) {
-        // Wait for Claude to be ready
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Poll for Claude's interactive prompt instead of fixed sleep.
+        // Fresh starts can take 5-10s; 15s timeout covers slow models.
+        const ready = await waitForClaudePrompt(tmuxSession, 15000);
+        if (!ready) {
+          console.warn(`[specialist] ${name}: prompt not detected within 15s, proceeding anyway`);
+        }
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -1680,30 +1682,58 @@ export async function wakeSpecialist(
   // Reset specialist state to clear stale context from previous tasks
   await resetSpecialist(name);
 
+  // Wait for Claude to be at its interactive prompt before sending the task.
+  // For already-running specialists this should be near-instant; for freshly-started
+  // ones the waitForReady above already waited, but resetSpecialist's C-c may have
+  // interrupted something so we re-confirm here.
+  const promptReady = await waitForClaudePrompt(tmuxSession, wasAlreadyRunning ? 5000 : 15000);
+  if (!promptReady) {
+    console.warn(`[specialist] ${name}: prompt not detected after reset, proceeding anyway`);
+  }
+
   // Send the task prompt
   try {
     // For large prompts (>500 chars or multiline), write to file to avoid tmux paste issues
     // Tmux send-keys with large text shows as "[Pasted text #1 +N lines]" which Claude doesn't process
     const isLargePrompt = taskPrompt.length > 500 || taskPrompt.includes('\n');
 
+    // Prepare the message to send
+    let messageToSend: string;
     if (isLargePrompt) {
-      // Ensure tasks directory exists
       if (!existsSync(TASKS_DIR)) {
         mkdirSync(TASKS_DIR, { recursive: true });
       }
-
-      // Write task to file with timestamp
       const taskFile = join(TASKS_DIR, `${name}-${Date.now()}.md`);
       writeFileSync(taskFile, taskPrompt, 'utf-8');
-
-      // Send a short message pointing to the task file
-      // Use centralized sendKeys which handles Enter correctly
-      const shortMessage = `Read and execute the task in: ${taskFile}`;
-      await sendKeysAsync(tmuxSession, shortMessage);
+      messageToSend = `Read and execute the task in: ${taskFile}`;
     } else {
-      // For short prompts, send directly via tmux
-      // Use centralized sendKeys which handles Enter correctly
-      await sendKeysAsync(tmuxSession, taskPrompt);
+      messageToSend = taskPrompt;
+    }
+
+    // Snapshot tmux output BEFORE sending so we can detect new activity
+    const outputBefore = await capturePaneAsync(tmuxSession, 50);
+
+    // Send the task message
+    await sendKeysAsync(tmuxSession, messageToSend);
+
+    // Verify Claude received the message by watching for new output (tool calls, responses).
+    // This catches silent delivery failures — the structural root cause of lost tasks.
+    const delivered = await confirmDelivery(tmuxSession, outputBefore, 10000);
+    if (!delivered) {
+      console.warn(`[specialist] ${name}: no activity detected after task send, retrying...`);
+      // Re-snapshot and retry once
+      const retryBefore = await capturePaneAsync(tmuxSession, 50);
+      await sendKeysAsync(tmuxSession, messageToSend);
+      const retryDelivered = await confirmDelivery(tmuxSession, retryBefore, 10000);
+      if (!retryDelivered) {
+        return {
+          success: false,
+          message: `Task message not received by specialist ${name} after retry`,
+          tmuxSession,
+          wasAlreadyRunning,
+          error: 'delivery_failed',
+        };
+      }
     }
 
     // Record wake event

@@ -444,19 +444,24 @@ function loadPendingOperations(): Record<string, PendingOperation> {
       const now = Date.now();
       const tenMinutes = 10 * 60 * 1000;
       const thirtyMinutes = 30 * 60 * 1000;
+      let dirty = false;
       for (const key of Object.keys(data)) {
         const op = data[key];
         const age = now - new Date(op.startedAt).getTime();
         if (op.status === 'running' && age > tenMinutes) {
           op.status = 'failed';
           op.error = 'Operation timed out';
+          dirty = true;
         }
         // Auto-clear failed operations after 30 minutes so stale errors
         // don't persist in the UI indefinitely
         if (op.status === 'failed' && age > thirtyMinutes) {
           delete data[key];
+          dirty = true;
         }
       }
+      // Persist cleanup so stale state doesn't re-appear on every server restart
+      if (dirty) savePendingOperations(data);
       return data;
     }
   } catch (err) {
@@ -7113,12 +7118,20 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
     });
   }
 
-  // Check if already merging
+  // Check if already merging — but only block if the pending op is still actively running.
+  // If the server crashed mid-merge the pending op will be timed-out/absent; allow retry.
   if (reviewStatus?.mergeStatus === 'merging') {
-    return res.status(400).json({
-      error: 'Merge already in progress',
-      mergeStatus: 'merging',
-    });
+    const pendingOp = getPendingOperation(issueId);
+    const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
+    if (activelyMerging) {
+      return res.status(400).json({
+        error: 'Merge already in progress',
+        mergeStatus: 'merging',
+      });
+    }
+    // Pending op is gone or timed out — clear the stuck state and fall through to retry
+    console.log(`[merge] Clearing stuck mergeStatus for ${issueId} (pending op: ${pendingOp?.status ?? 'absent'})`);
+    setReviewStatus(issueId, { mergeStatus: undefined });
   }
 
   // Check if already merged
@@ -7265,7 +7278,8 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
             repoMainPath,
             branchName,
             defaultBranch,
-            issueId
+            issueId,
+            { skipDoneReport: true }
           );
 
           if (mergeResult.success) {
@@ -8619,6 +8633,48 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
     const issueLower = issue.identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
+    // Return response immediately — workspace creation + agent spawning happen in background.
+    // This prevents the "Starting planning session..." spinner from blocking the UI (PAN-302).
+    const sessionName = `planning-${issueLower}`;
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    mkdirSync(agentStateDir, { recursive: true });
+
+    // Write preliminary agent state so the status endpoint knows planning is starting
+    writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+      id: sessionName,
+      issueId: issue.identifier,
+      workspace: workspacePath,
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+      type: 'planning',
+      location: workspaceLocation,
+    }, null, 2));
+
+    res.json({
+      success: true,
+      issue: {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        newState: newStateName,
+        source: issue.source,
+      },
+      workspace: {
+        created: existsSync(workspacePath),
+        path: workspacePath,
+      },
+      planningAgent: {
+        started: true,
+        sessionName,
+      },
+    });
+
+    // === BACKGROUND: workspace creation + agent spawning ===
+    // This runs after the response is sent. Errors are logged but don't affect the response.
+    (async () => {
+    try {
+      console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
+
     let workspaceCreated = false;
     let workspaceError: string | undefined;
     let existingRemoteWorkspace: any = null;
@@ -8698,9 +8754,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
     }
 
     // 5. Spawn planning agent (local tmux or remote VM)
-    const sessionName = `planning-${issueLower}`;
-    let planningAgentStarted = false;
-    let planningAgentError: string | undefined;
+    // sessionName and agentStateDir already defined above (early response)
     let isRemotePlanning = false;
 
     // Use existing remote workspace metadata if we already loaded it
@@ -8931,8 +8985,7 @@ Start by exploring the codebase to understand the context, then begin the discov
       // Get planning agent model from settings
       const agentSettings = loadSettings();
       const planningModel = (agentSettings.models as any).planning_agent || agentSettings.models.complexity?.expert || 'claude-opus-4-6';
-      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-      await execAsync(`mkdir -p "${agentStateDir}"`, { encoding: 'utf-8' });
+      // agentStateDir already created above (early response)
 
       if (isRemotePlanning && remoteWorkspaceMetadata) {
         // ===== REMOTE PLANNING AGENT =====
@@ -9122,32 +9175,29 @@ exec ${cmdWithArgs} "$prompt"
         console.log(`Started local planning agent ${sessionName} with initial prompt`);
       }
 
-      planningAgentStarted = true;
+      console.log(`[start-planning] Background setup complete for ${issue.identifier}`);
     } catch (err: any) {
-      planningAgentError = err.message;
-      console.error('Planning agent error:', err);
+      console.error(`[start-planning] Agent spawn failed for ${issue.identifier}:`, err);
+      // Update state file to reflect failure
+      try {
+        writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+          id: sessionName,
+          issueId: issue.identifier,
+          workspace: workspacePath,
+          status: 'failed',
+          error: err.message,
+          startedAt: new Date().toISOString(),
+          type: 'planning',
+          location: workspaceLocation,
+        }, null, 2));
+      } catch { /* ignore state write errors */ }
     }
 
-    res.json({
-      success: true,
-      issue: {
-        id: issue.id,
-        identifier: issue.identifier,
-        title: issue.title,
-        newState: newStateName,
-        source: issue.source,
-      },
-      workspace: {
-        created: workspaceCreated,
-        path: workspacePath,
-        error: workspaceError,
-      },
-      planningAgent: {
-        started: planningAgentStarted,
-        sessionName: planningAgentStarted ? sessionName : undefined,
-        error: planningAgentError,
-      },
-    });
+    } catch (bgErr: any) {
+      console.error(`[start-planning] Background setup failed for ${id}:`, bgErr);
+    }
+    })(); // End background async
+
   } catch (error: any) {
     console.error('Error starting planning:', error);
     res.status(500).json({ error: 'Failed to start planning: ' + error.message });
@@ -9170,6 +9220,7 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
     const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
     const stateFile = join(agentStateDir, 'state.json');
 
+    let agentStarting = false; // True when background setup is still running (PAN-302)
     try {
       if (existsSync(stateFile)) {
         const stateContent = readFileSync(stateFile, 'utf-8');
@@ -9177,6 +9228,11 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
         if (state.location === 'remote' && state.vmName) {
           isRemote = true;
           vmName = state.vmName;
+        }
+        // Background setup writes status: 'starting' before workspace/agent creation.
+        // Treat this as active so the frontend doesn't think planning hasn't begun.
+        if (state.status === 'starting') {
+          agentStarting = true;
         }
       }
     } catch (err) {
@@ -9220,7 +9276,7 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
     const planningCompleted = hasCompletionMarker;
 
     res.json({
-      active: sessionExists,
+      active: sessionExists || agentStarting,
       sessionName,
       workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
       planningCompleted,
@@ -14105,6 +14161,76 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log('Pipeline event handler wired (Socket.io push + immediate queue processing)');
   } catch (error: any) {
     console.error('Failed to wire pipeline handler:', error.message);
+  }
+
+  // Reconcile stuck mergeStatus: 'merging' entries from prior server crashes.
+  // Any issue still in 'merging' state at startup means the server crashed mid-merge.
+  // Check whether the branch was actually merged into main; reset accordingly.
+  try {
+    const allStatuses = loadReviewStatuses();
+    const stuckMerging = Object.values(allStatuses).filter(s => s.mergeStatus === 'merging');
+    for (const status of stuckMerging) {
+      const issueId = status.issueId;
+      const issueLower = issueId.toLowerCase();
+      const issuePrefix = issueId.split('-')[0];
+      const projectPath = getProjectPath(undefined, issuePrefix);
+      const branchName = `feature/${issueLower}`;
+      const projectConfig = findProjectByTeam(issuePrefix);
+      const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
+      const defaultBranch = projectConfig?.workspace?.default_branch || 'main';
+
+      let wasMerged = false;
+
+      if (isPolyrepo && projectConfig?.workspace?.repos) {
+        // Polyrepo: check each sub-repo that has the feature branch
+        const repos = projectConfig.workspace.repos;
+        let reposWithBranch = 0;
+        let reposMerged = 0;
+        for (const repo of repos) {
+          const repoPath = join(projectPath, repo.path);
+          try {
+            // Check if this repo has the feature branch at all
+            await execAsync(`git -C ${repoPath} rev-parse --verify origin/${branchName}`, { encoding: 'utf-8' });
+            reposWithBranch++;
+            // Check if it's merged into default branch
+            const { stdout } = await execAsync(
+              `git -C ${repoPath} branch -r --merged origin/${defaultBranch}`,
+              { encoding: 'utf-8' }
+            );
+            if (stdout.split('\n').some(line => line.trim() === `origin/${branchName}`)) {
+              reposMerged++;
+            }
+          } catch {
+            // Branch doesn't exist in this repo — skip (not all repos have changes)
+          }
+        }
+        // Merged if all repos that had the branch have merged it (or no repos had it)
+        wasMerged = reposWithBranch > 0 && reposMerged === reposWithBranch;
+        console.log(`[startup] ${issueId}: polyrepo check — ${reposMerged}/${reposWithBranch} repos merged`);
+      } else {
+        // Monorepo: single git check
+        try {
+          const { stdout } = await execAsync(
+            `git -C ${projectPath} branch -r --merged origin/${defaultBranch}`,
+            { encoding: 'utf-8' }
+          );
+          wasMerged = stdout.split('\n').some(line => line.trim() === `origin/${branchName}`);
+        } catch {
+          // git check failed — assume not merged, let user retry
+        }
+      }
+
+      if (wasMerged) {
+        setReviewStatusBase(issueId, { mergeStatus: 'merged', readyForMerge: false });
+        console.log(`[startup] ${issueId}: branch was merged, status corrected to 'merged'`);
+      } else {
+        setReviewStatusBase(issueId, { mergeStatus: undefined, readyForMerge: true });
+        console.log(`[startup] ${issueId}: stuck merge detected, reset to readyForMerge`);
+      }
+      clearPendingOperation(issueId);
+    }
+  } catch (err: any) {
+    console.error('[startup] Failed to reconcile stuck merge states:', err.message);
   }
 
   // One-time dedup of historical cost events on startup (PAN-238)

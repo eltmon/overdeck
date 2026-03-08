@@ -757,7 +757,8 @@ export async function spawnMergeAgentForBranches(
   projectPath: string,
   sourceBranch: string,
   targetBranch: string,
-  issueId: string
+  issueId: string,
+  options?: { skipDoneReport?: boolean }
 ): Promise<MergeResult> {
   console.log(`[merge-agent] Waking specialist for merge of ${sourceBranch} into ${targetBranch}`);
   logActivity('merge_attempt', `Waking specialist for merge: ${sourceBranch} -> ${targetBranch}`);
@@ -862,6 +863,22 @@ export async function spawnMergeAgentForBranches(
   // Build the task prompt for the merge-agent specialist
   const apiPort = process.env.API_PORT || process.env.PORT || '3011';
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
+  const skipDoneReport = options?.skipDoneReport ?? false;
+
+  // When called from the polyrepo merge loop, the server manages overall status.
+  // The merge-agent should NOT call /api/specialists/done — doing so would
+  // prematurely set the issue's overall mergeStatus to 'merged' after one repo,
+  // even if other repos haven't been merged yet.
+  const doneReportInstructions = skipDoneReport
+    ? `DO NOT call /api/specialists/done — the server manages status for this merge.
+    After pushing, simply STOP. If you need to rollback, rollback and STOP.`
+    : `Then report by calling the Panopticon API:
+    curl -s -X POST ${apiUrl}/api/specialists/done \\
+      -H "Content-Type: application/json" \\
+      -d '{"specialist":"merge","issueId":"${issueId}","status":"<passed or failed>","notes":"<reason if failed>"}'
+
+CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.`;
+
   const taskPrompt = `MERGE TASK for ${issueId}:
 
 PROJECT: ${projectPath}
@@ -880,9 +897,7 @@ PHASE 1 — SYNC & BASELINE (before merge):
    If local is behind origin (REMOTE_AHEAD > 0):
      a. git rebase origin/${targetBranch}
         (Replays local commits on top of origin — preserves linear history, no merge commits, no data loss)
-     b. If rebase conflicts: abort with git rebase --abort, then report failure:
-        "Cannot sync local ${targetBranch} with origin — rebase conflict. Human intervention needed."
-        Call /api/specialists/done with status "failed" and STOP.
+     b. If rebase conflicts: abort with git rebase --abort, then STOP — human intervention needed.
      c. If rebase succeeds: continue to next step
    If local is up-to-date or ahead-only (REMOTE_AHEAD = 0): continue to next step
 5. Run tests on the CURRENT ${targetBranch} to establish a baseline:
@@ -928,11 +943,11 @@ PHASE 4 — DECIDE:
     - Pre-existing failures on ${targetBranch} are NOT a reason to rollback
 12. ROLLBACK: git reset --hard ORIG_HEAD
     (ORIG_HEAD is set by git at merge time — always points to pre-merge state)
-    Then report failure by calling the Panopticon API:
+    ${doneReportInstructions.includes('DO NOT') ? 'Then STOP.' : `Then report failure by calling the Panopticon API:
     curl -s -X POST ${apiUrl}/api/specialists/done \\
       -H "Content-Type: application/json" \\
       -d '{"specialist":"merge","issueId":"${issueId}","status":"failed","notes":"<reason for rollback>"}'
-    Then STOP.
+    Then STOP.`}
 13. PUSH: git push origin ${targetBranch}
     If push is rejected (non-fast-forward / "tip of your current branch is behind"):
       a. git fetch origin ${targetBranch}
@@ -941,13 +956,9 @@ PHASE 4 — DECIDE:
       c. If rebase conflicts: abort with git rebase --abort, ROLLBACK (go to step 12)
       d. If rebase succeeds: retry git push origin ${targetBranch}
       e. If push fails again after one retry: ROLLBACK (go to step 12)
-    Then report success by calling the Panopticon API:
-    curl -s -X POST ${apiUrl}/api/specialists/done \\
-      -H "Content-Type: application/json" \\
-      -d '{"specialist":"merge","issueId":"${issueId}","status":"passed"}'
+    ${doneReportInstructions}
 
 CRITICAL: You MUST complete this merge. The approve operation is waiting.
-CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.
 
 WHY USE SUBAGENTS FOR BUILD/TEST:
 - Subagents have isolated context and won't pollute your working memory

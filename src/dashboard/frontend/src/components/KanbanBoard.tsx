@@ -2018,15 +2018,16 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
                 <AgentBadge key={i} type={b.type} name={b.name} isConflict={hasConflict} />
               ));
             })()}
-            {/* Planning badge - shows when a planning agent is active for this issue */}
+            {/* Planning badge - clickable to watch the active planning session */}
             {planningAgent && planningAgent.status !== 'stopped' && (
-              <span
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-900/50 text-purple-300 animate-pulse"
-                title="Planning agent is active"
+              <button
+                onClick={(e) => { e.stopPropagation(); onPlan(); }}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-900/50 text-purple-300 animate-pulse hover:bg-purple-800/60 transition-colors cursor-pointer"
+                title="Click to watch planning session"
               >
                 <Sparkles className="w-3 h-3" />
                 Planning
-              </span>
+              </button>
             )}
             {/* Model badge - shows which model the active agent is using */}
             {activeAgent && activeAgent.model && (
