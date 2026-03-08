@@ -1822,6 +1822,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
   const isRunning = activeAgent && activeAgent.status !== 'dead' && activeAgent.status !== 'stopped';
+  const isPlanningActive = planningAgent && planningAgent.status !== 'stopped';
 
   // For display in terminal viewer, use the active agent
   const agent = activeAgent;
@@ -2213,13 +2214,23 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
-          <button
-            onClick={handlePlan}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Plan
-          </button>
+          {isPlanningActive ? (
+            <button
+              onClick={handlePlan}
+              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              Watch Planning
+            </button>
+          ) : (
+            <button
+              onClick={handlePlan}
+              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Plan
+            </button>
+          )}
           <button
             onClick={handleStartAgent}
             disabled={startAgentMutation.isPending}
@@ -2239,13 +2250,23 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
       {/* In Progress items without running agent */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_progress' && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
-          <button
-            onClick={handlePlan}
-            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Re-plan
-          </button>
+          {isPlanningActive ? (
+            <button
+              onClick={handlePlan}
+              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              Watch Planning
+            </button>
+          ) : (
+            <button
+              onClick={handlePlan}
+              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Re-plan
+            </button>
+          )}
           <button
             onClick={() => onViewBeads && onViewBeads(issue)}
             className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
