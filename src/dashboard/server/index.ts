@@ -3022,8 +3022,8 @@ app.get('/api/tracker-status', (_req, res) => {
   try {
     const panConfig = loadPanConfig();
     const yamlConfig = loadYamlConfig();
-    const primary = panConfig.trackers.primary;
-    const secondary = panConfig.trackers.secondary;
+    const primary = panConfig.trackers?.primary;
+    const secondary = panConfig.trackers?.secondary;
 
     const trackerEnvVars: Record<string, string> = {
       linear: 'LINEAR_API_KEY',
@@ -3052,7 +3052,7 @@ app.get('/api/tracker-status', (_req, res) => {
     for (const trackerType of trackersToCheck) {
       const envVar = trackerEnvVars[trackerType] || `${trackerType.toUpperCase()}_API_KEY`;
       const hasEnvKey = !!process.env[envVar];
-      const hasConfigKey = !!(yamlConfig.trackerKeys as Record<string, string | undefined>)[trackerType];
+      const hasConfigKey = !!((yamlConfig.trackerKeys || {}) as Record<string, string | undefined>)[trackerType];
 
       // Also check .panopticon.env via tracker-config
       let hasEnvFileKey = false;
