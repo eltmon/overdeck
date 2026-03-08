@@ -274,6 +274,31 @@ export class IssueDataService {
    * Invalidate a tracker's cache and trigger immediate re-poll.
    * Called after mutations (move-status, label changes, etc.)
    */
+  /**
+   * Immediately patch a cached issue and push the update to all clients.
+   * Use this after any state mutation so the dashboard reflects the change
+   * instantly without waiting for the next poll cycle.
+   *
+   * @param identifier - Issue identifier (e.g. "MIN-734", "PAN-302")
+   * @param patch - Fields to merge into the cached issue object
+   */
+  patchIssue(identifier: string, patch: Record<string, any>): void {
+    const id = identifier.toLowerCase();
+    for (const state of Object.values(this.trackers)) {
+      const idx = state.lastFetchedIssues.findIndex(
+        (i: any) => (i.identifier || '').toLowerCase() === id
+      );
+      if (idx !== -1) {
+        state.lastFetchedIssues[idx] = { ...state.lastFetchedIssues[idx], ...patch };
+        this.pushUpdated();
+        return;
+      }
+    }
+    // Issue not in cache yet (e.g. just created) — trigger a full refresh instead
+    const source = patch.source || 'linear';
+    this.invalidateTracker(source).catch(() => {});
+  }
+
   async invalidateTracker(tracker: string): Promise<void> {
     this.cache.invalidate(tracker);
 
