@@ -1141,6 +1141,21 @@ app.get('/api/issues', (req, res) => {
   }
 });
 
+/**
+ * Immediately update the cached issue status and push to all clients.
+ * Call this after any endpoint that mutates issue state so the dashboard
+ * reflects the change instantly without waiting for the next poll cycle.
+ * Works for all trackers (Linear, GitHub, Rally) — operates on the
+ * normalized in-memory cache, tracker-agnostic.
+ */
+function notifyStateChange(issueId: string, status: string): void {
+  try {
+    issueDataService.patchIssue(issueId, { status });
+  } catch {
+    // Non-fatal — next poll will sync the state regardless
+  }
+}
+
 // Force refresh all trackers (full re-fetch, not incremental)
 app.post('/api/trackers/refresh', async (_req, res) => {
   try {
@@ -7941,6 +7956,7 @@ app.post('/api/agents', async (req, res) => {
 
       console.log(`[start-agent] Remote agent spawned for ${issueId}: ${state.id}`);
       socketIo.emit('agents:changed', { event: 'started', agentId: state.id, issueId });
+      notifyStateChange(issueId, 'In Progress');
 
       // Update issue status (GitHub/Linear) - same logic as local
       const apiKey = getLinearApiKey();
@@ -8066,6 +8082,9 @@ app.post('/api/agents', async (req, res) => {
           console.error('Failed to update Linear status:', linearError);
         }
       }
+
+      // Immediately update in-memory cache so dashboard reflects new status without waiting for poll
+      notifyStateChange(issueId, 'In Progress');
 
       return activityId;
     };
@@ -8650,6 +8669,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       location: workspaceLocation,
     }, null, 2));
 
+    notifyStateChange(issue.identifier, newStateName);
     res.json({
       success: true,
       issue: {
@@ -9950,6 +9970,7 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
       }
     }
 
+    notifyStateChange(id, revertedState || 'Todo');
     res.json({
       success: true,
       issueId: id,
@@ -10241,6 +10262,7 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
       }
     }
 
+    notifyStateChange(id, newState || 'Planned');
     res.json({
       success: true,
       issueId: id,
@@ -10458,9 +10480,10 @@ app.post('/api/issues/:id/reset', async (req, res) => {
       }
     }
 
+    notifyStateChange(id, 'Todo');
     res.json({ success: true, cleanupLog });
 
-    // Invalidate all tracker caches after reset
+    // Invalidate all tracker caches after reset (for full reconciliation)
     issueDataService.invalidateTracker('github').catch(() => {});
     issueDataService.invalidateTracker('linear').catch(() => {});
     issueDataService.invalidateTracker('rally').catch(() => {});
@@ -10598,11 +10621,12 @@ app.post('/api/issues/:id/cancel', async (req, res) => {
       }
     }
 
-    // Invalidate caches
+    // Invalidate caches (for full reconciliation)
     issueDataService.invalidateTracker('github').catch(() => {});
     issueDataService.invalidateTracker('linear').catch(() => {});
 
     console.log(`[cancel] Completed for ${id}:`, cleanupLog);
+    notifyStateChange(id, 'Canceled');
     res.json({ success: true, cleanupLog });
   } catch (error: any) {
     console.error('[cancel] Failed:', error);
@@ -10771,6 +10795,7 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
       ? `Agent is running. Send it context: pan tell ${id} "Issue reopened for re-work. <describe what needs to change>"`
       : `Start an agent: pan work issue ${id}`;
 
+    notifyStateChange(issueIdentifier || id, newState || 'In Progress');
     res.json({
       success: true,
       message: `Issue ${id} reopened and moved to ${newState}`,
@@ -10910,6 +10935,12 @@ app.post('/api/issues/:id/move-status', async (req, res) => {
       }
     }
 
+    // Map canonical status to display name for immediate cache update
+    const canonicalToDisplay: Record<string, string> = {
+      backlog: 'Backlog', todo: 'Todo', in_progress: 'In Progress',
+      in_review: 'In Review', done: 'Done',
+    };
+    notifyStateChange(id, canonicalToDisplay[targetStatus] || targetStatus);
     res.json({
       success: true,
       message: `Issue ${id} moved to ${targetStatus}`,
