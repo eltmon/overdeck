@@ -7316,7 +7316,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
               testsStatus: mergeResult.testsStatus,
             });
           } else {
-            const error = mergeResult.notes || 'Merge-agent failed';
+            const error = mergeResult.reason || mergeResult.notes || 'Merge-agent failed';
             console.error(`[merge] merge-agent failed for ${repo.name}: ${error}`);
             mergeResults.push({ repo: repo.name, success: false, message: error });
           }
@@ -7400,7 +7400,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
         note: mergeResult.testsStatus === 'SKIP' ? 'Tests were skipped' : undefined,
       });
     } else {
-      const error = mergeResult.notes || 'Merge failed';
+      const error = mergeResult.reason || mergeResult.notes || 'Merge failed';
       setReviewStatus(issueId, { mergeStatus: 'failed' });
       completePendingOperation(issueId, error);
       return res.status(500).json({ error, mergeResult });
