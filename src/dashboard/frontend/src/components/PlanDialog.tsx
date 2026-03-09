@@ -62,7 +62,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [error, setError] = useState<string | null>(null);
   const [minimized, setMinimized] = useState(false);
   const [position, setPosition] = useState({ x: -1, y: -1 }); // -1 means centered
-  const [size, setSize] = useState({ width: 900, height: 600 });
+  const [size, setSize] = useState({ width: 900, height: 720 });
   const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
   const [shadowMode, setShadowMode] = useState(false);
@@ -440,7 +440,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
 
               {/* Ready step - start planning */}
               {step === 'ready' && (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto">
+                <div className="flex-1 flex flex-col items-center p-8 pt-6 overflow-y-auto">
                   <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center mb-6">
                     <Terminal className="w-10 h-10 text-purple-400" />
                   </div>

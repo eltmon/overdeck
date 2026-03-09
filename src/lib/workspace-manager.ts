@@ -129,6 +129,9 @@ async function createWorktree(
       await execAsync(`git worktree add "${targetPath}" -b "${branchName}" "${defaultBranch}"`, { cwd: repoPath });
     }
 
+    // Configure beads role so agents don't get "beads.role not configured" warnings
+    await execAsync('git config beads.role agent', { cwd: targetPath }).catch(() => {});
+
     return { success: true, message: `Created worktree at ${targetPath}` };
   } catch (error) {
     return { success: false, message: `Failed to create worktree: ${error}` };

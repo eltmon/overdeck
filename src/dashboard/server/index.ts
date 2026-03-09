@@ -8511,7 +8511,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       // Add "planning" label to GitHub issue
       console.log(`[start-planning] Fetched GitHub issue${ghComments.length > 0 ? ` with ${ghComments.length} comments` : ''}, adding planning label...`);
       await addGitHubPlanningLabel(githubCheck.owner, githubCheck.repo, githubCheck.number);
-      newStateName = 'Planning (label added)';
+      newStateName = 'In Planning';
       console.log(`[start-planning] GitHub issue setup complete`);
 
     } else {
@@ -14167,10 +14167,70 @@ if (existsSync(publicDir)) {
   });
 }
 
+/**
+ * Startup migration: clean up legacy agent state.json files.
+ *
+ * Before the state.json/runtime.json split (PAN-80), Claude Code hooks wrote
+ * runtime state ({state: "idle", lastActivity: ...}) directly into state.json.
+ * After the split, hooks write to runtime.json and state.json holds agent config
+ * ({id, issueId, status, model, ...}). The old state.json files were never cleaned
+ * up, causing ghost entries on the Resources tab.
+ *
+ * This migration deletes any state.json that has the old runtime shape (has "state"
+ * field but no "id" field). Real agent config state.json always has "id".
+ */
+function migrateCleanupLegacyAgentState(): void {
+  const agentsDir = join(homedir(), '.panopticon', 'agents');
+  if (!existsSync(agentsDir)) return;
+
+  let cleaned = 0;
+  let dirsRemoved = 0;
+
+  for (const name of readdirSync(agentsDir)) {
+    const dirPath = join(agentsDir, name);
+    const stateFile = join(dirPath, 'state.json');
+    if (!existsSync(stateFile)) continue;
+
+    try {
+      const content = JSON.parse(readFileSync(stateFile, 'utf-8'));
+
+      // Real agent state.json always has "id". Legacy runtime-shape files don't.
+      if (content.id) continue;
+
+      // This is a legacy runtime-shape state.json — delete it
+      unlinkSync(stateFile);
+      cleaned++;
+
+      // If the directory has no other meaningful files, remove it entirely
+      const remaining = readdirSync(dirPath);
+      const meaningfulFiles = remaining.filter(f =>
+        f !== 'runtime.json' && f !== 'state.json.tmp'
+      );
+      if (meaningfulFiles.length === 0) {
+        rmSync(dirPath, { recursive: true, force: true });
+        dirsRemoved++;
+      }
+    } catch {
+      // Skip corrupt files silently
+    }
+  }
+
+  if (cleaned > 0) {
+    console.log(`[migration] Cleaned up ${cleaned} legacy agent state files from pre-runtime.json hook format${dirsRemoved > 0 ? ` (${dirsRemoved} empty dirs removed)` : ''}`);
+  }
+}
+
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Panopticon API server running on http://0.0.0.0:${PORT}`);
   console.log(`WebSocket terminal available at ws://0.0.0.0:${PORT}/ws/terminal`);
   console.log(`Socket.io available at ws://0.0.0.0:${PORT}/socket.io`);
+
+  // Run startup migrations
+  try {
+    migrateCleanupLegacyAgentState();
+  } catch (error: any) {
+    console.error('Legacy agent state cleanup failed:', error.message);
+  }
 
   // Start IssueDataService for background polling + real-time push
   try {
