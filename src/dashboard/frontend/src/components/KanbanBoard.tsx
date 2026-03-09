@@ -1824,8 +1824,8 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
   const isRunning = activeAgent && activeAgent.status !== 'dead' && activeAgent.status !== 'stopped';
   const isPlanningActive = planningAgent && planningAgent.status !== 'stopped';
 
-  // For display in terminal viewer, use the active agent
-  const agent = activeAgent;
+  // For display in terminal viewer and INPUT badge, prefer work agent, fall back to planning agent
+  const agent = activeAgent || planningAgent;
 
   // Check if issue has "Review Ready" label (agent completed work)
   // Don't show on terminal states — "ready for review" is meaningless once done/canceled

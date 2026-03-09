@@ -60,6 +60,11 @@ export function createWorktree(
       stdio: 'pipe',
     });
   }
+
+  // Configure beads role so agents don't get "beads.role not configured" warnings
+  try {
+    execSync('git config beads.role agent', { cwd: targetPath, stdio: 'pipe' });
+  } catch { /* non-fatal */ }
 }
 
 export function removeWorktree(repoPath: string, worktreePath: string): void {

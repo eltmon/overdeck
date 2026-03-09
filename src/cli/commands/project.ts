@@ -177,6 +177,12 @@ export async function projectAddCommand(
 
   const isPolyrepo = !hasRootGit && subRepos.length > 0;
 
+  // Pre-trust project directory in Claude Code to avoid the trust prompt for planning agents
+  try {
+    const { preTrustDirectory } = await import('../../lib/workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
+    preTrustDirectory(fullPath);
+  } catch { /* non-fatal */ }
+
   // Install git hooks (branch protection)
   let hooksInstalled = 0;
   if (hasRootGit) {
