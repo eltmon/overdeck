@@ -14168,55 +14168,92 @@ if (existsSync(publicDir)) {
 }
 
 /**
- * Startup migration: clean up legacy agent state.json files.
+ * Startup migration: clean up stale agent state directories.
  *
- * Before the state.json/runtime.json split (PAN-80), Claude Code hooks wrote
- * runtime state ({state: "idle", lastActivity: ...}) directly into state.json.
- * After the split, hooks write to runtime.json and state.json holds agent config
- * ({id, issueId, status, model, ...}). The old state.json files were never cleaned
- * up, causing ghost entries on the Resources tab.
+ * Three problems this solves:
  *
- * This migration deletes any state.json that has the old runtime shape (has "state"
- * field but no "id" field). Real agent config state.json always has "id".
+ * 1. Legacy state.json files from before the state.json/runtime.json split (PAN-80).
+ *    Old hooks wrote runtime state ({state: "idle"}) into state.json. Real agent
+ *    state.json has {id, issueId, status, model}. Delete the legacy ones.
+ *
+ * 2. Test fixture leaks. agent-runtime-state.test.ts creates test-agent-* dirs in
+ *    the real ~/.panopticon/agents/ because AGENTS_DIR resolves at import time.
+ *    Every npm test run leaks ~4 dirs. Delete them all.
+ *
+ * 3. Orphaned "running" agents. When a tmux session exits naturally (agent finishes,
+ *    crashes, system reboots), nothing sets state.json status to "stopped". These
+ *    show as phantom "running" entries on the Resources tab. Reconcile against
+ *    live tmux sessions on startup.
  */
-function migrateCleanupLegacyAgentState(): void {
+async function migrateCleanupAgentState(): Promise<void> {
   const agentsDir = join(homedir(), '.panopticon', 'agents');
   if (!existsSync(agentsDir)) return;
 
-  let cleaned = 0;
-  let dirsRemoved = 0;
+  // Get live tmux sessions for orphan detection
+  let tmuxSessions: Set<string>;
+  try {
+    const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
+    tmuxSessions = new Set(stdout.trim().split('\n').filter(Boolean));
+  } catch {
+    tmuxSessions = new Set();
+  }
+
+  let legacyCleaned = 0;
+  let testDirsRemoved = 0;
+  let orphansFixed = 0;
 
   for (const name of readdirSync(agentsDir)) {
     const dirPath = join(agentsDir, name);
+    try {
+      if (!statSync(dirPath).isDirectory()) continue;
+    } catch { continue; }
+
+    // (2) Test fixture leak — delete entire directory
+    if (name.startsWith('test-agent-')) {
+      rmSync(dirPath, { recursive: true, force: true });
+      testDirsRemoved++;
+      continue;
+    }
+
     const stateFile = join(dirPath, 'state.json');
     if (!existsSync(stateFile)) continue;
 
     try {
       const content = JSON.parse(readFileSync(stateFile, 'utf-8'));
 
-      // Real agent state.json always has "id". Legacy runtime-shape files don't.
-      if (content.id) continue;
+      // (1) Legacy runtime-shape state.json (no "id" field)
+      if (!content.id) {
+        unlinkSync(stateFile);
+        legacyCleaned++;
+        // Remove dir if nothing meaningful remains
+        const remaining = readdirSync(dirPath).filter(f =>
+          f !== 'runtime.json' && f !== 'state.json.tmp'
+        );
+        if (remaining.length === 0) {
+          rmSync(dirPath, { recursive: true, force: true });
+        }
+        continue;
+      }
 
-      // This is a legacy runtime-shape state.json — delete it
-      unlinkSync(stateFile);
-      cleaned++;
-
-      // If the directory has no other meaningful files, remove it entirely
-      const remaining = readdirSync(dirPath);
-      const meaningfulFiles = remaining.filter(f =>
-        f !== 'runtime.json' && f !== 'state.json.tmp'
-      );
-      if (meaningfulFiles.length === 0) {
-        rmSync(dirPath, { recursive: true, force: true });
-        dirsRemoved++;
+      // (3) Orphaned "running" — state.json says running but no tmux session
+      if (content.status === 'running' && !tmuxSessions.has(content.id)) {
+        content.status = 'stopped';
+        content.stoppedAt = new Date().toISOString();
+        content.stoppedReason = 'reconciled-at-startup';
+        writeFileSync(stateFile, JSON.stringify(content, null, 2));
+        orphansFixed++;
       }
     } catch {
-      // Skip corrupt files silently
+      // Skip corrupt files
     }
   }
 
-  if (cleaned > 0) {
-    console.log(`[migration] Cleaned up ${cleaned} legacy agent state files from pre-runtime.json hook format${dirsRemoved > 0 ? ` (${dirsRemoved} empty dirs removed)` : ''}`);
+  const parts: string[] = [];
+  if (legacyCleaned > 0) parts.push(`${legacyCleaned} legacy state files`);
+  if (testDirsRemoved > 0) parts.push(`${testDirsRemoved} leaked test dirs`);
+  if (orphansFixed > 0) parts.push(`${orphansFixed} orphaned "running" agents → stopped`);
+  if (parts.length > 0) {
+    console.log(`[startup] Agent state cleanup: ${parts.join(', ')}`);
   }
 }
 
@@ -14227,9 +14264,9 @@ server.listen(PORT, '0.0.0.0', async () => {
 
   // Run startup migrations
   try {
-    migrateCleanupLegacyAgentState();
+    await migrateCleanupAgentState();
   } catch (error: any) {
-    console.error('Legacy agent state cleanup failed:', error.message);
+    console.error('Agent state cleanup failed:', error.message);
   }
 
   // Start IssueDataService for background polling + real-time push

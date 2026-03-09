@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { tmpdir, homedir } from 'os';
 
 /**
  * Tests for PAN-80: Agent Runtime State Management
@@ -23,10 +23,27 @@ import { tmpdir } from 'os';
 
 describe('Agent Runtime State (PAN-80)', () => {
   let testCounter = 0;
+  const createdAgentIds: string[] = [];
 
   function getUniqueAgentId(): string {
-    return `test-agent-${Date.now()}-${testCounter++}`;
+    const id = `test-agent-${Date.now()}-${testCounter++}`;
+    createdAgentIds.push(id);
+    return id;
   }
+
+  // AGENTS_DIR resolves to ~/.panopticon/agents/ at import time and can't be
+  // overridden via process.env.HOME. Tests that call getAgentRuntimeState() or
+  // getActivity() with a nonexistent agent ID still create dirs in the real
+  // AGENTS_DIR. Clean them up.
+  afterAll(() => {
+    const agentsDir = join(homedir(), '.panopticon', 'agents');
+    for (const id of createdAgentIds) {
+      const dir = join(agentsDir, id);
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
 
   describe('getAgentRuntimeState', () => {
     it('should return uninitialized state when no state file exists', async () => {
