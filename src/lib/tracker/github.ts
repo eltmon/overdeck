@@ -162,7 +162,45 @@ export class GitHubTracker implements IssueTracker {
   }
 
   async transitionIssue(id: string, state: IssueState): Promise<void> {
-    await this.updateIssue(id, { state });
+    const issueNumber = parseInt(id.replace(/^#/, ''), 10);
+
+    if (state === 'in_progress') {
+      // GitHub has no native "in progress" state — use a label instead.
+      await this.ensureLabelExists('in-progress', 'In progress', '0075ca');
+      await this.octokit.issues.addLabels({
+        owner: this.owner,
+        repo: this.repo,
+        issue_number: issueNumber,
+        labels: ['in-progress'],
+      });
+    } else {
+      // Remove in-progress label when moving to open or closed
+      const issue = await this.getIssue(id);
+      if (issue.labels?.includes('in-progress')) {
+        await this.octokit.issues.removeLabel({
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: issueNumber,
+          name: 'in-progress',
+        }).catch(() => {/* label may not exist, ignore */});
+      }
+      await this.updateIssue(id, { state });
+    }
+  }
+
+  /** Ensure a label exists in the repo, creating it if needed. */
+  private async ensureLabelExists(name: string, description: string, color: string): Promise<void> {
+    try {
+      await this.octokit.issues.getLabel({ owner: this.owner, repo: this.repo, name });
+    } catch {
+      await this.octokit.issues.createLabel({
+        owner: this.owner,
+        repo: this.repo,
+        name,
+        description,
+        color,
+      }).catch(() => {/* race condition: another process created it first */});
+    }
   }
 
   async linkPR(issueId: string, prUrl: string): Promise<void> {
@@ -175,15 +213,16 @@ export class GitHubTracker implements IssueTracker {
   }
 
   private normalizeIssue(ghIssue: any): Issue {
+    const labels: string[] = ghIssue.labels.map((l: any) =>
+      typeof l === 'string' ? l : l.name
+    );
     return {
       id: String(ghIssue.id),
       ref: `#${ghIssue.number}`,
       title: ghIssue.title,
       description: ghIssue.body ?? '',
-      state: this.mapStateFromGitHub(ghIssue.state),
-      labels: ghIssue.labels.map((l: any) =>
-        typeof l === 'string' ? l : l.name
-      ),
+      state: this.mapStateFromGitHub(ghIssue.state, labels),
+      labels,
       assignee: ghIssue.assignee?.login,
       url: ghIssue.html_url,
       tracker: 'github',
@@ -194,10 +233,10 @@ export class GitHubTracker implements IssueTracker {
     };
   }
 
-  private mapStateFromGitHub(ghState: string): IssueState {
-    // GitHub only has open and closed states
-    // No way to distinguish "in_progress" without custom labels
-    return ghState === 'closed' ? 'closed' : 'open';
+  private mapStateFromGitHub(ghState: string, labels: string[] = []): IssueState {
+    if (ghState === 'closed') return 'closed';
+    if (labels.includes('in-progress')) return 'in_progress';
+    return 'open';
   }
 
   private mapStateToGitHub(

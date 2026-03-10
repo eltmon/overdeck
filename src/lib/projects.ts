@@ -78,6 +78,8 @@ export interface ProjectConfig {
   name: string;
   path: string;
   linear_team?: string;
+  github_repo?: string;  // e.g. "owner/repo"
+  gitlab_repo?: string;  // e.g. "group/repo"
   issue_routing?: IssueRoutingRule[];
   /** Workspace configuration */
   workspace?: WorkspaceConfig;
@@ -191,6 +193,25 @@ export function findProjectByTeam(teamPrefix: string): ProjectConfig | null {
 
   for (const [, projectConfig] of Object.entries(config.projects)) {
     if (projectConfig.linear_team?.toUpperCase() === teamPrefix.toUpperCase()) {
+      return projectConfig;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find project by workspace path.
+ * Matches any project whose root path is an ancestor of the given path.
+ * Used to resolve the tracker (GitHub/GitLab) from a workspace directory.
+ */
+export function findProjectByPath(workspacePath: string): ProjectConfig | null {
+  const config = loadProjectsConfig();
+  const normalizedTarget = resolve(workspacePath);
+
+  for (const [, projectConfig] of Object.entries(config.projects)) {
+    const normalizedProject = resolve(projectConfig.path);
+    if (normalizedTarget === normalizedProject || normalizedTarget.startsWith(normalizedProject + '/')) {
       return projectConfig;
     }
   }
