@@ -13,8 +13,9 @@ import { loadSettings, type ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresRouter } from './providers.js';
 import { loadConfig } from './config.js';
-import { createTrackerFromConfig } from './tracker/factory.js';
+import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { TrackerType } from './tracker/interface.js';
+import { findProjectByPath } from './projects.js';
 
 const execAsync = promisify(exec);
 
@@ -415,9 +416,17 @@ function determineModel(options: SpawnOptions): string {
 
 /**
  * Transition an issue to "in_progress" in its tracker.
- * Tries each configured tracker until one succeeds.
+ *
+ * Resolution order:
+ * 1. Primary tracker from global config (e.g. Linear)
+ * 2. Secondary tracker from global config (if configured)
+ * 3. Project-specific tracker derived from the workspace path:
+ *    looks up the project in projects.yaml and uses its github_repo or gitlab_repo
+ *
+ * This means projects that only have a github_repo (no linear_team) will
+ * still get their issues transitioned correctly without any extra config.
  */
-async function transitionIssueToInProgress(issueId: string): Promise<void> {
+async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
   const { config } = loadConfig();
   const trackersConfig = config.trackers;
 
@@ -435,6 +444,26 @@ async function transitionIssueToInProgress(issueId: string): Promise<void> {
       return;
     } catch {
       // Issue not found in this tracker or transition failed, try next
+    }
+  }
+
+  // Fall back to the project's own tracker derived from the workspace path.
+  // This handles projects with github_repo or gitlab_repo but no linear_team.
+  if (workspacePath) {
+    const projectConfig = findProjectByPath(workspacePath);
+    if (projectConfig?.github_repo) {
+      const [owner, repo] = projectConfig.github_repo.split('/');
+      try {
+        const tracker = createTracker({ type: 'github', owner, repo });
+        await tracker.transitionIssue(issueId, 'in_progress');
+        console.log(`[agents] Transitioned ${issueId} to in_progress via project GitHub (${projectConfig.github_repo})`);
+        return;
+      } catch (err: any) {
+        console.warn(`[agents] Could not transition via project GitHub (${projectConfig.github_repo}): ${err.message}`);
+      }
+    }
+    if (projectConfig?.gitlab_repo) {
+      console.warn(`[agents] GitLab project detected (${projectConfig.gitlab_repo}) but GitLab does not support in_progress label transitions`);
     }
   }
 }
@@ -601,7 +630,7 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
   // Transition issue tracker to "in progress" (best-effort, don't block agent spawn)
   // Only for work agents, not planning/specialist agents
   if (!options.agentType || options.agentType === 'work-agent') {
-    transitionIssueToInProgress(options.issueId).catch((err) => {
+    transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
       console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
     });
   }
