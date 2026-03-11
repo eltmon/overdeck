@@ -313,7 +313,7 @@ describe('parseClaudeSession', () => {
     const result = parseClaudeSession(sessionFile);
 
     expect(result).not.toBeNull();
-    expect(result!.model).toBe('claude-sonnet-4.5');  // Normalized
+    expect(result!.model).toBe('claude-sonnet-4-6');  // Normalized
     expect(result!.usage.inputTokens).toBe(3000);
     expect(result!.usage.outputTokens).toBe(1500);
     expect(result!.messageCount).toBe(2);
@@ -349,7 +349,7 @@ describe('parseClaudeSession', () => {
     expect(result).not.toBeNull();
 
     // Model display should show progression
-    expect(result!.model).toBe('claude-sonnet-4.5 → claude-opus-4.6');
+    expect(result!.model).toBe('claude-sonnet-4-6 → claude-opus-4-6');
 
     // Should have breakdown for both models
     expect(result!.modelBreakdown).toBeDefined();
@@ -458,7 +458,7 @@ describe('parseClaudeSession', () => {
     const result = parseClaudeSession(sessionFile);
 
     expect(result).not.toBeNull();
-    expect(result!.model).toBe('claude-opus-4.6');
+    expect(result!.model).toBe('claude-opus-4-6');
     expect(result!.usage.inputTokens).toBe(1000);
     expect(result!.usage.outputTokens).toBe(500);
     expect(result!.cost_v2).toBeDefined();

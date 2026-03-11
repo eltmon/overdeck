@@ -69,10 +69,10 @@ var PRD_PUBLISHED_DIR = join(PRDS_DIR, "published");
 
 // src/lib/cost.ts
 var DEFAULT_PRICING = [
-  // Anthropic - 4.6 series
-  { provider: "anthropic", model: "claude-opus-4.6", inputPer1k: 5e-3, outputPer1k: 0.025, cacheReadPer1k: 5e-4, cacheWrite5mPer1k: 625e-5, cacheWrite1hPer1k: 0.01, currency: "USD" },
-  { provider: "anthropic", model: "claude-sonnet-4.5", inputPer1k: 3e-3, outputPer1k: 0.015, cacheReadPer1k: 3e-4, cacheWrite5mPer1k: 375e-5, cacheWrite1hPer1k: 6e-3, currency: "USD" },
-  { provider: "anthropic", model: "claude-haiku-4.5", inputPer1k: 1e-3, outputPer1k: 5e-3, cacheReadPer1k: 1e-4, cacheWrite5mPer1k: 125e-5, cacheWrite1hPer1k: 2e-3, currency: "USD" },
+  // Anthropic - 4.6 series (API IDs use dashes: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5)
+  { provider: "anthropic", model: "claude-opus-4-6", inputPer1k: 5e-3, outputPer1k: 0.025, cacheReadPer1k: 5e-4, cacheWrite5mPer1k: 625e-5, cacheWrite1hPer1k: 0.01, currency: "USD" },
+  { provider: "anthropic", model: "claude-sonnet-4-6", inputPer1k: 3e-3, outputPer1k: 0.015, cacheReadPer1k: 3e-4, cacheWrite5mPer1k: 375e-5, cacheWrite1hPer1k: 6e-3, currency: "USD" },
+  { provider: "anthropic", model: "claude-haiku-4-5", inputPer1k: 1e-3, outputPer1k: 5e-3, cacheReadPer1k: 1e-4, cacheWrite5mPer1k: 125e-5, cacheWrite1hPer1k: 2e-3, currency: "USD" },
   // Anthropic - 4.x series
   { provider: "anthropic", model: "claude-opus-4-1", inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 15e-4, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03, currency: "USD" },
   { provider: "anthropic", model: "claude-opus-4", inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 15e-4, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03, currency: "USD" },
@@ -95,7 +95,7 @@ function calculateCost(usage, pricing) {
   let inputMultiplier = 1;
   let outputMultiplier = 1;
   const totalInputTokens = usage.inputTokens + (usage.cacheReadTokens || 0) + (usage.cacheWriteTokens || 0);
-  if ((pricing.model === "claude-sonnet-4" || pricing.model === "claude-sonnet-4.5") && totalInputTokens > 2e5) {
+  if ((pricing.model === "claude-sonnet-4" || pricing.model === "claude-sonnet-4-6") && totalInputTokens > 2e5) {
     inputMultiplier = 2;
     outputMultiplier = 1.5;
   }

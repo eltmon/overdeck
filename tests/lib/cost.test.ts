@@ -16,8 +16,8 @@ import { normalizeModelName } from '../../src/lib/cost-parsers/jsonl-parser.js';
 
 describe('cost module', () => {
   describe('DEFAULT_PRICING - Pricing Accuracy', () => {
-    it('should have correct pricing for claude-opus-4.6', () => {
-      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-opus-4.6');
+    it('should have correct pricing for claude-opus-4-6', () => {
+      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-opus-4-6');
       expect(pricing).toBeDefined();
       expect(pricing?.inputPer1k).toBe(0.005);
       expect(pricing?.outputPer1k).toBe(0.025);
@@ -26,8 +26,8 @@ describe('cost module', () => {
       expect(pricing?.cacheWrite1hPer1k).toBe(0.01);
     });
 
-    it('should have correct pricing for claude-sonnet-4.5', () => {
-      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-sonnet-4.5');
+    it('should have correct pricing for claude-sonnet-4-6', () => {
+      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-sonnet-4-6');
       expect(pricing).toBeDefined();
       expect(pricing?.inputPer1k).toBe(0.003);
       expect(pricing?.outputPer1k).toBe(0.015);
@@ -36,8 +36,8 @@ describe('cost module', () => {
       expect(pricing?.cacheWrite1hPer1k).toBe(0.006);
     });
 
-    it('should have correct pricing for claude-haiku-4.5', () => {
-      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-haiku-4.5');
+    it('should have correct pricing for claude-haiku-4-5', () => {
+      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-haiku-4-5');
       expect(pricing).toBeDefined();
       expect(pricing?.inputPer1k).toBe(0.001);
       expect(pricing?.outputPer1k).toBe(0.005);
@@ -116,10 +116,10 @@ describe('cost module', () => {
       expect(pricing?.model).toBe('claude-sonnet-4');
     });
 
-    it('should get pricing for 4.6 models with date suffix', () => {
-      const pricing = getPricing('anthropic', 'claude-opus-4.6-20250929');
+    it('should get pricing for 4-6 models with date suffix', () => {
+      const pricing = getPricing('anthropic', 'claude-opus-4-6-20250929');
       expect(pricing).toBeDefined();
-      expect(pricing?.model).toBe('claude-opus-4.6');
+      expect(pricing?.model).toBe('claude-opus-4-6');
     });
 
     it('should fallback claude-haiku-3.5 to claude-haiku-3 via partial match', () => {
@@ -228,7 +228,7 @@ describe('cost module', () => {
 
     const sonnet45Pricing: ModelPricing = {
       provider: 'anthropic',
-      model: 'claude-sonnet-4.5',
+      model: 'claude-sonnet-4-6',
       inputPer1k: 0.003,
       outputPer1k: 0.015,
       currency: 'USD',
@@ -305,7 +305,7 @@ describe('cost module', () => {
     it('should NOT apply long-context pricing to haiku models', () => {
       const haikuPricing: ModelPricing = {
         provider: 'anthropic',
-        model: 'claude-haiku-4.5',
+        model: 'claude-haiku-4-5',
         inputPer1k: 0.001,
         outputPer1k: 0.005,
         currency: 'USD',
@@ -401,16 +401,16 @@ describe('cost module', () => {
   });
 
   describe('normalizeModelName', () => {
-    it('should normalize opus-4.6 to claude-opus-4.6', () => {
+    it('should normalize opus-4.6 to claude-opus-4-6', () => {
       const result = normalizeModelName('claude-opus-4.6-20250929');
       expect(result.provider).toBe('anthropic');
-      expect(result.model).toBe('claude-opus-4.6');
+      expect(result.model).toBe('claude-opus-4-6');
     });
 
-    it('should normalize opus-4-6 to claude-opus-4.6', () => {
+    it('should normalize opus-4-6 to claude-opus-4-6', () => {
       const result = normalizeModelName('claude-opus-4-6-20250929');
       expect(result.provider).toBe('anthropic');
-      expect(result.model).toBe('claude-opus-4.6');
+      expect(result.model).toBe('claude-opus-4-6');
     });
 
     it('should normalize opus-4.1 to claude-opus-4-1', () => {
@@ -431,10 +431,10 @@ describe('cost module', () => {
       expect(result.model).toBe('claude-opus-4');
     });
 
-    it('should normalize sonnet-4.5 to claude-sonnet-4.5', () => {
+    it('should normalize sonnet-4.5 to claude-sonnet-4-6', () => {
       const result = normalizeModelName('claude-sonnet-4.5-20250929');
       expect(result.provider).toBe('anthropic');
-      expect(result.model).toBe('claude-sonnet-4.5');
+      expect(result.model).toBe('claude-sonnet-4-6');
     });
 
     it('should normalize sonnet-4 to claude-sonnet-4', () => {
@@ -443,10 +443,10 @@ describe('cost module', () => {
       expect(result.model).toBe('claude-sonnet-4');
     });
 
-    it('should normalize haiku-4.5 to claude-haiku-4.5', () => {
+    it('should normalize haiku-4.5 to claude-haiku-4-5', () => {
       const result = normalizeModelName('claude-haiku-4.5-20250929');
       expect(result.provider).toBe('anthropic');
-      expect(result.model).toBe('claude-haiku-4.5');
+      expect(result.model).toBe('claude-haiku-4-5');
     });
 
     it('should normalize haiku-3 to claude-haiku-3', () => {
@@ -455,10 +455,10 @@ describe('cost module', () => {
       expect(result.model).toBe('claude-haiku-3');
     });
 
-    it('should normalize generic haiku to claude-haiku-4.5 (current)', () => {
+    it('should normalize generic haiku to claude-haiku-4-5 (current)', () => {
       const result = normalizeModelName('claude-haiku-20250929');
       expect(result.provider).toBe('anthropic');
-      expect(result.model).toBe('claude-haiku-4.5');
+      expect(result.model).toBe('claude-haiku-4-5');
     });
 
     it('should handle OpenAI models', () => {

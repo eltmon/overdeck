@@ -82,10 +82,10 @@ export interface ModelPricing {
 // ============== Pricing Data ==============
 
 export const DEFAULT_PRICING: ModelPricing[] = [
-  // Anthropic - 4.6 series
-  { provider: 'anthropic', model: 'claude-opus-4.6', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
-  { provider: 'anthropic', model: 'claude-sonnet-4.5', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006, currency: 'USD' },
-  { provider: 'anthropic', model: 'claude-haiku-4.5', inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.0001, cacheWrite5mPer1k: 0.00125, cacheWrite1hPer1k: 0.002, currency: 'USD' },
+  // Anthropic - 4.6 series (API IDs use dashes: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5)
+  { provider: 'anthropic', model: 'claude-opus-4-6', inputPer1k: 0.005, outputPer1k: 0.025, cacheReadPer1k: 0.0005, cacheWrite5mPer1k: 0.00625, cacheWrite1hPer1k: 0.01, currency: 'USD' },
+  { provider: 'anthropic', model: 'claude-sonnet-4-6', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006, currency: 'USD' },
+  { provider: 'anthropic', model: 'claude-haiku-4-5', inputPer1k: 0.001, outputPer1k: 0.005, cacheReadPer1k: 0.0001, cacheWrite5mPer1k: 0.00125, cacheWrite1hPer1k: 0.002, currency: 'USD' },
   // Anthropic - 4.x series
   { provider: 'anthropic', model: 'claude-opus-4-1', inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03, currency: 'USD' },
   { provider: 'anthropic', model: 'claude-opus-4', inputPer1k: 0.015, outputPer1k: 0.075, cacheReadPer1k: 0.0015, cacheWrite5mPer1k: 0.01875, cacheWrite1hPer1k: 0.03, currency: 'USD' },
@@ -120,7 +120,7 @@ export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number 
     + (usage.cacheReadTokens || 0)
     + (usage.cacheWriteTokens || 0);
 
-  if ((pricing.model === 'claude-sonnet-4' || pricing.model === 'claude-sonnet-4.5')
+  if ((pricing.model === 'claude-sonnet-4' || pricing.model === 'claude-sonnet-4-6')
       && totalInputTokens > 200000) {
     inputMultiplier = 2;    // $6/MTok vs $3/MTok
     outputMultiplier = 1.5; // $22.50/MTok vs $15/MTok
