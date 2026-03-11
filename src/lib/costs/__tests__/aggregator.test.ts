@@ -157,7 +157,7 @@ describe('Aggregator Cache Management', () => {
           issueId: 'TEST-2',
           sessionType: 'implementation',
           provider: 'anthropic',
-          model: 'claude-haiku-4.5',
+          model: 'claude-haiku-4-5',
           input: 5000,
           output: 2500,
           cacheRead: 0,
@@ -169,9 +169,9 @@ describe('Aggregator Cache Management', () => {
       const cache = updateCacheFromEvents(events);
 
       expect(cache.issues['TEST-2'].models['claude-sonnet-4']).toBeDefined();
-      expect(cache.issues['TEST-2'].models['claude-haiku-4.5']).toBeDefined();
+      expect(cache.issues['TEST-2'].models['claude-haiku-4-5']).toBeDefined();
       expect(cache.issues['TEST-2'].models['claude-sonnet-4'].calls).toBe(1);
-      expect(cache.issues['TEST-2'].models['claude-haiku-4.5'].calls).toBe(1);
+      expect(cache.issues['TEST-2'].models['claude-haiku-4-5'].calls).toBe(1);
     });
 
     it('should track per-provider costs', () => {

@@ -42,7 +42,7 @@ export interface SessionUsage {
   sessionFile: string;
   startTime: string;
   endTime: string;
-  model: string;  // Display name (normalized). Shows "sonnet-4.5 → opus-4.6" for upgrades
+  model: string;  // Display name (normalized). Shows "sonnet-4-6 → opus-4-6" for upgrades
   usage: TokenUsage;  // Total tokens across all models
   cost: number;  // DEPRECATED: Uses first-model pricing (kept for backward compatibility)
   cost_v2?: number;  // NEW: Accurate per-message pricing
@@ -129,7 +129,7 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
 
     // Opus models
     if (model.includes('opus-4-6') || model.includes('opus-4.6')) {
-      normalizedModel = 'claude-opus-4.6';
+      normalizedModel = 'claude-opus-4-6';
     } else if (model.includes('opus-4-1') || model.includes('opus-4.1')) {
       normalizedModel = 'claude-opus-4-1';
     } else if (model.includes('opus-4') || model.includes('opus')) {
@@ -138,18 +138,18 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
 
     // Sonnet models
     if (model.includes('sonnet-4-5') || model.includes('sonnet-4.5')) {
-      normalizedModel = 'claude-sonnet-4.5';
+      normalizedModel = 'claude-sonnet-4-6';
     } else if (model.includes('sonnet-4') || model.includes('sonnet')) {
       normalizedModel = 'claude-sonnet-4';
     }
 
     // Haiku models - default to 4.5 (current), support 3 for legacy
     if (model.includes('haiku-4-5') || model.includes('haiku-4.5')) {
-      normalizedModel = 'claude-haiku-4.5';
+      normalizedModel = 'claude-haiku-4-5';
     } else if (model.includes('haiku-3')) {
       normalizedModel = 'claude-haiku-3';
     } else if (model.includes('haiku')) {
-      normalizedModel = 'claude-haiku-4.5';  // Default to current model
+      normalizedModel = 'claude-haiku-4-5';  // Default to current model
     }
 
     return { provider: 'anthropic', model: normalizedModel };
@@ -180,8 +180,8 @@ export function normalizeModelName(model: string): { provider: AIProvider; model
  * - `cost`: DEPRECATED. Uses first model's pricing for all messages (kept for backward compatibility).
  *
  * Model Display:
- * - Single model: "claude-sonnet-4.5" (normalized name)
- * - Multiple models: "claude-sonnet-4.5 → claude-opus-4.6" (progression of normalized names)
+ * - Single model: "claude-sonnet-4-6" (normalized name)
+ * - Multiple models: "claude-sonnet-4-6 → claude-opus-4-6" (progression of normalized names)
  *
  * Model Breakdown:
  * - Keys are exact model IDs (e.g., "claude-sonnet-4-5-20250929")
@@ -312,8 +312,8 @@ export function parseClaudeSession(sessionFile: string): SessionUsage | null {
   }
 
   // Generate model display string (normalized names)
-  // For multi-model sessions: "claude-sonnet-4.5 → claude-opus-4.6"
-  // For single-model sessions: "claude-sonnet-4.5"
+  // For multi-model sessions: "claude-sonnet-4-6 → claude-opus-4-6"
+  // For single-model sessions: "claude-sonnet-4-6"
   const normalizedModels = Object.keys(modelBreakdown)
     .map(id => normalizeModelName(id).model);
   const modelDisplay = normalizedModels.length > 0

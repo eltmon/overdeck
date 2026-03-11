@@ -47,8 +47,8 @@ describe('Cost Calculation Accuracy', () => {
       expect(cost).toBeCloseTo(0.525, 6);
     });
 
-    it('should calculate claude-haiku-4.5 costs correctly', () => {
-      const pricing = getPricing('anthropic', 'claude-haiku-4.5');
+    it('should calculate claude-haiku-4-5 costs correctly', () => {
+      const pricing = getPricing('anthropic', 'claude-haiku-4-5');
       expect(pricing).toBeDefined();
 
       const usage: TokenUsage = {
@@ -183,7 +183,7 @@ describe('Cost Calculation Accuracy', () => {
 
     it('should NOT apply long-context multiplier to Opus or Haiku', () => {
       const opusPricing = getPricing('anthropic', 'claude-opus-4');
-      const haikuPricing = getPricing('anthropic', 'claude-haiku-4.5');
+      const haikuPricing = getPricing('anthropic', 'claude-haiku-4-5');
 
       const usage: TokenUsage = {
         inputTokens: 250000,
@@ -207,7 +207,7 @@ describe('Cost Calculation Accuracy', () => {
     it('should match exact model names', () => {
       expect(getPricing('anthropic', 'claude-sonnet-4')).toBeDefined();
       expect(getPricing('anthropic', 'claude-opus-4')).toBeDefined();
-      expect(getPricing('anthropic', 'claude-haiku-4.5')).toBeDefined();
+      expect(getPricing('anthropic', 'claude-haiku-4-5')).toBeDefined();
     });
 
     it('should match model names with date suffixes', () => {
@@ -241,7 +241,7 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should handle very small costs without underflow', () => {
-      const pricing = getPricing('anthropic', 'claude-haiku-4.5');
+      const pricing = getPricing('anthropic', 'claude-haiku-4-5');
 
       const usage: TokenUsage = {
         inputTokens: 1,

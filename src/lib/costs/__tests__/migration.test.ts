@@ -168,7 +168,7 @@ describe('Migration Safety Tests', () => {
       writeFileSync(
         join(subagentsDir, 'subagent-1.jsonl'),
         JSON.stringify({
-          model: 'claude-haiku-4.5',
+          model: 'claude-haiku-4-5',
           usage: {
             input_tokens: 500,
             output_tokens: 250,
