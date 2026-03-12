@@ -165,7 +165,18 @@ const { stdout } = await execAsync('tmux capture-pane -t session -p');
 - This applies to ALL shell commands: tmux, git, bd (beads), docker, etc.
 - The ONLY exception is one-time startup initialization code that runs before the server starts listening
 
-### 7. All Beads Must Be Closed
+### 7. No Temporal Dead Zone (TDZ) Bugs
+
+**In React/TypeScript components**, all `useCallback`, `useMemo`, and `useEffect` hooks MUST only reference variables that are declared **above** them in the component body. Out-of-order `const`/`let` declarations create Temporal Dead Zone crashes that only appear in **production builds** (minification renames variables, exposing the reference-before-initialization error).
+
+**How to check:**
+1. For each `useCallback`/`useMemo`, verify its dependency array only references variables declared earlier in the file
+2. Check that any function called inside the hook body is declared above the hook
+3. This is especially critical for hooks that reference other hooks (e.g., `handleSubmit` referencing `validateForm`)
+
+**If found:** REQUEST CHANGES with: "TDZ risk: `<variable>` is declared after `<hook>` but referenced in its closure/dependency array. Move the declaration above the hook."
+
+### 8. All Beads Must Be Closed
 - **Before approval, run `beads-completion-check` subagent**
 - All beads (tracked tasks) created during implementation must be closed
 - Open beads indicate incomplete work, forgotten sub-tasks, or unfinished documentation

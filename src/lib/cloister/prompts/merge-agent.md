@@ -88,14 +88,16 @@ Or search manually for `<<<<<<<`, `=======`, or `>>>>>>>` markers.
 
 **If markers found:** Go back and resolve them before proceeding.
 
-#### Step 3b: Build the Project (REQUIRED)
+#### Step 3b: Build the Project (REQUIRED — PRODUCTION MODE)
 
-**Use the Task tool with subagent_type="Bash"** to run the build in an isolated context:
+**Use the Task tool with subagent_type="Bash"** to run the build in an isolated context.
 
-Detect the project type and run the appropriate build command:
-- **Node.js** (package.json exists): `npm run build`
+**CRITICAL:** Always build in **production mode**. Dev builds mask minification bugs (e.g., Temporal Dead Zone errors that only surface when variables are renamed by esbuild/terser).
+
+Detect the project type and run the appropriate **production** build command:
+- **Node.js** (package.json exists): `NODE_ENV=production npm run build` (or the project's prod build script)
 - **Java/Maven** (pom.xml exists): `mvn compile`
-- **Rust** (Cargo.toml exists): `cargo build`
+- **Rust** (Cargo.toml exists): `cargo build --release`
 - **Python** (setup.py/pyproject.toml): `pip install -e .` or `python -m build`
 
 **Why use a subagent?** Build output can be verbose. A subagent isolates the output and returns a clean summary.

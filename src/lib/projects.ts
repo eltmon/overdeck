@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { PANOPTICON_HOME } from './paths.js';
+import type { QualityGateConfig } from './workspace-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, 'projects.yaml');
 
@@ -93,6 +94,8 @@ export interface ProjectConfig {
   rally_project?: string;
   /** Specialist agent configuration */
   specialists?: SpecialistConfig;
+  /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
+  quality_gates?: Record<string, QualityGateConfig>;
 }
 
 /**
