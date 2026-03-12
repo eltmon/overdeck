@@ -1603,6 +1603,25 @@ export async function wakeSpecialist(
   const sessionId = getSessionId(name);
   const wasAlreadyRunning = await isRunning(name);
 
+  // Guard: if specialist is running and busy, refuse to send a new task.
+  // Sending a message to a busy Claude session causes "Interrupted" behavior —
+  // the running tool is cancelled and the previous task is abandoned mid-flight.
+  // Callers should use wakeSpecialistOrQueue() for automatic busy handling.
+  if (wasAlreadyRunning) {
+    const { getAgentRuntimeState } = await import('../agents.js');
+    const runtimeState = getAgentRuntimeState(tmuxSession);
+    if (runtimeState?.state === 'active') {
+      console.warn(`[specialist] ${name} is busy (working on ${runtimeState.currentIssue}), refusing to interrupt`);
+      return {
+        success: false,
+        message: `Specialist ${name} is busy (working on ${runtimeState.currentIssue}). Use wakeSpecialistOrQueue() instead.`,
+        tmuxSession,
+        wasAlreadyRunning: true,
+        error: 'specialist_busy',
+      };
+    }
+  }
+
   // If not running, start it first
   if (!wasAlreadyRunning) {
     if (!startIfNotRunning) {
