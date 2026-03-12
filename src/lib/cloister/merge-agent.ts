@@ -25,7 +25,8 @@ import {
   wakeSpecialist,
   isRunning,
 } from './specialists.js';
-import { runMergeValidation, autoRevertMerge } from './validation.js';
+import { runMergeValidation, autoRevertMerge, runQualityGates } from './validation.js';
+import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
@@ -651,8 +652,32 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
             });
 
             if (validationResult.valid) {
-              // Validation passed
+              // Validation passed — now run quality gates if configured
               console.log(`[merge-agent] ✓ Validation passed`);
+
+              const gateResults = await runProjectQualityGates(context.projectPath, 'pre_push');
+              const failedRequired = gateResults.filter(g => !g.passed && g.required);
+              if (failedRequired.length > 0) {
+                const failedNames = failedRequired.map(g => g.name).join(', ');
+                console.log(`[merge-agent] ✗ Quality gates failed: ${failedNames}`);
+                logActivity('merge_quality_gate_fail', `Quality gates failed for ${context.issueId}: ${failedNames}`);
+
+                const revertSuccess = await autoRevertMerge(context.projectPath);
+                const revertNote = revertSuccess
+                  ? 'Merge auto-reverted to clean state'
+                  : 'WARNING: Auto-revert failed - manual cleanup required';
+
+                const failedResult: MergeResult = {
+                  success: false,
+                  validationStatus: 'FAIL',
+                  reason: `Quality gate(s) failed: ${failedNames}. ${revertNote}`,
+                  notes: result.notes,
+                  output,
+                };
+                logMergeHistory(context, failedResult);
+                return failedResult;
+              }
+
               logActivity('merge_success', `Merge and validation completed for ${context.issueId}`);
 
               // Update result with validation status
@@ -1093,9 +1118,29 @@ Report any issues or conflicts you encountered.`;
               });
 
               if (validationResult.valid) {
-                // Validation passed (or skipped — specialist already validated)
+                // Validation passed — now run quality gates if configured
                 const skipNote = validationResult.skipped ? ' (no validation script, specialist already validated)' : '';
                 console.log(`[merge-agent] ✓ Merge validation passed${skipNote}`);
+
+                const gateResults = await runProjectQualityGates(projectPath, 'pre_push');
+                const failedRequired = gateResults.filter(g => !g.passed && g.required);
+                if (failedRequired.length > 0) {
+                  const failedNames = failedRequired.map(g => g.name).join(', ');
+                  console.log(`[merge-agent] ✗ Quality gates failed: ${failedNames}`);
+                  logActivity('merge_quality_gate_fail', `Quality gates failed for ${issueId}: ${failedNames}`);
+
+                  const revertSuccess = await autoRevertMerge(projectPath);
+                  const revertNote = revertSuccess
+                    ? 'Merge auto-reverted to clean state'
+                    : 'WARNING: Auto-revert failed';
+
+                  return {
+                    success: false,
+                    validationStatus: 'FAIL',
+                    reason: `Quality gate(s) failed: ${failedNames}. ${revertNote}`,
+                  };
+                }
+
                 logActivity('merge_complete', `Merge completed by specialist${skipNote}`);
 
                 // Run post-merge cleanup (move PRD, update issue status)
@@ -1484,4 +1529,29 @@ export async function syncMainIntoWorkspace(
     conflictFiles,
     reason: `Timeout: merge agent did not complete within ${SYNC_TIMEOUT_MS / 60000} minutes`,
   };
+}
+
+/**
+ * Look up and run quality gates for the project at projectPath.
+ * Returns empty array if no quality gates are configured.
+ */
+async function runProjectQualityGates(
+  projectPath: string,
+  phase: 'pre_push' | 'post_push'
+): Promise<import('./validation.js').QualityGateResult[]> {
+  try {
+    const config = loadProjectsConfig();
+    // Find the project whose path matches
+    const project = Object.values(config.projects).find(p => projectPath.startsWith(p.path));
+    if (!project?.quality_gates || Object.keys(project.quality_gates).length === 0) {
+      console.log(`[merge-agent] No quality gates configured for ${projectPath}`);
+      return [];
+    }
+
+    console.log(`[merge-agent] Running ${phase} quality gates for project "${project.name}"`);
+    return await runQualityGates(project.quality_gates, projectPath, phase);
+  } catch (error: any) {
+    console.error(`[merge-agent] Failed to load quality gates: ${error.message}`);
+    return [];
+  }
 }

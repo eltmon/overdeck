@@ -11,6 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import type { QualityGateConfig } from '../workspace-config.js';
 
 const execAsync = promisify(exec);
 
@@ -286,5 +287,169 @@ export async function autoRevertMerge(projectPath: string): Promise<boolean> {
   } catch (error: any) {
     console.error(`[validation] ✗ Auto-revert failed:`, error.message);
     return false;
+  }
+}
+
+/**
+ * Result of a single quality gate execution
+ */
+export interface QualityGateResult {
+  /** Gate name from projects.yaml */
+  name: string;
+  /** Whether the gate passed */
+  passed: boolean;
+  /** Whether the gate was required */
+  required: boolean;
+  /** Gate output (stdout + stderr) */
+  output: string;
+  /** Duration in milliseconds */
+  durationMs: number;
+  /** Error message if gate failed */
+  error?: string;
+}
+
+/**
+ * Run all quality gates for a project
+ *
+ * Executes each gate in declaration order, stopping on first required failure.
+ * Returns results for all gates that were run.
+ *
+ * @param gates - Quality gate configs from projects.yaml
+ * @param projectPath - Project root (or workspace root)
+ * @param phase - Which phase to run ('pre_push' or 'post_push')
+ * @returns Array of gate results
+ */
+export async function runQualityGates(
+  gates: Record<string, QualityGateConfig>,
+  projectPath: string,
+  phase: 'pre_push' | 'post_push' = 'pre_push'
+): Promise<QualityGateResult[]> {
+  const results: QualityGateResult[] = [];
+
+  for (const [name, gate] of Object.entries(gates)) {
+    const gatePhase = gate.phase || 'pre_push';
+    if (gatePhase !== phase) continue;
+
+    const required = gate.required !== false; // default true
+    const cwd = gate.path ? join(projectPath, gate.path) : projectPath;
+
+    console.log(`[quality-gate] Running "${name}" (${required ? 'required' : 'optional'}) in ${cwd}`);
+    const startTime = Date.now();
+
+    if (gate.type === 'http_health') {
+      // HTTP health check gate
+      const result = await runHttpHealthGate(name, gate, required);
+      results.push(result);
+      if (!result.passed && required) {
+        console.log(`[quality-gate] ✗ Required gate "${name}" failed — stopping`);
+        break;
+      }
+      continue;
+    }
+
+    // Command gate (default)
+    try {
+      const env = { ...process.env, ...gate.env };
+      const { stdout, stderr } = await execAsync(gate.command, {
+        cwd,
+        env,
+        maxBuffer: 10 * 1024 * 1024, // 10MB
+        timeout: 5 * 60 * 1000, // 5 minute timeout per gate
+      });
+
+      const durationMs = Date.now() - startTime;
+      console.log(`[quality-gate] ✓ "${name}" passed (${durationMs}ms)`);
+      results.push({
+        name,
+        passed: true,
+        required,
+        output: (stdout + stderr).slice(-2000), // keep last 2KB
+        durationMs,
+      });
+    } catch (error: any) {
+      const durationMs = Date.now() - startTime;
+      const output = ((error.stdout || '') + (error.stderr || '')).slice(-2000);
+      console.log(`[quality-gate] ✗ "${name}" failed (${durationMs}ms): ${error.message?.slice(0, 200)}`);
+      results.push({
+        name,
+        passed: false,
+        required,
+        output,
+        durationMs,
+        error: error.message?.slice(0, 500),
+      });
+
+      if (required) {
+        console.log(`[quality-gate] ✗ Required gate "${name}" failed — stopping`);
+        break;
+      }
+    }
+  }
+
+  const passed = results.filter(r => r.passed).length;
+  const failed = results.filter(r => !r.passed).length;
+  console.log(`[quality-gate] Complete: ${passed} passed, ${failed} failed out of ${results.length} gates`);
+
+  return results;
+}
+
+/**
+ * Run an HTTP health check gate (for post-push deployment verification)
+ */
+async function runHttpHealthGate(
+  name: string,
+  gate: QualityGateConfig,
+  required: boolean
+): Promise<QualityGateResult> {
+  const url = gate.url;
+  if (!url) {
+    return {
+      name,
+      passed: false,
+      required,
+      output: '',
+      durationMs: 0,
+      error: 'http_health gate missing url',
+    };
+  }
+
+  const waitSeconds = gate.wait || 120;
+  const expectStatus = gate.expect_status || 200;
+  const startTime = Date.now();
+
+  console.log(`[quality-gate] Waiting ${waitSeconds}s for deployment, then checking ${url}`);
+
+  // Wait for deployment
+  await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+
+  try {
+    const { stdout } = await execAsync(
+      `curl -sL -o /dev/null -w '%{http_code}' --max-time 30 '${url}'`,
+      { timeout: 60 * 1000 }
+    );
+
+    const statusCode = parseInt(stdout.trim(), 10);
+    const passed = statusCode === expectStatus;
+    const durationMs = Date.now() - startTime;
+
+    console.log(`[quality-gate] Health check ${url}: ${statusCode} (expected ${expectStatus}) — ${passed ? 'PASS' : 'FAIL'}`);
+
+    return {
+      name,
+      passed,
+      required,
+      output: `HTTP ${statusCode} from ${url}`,
+      durationMs,
+      error: passed ? undefined : `Expected HTTP ${expectStatus}, got ${statusCode}`,
+    };
+  } catch (error: any) {
+    return {
+      name,
+      passed: false,
+      required,
+      output: error.message || '',
+      durationMs: Date.now() - startTime,
+      error: `Health check failed: ${error.message?.slice(0, 200)}`,
+    };
   }
 }

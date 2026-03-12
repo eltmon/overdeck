@@ -92,6 +92,27 @@ export interface TestConfig {
   env?: Record<string, string>;
 }
 
+export interface QualityGateConfig {
+  /** Command to run (e.g., 'pnpm lint', 'pnpm typecheck') */
+  command: string;
+  /** Path relative to workspace (e.g., 'frontend' for polyrepo) */
+  path?: string;
+  /** If true, merge is blocked on failure (default: true) */
+  required?: boolean;
+  /** Additional environment variables */
+  env?: Record<string, string>;
+  /** When to run: before push (default) or after push */
+  phase?: 'pre_push' | 'post_push';
+  /** Gate type: shell command (default) or HTTP health check */
+  type?: 'command' | 'http_health';
+  /** URL for http_health type */
+  url?: string;
+  /** Seconds to wait for deployment before checking (http_health only) */
+  wait?: number;
+  /** Expected HTTP status code (http_health only, default: 200) */
+  expect_status?: number;
+}
+
 export interface DatabaseConfig {
   /** Path to seed file for database initialization */
   seed_file?: string;
