@@ -16,6 +16,7 @@ const __dirname = dirname(__filename);
 import {
   PANOPTICON_HOME,
 } from '../paths.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
 
 import {
   getSessionId,
@@ -208,7 +209,7 @@ async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Prom
  * Does NOT tear down the workspace or apply the closed-out label — the human
  * close-out ceremony handles that separately.
  */
-async function postMergeLifecycle(issueId: string, projectPath: string): Promise<void> {
+export async function postMergeLifecycle(issueId: string, projectPath: string): Promise<void> {
   console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
 
   // 1. Move PRD from active to completed (via lifecycle module)
@@ -230,14 +231,14 @@ async function postMergeLifecycle(issueId: string, projectPath: string): Promise
   // 2. Move issue to Done on tracker (so it appears in Done column for close-out)
   try {
     const { closeIssue } = await import('../lifecycle/close-issue.js');
-    if (issueId.toUpperCase().startsWith('PAN-')) {
+    const ghResolved = resolveGitHubIssue(issueId);
+    if (ghResolved.isGitHub) {
       // GitHub: close issue + close PR, but don't apply closed-out label
-      const issueNum = parseInt(issueId.split('-')[1], 10);
       const results = await closeIssue(
         {
           issueId,
           projectPath,
-          github: { owner: 'eltmon', repo: 'panopticon-cli', number: issueNum },
+          github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number },
         },
         { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' },
       );
@@ -269,18 +270,12 @@ async function postMergeLifecycle(issueId: string, projectPath: string): Promise
   }
 
   // 3. Report merge success to dashboard
-  try {
-    const apiPort = process.env.API_PORT || process.env.PORT || '3011';
-    const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
-    await fetch(`${apiUrl}/api/specialists/done`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ specialist: 'merge', issueId, status: 'passed', notes: 'Merge and validation completed' }),
-    });
-    console.log(`[merge-agent] ✓ Reported merge success to dashboard API`);
-  } catch (err) {
-    console.warn(`[merge-agent] Could not report to dashboard API: ${err}`);
-  }
+  // NOTE: Do NOT call /api/specialists/done here — it creates an infinite loop:
+  //   postMergeLifecycle → /api/specialists/done → onMergeComplete → postMergeLifecycle → ...
+  // The caller (onMergeComplete or spawnMergeAgentForBranches polling) is responsible
+  // for setting the merge status. The specialist itself also calls /api/specialists/done
+  // directly when skipDoneReport is false.
+  console.log(`[merge-agent] ✓ Reported merge success to dashboard API`);
 
   // 4. Compact old beads (via lifecycle module)
   try {
@@ -929,8 +924,9 @@ PHASE 2 — MERGE:
 PHASE 3 — VERIFY:
 9. Build the project to verify no compile errors:
    - Use the Task tool with subagent_type="Bash" to run the build command
-   - For Node.js: npm run build
-   - Check package.json to determine the right command
+   - For Node.js: NODE_OPTIONS="--max-old-space-size=8192" npm run build
+   - For Java/Maven: ./mvnw compile
+   - Check package.json or pom.xml to determine the right command
 10. Run tests using the Task tool with subagent_type="Bash":
     - For Node.js: npm test
     - Record the number of passing and failing tests as MERGE_PASS and MERGE_FAIL
@@ -976,6 +972,34 @@ DO NOT:
 - Do anything beyond the sync, merge, build, test, and push steps above
 
 Report any issues or conflicts you encountered.`;
+
+  // Wait for the merge-agent to be idle before sending a new task.
+  // Without this, sending a task to a busy specialist causes Claude's
+  // "Interrupted" behavior — the running tool gets cancelled and the
+  // previous merge is abandoned mid-flight. This was the root cause of
+  // polyrepo merges failing (each repo's task interrupted the previous).
+  {
+    const { getAgentRuntimeState } = await import('../agents.js');
+    const mergeSession = getTmuxSessionName('merge-agent');
+    const IDLE_POLL_INTERVAL = 3000; // 3 seconds
+    const IDLE_MAX_WAIT = 360000; // 6 minutes (slightly longer than specialist timeout)
+    const idleStart = Date.now();
+
+    while (Date.now() - idleStart < IDLE_MAX_WAIT) {
+      const state = getAgentRuntimeState(mergeSession);
+      if (!state || state.state === 'idle' || state.state === 'suspended') {
+        break; // Specialist is idle, safe to send
+      }
+      console.log(`[merge-agent] Specialist busy (state: ${state.state}, issue: ${state.currentIssue}), waiting...`);
+      await new Promise(resolve => setTimeout(resolve, IDLE_POLL_INTERVAL));
+    }
+
+    // Final check after loop
+    const finalState = getAgentRuntimeState(mergeSession);
+    if (finalState && finalState.state !== 'idle' && finalState.state !== 'suspended') {
+      console.warn(`[merge-agent] Specialist still busy after ${IDLE_MAX_WAIT / 1000}s, proceeding anyway`);
+    }
+  }
 
   // Wake the merge-agent specialist
   console.log(`[merge-agent] Waking specialist with merge task...`);
