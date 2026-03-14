@@ -86,6 +86,26 @@ function isSpecialistAgent(agentId: string): boolean {
   return agentId.startsWith('specialist-');
 }
 
+/**
+ * Parse a per-project ephemeral session name.
+ * "specialist-pan-merge-agent" → { projectKey: "pan", specialistType: "merge-agent" }
+ * Returns null for global specialist sessions like "specialist-merge-agent".
+ */
+function parseEphemeralSession(agentId: string): { projectKey: string; specialistType: string } | null {
+  const validTypes = ['merge-agent', 'review-agent', 'test-agent'];
+  if (!agentId.startsWith('specialist-')) return null;
+  const withoutPrefix = agentId.slice('specialist-'.length);
+  for (const type of validTypes) {
+    if (withoutPrefix.endsWith(`-${type}`)) {
+      const projectKey = withoutPrefix.slice(0, withoutPrefix.length - type.length - 1);
+      if (projectKey && projectKey !== '') {
+        return { projectKey, specialistType: type };
+      }
+    }
+  }
+  return null;
+}
+
 export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
   const [historyHours, setHistoryHours] = useState(24);
   const [showChart, setShowChart] = useState(false);
@@ -107,6 +127,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
 
   const specialist = specialists?.find((s) => `specialist-${s.name}` === agentId);
   const isSpecialist = isSpecialistAgent(agentId);
+  const ephemeralInfo = agentId ? parseEphemeralSession(agentId) : null;
   const latestEvent = healthHistory?.events[healthHistory.events.length - 1];
 
   return (
@@ -132,6 +153,14 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
               {isSpecialist && specialist && (
                 <div className="text-sm text-content-subtle mt-1">
                   {specialist.displayName}
+                </div>
+              )}
+              {isSpecialist && !specialist && ephemeralInfo && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="bg-purple-900/50 text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono">
+                    {ephemeralInfo.projectKey.toUpperCase()}
+                  </span>
+                  <span className="text-sm text-content-subtle">{ephemeralInfo.specialistType} (ephemeral)</span>
                 </div>
               )}
             </div>
