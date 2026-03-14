@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { createShadowState } from '../../../lib/shadow-state.js';
+import { resolveGitHubIssue } from '../../../lib/tracker-utils.js';
 import {
   findPRDFiles,
   analyzeComplexity,
@@ -211,56 +212,89 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
   const spinner = ora(`Creating execution plan for ${id}...`).start();
 
   try {
-    const apiKey = getLinearApiKey();
-    if (!apiKey) {
-      spinner.fail('LINEAR_API_KEY not found');
-      console.log('');
-      console.log(chalk.dim('Set it in ~/.panopticon.env:'));
-      console.log('  LINEAR_API_KEY=lin_api_xxxxx');
-      process.exit(1);
+    // Resolve tracker type from project config
+    const ghResolution = resolveGitHubIssue(id);
+    let issueData: PlanIssue;
+
+    if (ghResolution.isGitHub) {
+      // Fetch from GitHub
+      spinner.text = 'Fetching issue from GitHub...';
+      const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
+      const yamlConfig = loadYamlConfig();
+      const token = yamlConfig.trackerKeys?.github || process.env.GITHUB_TOKEN;
+      if (!token) {
+        spinner.fail('GitHub token not found');
+        process.exit(1);
+      }
+      const { Octokit } = await import('@octokit/rest');
+      const octokit = new Octokit({ auth: token });
+      const { data: ghIssue } = await octokit.issues.get({
+        owner: ghResolution.owner,
+        repo: ghResolution.repo,
+        issue_number: ghResolution.number,
+      });
+      issueData = {
+        id: String(ghIssue.id),
+        identifier: id,
+        title: ghIssue.title,
+        description: ghIssue.body || undefined,
+        url: ghIssue.html_url,
+        state: { name: ghIssue.state === 'open' ? 'Todo' : 'Done' },
+        priority: 0,
+        labels: (ghIssue.labels || []).map(l => ({ name: typeof l === 'string' ? l : l.name || '' })),
+        assignee: ghIssue.assignee ? { name: ghIssue.assignee.login } : undefined,
+      };
+    } else {
+      // Fetch from Linear
+      const apiKey = getLinearApiKey();
+      if (!apiKey) {
+        spinner.fail('LINEAR_API_KEY not found');
+        console.log('');
+        console.log(chalk.dim('Set it in ~/.panopticon.env:'));
+        console.log('  LINEAR_API_KEY=lin_api_xxxxx');
+        process.exit(1);
+      }
+      spinner.text = 'Fetching issue from Linear...';
+      const { LinearClient } = await import('@linear/sdk');
+      const client = new LinearClient({ apiKey });
+
+      const me = await client.viewer;
+      const teams = await me.teams();
+      const team = teams.nodes[0];
+
+      if (!team) {
+        spinner.fail('No Linear team found');
+        process.exit(1);
+      }
+
+      const searchResult = await team.issues({ first: 100 });
+      const issue = searchResult.nodes.find(
+        (i) => i.identifier.toUpperCase() === id.toUpperCase()
+      );
+
+      if (!issue) {
+        spinner.fail(`Issue not found: ${id}`);
+        process.exit(1);
+      }
+
+      const state = await issue.state;
+      const assignee = await issue.assignee;
+      const project = await issue.project;
+      const labels = await issue.labels();
+
+      issueData = {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description || undefined,
+        url: issue.url,
+        state: { name: state?.name || 'Unknown' },
+        priority: issue.priority,
+        labels: labels.nodes.map(l => ({ name: l.name })),
+        assignee: assignee ? { name: assignee.name } : undefined,
+        project: project ? { name: project.name } : undefined,
+      };
     }
-
-    // Fetch issue from Linear
-    spinner.text = 'Fetching issue from Linear...';
-    const { LinearClient } = await import('@linear/sdk');
-    const client = new LinearClient({ apiKey });
-
-    const me = await client.viewer;
-    const teams = await me.teams();
-    const team = teams.nodes[0];
-
-    if (!team) {
-      spinner.fail('No Linear team found');
-      process.exit(1);
-    }
-
-    const searchResult = await team.issues({ first: 100 });
-    const issue = searchResult.nodes.find(
-      (i) => i.identifier.toUpperCase() === id.toUpperCase()
-    );
-
-    if (!issue) {
-      spinner.fail(`Issue not found: ${id}`);
-      process.exit(1);
-    }
-
-    const state = await issue.state;
-    const assignee = await issue.assignee;
-    const project = await issue.project;
-    const labels = await issue.labels();
-
-    const issueData: PlanIssue = {
-      id: issue.id,
-      identifier: issue.identifier,
-      title: issue.title,
-      description: issue.description || undefined,
-      url: issue.url,
-      state: { name: state?.name || 'Unknown' },
-      priority: issue.priority,
-      labels: labels.nodes.map(l => ({ name: l.name })),
-      assignee: assignee ? { name: assignee.name } : undefined,
-      project: project ? { name: project.name } : undefined,
-    };
 
     // Look for related PRD files
     spinner.text = 'Searching for related PRDs...';
