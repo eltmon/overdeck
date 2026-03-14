@@ -430,20 +430,22 @@ async function transitionIssueToInProgress(issueId: string, workspacePath?: stri
   const { config } = loadConfig();
   const trackersConfig = config.trackers;
 
-  // Try primary tracker first, then secondary
-  const trackerTypes: TrackerType[] = [trackersConfig.primary];
-  if (trackersConfig.secondary) {
-    trackerTypes.push(trackersConfig.secondary);
-  }
+  // Try primary/secondary trackers (may not be configured)
+  if (trackersConfig?.primary) {
+    const trackerTypes: TrackerType[] = [trackersConfig.primary];
+    if (trackersConfig.secondary) {
+      trackerTypes.push(trackersConfig.secondary);
+    }
 
-  for (const trackerType of trackerTypes) {
-    try {
-      const tracker = createTrackerFromConfig(trackersConfig, trackerType);
-      await tracker.transitionIssue(issueId, 'in_progress');
-      console.log(`[agents] Transitioned ${issueId} to in_progress via ${trackerType}`);
-      return;
-    } catch {
-      // Issue not found in this tracker or transition failed, try next
+    for (const trackerType of trackerTypes) {
+      try {
+        const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+        await tracker.transitionIssue(issueId, 'in_progress');
+        console.log(`[agents] Transitioned ${issueId} to in_progress via ${trackerType}`);
+        return;
+      } catch {
+        // Issue not found in this tracker or transition failed, try next
+      }
     }
   }
 
