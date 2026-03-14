@@ -535,6 +535,11 @@ export function SpecialistAgentCard({
               >
                 <div className="flex items-center gap-2 flex-1">
                   <span className="text-content-muted">{index + 1}.</span>
+                  {item.payload.issueId && (
+                    <span className="bg-purple-900/50 text-purple-300 px-1 rounded text-xs font-mono">
+                      {item.payload.issueId.match(/^([A-Z]+)-/)?.[1] ?? '?'}
+                    </span>
+                  )}
                   <span className="text-content font-mono">
                     {item.payload.issueId || item.payload.message || item.id.substring(0, 8)}
                   </span>
