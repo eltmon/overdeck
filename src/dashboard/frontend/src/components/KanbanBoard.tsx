@@ -18,7 +18,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban, XCircle, AlertCircle } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
@@ -2079,6 +2079,34 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
               >
                 <HelpCircle className="w-3 h-3" />
                 Input
+              </span>
+            )}
+            {/* Lifecycle resolution badges (PAN-309) */}
+            {!isTerminal && agent?.resolution === 'done' && !agent?.hasPendingQuestion && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-700 text-content"
+                title="Agent evidence shows work is complete — waiting for agent to call pan work done"
+              >
+                <CheckCircle className="w-3 h-3" />
+                Done
+              </span>
+            )}
+            {!isTerminal && agent?.resolution === 'stuck' && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-700 text-content animate-pulse"
+                title={`Agent appears stuck — no clear progress signal after ${agent.resolutionCount || 0} check(s). Consider sending a message.`}
+              >
+                <XCircle className="w-3 h-3" />
+                Stuck
+              </span>
+            )}
+            {!isTerminal && agent?.resolution === 'needs_input' && !agent?.hasPendingQuestion && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-700 text-content animate-pulse"
+                title="Agent stopped because it needs human input or hit a blocker"
+              >
+                <AlertCircle className="w-3 h-3" />
+                Blocked
               </span>
             )}
             {/* Tracker vs Shadow state badges */}

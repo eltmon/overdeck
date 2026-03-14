@@ -153,6 +153,8 @@ export function saveAgentState(state: AgentState): void {
 /**
  * Agent runtime state (hook-based tracking)
  */
+export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed';
+
 export interface AgentRuntimeState {
   state: 'active' | 'idle' | 'suspended' | 'uninitialized';
   lastActivity: string;
@@ -161,6 +163,9 @@ export interface AgentRuntimeState {
   suspendedAt?: string;
   resumedAt?: string;
   currentIssue?: string; // Issue ID the agent is currently working on
+  resolution?: AgentResolution; // Lifecycle completion signal (PAN-309)
+  resolutionCount?: number;     // How many times this resolution was set
+  resolutionUpdatedAt?: string; // When resolution was last updated
 }
 
 /**
