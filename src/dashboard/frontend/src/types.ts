@@ -47,6 +47,8 @@ export interface GitStatus {
   latestCommit: string;
 }
 
+export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear';
+
 export interface Agent {
   id: string;
   issueId?: string;
@@ -65,6 +67,8 @@ export interface Agent {
   agentPhase?: 'planning' | 'implementation' | 'exploration' | string;
   hasPendingQuestion?: boolean;
   pendingQuestionCount?: number;
+  resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
+  resolutionCount?: number;      // How many times this resolution was set
 }
 
 export interface AgentHealth {
