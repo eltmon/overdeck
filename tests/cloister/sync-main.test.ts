@@ -17,10 +17,18 @@ const realExecAsync = promisify(exec);
 
 vi.mock('../../src/lib/cloister/specialists.js', () => ({
   wakeSpecialist: vi.fn(),
-  getTmuxSessionName: vi.fn((name: string) => `specialist-${name}`),
+  spawnEphemeralSpecialist: vi.fn(),
+  getTmuxSessionName: vi.fn((name: string, projectKey?: string) =>
+    projectKey ? `specialist-${projectKey}-${name}` : `specialist-${name}`
+  ),
   isRunning: vi.fn(() => true),
   getSessionId: vi.fn(),
   recordWake: vi.fn(),
+}));
+
+// Return null so syncMainIntoWorkspace falls back to wakeSpecialist (legacy path)
+vi.mock('../../src/lib/projects.js', () => ({
+  resolveProjectFromIssue: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../src/lib/git-utils.js', () => ({

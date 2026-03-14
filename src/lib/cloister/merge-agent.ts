@@ -23,8 +23,10 @@ import {
   recordWake,
   getTmuxSessionName,
   wakeSpecialist,
+  spawnEphemeralSpecialist,
   isRunning,
 } from './specialists.js';
+import { resolveProjectFromIssue } from '../projects.js';
 import { runMergeValidation, autoRevertMerge, runQualityGates } from './validation.js';
 import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
@@ -998,6 +1000,11 @@ DO NOT:
 
 Report any issues or conflicts you encountered.`;
 
+  // Resolve project key for per-project ephemeral lifecycle (PAN-300)
+  const resolvedProject = resolveProjectFromIssue(issueId);
+  const mergeProjectKey = resolvedProject?.projectKey ?? null;
+  const mergeSession = getTmuxSessionName('merge-agent', mergeProjectKey ?? undefined);
+
   // Wait for the merge-agent to be idle before sending a new task.
   // Without this, sending a task to a busy specialist causes Claude's
   // "Interrupted" behavior — the running tool gets cancelled and the
@@ -1005,7 +1012,6 @@ Report any issues or conflicts you encountered.`;
   // polyrepo merges failing (each repo's task interrupted the previous).
   {
     const { getAgentRuntimeState } = await import('../agents.js');
-    const mergeSession = getTmuxSessionName('merge-agent');
     const IDLE_POLL_INTERVAL = 3000; // 3 seconds
     const IDLE_MAX_WAIT = 360000; // 6 minutes (slightly longer than specialist timeout)
     const idleStart = Date.now();
@@ -1026,13 +1032,24 @@ Report any issues or conflicts you encountered.`;
     }
   }
 
-  // Wake the merge-agent specialist
-  console.log(`[merge-agent] Waking specialist with merge task...`);
-  const wakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
-    waitForReady: true,
-    startIfNotRunning: true,
-    issueId: issueId,
-  });
+  // Wake the merge-agent specialist using per-project ephemeral lifecycle when possible
+  console.log(`[merge-agent] Waking specialist with merge task (projectKey=${mergeProjectKey ?? 'global'})...`);
+  let wakeResult: { success: boolean; message: string; tmuxSession?: string; error?: string };
+  if (mergeProjectKey) {
+    wakeResult = await spawnEphemeralSpecialist(mergeProjectKey, 'merge-agent', {
+      issueId,
+      branch: sourceBranch,
+      workspace: projectPath,
+      promptOverride: taskPrompt,
+    });
+  } else {
+    // Fallback to legacy global specialist when project can't be resolved
+    wakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
+      waitForReady: true,
+      startIfNotRunning: true,
+      issueId,
+    });
+  }
 
   if (!wakeResult.success) {
     console.error(`[merge-agent] Failed to wake specialist: ${wakeResult.message}`);
@@ -1427,16 +1444,28 @@ export async function syncMainIntoWorkspace(
     return { success: false, conflictFiles, reason: 'Internal error: sync-main prompt template not found' };
   }
 
-  // Wake the merge-agent specialist
-  const wakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
-    waitForReady: true,
-    startIfNotRunning: true,
-    issueId,
-  });
+  // Wake the merge-agent specialist using per-project ephemeral lifecycle when possible
+  const syncResolvedProject = resolveProjectFromIssue(issueId);
+  const syncProjectKey = syncResolvedProject?.projectKey ?? null;
+  let syncWakeResult: { success: boolean; message: string; tmuxSession?: string; error?: string };
+  if (syncProjectKey) {
+    syncWakeResult = await spawnEphemeralSpecialist(syncProjectKey, 'merge-agent', {
+      issueId,
+      branch: workspaceBranch,
+      workspace: projectPath,
+      promptOverride: taskPrompt,
+    });
+  } else {
+    syncWakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
+      waitForReady: true,
+      startIfNotRunning: true,
+      issueId,
+    });
+  }
 
-  if (!wakeResult.success) {
+  if (!syncWakeResult.success) {
     try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch {}
-    const message = `Failed to wake merge-agent specialist: ${wakeResult.message}`;
+    const message = `Failed to wake merge-agent specialist: ${syncWakeResult.message}`;
     console.error(`[sync-main] ${message}`);
     logActivity('sync_main_error', message);
     return { success: false, conflictFiles, reason: message };
@@ -1446,7 +1475,7 @@ export async function syncMainIntoWorkspace(
   logActivity('sync_main_agent_woken', `Agent resolving ${conflictFiles.length} conflict(s) for ${issueId}`);
 
   // Poll tmux output for MERGE_RESULT markers
-  const tmuxSession = getTmuxSessionName('merge-agent');
+  const tmuxSession = getTmuxSessionName('merge-agent', syncProjectKey ?? undefined);
   const startTime = Date.now();
   const POLL_INTERVAL = 5000;
   const SYNC_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes

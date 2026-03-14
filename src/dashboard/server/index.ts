@@ -6879,10 +6879,13 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
 
     // 3. Start the review pipeline (review-agent → test-agent)
     // PAN-88: Check if review-agent is busy BEFORE waking
-    const { wakeSpecialist, isRunning, getTmuxSessionName, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+    // PAN-300: Use per-project ephemeral lifecycle when possible
+    const { wakeSpecialist, spawnEphemeralSpecialist: spawnEphemeral, isRunning, getTmuxSessionName, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
 
-    const reviewSession = getTmuxSessionName('review-agent');
-    const reviewRunning = await isRunning('review-agent');
+    const reviewResolvedProject = resolveProjectFromIssue(issueId);
+    const reviewProjectKey = reviewResolvedProject?.projectKey ?? null;
+    const reviewSession = getTmuxSessionName('review-agent', reviewProjectKey ?? undefined);
+    const reviewRunning = await isRunning('review-agent', reviewProjectKey ?? undefined);
     const reviewState = getAgentRuntimeState(reviewSession);
     const reviewIdle = reviewState?.state === 'idle' || reviewState?.state === 'suspended' || !reviewRunning;
 
@@ -6966,11 +6969,22 @@ ${workspaceAccessInstructions}
 
 curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","isRemote":${workspaceInfo.isRemote},"vmName":"${workspaceInfo.vmName || ''}","customPrompt":"TEST for ${issueId}:\\nWORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}\\nBRANCH: ${branchName}\\n\\n1. ${isRemoteWorkspace ? `SSH: ssh -A ${workspaceInfo.vmName}.exe.xyz then cd ${workspacePath}` : `cd ${workspacePath}`}\\n2. Run tests: npm test\\n3. Update status:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Just update status. Human will click Merge."}'`;
 
-    const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
-      waitForReady: true,
-      startIfNotRunning: true,
-      skipBusyGuard: true, // We already checked idle + set active above
-    });
+    // Use per-project ephemeral specialist when possible (PAN-300)
+    let reviewResult: { success: boolean; message: string };
+    if (reviewProjectKey) {
+      reviewResult = await spawnEphemeral(reviewProjectKey, 'review-agent', {
+        issueId,
+        branch: branchName,
+        workspace: workspacePath,
+        promptOverride: reviewPrompt,
+      });
+    } else {
+      reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
+        waitForReady: true,
+        startIfNotRunning: true,
+        skipBusyGuard: true, // We already checked idle + set active above
+      });
+    }
 
     if (!reviewResult.success) {
       console.warn(`[review] review-agent failed to wake: ${reviewResult.message}`);
@@ -7617,7 +7631,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
 
     // 6. SPECIALIST WORKFLOW: review-agent → test-agent → merge-agent
     // Kick off review-agent with handoff instructions - it will wake the next specialists
-    const { wakeSpecialist } = await import('../../lib/cloister/specialists.js');
+    // PAN-300: Use per-project ephemeral lifecycle when possible
+    const { wakeSpecialist, spawnEphemeralSpecialist: spawnApproveEphemeral } = await import('../../lib/cloister/specialists.js');
+    const approveProjectKey = resolveProjectFromIssue(issueId)?.projectKey ?? null;
 
     // Build the full pipeline prompt for review-agent
     // It will hand off to test-agent, which hands off to merge-agent
@@ -7674,10 +7690,21 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 - "It works" is NOT enough - code must be EXCELLENT
 - Find EVERYTHING. The agent should learn from your feedback.`;
 
-    const reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
-      waitForReady: true,
-      startIfNotRunning: true,
-    });
+    // Use per-project ephemeral specialist when possible (PAN-300)
+    let reviewResult: { success: boolean; message: string };
+    if (approveProjectKey) {
+      reviewResult = await spawnApproveEphemeral(approveProjectKey, 'review-agent', {
+        issueId,
+        branch: branchName,
+        workspace: workspacePath,
+        promptOverride: pipelinePrompt,
+      });
+    } else {
+      reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
+        waitForReady: true,
+        startIfNotRunning: true,
+      });
+    }
 
     if (!reviewResult.success) {
       console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}`);

@@ -539,6 +539,7 @@ export async function spawnEphemeralSpecialist(
     workspace?: string;
     prUrl?: string;
     context?: TaskContext;
+    promptOverride?: string; // Use this prompt instead of building from template
   }
 ): Promise<{
   success: boolean;
@@ -567,14 +568,34 @@ export async function spawnEphemeralSpecialist(
   setCurrentRun(projectKey, specialistType, runId);
   incrementProjectRunCount(projectKey, specialistType);
 
-  // Build task prompt
-  const taskPrompt = await buildTaskPrompt(projectKey, specialistType, task, contextDigest);
+  // Build task prompt (use override if provided, otherwise build from template)
+  const taskPrompt = task.promptOverride ?? await buildTaskPrompt(projectKey, specialistType, task, contextDigest);
 
   // Spawn tmux session
   const tmuxSession = getTmuxSessionName(specialistType, projectKey);
   const cwd = process.env.HOME || '/home/exedev';
 
   try {
+    // Check if session already exists (stale from previous run)
+    try {
+      const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', { encoding: 'utf-8' });
+      if (sessions.split('\n').map(s => s.trim()).includes(tmuxSession)) {
+        const { getAgentRuntimeState } = await import('../agents.js');
+        const existingState = getAgentRuntimeState(tmuxSession);
+        if (existingState?.state === 'active') {
+          return {
+            success: false,
+            message: `Specialist ${specialistType} (${projectKey}) is already running task ${existingState.currentIssue ?? 'unknown'}`,
+            error: 'specialist_busy',
+          };
+        }
+        // Stale session — kill it before spawning fresh
+        console.log(`[specialist] Killing stale ${tmuxSession} session before respawn`);
+        await execAsync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' }).catch(() => {});
+      }
+    } catch {
+      // Non-fatal: session check failure shouldn't block spawn
+    }
     // Determine model for this specialist
     let model = 'claude-sonnet-4-6'; // default
     try {
