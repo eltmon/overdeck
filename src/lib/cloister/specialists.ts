@@ -322,12 +322,18 @@ export function saveRegistry(registry: SpecialistRegistry): void {
 }
 
 /**
- * Get session file path for a specialist
+ * Get session file path for a specialist.
+ * Per-project specialists use a project-scoped subdirectory to prevent
+ * session ID collision when multiple projects share the same specialist type.
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key (per-project specialists only)
  * @returns Path to session file
  */
-export function getSessionFilePath(name: SpecialistType): string {
+export function getSessionFilePath(name: SpecialistType, projectKey?: string): string {
+  if (projectKey) {
+    return join(SPECIALISTS_DIR, 'projects', projectKey, `${name}.session`);
+  }
   return join(SPECIALISTS_DIR, `${name}.session`);
 }
 
@@ -335,10 +341,11 @@ export function getSessionFilePath(name: SpecialistType): string {
  * Read session ID from file
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key (per-project specialists only)
  * @returns Session ID or null if not found
  */
-export function getSessionId(name: SpecialistType): string | null {
-  const sessionFile = getSessionFilePath(name);
+export function getSessionId(name: SpecialistType, projectKey?: string): string | null {
+  const sessionFile = getSessionFilePath(name, projectKey);
 
   if (!existsSync(sessionFile)) {
     return null;
@@ -347,7 +354,7 @@ export function getSessionId(name: SpecialistType): string | null {
   try {
     return readFileSync(sessionFile, 'utf-8').trim();
   } catch (error) {
-    console.error(`Failed to read session file for ${name}:`, error);
+    console.error(`Failed to read session file for ${name} (${projectKey ?? 'global'}):`, error);
     return null;
   }
 }
@@ -357,16 +364,21 @@ export function getSessionId(name: SpecialistType): string | null {
  *
  * @param name - Specialist name
  * @param sessionId - Session ID to store
+ * @param projectKey - Optional project key (per-project specialists only)
  */
-export function setSessionId(name: SpecialistType, sessionId: string): void {
-  initSpecialistsDirectory();
-
-  const sessionFile = getSessionFilePath(name);
+export function setSessionId(name: SpecialistType, sessionId: string, projectKey?: string): void {
+  const sessionFile = getSessionFilePath(name, projectKey);
+  const dir = projectKey
+    ? join(SPECIALISTS_DIR, 'projects', projectKey)
+    : SPECIALISTS_DIR;
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
 
   try {
     writeFileSync(sessionFile, sessionId.trim(), 'utf-8');
   } catch (error) {
-    console.error(`Failed to write session file for ${name}:`, error);
+    console.error(`Failed to write session file for ${name} (${projectKey ?? 'global'}):`, error);
     throw error;
   }
 }
@@ -375,10 +387,11 @@ export function setSessionId(name: SpecialistType, sessionId: string): void {
  * Delete session file
  *
  * @param name - Specialist name
+ * @param projectKey - Optional project key (per-project specialists only)
  * @returns True if file was deleted, false if it didn't exist
  */
-export function clearSessionId(name: SpecialistType): boolean {
-  const sessionFile = getSessionFilePath(name);
+export function clearSessionId(name: SpecialistType, projectKey?: string): boolean {
+  const sessionFile = getSessionFilePath(name, projectKey);
 
   if (!existsSync(sessionFile)) {
     return false;
@@ -388,7 +401,7 @@ export function clearSessionId(name: SpecialistType): boolean {
     unlinkSync(sessionFile);
     return true;
   } catch (error) {
-    console.error(`Failed to delete session file for ${name}:`, error);
+    console.error(`Failed to delete session file for ${name} (${projectKey ?? 'global'}):`, error);
     throw error;
   }
 }
@@ -571,9 +584,13 @@ export async function spawnEphemeralSpecialist(
   // Build task prompt (use override if provided, otherwise build from template)
   const taskPrompt = task.promptOverride ?? await buildTaskPrompt(projectKey, specialistType, task, contextDigest);
 
+  if (task.promptOverride) {
+    console.log(`[specialist] Using promptOverride for ${projectKey}/${task.issueId} (${taskPrompt.length} chars)`);
+  }
+
   // Spawn tmux session
   const tmuxSession = getTmuxSessionName(specialistType, projectKey);
-  const cwd = process.env.HOME || '/home/exedev';
+  const cwd = homedir();
 
   try {
     // Check if session already exists (stale from previous run)
@@ -1352,7 +1369,7 @@ export async function getSpecialistStatus(
     autoWake: false,
   };
 
-  const sessionId = getSessionId(name);
+  const sessionId = getSessionId(name, projectKey);
   const running = await isRunning(name, projectKey);
   const contextTokens = countContextTokens(name);
 
