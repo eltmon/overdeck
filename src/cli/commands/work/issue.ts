@@ -6,6 +6,7 @@ import { homedir } from 'os';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../../lib/prd-draft.js';
+import { isGitHubIssue, resolveGitHubIssue } from '../../../lib/tracker-utils.js';
 
 /**
  * Get Linear API key from environment or config file
@@ -324,6 +325,24 @@ async function handleRemoteWorkspace(
       createShadowState(issueId, 'open', 'pan work issue');
       updateShadowState(issueId, 'in_progress', 'pan work issue');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
+    } else if (isGitHubIssue(issueId)) {
+      // GitHub issue — add in-progress label
+      const gh = resolveGitHubIssue(issueId);
+      if (gh.isGitHub) {
+        try {
+          const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
+          const yamlConfig = loadYamlConfig();
+          const token = yamlConfig.trackerKeys?.github || process.env.GITHUB_TOKEN;
+          if (token) {
+            const { Octokit } = await import('@octokit/rest');
+            const octokit = new Octokit({ auth: token });
+            await octokit.issues.addLabels({ owner: gh.owner, repo: gh.repo, issue_number: gh.number, labels: ['in-progress'] });
+            console.log(chalk.green(`  ✓ Updated ${issueId.toUpperCase()} to In Progress`));
+          }
+        } catch (err: any) {
+          console.warn(chalk.dim(`  ⚠ Could not update GitHub label: ${err.message}`));
+        }
+      }
     } else if (isLinearIssue(issueId)) {
       const apiKey = getLinearApiKey();
       if (apiKey) {
@@ -606,8 +625,24 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       createShadowState(id, 'open', 'pan work issue');
       updateShadowState(id, 'in_progress', 'pan work issue');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
+    } else if (isGitHubIssue(id)) {
+      const gh = resolveGitHubIssue(id);
+      if (gh.isGitHub) {
+        try {
+          const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
+          const yamlConfig = loadYamlConfig();
+          const token = yamlConfig.trackerKeys?.github || process.env.GITHUB_TOKEN;
+          if (token) {
+            const { Octokit } = await import('@octokit/rest');
+            const octokit = new Octokit({ auth: token });
+            await octokit.issues.addLabels({ owner: gh.owner, repo: gh.repo, issue_number: gh.number, labels: ['in-progress'] });
+            console.log(chalk.green(`  ✓ Updated ${id.toUpperCase()} to In Progress`));
+          }
+        } catch (err: any) {
+          console.warn(chalk.dim(`  ⚠ Could not update GitHub label: ${err.message}`));
+        }
+      }
     } else if (isLinearIssue(id)) {
-      // Update Linear issue to "In Progress" if applicable
       const apiKey = getLinearApiKey();
       if (apiKey) {
         const updated = await updateLinearToInProgress(apiKey, id);
