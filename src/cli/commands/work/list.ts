@@ -10,6 +10,7 @@ import { loadConfig } from '../../../lib/config.js';
 import type { Issue, IssueTracker, TrackerType } from '../../../lib/tracker/index.js';
 import { createTracker, TrackerConfig } from '../../../lib/tracker/index.js';
 import { isShadowed, getPendingSyncCount } from '../../../lib/shadow-state.js';
+import { loadProjectsConfig } from '../../../lib/projects.js';
 
 interface ListOptions {
   all?: boolean;
@@ -41,22 +42,42 @@ function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
   const config = loadConfig();
   const trackerConfig = config.trackers[trackerType];
 
-  if (!trackerConfig) {
-    return null;
+  if (trackerConfig) {
+    return {
+      type: trackerType,
+      apiKeyEnv: (trackerConfig as any).api_key_env,
+      team: (trackerConfig as any).team,
+      tokenEnv: (trackerConfig as any).token_env,
+      owner: (trackerConfig as any).owner,
+      repo: (trackerConfig as any).repo,
+      projectId: (trackerConfig as any).project_id,
+      server: (trackerConfig as any).server,
+      workspace: (trackerConfig as any).workspace,
+      project: (trackerConfig as any).project,
+    };
   }
 
-  return {
-    type: trackerType,
-    apiKeyEnv: (trackerConfig as any).api_key_env,
-    team: (trackerConfig as any).team,
-    tokenEnv: (trackerConfig as any).token_env,
-    owner: (trackerConfig as any).owner,
-    repo: (trackerConfig as any).repo,
-    projectId: (trackerConfig as any).project_id,
-    server: (trackerConfig as any).server,
-    workspace: (trackerConfig as any).workspace,
-    project: (trackerConfig as any).project,
-  };
+  // Auto-derive from projects.yaml for GitHub/GitLab
+  if (trackerType === 'github') {
+    try {
+      const { projects } = loadProjectsConfig();
+      for (const [, project] of Object.entries(projects)) {
+        if (project.github_repo) {
+          const [owner, repo] = project.github_repo.split('/');
+          if (owner && repo) {
+            return {
+              type: 'github',
+              tokenEnv: 'GITHUB_TOKEN',
+              owner,
+              repo,
+            };
+          }
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  return null;
 }
 
 /**
@@ -70,6 +91,17 @@ function getConfiguredTrackers(): TrackerType[] {
   if (config.trackers.github) trackers.push('github');
   if (config.trackers.gitlab) trackers.push('gitlab');
   if (config.trackers.rally) trackers.push('rally');
+
+  // Auto-detect from projects.yaml if not explicitly configured
+  if (!trackers.includes('github') || !trackers.includes('gitlab')) {
+    try {
+      const { projects } = loadProjectsConfig();
+      for (const [, project] of Object.entries(projects)) {
+        if (project.github_repo && !trackers.includes('github')) trackers.push('github');
+        if (project.gitlab_repo && !trackers.includes('gitlab')) trackers.push('gitlab');
+      }
+    } catch { /* ignore */ }
+  }
 
   return trackers;
 }
