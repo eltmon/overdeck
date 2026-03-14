@@ -175,3 +175,77 @@ export class DockerStatsCollector {
     }
   }
 }
+
+export interface DockerNetwork {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+}
+
+export interface DockerVolume {
+  name: string;
+  driver: string;
+  mountpoint: string;
+}
+
+/**
+ * List Docker networks via `docker network ls`.
+ * Returns empty array if Docker is not available.
+ */
+export async function getDockerNetworks(): Promise<DockerNetwork[]> {
+  try {
+    const { stdout } = await execAsync(
+      `docker network ls --format '{{json .}}' 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 5000 }
+    );
+    const networks: DockerNetwork[] = [];
+    for (const line of stdout.trim().split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const raw = JSON.parse(line);
+        networks.push({
+          id: raw.ID ?? '',
+          name: raw.Name ?? '',
+          driver: raw.Driver ?? '',
+          scope: raw.Scope ?? '',
+        });
+      } catch {
+        // Skip malformed lines
+      }
+    }
+    return networks;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * List Docker volumes via `docker volume ls`.
+ * Returns empty array if Docker is not available.
+ */
+export async function getDockerVolumes(): Promise<DockerVolume[]> {
+  try {
+    const { stdout } = await execAsync(
+      `docker volume ls --format '{{json .}}' 2>/dev/null`,
+      { encoding: 'utf-8', timeout: 5000 }
+    );
+    const volumes: DockerVolume[] = [];
+    for (const line of stdout.trim().split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const raw = JSON.parse(line);
+        volumes.push({
+          name: raw.Name ?? '',
+          driver: raw.Driver ?? '',
+          mountpoint: raw.Mountpoint ?? '',
+        });
+      } catch {
+        // Skip malformed lines
+      }
+    }
+    return volumes;
+  } catch {
+    return [];
+  }
+}

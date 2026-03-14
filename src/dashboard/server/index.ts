@@ -1776,8 +1776,10 @@ app.get('/api/agents', async (_req, res) => {
           git: gitStatus,
           type: 'agent',
           agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
-          hasPendingQuestion: pendingQuestions.length > 0 || isIdle,
+          hasPendingQuestion: pendingQuestions.length > 0 || isIdle || runtimeState?.resolution === 'needs_input',
           pendingQuestionCount: pendingQuestions.length,
+          resolution: runtimeState?.resolution || 'working',
+          resolutionCount: runtimeState?.resolutionCount || 0,
           contextPercent,
           initialContextPercent,
         };
@@ -1878,8 +1880,10 @@ app.get('/api/agents', async (_req, res) => {
             git: null,
             type: 'agent',
             agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
-            hasPendingQuestion: false,
+            hasPendingQuestion: runtimeData.resolution === 'needs_input',
             pendingQuestionCount: 0,
+            resolution: runtimeData.resolution || 'working',
+            resolutionCount: runtimeData.resolutionCount || 0,
           });
         } catch {
           // Skip corrupted state files
