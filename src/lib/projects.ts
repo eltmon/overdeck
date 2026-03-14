@@ -223,6 +223,24 @@ export function findProjectByPath(workspacePath: string): ProjectConfig | null {
 }
 
 /**
+ * Find project key by workspace path.
+ * Returns the config key (e.g. "pan", "min") for the project at the given path.
+ */
+export function findProjectKeyByPath(workspacePath: string): string | null {
+  const config = loadProjectsConfig();
+  const normalizedTarget = resolve(workspacePath);
+
+  for (const [key, projectConfig] of Object.entries(config.projects)) {
+    const normalizedProject = resolve(projectConfig.path);
+    if (normalizedTarget === normalizedProject || normalizedTarget.startsWith(normalizedProject + '/')) {
+      return key;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Resolve the correct project path for an issue based on labels
  *
  * @param project - The project config
