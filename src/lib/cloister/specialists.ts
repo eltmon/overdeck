@@ -1590,6 +1590,7 @@ export async function wakeSpecialist(
     waitForReady?: boolean; // Wait for agent to be ready before sending prompt (default: true)
     startIfNotRunning?: boolean; // Start the agent if not running (default: true)
     issueId?: string; // Issue ID being worked on (for tracking)
+    skipBusyGuard?: boolean; // Skip busy check (caller already verified idle + set active)
   } = {}
 ): Promise<{
   success: boolean;
@@ -1607,7 +1608,9 @@ export async function wakeSpecialist(
   // Sending a message to a busy Claude session causes "Interrupted" behavior —
   // the running tool is cancelled and the previous task is abandoned mid-flight.
   // Callers should use wakeSpecialistOrQueue() for automatic busy handling.
-  if (wasAlreadyRunning) {
+  // Skip this guard when called from wakeSpecialistOrQueue (skipBusyGuard),
+  // since the caller already verified idle state and pre-set active to prevent races.
+  if (wasAlreadyRunning && !options.skipBusyGuard) {
     const { getAgentRuntimeState } = await import('../agents.js');
     const runtimeState = getAgentRuntimeState(tmuxSession);
     if (runtimeState?.state === 'active') {
@@ -1803,7 +1806,8 @@ export async function wakeSpecialistWithTask(
     workspace?: string;
     prUrl?: string;
     context?: TaskContext;
-  }
+  },
+  options: { skipBusyGuard?: boolean } = {}
 ): Promise<ReturnType<typeof wakeSpecialist>> {
   // Build context-aware prompt based on specialist type and task
   const apiPort = process.env.API_PORT || process.env.PORT || '3011';
@@ -2179,7 +2183,7 @@ IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.
       prompt = `Task for ${task.issueId}: Please process this task and report findings.`;
   }
 
-  return wakeSpecialist(name, prompt, { issueId: task.issueId });
+  return wakeSpecialist(name, prompt, { issueId: task.issueId, skipBusyGuard: options.skipBusyGuard });
 }
 
 /**
@@ -2279,7 +2283,7 @@ export async function wakeSpecialistOrQueue(
   console.log(`[specialist] ${name} marked active (preventing concurrent wakes)`);
 
   try {
-    const wakeResult = await wakeSpecialistWithTask(name, task);
+    const wakeResult = await wakeSpecialistWithTask(name, task, { skipBusyGuard: true });
 
     if (!wakeResult.success) {
       // Wake failed - revert state to idle and clear currentIssue
