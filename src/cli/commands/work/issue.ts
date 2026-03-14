@@ -625,32 +625,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       createShadowState(id, 'open', 'pan work issue');
       updateShadowState(id, 'in_progress', 'pan work issue');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
-    } else if (isGitHubIssue(id)) {
-      const gh = resolveGitHubIssue(id);
-      if (gh.isGitHub) {
-        try {
-          const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
-          const yamlConfig = loadYamlConfig();
-          const token = yamlConfig.trackerKeys?.github || process.env.GITHUB_TOKEN;
-          if (token) {
-            const { Octokit } = await import('@octokit/rest');
-            const octokit = new Octokit({ auth: token });
-            await octokit.issues.addLabels({ owner: gh.owner, repo: gh.repo, issue_number: gh.number, labels: ['in-progress'] });
-            console.log(chalk.green(`  ✓ Updated ${id.toUpperCase()} to In Progress`));
-          }
-        } catch (err: any) {
-          console.warn(chalk.dim(`  ⚠ Could not update GitHub label: ${err.message}`));
-        }
-      }
-    } else if (isLinearIssue(id)) {
-      const apiKey = getLinearApiKey();
-      if (apiKey) {
-        const updated = await updateLinearToInProgress(apiKey, id);
-        if (updated) {
-          console.log(chalk.green(`  ✓ Updated ${id.toUpperCase()} to In Progress`));
-        }
-      }
     }
+    // Note: tracker transition for local agents is handled by spawnAgent() → transitionIssueToInProgress()
+    // No duplicate transition needed here.
 
     console.log('');
     console.log(chalk.bold('Agent Details:'));
