@@ -2389,7 +2389,7 @@ let dockerStatsCollector: DockerStatsCollector | null = null;
 app.get('/api/resources', async (_req, res) => {
   try {
     const containers = dockerStatsCollector ? dockerStatsCollector.getStats() : [];
-    const stoppedContainers = dockerStatsCollector ? dockerStatsCollector.getStoppedContainers() : [];
+    const stoppedContainers = dockerStatsCollector ? [] : [];
 
     // Gather active agents
     const agentsDir = join(homedir(), '.panopticon', 'agents');
@@ -14376,7 +14376,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     setInterval(async () => {
       if (!dockerStatsCollector) return;
       const containers = dockerStatsCollector.getStats();
-      const stoppedContainers = dockerStatsCollector.getStoppedContainers();
+      const stoppedContainers = [];
       const agentsDir = join(homedir(), '.panopticon', 'agents');
       const agents: Record<string, unknown>[] = [];
       if (existsSync(agentsDir)) {
