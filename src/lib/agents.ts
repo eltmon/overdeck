@@ -153,7 +153,7 @@ export function saveAgentState(state: AgentState): void {
 /**
  * Agent runtime state (hook-based tracking)
  */
-export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed';
+export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear';
 
 export interface AgentRuntimeState {
   state: 'active' | 'idle' | 'suspended' | 'uninitialized';

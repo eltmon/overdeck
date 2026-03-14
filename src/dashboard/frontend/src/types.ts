@@ -47,7 +47,7 @@ export interface GitStatus {
   latestCommit: string;
 }
 
-export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed';
+export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear';
 
 export interface Agent {
   id: string;
