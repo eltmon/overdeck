@@ -222,6 +222,7 @@ export function findProjectByPath(workspacePath: string): ProjectConfig | null {
   return null;
 }
 
+
 /**
  * Resolve the correct project path for an issue based on labels
  *

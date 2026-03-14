@@ -5,7 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, BellOff, AlertTriangle, StopCircle, Settings } from 'lucide-react';
+import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 interface CloisterStatus {
@@ -89,6 +89,19 @@ export function CloisterStatusBar() {
     queryFn: fetchCloisterConfig,
   });
 
+  const { data: specialistsData } = useQuery({
+    queryKey: ['specialists'],
+    queryFn: async () => {
+      const res = await fetch('/api/specialists');
+      if (!res.ok) return null;
+      return res.json();
+    },
+    refetchInterval: 5000,
+  });
+
+  const runningEphemeral: Array<{ projectKey: string; specialistType: string }> =
+    (specialistsData?.projects ?? []).filter((p: { isRunning: boolean }) => p.isRunning);
+
   const configMutation = useMutation({
     mutationFn: updateCloisterConfig,
     onSuccess: () => {
@@ -154,6 +167,17 @@ export function CloisterStatusBar() {
             <span className="text-red-400">{status.summary.stuck}</span>
           )}
         </div>
+      )}
+
+      {/* Running Ephemeral Specialists Indicator */}
+      {runningEphemeral.length > 0 && (
+        <span
+          className="flex items-center gap-0.5 text-xs text-green-400"
+          title={`Ephemeral: ${runningEphemeral.map(p => `${p.projectKey.toUpperCase()} ${p.specialistType}`).join(', ')}`}
+        >
+          <Zap className="w-3 h-3" />
+          {runningEphemeral.length}
+        </span>
       )}
 
       {/* Warning Indicator */}
