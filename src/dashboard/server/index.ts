@@ -42,9 +42,10 @@ import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
+import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../lib/tracker-utils.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
 import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
-import { DockerStatsCollector } from '../../lib/docker-stats.js';
+import { DockerStatsCollector, getDockerNetworks, getDockerVolumes } from '../../lib/docker-stats.js';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -252,10 +253,10 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
 
 /**
  * Update a Linear issue's status (state) by name.
- * No-op for GitHub issues (PAN-*) or if LINEAR_API_KEY is not set.
+ * No-op for GitHub issues or if LINEAR_API_KEY is not set.
  */
 async function updateLinearIssueStatus(issueId: string, statusName: string): Promise<void> {
-  if (issueId.toUpperCase().startsWith('PAN-')) return;
+  if (resolveGitHubIssueShared(issueId).isGitHub) return;
 
   const linearApiKey = getLinearApiKey();
   if (!linearApiKey) {
@@ -328,11 +329,11 @@ async function ensurePRExists(issueId: string): Promise<{ created: boolean; prUr
 
     // Get issue title for PR title
     let issueTitle = issueId;
-    if (issueId.toUpperCase().startsWith('PAN-')) {
-      const issueNumber = issueId.replace(/^PAN-/i, '');
+    const ghCheck = resolveGitHubIssueShared(issueId);
+    if (ghCheck.isGitHub) {
       try {
         const { stdout } = await execAsync(
-          `gh issue view ${issueNumber} --repo eltmon/panopticon-cli --json title --jq '.title'`,
+          `gh issue view ${ghCheck.number} --repo ${ghCheck.owner}/${ghCheck.repo} --json title --jq '.title'`,
           { encoding: 'utf-8' }
         );
         issueTitle = stdout.trim() || issueId;
@@ -405,10 +406,28 @@ Auto-created PR for ${issueId}
 }
 
 /**
- * Post-merge hook — merge-agent moves issue to Done, then awaits human close-out ceremony.
+ * Post-merge hook — transitions issue to Done on the tracker and runs post-merge cleanup.
+ *
+ * This is the authoritative "issue is merged" handler at the server level.
+ * postMergeLifecycle may also run inside spawnMergeAgentForBranches when polling succeeds,
+ * but closeIssue is idempotent (transitioning an already-Done issue is a no-op), so calling
+ * it from both places is safe and ensures the transition happens even when polling fails.
  */
 function onMergeComplete(issueId: string): void {
-  console.log(`[merge] Issue ${issueId} merged and moved to Done. Awaiting close-out.`);
+  // Resolve project path from issue prefix
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+
+  // Fire-and-forget — don't block the HTTP response
+  (async () => {
+    try {
+      const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
+      await postMergeLifecycle(issueId, projectPath);
+      console.log(`[merge] onMergeComplete: post-merge lifecycle completed for ${issueId}`);
+    } catch (err) {
+      console.error(`[merge] onMergeComplete: post-merge lifecycle failed for ${issueId}:`, err);
+    }
+  })();
 }
 
 // ============================================================================
@@ -2370,6 +2389,7 @@ let dockerStatsCollector: DockerStatsCollector | null = null;
 app.get('/api/resources', async (_req, res) => {
   try {
     const containers = dockerStatsCollector ? dockerStatsCollector.getStats() : [];
+    const stoppedContainers = dockerStatsCollector ? dockerStatsCollector.getStoppedContainers() : [];
 
     // Gather active agents
     const agentsDir = join(homedir(), '.panopticon', 'agents');
@@ -2385,7 +2405,13 @@ app.get('/api/resources', async (_req, res) => {
       }
     }
 
-    res.json({ containers, agents, updatedAt: new Date().toISOString() });
+    // Networks and volumes are slower — fetch in parallel
+    const [networks, volumes] = await Promise.all([
+      getDockerNetworks(),
+      getDockerVolumes(),
+    ]);
+
+    res.json({ containers, stoppedContainers, networks, volumes, agents, updatedAt: new Date().toISOString() });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch resources: ' + error.message });
   }
@@ -2464,6 +2490,64 @@ function formatUptime(startedAt: string): string {
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
 }
+
+// Docker resource cleanup endpoints
+app.delete('/api/resources/docker/container/:id', async (req, res) => {
+  const { id } = req.params;
+  if (!/^[a-f0-9]{12,64}$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid container ID' });
+  }
+  try {
+    await execAsync(`docker rm "${id}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/resources/docker/prune-containers', async (_req, res) => {
+  try {
+    const { stdout } = await execAsync('docker container prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 });
+    res.json({ ok: true, output: stdout.trim() });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/resources/docker/network/:name', async (req, res) => {
+  const { name } = req.params;
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)) {
+    return res.status(400).json({ error: 'Invalid network name' });
+  }
+  try {
+    await execAsync(`docker network rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/resources/docker/volume/:name', async (req, res) => {
+  const { name } = req.params;
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)) {
+    return res.status(400).json({ error: 'Invalid volume name' });
+  }
+  try {
+    await execAsync(`docker volume rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/resources/docker/prune-volumes', async (_req, res) => {
+  try {
+    const { stdout } = await execAsync('docker volume prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 });
+    res.json({ ok: true, output: stdout.trim() });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ============== Cloister API ==============
 
@@ -6707,6 +6791,8 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       'Command failed: tmux',
       'Operation timed out',
       'specialist.*not running',
+      'specialist.*busy',
+      'wakeSpecialistOrQueue',
     ];
     const isInfraFailure = infraFailurePatterns.some(pattern =>
       new RegExp(pattern, 'i').test(existingStatus.reviewNotes || '')
@@ -6779,6 +6865,18 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       }
     } catch (pushErr: any) {
       console.log(`Feature branch push note: ${pushErr.message}`);
+    }
+
+    // 2b. Snapshot commit hashes for this review run (local workspaces only)
+    if (!workspaceInfo.isRemote) {
+      try {
+        const { getWorkspaceCommitHashes } = await import('../../lib/git-utils.js');
+        const commits = await getWorkspaceCommitHashes(workspacePath);
+        setReviewStatus(issueId, { lastReviewCommits: commits });
+        console.log(`[review] Snapshotted commits for ${issueId}:`, commits);
+      } catch (hashErr: any) {
+        console.log(`[review] Could not snapshot commits for ${issueId}: ${hashErr.message}`);
+      }
     }
 
     // 3. Start the review pipeline (review-agent → test-agent)
@@ -6956,11 +7054,24 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
   const newCount = currentCount + 1;
   const reviewNotes = message ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}` : undefined;
 
+  // Snapshot commit hashes before dispatching (local workspaces only)
+  let requestReviewCommits: Record<string, string> | undefined;
+  if (!workspaceInfo.isRemote) {
+    try {
+      const { getWorkspaceCommitHashes } = await import('../../lib/git-utils.js');
+      requestReviewCommits = await getWorkspaceCommitHashes(workspacePath);
+      console.log(`[request-review] Snapshotted commits for ${issueId}:`, requestReviewCommits);
+    } catch (hashErr: any) {
+      console.log(`[request-review] Could not snapshot commits for ${issueId}: ${hashErr.message}`);
+    }
+  }
+
   setReviewStatus(issueId, {
     reviewStatus: 'reviewing',
     testStatus: 'pending',
     autoRequeueCount: newCount,
     reviewNotes,
+    ...(requestReviewCommits ? { lastReviewCommits: requestReviewCommits } : {}),
   });
 
   console.log(`[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`);
@@ -7662,16 +7773,16 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
     // 8. Post-merge lifecycle (archive, close, teardown, beads, clear-status)
     const { approve: lifecycleApprove } = await import('../../lib/lifecycle/index.js');
 
-    const ghConfig = getGitHubConfig();
-    const isGitHubIssueFlag = issueId.toUpperCase().startsWith('PAN-');
+    const ghResolved = resolveGitHubIssueShared(issueId);
+    const isGitHubIssueFlag = ghResolved.isGitHub;
     const lifecycleCtx = {
       issueId,
       projectPath,
-      ...(isGitHubIssueFlag && ghConfig ? {
+      ...(ghResolved.isGitHub ? {
         github: {
-          owner: ghConfig.repos.find(r => r.prefix === 'PAN')?.owner || '',
-          repo: ghConfig.repos.find(r => r.prefix === 'PAN')?.repo || '',
-          number: parseInt(issueId.split('-')[1], 10),
+          owner: ghResolved.owner,
+          repo: ghResolved.repo,
+          number: ghResolved.number,
         },
       } : {}),
     };
@@ -7970,15 +8081,13 @@ app.post('/api/agents', async (req, res) => {
 
       // Update issue status (GitHub/Linear) - same logic as local
       const apiKey = getLinearApiKey();
-      const isGitHubIssue = issueId.startsWith('PAN-');
+      const ghStartRemote = resolveGitHubIssueShared(issueId);
 
-      if (isGitHubIssue) {
+      if (ghStartRemote.isGitHub) {
         try {
           const ghConfig = getGitHubConfig();
           if (ghConfig) {
-            const number = parseInt(issueId.split('-')[1], 10);
-            const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
-            const { owner, repo } = repoConfig;
+            const { owner, repo, number } = ghStartRemote;
             const token = ghConfig.token;
 
             await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
@@ -8029,15 +8138,13 @@ app.post('/api/agents', async (req, res) => {
 
       // Update issue status to "In Progress"
       const apiKey = getLinearApiKey();
-      const isGitHubIssue = issueId.startsWith('PAN-');
+      const ghStartLocal = resolveGitHubIssueShared(issueId);
 
-      if (isGitHubIssue) {
+      if (ghStartLocal.isGitHub) {
         try {
           const ghConfig = getGitHubConfig();
           if (ghConfig) {
-            const number = parseInt(issueId.split('-')[1], 10);
-            const repoConfig = ghConfig.repos.find(r => r.prefix === 'PAN') || ghConfig.repos[0];
-            const { owner, repo } = repoConfig;
+            const { owner, repo, number } = ghStartLocal;
             const token = ghConfig.token;
 
             await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
@@ -8339,23 +8446,12 @@ app.get('/api/skills', (_req, res) => {
   }
 });
 
-// Helper to detect if an issue ID is from GitHub
+// Helper to detect if an issue ID is from GitHub (delegates to shared utility)
 function isGitHubIssue(issueId: string): { isGitHub: boolean; owner?: string; repo?: string; number?: number } {
-  const config = getGitHubConfig();
-  if (!config) return { isGitHub: false };
-
-  // Check if the prefix matches any configured GitHub repo
-  const prefix = issueId.split('-')[0].toUpperCase();
-  for (const { owner, repo, prefix: repoPrefix } of config.repos) {
-    const configPrefix = (repoPrefix || repo).toUpperCase();
-    if (prefix === configPrefix) {
-      const number = parseInt(issueId.split('-')[1], 10);
-      if (!isNaN(number)) {
-        return { isGitHub: true, owner, repo, number };
-      }
-    }
+  const resolved = resolveGitHubIssueShared(issueId);
+  if (resolved.isGitHub) {
+    return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
   }
-
   return { isGitHub: false };
 }
 
@@ -9844,11 +9940,10 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
                 projectPath = projConfig.path;
                 break;
               }
-              // Check for GitHub issue_tracker with matching prefix (for PAN-* etc.)
+              // Check for GitHub issue_tracker with matching prefix
               if (projConfig.issue_tracker === 'github' && projConfig.repo) {
-                // Match by checking if the repo config uses this prefix
-                const repoPrefix = projConfig.repo.split('/')[1]?.toUpperCase().slice(0, 3);
-                if (prefix === 'PAN' && projConfig.repo.includes('panopticon')) {
+                const ghAbort = resolveGitHubIssueShared(issueIdentifier);
+                if (ghAbort.isGitHub && `${ghAbort.owner}/${ghAbort.repo}` === projConfig.repo) {
                   projectPath = projConfig.path;
                   break;
                 }
@@ -14282,10 +14377,15 @@ server.listen(PORT, '0.0.0.0', async () => {
     dockerStatsCollector = new DockerStatsCollector();
     await dockerStatsCollector.start(5000);
 
-    // Emit snapshot on every collection cycle
+    // Emit snapshot on every collection cycle (5s for containers/agents, 30s for networks/volumes)
+    let cachedNetworks: Awaited<ReturnType<typeof getDockerNetworks>> = [];
+    let cachedVolumes: Awaited<ReturnType<typeof getDockerVolumes>> = [];
+    let slowTickCounter = 0;
+
     setInterval(async () => {
       if (!dockerStatsCollector) return;
       const containers = dockerStatsCollector.getStats();
+      const stoppedContainers = dockerStatsCollector.getStoppedContainers();
       const agentsDir = join(homedir(), '.panopticon', 'agents');
       const agents: Record<string, unknown>[] = [];
       if (existsSync(agentsDir)) {
@@ -14298,7 +14398,24 @@ server.listen(PORT, '0.0.0.0', async () => {
           } catch { /* skip */ }
         }
       }
-      socketIo.emit('resources:updated', { containers, agents, updatedAt: new Date().toISOString() });
+
+      // Refresh networks/volumes every 30s (6 ticks at 5s)
+      slowTickCounter++;
+      if (slowTickCounter >= 6) {
+        slowTickCounter = 0;
+        try {
+          [cachedNetworks, cachedVolumes] = await Promise.all([
+            getDockerNetworks(),
+            getDockerVolumes(),
+          ]);
+        } catch { /* non-fatal */ }
+      }
+
+      socketIo.emit('resources:updated', {
+        containers, stoppedContainers,
+        networks: cachedNetworks, volumes: cachedVolumes,
+        agents, updatedAt: new Date().toISOString(),
+      });
     }, 5000);
 
     console.log('DockerStatsCollector started (5s polling, resources:updated socket events)');
