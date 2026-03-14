@@ -1048,7 +1048,7 @@ Report any issues or conflicts you encountered.`;
 
   // Poll for merge completion (check if HEAD has changed and been pushed)
   const POLL_INTERVAL = 5000; // 5 seconds
-  const MAX_WAIT = 300000; // 5 minutes
+  const MAX_WAIT = 15 * 60 * 1000; // 15 minutes (match MERGE_TIMEOUT_MS)
   const startTime = Date.now();
 
   while (Date.now() - startTime < MAX_WAIT) {
@@ -1239,7 +1239,7 @@ Report any issues or conflicts you encountered.`;
   logActivity('merge_timeout', 'Timeout waiting for specialist to complete merge');
   return {
     success: false,
-    reason: 'Timeout waiting for merge-agent specialist to complete merge (5 minutes)',
+    reason: 'Timeout waiting for merge-agent specialist to complete merge (15 minutes)',
   };
 }
 
