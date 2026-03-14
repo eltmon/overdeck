@@ -1503,9 +1503,12 @@ export async function runPatrol(): Promise<PatrolResult> {
 
       // Auto-restart after force-kill (PAN-246: use wakeSpecialist, not initializeSpecialist)
       // Clear session ID so we get a fresh session, not a stale resume of the old context
+      // Reset runtime state so queue processing doesn't think the specialist is still busy
       if (killResult.success) {
         console.log(`[deacon] Auto-restarting ${specialist.name} with fresh session...`);
         clearSessionId(specialist.name);
+        const specialistSession = getTmuxSessionName(specialist.name);
+        saveAgentRuntimeState(specialistSession, { state: 'idle', lastActivity: new Date().toISOString() });
         const wakeResult = await wakeSpecialist(specialist.name, '', {
           waitForReady: true,
           startIfNotRunning: true,
