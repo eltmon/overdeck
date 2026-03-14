@@ -4231,6 +4231,26 @@ app.post('/api/specialists/:project/:type/kill', async (req, res) => {
   }
 });
 
+// Get queue for a per-project specialist
+// Ephemeral specialists share the global queue for their type
+app.get('/api/specialists/:project/:type/queue', async (req, res) => {
+  const { type } = req.params;
+
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
+  try {
+    const { checkSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+    const queue = checkSpecialistQueue(type);
+    res.json(queue);
+  } catch (error: unknown) {
+    console.error('Error getting per-project specialist queue:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to get queue: ' + message });
+  }
+});
+
 // Spawn ephemeral specialist for a project
 app.post('/api/specialists/:project/:type/spawn', async (req, res) => {
   const { project, type } = req.params;
