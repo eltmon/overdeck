@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Brain, Cpu, RotateCcw, Loader2, Play, Square, Clock, AlertCircle, CheckCircle2, Activity } from 'lucide-react';
+import { Brain, Cpu, RotateCcw, Loader2, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle } from 'lucide-react';
 import { SpecialistAgentCard, type SpecialistAgent, type IssueInfo } from './SpecialistAgentCard';
 import { IssueAgentCard, type IssueAgent, type CloisterHealth } from './IssueAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
@@ -436,11 +436,24 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                     <div className="text-xs text-content-muted font-mono mt-0.5">{ps.tmuxSession}</div>
                   </div>
                 </div>
-                <div className="text-right text-xs text-content-subtle">
-                  <div className="text-green-400">● Running</div>
-                  {ps.metadata.lastRunAt && (
-                    <div className="text-content-muted">{formatTimeAgo(ps.metadata.lastRunAt)}</div>
-                  )}
+                <div className="flex items-center gap-3">
+                  <div className="text-right text-xs text-content-subtle">
+                    <div className="text-green-400">● Running</div>
+                    {ps.metadata.lastRunAt && (
+                      <div className="text-content-muted">{formatTimeAgo(ps.metadata.lastRunAt)}</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fetch(`/api/specialists/${ps.projectKey}/${ps.specialistType}/kill`, { method: 'POST' })
+                        .then(() => queryClient.invalidateQueries({ queryKey: ['project-specialists-running'] }));
+                    }}
+                    className="p-2 text-content-subtle hover:text-red-400 hover:bg-surface-emphasis rounded"
+                    title={`Kill ${ps.specialistType} (${ps.projectKey})`}
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             ))}

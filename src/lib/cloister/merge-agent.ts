@@ -1005,12 +1005,17 @@ Report any issues or conflicts you encountered.`;
   const mergeProjectKey = resolvedProject?.projectKey ?? null;
   const mergeSession = getTmuxSessionName('merge-agent', mergeProjectKey ?? undefined);
 
-  // Wait for the merge-agent to be idle before sending a new task.
+  if (!resolvedProject) {
+    console.warn(`[merge-agent] Could not resolve project for ${issueId} — falling back to global specialist. Check projects.yaml configuration.`);
+  }
+
+  // Wait for the per-project merge-agent to be idle before sending a new task.
+  // Only applies to the per-project ephemeral path — the legacy wakeSpecialist
+  // path manages its own ready-wait internally via waitForReady: true.
   // Without this, sending a task to a busy specialist causes Claude's
   // "Interrupted" behavior — the running tool gets cancelled and the
-  // previous merge is abandoned mid-flight. This was the root cause of
-  // polyrepo merges failing (each repo's task interrupted the previous).
-  {
+  // previous merge is abandoned mid-flight.
+  if (mergeProjectKey) {
     const { getAgentRuntimeState } = await import('../agents.js');
     const IDLE_POLL_INTERVAL = 3000; // 3 seconds
     const IDLE_MAX_WAIT = 360000; // 6 minutes (slightly longer than specialist timeout)
@@ -1033,9 +1038,9 @@ Report any issues or conflicts you encountered.`;
   }
 
   // Wake the merge-agent specialist using per-project ephemeral lifecycle when possible
-  console.log(`[merge-agent] Waking specialist with merge task (projectKey=${mergeProjectKey ?? 'global'})...`);
   let wakeResult: { success: boolean; message: string; tmuxSession?: string; error?: string };
   if (mergeProjectKey) {
+    console.log(`[merge-agent] Using per-project ephemeral specialist for ${issueId} (${mergeProjectKey})`);
     wakeResult = await spawnEphemeralSpecialist(mergeProjectKey, 'merge-agent', {
       issueId,
       branch: sourceBranch,
@@ -1043,7 +1048,7 @@ Report any issues or conflicts you encountered.`;
       promptOverride: taskPrompt,
     });
   } else {
-    // Fallback to legacy global specialist when project can't be resolved
+    console.log(`[merge-agent] Project resolution failed, falling back to legacy global specialist for ${issueId}`);
     wakeResult = await wakeSpecialist('merge-agent', taskPrompt, {
       waitForReady: true,
       startIfNotRunning: true,
@@ -1119,7 +1124,7 @@ Report any issues or conflicts you encountered.`;
               // Extract baseline from specialist output if available
               let specialistBaseline: number | undefined;
               try {
-                const specialistOutput = await captureTmuxOutput(getTmuxSessionName('merge-agent'));
+                const specialistOutput = await captureTmuxOutput(mergeSession);
                 const baselineMatch = specialistOutput.match(/Failed\s*│\s*(\d+)\s*│/);
                 specialistBaseline = baselineMatch ? parseInt(baselineMatch[1], 10) : undefined;
                 if (specialistBaseline !== undefined) {

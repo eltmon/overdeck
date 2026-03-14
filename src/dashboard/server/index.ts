@@ -4190,6 +4190,47 @@ app.get('/api/specialists/projects', async (_req, res) => {
   }
 });
 
+// Get per-project specialist status
+app.get('/api/specialists/:project/:type/status', async (req, res) => {
+  const { project, type } = req.params;
+
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
+  try {
+    const { getSpecialistStatus } = await import('../../lib/cloister/specialists.js');
+    const status = await getSpecialistStatus(type, project);
+    res.json(status);
+  } catch (error: unknown) {
+    console.error('Error getting per-project specialist status:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to get specialist status: ' + message });
+  }
+});
+
+// Kill a running per-project specialist session
+app.post('/api/specialists/:project/:type/kill', async (req, res) => {
+  const { project, type } = req.params;
+
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
+  try {
+    const { getTmuxSessionName, clearSessionId } = await import('../../lib/cloister/specialists.js');
+    const tmuxSession = getTmuxSessionName(type, project);
+    await execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {});
+    clearSessionId(type, project);
+    saveAgentRuntimeState(tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
+    res.json({ success: true, message: `Killed ${type} (${project})` });
+  } catch (error: unknown) {
+    console.error('Error killing per-project specialist:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to kill specialist: ' + message });
+  }
+});
+
 // Spawn ephemeral specialist for a project
 app.post('/api/specialists/:project/:type/spawn', async (req, res) => {
   const { project, type } = req.params;
