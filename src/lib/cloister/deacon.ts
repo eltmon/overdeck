@@ -1476,6 +1476,86 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
 }
 
 /**
+ * Patrol work agent resolution fields (PAN-309).
+ *
+ * For each running work agent:
+ * - resolution === 'done' && count >= 2: auto-complete via pan work done
+ * - resolution === 'stuck' && count >= 3: send a poke message
+ */
+export async function patrolWorkAgentResolutions(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const agents = listRunningAgents();
+    const specialists = getEnabledSpecialists();
+    const specialistNames = new Set(specialists.map(s => getTmuxSessionName(s.name)));
+
+    for (const agent of agents) {
+      if (!agent.id.startsWith('agent-') || specialistNames.has(agent.id)) continue;
+
+      const runtimeState = getAgentRuntimeState(agent.id);
+      if (!runtimeState?.resolution || runtimeState.resolution === 'working' || runtimeState.resolution === 'completed') continue;
+
+      const resolution = runtimeState.resolution;
+      const count = runtimeState.resolutionCount || 0;
+      const issueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
+
+      if (resolution === 'done' && count >= 2) {
+        // Agent was nudged twice but still hasn't called pan work done — auto-complete
+        console.log(`[deacon] Auto-completing ${agent.id} (${issueId}): resolution=done, count=${count}`);
+
+        try {
+          const { execFile } = await import('child_process');
+          const { promisify: prom } = await import('util');
+          const execFileAsync = prom(execFile);
+
+          // Find pan binary
+          const panBin = join(PANOPTICON_HOME, 'bin', 'pan');
+          const binExists = existsSync(panBin);
+          const bin = binExists ? panBin : 'pan';
+
+          await execFileAsync(bin, ['work', 'done', issueId, '-c', 'Auto-completed by Deacon: evidence showed work complete after 2 nudges'], {
+            timeout: 30000,
+          });
+
+          // Mark as completed in runtime.json
+          saveAgentRuntimeState(agent.id, {
+            resolution: 'completed',
+            resolutionCount: count + 1,
+            resolutionUpdatedAt: new Date().toISOString(),
+          });
+
+          actions.push(`Deacon auto-completed ${issueId} (${agent.id}) after ${count} failed nudges`);
+          addLog('action', `Auto-completed ${issueId}: evidence-complete, ${count} nudges exhausted`, undefined);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[deacon] Failed to auto-complete ${agent.id}:`, msg);
+          actions.push(`Deacon auto-complete failed for ${agent.id}: ${msg}`);
+        }
+
+      } else if (resolution === 'stuck' && count >= 3) {
+        // Agent is stuck — send a poke to unstick it
+        console.log(`[deacon] Poking stuck agent ${agent.id} (${issueId}): count=${count}`);
+
+        try {
+          const pokeMsg = `Deacon health check: you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan work done ${issueId} -c "Implementation complete"`;
+          await sendKeysAsync(agent.id, pokeMsg);
+          actions.push(`Deacon poked stuck agent ${agent.id} (${issueId})`);
+          addLog('action', `Poked stuck agent ${issueId} (count=${count})`, undefined);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[deacon] Failed to poke ${agent.id}:`, msg);
+        }
+      }
+    }
+  } catch (error: unknown) {
+    console.error('[deacon] Error in patrolWorkAgentResolutions:', error);
+  }
+
+  return actions;
+}
+
+/**
  * Run a single patrol cycle
  */
 export async function runPatrol(): Promise<PatrolResult> {
@@ -1620,6 +1700,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const firstCompletionActions = await checkFirstCompletionAgents();
   actions.push(...firstCompletionActions);
   for (const a of firstCompletionActions) addLog('action', a, state.patrolCycle);
+
+  // Patrol work agent resolution fields: auto-complete done agents, poke stuck agents (PAN-309)
+  const resolutionActions = await patrolWorkAgentResolutions();
+  actions.push(...resolutionActions);
+  for (const a of resolutionActions) addLog('action', a, state.patrolCycle);
 
   // Check for lazy agent behavior and auto-correct (PAN-80, fixed in PAN-154)
   const lazyActions = await checkAndCorrectLazyAgents();
