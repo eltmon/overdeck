@@ -2305,7 +2305,7 @@ app.get('/api/health/agents', async (_req, res) => {
     }
 
     const agentNames = readdirSync(agentsDir).filter((name) =>
-      name.startsWith('agent-') || name.startsWith('planning-')
+      name.startsWith('agent-') || name.startsWith('planning-') || name.startsWith('specialist-')
     );
 
     // Process agents in parallel to avoid blocking
@@ -4187,6 +4187,67 @@ app.get('/api/specialists/projects', async (_req, res) => {
     console.error('Error getting project specialists:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     res.status(500).json({ error: 'Failed to get project specialists: ' + message });
+  }
+});
+
+// Get per-project specialist status
+app.get('/api/specialists/:project/:type/status', async (req, res) => {
+  const { project, type } = req.params;
+
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
+  try {
+    const { getSpecialistStatus } = await import('../../lib/cloister/specialists.js');
+    const status = await getSpecialistStatus(type, project);
+    res.json(status);
+  } catch (error: unknown) {
+    console.error('Error getting per-project specialist status:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to get specialist status: ' + message });
+  }
+});
+
+// Kill a running per-project specialist session
+app.post('/api/specialists/:project/:type/kill', async (req, res) => {
+  const { project, type } = req.params;
+
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
+  try {
+    const { getTmuxSessionName, clearSessionId } = await import('../../lib/cloister/specialists.js');
+    const tmuxSession = getTmuxSessionName(type, project);
+    await execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {});
+    clearSessionId(type, project);
+    saveAgentRuntimeState(tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
+    res.json({ success: true, message: `Killed ${type} (${project})` });
+  } catch (error: unknown) {
+    console.error('Error killing per-project specialist:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to kill specialist: ' + message });
+  }
+});
+
+// Get queue for a per-project specialist
+// Ephemeral specialists share the global queue for their type
+app.get('/api/specialists/:project/:type/queue', async (req, res) => {
+  const { type } = req.params;
+
+  if (!validateSpecialistType(type)) {
+    return res.status(400).json({ error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' });
+  }
+
+  try {
+    const { checkSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+    const queue = checkSpecialistQueue(type);
+    res.json(queue);
+  } catch (error: unknown) {
+    console.error('Error getting per-project specialist queue:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to get queue: ' + message });
   }
 });
 
@@ -6879,10 +6940,13 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
 
     // 3. Start the review pipeline (review-agent → test-agent)
     // PAN-88: Check if review-agent is busy BEFORE waking
-    const { wakeSpecialist, isRunning, getTmuxSessionName, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+    // PAN-300: Use per-project ephemeral lifecycle when possible
+    const { wakeSpecialist, spawnEphemeralSpecialist: spawnEphemeral, isRunning, getTmuxSessionName, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
 
-    const reviewSession = getTmuxSessionName('review-agent');
-    const reviewRunning = await isRunning('review-agent');
+    const reviewResolvedProject = resolveProjectFromIssue(issueId);
+    const reviewProjectKey = reviewResolvedProject?.projectKey ?? null;
+    const reviewSession = getTmuxSessionName('review-agent', reviewProjectKey ?? undefined);
+    const reviewRunning = await isRunning('review-agent', reviewProjectKey ?? undefined);
     const reviewState = getAgentRuntimeState(reviewSession);
     const reviewIdle = reviewState?.state === 'idle' || reviewState?.state === 'suspended' || !reviewRunning;
 
@@ -6966,11 +7030,22 @@ ${workspaceAccessInstructions}
 
 curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","isRemote":${workspaceInfo.isRemote},"vmName":"${workspaceInfo.vmName || ''}","customPrompt":"TEST for ${issueId}:\\nWORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}\\nBRANCH: ${branchName}\\n\\n1. ${isRemoteWorkspace ? `SSH: ssh -A ${workspaceInfo.vmName}.exe.xyz then cd ${workspacePath}` : `cd ${workspacePath}`}\\n2. Run tests: npm test\\n3. Update status:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Just update status. Human will click Merge."}'`;
 
-    const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
-      waitForReady: true,
-      startIfNotRunning: true,
-      skipBusyGuard: true, // We already checked idle + set active above
-    });
+    // Use per-project ephemeral specialist when possible (PAN-300)
+    let reviewResult: { success: boolean; message: string };
+    if (reviewProjectKey) {
+      reviewResult = await spawnEphemeral(reviewProjectKey, 'review-agent', {
+        issueId,
+        branch: branchName,
+        workspace: workspacePath,
+        promptOverride: reviewPrompt,
+      });
+    } else {
+      reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
+        waitForReady: true,
+        startIfNotRunning: true,
+        skipBusyGuard: true, // We already checked idle + set active above
+      });
+    }
 
     if (!reviewResult.success) {
       console.warn(`[review] review-agent failed to wake: ${reviewResult.message}`);
@@ -7617,7 +7692,9 @@ app.post('/api/workspaces/:issueId/approve', async (req, res) => {
 
     // 6. SPECIALIST WORKFLOW: review-agent → test-agent → merge-agent
     // Kick off review-agent with handoff instructions - it will wake the next specialists
-    const { wakeSpecialist } = await import('../../lib/cloister/specialists.js');
+    // PAN-300: Use per-project ephemeral lifecycle when possible
+    const { wakeSpecialist, spawnEphemeralSpecialist: spawnApproveEphemeral } = await import('../../lib/cloister/specialists.js');
+    const approveProjectKey = resolveProjectFromIssue(issueId)?.projectKey ?? null;
 
     // Build the full pipeline prompt for review-agent
     // It will hand off to test-agent, which hands off to merge-agent
@@ -7674,10 +7751,21 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 - "It works" is NOT enough - code must be EXCELLENT
 - Find EVERYTHING. The agent should learn from your feedback.`;
 
-    const reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
-      waitForReady: true,
-      startIfNotRunning: true,
-    });
+    // Use per-project ephemeral specialist when possible (PAN-300)
+    let reviewResult: { success: boolean; message: string };
+    if (approveProjectKey) {
+      reviewResult = await spawnApproveEphemeral(approveProjectKey, 'review-agent', {
+        issueId,
+        branch: branchName,
+        workspace: workspacePath,
+        promptOverride: pipelinePrompt,
+      });
+    } else {
+      reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
+        waitForReady: true,
+        startIfNotRunning: true,
+      });
+    }
 
     if (!reviewResult.success) {
       console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}`);

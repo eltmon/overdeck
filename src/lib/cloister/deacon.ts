@@ -56,6 +56,7 @@ import {
   getNextSpecialistTask,
   wakeSpecialistWithTask,
   completeSpecialistTask,
+  getAllProjectSpecialistStatuses,
 } from './specialists.js';
 import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState } from '../agents.js';
 import { sessionExists, sendKeysAsync } from '../tmux.js';
@@ -1729,6 +1730,39 @@ export async function runPatrol(): Promise<PatrolResult> {
     console.error(`[deacon] ${massDeathCheck.message}`);
     actions.push(massDeathCheck.message);
     addLog('error', massDeathCheck.message, state.patrolCycle);
+  }
+
+  // Patrol per-project ephemeral specialists (PAN-300)
+  // Ephemeral specialists are spawned on-demand and are not auto-restarted by the deacon.
+  // Patrol only detects stuck sessions and kills them to prevent tmux leaks.
+  try {
+    const projectSpecialists = await getAllProjectSpecialistStatuses();
+    for (const projSpec of projectSpecialists) {
+      if (!projSpec.isRunning) continue;
+
+      const runtimeState = getAgentRuntimeState(projSpec.tmuxSession);
+      // A running ephemeral specialist with no runtime state, or active for more than
+      // the max specialist timeout (wakeSpecialistWithTask uses 15 min), is considered stuck.
+      const isStuck = runtimeState?.state === 'active' && runtimeState.lastActivity
+        ? (Date.now() - new Date(runtimeState.lastActivity).getTime()) > 15 * 60 * 1000
+        : false;
+
+      if (isStuck) {
+        addLog('warn', `Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing`, state.patrolCycle);
+        console.log(`[deacon] Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing ${projSpec.tmuxSession}`);
+        try {
+          await execAsync(`tmux kill-session -t "${projSpec.tmuxSession}"`);
+          clearSessionId(projSpec.specialistType, projSpec.projectKey);
+          saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
+          actions.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
+        } catch {
+          // Non-fatal — session may have already exited
+        }
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error during per-project specialist patrol:', msg);
   }
 
   // Single save for the entire patrol cycle — all mutations from

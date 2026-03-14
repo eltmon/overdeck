@@ -17,10 +17,18 @@ const realExecAsync = promisify(exec);
 
 vi.mock('../../src/lib/cloister/specialists.js', () => ({
   wakeSpecialist: vi.fn(),
-  getTmuxSessionName: vi.fn((name: string) => `specialist-${name}`),
+  spawnEphemeralSpecialist: vi.fn(),
+  getTmuxSessionName: vi.fn((name: string, projectKey?: string) =>
+    projectKey ? `specialist-${projectKey}-${name}` : `specialist-${name}`
+  ),
   isRunning: vi.fn(() => true),
   getSessionId: vi.fn(),
   recordWake: vi.fn(),
+}));
+
+// Return null so syncMainIntoWorkspace falls back to wakeSpecialist (legacy path)
+vi.mock('../../src/lib/projects.js', () => ({
+  resolveProjectFromIssue: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../../src/lib/git-utils.js', () => ({
@@ -69,8 +77,9 @@ vi.mock('fs', async (importOriginal) => {
 
 // Import under test (after mocks)
 import { syncMainIntoWorkspace, scanForConflictMarkers } from '../../src/lib/cloister/merge-agent.js';
-import { wakeSpecialist, getTmuxSessionName } from '../../src/lib/cloister/specialists.js';
+import { wakeSpecialist, spawnEphemeralSpecialist, getTmuxSessionName } from '../../src/lib/cloister/specialists.js';
 import { cleanupStaleLocks } from '../../src/lib/git-utils.js';
+import { resolveProjectFromIssue } from '../../src/lib/projects.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -390,6 +399,40 @@ describe('syncMainIntoWorkspace', () => {
       expect(result.success).toBe(false);
       expect(result.reason).toMatch(/conflict marker/i);
       expect(mergeAbortCalled).toBe(true);
+    });
+
+    it('uses spawnEphemeralSpecialist when resolveProjectFromIssue returns a project key', async () => {
+      // Override the projects mock to return a project key for this test
+      vi.mocked(resolveProjectFromIssue).mockReturnValueOnce({ projectKey: 'pan' } as any);
+      const spawnMock = vi.mocked(spawnEphemeralSpecialist);
+      spawnMock.mockResolvedValueOnce({ success: true, message: 'spawned', tmuxSession: 'specialist-pan-merge-agent' });
+
+      execMock.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git merge origin/main')) {
+          const err: any = new Error('CONFLICT');
+          err.stdout = 'CONFLICT (content): Merge conflict in src/foo.ts\n';
+          throw err;
+        }
+        if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
+        if (cmd.includes('git branch --show-current')) return { stdout: 'feature/pan-242\n', stderr: '' };
+        if (cmd.includes('tmux capture-pane')) return { stdout: 'MERGE_RESULT: SUCCESS\nRESOLVED_FILES: src/foo.ts\n', stderr: '' };
+        if (cmd.includes('git diff --check')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git diff --name-only ORIG_HEAD HEAD')) return { stdout: 'src/foo.ts\n', stderr: '' };
+        if (cmd.includes('git log ORIG_HEAD..HEAD --oneline')) return { stdout: 'abc123 merge commit\n', stderr: '' };
+        return { stdout: '', stderr: '' };
+      });
+
+      const result = await syncMainIntoWorkspace(PROJECT_PATH, ISSUE_ID);
+
+      expect(spawnMock).toHaveBeenCalledWith(
+        'pan',
+        'merge-agent',
+        expect.objectContaining({ issueId: ISSUE_ID, promptOverride: expect.stringContaining('PAN-242') }),
+      );
+      expect(vi.mocked(wakeSpecialist)).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
     });
   });
 
