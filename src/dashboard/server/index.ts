@@ -45,7 +45,7 @@ import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../lib/tracker-utils.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
 import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
-import { DockerStatsCollector, getDockerNetworks, getDockerVolumes } from '../../lib/docker-stats.js';
+import { DockerStatsCollector } from '../../lib/docker-stats.js';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -2405,13 +2405,7 @@ app.get('/api/resources', async (_req, res) => {
       }
     }
 
-    // Networks and volumes are slower — fetch in parallel
-    const [networks, volumes] = await Promise.all([
-      getDockerNetworks(),
-      getDockerVolumes(),
-    ]);
-
-    res.json({ containers, stoppedContainers, networks, volumes, agents, updatedAt: new Date().toISOString() });
+    res.json({ containers, stoppedContainers, networks: [], volumes: [], agents, updatedAt: new Date().toISOString() });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to fetch resources: ' + error.message });
   }
@@ -6971,6 +6965,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
     const reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
       waitForReady: true,
       startIfNotRunning: true,
+      skipBusyGuard: true, // We already checked idle + set active above
     });
 
     if (!reviewResult.success) {
@@ -7000,7 +6995,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 
 // Agent-initiated re-review request with circuit breaker (PAN-90)
 // Allows agents to request re-review after fixing feedback, max 3 times
-const MAX_AUTO_REQUEUE = 3;
+const MAX_AUTO_REQUEUE = 7;
 
 app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
   const { issueId } = req.params;
@@ -14377,11 +14372,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     dockerStatsCollector = new DockerStatsCollector();
     await dockerStatsCollector.start(5000);
 
-    // Emit snapshot on every collection cycle (5s for containers/agents, 30s for networks/volumes)
-    let cachedNetworks: Awaited<ReturnType<typeof getDockerNetworks>> = [];
-    let cachedVolumes: Awaited<ReturnType<typeof getDockerVolumes>> = [];
-    let slowTickCounter = 0;
-
+    // Emit snapshot on every collection cycle (5s for containers/agents)
     setInterval(async () => {
       if (!dockerStatsCollector) return;
       const containers = dockerStatsCollector.getStats();
@@ -14399,21 +14390,9 @@ server.listen(PORT, '0.0.0.0', async () => {
         }
       }
 
-      // Refresh networks/volumes every 30s (6 ticks at 5s)
-      slowTickCounter++;
-      if (slowTickCounter >= 6) {
-        slowTickCounter = 0;
-        try {
-          [cachedNetworks, cachedVolumes] = await Promise.all([
-            getDockerNetworks(),
-            getDockerVolumes(),
-          ]);
-        } catch { /* non-fatal */ }
-      }
-
       socketIo.emit('resources:updated', {
         containers, stoppedContainers,
-        networks: cachedNetworks, volumes: cachedVolumes,
+        networks: [], volumes: [],
         agents, updatedAt: new Date().toISOString(),
       });
     }, 5000);
