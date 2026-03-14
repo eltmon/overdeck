@@ -13,11 +13,12 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
 import { join } from 'path';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
 
@@ -1505,10 +1506,6 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
         console.log(`[deacon] Auto-completing ${agent.id} (${issueId}): resolution=done, count=${count}`);
 
         try {
-          const { execFile } = await import('child_process');
-          const { promisify: prom } = await import('util');
-          const execFileAsync = prom(execFile);
-
           // Find pan binary
           const panBin = join(PANOPTICON_HOME, 'bin', 'pan');
           const binExists = existsSync(panBin);
