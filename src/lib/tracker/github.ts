@@ -17,6 +17,14 @@ import type {
 } from './interface.js';
 import { IssueNotFoundError, TrackerAuthError } from './interface.js';
 
+/**
+ * Extract issue number from various formats: "300", "#300", "PAN-300"
+ */
+function parseIssueNumber(id: string): number {
+  const match = id.match(/(\d+)$/);
+  return match ? parseInt(match[1], 10) : NaN;
+}
+
 export class GitHubTracker implements IssueTracker {
   readonly name: TrackerType = 'github';
   private octokit: Octokit;
@@ -57,7 +65,7 @@ export class GitHubTracker implements IssueTracker {
   async getIssue(id: string): Promise<Issue> {
     try {
       // Parse the issue number from refs like "#42" or just "42"
-      const issueNumber = parseInt(id.replace(/^#/, ''), 10);
+      const issueNumber = parseIssueNumber(id);
 
       if (isNaN(issueNumber)) {
         throw new IssueNotFoundError(id, 'github');
@@ -79,7 +87,7 @@ export class GitHubTracker implements IssueTracker {
   }
 
   async updateIssue(id: string, update: IssueUpdate): Promise<Issue> {
-    const issueNumber = parseInt(id.replace(/^#/, ''), 10);
+    const issueNumber = parseIssueNumber(id);
 
     const updatePayload: Record<string, unknown> = {};
 
@@ -123,7 +131,7 @@ export class GitHubTracker implements IssueTracker {
   }
 
   async getComments(issueId: string): Promise<Comment[]> {
-    const issueNumber = parseInt(issueId.replace(/^#/, ''), 10);
+    const issueNumber = parseIssueNumber(issueId);
 
     const { data: comments } = await this.octokit.issues.listComments({
       owner: this.owner,
@@ -142,7 +150,7 @@ export class GitHubTracker implements IssueTracker {
   }
 
   async addComment(issueId: string, body: string): Promise<Comment> {
-    const issueNumber = parseInt(issueId.replace(/^#/, ''), 10);
+    const issueNumber = parseIssueNumber(issueId);
 
     const { data: comment } = await this.octokit.issues.createComment({
       owner: this.owner,
@@ -162,7 +170,7 @@ export class GitHubTracker implements IssueTracker {
   }
 
   async transitionIssue(id: string, state: IssueState): Promise<void> {
-    const issueNumber = parseInt(id.replace(/^#/, ''), 10);
+    const issueNumber = parseIssueNumber(id);
 
     if (state === 'in_progress') {
       // GitHub has no native "in progress" state — use a label instead.
