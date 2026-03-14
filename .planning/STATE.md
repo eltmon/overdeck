@@ -40,3 +40,8 @@ Implemented the PAN-79 adoption gap: wired all specialist pipeline callers from 
 
 ## Remaining Work
 None
+
+## Specialist Feedback
+
+- **[2026-03-14T15:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/018-review-agent-changes-requested.md`
+- **[2026-03-14T15:17Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/019-review-agent-changes-requested.md`

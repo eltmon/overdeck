@@ -58,6 +58,26 @@ async function fetchSpecialists(): Promise<SpecialistAgent[]> {
   return data.specialists ?? data;
 }
 
+interface ProjectSpecialistStatus {
+  projectKey: string;
+  specialistType: 'merge-agent' | 'review-agent' | 'test-agent';
+  metadata: {
+    runCount: number;
+    lastRunAt: string | null;
+    lastRunStatus: 'passed' | 'failed' | 'blocked' | null;
+    currentRun: string | null;
+  };
+  isRunning: boolean;
+  tmuxSession: string;
+}
+
+async function fetchProjectSpecialists(): Promise<ProjectSpecialistStatus[]> {
+  const res = await fetch('/api/specialists');
+  if (!res.ok) throw new Error('Failed to fetch specialists');
+  const data = await res.json();
+  return (data.projects ?? []).filter((p: ProjectSpecialistStatus) => p.isRunning);
+}
+
 async function fetchCloisterHealth(): Promise<CloisterHealthResponse> {
   const res = await fetch('/api/cloister/agents/health');
   if (!res.ok) throw new Error('Failed to fetch Cloister health');
@@ -130,6 +150,12 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   const { data: specialists, isLoading: specialistsLoading } = useQuery({
     queryKey: ['specialists'],
     queryFn: fetchSpecialists,
+    refetchInterval: 5000,
+  });
+
+  const { data: runningProjectSpecialists } = useQuery({
+    queryKey: ['project-specialists-running'],
+    queryFn: fetchProjectSpecialists,
     refetchInterval: 5000,
   });
 
@@ -378,6 +404,49 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
           )}
         </div>
       </div>
+
+      {/* Active Ephemeral Specialists Section */}
+      {runningProjectSpecialists && runningProjectSpecialists.length > 0 && (
+        <div className="bg-surface-raised rounded-lg">
+          <div className="px-4 py-3 border-b border-divider">
+            <h2 className="font-semibold text-content flex items-center gap-2">
+              <Brain className="w-5 h-5 text-green-400" />
+              Active Ephemeral Specialists ({runningProjectSpecialists.length})
+            </h2>
+          </div>
+          <div className="divide-y divide-gray-700">
+            {runningProjectSpecialists.map((ps) => (
+              <div
+                key={ps.tmuxSession}
+                onClick={() => onSelectAgent(ps.tmuxSession === selectedAgent ? null : ps.tmuxSession)}
+                className={`p-4 cursor-pointer transition-colors flex items-center justify-between ${
+                  ps.tmuxSession === selectedAgent ? 'bg-surface-overlay' : 'hover:bg-gray-750'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Brain className="w-5 h-5 text-green-400" />
+                  <div>
+                    <div className="font-medium text-content flex items-center gap-2">
+                      <span className="bg-purple-900/50 text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono">
+                        {ps.projectKey.toUpperCase()}
+                      </span>
+                      {ps.specialistType.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Running" />
+                    </div>
+                    <div className="text-xs text-content-muted font-mono mt-0.5">{ps.tmuxSession}</div>
+                  </div>
+                </div>
+                <div className="text-right text-xs text-content-subtle">
+                  <div className="text-green-400">● Running</div>
+                  {ps.metadata.lastRunAt && (
+                    <div className="text-content-muted">{formatTimeAgo(ps.metadata.lastRunAt)}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Issue Agents Section */}
       <div className="bg-surface-raised rounded-lg">

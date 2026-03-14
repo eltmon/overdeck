@@ -2305,7 +2305,7 @@ app.get('/api/health/agents', async (_req, res) => {
     }
 
     const agentNames = readdirSync(agentsDir).filter((name) =>
-      name.startsWith('agent-') || name.startsWith('planning-')
+      name.startsWith('agent-') || name.startsWith('planning-') || name.startsWith('specialist-')
     );
 
     // Process agents in parallel to avoid blocking
