@@ -15,9 +15,10 @@ export interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
   mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed';
+  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   verificationNotes?: string;
   verificationCycleCount?: number;
+  verificationMaxCycles?: number;
   reviewNotes?: string;
   testNotes?: string;
   mergeNotes?: string;

@@ -63,9 +63,10 @@ interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
   mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed';
+  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   verificationNotes?: string;
   verificationCycleCount?: number;
+  verificationMaxCycles?: number;
   reviewNotes?: string;
   testNotes?: string;
   updatedAt: string;
@@ -1277,15 +1278,17 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                 <span className={
                   reviewStatus.verificationStatus === 'passed' ? 'text-green-400' :
                   reviewStatus.verificationStatus === 'failed' ? 'text-red-400' :
+                  reviewStatus.verificationStatus === 'skipped' ? 'text-content-muted' :
                   'text-yellow-400'
                 }>
                   {reviewStatus.verificationStatus === 'passed' ? '✓ Passed' :
                    reviewStatus.verificationStatus === 'failed' ? '✗ Failed' :
+                   reviewStatus.verificationStatus === 'skipped' ? '⊘ Skipped' :
                    '⟳ Running...'}
                 </span>
                 {(reviewStatus.verificationCycleCount ?? 0) > 0 && (
-                  <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= 3 ? 'text-red-400' : 'text-content-muted'}`}>
-                    Attempt {reviewStatus.verificationCycleCount}/3
+                  <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= (reviewStatus.verificationMaxCycles ?? 3) ? 'text-red-400' : 'text-content-muted'}`}>
+                    Attempt {reviewStatus.verificationCycleCount}/{reviewStatus.verificationMaxCycles ?? 3}
                   </span>
                 )}
               </div>

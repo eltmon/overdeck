@@ -156,4 +156,21 @@ describe('runVerificationGate', () => {
     expect(result.summary).toMatch(/lint \(\d+ms\)/);
     expect(result.summary).toMatch(/test \(\d+ms\)/);
   });
+
+  it('passes 5-minute timeout to each execAsync call', async () => {
+    execMock.mockResolvedValue({ stdout: '', stderr: '' });
+
+    await runVerificationGate(workspacePath);
+
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    for (const call of execMock.mock.calls) {
+      expect(call[1]).toMatchObject({ timeout: FIVE_MINUTES_MS });
+    }
+  });
+
+  it('throws when isRemote is true but vmName is missing', async () => {
+    await expect(
+      runVerificationGate(workspacePath, { isRemote: true, vmName: undefined })
+    ).rejects.toThrow('Remote workspace requires vmName');
+  });
 });

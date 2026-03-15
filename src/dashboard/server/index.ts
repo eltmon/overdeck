@@ -6821,89 +6821,9 @@ app.post('/api/specialists/done', async (req, res) => {
   });
 });
 
-// PAN-174: Shared verification gate runner used by both /review and /request-review.
-// Returns a discriminated result so callers don't need to catch throws.
-type VerificationGateOutcome =
-  | { outcome: 'passed' }
-  | { outcome: 'skipped'; reason: string }
-  | { outcome: 'failed'; failedCheck: string; cycleCount: number; maxCycles: number }
-  | { outcome: 'error'; message: string };
-
-const VERIFICATION_MAX_CYCLES = 3;
-
-async function runVerificationForIssue(
-  issueId: string,
-  workspacePath: string,
-  workspaceInfo: { isRemote: boolean; vmName?: string; localPath?: string },
-  logPrefix: string,
-): Promise<VerificationGateOutcome> {
-  const currentCycles = getReviewStatus(issueId)?.verificationCycleCount ?? 0;
-
-  if (currentCycles >= VERIFICATION_MAX_CYCLES) {
-    const reason = `Circuit breaker: ${currentCycles}/${VERIFICATION_MAX_CYCLES} cycles exceeded — skipping verification`;
-    console.log(`[${logPrefix}] ${reason} for ${issueId}`);
-    return { outcome: 'skipped', reason };
-  }
-
-  setReviewStatus(issueId, { verificationStatus: 'running' });
-  console.log(`[${logPrefix}] Running verification gate for ${issueId} (attempt ${currentCycles + 1}/${VERIFICATION_MAX_CYCLES})`);
-
-  try {
-    const { runVerificationGate } = await import('../../lib/cloister/verification-gate.js');
-    const verifyResult = await runVerificationGate(workspacePath, {
-      isRemote: workspaceInfo.isRemote,
-      vmName: workspaceInfo.vmName,
-    });
-
-    if (!verifyResult.passed) {
-      const newCycleCount = currentCycles + 1;
-      setReviewStatus(issueId, {
-        reviewStatus: 'pending',
-        verificationStatus: 'failed',
-        verificationNotes: verifyResult.summary,
-        verificationCycleCount: newCycleCount,
-      });
-
-      const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${verifyResult.failedCheck}\n\n${verifyResult.summary}\n\nFix the failing check, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\nDo NOT stop until review passes.`;
-
-      try {
-        const { writeFeedbackFile } = await import('../../lib/cloister/feedback-writer.js');
-        const fileResult = await writeFeedbackFile({
-          issueId,
-          workspacePath,
-          specialist: 'review-agent',
-          outcome: 'verification-failed',
-          summary: `Verification FAILED at ${verifyResult.failedCheck} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
-          markdownBody: feedbackBody,
-        });
-        if (fileResult.success) {
-          const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${verifyResult.failedCheck}\nRead and address: ${fileResult.relativePath}`;
-          await messageAgent(agentId, msg);
-          console.log(`[${logPrefix}] Verification failed for ${issueId} — sent feedback to ${agentId}`);
-        }
-      } catch (feedbackErr: any) {
-        console.error(`[${logPrefix}] Failed to write verification feedback for ${issueId}:`, feedbackErr);
-      }
-
-      return { outcome: 'failed', failedCheck: verifyResult.failedCheck!, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
-    }
-
-    setReviewStatus(issueId, { verificationStatus: 'passed', verificationNotes: undefined });
-    console.log(`[${logPrefix}] Verification passed for ${issueId} — proceeding to review-agent`);
-    return { outcome: 'passed' };
-
-  } catch (verifyErr: any) {
-    setReviewStatus(issueId, {
-      reviewStatus: 'pending',
-      verificationStatus: 'failed',
-      verificationNotes: `Verification infrastructure error: ${verifyErr.message}`,
-    });
-    console.error(`[${logPrefix}] Verification infrastructure error for ${issueId}:`, verifyErr);
-    return { outcome: 'error', message: verifyErr.message };
-  }
-}
+// PAN-174: Verification gate runner imported from testable module
+import { runVerificationForIssue } from '../../lib/cloister/verification-runner.js';
+type VerificationGateOutcome = Awaited<ReturnType<typeof runVerificationForIssue>>;
 
 // Start review pipeline: triggers review-agent → test-agent
 // Does NOT merge - just reviews and tests
