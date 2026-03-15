@@ -47,6 +47,10 @@ async function runCheck(
   let fullCommand: string;
   let cwd: string | undefined;
 
+  if (opts.isRemote && !opts.vmName) {
+    throw new Error('Remote workspace requires vmName');
+  }
+
   if (opts.isRemote && opts.vmName) {
     fullCommand = `ssh -A ${opts.vmName}.exe.xyz "cd ${workspacePath} && ${command}"`;
     cwd = undefined;
