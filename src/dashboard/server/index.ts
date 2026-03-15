@@ -6957,6 +6957,7 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
         if (!verifyResult.passed) {
           const newCycleCount = currentVerifyCycles + 1;
           setReviewStatus(issueId, {
+            reviewStatus: 'pending',
             verificationStatus: 'failed',
             verificationNotes: verifyResult.summary,
             verificationCycleCount: newCycleCount,
@@ -7000,9 +7001,12 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
         setReviewStatus(issueId, { verificationStatus: 'passed', verificationNotes: undefined });
         console.log(`[review] Verification passed for ${issueId} — proceeding to review-agent`);
       } catch (verifyErr: any) {
-        console.error(`[review] Verification gate error for ${issueId}:`, verifyErr);
-        // Verification infrastructure error — log and continue to review-agent
-        setReviewStatus(issueId, { verificationStatus: 'passed', verificationNotes: undefined });
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationNotes: `Verification infrastructure error: ${verifyErr.message}`,
+        });
+        throw verifyErr;
       }
     } else {
       console.log(`[review] Verification circuit breaker triggered for ${issueId} (${currentVerifyCycles}/${MAX_VERIFICATION_CYCLES}) — skipping verification`);
@@ -7208,6 +7212,78 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
     } catch (hashErr: any) {
       console.log(`[request-review] Could not snapshot commits for ${issueId}: ${hashErr.message}`);
     }
+  }
+
+  // Run verification gate before queuing review-agent (PAN-174)
+  const reqVerifyCycles = existingStatus?.verificationCycleCount ?? 0;
+  const MAX_VERIFICATION_CYCLES_REQ = 3;
+
+  if (reqVerifyCycles < MAX_VERIFICATION_CYCLES_REQ) {
+    setReviewStatus(issueId, { verificationStatus: 'running', autoRequeueCount: newCount, ...(requestReviewCommits ? { lastReviewCommits: requestReviewCommits } : {}) });
+    console.log(`[request-review] Running verification gate for ${issueId} (attempt ${reqVerifyCycles + 1}/${MAX_VERIFICATION_CYCLES_REQ})`);
+
+    try {
+      const { runVerificationGate } = await import('../../lib/cloister/verification-gate.js');
+      const verifyResult = await runVerificationGate(workspacePath, {
+        isRemote: workspaceInfo.isRemote,
+        vmName: workspaceInfo.vmName,
+      });
+
+      if (!verifyResult.passed) {
+        const newVerifyCycleCount = reqVerifyCycles + 1;
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationNotes: verifyResult.summary,
+          verificationCycleCount: newVerifyCycleCount,
+        });
+
+        const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newVerifyCycleCount}/${MAX_VERIFICATION_CYCLES_REQ}):\n\nFailed check: ${verifyResult.failedCheck}\n\n${verifyResult.summary}\n\nFix the failing check, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\nDo NOT stop until review passes.`;
+
+        try {
+          const { writeFeedbackFile } = await import('../../lib/cloister/feedback-writer.js');
+          const fileResult = await writeFeedbackFile({
+            issueId,
+            workspacePath: workspaceInfo.localPath,
+            specialist: 'review-agent',
+            outcome: 'verification-failed',
+            summary: `Verification FAILED at ${verifyResult.failedCheck} (attempt ${newVerifyCycleCount}/${MAX_VERIFICATION_CYCLES_REQ})`,
+            markdownBody: feedbackBody,
+          });
+          if (fileResult.success) {
+            const agentId = `agent-${issueId.toLowerCase()}`;
+            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${verifyResult.failedCheck}\nRead and address: ${fileResult.relativePath}`;
+            await messageAgent(agentId, msg);
+            console.log(`[request-review] Verification failed for ${issueId} — sent feedback to ${agentId}`);
+          }
+        } catch (feedbackErr: any) {
+          console.error(`[request-review] Failed to write verification feedback for ${issueId}:`, feedbackErr);
+        }
+
+        return res.json({
+          success: false,
+          verificationFailed: true,
+          failedCheck: verifyResult.failedCheck,
+          message: `Verification failed at ${verifyResult.failedCheck} — fix and resubmit`,
+          cycleCount: newVerifyCycleCount,
+          maxCycles: MAX_VERIFICATION_CYCLES_REQ,
+        });
+      }
+
+      // Verification passed
+      setReviewStatus(issueId, { verificationStatus: 'passed', verificationNotes: undefined });
+      console.log(`[request-review] Verification passed for ${issueId} — proceeding to review-agent`);
+    } catch (verifyErr: any) {
+      setReviewStatus(issueId, {
+        reviewStatus: 'pending',
+        verificationStatus: 'failed',
+        verificationNotes: `Verification infrastructure error: ${verifyErr.message}`,
+      });
+      throw verifyErr;
+    }
+  } else {
+    console.log(`[request-review] Verification circuit breaker triggered for ${issueId} (${reqVerifyCycles}/${MAX_VERIFICATION_CYCLES_REQ}) — skipping verification`);
   }
 
   setReviewStatus(issueId, {
