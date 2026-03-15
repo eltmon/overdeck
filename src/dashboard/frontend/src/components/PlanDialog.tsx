@@ -248,6 +248,11 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
             // Planning was done but not marked complete - go directly to complete step
             // This allows user to click "Done Planning" without restarting
             setStep('complete');
+          } else if (data.sessionName && ['In Planning', 'Planning', 'Discovery'].includes(issue.status)) {
+            // Issue is in planning state with a known session — show terminal view
+            // even if session is dead (terminal will show reconnection state)
+            hasConnectedToSession.current = true;
+            setStep('planning');
           } else {
             // No active session and no completed planning - show ready step
             setStep('ready');

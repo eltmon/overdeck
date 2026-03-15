@@ -2113,7 +2113,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
             {issue.source === 'rally' && <TrackerShadowBadges issue={issue} />}
             {/* Difficulty badge */}
             {(() => {
-              const difficulty = parseDifficultyLabel(issue.labels);
+              const difficulty = parseDifficultyLabel(issue.labels || []);
               return difficulty ? <DifficultyBadge level={difficulty} /> : null;
             })()}
             {/* Merged badge — prominent indicator for verified merges on Done cards */}
