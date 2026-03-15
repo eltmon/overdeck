@@ -52,6 +52,15 @@ async function runCheck(
   }
 
   if (opts.isRemote && opts.vmName) {
+    // Validate vmName and workspacePath to prevent shell injection.
+    // Both are controlled by Panopticon config, but explicit validation
+    // catches any accidental or malicious values before they reach the shell.
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(opts.vmName)) {
+      throw new Error(`Invalid vmName for SSH: ${opts.vmName}`);
+    }
+    if (!/^[a-zA-Z0-9/_\-.]+$/.test(workspacePath)) {
+      throw new Error(`Workspace path contains unsafe characters: ${workspacePath}`);
+    }
     fullCommand = `ssh -A ${opts.vmName}.exe.xyz "cd ${workspacePath} && ${command}"`;
     cwd = undefined;
   } else {
