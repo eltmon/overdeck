@@ -35,9 +35,13 @@ export function useSocketIssues(): void {
       console.log('[socket.io] Disconnected:', reason);
     });
 
-    // Update all issue-related queries (base ['issues'] and filtered ['issues', cycle, completed])
+    // Set base ['issues'] cache directly, then invalidate filtered queries so they refetch
     const updateIssueQueries = (issues: Issue[]) => {
-      queryClient.setQueriesData({ queryKey: ['issues'] }, issues);
+      // Set the exact ['issues'] key used by App.tsx and AgentList.tsx
+      queryClient.setQueryData(['issues'], issues);
+      // Invalidate filtered queries (e.g. ['issues', cycle, completed] in KanbanBoard)
+      // so they refetch through their queryFn with correct params
+      queryClient.invalidateQueries({ queryKey: ['issues'], exact: false });
     };
 
     // Full snapshot (on connect, or on request)

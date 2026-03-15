@@ -90,7 +90,7 @@ export function CloisterStatusBar() {
   });
 
   const { data: specialistsData } = useQuery({
-    queryKey: ['specialists'],
+    queryKey: ['specialists-raw'],
     queryFn: async () => {
       const res = await fetch('/api/specialists');
       if (!res.ok) return null;
