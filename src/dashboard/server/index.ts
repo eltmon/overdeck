@@ -8077,7 +8077,7 @@ app.post('/api/agents', async (req, res) => {
 
     // SAFEGUARD: Require beads tasks before work begins (planning must create them)
     const workspaceBeadsDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.beads');
-    const hasBeads = existsSync(workspaceBeadsDir) && readdirSync(workspaceBeadsDir).filter(f => f.endsWith('.md')).length > 0;
+    const hasBeads = existsSync(join(workspaceBeadsDir, 'issues.jsonl'));
     if (hasBeads) {
       const beadCount = readdirSync(workspaceBeadsDir).filter(f => f.endsWith('.md')).length;
       console.log(`[start-agent] Found ${beadCount} beads tasks for ${issueId}`);
