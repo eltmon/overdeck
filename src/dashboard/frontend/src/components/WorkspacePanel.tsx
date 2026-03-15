@@ -63,6 +63,9 @@ interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
   mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
+  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed';
+  verificationNotes?: string;
+  verificationCycleCount?: number;
   reviewNotes?: string;
   testNotes?: string;
   updatedAt: string;
@@ -1258,6 +1261,39 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               <div className="mt-1 text-content-subtle whitespace-pre-wrap">
                 {workspace.pendingOperation.error}
               </div>
+            </div>
+          )}
+          {/* Verification Status Display */}
+          {reviewStatus?.verificationStatus && reviewStatus.verificationStatus !== 'pending' && (
+            <div className={`mb-2 p-2 rounded text-xs ${
+              reviewStatus.verificationStatus === 'failed'
+                ? 'bg-red-900/20 border border-red-700/30'
+                : reviewStatus.verificationStatus === 'running'
+                ? 'bg-yellow-900/20 border border-yellow-700/30'
+                : 'bg-surface/50'
+            }`}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-content-subtle">Verify:</span>
+                <span className={
+                  reviewStatus.verificationStatus === 'passed' ? 'text-green-400' :
+                  reviewStatus.verificationStatus === 'failed' ? 'text-red-400' :
+                  'text-yellow-400'
+                }>
+                  {reviewStatus.verificationStatus === 'passed' ? '✓ Passed' :
+                   reviewStatus.verificationStatus === 'failed' ? '✗ Failed' :
+                   '⟳ Running...'}
+                </span>
+                {(reviewStatus.verificationCycleCount ?? 0) > 0 && (
+                  <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= 3 ? 'text-red-400' : 'text-content-muted'}`}>
+                    Attempt {reviewStatus.verificationCycleCount}/3
+                  </span>
+                )}
+              </div>
+              {reviewStatus.verificationStatus === 'failed' && reviewStatus.verificationNotes && (
+                <div className="mt-1 text-red-300 text-[10px] font-mono whitespace-pre-wrap break-all max-h-24 overflow-y-auto">
+                  {reviewStatus.verificationNotes}
+                </div>
+              )}
             </div>
           )}
           {/* Review Status Display */}
