@@ -8075,6 +8075,21 @@ app.post('/api/agents', async (req, res) => {
       console.log(`[start-agent] Found PRD draft for ${issueId}`);
     }
 
+    // SAFEGUARD: Require beads tasks before work begins (planning must create them)
+    const workspaceBeadsDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.beads');
+    const hasBeads = existsSync(workspaceBeadsDir) && readdirSync(workspaceBeadsDir).filter(f => f.endsWith('.md')).length > 0;
+    if (hasBeads) {
+      const beadCount = readdirSync(workspaceBeadsDir).filter(f => f.endsWith('.md')).length;
+      console.log(`[start-agent] Found ${beadCount} beads tasks for ${issueId}`);
+    } else {
+      console.warn(`[start-agent] BLOCKED: No beads tasks found for ${issueId}`);
+      return res.status(422).json({
+        error: `No beads tasks found for ${issueId}. Planning must create task breakdown before work begins.`,
+        hint: 'Run planning again and ensure it creates beads with "bd create". The planning prompt requires this.',
+        issueId,
+      });
+    }
+
     // Ensure workspace exists — create it if missing (e.g. after deep-wipe)
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
