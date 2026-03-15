@@ -6823,7 +6823,6 @@ app.post('/api/specialists/done', async (req, res) => {
 
 // PAN-174: Verification gate runner imported from testable module
 import { runVerificationForIssue } from '../../lib/cloister/verification-runner.js';
-type VerificationGateOutcome = Awaited<ReturnType<typeof runVerificationForIssue>>;
 
 // Start review pipeline: triggers review-agent → test-agent
 // Does NOT merge - just reviews and tests
@@ -6958,6 +6957,9 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     if (verifyOutcome.outcome === 'error') {
       completePendingOperation(issueId, `Verification infrastructure error: ${verifyOutcome.message}`);
       return res.status(500).json({ error: `Verification infrastructure error: ${verifyOutcome.message}` });
+    }
+    if (verifyOutcome.outcome === 'skipped') {
+      console.log(`[review] Verification skipped for ${issueId} (${verifyOutcome.reason}) — proceeding to review-agent`);
     }
 
     // 3. Start the review pipeline (review-agent → test-agent)
@@ -7178,8 +7180,11 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: `Verification infrastructure error: ${reqVerifyOutcome.message}`,
-      autoRequeueCount: newCount,
+      autoRequeueCount: currentCount,
     });
+  }
+  if (reqVerifyOutcome.outcome === 'skipped') {
+    console.log(`[request-review] Verification skipped for ${issueId} (${reqVerifyOutcome.reason}) — proceeding to review-agent`);
   }
 
   setReviewStatus(issueId, {

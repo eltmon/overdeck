@@ -173,4 +173,16 @@ describe('runVerificationGate', () => {
       runVerificationGate(workspacePath, { isRemote: true, vmName: undefined })
     ).rejects.toThrow('Remote workspace requires vmName');
   });
+
+  it('throws when vmName contains invalid characters', async () => {
+    await expect(
+      runVerificationGate(workspacePath, { isRemote: true, vmName: 'vm; rm -rf /' })
+    ).rejects.toThrow('Invalid vmName for SSH');
+  });
+
+  it('throws when workspacePath contains unsafe characters', async () => {
+    await expect(
+      runVerificationGate('/path/with spaces/workspace', { isRemote: true, vmName: 'my-vm' })
+    ).rejects.toThrow('Workspace path contains unsafe characters');
+  });
 });
