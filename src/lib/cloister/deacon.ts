@@ -1738,7 +1738,19 @@ export async function runPatrol(): Promise<PatrolResult> {
   try {
     const projectSpecialists = await getAllProjectSpecialistStatuses();
     for (const projSpec of projectSpecialists) {
-      if (!projSpec.isRunning) continue;
+      if (!projSpec.isRunning) {
+        // Session is dead — reset any stale active runtime state so the next
+        // merge request is not blocked by a phantom busy signal.
+        const runtimeState = getAgentRuntimeState(projSpec.tmuxSession);
+        if (runtimeState?.state === 'active') {
+          saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
+          const msg = `Dead-session reset: per-project ${projSpec.specialistType} (${projSpec.projectKey}) was active but session is gone`;
+          actions.push(msg);
+          addLog('action', msg, state.patrolCycle);
+          console.log(`[deacon] ${msg}`);
+        }
+        continue;
+      }
 
       const runtimeState = getAgentRuntimeState(projSpec.tmuxSession);
       // A running ephemeral specialist with no runtime state, or active for more than
