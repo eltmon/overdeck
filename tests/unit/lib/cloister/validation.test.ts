@@ -25,15 +25,16 @@ describe('validation', () => {
   });
 
   describe('runMergeValidation', () => {
-    it('should return error when validation script does not exist', async () => {
+    it('should return skipped when validation script does not exist', async () => {
       const result = await runMergeValidation({
         projectPath: testDir,
         issueId: 'TEST-1',
       });
 
-      expect(result.success).toBe(false);
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('Validation script not found');
+      // No validation script = skip (specialist already ran build + tests)
+      expect(result.success).toBe(true);
+      expect(result.valid).toBe(true);
+      expect(result.skipped).toBe(true);
     });
 
     it('should return success when validation script passes', async () => {
