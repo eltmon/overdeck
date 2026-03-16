@@ -211,8 +211,29 @@ async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Prom
  * Moves the issue to Done on the tracker so it appears in the Done column.
  * Does NOT tear down the workspace or apply the closed-out label — the human
  * close-out ceremony handles that separately.
+ *
+ * IDEMPOTENT: Safe to call multiple times for the same issueId. Tracks completed
+ * issues and returns immediately on re-entry. This is defense-in-depth against
+ * the infinite loop that burned 24,626 Linear API calls (PAN-328).
  */
+
+// Defense-in-depth: track issues that have completed postMergeLifecycle.
+// Prevents re-execution even if caller guards fail. Persists for server lifetime.
+const _completedPostMerge = new Set<string>();
+
+// Circuit breaker for issue tracker close operations.
+// After MAX_CLOSE_RETRIES consecutive failures, stop trying to close the issue
+// on the tracker. The issue can be closed manually via the dashboard close-out ceremony.
+const _closeIssueFailures = new Map<string, number>();
+const MAX_CLOSE_RETRIES = 3;
+
 export async function postMergeLifecycle(issueId: string, projectPath: string): Promise<void> {
+  // Guard 1: skip if already completed (defense-in-depth against infinite loops)
+  if (_completedPostMerge.has(issueId)) {
+    console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
+    return;
+  }
+
   console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
 
   // 1. Move PRD from active to completed (via lifecycle module)
@@ -231,56 +252,13 @@ export async function postMergeLifecycle(issueId: string, projectPath: string): 
     console.warn(`[merge-agent] Could not move PRD: ${err}`);
   }
 
-  // 2. Move issue to Done on tracker (so it appears in Done column for close-out)
-  try {
-    const { closeIssue } = await import('../lifecycle/close-issue.js');
-    const ghResolved = resolveGitHubIssue(issueId);
-    if (ghResolved.isGitHub) {
-      // GitHub: close issue + close PR, but don't apply closed-out label
-      const results = await closeIssue(
-        {
-          issueId,
-          projectPath,
-          github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number },
-        },
-        { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' },
-      );
-      for (const r of results) {
-        if (r.success && !r.skipped) {
-          console.log(`[merge-agent] ✓ ${r.details?.join('; ')}`);
-          logActivity(r.step, r.details?.join('; ') || r.step);
-        } else if (!r.skipped) {
-          console.warn(`[merge-agent] ✗ ${r.step} failed: ${r.error}`);
-        }
-      }
-    } else {
-      // Linear/other trackers: transition to Done, no label
-      const results = await closeIssue(
-        { issueId, projectPath },
-        { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' },
-      );
-      for (const r of results) {
-        if (r.success && !r.skipped) {
-          console.log(`[merge-agent] ✓ ${r.details?.join('; ')}`);
-          logActivity(r.step, r.details?.join('; ') || r.step);
-        } else if (!r.skipped) {
-          console.warn(`[merge-agent] ✗ ${r.step} failed: ${r.error}`);
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Could not move issue to Done: ${err}`);
-  }
+  // 2. Close issue on tracker (fire-and-forget with circuit breaker)
+  // This is decoupled from the merge lifecycle: failure to close the issue on the
+  // tracker does NOT block the merge or cause retries. The close-out ceremony handles
+  // any issues that weren't auto-closed.
+  closeIssueWithCircuitBreaker(issueId, projectPath);
 
-  // 3. Report merge success to dashboard
-  // NOTE: Do NOT call /api/specialists/done here — it creates an infinite loop:
-  //   postMergeLifecycle → /api/specialists/done → onMergeComplete → postMergeLifecycle → ...
-  // The caller (onMergeComplete or spawnMergeAgentForBranches polling) is responsible
-  // for setting the merge status. The specialist itself also calls /api/specialists/done
-  // directly when skipDoneReport is false.
-  console.log(`[merge-agent] ✓ Reported merge success to dashboard API`);
-
-  // 4. Compact old beads (via lifecycle module)
+  // 3. Compact old beads (via lifecycle module)
   try {
     const { compactBeads } = await import('../lifecycle/compact-beads.js');
     const beadsResult = await compactBeads({ issueId, projectPath });
@@ -292,8 +270,70 @@ export async function postMergeLifecycle(issueId: string, projectPath: string): 
     console.warn(`[merge-agent] Beads compaction failed: ${err}`);
   }
 
+  // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
+  _completedPostMerge.add(issueId);
+
   console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}. Issue moved to Done — awaiting close-out.`);
   logActivity('merge_complete', `Merged ${issueId}. Issue moved to Done — awaiting close-out.`);
+}
+
+/**
+ * Close issue on tracker with circuit breaker protection.
+ * Fire-and-forget: runs asynchronously, never blocks the caller.
+ * Stops retrying after MAX_CLOSE_RETRIES consecutive failures per issue.
+ */
+function closeIssueWithCircuitBreaker(issueId: string, projectPath: string): void {
+  const failures = _closeIssueFailures.get(issueId) || 0;
+  if (failures >= MAX_CLOSE_RETRIES) {
+    console.log(`[merge-agent] Circuit breaker open for ${issueId} issue close (${failures} failures). Will be closed during close-out ceremony.`);
+    return;
+  }
+
+  // Fire-and-forget — errors are caught and logged, never propagated
+  (async () => {
+    try {
+      const { closeIssue } = await import('../lifecycle/close-issue.js');
+      const ghResolved = resolveGitHubIssue(issueId);
+      const ctx = ghResolved.isGitHub
+        ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
+        : { issueId, projectPath };
+      const results = await closeIssue(ctx, { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' });
+
+      let anyFailure = false;
+      for (const r of results) {
+        if (r.success && !r.skipped) {
+          console.log(`[merge-agent] ✓ ${r.details?.join('; ')}`);
+          logActivity(r.step, r.details?.join('; ') || r.step);
+        } else if (!r.skipped) {
+          console.warn(`[merge-agent] ✗ ${r.step} failed: ${r.error}`);
+          anyFailure = true;
+        }
+      }
+
+      if (anyFailure) {
+        const newCount = (_closeIssueFailures.get(issueId) || 0) + 1;
+        _closeIssueFailures.set(issueId, newCount);
+        if (newCount >= MAX_CLOSE_RETRIES) {
+          console.warn(`[merge-agent] Circuit breaker tripped for ${issueId} after ${newCount} failures. Issue close deferred to close-out ceremony.`);
+        }
+      } else {
+        // Success — clear failure counter
+        _closeIssueFailures.delete(issueId);
+      }
+    } catch (err) {
+      const newCount = (_closeIssueFailures.get(issueId) || 0) + 1;
+      _closeIssueFailures.set(issueId, newCount);
+      console.warn(`[merge-agent] Could not move issue to Done (attempt ${newCount}/${MAX_CLOSE_RETRIES}): ${err}`);
+    }
+  })();
+}
+
+/**
+ * Reset postMergeLifecycle completion tracking for an issue (used by reopen).
+ */
+export function resetPostMergeState(issueId: string): void {
+  _completedPostMerge.delete(issueId);
+  _closeIssueFailures.delete(issueId);
 }
 
 /**
