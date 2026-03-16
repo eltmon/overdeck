@@ -353,6 +353,67 @@ For polyrepo projects:
 
 **Future enhancement:** Polyrepo-aware merge-agent that handles multiple repos automatically.
 
+## Quality Gates in Polyrepo Projects
+
+Quality gates support polyrepo projects through **path-based filtering**: each gate runs only when
+the repo being merged matches the gate's `path` field.
+
+### How it works
+
+When a polyrepo merge runs, Panopticon computes the relative path from the project root to the
+sub-repo being merged (e.g., `frontend` or `backend`). It then filters the configured quality gates
+to only those whose `path` field matches that relative path.
+
+| Gate config | Repo being merged | Result |
+|-------------|-------------------|--------|
+| `path: frontend` | `frontend` | ✅ Runs |
+| `path: backend` | `frontend` | ⏭️ Skipped |
+| no `path` field | `frontend` | ⏭️ Skipped (not applicable to any specific repo) |
+| no `path` field | project root (monorepo) | ✅ Runs |
+
+### Configuration example
+
+```yaml
+projects:
+  myapp:
+    name: "My App"
+    path: /home/user/projects/myapp
+
+    quality_gates:
+      # Runs only when merging the frontend repo
+      fe-lint:
+        command: pnpm lint
+        path: frontend
+        required: true
+        phase: pre_push
+
+      # Runs only when merging the backend repo
+      api-checkstyle:
+        command: ./mvnw checkstyle:check
+        path: backend
+        required: true
+        phase: pre_push
+
+      # Global gate — runs in monorepo context only (no path = skipped in polyrepo)
+      integration-tests:
+        command: make integration-test
+        required: false
+        phase: post_push
+
+    workspace:
+      type: polyrepo
+      repos:
+        - name: fe
+          path: frontend       # Must match gate.path exactly
+          branch_prefix: "feature/"
+        - name: api
+          path: backend        # Must match gate.path exactly
+          branch_prefix: "feature/"
+```
+
+> **Important:** The `path` value in a quality gate must exactly match the `path` value of the
+> corresponding repo in the `workspace.repos` list (both relative to the project root).
+
 ## Related Guides
 
 - [Project Registry](/configuration/projects) - Project configuration
