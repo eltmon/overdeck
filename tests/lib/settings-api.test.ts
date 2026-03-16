@@ -8,13 +8,16 @@ import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 // Mock the config-yaml module
 vi.mock('../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({
-    preset: 'balanced',
-    enabledProviders: new Set(['anthropic', 'openai']),
-    apiKeys: {
-      openai: 'sk-test-123',
+    config: {
+      preset: 'balanced',
+      enabledProviders: new Set(['anthropic', 'openai']),
+      apiKeys: {
+        openai: 'sk-test-123',
+      },
+      overrides: {},
+      geminiThinkingLevel: 3,
     },
-    overrides: {},
-    geminiThinkingLevel: 3,
+    migration: null,
   })),
   getGlobalConfigPath: vi.fn(() => '/test/config.yaml'),
 }));

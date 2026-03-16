@@ -112,12 +112,12 @@ describe('Migration Safety Tests', () => {
         join(agentDir, 'state.json'),
         JSON.stringify({
           issueId: 'TEST-3',
-          workspace: '/test/workspace'
+          workspace: '/test/workspaces/feature-test-3'
         })
       );
 
       // Create session directory with corrupted data
-      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspaces-feature-test-3');
       mkdirSync(sessionDir);
       writeFileSync(
         join(sessionDir, 'session.jsonl'),
@@ -141,12 +141,12 @@ describe('Migration Safety Tests', () => {
         join(agentDir, 'state.json'),
         JSON.stringify({
           issueId: 'TEST-4',
-          workspace: '/test/workspace4'
+          workspace: '/test/workspaces/feature-test-4'
         })
       );
 
       // Create session with main and subagent files
-      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace4');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspaces-feature-test-4');
       const subagentsDir = join(sessionDir, 'subagents');
       mkdirSync(subagentsDir, { recursive: true });
 
@@ -196,11 +196,11 @@ describe('Migration Safety Tests', () => {
         join(agentDir, 'state.json'),
         JSON.stringify({
           issueId: 'TEST-5',
-          workspace: '/test/workspace5'
+          workspace: '/test/workspaces/feature-test-5'
         })
       );
 
-      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace5');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspaces-feature-test-5');
       mkdirSync(sessionDir);
       writeFileSync(
         join(sessionDir, 'session.jsonl'),
@@ -246,11 +246,11 @@ describe('Migration Safety Tests', () => {
         join(agentDir, 'state.json'),
         JSON.stringify({
           issueId: 'TEST-6',
-          workspace: '/test/workspace6'
+          workspace: '/test/workspaces/feature-test-6'
         })
       );
 
-      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace6');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspaces-feature-test-6');
       mkdirSync(sessionDir);
       writeFileSync(
         join(sessionDir, 'session.jsonl'),
@@ -297,11 +297,11 @@ describe('Migration Safety Tests', () => {
         join(agentDir, 'state.json'),
         JSON.stringify({
           issueId: 'TEST-7',
-          workspace: '/test/workspace7'
+          workspace: '/test/workspaces/feature-test-7'
         })
       );
 
-      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspace7');
+      const sessionDir = join(TEST_CLAUDE_DIR, '-test-workspaces-feature-test-7');
       mkdirSync(sessionDir);
 
       // Known values for testing
