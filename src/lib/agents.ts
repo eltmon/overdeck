@@ -432,7 +432,7 @@ function determineModel(options: SpawnOptions): string {
  * still get their issues transitioned correctly without any extra config.
  */
 async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
-  const { config } = loadConfig();
+  const config = loadConfig();
   const trackersConfig = config.trackers;
 
   // Try primary/secondary trackers (may not be configured)
@@ -607,7 +607,7 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
     }
 
     // For non-planner agents, find the planner's session path for parent linking
-    if (options.phase && options.phase !== 'planning') {
+    if (options.phase && (options.phase as string) !== 'planning') {
       const plannerAgentId = `agent-${options.issueId.toLowerCase()}`;
       const plannerState = getAgentState(plannerAgentId);
       if (plannerState?.sageoxSessionPath) {
@@ -643,7 +643,7 @@ exec claude --dangerously-skip-permissions --model ${state.model} "\$prompt"
   }
 
   // For planner agents, capture SageOx session path after it becomes available
-  if (sageoxEnabled && options.phase === 'planning') {
+  if (sageoxEnabled && (options.phase as string) === 'planning') {
     captureSageoxSessionPath(agentId, projectRoot).catch((err) => {
       console.warn(`[agents] Could not capture SageOx session path: ${err.message}`);
     });

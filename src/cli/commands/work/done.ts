@@ -114,7 +114,7 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
     const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
       headers,
     });
-    const currentLabels = labelsRes.ok ? (await labelsRes.json()).map((l: any) => l.name) : [];
+    const currentLabels = labelsRes.ok ? (await labelsRes.json() as any[]).map((l: any) => l.name) : [];
 
     // Clean up workflow labels and get target labels for in_review state
     const targetLabels = cleanupWorkflowLabels(currentLabels, 'in_review');

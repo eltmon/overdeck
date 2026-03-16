@@ -221,7 +221,7 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
       spinner.text = 'Fetching issue from GitHub...';
       const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
       const yamlConfig = loadYamlConfig();
-      const token = yamlConfig.trackerKeys?.github || process.env.GITHUB_TOKEN;
+      const token = yamlConfig.config.trackerKeys?.github || process.env.GITHUB_TOKEN;
       if (!token) {
         spinner.fail('GitHub token not found');
         process.exit(1);

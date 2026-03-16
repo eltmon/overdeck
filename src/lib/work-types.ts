@@ -99,7 +99,11 @@ export const WORK_TYPES = {
     description: 'Synthesizes findings from convoy reviewers',
   },
 
-  // Pre-work agents (4)
+  // Pre-work agents (5)
+  'planning-agent': {
+    category: 'pre-work',
+    description: 'Interactive planning and discovery agent',
+  },
   'prd-agent': {
     category: 'pre-work',
     description: 'Generates Product Requirement Documents',
