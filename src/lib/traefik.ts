@@ -24,7 +24,7 @@ export function generatePanopticonTraefikConfig(): boolean {
     return false;
   }
 
-  const { config } = loadConfig();
+  const config = loadConfig();
   const placeholders: Record<string, string> = {
     TRAEFIK_DOMAIN: config.traefik?.domain || 'pan.localhost',
     DASHBOARD_PORT: String(config.dashboard.port),

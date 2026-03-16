@@ -332,7 +332,7 @@ async function handleRemoteWorkspace(
         try {
           const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
           const yamlConfig = loadYamlConfig();
-          const token = yamlConfig.trackerKeys?.github || process.env.GITHUB_TOKEN;
+          const token = yamlConfig.config.trackerKeys?.github || process.env.GITHUB_TOKEN;
           if (token) {
             const { Octokit } = await import('@octokit/rest');
             const octokit = new Octokit({ auth: token });

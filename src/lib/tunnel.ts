@@ -82,7 +82,7 @@ async function cfFetch(
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
-    const json = await resp.json();
+    const json = await resp.json() as any;
     return { ok: json.success !== false, data: json.result, errors: json.errors };
   } catch (err: any) {
     return { ok: false, data: null, errors: [{ message: err.message }] };

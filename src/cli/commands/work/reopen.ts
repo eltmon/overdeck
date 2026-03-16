@@ -58,8 +58,8 @@ async function fetchIssueWithComments(
   const linearIssue = results.nodes[0];
   const state = await linearIssue.state;
 
-  // Fetch comments
-  const commentsData = await linearIssue.comments();
+  // Fetch comments (IssueSearchResult has the comments() method at runtime via prototype chain)
+  const commentsData = await (linearIssue as any).comments();
   const comments: LinearComment[] = [];
 
   for (const comment of commentsData.nodes) {
@@ -325,7 +325,7 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
       const { getAgentState } = await import('../../../lib/agents.js');
       const agentId = `agent-${id.toLowerCase()}`;
       const agentState = getAgentState(agentId);
-      const agentRunning = agentState?.status === 'active' || agentState?.status === 'running';
+      const agentRunning = agentState?.status === 'running' || agentState?.status === 'starting';
 
       if (agentRunning) {
         console.log(chalk.dim('Agent is still running. Send it context about the re-work:'));

@@ -252,7 +252,7 @@ async function removeTunnelConfig(
   const step = 'teardown:tunnel';
   try {
     const { removeTunnelIngress } = await import('../tunnel.js');
-    const result = await removeTunnelIngress(tunnelConfig, placeholders);
+    const result = await removeTunnelIngress(tunnelConfig, placeholders as any);
     return stepOk(step, result.steps || ['Removed tunnel ingress']);
   } catch (err) {
     return stepSkipped(step, [`Tunnel cleanup warning: ${(err as Error).message}`]);
@@ -269,7 +269,7 @@ async function removeHumeEviConfig(
   const step = 'teardown:hume';
   try {
     const { deleteHumeConfig } = await import('../hume.js');
-    const result = await deleteHumeConfig(humeConfig, placeholders);
+    const result = await deleteHumeConfig(humeConfig, placeholders as any);
     return stepOk(step, result.steps || ['Removed Hume EVI config']);
   } catch (err) {
     return stepSkipped(step, [`Hume cleanup warning: ${(err as Error).message}`]);

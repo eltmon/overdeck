@@ -148,6 +148,12 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
   // PRE-WORK AGENTS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  'planning-agent': [
+    { skill: 'planning', weight: 0.5 }, // Primary skill
+    { skill: 'synthesis', weight: 0.3 }, // Combining requirements
+    { skill: 'documentation', weight: 0.2 }, // Documenting decisions
+  ],
+
   'prd-agent': [
     { skill: 'documentation', weight: 0.5 }, // Primary skill
     { skill: 'planning', weight: 0.3 }, // Structure
