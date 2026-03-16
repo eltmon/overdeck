@@ -3,7 +3,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
@@ -1568,8 +1568,12 @@ export async function syncMainIntoWorkspace(
 /**
  * Look up and run quality gates for the project at projectPath.
  * Returns empty array if no quality gates are configured.
+ *
+ * In polyrepo mode (projectPath is a sub-repo of project.path), only gates
+ * whose `path` field matches the relative sub-repo path are run. Gates with
+ * no `path` field are skipped in polyrepo context.
  */
-async function runProjectQualityGates(
+export async function runProjectQualityGates(
   projectPath: string,
   phase: 'pre_push' | 'post_push'
 ): Promise<import('./validation.js').QualityGateResult[]> {
@@ -1582,8 +1586,28 @@ async function runProjectQualityGates(
       return [];
     }
 
+    // Detect polyrepo context: if projectPath is a subdirectory of project.path,
+    // repoRelPath is non-empty (e.g., 'frontend' or 'backend').
+    const repoRelPath = relative(project.path, projectPath);
+
+    let gatesToRun = project.quality_gates;
+    if (repoRelPath && !repoRelPath.startsWith('..')) {
+      // Polyrepo: only run gates whose path matches this sub-repo
+      const filtered = Object.entries(project.quality_gates).filter(
+        ([, gate]) => gate.path === repoRelPath
+      );
+      if (filtered.length === 0) {
+        console.log(`[merge-agent] No quality gates configured for repo path "${repoRelPath}"`);
+        return [];
+      }
+      gatesToRun = Object.fromEntries(filtered);
+      console.log(
+        `[merge-agent] Polyrepo: running ${Object.keys(gatesToRun).length} gate(s) for path "${repoRelPath}"`
+      );
+    }
+
     console.log(`[merge-agent] Running ${phase} quality gates for project "${project.name}"`);
-    return await runQualityGates(project.quality_gates, projectPath, phase);
+    return await runQualityGates(gatesToRun, projectPath, phase);
   } catch (error: any) {
     console.error(`[merge-agent] Failed to load quality gates: ${error.message}`);
     return [];
