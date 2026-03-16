@@ -25,7 +25,7 @@ import {
 } from './database.js';
 import { initializeEnabledSpecialists } from './specialists.js';
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgents, getAgentState, getAgentRuntimeState } from '../agents.js';
+import { listRunningAgents, getAgentState, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
@@ -306,6 +306,7 @@ export class CloisterService {
           const runtime = getRuntimeForAgent(agent.id);
           if (runtime) {
             runtime.killAgent(agent.id);
+            saveAgentRuntimeState(agent.id, { state: 'idle', lastActivity: new Date().toISOString() });
             killedAgents.push(agent.id);
             console.log(`  ✓ Killed ${agent.id}`);
           }

@@ -20,7 +20,7 @@ import type {
   Agent,
   ActivitySource,
 } from './types.js';
-import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentState } from '../agents.js';
+import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentState, saveAgentRuntimeState } from '../agents.js';
 import { sessionExists, killSession, sendKeys, sendKeysAsync, getAgentSessions } from '../tmux.js';
 import { parseClaudeSession, getSessionFiles, getProjectDirs } from '../cost-parsers/jsonl-parser.js';
 
@@ -322,6 +322,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     }
 
     killSession(agentId);
+
+    // Reset runtime state so deacon / merge-agent busy-wait don't see a phantom active session
+    saveAgentRuntimeState(agentId, { state: 'idle', lastActivity: new Date().toISOString() });
 
     // Update agent state
     const state = getAgentState(agentId);

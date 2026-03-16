@@ -1056,7 +1056,7 @@ Report any issues or conflicts you encountered.`;
   // "Interrupted" behavior — the running tool gets cancelled and the
   // previous merge is abandoned mid-flight.
   if (mergeProjectKey) {
-    const { getAgentRuntimeState } = await import('../agents.js');
+    const { getAgentRuntimeState, saveAgentRuntimeState } = await import('../agents.js');
     const IDLE_POLL_INTERVAL = 3000; // 3 seconds
     const IDLE_MAX_WAIT = 360000; // 6 minutes (slightly longer than specialist timeout)
     const idleStart = Date.now();
@@ -1065,6 +1065,16 @@ Report any issues or conflicts you encountered.`;
       const state = getAgentRuntimeState(mergeSession);
       if (!state || state.state === 'idle' || state.state === 'suspended') {
         break; // Specialist is idle, safe to send
+      }
+      // Dead-session check: if runtime.json says active but tmux session is gone,
+      // the specialist died without resetting state. Reset to idle and proceed immediately.
+      try {
+        await execAsync(`tmux has-session -t "${mergeSession}" 2>/dev/null`);
+      } catch {
+        // tmux has-session exits non-zero when the session does not exist
+        console.log(`[merge-agent] Specialist session ${mergeSession} is dead (state was ${state.state}), resetting to idle`);
+        saveAgentRuntimeState(mergeSession, { state: 'idle', lastActivity: new Date().toISOString() });
+        break;
       }
       console.log(`[merge-agent] Specialist busy (state: ${state.state}, issue: ${state.currentIssue}), waiting...`);
       await new Promise(resolve => setTimeout(resolve, IDLE_POLL_INTERVAL));
