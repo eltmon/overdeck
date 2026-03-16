@@ -413,12 +413,29 @@ Auto-created PR for ${issueId}
  * but closeIssue is idempotent (transitioning an already-Done issue is a no-op), so calling
  * it from both places is safe and ensures the transition happens even when polling fails.
  */
+// Track in-flight postMergeLifecycle calls to prevent infinite loops
+const _postMergeInFlight = new Set<string>();
+
 function onMergeComplete(issueId: string): void {
+  // Guard: skip if already merged (prevents infinite loop from /api/specialists/done re-triggering)
+  const existingStatus = getReviewStatus(issueId);
+  if (existingStatus?.mergeStatus === 'merged') {
+    console.log(`[merge] onMergeComplete: skipping ${issueId} — already merged`);
+    return;
+  }
+
+  // Guard: skip if postMergeLifecycle is already running for this issue
+  if (_postMergeInFlight.has(issueId)) {
+    console.log(`[merge] onMergeComplete: skipping ${issueId} — postMergeLifecycle already in flight`);
+    return;
+  }
+
   // Resolve project path from issue prefix
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
 
   // Fire-and-forget — don't block the HTTP response
+  _postMergeInFlight.add(issueId);
   (async () => {
     try {
       const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
@@ -426,6 +443,8 @@ function onMergeComplete(issueId: string): void {
       console.log(`[merge] onMergeComplete: post-merge lifecycle completed for ${issueId}`);
     } catch (err) {
       console.error(`[merge] onMergeComplete: post-merge lifecycle failed for ${issueId}:`, err);
+    } finally {
+      _postMergeInFlight.delete(issueId);
     }
   })();
 }
@@ -6806,9 +6825,17 @@ app.post('/api/specialists/done', async (req, res) => {
     }
   }
 
-  // When merge specialist reports success, log awaiting close-out
+  // When merge specialist reports success, run post-merge lifecycle ONCE
+  // Guard: only trigger if not already merged (prevents infinite loop)
   if (specialist === 'merge' && status === 'passed') {
-    onMergeComplete(normalizedIssueId);
+    const currentStatus = getReviewStatus(normalizedIssueId);
+    if (currentStatus?.mergeStatus !== 'merged') {
+      // Set merged BEFORE calling onMergeComplete to prevent re-entry
+      setReviewStatus(normalizedIssueId, { mergeStatus: 'merged', readyForMerge: false });
+      onMergeComplete(normalizedIssueId);
+    } else {
+      console.log(`[specialists/done] Skipping onMergeComplete for ${normalizedIssueId} — already merged`);
+    }
   }
 
   res.json({
