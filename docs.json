@@ -83,6 +83,10 @@
       }
     ]
   },
+  "metadata": {
+    "og:image": "/docs/screenshot-board.png",
+    "og:type": "website"
+  },
   "footerSocials": {
     "github": "https://github.com/eltmon/panopticon-cli"
   },
