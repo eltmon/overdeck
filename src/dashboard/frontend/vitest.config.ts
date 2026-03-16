@@ -4,6 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  cacheDir: '../../../.cache/vitest-frontend',
   test: {
     globals: true,
     environment: 'jsdom',
