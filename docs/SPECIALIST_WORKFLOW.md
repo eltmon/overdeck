@@ -83,6 +83,10 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 4. Work agent reads .planning/STATE.md and implements remaining work
 ```
 
+### Beads Prerequisite
+
+Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. The planning agent must create beads via `bd create` before handing off to implementation.
+
 ### Handling Pre-Existing PRDs
 
 A PRD may already exist in `docs/prds/active/` or `docs/prds/drafts/` before the planning agent runs — e.g., written manually or by a previous session. The planning agent handles three cases:
@@ -449,15 +453,19 @@ When the circuit breaker fires, the human should:
 
 ```
 Agent runs `pan work done` (Bash command)
-  → Auto-triggers review-agent
-    → review-agent reviews code
-      → APPROVED → queues test-agent
-        → test-agent runs tests
-          → PASS → marks ready for merge (human clicks MERGE or merge-agent handles)
-          → FAIL → feedback to .planning/feedback/ → agent fixes → re-requests review
-      → CHANGES REQUESTED → feedback to .planning/feedback/ → agent fixes → re-requests review
-        → This cycle repeats up to 3 times before circuit breaker trips
+  → Verification gate runs quality_gates from projects.yaml (typecheck, lint, test)
+    → FAIL → feedback sent to agent's tmux session, completion NOT marked as processed (agent retries)
+    → PASS → wake review-agent
+      → review-agent reviews code
+        → APPROVED → queues test-agent
+          → test-agent runs tests
+            → PASS → marks ready for merge (human clicks MERGE or merge-agent handles)
+            → FAIL → feedback to .planning/feedback/ → agent fixes → re-requests review
+        → CHANGES REQUESTED → feedback to .planning/feedback/ → agent fixes → re-requests review
+          → This cycle repeats up to 3 times before circuit breaker trips
 ```
+
+The verification gate (PAN-174) runs between agent completion and review-agent wake. It executes the `quality_gates` defined in `projects.yaml` (typecheck, lint, test). If any gate fails, feedback is sent to the agent's tmux session and the completion marker is NOT processed, allowing the agent to fix issues and re-signal completion. After 3 consecutive failures, the gate is bypassed to prevent permanent blocking. See `src/lib/cloister/verification-gate.ts`.
 
 ### Key API Endpoints
 

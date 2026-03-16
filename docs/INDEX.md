@@ -156,6 +156,7 @@
 - **"messaging"** / **"messageAgent"** → CLAUDE.md
 - **"completion"** / **"work complete"** → CLAUDE.md
 - **"beads"** / **"tasks"** → CLAUDE.md
+- **"verification gate"** / **"quality gates"** → SPECIALIST_WORKFLOW.md (Full Review Flow), `src/lib/cloister/verification-gate.ts`
 
 ### UI/UX
 - **"settings"** / **"settings page"** → SETTINGS-UI-DESIGN.md
