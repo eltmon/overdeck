@@ -61,6 +61,26 @@ await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
 
 Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
 
+## Verification Gate (PAN-174)
+
+After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
+before waking the review-agent. If typecheck/lint/test fail, feedback is sent to the
+agent's tmux session and the completion marker is NOT processed (allowing retry).
+After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
+
+## Beads Enforcement
+
+Work agents cannot start without beads tasks in the workspace. The start-agent endpoint
+returns 422 if `.beads/issues.jsonl` does not exist. Planning must create beads via
+`bd create` before handing off to implementation.
+
+## CRITICAL: postMergeLifecycle Idempotency
+
+`onMergeComplete()` and `/api/specialists/done` have idempotency guards to prevent
+infinite loops. NEVER remove these guards. The loop: specialists/done → onMergeComplete
+→ postMergeLifecycle → (re-trigger) → specialists/done burned 24,626 Linear API calls
+before guards were added (PAN-328).
+
 ## CRITICAL: Deep-Wipe Destroys Everything — NEVER Run Without Explicit User Confirmation
 
 The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace: true` is **irreversible** and destroys:
