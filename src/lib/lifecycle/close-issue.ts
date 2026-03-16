@@ -184,10 +184,25 @@ async function closeGitHubPr(ctx: LifecycleContext): Promise<StepResult> {
 }
 
 /**
+ * Rate limit circuit breaker for Linear API.
+ * After hitting a rate limit, stop all Linear API calls for COOLDOWN_MS.
+ * This prevents the 24,626-call storm that exhausted Linear's 5000 req/hr limit (PAN-328).
+ */
+let _linearRateLimitUntil = 0;
+const LINEAR_RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour (matches Linear's 5000/hr window)
+
+/**
  * Close a Linear issue via SDK (find by identifier, transition to Done).
  */
 async function closeLinearDirect(ctx: LifecycleContext, apiKey: string): Promise<StepResult> {
   const step = 'close-issue:transition';
+
+  // Circuit breaker: if we recently hit a rate limit, fail fast without making API calls
+  if (Date.now() < _linearRateLimitUntil) {
+    const remainingMin = Math.ceil((_linearRateLimitUntil - Date.now()) / 60000);
+    return stepFailed(step, `Linear rate limit cooldown active (${remainingMin}min remaining). Issue will be closed during close-out ceremony.`);
+  }
+
   try {
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
@@ -219,7 +234,16 @@ async function closeLinearDirect(ctx: LifecycleContext, apiKey: string): Promise
 
     return stepOk(step, [`Moved Linear issue ${ctx.issueId} to Done`]);
   } catch (err) {
-    return stepFailed(step, `Linear close failed: ${(err as Error).message}`);
+    const message = (err as Error).message;
+
+    // Detect rate limit errors and activate circuit breaker
+    if (message.includes('Rate limit') || message.includes('rate limit') || message.includes('429')) {
+      _linearRateLimitUntil = Date.now() + LINEAR_RATE_LIMIT_COOLDOWN_MS;
+      console.warn(`[close-issue] Linear rate limit hit — circuit breaker activated for 1 hour`);
+      return stepFailed(step, `Linear rate limit exceeded. Circuit breaker activated — no Linear API calls for 1 hour. Issue will be closed during close-out ceremony.`);
+    }
+
+    return stepFailed(step, `Linear close failed: ${message}`);
   }
 }
 

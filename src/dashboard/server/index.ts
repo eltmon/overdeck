@@ -410,21 +410,31 @@ Auto-created PR for ${issueId}
  *
  * This is the authoritative "issue is merged" handler at the server level.
  * postMergeLifecycle may also run inside spawnMergeAgentForBranches when polling succeeds,
- * but closeIssue is idempotent (transitioning an already-Done issue is a no-op), so calling
- * it from both places is safe and ensures the transition happens even when polling fails.
+ * but postMergeLifecycle is itself idempotent (tracks completed issues internally), so
+ * calling it from both places is safe.
+ *
+ * THREE layers of defense against the infinite loop (PAN-328):
+ *   1. onMergeComplete checks mergeStatus === 'merged' (server-level guard)
+ *   2. onMergeComplete checks _postMergeInFlight Set (concurrency guard)
+ *   3. postMergeLifecycle checks its own _completedPostMerge Set (defense-in-depth)
  */
-// Track in-flight postMergeLifecycle calls to prevent infinite loops
+// Track in-flight postMergeLifecycle calls to prevent concurrent execution
 const _postMergeInFlight = new Set<string>();
 
+// Track issues where the server is managing the merge lifecycle (polyrepo merges).
+// When set, /api/specialists/done calls for these issues are acknowledged but
+// do NOT trigger onMergeComplete — the server handles it after all repos are done.
+const _serverManagedMerges = new Set<string>();
+
 function onMergeComplete(issueId: string): void {
-  // Guard: skip if already merged (prevents infinite loop from /api/specialists/done re-triggering)
+  // Guard 1: skip if already merged (prevents infinite loop from /api/specialists/done re-triggering)
   const existingStatus = getReviewStatus(issueId);
   if (existingStatus?.mergeStatus === 'merged') {
     console.log(`[merge] onMergeComplete: skipping ${issueId} — already merged`);
     return;
   }
 
-  // Guard: skip if postMergeLifecycle is already running for this issue
+  // Guard 2: skip if postMergeLifecycle is already running for this issue
   if (_postMergeInFlight.has(issueId)) {
     console.log(`[merge] onMergeComplete: skipping ${issueId} — postMergeLifecycle already in flight`);
     return;
@@ -439,6 +449,7 @@ function onMergeComplete(issueId: string): void {
   (async () => {
     try {
       const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
+      // Guard 3 is inside postMergeLifecycle itself (_completedPostMerge Set)
       await postMergeLifecycle(issueId, projectPath);
       console.log(`[merge] onMergeComplete: post-merge lifecycle completed for ${issueId}`);
     } catch (err) {
@@ -6785,6 +6796,21 @@ app.post('/api/specialists/done', async (req, res) => {
   const normalizedIssueId = issueId.toUpperCase();
   console.log(`[specialists/done] ${specialist} signaling ${status} for ${normalizedIssueId}`);
 
+  // GUARD: If this issue is in a server-managed merge (polyrepo), the server handles
+  // the merge lifecycle. Acknowledge the agent's call but do NOT trigger onMergeComplete.
+  // This prevents the dual-trigger bug where both the agent and the server run postMergeLifecycle.
+  if (specialist === 'merge' && _serverManagedMerges.has(normalizedIssueId)) {
+    console.log(`[specialists/done] ${normalizedIssueId} is server-managed merge — acknowledging without triggering lifecycle`);
+    return res.json({
+      success: true,
+      specialist,
+      issueId: normalizedIssueId,
+      status,
+      notes,
+      serverManaged: true,
+    });
+  }
+
   // Build the update based on specialist type
   const update: Partial<ReviewStatus> = {};
 
@@ -6807,30 +6833,45 @@ app.post('/api/specialists/done', async (req, res) => {
   // Apply the update (this triggers all the side effects like idle state, queue processing)
   const updatedStatus = setReviewStatus(normalizedIssueId, update);
 
-  // Set specialist state to idle
-  const { getTmuxSessionName, checkSpecialistQueue, completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
-  const tmuxSession = getTmuxSessionName(`${specialist}-agent` as any);
-  saveAgentRuntimeState(tmuxSession, {
-    state: 'idle',
-    lastActivity: new Date().toISOString(),
-  });
-  console.log(`[specialists/done] Set ${specialist}-agent to idle`);
+  // Set specialist state to idle and clear queue.
+  // CRITICAL: No `await` between the mergeStatus write above and the guard check below.
+  // The previous code had `await import()` here which yielded the event loop, allowing
+  // concurrent requests to interleave and bypass the guard. Use a sync import cache instead.
+  try {
+    const { getTmuxSessionName, checkSpecialistQueue, completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
+    const tmuxSession = getTmuxSessionName(`${specialist}-agent` as any);
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+    console.log(`[specialists/done] Set ${specialist}-agent to idle`);
 
-  // Clear this issue from the specialist's queue
-  const queue = checkSpecialistQueue(`${specialist}-agent` as any);
-  for (const item of queue.items) {
-    if (item.payload?.issueId?.toLowerCase() === normalizedIssueId.toLowerCase()) {
-      completeSpecialistTask(`${specialist}-agent` as any, item.id);
-      console.log(`[specialists/done] Cleared ${normalizedIssueId} from ${specialist}-agent queue`);
+    // Clear this issue from the specialist's queue
+    const queue = checkSpecialistQueue(`${specialist}-agent` as any);
+    for (const item of queue.items) {
+      if (item.payload?.issueId?.toLowerCase() === normalizedIssueId.toLowerCase()) {
+        completeSpecialistTask(`${specialist}-agent` as any, item.id);
+        console.log(`[specialists/done] Cleared ${normalizedIssueId} from ${specialist}-agent queue`);
+      }
     }
+  } catch (err) {
+    console.error(`[specialists/done] Error managing specialist state:`, err);
   }
 
-  // When merge specialist reports success, run post-merge lifecycle ONCE
-  // Guard: only trigger if not already merged (prevents infinite loop)
+  // When merge specialist reports success, run post-merge lifecycle ONCE.
+  // THREE guards prevent infinite loops:
+  //   1. mergeStatus === 'merged' check here (set by setReviewStatus above)
+  //   2. onMergeComplete's own mergeStatus + _postMergeInFlight guards
+  //   3. postMergeLifecycle's own _completedPostMerge guard
   if (specialist === 'merge' && status === 'passed') {
+    // Re-read AFTER the status write to get the authoritative state.
+    // The setReviewStatus call above already wrote mergeStatus='merged' to disk (sync).
     const currentStatus = getReviewStatus(normalizedIssueId);
     if (currentStatus?.mergeStatus !== 'merged') {
-      // Set merged BEFORE calling onMergeComplete to prevent re-entry
+      // This branch should rarely execute: setReviewStatus above set mergeStatus='merged',
+      // so getReviewStatus should return 'merged'. If we get here, something reset the status
+      // concurrently — set it again and proceed.
+      console.warn(`[specialists/done] mergeStatus was reset for ${normalizedIssueId} after write — re-setting and triggering lifecycle`);
       setReviewStatus(normalizedIssueId, { mergeStatus: 'merged', readyForMerge: false });
       onMergeComplete(normalizedIssueId);
     } else {
@@ -7311,6 +7352,12 @@ app.post('/api/workspaces/:issueId/reset-review', async (req, res) => {
       verificationCycleCount: 0,
     });
 
+    // Reset postMergeLifecycle completion tracking so the issue can be re-merged
+    try {
+      const { resetPostMergeState } = await import('../../lib/cloister/merge-agent.js');
+      resetPostMergeState(issueId);
+    } catch { /* non-fatal */ }
+
     console.log(`[reset-review] Pipeline state reset for ${issueId} — awaiting agent to request review`);
 
     return res.json({
@@ -7440,6 +7487,12 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
 
   // Mark merge as in progress
   setReviewStatus(issueId, { mergeStatus: 'merging' });
+
+  // Track as server-managed merge. This prevents /api/specialists/done from triggering
+  // onMergeComplete — the server handles the lifecycle after all repos are merged.
+  // The agent's call to /api/specialists/done is acknowledged but has no side effects.
+  const normalizedMergeId = issueId.toUpperCase();
+  _serverManagedMerges.add(normalizedMergeId);
 
   // Mark operation as pending
   setPendingOperation(issueId, 'merge');
@@ -7673,6 +7726,10 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
     setReviewStatus(issueId, { mergeStatus: 'failed' });
     completePendingOperation(issueId, error.message);
     return res.status(500).json({ error: error.message });
+  } finally {
+    // Always clear server-managed merge tracking when the endpoint completes.
+    // After this point, /api/specialists/done calls are handled normally.
+    _serverManagedMerges.delete(normalizedMergeId);
   }
 });
 
@@ -11033,6 +11090,13 @@ app.post('/api/issues/:id/reopen', async (req, res) => {
       console.log(`Reopened issue ${id} - moved to ${newState}`);
       issueDataService.invalidateTracker('linear').catch(() => {});
     }
+
+    // Reset postMergeLifecycle completion tracking so the issue can be re-merged
+    try {
+      const { resetPostMergeState } = await import('../../lib/cloister/merge-agent.js');
+      resetPostMergeState(id);
+      resetPostMergeState(id.toUpperCase());
+    } catch { /* non-fatal */ }
 
     // Reset workspace state (specialist statuses, queue items, STATE.md)
     const workspaceInfo = getWorkspaceInfoForIssue(id);
@@ -14616,6 +14680,26 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log('Pipeline event handler wired (Socket.io push + immediate queue processing)');
   } catch (error: any) {
     console.error('Failed to wire pipeline handler:', error.message);
+  }
+
+  // BUILD FRESHNESS CHECK: Warn if the compiled server.js is older than the latest commit.
+  // This catches the exact scenario that caused PAN-328: guards were added in source but
+  // the server was running a stale build without them.
+  try {
+    const { statSync } = await import('fs');
+    const { execSync } = await import('child_process');
+    const serverJsPath = join(__dirname, 'server.js');
+    const serverJsStat = statSync(serverJsPath);
+    const latestCommitTime = execSync('git log -1 --format=%ct', { cwd: join(__dirname, '..', '..'), encoding: 'utf-8' }).trim();
+    const commitDate = new Date(parseInt(latestCommitTime, 10) * 1000);
+    if (serverJsStat.mtime < commitDate) {
+      const staleSecs = Math.round((commitDate.getTime() - serverJsStat.mtime.getTime()) / 1000);
+      console.warn(`[startup] ⚠ STALE BUILD: server.js (${serverJsStat.mtime.toISOString()}) is ${staleSecs}s older than latest commit (${commitDate.toISOString()}). Run 'npm run build' to update.`);
+    } else {
+      console.log(`[startup] Build freshness OK: server.js is up to date with latest commit`);
+    }
+  } catch {
+    // Non-fatal — skip check if git is unavailable or paths don't resolve
   }
 
   // Reconcile stuck mergeStatus: 'merging' entries from prior server crashes.
