@@ -22,20 +22,16 @@ Spawn AI agents from a dashboard. Route tasks to the right model. Review, test, 
 
 ## How It Works
 
-```
- Issue         PRD           Agent         Review        Test          Merge
-┌──────┐    ┌──────┐    ┌──────────┐    ┌──────┐    ┌──────┐    ┌──────────┐
-│ Task │ ─► │ Plan │ ─► │ Write    │ ─► │ Code │ ─► │ Run  │ ─► │ PR       │
-│ from │    │ with │    │ code in  │    │ rev. │    │ test │    │ merged   │
-│ any  │    │ Opus │    │ isolated │    │ by   │    │ by   │    │ by       │
-│track-│    │      │    │ worktree │    │ spec-│    │ spec-│    │ spec-    │
-│ er   │    │      │    │          │    │ialist│    │ialist│    │ ialist   │
-└──────┘    └──────┘    └──────────┘    └──────┘    └──────┘    └──────────┘
- GitHub       Opus        Kimi/Sonnet    Opus        Sonnet       Sonnet
- Linear                   (routed)
- GitLab
- Jira
- Rally
+```mermaid
+flowchart LR
+    Issue["🎫 Issue\nGitHub · Linear\nGitLab · Jira · Rally"]
+    PRD["📋 PRD\nPlan with Opus"]
+    Agent["⚡ Agent\nWrite code in\nisolated worktree\n(Kimi/Sonnet — routed)"]
+    Review["🔍 Review\nCode review\nby specialist\n(Opus)"]
+    Test["🧪 Test\nRun tests\nby specialist\n(Sonnet)"]
+    Merge["✅ Merge\nPR merged\nby specialist\n(Sonnet)"]
+
+    Issue --> PRD --> Agent --> Review --> Test --> Merge
 ```
 
 Create a workspace, and Panopticon handles the rest: planning with Opus, implementation with your configured model, automated code review, test execution, and merge — the only manual step is clicking **MERGE** when you're satisfied.
