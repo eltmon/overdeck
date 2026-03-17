@@ -202,12 +202,13 @@ import {
   clearReviewStatus,
 } from './review-status.js';
 
-// Wrapper that adds auto-PR creation logic on top of the base setReviewStatus
+// Wrapper that adds auto-PR creation, Linear status update, and auto-merge trigger
+// on top of the base setReviewStatus.
 function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): ReviewStatus {
   const existing = getReviewStatus(issueId);
   const wasReadyForMerge = existing?.readyForMerge ?? false;
 
-  const updated = setReviewStatusBase(issueId, update);
+  let updated = setReviewStatusBase(issueId, update);
 
   // Clear stale pending operations when review/test succeeds.
   // A prior attempt may have failed (e.g. transient "Workspace does not exist")
@@ -221,31 +222,48 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
     }
   }
 
-  // Auto-create PR when ready for merge transitions from false to true
   const becameReadyForMerge = updated.readyForMerge && !wasReadyForMerge;
-  if (becameReadyForMerge && !updated.prUrl) {
-    console.log(`[pr] Issue ${issueId} is ready for merge, auto-creating PR...`);
-    ensurePRExists(issueId).then(result => {
-      if (result.prUrl) {
-        const freshStatuses = loadReviewStatuses();
-        if (freshStatuses[issueId]) {
-          freshStatuses[issueId].prUrl = result.prUrl;
-          saveReviewStatuses(freshStatuses);
-          console.log(`[pr] Updated ${issueId} with PR URL: ${result.prUrl}`);
-        }
-      } else if (result.error) {
-        console.error(`[pr] Failed to create PR for ${issueId}: ${result.error}`);
-      }
-    }).catch(err => {
-      console.error(`[pr] Error creating PR for ${issueId}:`, err);
-    });
-  }
-
-  // Update Linear status to "In Review" when readyForMerge transitions to true
   if (becameReadyForMerge) {
+    // Auto-create PR
+    if (!updated.prUrl) {
+      console.log(`[pr] Issue ${issueId} is ready for merge, auto-creating PR...`);
+      ensurePRExists(issueId).then(result => {
+        if (result.prUrl) {
+          const freshStatuses = loadReviewStatuses();
+          if (freshStatuses[issueId]) {
+            freshStatuses[issueId].prUrl = result.prUrl;
+            saveReviewStatuses(freshStatuses);
+            console.log(`[pr] Updated ${issueId} with PR URL: ${result.prUrl}`);
+          }
+        } else if (result.error) {
+          console.error(`[pr] Failed to create PR for ${issueId}: ${result.error}`);
+        }
+      }).catch(err => {
+        console.error(`[pr] Error creating PR for ${issueId}:`, err);
+      });
+    }
+
+    // Update Linear status to "In Review"
     updateLinearIssueStatus(issueId, 'In Review').catch(err => {
       console.error(`[status] Error updating Linear to In Review for ${issueId}:`, err);
     });
+
+    // Auto-trigger merge. Guards: skip if already merging/merged, or if a pending
+    // merge op is actively running (prevents double-merge on rapid status updates).
+    if (updated.mergeStatus !== 'merging' && updated.mergeStatus !== 'merged') {
+      const pendingOp = getPendingOperation(issueId);
+      const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
+      if (!activelyMerging) {
+        console.log(`[merge] Auto-triggering merge for ${issueId}`);
+        // triggerMerge runs synchronously up to its first await, setting
+        // mergeStatus='merging' before yielding. Re-read so the return value
+        // of this wrapper reflects the updated state to callers and the dashboard.
+        triggerMerge(issueId).catch(err => {
+          console.error(`[merge] Auto-merge failed for ${issueId}:`, err);
+        });
+        updated = getReviewStatus(issueId) ?? updated;
+      }
+    }
   }
 
   return updated;
@@ -7437,31 +7455,58 @@ app.post('/api/workspaces/:issueId/sync-main', async (req, res) => {
   }
 });
 
-// Merge workspace: ONLY merges (requires review+test to have passed first)
-// SAFETY: Never delete remote branches. Always push before cleanup. Abort on any error.
-app.post('/api/workspaces/:issueId/merge', async (req, res) => {
-  const { issueId } = req.params;
+// Result type for triggerMerge — carries the HTTP status code so the endpoint
+// can translate it, and auto-merge callers can log failures without needing
+// to reconstruct the reason.
+interface TriggerMergeResult {
+  success: boolean;
+  statusCode: number;
+  error?: string;
+  message?: string;
+  reviewStatus?: string;
+  testStatus?: string;
+  mergeStatus?: string;
+  prUrl?: string;
+  remote?: boolean;
+  repos?: Array<{ repo: string; success: boolean; message: string; testsStatus?: string }>;
+  testsStatus?: string;
+  note?: string;
+  mergeResult?: unknown;
+}
 
-  // Check review status - must be ready for merge
+/**
+ * Execute the full merge flow for an issue.
+ *
+ * Validates readyForMerge, applies mergeStatus guards, resolves workspace info,
+ * and runs the appropriate merge path (remote PR, polyrepo, or monorepo).
+ * Returns a TriggerMergeResult whose statusCode the HTTP endpoint can use
+ * directly; auto-merge callers (setReviewStatus, deacon) discard the statusCode.
+ */
+async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
+  // Validate readyForMerge
   const reviewStatus = getReviewStatus(issueId);
   if (!reviewStatus?.readyForMerge) {
-    return res.status(400).json({
+    return {
+      success: false,
+      statusCode: 400,
       error: 'Cannot merge: review and tests have not passed yet',
       reviewStatus: reviewStatus?.reviewStatus || 'pending',
       testStatus: reviewStatus?.testStatus || 'pending',
-    });
+    };
   }
 
-  // Check if already merging — but only block if the pending op is still actively running.
+  // Check if already merging — only block if the pending op is still actively running.
   // If the server crashed mid-merge the pending op will be timed-out/absent; allow retry.
   if (reviewStatus?.mergeStatus === 'merging') {
     const pendingOp = getPendingOperation(issueId);
     const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
     if (activelyMerging) {
-      return res.status(400).json({
+      return {
+        success: false,
+        statusCode: 400,
         error: 'Merge already in progress',
         mergeStatus: 'merging',
-      });
+      };
     }
     // Pending op is gone or timed out — clear the stuck state and fall through to retry
     console.log(`[merge] Clearing stuck mergeStatus for ${issueId} (pending op: ${pendingOp?.status ?? 'absent'})`);
@@ -7470,10 +7515,12 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
 
   // Check if already merged
   if (reviewStatus?.mergeStatus === 'merged') {
-    return res.status(400).json({
+    return {
+      success: false,
+      statusCode: 400,
       error: 'Already merged',
       mergeStatus: 'merged',
-    });
+    };
   }
 
   const issuePrefix = issueId.split('-')[0];
@@ -7490,25 +7537,24 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
 
   // Track as server-managed merge. This prevents /api/specialists/done from triggering
   // onMergeComplete — the server handles the lifecycle after all repos are merged.
-  // The agent's call to /api/specialists/done is acknowledged but has no side effects.
   const normalizedMergeId = issueId.toUpperCase();
   _serverManagedMerges.add(normalizedMergeId);
 
   // Mark operation as pending
   setPendingOperation(issueId, 'merge');
 
-  // REMOTE WORKSPACE: Merge via GitHub PR
-  if (workspaceInfo.isRemote && workspaceInfo.vmName) {
-    console.log(`[merge] Remote workspace detected for ${issueId}, using GitHub PR merge...`);
+  try {
+    // REMOTE WORKSPACE: Merge via GitHub PR
+    if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+      console.log(`[merge] Remote workspace detected for ${issueId}, using GitHub PR merge...`);
 
-    try {
       // Ensure PR exists
       const prResult = await ensurePRExists(issueId);
       if (!prResult.prUrl) {
         const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
         setReviewStatus(issueId, { mergeStatus: 'failed' });
         completePendingOperation(issueId, error);
-        return res.status(400).json({ error });
+        return { success: false, statusCode: 400, error };
       }
 
       // Extract PR number from URL
@@ -7517,47 +7563,47 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
         const error = `Could not parse PR number from URL: ${prResult.prUrl}`;
         setReviewStatus(issueId, { mergeStatus: 'failed' });
         completePendingOperation(issueId, error);
-        return res.status(400).json({ error });
+        return { success: false, statusCode: 400, error };
       }
       const prNumber = prMatch[1];
 
-      // Merge the PR via GitHub CLI (squash merge, do NOT delete branch)
-      console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
-      const { stdout: mergeOutput } = await execAsync(
-        `gh pr merge ${prNumber} --repo eltmon/panopticon-cli --squash`,
-        { encoding: 'utf-8' }
-      );
-      console.log(`[merge] PR merge output: ${mergeOutput}`);
+      try {
+        // Merge the PR via GitHub CLI (squash merge, do NOT delete branch)
+        console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
+        const { stdout: mergeOutput } = await execAsync(
+          `gh pr merge ${prNumber} --repo eltmon/panopticon-cli --squash`,
+          { encoding: 'utf-8' }
+        );
+        console.log(`[merge] PR merge output: ${mergeOutput}`);
 
-      // Mark as merged (keep status so frontend shows "MERGED" instead of clearing)
-      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
-      completePendingOperation(issueId, null);
+        // Mark as merged (keep status so frontend shows "MERGED" instead of clearing)
+        setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+        completePendingOperation(issueId, null);
 
-      // Close the issue
-      onMergeComplete(issueId);
+        // Close the issue
+        onMergeComplete(issueId);
 
-      return res.json({
-        success: true,
-        message: `Successfully merged PR #${prNumber} for ${issueId}`,
-        prUrl: prResult.prUrl,
-        remote: true,
-      });
-    } catch (error: any) {
-      console.error(`[merge] Remote merge failed for ${issueId}:`, error);
-      setReviewStatus(issueId, { mergeStatus: 'failed' });
-      completePendingOperation(issueId, error.message);
-      return res.status(500).json({
-        error: `Remote merge failed: ${error.message}`,
-      });
+        return {
+          success: true,
+          statusCode: 200,
+          message: `Successfully merged PR #${prNumber} for ${issueId}`,
+          prUrl: prResult.prUrl,
+          remote: true,
+        };
+      } catch (remoteErr: any) {
+        console.error(`[merge] Remote merge failed for ${issueId}:`, remoteErr);
+        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        completePendingOperation(issueId, remoteErr.message);
+        return { success: false, statusCode: 500, error: `Remote merge failed: ${remoteErr.message}` };
+      }
     }
-  }
 
-  // LOCAL WORKSPACE: Use merge-agent for local git merge
-  try {
+    // LOCAL WORKSPACE: Use merge-agent for local git merge
+
     // 1. Check workspace exists
     if (!existsSync(workspacePath)) {
       completePendingOperation(issueId, 'Workspace does not exist');
-      return res.status(400).json({ error: 'Workspace does not exist' });
+      return { success: false, statusCode: 400, error: 'Workspace does not exist' };
     }
 
     // 2. Check if this is a polyrepo project
@@ -7565,7 +7611,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
     const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
 
     if (isPolyrepo && projectConfig?.workspace?.repos) {
-      // POLYREPO MERGE: Use merge-agent per repo (same as monorepo path)
+      // POLYREPO MERGE: Use merge-agent per repo
       console.log(`[merge] Polyrepo detected for ${issueId}, using merge-agent per repo...`);
       const repos = projectConfig.workspace.repos;
       const defaultBranch = projectConfig.workspace.default_branch || 'main';
@@ -7649,7 +7695,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
         const error = `Polyrepo merge failed for: ${failedRepos.map(r => `${r.repo} (${r.message})`).join(', ')}`;
         setReviewStatus(issueId, { mergeStatus: 'failed' });
         completePendingOperation(issueId, error);
-        return res.status(500).json({ error, repos: mergeResults });
+        return { success: false, statusCode: 500, error, repos: mergeResults };
       }
 
       console.log(`[merge] Polyrepo merge complete for ${issueId}: ${reposWithChanges.length} repo(s) merged`);
@@ -7659,15 +7705,16 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       // Close the issue after successful merge
       onMergeComplete(issueId);
 
-      return res.json({
+      return {
         success: true,
+        statusCode: 200,
         message: `Polyrepo merge complete for ${issueId}`,
         repos: mergeResults,
-      });
+      };
     }
 
     // MONOREPO / SINGLE-REPO: Use merge-agent for local git merge
-    // 2. Push the feature branch to remote BEFORE merging (preserve work)
+    // Push the feature branch to remote BEFORE merging (preserve work)
     try {
       await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
       console.log(`Pushed ${branchName} to remote`);
@@ -7675,7 +7722,7 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       console.log(`Feature branch push note: ${pushErr.message}`);
     }
 
-    // 3. Spawn merge-agent to handle the merge
+    // Spawn merge-agent to handle the merge
     const { spawnMergeAgentForBranches } = await import('../../lib/cloister/merge-agent.js');
 
     console.log(`[merge] Starting merge-agent for ${issueId}...`);
@@ -7691,46 +7738,51 @@ app.post('/api/workspaces/:issueId/merge', async (req, res) => {
       console.log(`[merge] Successfully merged ${issueId}`);
       setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
       completePendingOperation(issueId, null);
-
-      // Close the issue after successful merge
       onMergeComplete(issueId);
-
-      return res.json({
+      return {
         success: true,
+        statusCode: 200,
         message: `Successfully merged ${issueId} to main and closed issue`,
         testsStatus: 'PASS',
-      });
+      };
     } else if (mergeResult.success) {
       console.log(`[merge] Merged ${issueId} (tests: ${mergeResult.testsStatus})`);
       setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
       completePendingOperation(issueId, null);
-
-      // Close the issue after successful merge (even if tests skipped)
       onMergeComplete(issueId);
-
-      return res.json({
+      return {
         success: true,
+        statusCode: 200,
         message: `Merged ${issueId} to main and closed issue`,
         testsStatus: mergeResult.testsStatus,
         note: mergeResult.testsStatus === 'SKIP' ? 'Tests were skipped' : undefined,
-      });
+      };
     } else {
       const error = mergeResult.reason || mergeResult.notes || 'Merge failed';
       setReviewStatus(issueId, { mergeStatus: 'failed' });
       completePendingOperation(issueId, error);
-      return res.status(500).json({ error, mergeResult });
+      return { success: false, statusCode: 500, error, mergeResult };
     }
 
   } catch (error: any) {
     console.error(`[merge] Error:`, error);
     setReviewStatus(issueId, { mergeStatus: 'failed' });
     completePendingOperation(issueId, error.message);
-    return res.status(500).json({ error: error.message });
+    return { success: false, statusCode: 500, error: error.message };
   } finally {
-    // Always clear server-managed merge tracking when the endpoint completes.
+    // Always clear server-managed merge tracking when triggerMerge completes.
     // After this point, /api/specialists/done calls are handled normally.
     _serverManagedMerges.delete(normalizedMergeId);
   }
+}
+
+// Merge workspace: ONLY merges (requires review+test to have passed first)
+// SAFETY: Never delete remote branches. Always push before cleanup. Abort on any error.
+app.post('/api/workspaces/:issueId/merge', async (req, res) => {
+  const { issueId } = req.params;
+  const result = await triggerMerge(issueId);
+  const { statusCode, ...body } = result;
+  return res.status(statusCode).json(body);
 });
 
 // Approve endpoint - if review+test already passed, redirects to merge
