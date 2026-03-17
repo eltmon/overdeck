@@ -5,25 +5,58 @@
  *  1. checkReadyForMergeStuck finds a stuck issue and calls the merge API
  *  2. checkReadyForMergeStuck skips issues where mergeStatus=merging
  *  3. checkReadyForMergeStuck skips issues where mergeStatus=merged
- *  4. Staleness check: status younger than 2 min is skipped
- *  5. Circuit breaker stops after MERGE_STUCK_MAX_ATTEMPTS (3)
+ *  4. checkReadyForMergeStuck skips issues where mergeStatus=failed
+ *  5. Staleness check: status younger than 2 min is skipped
+ *  6. Staleness check: missing updatedAt is skipped
+ *  7. Circuit breaker stops after MERGE_STUCK_MAX_ATTEMPTS (3)
+ *
+ * The tests mock fs.existsSync and fs.readFileSync so they never touch
+ * the real ~/.panopticon/review-status.json file.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { homedir } from 'os';
+import { join } from 'path';
 
 // ---------------------------------------------------------------------------
-// Path helpers (mirrors deacon.ts internals)
+// Derive the review-status file path that deacon.ts uses internally
 // ---------------------------------------------------------------------------
-const PANOPTICON_HOME = join(homedir(), '.panopticon');
-const REVIEW_STATUS_FILE = join(PANOPTICON_HOME, 'review-status.json');
+const REVIEW_STATUS_PATH = join(homedir(), '.panopticon', 'review-status.json');
 
 // ---------------------------------------------------------------------------
-// Module-level mocks — must be declared before any imports of the module
+// Mutable test state — mutated in beforeEach, read via closure by the fs mock
 // ---------------------------------------------------------------------------
+let _statusData: Record<string, object> = {};
+let _statusExists = true;
 
+// ---------------------------------------------------------------------------
+// Mock fs BEFORE any module that imports it is loaded.
+// We intercept existsSync and readFileSync only for the review-status path;
+// all other paths fall through to the real fs implementation.
+// ---------------------------------------------------------------------------
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn((p: string) => {
+      if (p === REVIEW_STATUS_PATH) return _statusExists;
+      return actual.existsSync(p);
+    }),
+    readFileSync: vi.fn((p: string, enc?: any) => {
+      if (p === REVIEW_STATUS_PATH) return JSON.stringify(_statusData);
+      return actual.readFileSync(p, enc);
+    }),
+    // writeFileSync is a no-op for the review-status path; other paths pass through
+    writeFileSync: vi.fn((p: string, data: any, enc?: any) => {
+      if (p === REVIEW_STATUS_PATH) return; // discard — tests don't need write-back
+      actual.writeFileSync(p, data, enc);
+    }),
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Mock heavy deacon dependencies that aren't under test
+// ---------------------------------------------------------------------------
 vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
   getEnabledSpecialists: vi.fn().mockReturnValue([]),
   getTmuxSessionName: vi.fn(),
@@ -53,27 +86,12 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn(),
 }));
 
-// We will mock global fetch below per-test
+// Mock global fetch
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
+// Import after mocks are in place
 import { checkReadyForMergeStuck } from '../../../../src/lib/cloister/deacon.js';
-
-// ---------------------------------------------------------------------------
-// Helper: write review-status.json with the given entries
-// ---------------------------------------------------------------------------
-function writeReviewStatus(entries: Record<string, object>): void {
-  if (!existsSync(PANOPTICON_HOME)) {
-    mkdirSync(PANOPTICON_HOME, { recursive: true });
-  }
-  writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(entries, null, 2), 'utf-8');
-}
-
-function removeReviewStatus(): void {
-  if (existsSync(REVIEW_STATUS_FILE)) {
-    try { unlinkSync(REVIEW_STATUS_FILE); } catch { /* ignore */ }
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Timestamp helpers
@@ -89,25 +107,23 @@ const ONE_MIN_AGO  = new Date(NOW - 1 * 60 * 1000).toISOString();
 describe('checkReadyForMergeStuck', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    _statusData = {};
+    _statusExists = true;
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ success: true }),
     } as any);
   });
 
-  afterEach(() => {
-    removeReviewStatus();
-  });
-
   it('triggers merge for a stuck readyForMerge issue older than 2 min', async () => {
-    writeReviewStatus({
+    _statusData = {
       'PAN-344': {
         issueId: 'PAN-344',
         readyForMerge: true,
         mergeStatus: undefined,
         updatedAt: THREE_MIN_AGO,
       },
-    });
+    };
 
     const actions = await checkReadyForMergeStuck();
 
@@ -120,14 +136,9 @@ describe('checkReadyForMergeStuck', () => {
   });
 
   it('skips an issue where mergeStatus is already "merging"', async () => {
-    writeReviewStatus({
-      'PAN-344': {
-        issueId: 'PAN-344',
-        readyForMerge: true,
-        mergeStatus: 'merging',
-        updatedAt: THREE_MIN_AGO,
-      },
-    });
+    _statusData = {
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'merging', updatedAt: THREE_MIN_AGO },
+    };
 
     const actions = await checkReadyForMergeStuck();
 
@@ -136,30 +147,9 @@ describe('checkReadyForMergeStuck', () => {
   });
 
   it('skips an issue where mergeStatus is already "merged"', async () => {
-    writeReviewStatus({
-      'PAN-344': {
-        issueId: 'PAN-344',
-        readyForMerge: true,
-        mergeStatus: 'merged',
-        updatedAt: THREE_MIN_AGO,
-      },
-    });
-
-    const actions = await checkReadyForMergeStuck();
-
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(actions).toHaveLength(0);
-  });
-
-  it('skips an issue whose readyForMerge status is younger than 2 min', async () => {
-    writeReviewStatus({
-      'PAN-344': {
-        issueId: 'PAN-344',
-        readyForMerge: true,
-        mergeStatus: undefined,
-        updatedAt: ONE_MIN_AGO,
-      },
-    });
+    _statusData = {
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'merged', updatedAt: THREE_MIN_AGO },
+    };
 
     const actions = await checkReadyForMergeStuck();
 
@@ -168,14 +158,20 @@ describe('checkReadyForMergeStuck', () => {
   });
 
   it('skips an issue with mergeStatus=failed', async () => {
-    writeReviewStatus({
-      'PAN-344': {
-        issueId: 'PAN-344',
-        readyForMerge: true,
-        mergeStatus: 'failed',
-        updatedAt: THREE_MIN_AGO,
-      },
-    });
+    _statusData = {
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: 'failed', updatedAt: THREE_MIN_AGO },
+    };
+
+    const actions = await checkReadyForMergeStuck();
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(actions).toHaveLength(0);
+  });
+
+  it('skips an issue whose readyForMerge status is younger than 2 min', async () => {
+    _statusData = {
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: undefined, updatedAt: ONE_MIN_AGO },
+    };
 
     const actions = await checkReadyForMergeStuck();
 
@@ -184,14 +180,9 @@ describe('checkReadyForMergeStuck', () => {
   });
 
   it('skips an issue with no updatedAt timestamp', async () => {
-    writeReviewStatus({
-      'PAN-344': {
-        issueId: 'PAN-344',
-        readyForMerge: true,
-        mergeStatus: undefined,
-        // no updatedAt field
-      },
-    });
+    _statusData = {
+      'PAN-344': { issueId: 'PAN-344', readyForMerge: true, mergeStatus: undefined },
+    };
 
     const actions = await checkReadyForMergeStuck();
 
@@ -200,24 +191,24 @@ describe('checkReadyForMergeStuck', () => {
   });
 
   it('circuit breaker stops triggering after 3 attempts for the same issue', async () => {
-    // Use a unique key isolated from other tests (module-level Maps persist within a file)
-    const CKEY = 'PAN-CB-SINGLE';
+    // Use a unique key isolated from other tests (mergeStuckCooldowns Map persists within a file)
+    const CKEY = 'PAN-CB-CIRCUIT';
 
     vi.useFakeTimers();
-    // Start far in the future to avoid colliding with real-clock tests
-    let fakeNow = NOW + 100 * 60 * 60 * 1000; // +100 hours
+    // Start far in the future to avoid colliding with real-clock cooldowns from other tests
+    let fakeNow = NOW + 200 * 60 * 60 * 1000; // +200 hours
 
     // Make 3 successful attempts, advancing past the 10-min cooldown each time
     for (let attempt = 0; attempt < 3; attempt++) {
       vi.setSystemTime(fakeNow);
-      writeReviewStatus({
+      _statusData = {
         [CKEY]: {
           issueId: CKEY,
           readyForMerge: true,
           mergeStatus: undefined,
           updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
         },
-      });
+      };
       await checkReadyForMergeStuck();
       fakeNow += 11 * 60 * 1000; // advance 11 min (past the 10-min cooldown)
     }
@@ -227,14 +218,14 @@ describe('checkReadyForMergeStuck', () => {
 
     // 4th attempt — should be blocked by the circuit breaker
     vi.setSystemTime(fakeNow);
-    writeReviewStatus({
+    _statusData = {
       [CKEY]: {
         issueId: CKEY,
         readyForMerge: true,
         mergeStatus: undefined,
         updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
       },
-    });
+    };
     await checkReadyForMergeStuck();
     vi.useRealTimers();
 

@@ -202,12 +202,13 @@ import {
   clearReviewStatus,
 } from './review-status.js';
 
-// Wrapper that adds auto-PR creation logic on top of the base setReviewStatus
+// Wrapper that adds auto-PR creation, Linear status update, and auto-merge trigger
+// on top of the base setReviewStatus.
 function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): ReviewStatus {
   const existing = getReviewStatus(issueId);
   const wasReadyForMerge = existing?.readyForMerge ?? false;
 
-  const updated = setReviewStatusBase(issueId, update);
+  let updated = setReviewStatusBase(issueId, update);
 
   // Clear stale pending operations when review/test succeeds.
   // A prior attempt may have failed (e.g. transient "Workspace does not exist")
@@ -221,44 +222,46 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
     }
   }
 
-  // Auto-create PR when ready for merge transitions from false to true
   const becameReadyForMerge = updated.readyForMerge && !wasReadyForMerge;
-  if (becameReadyForMerge && !updated.prUrl) {
-    console.log(`[pr] Issue ${issueId} is ready for merge, auto-creating PR...`);
-    ensurePRExists(issueId).then(result => {
-      if (result.prUrl) {
-        const freshStatuses = loadReviewStatuses();
-        if (freshStatuses[issueId]) {
-          freshStatuses[issueId].prUrl = result.prUrl;
-          saveReviewStatuses(freshStatuses);
-          console.log(`[pr] Updated ${issueId} with PR URL: ${result.prUrl}`);
-        }
-      } else if (result.error) {
-        console.error(`[pr] Failed to create PR for ${issueId}: ${result.error}`);
-      }
-    }).catch(err => {
-      console.error(`[pr] Error creating PR for ${issueId}:`, err);
-    });
-  }
-
-  // Update Linear status to "In Review" when readyForMerge transitions to true
   if (becameReadyForMerge) {
+    // Auto-create PR
+    if (!updated.prUrl) {
+      console.log(`[pr] Issue ${issueId} is ready for merge, auto-creating PR...`);
+      ensurePRExists(issueId).then(result => {
+        if (result.prUrl) {
+          const freshStatuses = loadReviewStatuses();
+          if (freshStatuses[issueId]) {
+            freshStatuses[issueId].prUrl = result.prUrl;
+            saveReviewStatuses(freshStatuses);
+            console.log(`[pr] Updated ${issueId} with PR URL: ${result.prUrl}`);
+          }
+        } else if (result.error) {
+          console.error(`[pr] Failed to create PR for ${issueId}: ${result.error}`);
+        }
+      }).catch(err => {
+        console.error(`[pr] Error creating PR for ${issueId}:`, err);
+      });
+    }
+
+    // Update Linear status to "In Review"
     updateLinearIssueStatus(issueId, 'In Review').catch(err => {
       console.error(`[status] Error updating Linear to In Review for ${issueId}:`, err);
     });
-  }
 
-  // Auto-trigger merge when readyForMerge transitions to true
-  if (becameReadyForMerge) {
-    const existingMergeStatus = updated.mergeStatus;
-    if (existingMergeStatus !== 'merging' && existingMergeStatus !== 'merged') {
+    // Auto-trigger merge. Guards: skip if already merging/merged, or if a pending
+    // merge op is actively running (prevents double-merge on rapid status updates).
+    if (updated.mergeStatus !== 'merging' && updated.mergeStatus !== 'merged') {
       const pendingOp = getPendingOperation(issueId);
       const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
       if (!activelyMerging) {
         console.log(`[merge] Auto-triggering merge for ${issueId}`);
+        // triggerMerge runs synchronously up to its first await, setting
+        // mergeStatus='merging' before yielding. Re-read so the return value
+        // of this wrapper reflects the updated state to callers and the dashboard.
         triggerMerge(issueId).catch(err => {
           console.error(`[merge] Auto-merge failed for ${issueId}:`, err);
         });
+        updated = getReviewStatus(issueId) ?? updated;
       }
     }
   }

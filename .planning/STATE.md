@@ -42,7 +42,12 @@ deacon patrol safety-net that retries stuck cases.
 ## Files Changed
 - `src/dashboard/server/index.ts` — `TriggerMergeResult` + `triggerMerge()` + auto-merge in `setReviewStatus`
 - `src/lib/cloister/deacon.ts` — `checkReadyForMergeStuck()` + wired into `runPatrol()`
-- `tests/unit/lib/cloister/pan-344-auto-merge.test.ts` — new (5 tests, all pass)
+- `tests/unit/lib/cloister/pan-344-auto-merge.test.ts` — new (7 tests, all pass)
 
 ## Remaining Work
 None
+
+## Specialist Feedback
+
+- **[2026-03-17T16:46Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/018-review-agent-changes-requested.md`
+- **[2026-03-17T16:55Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/019-review-agent-changes-requested.md`
