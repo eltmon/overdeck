@@ -1,212 +1,184 @@
 /**
  * Tests for PAN-343: test-agent delivery failure silently treated as success.
  *
- * The fix is in the POST /api/workspaces/:issueId/review-status handler.
- * It ensures that when wakeSpecialistOrQueue returns success:false, the pipeline
- * does NOT advance (work agent is not notified "REVIEW PASSED") and instead
- * falls back to submitToSpecialistQueue so the deacon can retry.
+ * Tests the exported `autoQueueTestAgentAndNotify` function from
+ * src/lib/cloister/test-agent-queue.ts — the production code extracted from
+ * the route handler. Does NOT duplicate logic in a test helper.
  *
  * Coverage:
- *  1. On wake success: testStatus set to 'testing', task delivered
- *  2. On wake failure: submitToSpecialistQueue called as fallback
- *  3. On wake failure + fallback queue: testStatus still set to 'testing'
- *  4. Notification gating: work agent notified only when delivery succeeded
- *  5. Already-queued dedup: testTaskDelivered=true without waking or re-queuing
+ *  1. Wake succeeds (queued=false): testStatus='testing', agent notified
+ *  2. Wake succeeds (queued=true, specialist busy): testStatus='testing', agent notified
+ *  3. Wake fails: submitToSpecialistQueue called as fallback, agent notified
+ *  4. Wake fails: testStatus still set to 'testing' via fallback path
+ *  5. Already queued: no wake/re-queue, testStatus refreshed, agent notified
+ *  6. Exception path: specialists module throws → testTaskDelivered=false,
+ *     agent NOT notified (core PAN-343 safety invariant)
+ *  7. Already-queued path calls setReviewStatus to refresh stale testStatus (B3)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
-// Simulate the auto-queue logic from the review-status route handler.
-// This function mirrors the logic added by the PAN-343 fix so the tests
-// can verify behavior without spinning up the full Express server.
+// Mock the specialists module (imported statically by test-agent-queue.ts)
 // ---------------------------------------------------------------------------
 
-type WakeResult = { success: boolean; queued: boolean; message: string };
-type QueueTask = { priority: string; source: string; issueId: string; workspace?: string; branch?: string };
+const mockWakeSpecialistOrQueue = vi.fn();
+const mockCheckSpecialistQueue = vi.fn();
+const mockSubmitToSpecialistQueue = vi.fn();
 
-interface TestDeps {
-  checkAlreadyQueued: (issueId: string) => boolean;
-  wakeSpecialistOrQueue: (name: string, task: object, opts: object) => Promise<WakeResult>;
-  submitToSpecialistQueue: (name: string, task: QueueTask) => void;
-  setReviewStatus: (issueId: string, update: { testStatus: string; testNotes?: string }) => void;
-  messageAgent: (agentId: string, msg: string) => Promise<void>;
+vi.mock('../../../src/lib/cloister/specialists.js', () => ({
+  wakeSpecialistOrQueue: (...args: unknown[]) => mockWakeSpecialistOrQueue(...args),
+  checkSpecialistQueue: (...args: unknown[]) => mockCheckSpecialistQueue(...args),
+  submitToSpecialistQueue: (...args: unknown[]) => mockSubmitToSpecialistQueue(...args),
+  // Unused exports referenced by other modules imported transitively
+  getEnabledSpecialists: vi.fn().mockReturnValue([]),
+  getTmuxSessionName: vi.fn().mockReturnValue('test-agent'),
+  isRunning: vi.fn().mockResolvedValue(false),
+  initializeSpecialist: vi.fn(),
+  wakeSpecialist: vi.fn(),
+  clearSessionId: vi.fn(),
+  getNextSpecialistTask: vi.fn(),
+  wakeSpecialistWithTask: vi.fn(),
+  completeSpecialistTask: vi.fn(),
+  getAllProjectSpecialistStatuses: vi.fn().mockResolvedValue([]),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock review-status (file I/O side effect)
+// ---------------------------------------------------------------------------
+
+const mockSetReviewStatus = vi.fn();
+
+vi.mock('../../../src/lib/review-status.js', () => ({
+  setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
+  getReviewStatus: vi.fn(),
+}));
+
+// ---------------------------------------------------------------------------
+// Import the production function AFTER mocks are in place
+// ---------------------------------------------------------------------------
+
+import { autoQueueTestAgentAndNotify } from '../../../src/lib/cloister/test-agent-queue.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const ISSUE = 'PAN-343';
+const WS = '/workspaces/feature-pan-343';
+const BRANCH = 'feature/pan-343';
+
+function makeNotify() {
+  return vi.fn<[string, string], Promise<void>>().mockResolvedValue(undefined);
 }
 
-async function runAutoQueueTestAgent(
-  issueId: string,
-  workspace: string,
-  branch: string,
-  deps: TestDeps,
-): Promise<{ testTaskDelivered: boolean }> {
-  let testTaskDelivered = false;
-  const alreadyQueued = deps.checkAlreadyQueued(issueId);
+function queueWithoutIssue() {
+  mockCheckSpecialistQueue.mockReturnValue({ items: [], hasWork: false });
+}
 
-  if (alreadyQueued) {
-    testTaskDelivered = true;
-  } else {
-    const testResult = await deps.wakeSpecialistOrQueue(
-      'test-agent',
-      { issueId, workspace, branch },
-      { priority: 'normal', source: 'review-passed-auto' },
-    );
-
-    if (testResult.success) {
-      deps.setReviewStatus(issueId, { testStatus: 'testing' });
-      testTaskDelivered = true;
-    } else {
-      // Wake failed — submit to queue so deacon can retry on next patrol cycle
-      deps.submitToSpecialistQueue('test-agent', {
-        priority: 'normal',
-        source: 'review-passed-delivery-retry',
-        issueId,
-        workspace,
-        branch,
-      });
-      deps.setReviewStatus(issueId, { testStatus: 'testing' });
-      testTaskDelivered = true;
-    }
-  }
-
-  // Only notify work agent when test task was successfully delivered or queued
-  if (testTaskDelivered) {
-    await deps.messageAgent(
-      `agent-${issueId.toLowerCase()}`,
-      `REVIEW PASSED for ${issueId}. Tests have been queued automatically.`,
-    );
-  }
-
-  return { testTaskDelivered };
+function queueAlreadyHasIssue() {
+  mockCheckSpecialistQueue.mockReturnValue({
+    items: [{ payload: { issueId: ISSUE } }],
+    hasWork: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('autoQueueTestAgent (PAN-343 fix)', () => {
-  const ISSUE = 'PAN-343';
-  const WS = '/workspaces/feature-pan-343';
-  const BRANCH = 'feature/pan-343';
-
-  let deps: TestDeps;
-
+describe('autoQueueTestAgentAndNotify (PAN-343)', () => {
   beforeEach(() => {
-    deps = {
-      checkAlreadyQueued: vi.fn().mockReturnValue(false),
-      wakeSpecialistOrQueue: vi.fn(),
-      submitToSpecialistQueue: vi.fn(),
-      setReviewStatus: vi.fn(),
-      messageAgent: vi.fn().mockResolvedValue(undefined),
-    };
+    vi.clearAllMocks();
   });
 
-  it('sets testStatus to testing and notifies agent when wake succeeds', async () => {
-    (deps.wakeSpecialistOrQueue as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: true,
-      queued: false,
-      message: 'Sent task to running specialist test-agent',
-    });
+  it('sets testStatus to testing and notifies agent when wake succeeds (direct)', async () => {
+    queueWithoutIssue();
+    mockWakeSpecialistOrQueue.mockResolvedValue({ success: true, queued: false, message: 'woken' });
+    const notify = makeNotify();
 
-    const result = await runAutoQueueTestAgent(ISSUE, WS, BRANCH, deps);
+    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    expect(result.testTaskDelivered).toBe(true);
-    expect(deps.setReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
-    expect(deps.submitToSpecialistQueue).not.toHaveBeenCalled();
-    expect(deps.messageAgent).toHaveBeenCalledWith(
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
+    expect(mockSubmitToSpecialistQueue).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(
       `agent-${ISSUE.toLowerCase()}`,
       expect.stringContaining('REVIEW PASSED'),
     );
   });
 
   it('sets testStatus to testing and notifies agent when wake queues (specialist busy)', async () => {
-    (deps.wakeSpecialistOrQueue as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: true,
-      queued: true,
-      message: 'Specialist test-agent is busy. Task queued.',
-    });
+    queueWithoutIssue();
+    mockWakeSpecialistOrQueue.mockResolvedValue({ success: true, queued: true, message: 'queued' });
+    const notify = makeNotify();
 
-    const result = await runAutoQueueTestAgent(ISSUE, WS, BRANCH, deps);
+    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    expect(result.testTaskDelivered).toBe(true);
-    expect(deps.setReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
-    expect(deps.messageAgent).toHaveBeenCalled();
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
+    expect(notify).toHaveBeenCalled();
   });
 
   it('falls back to submitToSpecialistQueue when wake fails', async () => {
-    (deps.wakeSpecialistOrQueue as ReturnType<typeof vi.fn>).mockResolvedValue({
+    queueWithoutIssue();
+    mockWakeSpecialistOrQueue.mockResolvedValue({
       success: false,
       queued: false,
       message: 'Task message not received by specialist test-agent after retry',
     });
+    const notify = makeNotify();
 
-    const result = await runAutoQueueTestAgent(ISSUE, WS, BRANCH, deps);
+    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    expect(deps.submitToSpecialistQueue).toHaveBeenCalledWith('test-agent', {
+    expect(mockSubmitToSpecialistQueue).toHaveBeenCalledWith('test-agent', {
       priority: 'normal',
       source: 'review-passed-delivery-retry',
       issueId: ISSUE,
       workspace: WS,
       branch: BRANCH,
     });
-    expect(result.testTaskDelivered).toBe(true);
   });
 
-  it('still sets testStatus to testing after fallback queue submission', async () => {
-    (deps.wakeSpecialistOrQueue as ReturnType<typeof vi.fn>).mockResolvedValue({
+  it('sets testStatus to testing after wake-failure fallback', async () => {
+    queueWithoutIssue();
+    mockWakeSpecialistOrQueue.mockResolvedValue({
       success: false,
       queued: false,
       message: 'Task message not received by specialist test-agent after retry',
     });
+    const notify = makeNotify();
 
-    await runAutoQueueTestAgent(ISSUE, WS, BRANCH, deps);
+    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    expect(deps.setReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
-  });
-
-  it('still notifies work agent when fallback queue succeeds', async () => {
-    (deps.wakeSpecialistOrQueue as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: false,
-      queued: false,
-      message: 'Task message not received by specialist test-agent after retry',
-    });
-
-    const result = await runAutoQueueTestAgent(ISSUE, WS, BRANCH, deps);
-
-    expect(result.testTaskDelivered).toBe(true);
-    expect(deps.messageAgent).toHaveBeenCalledWith(
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
+    expect(notify).toHaveBeenCalledWith(
       `agent-${ISSUE.toLowerCase()}`,
       expect.stringContaining('REVIEW PASSED'),
     );
   });
 
-  it('does not call wakeSpecialistOrQueue when already queued', async () => {
-    (deps.checkAlreadyQueued as ReturnType<typeof vi.fn>).mockReturnValue(true);
+  it('refreshes testStatus and notifies agent when issue is already queued (B3)', async () => {
+    queueAlreadyHasIssue();
+    const notify = makeNotify();
 
-    const result = await runAutoQueueTestAgent(ISSUE, WS, BRANCH, deps);
+    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    expect(deps.wakeSpecialistOrQueue).not.toHaveBeenCalled();
-    expect(deps.submitToSpecialistQueue).not.toHaveBeenCalled();
-    expect(result.testTaskDelivered).toBe(true);
-    // Should still notify agent even when already queued (review passed)
-    expect(deps.messageAgent).toHaveBeenCalled();
-  });
-});
-
-describe('testStatus readyForMerge invariants (PAN-343)', () => {
-  it('testStatus testing does not set readyForMerge (tests not complete)', () => {
-    // When we set testStatus to 'testing' (queued/in-progress), readyForMerge must stay false
-    // The reviewStatus.ts logic: readyForMerge = reviewStatus=passed AND testStatus=passed AND mergeStatus!=merged
-    const reviewStatus = 'passed';
-    const testStatus = 'testing';
-    const readyForMerge = reviewStatus === 'passed' && testStatus === 'passed';
-    expect(readyForMerge).toBe(false);
+    expect(mockWakeSpecialistOrQueue).not.toHaveBeenCalled();
+    expect(mockSubmitToSpecialistQueue).not.toHaveBeenCalled();
+    // B3: setReviewStatus must be called even in the already-queued path
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
+    expect(notify).toHaveBeenCalled();
   });
 
-  it('delivery-failed state does not set readyForMerge', () => {
-    // If testStatus is anything other than 'passed', readyForMerge must be false
-    const reviewStatus = 'passed';
-    const testStatus = 'failed'; // delivery failure falls back to failed
-    const readyForMerge = reviewStatus === 'passed' && testStatus === 'passed';
-    expect(readyForMerge).toBe(false);
+  it('does NOT notify agent when specialists module throws (exception path safety invariant)', async () => {
+    // Simulate an unrecoverable error in the queuing block
+    mockCheckSpecialistQueue.mockImplementation(() => {
+      throw new Error('specialists module unavailable');
+    });
+    const notify = makeNotify();
+
+    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+
+    // The core PAN-343 invariant: exception must NOT advance the pipeline
+    expect(notify).not.toHaveBeenCalled();
   });
 });
