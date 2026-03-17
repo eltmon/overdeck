@@ -7018,8 +7018,8 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     // 2b. Snapshot commit hashes for this review run (local workspaces only)
     if (!workspaceInfo.isRemote) {
       try {
-        const { getWorkspaceCommitHashes } = await import('../../lib/git-utils.js');
-        const commits = await getWorkspaceCommitHashes(workspacePath);
+        const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
+        const commits = await getWorkspaceGitInfo(workspacePath);
         setReviewStatus(issueId, { lastReviewCommits: commits });
         console.log(`[review] Snapshotted commits for ${issueId}:`, commits);
       } catch (hashErr: any) {
@@ -7242,8 +7242,8 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
   let requestReviewCommits: Record<string, string> | undefined;
   if (!workspaceInfo.isRemote) {
     try {
-      const { getWorkspaceCommitHashes } = await import('../../lib/git-utils.js');
-      requestReviewCommits = await getWorkspaceCommitHashes(workspacePath);
+      const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
+      requestReviewCommits = await getWorkspaceGitInfo(workspacePath);
       console.log(`[request-review] Snapshotted commits for ${issueId}:`, requestReviewCommits);
     } catch (hashErr: any) {
       console.log(`[request-review] Could not snapshot commits for ${issueId}: ${hashErr.message}`);
