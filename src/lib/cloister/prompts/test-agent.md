@@ -129,8 +129,10 @@ If tests take longer than 10 minutes, consider them hung and report failure.
 
 ```bash
 # Save current state, run tests on main, restore — ALL output to file
+# Use --detach with origin/main to avoid the "branch already checked out" error
+# that occurs in git worktrees where the parent repo holds the main branch lock.
 git stash
-git checkout main
+git checkout --detach origin/main
 {{detectedTestCommand}} 2>&1 > /tmp/test-main.txt; echo "EXIT_CODE: $?"  # with timeout: 300000
 tail -20 /tmp/test-main.txt
 git checkout {{branch}}

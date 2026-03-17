@@ -1,5 +1,8 @@
 /**
- * Tests for runVerificationGate (PAN-174)
+ * Tests for runQualityGates SSH support and DEFAULT_GATES (PAN-336)
+ *
+ * Covers the SSH remote workspace functionality ported from the deleted
+ * verification-gate.ts into runQualityGates.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -25,164 +28,132 @@ vi.mock('child_process', () => {
   return { exec };
 });
 
-import { runVerificationGate } from '../../src/lib/cloister/verification-gate.js';
+import { runQualityGates, DEFAULT_GATES } from '../../src/lib/cloister/validation.js';
 
-describe('runVerificationGate', () => {
-  const workspacePath = '/tmp/test-workspace';
+const workspacePath = '/tmp/test-workspace';
 
+describe('DEFAULT_GATES', () => {
+  it('defines typecheck, lint, and test gates', () => {
+    expect(Object.keys(DEFAULT_GATES)).toEqual(['typecheck', 'lint', 'test']);
+  });
+
+  it('uses npm commands matching the old verification-gate defaults', () => {
+    expect(DEFAULT_GATES.typecheck.command).toContain('npm run typecheck');
+    expect(DEFAULT_GATES.lint.command).toContain('npm run lint');
+    expect(DEFAULT_GATES.test.command).toContain('npm test');
+  });
+});
+
+describe('runQualityGates — SSH remote support', () => {
   beforeEach(() => {
     execMock.mockReset();
-  });
-
-  it('returns passed when all checks succeed', async () => {
-    execMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
-
-    const result = await runVerificationGate(workspacePath);
-
-    expect(result.passed).toBe(true);
-    expect(result.failedCheck).toBeUndefined();
-    expect(result.checks).toHaveLength(3);
-    expect(result.checks.every(c => c.passed)).toBe(true);
-    expect(result.summary).toContain('All checks passed');
-    expect(result.summary).toContain('typecheck');
-    expect(result.summary).toContain('lint');
-    expect(result.summary).toContain('test');
-  });
-
-  it('bails on typecheck failure without running lint or test', async () => {
-    const typecheckErr = Object.assign(new Error('Type error'), {
-      stdout: 'error TS2345: Type mismatch',
-      stderr: '',
-    });
-    execMock.mockRejectedValueOnce(typecheckErr);
-
-    const result = await runVerificationGate(workspacePath);
-
-    expect(result.passed).toBe(false);
-    expect(result.failedCheck).toBe('typecheck');
-    expect(result.checks).toHaveLength(1);
-    expect(result.checks[0].name).toBe('typecheck');
-    expect(result.checks[0].passed).toBe(false);
-    expect(result.checks[0].output).toContain('Type error');
-    expect(result.summary).toContain('Verification FAILED at typecheck');
-    // Lint and test should not have been called
-    expect(execMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('bails on lint failure without running test', async () => {
-    // typecheck passes
-    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
-    // lint fails
-    const lintErr = Object.assign(new Error('Lint failed'), {
-      stdout: '5 errors found',
-      stderr: '',
-    });
-    execMock.mockRejectedValueOnce(lintErr);
-
-    const result = await runVerificationGate(workspacePath);
-
-    expect(result.passed).toBe(false);
-    expect(result.failedCheck).toBe('lint');
-    expect(result.checks).toHaveLength(2);
-    expect(result.checks[0].passed).toBe(true);
-    expect(result.checks[1].passed).toBe(false);
-    expect(execMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('reports test failure after typecheck and lint pass', async () => {
-    // typecheck + lint pass
-    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
-    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
-    // test fails
-    const testErr = Object.assign(new Error('Test suite failed'), {
-      stdout: '3 tests failed',
-      stderr: 'FAIL src/foo.test.ts',
-    });
-    execMock.mockRejectedValueOnce(testErr);
-
-    const result = await runVerificationGate(workspacePath);
-
-    expect(result.passed).toBe(false);
-    expect(result.failedCheck).toBe('test');
-    expect(result.checks).toHaveLength(3);
-    expect(result.checks[2].passed).toBe(false);
-    expect(result.checks[2].output).toContain('3 tests failed');
+    execMock.mockResolvedValue({ stdout: '', stderr: '' });
   });
 
   it('uses SSH prefix for remote workspaces', async () => {
-    execMock.mockResolvedValue({ stdout: '', stderr: '' });
-
-    await runVerificationGate(workspacePath, { isRemote: true, vmName: 'my-vm' });
+    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+      isRemote: true,
+      vmName: 'my-vm',
+    });
 
     const calls = execMock.mock.calls.map(c => c[0] as string);
     expect(calls.every(cmd => cmd.startsWith('ssh -A my-vm.exe.xyz "cd /tmp/test-workspace &&'))).toBe(true);
   });
 
-  it('uses local cwd for non-remote workspaces', async () => {
-    execMock.mockResolvedValue({ stdout: '', stderr: '' });
-
-    await runVerificationGate(workspacePath);
+  it('does not set cwd for remote workspaces', async () => {
+    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+      isRemote: true,
+      vmName: 'my-vm',
+    });
 
     const calls = execMock.mock.calls;
-    // No SSH prefix
+    expect(calls.every(c => c[1]?.cwd === undefined)).toBe(true);
+  });
+
+  it('uses local cwd for non-remote workspaces', async () => {
+    await runQualityGates(DEFAULT_GATES, workspacePath);
+
+    const calls = execMock.mock.calls;
     expect(calls.every(c => !(c[0] as string).startsWith('ssh'))).toBe(true);
-    // cwd set to workspacePath
     expect(calls.every(c => c[1]?.cwd === workspacePath)).toBe(true);
   });
 
-  it('truncates long output to avoid oversized feedback', async () => {
-    const longOutput = 'x'.repeat(5000);
-    const err = Object.assign(new Error('typecheck failed'), {
-      stdout: longOutput,
-      stderr: '',
+  it('throws when isRemote is true but vmName is missing', async () => {
+    await expect(
+      runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: undefined })
+    ).rejects.toThrow('Remote workspace requires vmName');
+  });
+
+  it('throws when vmName contains invalid characters', async () => {
+    await expect(
+      runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', { isRemote: true, vmName: 'vm; rm -rf /' })
+    ).rejects.toThrow('Invalid vmName for SSH');
+  });
+
+  it('throws when workspacePath contains unsafe characters for SSH', async () => {
+    await expect(
+      runQualityGates(DEFAULT_GATES, '/path/with spaces/workspace', 'pre_push', {
+        isRemote: true,
+        vmName: 'my-vm',
+      })
+    ).rejects.toThrow('Workspace path contains unsafe characters');
+  });
+
+  it('includes gate path subdirectory in SSH command', async () => {
+    const gatesWithPath = {
+      lint: { command: 'pnpm lint', path: 'frontend' },
+    };
+
+    await runQualityGates(gatesWithPath, workspacePath, 'pre_push', {
+      isRemote: true,
+      vmName: 'my-vm',
     });
-    execMock.mockRejectedValueOnce(err);
 
-    const result = await runVerificationGate(workspacePath);
-
-    expect(result.passed).toBe(false);
-    expect(result.summary.length).toBeLessThan(4500);
-    expect(result.summary).toContain('...(truncated)');
+    const cmd = execMock.mock.calls[0][0] as string;
+    expect(cmd).toContain(`cd ${workspacePath}/frontend &&`);
   });
 
-  it('includes duration in summary for passed checks', async () => {
-    execMock.mockResolvedValue({ stdout: 'success', stderr: '' });
-
-    const result = await runVerificationGate(workspacePath);
-
-    expect(result.passed).toBe(true);
-    // Each check reports durationMs in the summary
-    expect(result.summary).toMatch(/typecheck \(\d+ms\)/);
-    expect(result.summary).toMatch(/lint \(\d+ms\)/);
-    expect(result.summary).toMatch(/test \(\d+ms\)/);
-  });
-
-  it('passes 5-minute timeout to each execAsync call', async () => {
-    execMock.mockResolvedValue({ stdout: '', stderr: '' });
-
-    await runVerificationGate(workspacePath);
+  it('passes 5-minute timeout to each execAsync call for SSH', async () => {
+    await runQualityGates(DEFAULT_GATES, workspacePath, 'pre_push', {
+      isRemote: true,
+      vmName: 'my-vm',
+    });
 
     const FIVE_MINUTES_MS = 5 * 60 * 1000;
     for (const call of execMock.mock.calls) {
       expect(call[1]).toMatchObject({ timeout: FIVE_MINUTES_MS });
     }
   });
+});
 
-  it('throws when isRemote is true but vmName is missing', async () => {
-    await expect(
-      runVerificationGate(workspacePath, { isRemote: true, vmName: undefined })
-    ).rejects.toThrow('Remote workspace requires vmName');
+describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
+  beforeEach(() => {
+    execMock.mockReset();
+    execMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
   });
 
-  it('throws when vmName contains invalid characters', async () => {
-    await expect(
-      runVerificationGate(workspacePath, { isRemote: true, vmName: 'vm; rm -rf /' })
-    ).rejects.toThrow('Invalid vmName for SSH');
+  it('runs all 3 default gates when all pass', async () => {
+    const results = await runQualityGates(DEFAULT_GATES, workspacePath);
+
+    expect(execMock).toHaveBeenCalledTimes(3);
+    expect(results).toHaveLength(3);
+    expect(results.every(r => r.passed)).toBe(true);
+    expect(results.map(r => r.name)).toEqual(['typecheck', 'lint', 'test']);
   });
 
-  it('throws when workspacePath contains unsafe characters', async () => {
-    await expect(
-      runVerificationGate('/path/with spaces/workspace', { isRemote: true, vmName: 'my-vm' })
-    ).rejects.toThrow('Workspace path contains unsafe characters');
+  it('stops at first failing gate (bail-on-failure)', async () => {
+    const typecheckErr = Object.assign(new Error('Type error'), {
+      stdout: 'error TS2345: Type mismatch',
+      stderr: '',
+    });
+    execMock.mockRejectedValueOnce(typecheckErr);
+
+    const results = await runQualityGates(DEFAULT_GATES, workspacePath);
+
+    // Only typecheck ran — lint and test were not called
+    expect(execMock).toHaveBeenCalledTimes(1);
+    expect(results).toHaveLength(1);
+    expect(results[0].name).toBe('typecheck');
+    expect(results[0].passed).toBe(false);
   });
 });
