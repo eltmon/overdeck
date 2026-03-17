@@ -1,41 +1,48 @@
-# PAN-325: Filter Quality Gates by Repo Path in Polyrepo Merges
+# PAN-344: Auto-merge trigger and stuck-merge patrol check
 
 ## Current Status: COMPLETE
 
 ## Summary
 
-Added polyrepo path filtering to `runProjectQualityGates()` in `merge-agent.ts`. In a polyrepo
-merge, each sub-repo merge only runs quality gates whose `path` field matches the relative sub-repo
-path. Gates without a `path` field are skipped in polyrepo context. Monorepo behavior is unchanged
-(all gates run when `projectPath === project.path`).
+Implemented automatic merge triggering when a workspace becomes ready for merge, plus a
+deacon patrol safety-net that retries stuck cases.
 
 ## Implementation
 
-### Task 1: `src/lib/cloister/merge-agent.ts`
-- Added `relative` import from `path`
-- Exported `runProjectQualityGates` (previously unexported)
-- Added polyrepo filtering logic: compute `repoRelPath = relative(project.path, projectPath)`;
-  if non-empty and not a `..` path, filter gates to only those with `gate.path === repoRelPath`
-- Added console logging for polyrepo gate runs ("Polyrepo: running N gate(s) for path X")
+### Task 1 (panopticon-roov): Extract `triggerMerge()` from merge endpoint handler
+- `src/dashboard/server/index.ts`: Added `TriggerMergeResult` interface and `async function triggerMerge(issueId)`.
+  All merge logic (remote PR, polyrepo, monorepo paths) extracted from the endpoint into this function.
+  The function returns `{ statusCode, ...body }`. Fixed a pre-existing bug where the remote-workspace
+  path did not delete from `_serverManagedMerges` in a finally block.
+- Endpoint handler replaced with a 3-line wrapper that calls `triggerMerge` and translates the result.
 
-### Task 2: `tests/unit/lib/cloister/merge-agent-quality-gates.test.ts` (NEW)
-- 4 tests covering:
-  1. Monorepo: all gates run unchanged
-  2. Polyrepo: only matching-path gates run
-  3. Polyrepo: gates with non-matching path are skipped
-  4. Polyrepo: gates with no path are skipped
+### Task 2 (panopticon-oqrp): Auto-merge trigger in `setReviewStatus` wrapper
+- Added an auto-merge block after the `updateLinearIssueStatus` call (index.ts ~line 252).
+- When `becameReadyForMerge` is true, guards check: `mergeStatus` not already `merging`/`merged`,
+  no active pending merge op. If clear, calls `triggerMerge(issueId)` fire-and-forget with `.catch`.
+- Log: `[merge] Auto-triggering merge for {issueId}`.
 
-### Task 3: `configuration/polyrepo.mdx`
-- Added "Quality Gates in Polyrepo Projects" section with:
-  - Explanation of path-based filtering
-  - Filtering behavior table
-  - Full YAML configuration example with per-repo and global gates
-  - Note on exact path matching requirement
+### Task 3 (panopticon-1qs4): `checkReadyForMergeStuck()` deacon patrol check
+- `src/lib/cloister/deacon.ts`: Added `checkReadyForMergeStuck()` function.
+  - Reads `review-status.json` directly (same pattern as other deacon checks).
+  - Staleness threshold: 2 minutes (avoids racing with primary trigger).
+  - Per-issue cooldown: 10 minutes (in-memory Map `mergeStuckCooldowns`).
+  - Circuit breaker: max 3 attempts per issue (in-memory Map `mergeStuckAttempts`).
+  - Calls `POST /api/workspaces/:issueId/merge` via `fetch` for stuck issues.
+- Wired into `runPatrol()` after `checkDeadEndAgents()`.
+
+### Task 4 (panopticon-e7oy): Tests
+- `tests/unit/lib/cloister/pan-344-auto-merge.test.ts` (NEW): 5 tests
+  1. Triggers merge for a stuck readyForMerge issue older than 2 min
+  2. Skips issues where mergeStatus=merging
+  3. Skips issues where mergeStatus=merged
+  4. Staleness check: status younger than 2 min is skipped
+  5. Circuit breaker stops after 3 attempts
 
 ## Files Changed
-- `src/lib/cloister/merge-agent.ts` — filtering logic + export
-- `tests/unit/lib/cloister/merge-agent-quality-gates.test.ts` — new tests (4/4 pass)
-- `configuration/polyrepo.mdx` — quality gates documentation
+- `src/dashboard/server/index.ts` — `TriggerMergeResult` + `triggerMerge()` + auto-merge in `setReviewStatus`
+- `src/lib/cloister/deacon.ts` — `checkReadyForMergeStuck()` + wired into `runPatrol()`
+- `tests/unit/lib/cloister/pan-344-auto-merge.test.ts` — new (5 tests, all pass)
 
 ## Remaining Work
 None
