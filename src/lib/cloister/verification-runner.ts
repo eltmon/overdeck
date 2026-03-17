@@ -1,16 +1,18 @@
 /**
  * Verification Runner — orchestrates the full verification gate lifecycle.
  *
- * Runs the verification gate (typecheck → lint → test), updates review status,
- * writes feedback files, and notifies the work agent on failure.
+ * Runs quality gates (typecheck → lint → test by default, or project-specific
+ * gates from projects.yaml), updates review status, writes feedback files,
+ * and notifies the work agent on failure.
  *
  * Extracted from dashboard/server to be independently testable.
  */
 
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
-import { runVerificationGate } from './verification-gate.js';
+import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { messageAgent } from '../agents.js';
+import { findProjectByPath } from '../projects.js';
 
 export const VERIFICATION_MAX_CYCLES = 3;
 
@@ -28,6 +30,8 @@ export interface WorkspaceInfo {
 /**
  * Run the full verification gate for an issue.
  *
+ * Loads quality gates from projects.yaml for the workspace's project, falling
+ * back to DEFAULT_GATES (typecheck, lint, test) when no config exists.
  * Handles circuit breaking, status updates, feedback writing, and agent messaging.
  * Returns a discriminated union so callers need no try/catch.
  */
@@ -50,24 +54,38 @@ export async function runVerificationForIssue(
   console.log(`[${logPrefix}] Running verification gate for ${issueId} (attempt ${currentCycles + 1}/${VERIFICATION_MAX_CYCLES})`);
 
   try {
-    const verifyResult = await runVerificationGate(workspacePath, {
+    // Load project-specific gates or fall back to defaults
+    const projectConfig = findProjectByPath(workspacePath);
+    const gates =
+      projectConfig?.quality_gates && Object.keys(projectConfig.quality_gates).length > 0
+        ? projectConfig.quality_gates
+        : DEFAULT_GATES;
+
+    const gateResults = await runQualityGates(gates, workspacePath, 'pre_push', {
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
     });
 
-    if (!verifyResult.passed) {
+    const failedGate = gateResults.find(r => !r.passed && r.required !== false);
+
+    if (failedGate) {
       const newCycleCount = currentCycles + 1;
-      const failedCheck = verifyResult.failedCheck ?? 'unknown';
+      const failedCheck = failedGate.name;
+      const rawOutput = failedGate.output || failedGate.error || '(no output)';
+      const truncatedOutput =
+        rawOutput.length > 3000 ? rawOutput.slice(0, 3000) + '\n...(truncated)' : rawOutput;
+      const summary = `Verification FAILED at ${failedCheck} (${failedGate.durationMs}ms):\n\n${truncatedOutput}`;
+
       setReviewStatus(issueId, {
         reviewStatus: 'pending',
         verificationStatus: 'failed',
-        verificationNotes: verifyResult.summary,
+        verificationNotes: summary,
         verificationCycleCount: newCycleCount,
         verificationMaxCycles: VERIFICATION_MAX_CYCLES,
       });
 
       const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${verifyResult.summary}\n\nFix the failing check, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\nDo NOT stop until review passes.`;
+      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\nFix the failing check, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\nDo NOT stop until review passes.`;
 
       try {
         const fileResult = await writeFeedbackFile({

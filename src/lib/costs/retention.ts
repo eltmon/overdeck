@@ -26,10 +26,8 @@ export interface RetentionStats {
 export function pruneOldEvents(retentionDays: number = 90): RetentionStats {
   console.log(`Pruning events older than ${retentionDays} days...`);
 
-  // Calculate cutoff date
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-  const cutoffTs = cutoffDate.toISOString();
+  // Calculate cutoff date using milliseconds (not setDate, which is DST-sensitive)
+  const cutoffTs = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
 
   // Read all events
   const allEvents = readEvents();
@@ -89,8 +87,7 @@ export function needsPruning(retentionDays: number = 90): boolean {
   // Check oldest event
   const oldestEvent = allEvents[0];
   const oldestDate = new Date(oldestEvent.ts);
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+  const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
 
   return oldestDate < cutoffDate;
 }
@@ -122,9 +119,7 @@ export function getRetentionStatus(retentionDays: number = 90): {
   const now = new Date();
   const oldestEventAge = Math.floor((now.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
 
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-  const cutoffTs = cutoffDate.toISOString();
+  const cutoffTs = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
 
   const eventsToRemove = allEvents.filter(e => e.ts < cutoffTs).length;
 

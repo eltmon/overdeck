@@ -4,7 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  cacheDir: '/tmp/vitest-cache-panopticon-dashboard',
+  cacheDir: '../../../.cache/vitest-frontend',
   test: {
     globals: true,
     environment: 'jsdom',

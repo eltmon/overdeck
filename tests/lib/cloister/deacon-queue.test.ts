@@ -42,7 +42,7 @@ describe('Deacon Configuration', () => {
     expect(config.pingTimeoutMs).toBe(30_000);
     expect(config.consecutiveFailures).toBe(3);
     expect(config.cooldownMs).toBe(5 * 60_000);
-    expect(config.patrolIntervalMs).toBe(30_000);
+    expect(config.patrolIntervalMs).toBe(60_000);
     expect(config.massDeathThreshold).toBe(2);
     expect(config.massDeathWindowMs).toBe(60_000);
   });

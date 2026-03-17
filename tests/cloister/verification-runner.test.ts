@@ -1,5 +1,5 @@
 /**
- * Tests for runVerificationForIssue (PAN-174)
+ * Tests for runVerificationForIssue (PAN-174, updated for PAN-336)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -8,12 +8,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Module mocks — hoisted so vi.mock factories can reference them
 // ---------------------------------------------------------------------------
 
-const { setReviewStatusMock, getReviewStatusMock, runVerificationGateMock, writeFeedbackFileMock, messageAgentMock } = vi.hoisted(() => ({
+const {
+  setReviewStatusMock,
+  getReviewStatusMock,
+  runQualityGatesMock,
+  writeFeedbackFileMock,
+  messageAgentMock,
+  findProjectByPathMock,
+} = vi.hoisted(() => ({
   setReviewStatusMock: vi.fn(),
   getReviewStatusMock: vi.fn(),
-  runVerificationGateMock: vi.fn(),
+  runQualityGatesMock: vi.fn(),
   writeFeedbackFileMock: vi.fn(),
   messageAgentMock: vi.fn(),
+  findProjectByPathMock: vi.fn(),
 }));
 
 vi.mock('../../src/lib/review-status.js', () => ({
@@ -21,8 +29,13 @@ vi.mock('../../src/lib/review-status.js', () => ({
   setReviewStatus: setReviewStatusMock,
 }));
 
-vi.mock('../../src/lib/cloister/verification-gate.js', () => ({
-  runVerificationGate: runVerificationGateMock,
+vi.mock('../../src/lib/cloister/validation.js', () => ({
+  runQualityGates: runQualityGatesMock,
+  DEFAULT_GATES: {
+    typecheck: { command: 'npm run typecheck 2>&1' },
+    lint: { command: 'npm run lint 2>&1' },
+    test: { command: 'npm test 2>&1' },
+  },
 }));
 
 vi.mock('../../src/lib/cloister/feedback-writer.js', () => ({
@@ -31,6 +44,10 @@ vi.mock('../../src/lib/cloister/feedback-writer.js', () => ({
 
 vi.mock('../../src/lib/agents.js', () => ({
   messageAgent: messageAgentMock,
+}));
+
+vi.mock('../../src/lib/projects.js', () => ({
+  findProjectByPath: findProjectByPathMock,
 }));
 
 // Import under test after mocks
@@ -44,21 +61,16 @@ const issueId = 'PAN-174';
 const workspacePath = '/tmp/test-workspace';
 const workspaceInfo = { isRemote: false };
 
-function makePassedResult() {
-  return {
-    passed: true,
-    checks: [{ name: 'typecheck', passed: true, output: '', durationMs: 100 }],
-    summary: 'All checks passed: typecheck (100ms)',
-  };
+function makePassedResults() {
+  return [
+    { name: 'typecheck', passed: true, required: true, output: 'ok', durationMs: 100 },
+  ];
 }
 
-function makeFailedResult(failedCheck = 'lint') {
-  return {
-    passed: false,
-    failedCheck,
-    checks: [{ name: failedCheck, passed: false, output: 'error output', durationMs: 200 }],
-    summary: `Verification FAILED at ${failedCheck} (200ms):\n\nerror output`,
-  };
+function makeFailedResults(failedCheck = 'lint') {
+  return [
+    { name: failedCheck, passed: false, required: true, output: 'error output', durationMs: 200 },
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -69,9 +81,10 @@ describe('runVerificationForIssue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getReviewStatusMock.mockReturnValue(null); // no existing status → 0 cycles
-    runVerificationGateMock.mockResolvedValue(makePassedResult());
+    runQualityGatesMock.mockResolvedValue(makePassedResults());
     writeFeedbackFileMock.mockResolvedValue({ success: true, relativePath: '.planning/feedback/001-verification-failed.md' });
     messageAgentMock.mockResolvedValue(undefined);
+    findProjectByPathMock.mockReturnValue(null); // no project config → DEFAULT_GATES
   });
 
   describe('circuit breaker', () => {
@@ -82,7 +95,7 @@ describe('runVerificationForIssue', () => {
 
       expect(result.outcome).toBe('skipped');
       expect(setReviewStatusMock).toHaveBeenCalledWith(issueId, { verificationStatus: 'skipped' });
-      expect(runVerificationGateMock).not.toHaveBeenCalled();
+      expect(runQualityGatesMock).not.toHaveBeenCalled();
     });
 
     it('runs verification when cycles are below max', async () => {
@@ -90,7 +103,7 @@ describe('runVerificationForIssue', () => {
 
       await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
 
-      expect(runVerificationGateMock).toHaveBeenCalledOnce();
+      expect(runQualityGatesMock).toHaveBeenCalledOnce();
     });
   });
 
@@ -121,7 +134,7 @@ describe('runVerificationForIssue', () => {
 
   describe('verification fails', () => {
     beforeEach(() => {
-      runVerificationGateMock.mockResolvedValue(makeFailedResult('lint'));
+      runQualityGatesMock.mockResolvedValue(makeFailedResults('lint'));
     });
 
     it('returns failed with correct failedCheck and cycleCount', async () => {
@@ -170,7 +183,7 @@ describe('runVerificationForIssue', () => {
       );
     });
 
-    it('uses workspacePath directly (not localPath) for writeFeedbackFile', async () => {
+    it('uses workspacePath directly for writeFeedbackFile', async () => {
       await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
 
       expect(writeFeedbackFileMock).toHaveBeenCalledWith(
@@ -178,18 +191,18 @@ describe('runVerificationForIssue', () => {
       );
     });
 
-    it('handles missing failedCheck gracefully (falls back to unknown)', async () => {
-      runVerificationGateMock.mockResolvedValue({
-        passed: false,
-        failedCheck: undefined,
-        checks: [],
-        summary: 'failed',
-      });
+    it('treats first failed required gate as failedCheck', async () => {
+      // Multiple gates: optional failure then required failure
+      runQualityGatesMock.mockResolvedValue([
+        { name: 'format', passed: false, required: false, output: 'style issues', durationMs: 50 },
+        { name: 'typecheck', passed: false, required: true, output: 'type error', durationMs: 200 },
+      ]);
 
       const result = await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
 
+      expect(result.outcome).toBe('failed');
       if (result.outcome === 'failed') {
-        expect(result.failedCheck).toBe('unknown');
+        expect(result.failedCheck).toBe('typecheck');
       }
     });
 
@@ -204,7 +217,7 @@ describe('runVerificationForIssue', () => {
 
   describe('infrastructure error', () => {
     it('returns error outcome and sets verificationStatus:failed', async () => {
-      runVerificationGateMock.mockRejectedValue(new Error('exec failed'));
+      runQualityGatesMock.mockRejectedValue(new Error('exec failed'));
 
       const result = await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
 
@@ -219,7 +232,7 @@ describe('runVerificationForIssue', () => {
     });
 
     it('does not throw — returns error outcome instead', async () => {
-      runVerificationGateMock.mockRejectedValue(new Error('unexpected'));
+      runQualityGatesMock.mockRejectedValue(new Error('unexpected'));
 
       await expect(
         runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test')
@@ -228,14 +241,60 @@ describe('runVerificationForIssue', () => {
   });
 
   describe('remote workspace', () => {
-    it('passes isRemote and vmName to runVerificationGate', async () => {
+    it('passes isRemote and vmName to runQualityGates', async () => {
       const remoteInfo = { isRemote: true, vmName: 'my-vm' };
 
       await runVerificationForIssue(issueId, workspacePath, remoteInfo, 'test');
 
-      expect(runVerificationGateMock).toHaveBeenCalledWith(
+      expect(runQualityGatesMock).toHaveBeenCalledWith(
+        expect.any(Object), // gates (DEFAULT_GATES since findProjectByPath returns null)
         workspacePath,
+        'pre_push',
         { isRemote: true, vmName: 'my-vm' }
+      );
+    });
+  });
+
+  describe('project quality gates config', () => {
+    it('uses project quality gates when available', async () => {
+      const projectGates = {
+        'custom-lint': { command: 'pnpm lint', required: true },
+      };
+      findProjectByPathMock.mockReturnValue({ quality_gates: projectGates });
+
+      await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
+
+      expect(runQualityGatesMock).toHaveBeenCalledWith(
+        projectGates,
+        workspacePath,
+        'pre_push',
+        expect.any(Object)
+      );
+    });
+
+    it('falls back to DEFAULT_GATES when project has no quality_gates', async () => {
+      findProjectByPathMock.mockReturnValue({ name: 'my-project', path: '/some/path' }); // no quality_gates
+
+      await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
+
+      expect(runQualityGatesMock).toHaveBeenCalledWith(
+        expect.objectContaining({ typecheck: expect.any(Object), lint: expect.any(Object), test: expect.any(Object) }),
+        workspacePath,
+        'pre_push',
+        expect.any(Object)
+      );
+    });
+
+    it('falls back to DEFAULT_GATES when no project found', async () => {
+      findProjectByPathMock.mockReturnValue(null);
+
+      await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
+
+      expect(runQualityGatesMock).toHaveBeenCalledWith(
+        expect.objectContaining({ typecheck: expect.any(Object) }),
+        workspacePath,
+        'pre_push',
+        expect.any(Object)
       );
     });
   });

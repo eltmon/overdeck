@@ -305,7 +305,7 @@ export class CloisterService {
         try {
           const runtime = getRuntimeForAgent(agent.id);
           if (runtime) {
-            runtime.killAgent(agent.id);
+            runtime.killAgent(agent.id); // killAgent already resets runtime.json to idle
             killedAgents.push(agent.id);
             console.log(`  ✓ Killed ${agent.id}`);
           }

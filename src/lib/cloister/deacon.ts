@@ -112,6 +112,7 @@ export interface DeaconState {
   patrolCycle: number;
   recentDeaths: string[];        // ISO timestamps of recent deaths
   lastMassDeathAlert?: string;   // ISO 8601
+  mergeStuckAttempts?: Record<string, number>;  // circuit-breaker attempt counts (PAN-344)
 }
 
 /**
@@ -1206,6 +1207,124 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
   return actions;
 }
 
+// ============================================================================
+// Ready-for-merge stuck detection (PAN-344)
+// ============================================================================
+
+// Minimum age (ms) of a readyForMerge status before deacon considers it stuck.
+// Primary trigger fires synchronously in setReviewStatus; 2 min gives it time to start.
+const MERGE_STUCK_STALENESS_MS = 2 * 60 * 1000; // 2 minutes
+// Minimum wait (ms) between successive auto-merge attempts for the same issue
+const MERGE_STUCK_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+// Circuit breaker: stop attempting after this many tries
+const MERGE_STUCK_MAX_ATTEMPTS = 3;
+
+// In-memory cooldowns for stuck-merge detection (reset on server restart is acceptable —
+// cooldowns are a performance optimisation, not critical state)
+const mergeStuckCooldowns = new Map<string, number>();
+
+/**
+ * Safety-net patrol: find issues that are readyForMerge but not yet merging/merged
+ * and whose readyForMerge status is older than MERGE_STUCK_STALENESS_MS.
+ *
+ * The primary merge trigger fires in the setReviewStatus wrapper when
+ * becameReadyForMerge transitions to true.  This check catches cases where
+ * that primary trigger failed (e.g. server restart between review passing and
+ * the trigger running, or a transient merge error that left readyForMerge=true).
+ *
+ * Guards:
+ *   - Staleness: status must be at least 2 min old (avoids racing with primary trigger)
+ *   - Per-issue cooldown: 10 min between successive attempts
+ *   - Circuit breaker: max 3 attempts per issue per process lifetime
+ */
+export async function checkReadyForMergeStuck(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    if (!existsSync(REVIEW_STATUS_FILE)) {
+      return actions;
+    }
+
+    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
+    const statuses: Record<string, {
+      issueId?: string;
+      readyForMerge?: boolean;
+      mergeStatus?: string;
+      updatedAt?: string;
+    }> = JSON.parse(content);
+
+    const now = Date.now();
+    const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+    const state = loadState();
+    const attemptCounts = state.mergeStuckAttempts ?? {};
+    let stateModified = false;
+
+    for (const [key, status] of Object.entries(statuses)) {
+      // Only act on issues that are ready but not yet merging/merged/failed
+      if (!status.readyForMerge) continue;
+      if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
+
+      // Staleness check: must have been readyForMerge for at least 2 minutes.
+      // Skip entries without a timestamp — we cannot determine staleness.
+      if (!status.updatedAt) continue;
+      const statusAge = now - new Date(status.updatedAt).getTime();
+      if (statusAge < MERGE_STUCK_STALENESS_MS) continue;
+
+      // Per-issue cooldown (in-memory — reset on restart is acceptable for a rate-limiter)
+      const lastAttempt = mergeStuckCooldowns.get(key);
+      if (lastAttempt && (now - lastAttempt) < MERGE_STUCK_COOLDOWN_MS) continue;
+
+      // Circuit breaker (persisted to deacon state so restart doesn't reset the count)
+      const attempts = attemptCounts[key] ?? 0;
+      if (attempts >= MERGE_STUCK_MAX_ATTEMPTS) {
+        console.log(`[deacon] Merge stuck circuit breaker active for ${key} (${attempts}/${MERGE_STUCK_MAX_ATTEMPTS} attempts)`);
+        continue;
+      }
+
+      const issueId = status.issueId || key;
+      const ageMin = Math.round((now - new Date(status.updatedAt).getTime()) / 60000);
+      console.log(`[deacon] readyForMerge stuck for ${key} (age: ${ageMin}m, attempts: ${attempts}), triggering merge...`);
+
+      // Record attempt before the call so a crash doesn't leave us in a retry loop
+      mergeStuckCooldowns.set(key, now);
+      attemptCounts[key] = attempts + 1;
+      stateModified = true;
+
+      try {
+        const response = await fetch(`http://localhost:${apiPort}/api/workspaces/${issueId}/merge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const body = await response.json() as { error?: string };
+        if (response.ok) {
+          const msg = `Stuck-merge trigger: initiated merge for ${key}`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+        } else {
+          const msg = `Stuck-merge trigger: merge API returned ${response.status} for ${key}: ${body.error ?? ''}`;
+          actions.push(msg);
+          console.warn(`[deacon] ${msg}`);
+        }
+      } catch (fetchErr: unknown) {
+        const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        console.error(`[deacon] Stuck-merge trigger fetch failed for ${key}:`, msg);
+        actions.push(`Stuck-merge trigger failed for ${key}: ${msg}`);
+      }
+    }
+
+    // Persist updated attempt counts so circuit breaker survives server restarts
+    if (stateModified) {
+      state.mergeStuckAttempts = attemptCounts;
+      saveState(state);
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error in checkReadyForMergeStuck:', msg);
+  }
+
+  return actions;
+}
+
 // Track per-issue cooldowns for dead-end recovery to avoid spamming
 const deadEndCooldowns = new Map<string, number>();
 
@@ -1697,6 +1816,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...deadEndActions);
   for (const a of deadEndActions) addLog('action', a, state.patrolCycle);
 
+  // Safety-net: trigger merge for issues stuck in readyForMerge state (PAN-344)
+  const mergeStuckActions = await checkReadyForMergeStuck();
+  actions.push(...mergeStuckActions);
+  for (const a of mergeStuckActions) addLog('action', a, state.patrolCycle);
+
   // Detect work agents that forgot to call "pan work done" (Layer 3 safety net)
   const firstCompletionActions = await checkFirstCompletionAgents();
   actions.push(...firstCompletionActions);
@@ -1738,7 +1862,19 @@ export async function runPatrol(): Promise<PatrolResult> {
   try {
     const projectSpecialists = await getAllProjectSpecialistStatuses();
     for (const projSpec of projectSpecialists) {
-      if (!projSpec.isRunning) continue;
+      if (!projSpec.isRunning) {
+        // Session is dead — reset any stale active runtime state so the next
+        // merge request is not blocked by a phantom busy signal.
+        const runtimeState = getAgentRuntimeState(projSpec.tmuxSession);
+        if (runtimeState?.state === 'active') {
+          saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
+          const msg = `Dead-session reset: per-project ${projSpec.specialistType} (${projSpec.projectKey}) was active but session is gone`;
+          actions.push(msg);
+          addLog('action', msg, state.patrolCycle);
+          console.log(`[deacon] ${msg}`);
+        }
+        continue;
+      }
 
       const runtimeState = getAgentRuntimeState(projSpec.tmuxSession);
       // A running ephemeral specialist with no runtime state, or active for more than
