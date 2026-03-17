@@ -109,7 +109,6 @@ export async function runVerificationForIssue(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    const passSummary = `All checks passed: ${gateResults.map(r => `${r.name} (${r.durationMs}ms)`).join(', ')}`;
     setReviewStatus(issueId, { verificationStatus: 'passed', verificationNotes: undefined });
     console.log(`[${logPrefix}] Verification passed for ${issueId} — proceeding to review-agent`);
     return { outcome: 'passed' };

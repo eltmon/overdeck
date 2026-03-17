@@ -99,6 +99,30 @@ describe('runQualityGates — SSH remote support', () => {
     ).rejects.toThrow('Workspace path contains unsafe characters');
   });
 
+  it('throws when gate.path produces an unsafe cwd for SSH', async () => {
+    const gatesWithBadPath = {
+      lint: { command: 'pnpm lint', path: 'frontend;rm -rf /' },
+    };
+    await expect(
+      runQualityGates(gatesWithBadPath, workspacePath, 'pre_push', {
+        isRemote: true,
+        vmName: 'my-vm',
+      })
+    ).rejects.toThrow('unsafe characters for SSH');
+  });
+
+  it('throws when gate.command contains double quotes (SSH injection prevention)', async () => {
+    const gatesWithQuotes = {
+      lint: { command: 'echo "hello"' },
+    };
+    await expect(
+      runQualityGates(gatesWithQuotes, workspacePath, 'pre_push', {
+        isRemote: true,
+        vmName: 'my-vm',
+      })
+    ).rejects.toThrow('double quotes which are unsafe in SSH context');
+  });
+
   it('includes gate path subdirectory in SSH command', async () => {
     const gatesWithPath = {
       lint: { command: 'pnpm lint', path: 'frontend' },
