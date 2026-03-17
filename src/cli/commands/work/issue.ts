@@ -601,6 +601,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
     }
 
+    // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
+    const workspaceBeadsDir = join(workspace, '.beads');
+    const hasBeads = existsSync(join(workspaceBeadsDir, 'issues.jsonl'));
+    if (!hasBeads) {
+      spinner.fail(`No beads tasks found for ${id}`);
+      console.log('');
+      console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
+      console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
+      console.log('');
+      console.log(chalk.bold('To re-run planning:'));
+      console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
+      process.exit(1);
+    }
+
     spinner.text = 'Building agent prompt with planning context...';
     const trackerContext = await getTrackerContext(id, workspace);
     const prompt = buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });

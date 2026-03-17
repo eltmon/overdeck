@@ -309,21 +309,60 @@ export interface QualityGateResult {
 }
 
 /**
+ * Options for running quality gates
+ */
+export interface QualityGateRunOptions {
+  /** Whether the workspace is remote (SSH) */
+  isRemote?: boolean;
+  /** VM name for SSH connections (required when isRemote is true) */
+  vmName?: string;
+}
+
+/**
+ * Default quality gates used when no quality_gates config exists in projects.yaml.
+ * Runs typecheck → lint → test sequentially (bail on first failure).
+ */
+export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
+  typecheck: { command: 'npm run typecheck 2>&1' },
+  lint: { command: 'npm run lint 2>&1' },
+  test: { command: 'npm test 2>&1' },
+};
+
+/**
  * Run all quality gates for a project
  *
  * Executes each gate in declaration order, stopping on first required failure.
  * Returns results for all gates that were run.
  *
- * @param gates - Quality gate configs from projects.yaml
+ * Supports both local and remote (SSH) workspaces. For remote workspaces,
+ * commands are wrapped with SSH and run on the specified VM.
+ *
+ * @param gates - Quality gate configs from projects.yaml (or DEFAULT_GATES)
  * @param projectPath - Project root (or workspace root)
  * @param phase - Which phase to run ('pre_push' or 'post_push')
+ * @param opts - Optional remote workspace options
  * @returns Array of gate results
  */
 export async function runQualityGates(
   gates: Record<string, QualityGateConfig>,
   projectPath: string,
-  phase: 'pre_push' | 'post_push' = 'pre_push'
+  phase: 'pre_push' | 'post_push' = 'pre_push',
+  opts: QualityGateRunOptions = {}
 ): Promise<QualityGateResult[]> {
+  if (opts.isRemote && !opts.vmName) {
+    throw new Error('Remote workspace requires vmName');
+  }
+  if (opts.isRemote && opts.vmName) {
+    // Validate vmName and projectPath to prevent shell injection.
+    // Both are controlled by Panopticon config, but explicit validation
+    // catches any accidental or malicious values before they reach the shell.
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(opts.vmName)) {
+      throw new Error(`Invalid vmName for SSH: ${opts.vmName}`);
+    }
+    if (!/^[a-zA-Z0-9/_\-.]+$/.test(projectPath)) {
+      throw new Error(`Workspace path contains unsafe characters: ${projectPath}`);
+    }
+  }
   const results: QualityGateResult[] = [];
 
   for (const [name, gate] of Object.entries(gates)) {
@@ -350,8 +389,13 @@ export async function runQualityGates(
     // Command gate (default)
     try {
       const env = { ...process.env, ...gate.env };
-      const { stdout, stderr } = await execAsync(gate.command, {
-        cwd,
+      // For remote workspaces, wrap the command with SSH instead of using cwd.
+      const isRemote = opts.isRemote && opts.vmName;
+      const command = isRemote
+        ? `ssh -A ${opts.vmName}.exe.xyz "cd ${cwd} && ${gate.command}"`
+        : gate.command;
+      const { stdout, stderr } = await execAsync(command, {
+        cwd: isRemote ? undefined : cwd,
         env,
         maxBuffer: 10 * 1024 * 1024, // 10MB
         timeout: 5 * 60 * 1000, // 5 minute timeout per gate
