@@ -6661,70 +6661,15 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     // Auto-queue test-agent when review passes (server-side guarantee)
     // This ensures test-agent is always triggered regardless of which prompt the review-agent used
     if (reviewStatus === 'passed') {
-      let testTaskDelivered = false;
-      try {
-        const { wakeSpecialistOrQueue, checkSpecialistQueue: checkTestQueue, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
+      // Derive workspace/branch from issueId (review-agent doesn't send these)
+      const issueLower = issueId.toLowerCase();
+      const issuePrefix = issueId.split('-')[0];
+      const projectPath = getProjectPath(undefined, issuePrefix);
+      const testWorkspace = req.body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
+      const testBranch = req.body.branch || `feature/${issueLower}`;
 
-        // Dedup: check if test-agent already has this issue queued
-        const testQueue = checkTestQueue('test-agent');
-        const alreadyQueued = testQueue.items.some(
-          (item: any) => item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()
-        );
-
-        if (alreadyQueued) {
-          console.log(`[review-status] Test-agent already has ${issueId} queued, skipping`);
-          testTaskDelivered = true;
-        } else {
-          // Derive workspace/branch from issueId (review-agent doesn't send these)
-          const issueLower = issueId.toLowerCase();
-          const issuePrefix = issueId.split('-')[0];
-          const projectPath = getProjectPath(undefined, issuePrefix);
-          const testWorkspace = req.body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
-          const testBranch = req.body.branch || `feature/${issueLower}`;
-
-          const testResult = await wakeSpecialistOrQueue('test-agent', {
-            issueId,
-            workspace: testWorkspace,
-            branch: testBranch,
-          }, {
-            priority: 'normal',
-            source: 'review-passed-auto',
-          });
-          if (testResult.success) {
-            setReviewStatus(issueId, { testStatus: 'testing' });
-            testTaskDelivered = true;
-            console.log(`[review-status] Auto-queued test-agent for ${issueId}: ${testResult.queued ? 'queued' : 'woken'} - ${testResult.message}`);
-          } else {
-            // Wake failed — submit to queue so deacon can retry on next patrol cycle
-            console.error(`[review-status] Test-agent wake failed for ${issueId}: ${testResult.message}. Submitting to queue for deacon retry.`);
-            submitToSpecialistQueue('test-agent', {
-              priority: 'normal',
-              source: 'review-passed-delivery-retry',
-              issueId,
-              workspace: testWorkspace,
-              branch: testBranch,
-            });
-            setReviewStatus(issueId, { testStatus: 'testing' });
-            testTaskDelivered = true;
-            console.log(`[review-status] Test-agent task queued for ${issueId} after wake failure (deacon will retry)`);
-          }
-        }
-      } catch (err) {
-        console.error(`[review-status] Failed to auto-queue test-agent for ${issueId}:`, err);
-        // testTaskDelivered remains false — work agent will not be falsely notified
-      }
-
-      // Only notify work agent when test task was successfully delivered or queued
-      if (testTaskDelivered) {
-        try {
-          const agentId = `agent-${issueId.toLowerCase()}`;
-          await messageAgent(agentId, `REVIEW PASSED for ${issueId}. Tests have been queued automatically. Do NOT poll or check status — you will be notified when tests complete.`);
-          console.log(`[review-status] Notified ${agentId} that review passed`);
-        } catch (err) {
-          // Agent may not be running — that's fine
-          console.log(`[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`);
-        }
-      }
+      const { autoQueueTestAgentAndNotify } = await import('../../lib/cloister/test-agent-queue.js');
+      await autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent);
     }
 
     // Immediately process next queued item (don't wait for deacon patrol)
