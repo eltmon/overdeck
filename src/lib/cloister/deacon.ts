@@ -1256,15 +1256,15 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
     const apiPort = process.env.API_PORT || process.env.PORT || '3011';
 
     for (const [key, status] of Object.entries(statuses)) {
-      // Only act on issues that are ready but not yet merging/merged
+      // Only act on issues that are ready but not yet merging/merged/failed
       if (!status.readyForMerge) continue;
-      if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged') continue;
+      if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
 
-      // Staleness check: must have been readyForMerge for at least 2 minutes
-      if (status.updatedAt) {
-        const statusAge = now - new Date(status.updatedAt).getTime();
-        if (statusAge < MERGE_STUCK_STALENESS_MS) continue;
-      }
+      // Staleness check: must have been readyForMerge for at least 2 minutes.
+      // Skip entries without a timestamp — we cannot determine staleness.
+      if (!status.updatedAt) continue;
+      const statusAge = now - new Date(status.updatedAt).getTime();
+      if (statusAge < MERGE_STUCK_STALENESS_MS) continue;
 
       // Per-issue cooldown
       const lastAttempt = mergeStuckCooldowns.get(key);
