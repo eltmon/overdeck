@@ -457,6 +457,14 @@ import {
 } from '../../../lib/cloister/work-agent-prompt.js';
 
 /**
+ * Check whether a workspace has beads tasks (planning must create them before work begins).
+ * Exported for testing.
+ */
+export function hasBeadsTasks(workspacePath: string): boolean {
+  return existsSync(join(workspacePath, '.beads', 'issues.jsonl'));
+}
+
+/**
  * Validate that STATE.md belongs to the current issue.
  * If the STATE.md is for a different issue (cross-contamination from git merge),
  * remove it to prevent the agent from working on the wrong issue.
@@ -599,6 +607,18 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const stateValidation = validateAndCleanStateFile(workspace, id);
     if (stateValidation.removed) {
       spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
+    }
+
+    // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
+    if (!hasBeadsTasks(workspace)) {
+      spinner.fail(`No beads tasks found for ${id}`);
+      console.log('');
+      console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
+      console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
+      console.log('');
+      console.log(chalk.bold('To re-run planning:'));
+      console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
+      process.exit(1);
     }
 
     spinner.text = 'Building agent prompt with planning context...';
