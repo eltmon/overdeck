@@ -6661,52 +6661,15 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     // Auto-queue test-agent when review passes (server-side guarantee)
     // This ensures test-agent is always triggered regardless of which prompt the review-agent used
     if (reviewStatus === 'passed') {
-      try {
-        const { wakeSpecialistOrQueue, checkSpecialistQueue: checkTestQueue } = await import('../../lib/cloister/specialists.js');
+      // Derive workspace/branch from issueId (review-agent doesn't send these)
+      const issueLower = issueId.toLowerCase();
+      const issuePrefix = issueId.split('-')[0];
+      const projectPath = getProjectPath(undefined, issuePrefix);
+      const testWorkspace = req.body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
+      const testBranch = req.body.branch || `feature/${issueLower}`;
 
-        // Dedup: check if test-agent already has this issue queued
-        const testQueue = checkTestQueue('test-agent');
-        const alreadyQueued = testQueue.items.some(
-          (item: any) => item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()
-        );
-
-        if (!alreadyQueued) {
-          // Derive workspace/branch from issueId (review-agent doesn't send these)
-          const issueLower = issueId.toLowerCase();
-          const issuePrefix = issueId.split('-')[0];
-          const projectPath = getProjectPath(undefined, issuePrefix);
-          const testWorkspace = req.body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
-          const testBranch = req.body.branch || `feature/${issueLower}`;
-
-          const testResult = await wakeSpecialistOrQueue('test-agent', {
-            issueId,
-            workspace: testWorkspace,
-            branch: testBranch,
-          }, {
-            priority: 'normal',
-            source: 'review-passed-auto',
-          });
-          // Update testStatus based on whether the agent was woken or queued
-          if (testResult.success) {
-            setReviewStatus(issueId, { testStatus: testResult.queued ? 'queued' : 'testing' });
-          }
-          console.log(`[review-status] Auto-queued test-agent for ${issueId}: ${testResult.success ? (testResult.queued ? 'queued' : 'woken') : 'failed'} - ${testResult.message}`);
-        } else {
-          console.log(`[review-status] Test-agent already has ${issueId} queued, skipping`);
-        }
-      } catch (err) {
-        console.error(`[review-status] Failed to auto-queue test-agent for ${issueId}:`, err);
-      }
-
-      // Notify work agent that review passed — prevents polling
-      try {
-        const agentId = `agent-${issueId.toLowerCase()}`;
-        await messageAgent(agentId, `REVIEW PASSED for ${issueId}. Tests have been queued automatically. Do NOT poll or check status — you will be notified when tests complete.`);
-        console.log(`[review-status] Notified ${agentId} that review passed`);
-      } catch (err) {
-        // Agent may not be running — that's fine
-        console.log(`[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`);
-      }
+      const { autoQueueTestAgentAndNotify } = await import('../../lib/cloister/test-agent-queue.js');
+      await autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent);
     }
 
     // Immediately process next queued item (don't wait for deacon patrol)
