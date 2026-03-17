@@ -167,72 +167,47 @@ describe('checkReadyForMergeStuck', () => {
     expect(actions).toHaveLength(0);
   });
 
-  it('circuit breaker stops triggering after 3 attempts', async () => {
-    // Each call to checkReadyForMergeStuck (when the cooldown expires) counts as an attempt.
-    // We need to bypass the cooldown between calls by using distinct issue keys.
-    // Alternatively, test by calling 3 times with a very old status AND clearing cooldowns
-    // is fragile; instead we test with 3 distinct issues that each hit the breaker limit
-    // by examining the in-memory state indirectly.
-    //
-    // The cleaner approach: use a single issue and verify the 4th call is skipped.
-    // Since the cooldown is 10 min, we can't simply re-call — instead we test using a
-    // different issue key for each "historical attempt" by verifying that after the
-    // module has attempted 3 times in prior calls, a 4th stale entry is skipped.
-    //
-    // Because module-level Maps persist across tests in the same file, this test is
-    // intentionally isolated using a unique issue key.
-
-    const KEY = 'PAN-CB-TEST';
+  it('skips an issue with mergeStatus=failed', async () => {
     writeReviewStatus({
-      [KEY]: {
-        issueId: KEY,
+      'PAN-344': {
+        issueId: 'PAN-344',
         readyForMerge: true,
-        mergeStatus: undefined,
-        updatedAt: new Date(NOW - 30 * 60 * 1000).toISOString(), // 30 min ago
+        mergeStatus: 'failed',
+        updatedAt: THREE_MIN_AGO,
       },
     });
 
-    // Force the cooldown to appear expired between calls by manipulating the test clock
-    // isn't feasible without fake timers; instead verify 3 calls succeed and a 4th is
-    // blocked — but only after the cooldown window elapses. We simulate this by
-    // calling in a sub-test that uses a fresh issue key for each "attempt slot".
-    //
-    // Practical approach: call once per "minute" is impractical in unit tests.
-    // We verify the circuit breaker guard by checking the behaviour when the map
-    // already records 3 attempts — done via white-box testing of the exported function.
-    //
-    // Since mergeStuckAttempts is module-private, we exercise it indirectly:
-    // call checkReadyForMergeStuck 3 times (bypassing cooldown by using distinct keys
-    // each time), then check the 4th entry is skipped.
+    const actions = await checkReadyForMergeStuck();
 
-    const KEYS = ['PAN-CB-A', 'PAN-CB-B', 'PAN-CB-C', 'PAN-CB-D'];
-    const staleTime = new Date(NOW - 30 * 60 * 1000).toISOString();
-    let callCount = 0;
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(actions).toHaveLength(0);
+  });
 
-    for (let i = 0; i < 4; i++) {
-      writeReviewStatus({
-        [KEYS[i]]: {
-          issueId: KEYS[i],
-          readyForMerge: true,
-          mergeStatus: undefined,
-          updatedAt: staleTime,
-        },
-      });
-      await checkReadyForMergeStuck();
-      callCount = mockFetch.mock.calls.length;
-    }
+  it('skips an issue with no updatedAt timestamp', async () => {
+    writeReviewStatus({
+      'PAN-344': {
+        issueId: 'PAN-344',
+        readyForMerge: true,
+        mergeStatus: undefined,
+        // no updatedAt field
+      },
+    });
 
-    // All 4 distinct keys should have triggered once each (circuit breaker is per-key)
-    expect(callCount).toBe(4);
+    const actions = await checkReadyForMergeStuck();
 
-    // Now verify that a single key DOES hit the circuit breaker after 3 attempts.
-    // We can't easily advance the cooldown in unit tests, so we test by simulating
-    // repeated calls at a future time using vi.setSystemTime.
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(actions).toHaveLength(0);
+  });
+
+  it('circuit breaker stops triggering after 3 attempts for the same issue', async () => {
+    // Use a unique key isolated from other tests (module-level Maps persist within a file)
     const CKEY = 'PAN-CB-SINGLE';
 
     vi.useFakeTimers();
-    let fakeNow = NOW + 60 * 60 * 1000; // start 1 hour in the future
+    // Start far in the future to avoid colliding with real-clock tests
+    let fakeNow = NOW + 100 * 60 * 60 * 1000; // +100 hours
 
+    // Make 3 successful attempts, advancing past the 10-min cooldown each time
     for (let attempt = 0; attempt < 3; attempt++) {
       vi.setSystemTime(fakeNow);
       writeReviewStatus({
@@ -240,17 +215,17 @@ describe('checkReadyForMergeStuck', () => {
           issueId: CKEY,
           readyForMerge: true,
           mergeStatus: undefined,
-          // status is always "old enough" relative to current fake time
           updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
         },
       });
       await checkReadyForMergeStuck();
-      fakeNow += 11 * 60 * 1000; // advance 11 min (past cooldown)
+      fakeNow += 11 * 60 * 1000; // advance 11 min (past the 10-min cooldown)
     }
 
     const callsAfterThree = mockFetch.mock.calls.length;
+    expect(callsAfterThree).toBeGreaterThanOrEqual(3);
 
-    // 4th attempt — should be blocked by circuit breaker
+    // 4th attempt — should be blocked by the circuit breaker
     vi.setSystemTime(fakeNow);
     writeReviewStatus({
       [CKEY]: {
@@ -263,7 +238,6 @@ describe('checkReadyForMergeStuck', () => {
     await checkReadyForMergeStuck();
     vi.useRealTimers();
 
-    // No additional call after 3 attempts
     expect(mockFetch.mock.calls.length).toBe(callsAfterThree);
   });
 });
