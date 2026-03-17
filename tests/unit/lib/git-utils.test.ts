@@ -6,11 +6,11 @@ vi.mock('child_process', () => ({
 }));
 
 import { exec } from 'child_process';
-import { getWorkspaceCommitHashes } from '../../../src/lib/git-utils.js';
+import { getWorkspaceGitInfo } from '../../../src/lib/git-utils.js';
 
 const mockExec = vi.mocked(exec);
 
-describe('getWorkspaceCommitHashes', () => {
+describe('getWorkspaceGitInfo', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
@@ -26,7 +26,7 @@ describe('getWorkspaceCommitHashes', () => {
       return {} as any;
     });
 
-    const result = await getWorkspaceCommitHashes('/some/workspace');
+    const result = await getWorkspaceGitInfo('/some/workspace');
 
     expect(result.HEAD).toBe('abc1234def5678abc1234def5678abc1234def56');
     expect(result.branch).toBe('feature/pan-342');
@@ -42,7 +42,7 @@ describe('getWorkspaceCommitHashes', () => {
       return {} as any;
     });
 
-    const result = await getWorkspaceCommitHashes('/some/workspace');
+    const result = await getWorkspaceGitInfo('/some/workspace');
 
     expect(result.HEAD).toBe('deadbeef');
     expect(result.branch).toBe('main');
@@ -54,8 +54,8 @@ describe('getWorkspaceCommitHashes', () => {
       return {} as any;
     });
 
-    await expect(getWorkspaceCommitHashes('/not/a/repo')).rejects.toThrow(
-      'getWorkspaceCommitHashes failed for /not/a/repo'
+    await expect(getWorkspaceGitInfo('/not/a/repo')).rejects.toThrow(
+      'getWorkspaceGitInfo failed for /not/a/repo'
     );
   });
 });

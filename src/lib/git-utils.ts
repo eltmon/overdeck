@@ -139,7 +139,7 @@ export async function cleanupStaleLocks(repoPath: string): Promise<{
 }
 
 /**
- * Result of getWorkspaceCommitHashes.
+ * Result of getWorkspaceGitInfo.
  * Note: `branch` is the branch name (not a hash) despite the parent function name.
  */
 export interface WorkspaceCommitInfo {
@@ -159,7 +159,7 @@ export interface WorkspaceCommitInfo {
  * @returns WorkspaceCommitInfo with HEAD SHA and branch name
  * @throws Error if git commands fail (e.g. path is not a git repository)
  */
-export async function getWorkspaceCommitHashes(workspacePath: string): Promise<WorkspaceCommitInfo> {
+export async function getWorkspaceGitInfo(workspacePath: string): Promise<WorkspaceCommitInfo> {
   try {
     const [headResult, branchResult] = await Promise.all([
       execAsync('git rev-parse HEAD', { cwd: workspacePath }),
@@ -171,7 +171,7 @@ export async function getWorkspaceCommitHashes(workspacePath: string): Promise<W
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`getWorkspaceCommitHashes failed for ${workspacePath}: ${msg}`);
+    throw new Error(`getWorkspaceGitInfo failed for ${workspacePath}: ${msg}`);
   }
 }
 
