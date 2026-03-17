@@ -1,6 +1,6 @@
 # PAN-336: Unify Verification Gate into Quality Gates System
 
-## Current Status: PLANNED
+## Current Status: IMPLEMENTATION COMPLETE
 
 ## Summary
 
@@ -36,4 +36,4 @@ Three failures exposed during MIN-779: planning was skipped, verification gate i
 
 ## Remaining Work
 
-All tasks above.
+None — all tasks complete. Tests pass (135/135).
