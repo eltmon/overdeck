@@ -387,14 +387,31 @@ export async function runQualityGates(
     }
 
     // Command gate (default)
+
+    // For remote workspaces, build and validate the SSH command BEFORE entering
+    // the try/catch so validation errors propagate as real errors (not gate failures).
+    const isRemote = opts.isRemote && opts.vmName;
+    let resolvedCommand: string;
+    if (isRemote) {
+      // Validate cwd (which may include gate.path) — not just the base projectPath.
+      // A gate.path like "frontend;rm -rf /" would produce an unsafe cwd after join.
+      if (!/^[a-zA-Z0-9/_\-.]+$/.test(cwd)) {
+        throw new Error(`Gate "${name}" path resolves to unsafe characters for SSH: ${cwd}`);
+      }
+      // Validate gate.command doesn't contain double quotes — a " in the command would
+      // end the SSH double-quoted string and allow local command injection:
+      //   ssh host "cd /path && legit; injected"  ← breaks when command contains "
+      if (gate.command.includes('"')) {
+        throw new Error(`Gate "${name}" command contains double quotes which are unsafe in SSH context`);
+      }
+      resolvedCommand = `ssh -A ${opts.vmName}.exe.xyz "cd ${cwd} && ${gate.command}"`;
+    } else {
+      resolvedCommand = gate.command;
+    }
+
     try {
       const env = { ...process.env, ...gate.env };
-      // For remote workspaces, wrap the command with SSH instead of using cwd.
-      const isRemote = opts.isRemote && opts.vmName;
-      const command = isRemote
-        ? `ssh -A ${opts.vmName}.exe.xyz "cd ${cwd} && ${gate.command}"`
-        : gate.command;
-      const { stdout, stderr } = await execAsync(command, {
+      const { stdout, stderr } = await execAsync(resolvedCommand, {
         cwd: isRemote ? undefined : cwd,
         env,
         maxBuffer: 10 * 1024 * 1024, // 10MB
