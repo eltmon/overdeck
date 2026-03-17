@@ -908,8 +908,12 @@ export async function spawnMergeAgentForBranches(
         { cwd: projectPath, encoding: 'utf-8' }
       );
       isAlreadyMerged = true;
-    } catch {
+    } catch (e: any) {
       // exit code 1 means not an ancestor — proceed with merge
+      // any other exit code is a real error; propagate it
+      if (e.code !== 1) {
+        throw e;
+      }
     }
     if (isAlreadyMerged) {
       const message = `Branch ${sourceBranch} is already integrated into ${targetBranch} — no merge needed`;
