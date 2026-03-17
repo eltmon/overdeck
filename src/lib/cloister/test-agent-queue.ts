@@ -13,7 +13,7 @@ import {
   checkSpecialistQueue,
   submitToSpecialistQueue,
 } from './specialists.js';
-import type { SpecialistQueueItem } from './specialists.js';
+import type { HookItem } from '../hooks.js';
 
 /**
  * Attempt to wake or queue the test-agent for a given issue, then notify
@@ -41,7 +41,7 @@ export async function autoQueueTestAgentAndNotify(
     // Dedup: skip if test-agent already has this issue queued
     const testQueue = checkSpecialistQueue('test-agent');
     const alreadyQueued = testQueue.items.some(
-      (item: SpecialistQueueItem) =>
+      (item: HookItem) =>
         item.payload?.issueId?.toLowerCase() === issueId.toLowerCase(),
     );
 
