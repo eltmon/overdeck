@@ -139,6 +139,23 @@ export async function cleanupStaleLocks(repoPath: string): Promise<{
 }
 
 /**
+ * Get the current HEAD commit SHA and branch name for a workspace
+ *
+ * @param workspacePath - Path to the git workspace
+ * @returns Object with HEAD SHA and branch name
+ */
+export async function getWorkspaceCommitHashes(workspacePath: string): Promise<Record<string, string>> {
+  const [headResult, branchResult] = await Promise.all([
+    execAsync('git rev-parse HEAD', { cwd: workspacePath }),
+    execAsync('git rev-parse --abbrev-ref HEAD', { cwd: workspacePath }),
+  ]);
+  return {
+    HEAD: headResult.stdout.trim(),
+    branch: branchResult.stdout.trim(),
+  };
+}
+
+/**
  * Check if a repository has stale lock files
  *
  * @param repoPath - Path to the git repository
