@@ -895,6 +895,36 @@ export async function spawnMergeAgentForBranches(
     return { success: false, reason: `Pre-flight check failed: ${error.message}` };
   }
 
+  // 3. No-op check: if sourceBranch is already an ancestor of targetBranch, skip the merge
+  try {
+    await execAsync(`git fetch origin ${sourceBranch} ${targetBranch}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    let isAlreadyMerged = false;
+    try {
+      await execAsync(
+        `git merge-base --is-ancestor origin/${sourceBranch} origin/${targetBranch}`,
+        { cwd: projectPath, encoding: 'utf-8' }
+      );
+      isAlreadyMerged = true;
+    } catch (e: any) {
+      // exit code 1 means not an ancestor — proceed with merge
+      // any other exit code is a real error; propagate it
+      if (e.code !== 1) {
+        throw e;
+      }
+    }
+    if (isAlreadyMerged) {
+      const message = `Branch ${sourceBranch} is already integrated into ${targetBranch} — no merge needed`;
+      console.log(`[merge-agent] ${message}`);
+      logActivity('merge_skipped', message);
+      return { success: true, reason: message };
+    }
+  } catch (ancestorErr: any) {
+    console.warn(`[merge-agent] Ancestor check failed: ${ancestorErr.message} (continuing)`);
+  }
+
   // Record current HEAD to detect when merge happens (polling compares against this)
   const { stdout: headBeforeRaw } = await execAsync('git rev-parse HEAD', {
     cwd: projectPath,
@@ -1056,7 +1086,7 @@ Report any issues or conflicts you encountered.`;
   // "Interrupted" behavior — the running tool gets cancelled and the
   // previous merge is abandoned mid-flight.
   if (mergeProjectKey) {
-    const { getAgentRuntimeState } = await import('../agents.js');
+    const { getAgentRuntimeState, saveAgentRuntimeState } = await import('../agents.js');
     const IDLE_POLL_INTERVAL = 3000; // 3 seconds
     const IDLE_MAX_WAIT = 360000; // 6 minutes (slightly longer than specialist timeout)
     const idleStart = Date.now();
@@ -1065,6 +1095,16 @@ Report any issues or conflicts you encountered.`;
       const state = getAgentRuntimeState(mergeSession);
       if (!state || state.state === 'idle' || state.state === 'suspended') {
         break; // Specialist is idle, safe to send
+      }
+      // Dead-session check: if runtime.json says active but tmux session is gone,
+      // the specialist died without resetting state. Reset to idle and proceed immediately.
+      try {
+        await execAsync(`tmux has-session -t "${mergeSession}" 2>/dev/null`);
+      } catch {
+        // tmux has-session exits non-zero when the session does not exist
+        console.log(`[merge-agent] Specialist session ${mergeSession} is dead (state was ${state.state}), resetting to idle`);
+        saveAgentRuntimeState(mergeSession, { state: 'idle', lastActivity: new Date().toISOString() });
+        break;
       }
       console.log(`[merge-agent] Specialist busy (state: ${state.state}, issue: ${state.currentIssue}), waiting...`);
       await new Promise(resolve => setTimeout(resolve, IDLE_POLL_INTERVAL));
@@ -1281,7 +1321,7 @@ Report any issues or conflicts you encountered.`;
       }
 
       // Check if merge-agent is still running
-      if (!isRunning('merge-agent')) {
+      if (!(await isRunning('merge-agent', mergeProjectKey ?? undefined))) {
         console.error(`[merge-agent] Specialist stopped unexpectedly`);
         logActivity('merge_error', 'Specialist stopped unexpectedly');
         return {

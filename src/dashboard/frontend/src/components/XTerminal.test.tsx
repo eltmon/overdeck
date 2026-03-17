@@ -3,6 +3,36 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { XTerminal } from './XTerminal';
 
+// Mock xterm.js — it performs real DOM/media-query operations that break in jsdom.
+// Use plain classes (no vi.fn() methods) so vi.clearAllMocks() doesn't clear them.
+vi.mock('@xterm/xterm', () => ({
+  Terminal: class {
+    options: Record<string, unknown> = {};
+    rows = 24;
+    cols = 80;
+    loadAddon(): void {}
+    open(): void {}
+    writeln(): void {}
+    write(): void {}
+    clear(): void {}
+    dispose(): void {}
+    onData(): { dispose(): void } { return { dispose() {} }; }
+    onSelectionChange(): { dispose(): void } { return { dispose() {} }; }
+    onResize(): { dispose(): void } { return { dispose() {} }; }
+    getSelection(): string { return ''; }
+    hasSelection(): boolean { return false; }
+  },
+}));
+
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: class {
+    fit(): void {}
+    dispose(): void {}
+  },
+}));
+
+vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
+
 // Mock localStorage
 const localStorageMock: Storage = {
   getItem: vi.fn(),

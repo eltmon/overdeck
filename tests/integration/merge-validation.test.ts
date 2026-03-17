@@ -236,10 +236,10 @@ exit 1
         issueId: 'TEST-NO-SCRIPT',
       });
 
-      // Verify
-      expect(result.success).toBe(false);
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('Validation script not found');
+      // No validation script = skip (specialist already ran build + tests)
+      expect(result.success).toBe(true);
+      expect(result.valid).toBe(true);
+      expect(result.skipped).toBe(true);
     });
   });
 });
