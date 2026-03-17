@@ -895,6 +895,32 @@ export async function spawnMergeAgentForBranches(
     return { success: false, reason: `Pre-flight check failed: ${error.message}` };
   }
 
+  // 3. No-op check: if sourceBranch is already an ancestor of targetBranch, skip the merge
+  try {
+    await execAsync(`git fetch origin ${sourceBranch} ${targetBranch}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    let isAlreadyMerged = false;
+    try {
+      await execAsync(
+        `git merge-base --is-ancestor origin/${sourceBranch} origin/${targetBranch}`,
+        { cwd: projectPath, encoding: 'utf-8' }
+      );
+      isAlreadyMerged = true;
+    } catch {
+      // exit code 1 means not an ancestor — proceed with merge
+    }
+    if (isAlreadyMerged) {
+      const message = `Branch ${sourceBranch} is already integrated into ${targetBranch} — no merge needed`;
+      console.log(`[merge-agent] ${message}`);
+      logActivity('merge_skipped', message);
+      return { success: true, reason: message };
+    }
+  } catch (ancestorErr: any) {
+    console.warn(`[merge-agent] Ancestor check failed: ${ancestorErr.message} (continuing)`);
+  }
+
   // Record current HEAD to detect when merge happens (polling compares against this)
   const { stdout: headBeforeRaw } = await execAsync('git rev-parse HEAD', {
     cwd: projectPath,
@@ -1291,7 +1317,7 @@ Report any issues or conflicts you encountered.`;
       }
 
       // Check if merge-agent is still running
-      if (!isRunning('merge-agent')) {
+      if (!(await isRunning('merge-agent', mergeProjectKey ?? undefined))) {
         console.error(`[merge-agent] Specialist stopped unexpectedly`);
         logActivity('merge_error', 'Specialist stopped unexpectedly');
         return {
