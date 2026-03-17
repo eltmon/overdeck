@@ -112,6 +112,7 @@ export interface DeaconState {
   patrolCycle: number;
   recentDeaths: string[];        // ISO timestamps of recent deaths
   lastMassDeathAlert?: string;   // ISO 8601
+  mergeStuckAttempts?: Record<string, number>;  // circuit-breaker attempt counts (PAN-344)
 }
 
 /**
@@ -1218,9 +1219,9 @@ const MERGE_STUCK_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
 // Circuit breaker: stop attempting after this many tries
 const MERGE_STUCK_MAX_ATTEMPTS = 3;
 
-// In-memory state for stuck-merge detection (survives within a process lifetime)
+// In-memory cooldowns for stuck-merge detection (reset on server restart is acceptable —
+// cooldowns are a performance optimisation, not critical state)
 const mergeStuckCooldowns = new Map<string, number>();
-const mergeStuckAttempts = new Map<string, number>();
 
 /**
  * Safety-net patrol: find issues that are readyForMerge but not yet merging/merged
@@ -1254,6 +1255,9 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 
     const now = Date.now();
     const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+    const state = loadState();
+    const attemptCounts = state.mergeStuckAttempts ?? {};
+    let stateModified = false;
 
     for (const [key, status] of Object.entries(statuses)) {
       // Only act on issues that are ready but not yet merging/merged/failed
@@ -1266,26 +1270,25 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
       const statusAge = now - new Date(status.updatedAt).getTime();
       if (statusAge < MERGE_STUCK_STALENESS_MS) continue;
 
-      // Per-issue cooldown
+      // Per-issue cooldown (in-memory — reset on restart is acceptable for a rate-limiter)
       const lastAttempt = mergeStuckCooldowns.get(key);
       if (lastAttempt && (now - lastAttempt) < MERGE_STUCK_COOLDOWN_MS) continue;
 
-      // Circuit breaker
-      const attempts = mergeStuckAttempts.get(key) ?? 0;
+      // Circuit breaker (persisted to deacon state so restart doesn't reset the count)
+      const attempts = attemptCounts[key] ?? 0;
       if (attempts >= MERGE_STUCK_MAX_ATTEMPTS) {
         console.log(`[deacon] Merge stuck circuit breaker active for ${key} (${attempts}/${MERGE_STUCK_MAX_ATTEMPTS} attempts)`);
         continue;
       }
 
       const issueId = status.issueId || key;
-      const ageMin = status.updatedAt
-        ? Math.round((now - new Date(status.updatedAt).getTime()) / 60000)
-        : '?';
+      const ageMin = Math.round((now - new Date(status.updatedAt).getTime()) / 60000);
       console.log(`[deacon] readyForMerge stuck for ${key} (age: ${ageMin}m, attempts: ${attempts}), triggering merge...`);
 
       // Record attempt before the call so a crash doesn't leave us in a retry loop
       mergeStuckCooldowns.set(key, now);
-      mergeStuckAttempts.set(key, attempts + 1);
+      attemptCounts[key] = attempts + 1;
+      stateModified = true;
 
       try {
         const response = await fetch(`http://localhost:${apiPort}/api/workspaces/${issueId}/merge`, {
@@ -1307,6 +1310,12 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
         console.error(`[deacon] Stuck-merge trigger fetch failed for ${key}:`, msg);
         actions.push(`Stuck-merge trigger failed for ${key}: ${msg}`);
       }
+    }
+
+    // Persist updated attempt counts so circuit breaker survives server restarts
+    if (stateModified) {
+      state.mergeStuckAttempts = attemptCounts;
+      saveState(state);
     }
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
