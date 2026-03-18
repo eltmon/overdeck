@@ -60,6 +60,7 @@ export async function runVerificationForIssue(
       projectConfig?.quality_gates && Object.keys(projectConfig.quality_gates).length > 0
         ? projectConfig.quality_gates
         : DEFAULT_GATES;
+    console.log(`[${logPrefix}] Project: ${projectConfig?.name || 'NOT FOUND'}, gates: [${Object.keys(gates).join(', ')}], workspace: ${workspacePath}`);
 
     const gateResults = await runQualityGates(gates, workspacePath, 'pre_push', {
       isRemote: workspaceInfo.isRemote,
