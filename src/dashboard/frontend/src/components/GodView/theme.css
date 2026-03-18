@@ -1,0 +1,149 @@
+/* God View Design System — PAN-341 */
+/* Scoped under .god-view to avoid polluting global styles */
+
+@import '@fontsource/space-grotesk/400.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+
+:root {
+  --gv-bg: #0a0e1a;
+  --gv-surface: rgba(21, 27, 43, 0.7);
+  --gv-surface-solid: #151b2b;
+  --gv-border: rgba(30, 38, 56, 0.8);
+  --gv-border-bright: rgba(0, 212, 255, 0.3);
+
+  --gv-blue: #00d4ff;
+  --gv-pink: #ff2d7c;
+  --gv-green: #39ff14;
+  --gv-amber: #ffb800;
+  --gv-purple: #9d4edd;
+
+  --gv-text-primary: #e8edf8;
+  --gv-text-secondary: #7a8aaa;
+  --gv-text-dim: #4a5a7a;
+
+  --gv-font-display: 'Space Grotesk', system-ui, sans-serif;
+  --gv-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --gv-blur: blur(12px);
+  --gv-glow-blue: 0 0 20px rgba(0, 212, 255, 0.3);
+  --gv-glow-pink: 0 0 20px rgba(255, 45, 124, 0.3);
+  --gv-glow-green: 0 0 20px rgba(57, 255, 20, 0.3);
+  --gv-glow-amber: 0 0 20px rgba(255, 184, 0, 0.3);
+}
+
+.god-view {
+  background: var(--gv-bg);
+  color: var(--gv-text-primary);
+  font-family: var(--gv-font-display);
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Glassmorphism panel */
+.gv-glass {
+  background: var(--gv-surface);
+  backdrop-filter: var(--gv-blur);
+  -webkit-backdrop-filter: var(--gv-blur);
+  border: 1px solid var(--gv-border);
+  border-radius: 12px;
+}
+
+/* Status colors */
+.gv-status-healthy { color: var(--gv-green); }
+.gv-status-warning { color: var(--gv-amber); }
+.gv-status-stuck   { color: var(--gv-pink); }
+.gv-status-dead    { color: var(--gv-text-dim); }
+.gv-status-stopped { color: var(--gv-text-dim); }
+
+/* Breathing glow animation for borders */
+@keyframes gv-breathe-blue {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 212, 255, 0.15); }
+  50%       { box-shadow: 0 0 20px rgba(0, 212, 255, 0.45); }
+}
+
+@keyframes gv-breathe-green {
+  0%, 100% { box-shadow: 0 0 8px rgba(57, 255, 20, 0.15); }
+  50%       { box-shadow: 0 0 20px rgba(57, 255, 20, 0.45); }
+}
+
+@keyframes gv-breathe-amber {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 184, 0, 0.15); }
+  50%       { box-shadow: 0 0 20px rgba(255, 184, 0, 0.45); }
+}
+
+@keyframes gv-breathe-pink {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 45, 124, 0.15); }
+  50%       { box-shadow: 0 0 20px rgba(255, 45, 124, 0.45); }
+}
+
+/* Pulse animation for status pills */
+@keyframes gv-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(0.92); }
+}
+
+/* Scan line effect for terminals */
+@keyframes gv-scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+/* Slide-in for activity feed items */
+@keyframes gv-slide-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Logo glow pulse */
+@keyframes gv-logo-glow {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(0, 212, 255, 0.6)); }
+  50%       { filter: drop-shadow(0 0 14px rgba(0, 212, 255, 1)); }
+}
+
+.gv-breathe-healthy { animation: gv-breathe-green 3s ease-in-out infinite; }
+.gv-breathe-warning { animation: gv-breathe-amber 2s ease-in-out infinite; }
+.gv-breathe-stuck   { animation: gv-breathe-pink 1.5s ease-in-out infinite; }
+.gv-breathe-dead    { box-shadow: none; }
+
+.gv-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.gv-status-pill.healthy {
+  background: rgba(57, 255, 20, 0.15);
+  color: var(--gv-green);
+  animation: gv-pulse 2s ease-in-out infinite;
+}
+
+.gv-status-pill.warning {
+  background: rgba(255, 184, 0, 0.15);
+  color: var(--gv-amber);
+  animation: gv-pulse 1.5s ease-in-out infinite;
+}
+
+.gv-status-pill.stuck {
+  background: rgba(255, 45, 124, 0.15);
+  color: var(--gv-pink);
+  animation: gv-pulse 1s ease-in-out infinite;
+}
+
+.gv-status-pill.dead,
+.gv-status-pill.stopped {
+  background: rgba(74, 90, 122, 0.2);
+  color: var(--gv-text-dim);
+}
+
+.gv-mono {
+  font-family: var(--gv-font-mono);
+}
