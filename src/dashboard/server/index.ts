@@ -2297,6 +2297,111 @@ app.get('/api/agents/:id/activity', (req, res) => {
   }
 });
 
+// ─── God View REST Endpoints (PAN-341) ────────────────────────────────────────
+
+// GET /api/agents/:id/files — files touched by agent (git diff HEAD~1 or diff)
+app.get('/api/agents/:id/files', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const agentState = getAgentState(id);
+    if (!agentState?.workspace) {
+      return res.json({ files: [] });
+    }
+    const workspacePath = agentState.workspace;
+    if (!existsSync(workspacePath)) {
+      return res.json({ files: [] });
+    }
+    // Get staged + unstaged changes
+    const { stdout } = await execAsync(
+      'git diff --name-status HEAD 2>/dev/null || git status --porcelain 2>/dev/null || echo ""',
+      { cwd: workspacePath, encoding: 'utf-8' }
+    );
+    const files = stdout
+      .split('\n')
+      .filter(l => l.trim())
+      .map(l => {
+        const parts = l.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          return { status: parts[0], path: parts[parts.length - 1] };
+        }
+        return { status: '?', path: l.trim() };
+      })
+      .filter(f => f.path);
+    res.json({ files });
+  } catch (err) {
+    console.error('[god-view] files error:', err);
+    res.json({ files: [] });
+  }
+});
+
+// GET /api/agents/:id/timeline — agent event timeline (health_events + activity)
+app.get('/api/agents/:id/timeline', (req, res) => {
+  const { id } = req.params;
+  const limit = parseInt(req.query.limit as string) || 50;
+  try {
+    const activity = getActivity(id, limit);
+    const agentState = getAgentState(id);
+    const events = activity.map((a: any) => ({
+      timestamp: a.timestamp || new Date().toISOString(),
+      type: a.type || 'activity',
+      message: a.message || a.content || '',
+    }));
+    // Add start event
+    if (agentState?.startedAt) {
+      events.unshift({ timestamp: agentState.startedAt, type: 'started', message: 'Agent started' });
+    }
+    events.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    res.json({ timeline: events.slice(0, limit) });
+  } catch (err) {
+    console.error('[god-view] timeline error:', err);
+    res.json({ timeline: [] });
+  }
+});
+
+// System health cache for God View
+let godViewSystemHealthCache: { cpu: number; memPercent: number; memUsed: number; memTotal: number; updatedAt: string } | null = null;
+let godViewHealthRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+
+async function refreshGodViewSystemHealth() {
+  try {
+    const { cpus, freemem, totalmem } = await import('os');
+    const cpuList = cpus();
+    // CPU usage: average of all cores (idle vs total)
+    const cpuUsage = cpuList.reduce((acc: number, cpu) => {
+      const total = Object.values(cpu.times).reduce((s, t) => s + t, 0);
+      const idle = cpu.times.idle;
+      return acc + ((total - idle) / total) * 100;
+    }, 0) / cpuList.length;
+    const memTotal = totalmem();
+    const memFree = freemem();
+    godViewSystemHealthCache = {
+      cpu: Math.round(cpuUsage * 10) / 10,
+      memPercent: Math.round(((memTotal - memFree) / memTotal) * 1000) / 10,
+      memUsed: memTotal - memFree,
+      memTotal,
+      updatedAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.error('[god-view] system health refresh error:', err);
+  }
+  // Refresh every 10s
+  godViewHealthRefreshTimeout = setTimeout(refreshGodViewSystemHealth, 10000);
+}
+
+// Start background health refresh
+refreshGodViewSystemHealth();
+
+// GET /api/godview/system-health — CPU, memory stats
+app.get('/api/godview/system-health', (_req, res) => {
+  if (godViewSystemHealthCache) {
+    return res.json(godViewSystemHealthCache);
+  }
+  // Return defaults if not yet populated
+  res.json({ cpu: 0, memPercent: 0, memUsed: 0, memTotal: 0, updatedAt: new Date().toISOString() });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Suspend an agent (save session ID, kill tmux)
 app.post('/api/agents/:id/suspend', async (req, res) => {
   const { id } = req.params;
@@ -14702,6 +14807,89 @@ server.listen(PORT, '0.0.0.0', async () => {
   } catch (error: any) {
     console.error('Failed to wire pipeline handler:', error.message);
   }
+
+  // ─── God View Socket.io streaming (PAN-341) ────────────────────────────────
+  // Debounced terminal output capture: every 2s, capture last 30 lines per agent
+  const godViewOutputDebounce = new Map<string, ReturnType<typeof setTimeout>>();
+  const godViewLastStatus = new Map<string, string>();
+
+  async function captureAgentOutputForGodView(agentId: string) {
+    try {
+      const { stdout } = await execAsync(
+        `tmux capture-pane -t "${agentId}" -p -S -30 2>/dev/null || echo ""`,
+        { encoding: 'utf-8' }
+      );
+      if (stdout.trim()) {
+        socketIo.emit('godview:agent-output', { agentId, lines: stdout.split('\n').slice(-30) });
+      }
+    } catch {
+      // tmux session may not exist — ignore
+    }
+  }
+
+  function scheduleGodViewOutput(agentId: string) {
+    if (godViewOutputDebounce.has(agentId)) return;
+    const t = setTimeout(async () => {
+      godViewOutputDebounce.delete(agentId);
+      await captureAgentOutputForGodView(agentId);
+    }, 2000);
+    godViewOutputDebounce.set(agentId, t);
+  }
+
+  // Poll agent statuses every 3s; emit godview:status-change on transitions
+  setInterval(async () => {
+    try {
+      const agentsDir = join(homedir(), '.panopticon', 'agents');
+      if (!existsSync(agentsDir)) return;
+      for (const name of readdirSync(agentsDir)) {
+        const stateFile = join(agentsDir, name, 'state.json');
+        if (!existsSync(stateFile)) continue;
+        try {
+          const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+          const { id, status } = state;
+          if (!id) continue;
+          const prev = godViewLastStatus.get(id);
+          if (prev !== status) {
+            godViewLastStatus.set(id, status);
+            socketIo.emit('godview:status-change', { agentId: id, status, previousStatus: prev });
+          }
+          // Schedule terminal output capture for running agents
+          if (status === 'running' || status === 'healthy') {
+            scheduleGodViewOutput(id);
+          }
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
+  }, 3000);
+
+  // Broadcast global activity feed every 5s (last 20 events across all agents)
+  setInterval(async () => {
+    try {
+      const agentsDir = join(homedir(), '.panopticon', 'agents');
+      if (!existsSync(agentsDir)) return;
+      const allEvents: Array<{ agentId: string; timestamp: string; type: string; message: string }> = [];
+      for (const name of readdirSync(agentsDir)) {
+        try {
+          const activityFile = join(agentsDir, name, 'activity.jsonl');
+          if (!existsSync(activityFile)) continue;
+          const lines = readFileSync(activityFile, 'utf-8').split('\n').filter(l => l.trim()).slice(-10);
+          for (const line of lines) {
+            try {
+              const e = JSON.parse(line);
+              allEvents.push({ agentId: name.replace(/^agent-/, ''), timestamp: e.timestamp || '', type: e.type || 'activity', message: e.message || e.content || '' });
+            } catch { /* skip */ }
+          }
+        } catch { /* skip */ }
+      }
+      allEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      if (allEvents.length > 0) {
+        socketIo.emit('godview:activity', { events: allEvents.slice(0, 20) });
+      }
+    } catch { /* skip */ }
+  }, 5000);
+
+  console.log('God View Socket.io streaming started (PAN-341)');
+  // ──────────────────────────────────────────────────────────────────────────
 
   // BUILD FRESHNESS CHECK: Warn if the compiled server.js is older than the latest commit.
   // This catches the exact scenario that caused PAN-328: guards were added in source but

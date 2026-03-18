@@ -17,6 +17,7 @@ import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
 import { MissionControl } from './components/MissionControl';
 import { ResourcesPanel } from './components/ResourcesPanel';
+import { GodViewPage } from './components/GodView';
 import { Header, Tab } from './components/Header';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
 import { AlertTriangle } from 'lucide-react';
@@ -50,6 +51,7 @@ const TAB_PATHS: Record<Tab, string> = {
   skills: '/skills',
   health: '/health',
   settings: '/settings',
+  'god-view': '/god-view',
 };
 
 const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
@@ -362,6 +364,11 @@ export default function App() {
         {activeTab === 'settings' && (
           <div className="p-6 w-full overflow-auto">
             <SettingsPage />
+          </div>
+        )}
+        {activeTab === 'god-view' && (
+          <div className="w-full h-full overflow-hidden">
+            <GodViewPage />
           </div>
         )}
       </main>

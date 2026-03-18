@@ -72,6 +72,7 @@
 | Document | Description |
 |----------|-------------|
 | [SETTINGS-UI-DESIGN.md](./SETTINGS-UI-DESIGN.md) | Settings page design and implementation |
+| [god-view.md](./god-view.md) | God View — real-time agent activity command center (PAN-341) |
 
 ---
 
