@@ -39,7 +39,7 @@ function parseAnsiLine(raw: string): TextSegment[] {
 
     const codes = match[1].split(';').map(Number);
     for (const code of codes) {
-      if (code === 0 || code === '') { currentColor = ANSI_RESET; currentBold = false; }
+      if (code === 0) { currentColor = ANSI_RESET; currentBold = false; }
       else if (code === 1) { currentBold = true; }
       else if (code === 22) { currentBold = false; }
       else if (ANSI_COLORS[String(code)]) { currentColor = ANSI_COLORS[String(code)]; }
