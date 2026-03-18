@@ -3,6 +3,7 @@
  *
  * Atomic operations:
  *   archive-planning  — PRD active→completed + .planning/ preservation
+ *   clean-planning    — Remove ephemeral .planning/ files from main after merge
  *   close-issue       — IssueTracker transition + label management
  *   teardown-workspace — Full workspace cleanup (agent, worktree, Docker, tmux)
  *   compact-beads     — Beads compaction + git commit/push
@@ -29,6 +30,7 @@ export { stepOk, stepSkipped, stepFailed } from './types.js';
 
 // Atomic operations (will be added as they are created)
 export { archivePlanning } from './archive-planning.js';
+export { cleanPlanningArtifacts } from './clean-planning.js';
 export { closeIssue } from './close-issue.js';
 export { teardownWorkspace } from './teardown-workspace.js';
 export { compactBeads } from './compact-beads.js';
