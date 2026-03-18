@@ -65,7 +65,7 @@ export function syncWalFromAllProjects(): SyncResult {
       if (events.length === 0) continue;
 
       try {
-        const { inserted, duplicates } = insertCostEvents(events);
+        const { inserted, duplicates } = insertCostEvents(events, filePath);
         projectStats.imported += inserted;
         projectStats.duplicates += duplicates;
         projectStats.files++;
@@ -108,7 +108,7 @@ export function syncWalFromDir(eventsDir: string): { imported: number; duplicate
     if (events.length === 0) continue;
 
     try {
-      const { inserted, duplicates } = insertCostEvents(events);
+      const { inserted, duplicates } = insertCostEvents(events, filePath);
       stats.imported += inserted;
       stats.duplicates += duplicates;
       stats.files++;

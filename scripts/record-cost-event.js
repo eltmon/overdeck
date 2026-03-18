@@ -8384,15 +8384,16 @@ function getDatabase() {
 }
 
 // src/lib/database/cost-events-db.ts
-function insertCostEvent(event2) {
+function insertCostEvent(event2, sourceFile) {
   const db = getDatabase();
   try {
     const result = db.prepare(`
       INSERT OR IGNORE INTO cost_events (
         ts, agent_id, issue_id, session_type, provider, model,
         input, output, cache_read, cache_write, cost, request_id,
-        tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
+        source_file
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       event2.ts,
       event2.agentId,
@@ -8409,7 +8410,8 @@ function insertCostEvent(event2) {
       event2.tldrInterceptions ?? null,
       event2.tldrBypasses ?? null,
       event2.tldrTokensSaved ?? null,
-      event2.tldrBypassReasons ? JSON.stringify(event2.tldrBypassReasons) : null
+      event2.tldrBypassReasons ? JSON.stringify(event2.tldrBypassReasons) : null,
+      sourceFile ?? null
     );
     if (result.changes === 0) return null;
     return result.lastInsertRowid;

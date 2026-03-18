@@ -22,6 +22,45 @@ import {
 } from '../../lib/cost.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
 
+/**
+ * Run the cost sync action (shared by `pan cost sync` and `pan sync-costs`).
+ */
+export function runCostSync(): void {
+  try {
+    console.log(chalk.bold('Syncing cost events from project WAL files...'));
+    const result = syncWalFromAllProjects();
+
+    if (result.filesScanned === 0) {
+      console.log(chalk.yellow('No WAL files found. Make sure projects are registered and have cost events.'));
+      return;
+    }
+
+    console.log();
+    console.log(`Files scanned: ${result.filesScanned}`);
+    console.log(`Imported:     ${chalk.green(result.imported)} new events`);
+    console.log(`Duplicates:   ${chalk.dim(result.duplicates)} skipped`);
+
+    if (Object.keys(result.byProject).length > 0) {
+      console.log();
+      console.log(chalk.bold('By Project:'));
+      for (const [project, stats] of Object.entries(result.byProject)) {
+        console.log(`  ${project}: ${chalk.green(stats.imported)} imported, ${stats.files} file(s)`);
+      }
+    }
+
+    if (result.errors.length > 0) {
+      console.log();
+      console.log(chalk.yellow(`Warnings (${result.errors.length}):`));
+      for (const err of result.errors) {
+        console.log(`  ${chalk.dim(err)}`);
+      }
+    }
+  } catch (error: any) {
+    console.error(chalk.red('Error:'), error.message);
+    process.exit(1);
+  }
+}
+
 export function createCostCommand(): Command {
   const cost = new Command('cost')
     .description('Track and report AI usage costs');
@@ -362,41 +401,7 @@ export function createCostCommand(): Command {
   cost
     .command('sync')
     .description('Import cost events from per-project WAL files into the local database')
-    .action(() => {
-      try {
-        console.log(chalk.bold('Syncing cost events from project WAL files...'));
-        const result = syncWalFromAllProjects();
-
-        if (result.filesScanned === 0) {
-          console.log(chalk.yellow('No WAL files found. Make sure projects are registered and have cost events.'));
-          return;
-        }
-
-        console.log();
-        console.log(`Files scanned: ${result.filesScanned}`);
-        console.log(`Imported:     ${chalk.green(result.imported)} new events`);
-        console.log(`Duplicates:   ${chalk.dim(result.duplicates)} skipped`);
-
-        if (Object.keys(result.byProject).length > 0) {
-          console.log();
-          console.log(chalk.bold('By Project:'));
-          for (const [project, stats] of Object.entries(result.byProject)) {
-            console.log(`  ${project}: ${chalk.green(stats.imported)} imported, ${stats.files} file(s)`);
-          }
-        }
-
-        if (result.errors.length > 0) {
-          console.log();
-          console.log(chalk.yellow(`Warnings (${result.errors.length}):`));
-          for (const err of result.errors) {
-            console.log(`  ${chalk.dim(err)}`);
-          }
-        }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
-        process.exit(1);
-      }
-    });
+    .action(runCostSync);
 
   return cost;
 }

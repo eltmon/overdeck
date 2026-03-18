@@ -14693,15 +14693,17 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.error('Agent state cleanup failed:', error.message);
   }
 
-  // Import WAL cost events from all project repos on startup
-  try {
-    const walResult = syncWalFromAllProjects();
-    if (walResult.imported > 0) {
-      console.log(`WAL sync: imported ${walResult.imported} cost events (${walResult.duplicates} duplicates skipped)`);
+  // Import WAL cost events from all project repos on startup (deferred — non-blocking)
+  setImmediate(() => {
+    try {
+      const walResult = syncWalFromAllProjects();
+      if (walResult.imported > 0) {
+        console.log(`WAL sync: imported ${walResult.imported} cost events (${walResult.duplicates} duplicates skipped)`);
+      }
+    } catch (error: any) {
+      console.error('WAL startup sync failed (non-fatal):', error.message);
     }
-  } catch (error: any) {
-    console.error('WAL startup sync failed (non-fatal):', error.message);
-  }
+  });
 
   // Start IssueDataService for background polling + real-time push
   try {
