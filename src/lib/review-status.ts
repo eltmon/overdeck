@@ -68,6 +68,14 @@ export function setReviewStatus(
     readyForMerge: false,
   };
 
+  // Guard: reject reviewStatus regression from 'passed' to 'reviewing' unless the caller
+  // is explicitly resetting the merge lifecycle (update includes mergeStatus).
+  // This is belt-and-suspenders — endpoint-level guards should catch this first.
+  if (update.reviewStatus === 'reviewing' && existing.reviewStatus === 'passed' && update.mergeStatus === undefined) {
+    console.warn(`[review-status] Rejecting reviewStatus regression from 'passed' to 'reviewing' for ${issueId} (mergeStatus not being reset)`);
+    return existing as ReviewStatus;
+  }
+
   const merged = { ...existing, ...update };
 
   // Track status transitions in history (last 10 entries)

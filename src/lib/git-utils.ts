@@ -139,6 +139,43 @@ export async function cleanupStaleLocks(repoPath: string): Promise<{
 }
 
 /**
+ * Result of getWorkspaceGitInfo.
+ * Note: `branch` is the branch name (not a hash) despite the parent function name.
+ */
+export interface WorkspaceCommitInfo {
+  /** Full SHA of the HEAD commit */
+  HEAD: string;
+  /** Current branch name (e.g. "feature/pan-342") */
+  branch: string;
+}
+
+/**
+ * Get the current HEAD commit SHA and branch name for a workspace.
+ *
+ * Note: the return value includes `branch` (a name, not a hash) alongside `HEAD` (a SHA).
+ * The function name reflects its primary use-case of snapshotting commit state for review.
+ *
+ * @param workspacePath - Path to the git workspace
+ * @returns WorkspaceCommitInfo with HEAD SHA and branch name
+ * @throws Error if git commands fail (e.g. path is not a git repository)
+ */
+export async function getWorkspaceGitInfo(workspacePath: string): Promise<WorkspaceCommitInfo> {
+  try {
+    const [headResult, branchResult] = await Promise.all([
+      execAsync('git rev-parse HEAD', { cwd: workspacePath }),
+      execAsync('git rev-parse --abbrev-ref HEAD', { cwd: workspacePath }),
+    ]);
+    return {
+      HEAD: headResult.stdout.trim(),
+      branch: branchResult.stdout.trim(),
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`getWorkspaceGitInfo failed for ${workspacePath}: ${msg}`);
+  }
+}
+
+/**
  * Check if a repository has stale lock files
  *
  * @param repoPath - Path to the git repository

@@ -252,13 +252,50 @@ export async function postMergeLifecycle(issueId: string, projectPath: string): 
     console.warn(`[merge-agent] Could not move PRD: ${err}`);
   }
 
-  // 2. Close issue on tracker (fire-and-forget with circuit breaker)
+  // 2. Remove ephemeral planning artifacts from main (via lifecycle module)
+  try {
+    const { cleanPlanningArtifacts } = await import('../lifecycle/clean-planning.js');
+    const cleanResult = await cleanPlanningArtifacts({ issueId, projectPath });
+    if (cleanResult.success && !cleanResult.skipped) {
+      console.log(`[merge-agent] ✓ ${cleanResult.details?.join('; ')}`);
+      logActivity('planning_artifacts_cleaned', cleanResult.details?.join('; ') || 'Planning artifacts removed');
+    } else if (cleanResult.skipped) {
+      console.log(`[merge-agent] Planning artifact cleanup skipped: ${cleanResult.details?.join('; ')}`);
+    } else {
+      console.warn(`[merge-agent] Planning artifact cleanup failed: ${cleanResult.error}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not clean planning artifacts: ${err}`);
+  }
+
+  // 3. Close issue on tracker (fire-and-forget with circuit breaker)
   // This is decoupled from the merge lifecycle: failure to close the issue on the
   // tracker does NOT block the merge or cause retries. The close-out ceremony handles
   // any issues that weren't auto-closed.
   closeIssueWithCircuitBreaker(issueId, projectPath);
 
-  // 3. Compact old beads (via lifecycle module)
+  // 3b. Clean up workflow labels + apply 'merged' label (non-fatal)
+  // Runs independently of close-issue — labels are cleaned even if close fails.
+  try {
+    const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
+    const ghResolved = resolveGitHubIssue(issueId);
+    const labelCtx = ghResolved.isGitHub
+      ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
+      : { issueId, projectPath };
+    const labelResult = await cleanupMergedLabels(labelCtx);
+    if (labelResult.success && !labelResult.skipped) {
+      console.log(`[merge-agent] ✓ ${labelResult.details?.join('; ')}`);
+      logActivity('labels_cleaned', labelResult.details?.join('; ') || 'Labels cleaned');
+    } else if (labelResult.skipped) {
+      console.log(`[merge-agent] Label cleanup skipped: ${labelResult.details?.join('; ')}`);
+    } else {
+      console.warn(`[merge-agent] Label cleanup failed (non-fatal): ${labelResult.error}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not clean labels: ${err}`);
+  }
+
+  // 4. Compact old beads (via lifecycle module)
   try {
     const { compactBeads } = await import('../lifecycle/compact-beads.js');
     const beadsResult = await compactBeads({ issueId, projectPath });

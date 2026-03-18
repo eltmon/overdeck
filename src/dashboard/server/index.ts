@@ -423,19 +423,6 @@ Auto-created PR for ${issueId}
   }
 }
 
-/**
- * Post-merge hook — transitions issue to Done on the tracker and runs post-merge cleanup.
- *
- * This is the authoritative "issue is merged" handler at the server level.
- * postMergeLifecycle may also run inside spawnMergeAgentForBranches when polling succeeds,
- * but postMergeLifecycle is itself idempotent (tracks completed issues internally), so
- * calling it from both places is safe.
- *
- * THREE layers of defense against the infinite loop (PAN-328):
- *   1. onMergeComplete checks mergeStatus === 'merged' (server-level guard)
- *   2. onMergeComplete checks _postMergeInFlight Set (concurrency guard)
- *   3. postMergeLifecycle checks its own _completedPostMerge Set (defense-in-depth)
- */
 // Track in-flight postMergeLifecycle calls to prevent concurrent execution
 const _postMergeInFlight = new Set<string>();
 
@@ -444,38 +431,56 @@ const _postMergeInFlight = new Set<string>();
 // do NOT trigger onMergeComplete — the server handles it after all repos are done.
 const _serverManagedMerges = new Set<string>();
 
+/**
+ * Fire-and-forget post-merge lifecycle runner.
+ *
+ * Guarded by _postMergeInFlight to prevent concurrent execution for the same issue.
+ * A second guard lives inside postMergeLifecycle itself (_completedPostMerge Set).
+ *
+ * Callers are responsible for their own pre-conditions (e.g. checking mergeStatus).
+ */
+function firePostMergeLifecycle(issueId: string): void {
+  if (_postMergeInFlight.has(issueId)) {
+    console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
+    return;
+  }
+
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+
+  _postMergeInFlight.add(issueId);
+  (async () => {
+    try {
+      const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
+      await postMergeLifecycle(issueId, projectPath);
+      console.log(`[merge] post-merge lifecycle completed for ${issueId}`);
+    } catch (err) {
+      console.error(`[merge] post-merge lifecycle failed for ${issueId}:`, err);
+    } finally {
+      _postMergeInFlight.delete(issueId);
+    }
+  })();
+}
+
+/**
+ * Post-merge hook — transitions issue to Done on the tracker and runs post-merge cleanup.
+ *
+ * This is the authoritative "issue is merged" handler for callers that set mergeStatus
+ * AFTER calling this function (polling paths). The mergeStatus guard prevents infinite
+ * loops when lifecycle side-effects re-trigger the merge path.
+ *
+ * Note: /api/specialists/done calls firePostMergeLifecycle directly because it sets
+ * mergeStatus='merged' BEFORE this point — the guard here would always fire otherwise.
+ */
 function onMergeComplete(issueId: string): void {
-  // Guard 1: skip if already merged (prevents infinite loop from /api/specialists/done re-triggering)
+  // Guard: skip if already merged (prevents infinite loop from lifecycle re-triggering)
   const existingStatus = getReviewStatus(issueId);
   if (existingStatus?.mergeStatus === 'merged') {
     console.log(`[merge] onMergeComplete: skipping ${issueId} — already merged`);
     return;
   }
 
-  // Guard 2: skip if postMergeLifecycle is already running for this issue
-  if (_postMergeInFlight.has(issueId)) {
-    console.log(`[merge] onMergeComplete: skipping ${issueId} — postMergeLifecycle already in flight`);
-    return;
-  }
-
-  // Resolve project path from issue prefix
-  const issuePrefix = issueId.split('-')[0];
-  const projectPath = getProjectPath(undefined, issuePrefix);
-
-  // Fire-and-forget — don't block the HTTP response
-  _postMergeInFlight.add(issueId);
-  (async () => {
-    try {
-      const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
-      // Guard 3 is inside postMergeLifecycle itself (_completedPostMerge Set)
-      await postMergeLifecycle(issueId, projectPath);
-      console.log(`[merge] onMergeComplete: post-merge lifecycle completed for ${issueId}`);
-    } catch (err) {
-      console.error(`[merge] onMergeComplete: post-merge lifecycle failed for ${issueId}:`, err);
-    } finally {
-      _postMergeInFlight.delete(issueId);
-    }
-  })();
+  firePostMergeLifecycle(issueId);
 }
 
 // ============================================================================
@@ -6661,52 +6666,15 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     // Auto-queue test-agent when review passes (server-side guarantee)
     // This ensures test-agent is always triggered regardless of which prompt the review-agent used
     if (reviewStatus === 'passed') {
-      try {
-        const { wakeSpecialistOrQueue, checkSpecialistQueue: checkTestQueue } = await import('../../lib/cloister/specialists.js');
+      // Derive workspace/branch from issueId (review-agent doesn't send these)
+      const issueLower = issueId.toLowerCase();
+      const issuePrefix = issueId.split('-')[0];
+      const projectPath = getProjectPath(undefined, issuePrefix);
+      const testWorkspace = req.body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
+      const testBranch = req.body.branch || `feature/${issueLower}`;
 
-        // Dedup: check if test-agent already has this issue queued
-        const testQueue = checkTestQueue('test-agent');
-        const alreadyQueued = testQueue.items.some(
-          (item: any) => item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()
-        );
-
-        if (!alreadyQueued) {
-          // Derive workspace/branch from issueId (review-agent doesn't send these)
-          const issueLower = issueId.toLowerCase();
-          const issuePrefix = issueId.split('-')[0];
-          const projectPath = getProjectPath(undefined, issuePrefix);
-          const testWorkspace = req.body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
-          const testBranch = req.body.branch || `feature/${issueLower}`;
-
-          const testResult = await wakeSpecialistOrQueue('test-agent', {
-            issueId,
-            workspace: testWorkspace,
-            branch: testBranch,
-          }, {
-            priority: 'normal',
-            source: 'review-passed-auto',
-          });
-          // Update testStatus based on whether the agent was woken or queued
-          if (testResult.success) {
-            setReviewStatus(issueId, { testStatus: testResult.queued ? 'queued' : 'testing' });
-          }
-          console.log(`[review-status] Auto-queued test-agent for ${issueId}: ${testResult.success ? (testResult.queued ? 'queued' : 'woken') : 'failed'} - ${testResult.message}`);
-        } else {
-          console.log(`[review-status] Test-agent already has ${issueId} queued, skipping`);
-        }
-      } catch (err) {
-        console.error(`[review-status] Failed to auto-queue test-agent for ${issueId}:`, err);
-      }
-
-      // Notify work agent that review passed — prevents polling
-      try {
-        const agentId = `agent-${issueId.toLowerCase()}`;
-        await messageAgent(agentId, `REVIEW PASSED for ${issueId}. Tests have been queued automatically. Do NOT poll or check status — you will be notified when tests complete.`);
-        console.log(`[review-status] Notified ${agentId} that review passed`);
-      } catch (err) {
-        // Agent may not be running — that's fine
-        console.log(`[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`);
-      }
+      const { autoQueueTestAgentAndNotify } = await import('../../lib/cloister/test-agent-queue.js');
+      await autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent);
     }
 
     // Immediately process next queued item (don't wait for deacon patrol)
@@ -6877,24 +6845,13 @@ app.post('/api/specialists/done', async (req, res) => {
   }
 
   // When merge specialist reports success, run post-merge lifecycle ONCE.
-  // THREE guards prevent infinite loops:
-  //   1. mergeStatus === 'merged' check here (set by setReviewStatus above)
-  //   2. onMergeComplete's own mergeStatus + _postMergeInFlight guards
-  //   3. postMergeLifecycle's own _completedPostMerge guard
+  // Use firePostMergeLifecycle directly rather than onMergeComplete: onMergeComplete
+  // has a guard that checks mergeStatus !== 'merged', but setReviewStatus above already
+  // set mergeStatus='merged' — that guard would always fire and the lifecycle would
+  // never run. firePostMergeLifecycle skips that guard and uses _postMergeInFlight
+  // (concurrency) + postMergeLifecycle's _completedPostMerge (defense-in-depth).
   if (specialist === 'merge' && status === 'passed') {
-    // Re-read AFTER the status write to get the authoritative state.
-    // The setReviewStatus call above already wrote mergeStatus='merged' to disk (sync).
-    const currentStatus = getReviewStatus(normalizedIssueId);
-    if (currentStatus?.mergeStatus !== 'merged') {
-      // This branch should rarely execute: setReviewStatus above set mergeStatus='merged',
-      // so getReviewStatus should return 'merged'. If we get here, something reset the status
-      // concurrently — set it again and proceed.
-      console.warn(`[specialists/done] mergeStatus was reset for ${normalizedIssueId} after write — re-setting and triggering lifecycle`);
-      setReviewStatus(normalizedIssueId, { mergeStatus: 'merged', readyForMerge: false });
-      onMergeComplete(normalizedIssueId);
-    } else {
-      console.log(`[specialists/done] Skipping onMergeComplete for ${normalizedIssueId} — already merged`);
-    }
+    firePostMergeLifecycle(normalizedIssueId);
   }
 
   res.json({
@@ -7018,8 +6975,8 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     // 2b. Snapshot commit hashes for this review run (local workspaces only)
     if (!workspaceInfo.isRemote) {
       try {
-        const { getWorkspaceCommitHashes } = await import('../../lib/git-utils.js');
-        const commits = await getWorkspaceCommitHashes(workspacePath);
+        const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
+        const commits = await getWorkspaceGitInfo(workspacePath);
         setReviewStatus(issueId, { lastReviewCommits: commits });
         console.log(`[review] Snapshotted commits for ${issueId}:`, commits);
       } catch (hashErr: any) {
@@ -7202,6 +7159,16 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
     });
   }
 
+  // Guard: no-op if review already passed (prevents redundant re-review requests)
+  if (existingStatus?.reviewStatus === 'passed') {
+    console.log(`[request-review] ${issueId}: review already passed — returning success no-op`);
+    return res.json({
+      success: true,
+      alreadyPassed: true,
+      message: `Review already passed for ${issueId}`,
+    });
+  }
+
   const currentCount = existingStatus?.autoRequeueCount || 0;
 
   // Circuit breaker: max 3 auto-requeues
@@ -7242,8 +7209,8 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
   let requestReviewCommits: Record<string, string> | undefined;
   if (!workspaceInfo.isRemote) {
     try {
-      const { getWorkspaceCommitHashes } = await import('../../lib/git-utils.js');
-      requestReviewCommits = await getWorkspaceCommitHashes(workspacePath);
+      const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
+      requestReviewCommits = await getWorkspaceGitInfo(workspacePath);
       console.log(`[request-review] Snapshotted commits for ${issueId}:`, requestReviewCommits);
     } catch (hashErr: any) {
       console.log(`[request-review] Could not snapshot commits for ${issueId}: ${hashErr.message}`);
@@ -8289,8 +8256,9 @@ app.post('/api/agents', async (req, res) => {
           ? workspacePath
           : projectPath;
 
-        // Git add planning and beads directories
-        await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
+        // Git add planning and beads directories.
+        // .planning/ files are gitignored (PAN-337) so -f is required to track them on feature branches.
+        await execAsync(`git add -f .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
         // Also add .beads/ if it exists
         if (existsSync(join(gitRoot, '.beads'))) {
           await execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
@@ -10548,8 +10516,9 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           writeFileSync(join(planningDir, '.planning-complete'), '', 'utf-8');
           console.log(`[complete-planning] Wrote .planning-complete marker`);
 
-          // Git add planning and beads directories
-          await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
+          // Git add planning and beads directories.
+          // .planning/ files are gitignored (PAN-337) so -f is required to track them on feature branches.
+          await execAsync(`git add -f .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
           // Also add .beads/ if it exists (planning may create beads tasks)
           if (existsSync(join(gitRoot, '.beads'))) {
             await execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
