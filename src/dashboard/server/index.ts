@@ -8252,8 +8252,9 @@ app.post('/api/agents', async (req, res) => {
           ? workspacePath
           : projectPath;
 
-        // Git add planning and beads directories
-        await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
+        // Git add planning and beads directories.
+        // .planning/ files are gitignored (PAN-337) so -f is required to track them on feature branches.
+        await execAsync(`git add -f .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
         // Also add .beads/ if it exists
         if (existsSync(join(gitRoot, '.beads'))) {
           await execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
@@ -10511,8 +10512,9 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           writeFileSync(join(planningDir, '.planning-complete'), '', 'utf-8');
           console.log(`[complete-planning] Wrote .planning-complete marker`);
 
-          // Git add planning and beads directories
-          await execAsync(`git add .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
+          // Git add planning and beads directories.
+          // .planning/ files are gitignored (PAN-337) so -f is required to track them on feature branches.
+          await execAsync(`git add -f .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
           // Also add .beads/ if it exists (planning may create beads tasks)
           if (existsSync(join(gitRoot, '.beads'))) {
             await execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
