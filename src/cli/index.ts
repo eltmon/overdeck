@@ -52,7 +52,6 @@ import { registerBeadsCommands } from './commands/beads.js';
 import { migrateConfigCommand } from './commands/migrate-config.js';
 import { registerRemoteCommands } from './commands/remote/index.js';
 import { registerConfigCommand } from './commands/config.js';
-import { createCostCommand, runCostSync } from './commands/cost.js';
 
 const program = new Command();
 
@@ -524,15 +523,6 @@ program
   .option('--check', 'Only check for updates, don\'t install')
   .option('--force', 'Force update even if on latest')
   .action(updateCommand);
-
-// Cost tracking commands (pan cost today, pan cost sync, etc.)
-program.addCommand(createCostCommand());
-
-// Alias: pan sync-costs → pan cost sync
-program
-  .command('sync-costs')
-  .description('Import cost events from per-project WAL files (alias for: pan cost sync)')
-  .action(runCostSync);
 
 // Parse and execute
 program.parse();

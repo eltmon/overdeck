@@ -18,10 +18,11 @@ import {
   getAgentsNeedingAttention,
 } from './health.js';
 import {
+  initHealthDatabase,
   writeHealthEvent,
   getLatestHealthEvent,
-} from '../database/health-events-db.js';
-import { getDatabase, closeDatabase } from '../database/index.js';
+  closeHealthDatabase,
+} from './database.js';
 import { initializeEnabledSpecialists } from './specialists.js';
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgents, getAgentState, getAgentRuntimeState } from '../agents.js';
@@ -208,12 +209,12 @@ export class CloisterService {
 
     console.log('🔔 Starting Cloister agent watchdog...');
 
-    // Initialize unified panopticon database (includes health_events table)
+    // Initialize health history database
     try {
-      getDatabase();
-      console.log('  ✓ Panopticon database initialized');
+      initHealthDatabase();
+      console.log('  ✓ Health history database initialized');
     } catch (error) {
-      console.error('  ✗ Failed to initialize panopticon database:', error);
+      console.error('  ✗ Failed to initialize health database:', error);
     }
 
     // Auto-initialize enabled specialists
@@ -280,9 +281,9 @@ export class CloisterService {
 
     // Close database connection
     try {
-      closeDatabase();
+      closeHealthDatabase();
     } catch (error) {
-      console.error('Failed to close panopticon database:', error);
+      console.error('Failed to close health database:', error);
     }
 
     this.emit({ type: 'stopped' });

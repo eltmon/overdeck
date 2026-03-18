@@ -31,7 +31,7 @@ export interface HealthEvent {
  * Health event with parsed metadata
  */
 export interface HealthEventWithMetadata extends Omit<HealthEvent, 'metadata'> {
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, any>;
 }
 
 let db: Database.Database | null = null;
