@@ -6840,23 +6840,31 @@ app.post('/api/specialists/done', async (req, res) => {
   }
 
   // When merge specialist reports success, run post-merge lifecycle ONCE.
-  // THREE guards prevent infinite loops:
-  //   1. mergeStatus === 'merged' check here (set by setReviewStatus above)
-  //   2. onMergeComplete's own mergeStatus + _postMergeInFlight guards
-  //   3. postMergeLifecycle's own _completedPostMerge guard
+  // Call postMergeLifecycle directly rather than through onMergeComplete.
+  // onMergeComplete has a guard that checks mergeStatus !== 'merged', but we already
+  // set mergeStatus='merged' via setReviewStatus above — that guard always fires and
+  // the lifecycle would never run. Call postMergeLifecycle directly instead.
+  // TWO guards prevent duplicate execution:
+  //   1. _postMergeInFlight Set (concurrency guard — prevents parallel runs)
+  //   2. postMergeLifecycle's own _completedPostMerge Set (defense-in-depth)
   if (specialist === 'merge' && status === 'passed') {
-    // Re-read AFTER the status write to get the authoritative state.
-    // The setReviewStatus call above already wrote mergeStatus='merged' to disk (sync).
-    const currentStatus = getReviewStatus(normalizedIssueId);
-    if (currentStatus?.mergeStatus !== 'merged') {
-      // This branch should rarely execute: setReviewStatus above set mergeStatus='merged',
-      // so getReviewStatus should return 'merged'. If we get here, something reset the status
-      // concurrently — set it again and proceed.
-      console.warn(`[specialists/done] mergeStatus was reset for ${normalizedIssueId} after write — re-setting and triggering lifecycle`);
-      setReviewStatus(normalizedIssueId, { mergeStatus: 'merged', readyForMerge: false });
-      onMergeComplete(normalizedIssueId);
+    if (!_postMergeInFlight.has(normalizedIssueId)) {
+      const issuePrefix = normalizedIssueId.split('-')[0];
+      const lifecycleProjectPath = getProjectPath(undefined, issuePrefix);
+      _postMergeInFlight.add(normalizedIssueId);
+      (async () => {
+        try {
+          const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
+          await postMergeLifecycle(normalizedIssueId, lifecycleProjectPath);
+          console.log(`[specialists/done] post-merge lifecycle completed for ${normalizedIssueId}`);
+        } catch (err) {
+          console.error(`[specialists/done] post-merge lifecycle failed for ${normalizedIssueId}:`, err);
+        } finally {
+          _postMergeInFlight.delete(normalizedIssueId);
+        }
+      })();
     } else {
-      console.log(`[specialists/done] Skipping onMergeComplete for ${normalizedIssueId} — already merged`);
+      console.log(`[specialists/done] Skipping postMergeLifecycle for ${normalizedIssueId} — already in flight`);
     }
   }
 
@@ -7162,6 +7170,16 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
       success: false,
       alreadyMerged: true,
       message: `${issueId} is already merged. Use Reopen or Reset Reviews first.`,
+    });
+  }
+
+  // Guard: no-op if review already passed (prevents redundant re-review requests)
+  if (existingStatus?.reviewStatus === 'passed') {
+    console.log(`[request-review] ${issueId}: review already passed — returning success no-op`);
+    return res.json({
+      success: true,
+      alreadyPassed: true,
+      message: `Review already passed for ${issueId}`,
     });
   }
 
