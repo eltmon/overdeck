@@ -1,5 +1,5 @@
 {
-  "name": "Panopticon feature-pan-337",
+  "name": "Panopticon feature-pan-341",
   "dockerComposeFile": [
     "docker-compose.devcontainer.yml"
   ],
