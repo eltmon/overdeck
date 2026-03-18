@@ -1,6 +1,6 @@
 # PAN-331: Port PAN-103 progressive disclosure UI to current codebase
 
-## Current Status: REOPENED
+## Current Status: COMPLETE
 
 ## What Was Done (keep — already on main)
 - Component structure: Header, InspectorPanel, TerminalPanel, DetailPanelLayout, MetricsSummaryRow
@@ -8,31 +8,28 @@
 - Tailwind config with pan-* tokens defined
 - Basic layout working
 
+## Reopen Work (completed in commit 9a26984)
+
+### Task 1: Replace hardcoded hex with Stitch tokens in InspectorPanel ✓
+- Replaced all 25+ hardcoded hex colors with pan-* Tailwind tokens
+- Removed borderColor/bgColor/textSecondary variables, converted to className
+
+### Task 2: Split InspectorPanel into sub-components ✓
+- inspector/StatusHistory.tsx (64 lines)
+- inspector/AgentInfoSection.tsx (121 lines)
+- inspector/ContainerSection.tsx (152 lines)
+- inspector/ReviewPipelineSection.tsx (138 lines)
+- inspector/ActionsSection.tsx (243 lines)
+- InspectorPanel.tsx reduced from 1344 → 911 lines
+
+### Task 3: Apply Stitch styling to KanbanBoard ✓
+- Replaced #0d1117 hardcoded hex in IssueCard with bg-pan-panel-right
+
+### Task 5: Address improvement checklist ✓
+- confirm() already uses shadcn (useConfirm hook)
+- No unused Material Symbols import in index.html
+- Removed unused slide-out-right animation from tailwind.config.js
+- Added font preload link for Space Grotesk + Noto Sans in index.html
+
 ## Remaining Work
-
-### Task 1: Replace hardcoded hex with Stitch tokens in InspectorPanel
-- 25 hardcoded hex colors need to become pan-* Tailwind tokens
-- 0 pan-* tokens currently used in InspectorPanel.tsx
-
-### Task 2: Split InspectorPanel into sub-components
-- Currently 1,344 lines — split into <300 line components
-- Extract: AgentInfoSection, GitStatusSection, ContainerSection, ReviewPipelineSection, ActionsSection
-
-### Task 3: Apply Stitch styling to KanbanBoard
-- Only 4 pan-* references currently — needs full Stitch treatment
-- Done column styling uses generic Tailwind instead of design system
-
-### Task 4: Consult Stitch mockups and match design
-- Screen IDs: fd5bece5206f48cea74e13d745522659, 9777134c06e0443b9b92eb26dc90dded
-- Use /stitch-react-components skill or mcp__stitch__get_screen
-
-### Task 5: Address improvement checklist
-- [ ] Use shadcn confirm() instead of native confirm()
-- [ ] Remove unused Material Symbols font import
-- [ ] Remove or use slide-in/slide-out animations
-- [ ] Add font preloading for Space Grotesk / Noto Sans
-
-## Files to Modify
-- src/dashboard/frontend/src/components/InspectorPanel.tsx (split + tokens)
-- src/dashboard/frontend/src/components/KanbanBoard.tsx (Stitch styling)
-- src/dashboard/frontend/index.html (font preloading)
+None
