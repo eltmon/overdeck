@@ -24,7 +24,7 @@ function loadPanelState(issueId: string): PanelState {
   } catch {
     // ignore parse errors
   }
-  return { panelMode: 'inspector-only', inspectorDefaultSize: DEFAULT_INSPECTOR_SIZE };
+  return { panelMode: 'inspector+terminal', inspectorDefaultSize: DEFAULT_INSPECTOR_SIZE };
 }
 
 function savePanelState(issueId: string, state: Partial<PanelState>): void {
