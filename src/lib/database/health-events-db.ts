@@ -25,7 +25,7 @@ export interface HealthEvent {
 }
 
 export interface HealthEventWithMetadata extends Omit<HealthEvent, 'metadata'> {
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // ============== Write operations ==============

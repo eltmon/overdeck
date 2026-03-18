@@ -14,15 +14,16 @@ import type { CostEvent } from '../costs/events.js';
  * Insert a cost event. Returns the new row ID, or null if it was a duplicate.
  * Deduplication is handled by the UNIQUE index on request_id.
  */
-export function insertCostEvent(event: CostEvent): number | null {
+export function insertCostEvent(event: CostEvent, sourceFile?: string): number | null {
   const db = getDatabase();
   try {
     const result = db.prepare(`
       INSERT OR IGNORE INTO cost_events (
         ts, agent_id, issue_id, session_type, provider, model,
         input, output, cache_read, cache_write, cost, request_id,
-        tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
+        source_file
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       event.ts,
       event.agentId,
@@ -40,6 +41,7 @@ export function insertCostEvent(event: CostEvent): number | null {
       event.tldrBypasses ?? null,
       event.tldrTokensSaved ?? null,
       event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null,
+      sourceFile ?? null,
     );
     if (result.changes === 0) return null; // Duplicate
     return result.lastInsertRowid as number;
@@ -54,7 +56,10 @@ export function insertCostEvent(event: CostEvent): number | null {
  * Insert multiple cost events in a single transaction.
  * Returns { inserted, duplicates } counts.
  */
-export function insertCostEvents(events: CostEvent[]): { inserted: number; duplicates: number } {
+export function insertCostEvents(
+  events: CostEvent[],
+  sourceFile?: string,
+): { inserted: number; duplicates: number } {
   const db = getDatabase();
   let inserted = 0;
   let duplicates = 0;
@@ -68,7 +73,7 @@ export function insertCostEvents(events: CostEvent[]): { inserted: number; dupli
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const insertMany = db.transaction((evs: CostEvent[], sourceFile?: string) => {
+  const insertMany = db.transaction((evs: CostEvent[]) => {
     for (const ev of evs) {
       const result = insert.run(
         ev.ts,
@@ -136,8 +141,12 @@ export function queryCostEvents(opts: {
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limit = opts.limit ? `LIMIT ${opts.limit}` : '';
-  const offset = opts.offset ? `OFFSET ${opts.offset}` : '';
+
+  // LIMIT and OFFSET appended to params — SQLite supports bound ? for both
+  const limitClause = opts.limit !== undefined ? 'LIMIT ?' : '';
+  const offsetClause = opts.offset !== undefined ? 'OFFSET ?' : '';
+  if (opts.limit !== undefined) params.push(Math.max(0, Math.floor(opts.limit)));
+  if (opts.offset !== undefined) params.push(Math.max(0, Math.floor(opts.offset)));
 
   const sql = `
     SELECT ts, agent_id, issue_id, session_type, provider, model,
@@ -146,7 +155,7 @@ export function queryCostEvents(opts: {
     FROM cost_events
     ${where}
     ORDER BY ts ASC
-    ${limit} ${offset}
+    ${limitClause} ${offsetClause}
   `;
 
   const rows = db.prepare(sql).all(...params) as DbCostRow[];
