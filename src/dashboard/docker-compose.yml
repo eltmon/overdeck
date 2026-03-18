@@ -12,7 +12,7 @@ services:
       # Mount host paths for workspace/agent management
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${HOME}/.panopticon:/root/.panopticon:ro
-      - ${HOME}/projects:/root/projects
+      - ${HOME}/Projects:/root/Projects
     networks:
       - panopticon
     labels:

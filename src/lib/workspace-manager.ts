@@ -56,6 +56,7 @@ function createPlaceholders(
     DOMAIN: domain,
     PROJECT_NAME: basename(projectConfig.path),
     PROJECT_PATH: projectConfig.path,
+    PROJECTS_DIR: dirname(projectConfig.path),
     WORKSPACE_PATH: workspacePath,
     HOME: homedir(),
   };
