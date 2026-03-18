@@ -52,6 +52,7 @@ import { registerBeadsCommands } from './commands/beads.js';
 import { migrateConfigCommand } from './commands/migrate-config.js';
 import { registerRemoteCommands } from './commands/remote/index.js';
 import { registerConfigCommand } from './commands/config.js';
+import { createCostCommand } from './commands/cost.js';
 
 const program = new Command();
 
@@ -523,6 +524,30 @@ program
   .option('--check', 'Only check for updates, don\'t install')
   .option('--force', 'Force update even if on latest')
   .action(updateCommand);
+
+// Cost tracking commands (pan cost today, pan cost sync, etc.)
+program.addCommand(createCostCommand());
+
+// Alias: pan sync-costs → pan cost sync
+program
+  .command('sync-costs')
+  .description('Import cost events from per-project WAL files (alias for: pan cost sync)')
+  .action(async () => {
+    const { syncWalFromAllProjects } = await import('./commands/cost.js').then(
+      () => import('../lib/costs/sync-wal.js')
+    );
+    try {
+      console.log('Syncing cost events from project WAL files...');
+      const result = syncWalFromAllProjects();
+      console.log(`Imported ${result.imported} new events, ${result.duplicates} duplicates skipped.`);
+      if (result.errors.length > 0) {
+        for (const err of result.errors) console.warn(' ', err);
+      }
+    } catch (error: any) {
+      console.error('Error:', error.message);
+      process.exit(1);
+    }
+  });
 
 // Parse and execute
 program.parse();

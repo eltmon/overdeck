@@ -1,0 +1,69 @@
+/**
+ * Per-project WAL Writer
+ *
+ * After each cost event is written, appends the event to a per-project
+ * JSONL file at <events_repo>/.panopticon/events/ISSUE-ID.jsonl.
+ *
+ * These git-tracked files allow multi-developer cost sync via `pan sync-costs`.
+ */
+
+import { existsSync, mkdirSync, appendFileSync } from 'fs';
+import { join } from 'path';
+import { listProjects } from '../projects.js';
+import type { CostEvent } from './events.js';
+
+const DEFAULT_EVENTS_SUBDIR = '.panopticon/events';
+
+/**
+ * Resolve the directory where WAL files for a given issue should be written.
+ * Returns null if no matching project is found.
+ */
+export function resolveWalDir(issueId: string): string | null {
+  const projects = listProjects();
+
+  // Find which project this issueId belongs to.
+  // Match by issue prefix (e.g. "PAN" in "PAN-335") against project key or name.
+  const issuePrefix = issueId.split('-')[0]?.toUpperCase();
+  if (!issuePrefix) return null;
+
+  for (const { key, config } of projects) {
+    const projectKey = key.toUpperCase();
+    const projectName = config.name?.toUpperCase();
+
+    if (projectKey === issuePrefix || projectName === issuePrefix) {
+      const repoPath = config.events_repo ?? config.path;
+      const eventsSubdir = config.events_path ?? DEFAULT_EVENTS_SUBDIR;
+      return join(repoPath, eventsSubdir);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Append a cost event to the per-project WAL file.
+ *
+ * The WAL file path is: <events_dir>/<ISSUE-ID>.jsonl
+ *
+ * Returns true if the event was written, false if no matching project was found.
+ * Never throws — WAL writes are best-effort.
+ */
+export function appendToWal(event: CostEvent): boolean {
+  try {
+    const walDir = resolveWalDir(event.issueId);
+    if (!walDir) return false;
+
+    if (!existsSync(walDir)) {
+      mkdirSync(walDir, { recursive: true });
+    }
+
+    const walFile = join(walDir, `${event.issueId.toUpperCase()}.jsonl`);
+    const line = JSON.stringify(event) + '\n';
+    appendFileSync(walFile, line, 'utf-8');
+    return true;
+  } catch (err) {
+    // Best-effort — log but don't fail the caller
+    console.error(`[wal] Failed to write WAL for ${event.issueId}:`, err);
+    return false;
+  }
+}
