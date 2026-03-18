@@ -1962,8 +1962,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
         isSelected
           ? 'ring-2 ring-blue-500'
           : 'hover:border-pan-border/80'
-      } ${isRunning ? 'bg-blue-900/20' : ''}`}
-      style={{ backgroundColor: isRunning ? undefined : '#0d1117' }}
+      } ${isRunning ? 'bg-blue-900/20' : 'bg-pan-panel-right'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
