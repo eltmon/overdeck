@@ -69,7 +69,7 @@ async function cleanupLabelsGitHub(ctx: LifecycleContext): Promise<StepResult> {
       `Removed: ${LABELS_TO_REMOVE.join(', ')}`,
     ]);
   } catch (err) {
-    return stepSkipped(step, [`Label cleanup failed (non-fatal): ${(err as Error).message}`]);
+    return stepFailed(step, `Label cleanup failed: ${(err as Error).message}`);
   }
 }
 
@@ -123,6 +123,6 @@ async function cleanupLabelsLinear(ctx: LifecycleContext, apiKey: string): Promi
       `Removed: ${LABELS_TO_REMOVE.join(', ')}`,
     ]);
   } catch (err) {
-    return stepSkipped(step, [`Linear label cleanup failed (non-fatal): ${(err as Error).message}`]);
+    return stepFailed(step, `Linear label cleanup failed: ${(err as Error).message}`);
   }
 }

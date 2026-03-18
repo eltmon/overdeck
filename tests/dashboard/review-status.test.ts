@@ -191,3 +191,48 @@ describe('loadReviewStatuses', () => {
     expect(result).toEqual({});
   });
 });
+
+describe('setReviewStatus — regression guard (PAN-338)', () => {
+  it('rejects passed→reviewing regression when mergeStatus is not being reset', () => {
+    // Set up: issue is in 'passed' state
+    setReviewStatus('PAN-338', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatus('PAN-338', { reviewStatus: 'passed' }, statusFile);
+
+    // Try to regress to 'reviewing' without changing mergeStatus
+    const result = setReviewStatus('PAN-338', {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+    }, statusFile);
+
+    // Should remain at 'passed' — regression rejected
+    expect(result.reviewStatus).toBe('passed');
+  });
+
+  it('allows passed→reviewing when mergeStatus is explicitly included in the update', () => {
+    // Set up: issue is in 'passed' state
+    setReviewStatus('PAN-338b', { reviewStatus: 'reviewing' }, statusFile);
+    setReviewStatus('PAN-338b', { reviewStatus: 'passed' }, statusFile);
+
+    // Deliberate reopen — includes mergeStatus reset
+    const result = setReviewStatus('PAN-338b', {
+      reviewStatus: 'reviewing',
+      mergeStatus: 'pending',
+    }, statusFile);
+
+    expect(result.reviewStatus).toBe('reviewing');
+  });
+
+  it('allows normal transitions (pending→reviewing→passed) without interference', () => {
+    setReviewStatus('PAN-338c', { reviewStatus: 'reviewing' }, statusFile);
+    const result = setReviewStatus('PAN-338c', { reviewStatus: 'passed' }, statusFile);
+
+    expect(result.reviewStatus).toBe('passed');
+  });
+
+  it('allows regression from states other than passed (e.g. blocked→reviewing)', () => {
+    setReviewStatus('PAN-338d', { reviewStatus: 'blocked' }, statusFile);
+    const result = setReviewStatus('PAN-338d', { reviewStatus: 'reviewing' }, statusFile);
+
+    expect(result.reviewStatus).toBe('reviewing');
+  });
+});

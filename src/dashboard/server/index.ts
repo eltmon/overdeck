@@ -423,19 +423,6 @@ Auto-created PR for ${issueId}
   }
 }
 
-/**
- * Post-merge hook — transitions issue to Done on the tracker and runs post-merge cleanup.
- *
- * This is the authoritative "issue is merged" handler at the server level.
- * postMergeLifecycle may also run inside spawnMergeAgentForBranches when polling succeeds,
- * but postMergeLifecycle is itself idempotent (tracks completed issues internally), so
- * calling it from both places is safe.
- *
- * THREE layers of defense against the infinite loop (PAN-328):
- *   1. onMergeComplete checks mergeStatus === 'merged' (server-level guard)
- *   2. onMergeComplete checks _postMergeInFlight Set (concurrency guard)
- *   3. postMergeLifecycle checks its own _completedPostMerge Set (defense-in-depth)
- */
 // Track in-flight postMergeLifecycle calls to prevent concurrent execution
 const _postMergeInFlight = new Set<string>();
 
@@ -444,38 +431,56 @@ const _postMergeInFlight = new Set<string>();
 // do NOT trigger onMergeComplete — the server handles it after all repos are done.
 const _serverManagedMerges = new Set<string>();
 
+/**
+ * Fire-and-forget post-merge lifecycle runner.
+ *
+ * Guarded by _postMergeInFlight to prevent concurrent execution for the same issue.
+ * A second guard lives inside postMergeLifecycle itself (_completedPostMerge Set).
+ *
+ * Callers are responsible for their own pre-conditions (e.g. checking mergeStatus).
+ */
+function firePostMergeLifecycle(issueId: string): void {
+  if (_postMergeInFlight.has(issueId)) {
+    console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
+    return;
+  }
+
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+
+  _postMergeInFlight.add(issueId);
+  (async () => {
+    try {
+      const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
+      await postMergeLifecycle(issueId, projectPath);
+      console.log(`[merge] post-merge lifecycle completed for ${issueId}`);
+    } catch (err) {
+      console.error(`[merge] post-merge lifecycle failed for ${issueId}:`, err);
+    } finally {
+      _postMergeInFlight.delete(issueId);
+    }
+  })();
+}
+
+/**
+ * Post-merge hook — transitions issue to Done on the tracker and runs post-merge cleanup.
+ *
+ * This is the authoritative "issue is merged" handler for callers that set mergeStatus
+ * AFTER calling this function (polling paths). The mergeStatus guard prevents infinite
+ * loops when lifecycle side-effects re-trigger the merge path.
+ *
+ * Note: /api/specialists/done calls firePostMergeLifecycle directly because it sets
+ * mergeStatus='merged' BEFORE this point — the guard here would always fire otherwise.
+ */
 function onMergeComplete(issueId: string): void {
-  // Guard 1: skip if already merged (prevents infinite loop from /api/specialists/done re-triggering)
+  // Guard: skip if already merged (prevents infinite loop from lifecycle re-triggering)
   const existingStatus = getReviewStatus(issueId);
   if (existingStatus?.mergeStatus === 'merged') {
     console.log(`[merge] onMergeComplete: skipping ${issueId} — already merged`);
     return;
   }
 
-  // Guard 2: skip if postMergeLifecycle is already running for this issue
-  if (_postMergeInFlight.has(issueId)) {
-    console.log(`[merge] onMergeComplete: skipping ${issueId} — postMergeLifecycle already in flight`);
-    return;
-  }
-
-  // Resolve project path from issue prefix
-  const issuePrefix = issueId.split('-')[0];
-  const projectPath = getProjectPath(undefined, issuePrefix);
-
-  // Fire-and-forget — don't block the HTTP response
-  _postMergeInFlight.add(issueId);
-  (async () => {
-    try {
-      const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
-      // Guard 3 is inside postMergeLifecycle itself (_completedPostMerge Set)
-      await postMergeLifecycle(issueId, projectPath);
-      console.log(`[merge] onMergeComplete: post-merge lifecycle completed for ${issueId}`);
-    } catch (err) {
-      console.error(`[merge] onMergeComplete: post-merge lifecycle failed for ${issueId}:`, err);
-    } finally {
-      _postMergeInFlight.delete(issueId);
-    }
-  })();
+  firePostMergeLifecycle(issueId);
 }
 
 // ============================================================================
@@ -6840,32 +6845,13 @@ app.post('/api/specialists/done', async (req, res) => {
   }
 
   // When merge specialist reports success, run post-merge lifecycle ONCE.
-  // Call postMergeLifecycle directly rather than through onMergeComplete.
-  // onMergeComplete has a guard that checks mergeStatus !== 'merged', but we already
-  // set mergeStatus='merged' via setReviewStatus above — that guard always fires and
-  // the lifecycle would never run. Call postMergeLifecycle directly instead.
-  // TWO guards prevent duplicate execution:
-  //   1. _postMergeInFlight Set (concurrency guard — prevents parallel runs)
-  //   2. postMergeLifecycle's own _completedPostMerge Set (defense-in-depth)
+  // Use firePostMergeLifecycle directly rather than onMergeComplete: onMergeComplete
+  // has a guard that checks mergeStatus !== 'merged', but setReviewStatus above already
+  // set mergeStatus='merged' — that guard would always fire and the lifecycle would
+  // never run. firePostMergeLifecycle skips that guard and uses _postMergeInFlight
+  // (concurrency) + postMergeLifecycle's _completedPostMerge (defense-in-depth).
   if (specialist === 'merge' && status === 'passed') {
-    if (!_postMergeInFlight.has(normalizedIssueId)) {
-      const issuePrefix = normalizedIssueId.split('-')[0];
-      const lifecycleProjectPath = getProjectPath(undefined, issuePrefix);
-      _postMergeInFlight.add(normalizedIssueId);
-      (async () => {
-        try {
-          const { postMergeLifecycle } = await import('../../lib/cloister/merge-agent.js');
-          await postMergeLifecycle(normalizedIssueId, lifecycleProjectPath);
-          console.log(`[specialists/done] post-merge lifecycle completed for ${normalizedIssueId}`);
-        } catch (err) {
-          console.error(`[specialists/done] post-merge lifecycle failed for ${normalizedIssueId}:`, err);
-        } finally {
-          _postMergeInFlight.delete(normalizedIssueId);
-        }
-      })();
-    } else {
-      console.log(`[specialists/done] Skipping postMergeLifecycle for ${normalizedIssueId} — already in flight`);
-    }
+    firePostMergeLifecycle(normalizedIssueId);
   }
 
   res.json({
