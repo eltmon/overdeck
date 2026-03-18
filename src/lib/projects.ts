@@ -96,17 +96,6 @@ export interface ProjectConfig {
   specialists?: SpecialistConfig;
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
-  /**
-   * Path to the repo where per-project cost WAL files live.
-   * Defaults to `path` (the project repo itself).
-   * For polyrepo setups, point this at the docs/shared repo.
-   */
-  events_repo?: string;
-  /**
-   * Subdirectory within events_repo where cost JSONL files are stored.
-   * Defaults to ".panopticon/events".
-   */
-  events_path?: string;
 }
 
 /**

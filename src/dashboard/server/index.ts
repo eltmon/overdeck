@@ -44,8 +44,6 @@ import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyConte
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../lib/tracker-utils.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
-import { getCostsByIssueFromDb, getCostForIssueFromDb, getDailyTrends, getModelRollup, getAgentRollup } from '../../lib/database/cost-events-db.js';
-import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
 import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
 import { DockerStatsCollector } from '../../lib/docker-stats.js';
 import {
@@ -2117,7 +2115,7 @@ app.get('/api/agents/:id/health-history', async (req, res) => {
   const { hours = '24' } = req.query;
 
   try {
-    const { getHealthHistory } = await import('../../lib/database/health-events-db.js');
+    const { getHealthHistory } = await import('../../lib/cloister/database.js');
 
     // Calculate time range
     const endTime = new Date();
@@ -12157,69 +12155,6 @@ app.get('/api/costs/stream', (req, res) => {
   }
 });
 
-// GET /api/costs/trends - Daily cost trend data for charts (SQLite-backed)
-app.get('/api/costs/trends', (req, res) => {
-  try {
-    const days = parseInt((req.query.days as string) || '30', 10);
-    const issueId = req.query.issueId as string | undefined;
-    const trends = getDailyTrends({ days, issueId });
-    res.json({ trends, days, issueId: issueId ?? null });
-  } catch (error: any) {
-    console.error('Error getting cost trends:', error);
-    res.status(500).json({ error: 'Failed to get cost trends: ' + error.message });
-  }
-});
-
-// GET /api/costs/by-model - Model-level cost rollup (SQLite-backed)
-app.get('/api/costs/by-model', (req, res) => {
-  try {
-    const issueId = req.query.issueId as string | undefined;
-    const models = getModelRollup(issueId);
-    res.json({ models, issueId: issueId ?? null });
-  } catch (error: any) {
-    console.error('Error getting model costs:', error);
-    res.status(500).json({ error: 'Failed to get model costs: ' + error.message });
-  }
-});
-
-// GET /api/costs/issue/:id - Detailed cost breakdown for a single issue (SQLite-backed)
-app.get('/api/costs/issue/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    const data = getCostForIssueFromDb(id);
-    if (!data) {
-      return res.json({ issueId: id.toUpperCase(), totalCost: 0, models: {}, stages: {} });
-    }
-    return res.json(data);
-  } catch (error: any) {
-    console.error('Error getting issue cost detail:', error);
-    res.status(500).json({ error: 'Failed to get issue cost detail: ' + error.message });
-  }
-});
-
-// GET /api/costs/by-agent - Per-agent (developer) cost rollup (SQLite-backed)
-app.get('/api/costs/by-agent', (req, res) => {
-  try {
-    const issueId = req.query.issueId as string | undefined;
-    const agents = getAgentRollup(issueId);
-    res.json({ agents, issueId: issueId ?? null });
-  } catch (error: any) {
-    console.error('Error getting agent costs:', error);
-    res.status(500).json({ error: 'Failed to get agent costs: ' + error.message });
-  }
-});
-
-// POST /api/costs/sync-wal - Import WAL files from all project repos
-app.post('/api/costs/sync-wal', (_req, res) => {
-  try {
-    const result = syncWalFromAllProjects();
-    res.json({ success: true, ...result });
-  } catch (error: any) {
-    console.error('Error syncing WAL:', error);
-    res.status(500).json({ error: 'Failed to sync WAL: ' + error.message });
-  }
-});
-
 // GET /api/issues/:id/costs - Cost summary for a specific issue (from event-sourced cache)
 app.get('/api/issues/:id/costs', (req, res) => {
   try {
@@ -14679,18 +14614,6 @@ server.listen(PORT, '0.0.0.0', async () => {
   } catch (error: any) {
     console.error('Agent state cleanup failed:', error.message);
   }
-
-  // Import WAL cost events from all project repos on startup (deferred — non-blocking)
-  setImmediate(() => {
-    try {
-      const walResult = syncWalFromAllProjects();
-      if (walResult.imported > 0) {
-        console.log(`WAL sync: imported ${walResult.imported} cost events (${walResult.duplicates} duplicates skipped)`);
-      }
-    } catch (error: any) {
-      console.error('WAL startup sync failed (non-fatal):', error.message);
-    }
-  });
 
   // Start IssueDataService for background polling + real-time push
   try {
