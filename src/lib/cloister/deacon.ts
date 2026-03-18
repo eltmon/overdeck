@@ -1283,33 +1283,11 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 
       const issueId = status.issueId || key;
       const ageMin = Math.round((now - new Date(status.updatedAt).getTime()) / 60000);
-      console.log(`[deacon] readyForMerge stuck for ${key} (age: ${ageMin}m, attempts: ${attempts}), triggering merge...`);
-
-      // Record attempt before the call so a crash doesn't leave us in a retry loop
-      mergeStuckCooldowns.set(key, now);
-      attemptCounts[key] = attempts + 1;
-      stateModified = true;
-
-      try {
-        const response = await fetch(`http://localhost:${apiPort}/api/workspaces/${issueId}/merge`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const body = await response.json() as { error?: string };
-        if (response.ok) {
-          const msg = `Stuck-merge trigger: initiated merge for ${key}`;
-          actions.push(msg);
-          console.log(`[deacon] ${msg}`);
-        } else {
-          const msg = `Stuck-merge trigger: merge API returned ${response.status} for ${key}: ${body.error ?? ''}`;
-          actions.push(msg);
-          console.warn(`[deacon] ${msg}`);
-        }
-      } catch (fetchErr: unknown) {
-        const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-        console.error(`[deacon] Stuck-merge trigger fetch failed for ${key}:`, msg);
-        actions.push(`Stuck-merge trigger failed for ${key}: ${msg}`);
-      }
+      // PAN-354: Do NOT auto-merge. Only log that it's ready.
+      // Merges require human approval via the MERGE button.
+      const msg = `${key} is readyForMerge (age: ${ageMin}m) — waiting for human approval`;
+      actions.push(msg);
+      console.log(`[deacon] ${msg}`);
     }
 
     // Persist updated attempt counts so circuit breaker survives server restarts
