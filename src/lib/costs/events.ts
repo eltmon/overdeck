@@ -7,6 +7,8 @@
 import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, renameSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { insertCostEvent } from '../database/cost-events-db.js';
+import { appendToWal } from './wal.js';
 
 // ============== Types ==============
 
@@ -101,6 +103,20 @@ export function appendCostEvent(event: CostEvent): void {
   // Append to log atomically (single write operation, newline-terminated)
   const line = JSON.stringify(event) + '\n';
   appendFileSync(getEventsFile(), line, 'utf-8');
+
+  // Dual-write to SQLite (best-effort — JSONL remains canonical)
+  try {
+    insertCostEvent(event);
+  } catch (err) {
+    console.error('[cost-events] SQLite write failed (continuing with JSONL):', err);
+  }
+
+  // Append to per-project WAL file (best-effort — enables multi-developer sync)
+  try {
+    appendToWal(event);
+  } catch (err) {
+    console.error('[cost-events] WAL write failed (continuing):', err);
+  }
 }
 
 // ============== Event Reading ==============

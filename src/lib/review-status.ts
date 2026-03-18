@@ -2,6 +2,12 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
+import {
+  upsertReviewStatus as dbUpsert,
+  deleteReviewStatus as dbDelete,
+  getReviewStatusFromDb,
+  getAllReviewStatusesFromDb,
+} from './database/review-status-db.js';
 
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge';
@@ -32,6 +38,15 @@ export interface ReviewStatus {
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
+  // Prefer SQLite when using the default path
+  if (filePath === DEFAULT_STATUS_FILE) {
+    try {
+      return getAllReviewStatusesFromDb();
+    } catch {
+      // Fall through to JSON on DB error
+    }
+  }
+
   try {
     if (existsSync(filePath)) {
       return JSON.parse(readFileSync(filePath, 'utf-8'));
@@ -107,12 +122,30 @@ export function setReviewStatus(
   statuses[issueId] = updated;
   saveReviewStatuses(statuses, filePath);
 
+  // Dual-write to SQLite when using the default path
+  if (filePath === DEFAULT_STATUS_FILE) {
+    try {
+      dbUpsert(updated);
+    } catch (err) {
+      console.error('[review-status] SQLite write failed (continuing with JSON):', err);
+    }
+  }
+
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
 
   return updated;
 }
 
 export function getReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FILE): ReviewStatus | null {
+  // Prefer SQLite when using the default path
+  if (filePath === DEFAULT_STATUS_FILE) {
+    try {
+      const fromDb = getReviewStatusFromDb(issueId);
+      if (fromDb) return fromDb;
+    } catch {
+      // Fall through to JSON on DB error
+    }
+  }
   const statuses = loadReviewStatuses(filePath);
   return statuses[issueId] || null;
 }
@@ -121,4 +154,13 @@ export function clearReviewStatus(issueId: string, filePath = DEFAULT_STATUS_FIL
   const statuses = loadReviewStatuses(filePath);
   delete statuses[issueId];
   saveReviewStatuses(statuses, filePath);
+
+  // Dual-delete from SQLite when using the default path
+  if (filePath === DEFAULT_STATUS_FILE) {
+    try {
+      dbDelete(issueId);
+    } catch (err) {
+      console.error('[review-status] SQLite delete failed (continuing with JSON):', err);
+    }
+  }
 }
