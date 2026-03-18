@@ -250,22 +250,9 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
       console.error(`[status] Error updating Linear to In Review for ${issueId}:`, err);
     });
 
-    // Auto-trigger merge. Guards: skip if already merging/merged, or if a pending
-    // merge op is actively running (prevents double-merge on rapid status updates).
-    if (updated.mergeStatus !== 'merging' && updated.mergeStatus !== 'merged') {
-      const pendingOp = getPendingOperation(issueId);
-      const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
-      if (!activelyMerging) {
-        console.log(`[merge] Auto-triggering merge for ${issueId}`);
-        // triggerMerge runs synchronously up to its first await, setting
-        // mergeStatus='merging' before yielding. Re-read so the return value
-        // of this wrapper reflects the updated state to callers and the dashboard.
-        triggerMerge(issueId).catch(err => {
-          console.error(`[merge] Auto-merge failed for ${issueId}:`, err);
-        });
-        updated = getReviewStatus(issueId) ?? updated;
-      }
-    }
+    // PAN-354: Do NOT auto-merge. Only notify that the issue is ready.
+    // Merges require human approval via the MERGE button in the dashboard.
+    console.log(`[merge] ${issueId} is ready for merge — waiting for human approval via MERGE button`);
   }
 
   return updated;
