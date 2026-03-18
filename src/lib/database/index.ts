@@ -12,7 +12,7 @@ import Database from 'better-sqlite3';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { getPanopticonHome } from '../paths.js';
-import { initSchema, runMigrations } from './schema.js';
+import { runMigrations } from './schema.js';
 
 let _db: Database.Database | null = null;
 

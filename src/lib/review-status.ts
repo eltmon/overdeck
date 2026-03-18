@@ -119,10 +119,7 @@ export function setReviewStatus(
     history,
   };
 
-  statuses[issueId] = updated;
-  saveReviewStatuses(statuses, filePath);
-
-  // Dual-write to SQLite when using the default path
+  // SQLite first — it is the authoritative store (reads prefer SQLite)
   if (filePath === DEFAULT_STATUS_FILE) {
     try {
       dbUpsert(updated);
@@ -130,6 +127,10 @@ export function setReviewStatus(
       console.error('[review-status] SQLite write failed (continuing with JSON):', err);
     }
   }
+
+  // JSON second — legacy fallback for tools that read review-status.json directly
+  statuses[issueId] = updated;
+  saveReviewStatuses(statuses, filePath);
 
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
 

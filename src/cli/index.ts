@@ -52,7 +52,7 @@ import { registerBeadsCommands } from './commands/beads.js';
 import { migrateConfigCommand } from './commands/migrate-config.js';
 import { registerRemoteCommands } from './commands/remote/index.js';
 import { registerConfigCommand } from './commands/config.js';
-import { createCostCommand } from './commands/cost.js';
+import { createCostCommand, runCostSync } from './commands/cost.js';
 
 const program = new Command();
 
@@ -532,22 +532,7 @@ program.addCommand(createCostCommand());
 program
   .command('sync-costs')
   .description('Import cost events from per-project WAL files (alias for: pan cost sync)')
-  .action(async () => {
-    const { syncWalFromAllProjects } = await import('./commands/cost.js').then(
-      () => import('../lib/costs/sync-wal.js')
-    );
-    try {
-      console.log('Syncing cost events from project WAL files...');
-      const result = syncWalFromAllProjects();
-      console.log(`Imported ${result.imported} new events, ${result.duplicates} duplicates skipped.`);
-      if (result.errors.length > 0) {
-        for (const err of result.errors) console.warn(' ', err);
-      }
-    } catch (error: any) {
-      console.error('Error:', error.message);
-      process.exit(1);
-    }
-  });
+  .action(runCostSync);
 
 // Parse and execute
 program.parse();
