@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Use vi.hoisted to avoid initialization order issues
-const { mockExecAsync } = vi.hoisted(() => ({
+const { mockExecAsync, mockGetLinearApiKey } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+  mockGetLinearApiKey: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('child_process', () => ({
@@ -16,20 +17,36 @@ vi.mock('util', async (importOriginal) => {
   };
 });
 
-// Default: no Linear API key
 vi.mock('../../../../src/lib/lifecycle/types.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/lifecycle/types.js')>();
   return {
     ...actual,
-    getLinearApiKey: vi.fn().mockReturnValue(null),
+    getLinearApiKey: mockGetLinearApiKey,
   };
 });
+
+// Linear SDK mock — controls what the SDK returns per-test
+const mockIssueUpdate = vi.fn().mockResolvedValue({});
+const mockIssueLabels = vi.fn().mockResolvedValue({ nodes: [] });
+const mockClientIssues = vi.fn();
+const mockClientIssueLabels = vi.fn();
+const mockClientCreateIssueLabel = vi.fn();
+
+vi.mock('@linear/sdk', () => ({
+  LinearClient: vi.fn().mockImplementation(() => ({
+    issues: mockClientIssues,
+    issueLabels: mockClientIssueLabels,
+    createIssueLabel: mockClientCreateIssueLabel,
+  })),
+}));
 
 import { cleanupMergedLabels } from '../../../../src/lib/lifecycle/label-cleanup.js';
 
 describe('cleanupMergedLabels', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetLinearApiKey.mockReturnValue(null); // Default: no Linear
+    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
   });
 
   describe('GitHub', () => {
@@ -40,8 +57,6 @@ describe('cleanupMergedLabels', () => {
     };
 
     it('returns ok with merged label applied', async () => {
-      mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
-
       const result = await cleanupMergedLabels(ctx);
 
       expect(result.step).toBe('label-cleanup:merged');
@@ -51,8 +66,6 @@ describe('cleanupMergedLabels', () => {
     });
 
     it('calls gh label create to ensure merged label exists', async () => {
-      mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
-
       await cleanupMergedLabels(ctx);
 
       const calls = mockExecAsync.mock.calls.map((c: any[]) => c[0] as string);
@@ -60,8 +73,6 @@ describe('cleanupMergedLabels', () => {
     });
 
     it('calls gh issue edit to add merged label', async () => {
-      mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
-
       await cleanupMergedLabels(ctx);
 
       const calls = mockExecAsync.mock.calls.map((c: any[]) => c[0] as string);
@@ -69,14 +80,16 @@ describe('cleanupMergedLabels', () => {
     });
 
     it('calls gh issue edit to remove workflow labels', async () => {
-      mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
-
       await cleanupMergedLabels(ctx);
 
       const calls = mockExecAsync.mock.calls.map((c: any[]) => c[0] as string);
       const removeCalls = calls.filter(c => c.includes('--remove-label'));
       expect(removeCalls.length).toBeGreaterThan(0);
-      expect(removeCalls.some(c => c.includes('"in-review"') || c.includes('"in-progress"') || c.includes('"merge-agent"'))).toBe(true);
+      expect(
+        removeCalls.some(c =>
+          c.includes('"in-review"') || c.includes('"in-progress"') || c.includes('"merge-agent"'),
+        ),
+      ).toBe(true);
     });
 
     it('returns stepFailed when gh CLI throws', async () => {
@@ -87,6 +100,97 @@ describe('cleanupMergedLabels', () => {
       expect(result.step).toBe('label-cleanup:merged');
       expect(result.success).toBe(false);
       expect(result.error).toContain('gh: command not found');
+    });
+  });
+
+  describe('Linear', () => {
+    const ctx = { issueId: 'PAN-338', projectPath: '/tmp/test' };
+
+    /** Minimal mock for a Linear issue node */
+    function makeIssueNode(labelNames: string[] = ['in-review', 'in-progress']) {
+      return {
+        update: mockIssueUpdate,
+        labels: mockIssueLabels.mockResolvedValue({
+          nodes: labelNames.map((name, i) => ({ id: `label-${i}`, name })),
+        }),
+      };
+    }
+
+    beforeEach(() => {
+      mockGetLinearApiKey.mockReturnValue('test-linear-key');
+    });
+
+    it('applies merged label and removes workflow labels (happy path)', async () => {
+      mockClientIssues.mockResolvedValue({ nodes: [makeIssueNode()] });
+      mockClientIssueLabels.mockResolvedValue({ nodes: [{ id: 'merged-label-id', name: 'merged' }] });
+
+      const result = await cleanupMergedLabels(ctx);
+
+      expect(result.step).toBe('label-cleanup:merged');
+      expect(result.success).toBe(true);
+      expect(result.skipped).toBe(false);
+      expect(result.details?.some(d => d.includes('merged'))).toBe(true);
+      // update() was called with labelIds that include the merged label
+      expect(mockIssueUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ labelIds: expect.arrayContaining(['merged-label-id']) }),
+      );
+    });
+
+    it('creates merged label when it does not exist', async () => {
+      mockClientIssues.mockResolvedValue({ nodes: [makeIssueNode()] });
+      mockClientIssueLabels.mockResolvedValue({ nodes: [] }); // label doesn't exist
+      mockClientCreateIssueLabel.mockResolvedValue({
+        issueLabel: Promise.resolve({ id: 'new-merged-id' }),
+      });
+
+      const result = await cleanupMergedLabels(ctx);
+
+      expect(result.success).toBe(true);
+      expect(mockClientCreateIssueLabel).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'merged' }),
+      );
+      expect(mockIssueUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ labelIds: expect.arrayContaining(['new-merged-id']) }),
+      );
+    });
+
+    it('returns skipped when issue not found in Linear', async () => {
+      mockClientIssues.mockResolvedValue({ nodes: [] });
+
+      const result = await cleanupMergedLabels(ctx);
+
+      expect(result.step).toBe('label-cleanup:merged');
+      expect(result.skipped).toBe(true);
+    });
+
+    it('returns stepFailed when Linear SDK throws', async () => {
+      mockClientIssues.mockRejectedValue(new Error('Linear API error'));
+
+      const result = await cleanupMergedLabels(ctx);
+
+      expect(result.step).toBe('label-cleanup:merged');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Linear API error');
+    });
+
+    it('strips workflow labels from existing label IDs before applying merged', async () => {
+      makeIssueNode(['in-review', 'in-progress', 'merge-agent', 'bug']);
+      mockClientIssues.mockResolvedValue({
+        nodes: [makeIssueNode(['in-review', 'in-progress', 'merge-agent', 'bug'])],
+      });
+      mockClientIssueLabels.mockResolvedValue({ nodes: [{ id: 'merged-id', name: 'merged' }] });
+
+      await cleanupMergedLabels(ctx);
+
+      const updateArg = mockIssueUpdate.mock.calls[0][0];
+      const labelIds: string[] = updateArg.labelIds;
+      // bug label should survive, workflow labels should not
+      expect(labelIds).toContain('merged-id');
+      // in-review, in-progress, merge-agent nodes had ids label-0, label-1, label-2
+      expect(labelIds).not.toContain('label-0'); // in-review
+      expect(labelIds).not.toContain('label-1'); // in-progress
+      expect(labelIds).not.toContain('label-2'); // merge-agent
+      expect(labelIds).toContain('label-3');     // bug — preserved
     });
   });
 
