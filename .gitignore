@@ -46,8 +46,16 @@ src/dashboard/restart.sh
 
 # Workspace-specific generated files
 CLAUDE.md
-# Note: .planning/ is intentionally NOT gitignored - it's tracked on feature branches
-# but excluded when merging to main (see merge-agent.md)
+
+# Ephemeral planning artifacts — ignored so they don't re-leak to main after cleanup.
+# Feature branches MUST use `git add -f` to track these files intentionally.
+# postMergeLifecycle removes them from main programmatically (PAN-337).
+.planning/STATE.md
+.planning/PRD.md
+.planning/PLANNING_PROMPT.md
+.planning/PLANNING_PROMPT.md.archived
+.planning/.planning-complete
+.planning/feedback/
 
 # Beads daemon files
 .beads/
