@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pause, MessageSquare, GitBranch, Terminal, Square } from 'lucide-react';
+import { MessageSquare, GitBranch, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Agent } from '../../types';
 

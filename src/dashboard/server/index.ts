@@ -11,7 +11,7 @@ import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, r
 import { readFile, readdir } from 'fs/promises';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
-import { homedir } from 'os';
+import { homedir, cpus as osCpus, freemem, totalmem } from 'os';
 import { crc32 } from 'node:zlib';
 import { Server as SocketIOServer } from 'socket.io';
 import { CacheService } from './services/cache-service.js';
@@ -2364,8 +2364,7 @@ let godViewHealthRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
 
 async function refreshGodViewSystemHealth() {
   try {
-    const { cpus, freemem, totalmem } = await import('os');
-    const cpuList = cpus();
+    const cpuList = osCpus();
     // CPU usage: average of all cores (idle vs total)
     const cpuUsage = cpuList.reduce((acc: number, cpu) => {
       const total = Object.values(cpu.times).reduce((s, t) => s + t, 0);
@@ -14837,56 +14836,68 @@ server.listen(PORT, '0.0.0.0', async () => {
   }
 
   // Poll agent statuses every 3s; emit godview:status-change on transitions
-  setInterval(async () => {
+  // Uses async FS to avoid blocking the event loop (PAN-70)
+  const godViewStatusInterval = setInterval(async () => {
     try {
       const agentsDir = join(homedir(), '.panopticon', 'agents');
-      if (!existsSync(agentsDir)) return;
-      for (const name of readdirSync(agentsDir)) {
+      const names = await readdir(agentsDir).catch(() => [] as string[]);
+      await Promise.all(names.map(async (name) => {
         const stateFile = join(agentsDir, name, 'state.json');
-        if (!existsSync(stateFile)) continue;
         try {
-          const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+          const raw = await readFile(stateFile, 'utf-8');
+          const state = JSON.parse(raw);
           const { id, status } = state;
-          if (!id) continue;
+          if (!id) return;
           const prev = godViewLastStatus.get(id);
           if (prev !== status) {
             godViewLastStatus.set(id, status);
             socketIo.emit('godview:status-change', { agentId: id, status, previousStatus: prev });
           }
-          // Schedule terminal output capture for running agents
           if (status === 'running' || status === 'healthy') {
             scheduleGodViewOutput(id);
           }
-        } catch { /* skip */ }
-      }
+        } catch { /* skip missing/corrupt files */ }
+      }));
     } catch { /* skip */ }
   }, 3000);
 
   // Broadcast global activity feed every 5s (last 20 events across all agents)
-  setInterval(async () => {
+  // Uses async FS to avoid blocking the event loop (PAN-70)
+  const godViewActivityInterval = setInterval(async () => {
     try {
       const agentsDir = join(homedir(), '.panopticon', 'agents');
-      if (!existsSync(agentsDir)) return;
+      const names = await readdir(agentsDir).catch(() => [] as string[]);
       const allEvents: Array<{ agentId: string; timestamp: string; type: string; message: string }> = [];
-      for (const name of readdirSync(agentsDir)) {
+      await Promise.all(names.map(async (name) => {
         try {
           const activityFile = join(agentsDir, name, 'activity.jsonl');
-          if (!existsSync(activityFile)) continue;
-          const lines = readFileSync(activityFile, 'utf-8').split('\n').filter(l => l.trim()).slice(-10);
+          const content = await readFile(activityFile, 'utf-8');
+          const lines = content.split('\n').filter(l => l.trim()).slice(-10);
           for (const line of lines) {
             try {
               const e = JSON.parse(line);
               allEvents.push({ agentId: name.replace(/^agent-/, ''), timestamp: e.timestamp || '', type: e.type || 'activity', message: e.message || e.content || '' });
             } catch { /* skip */ }
           }
-        } catch { /* skip */ }
-      }
+        } catch { /* skip missing files */ }
+      }));
       allEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       if (allEvents.length > 0) {
         socketIo.emit('godview:activity', { events: allEvents.slice(0, 20) });
       }
     } catch { /* skip */ }
   }, 5000);
+
+  // Clean up God View timers on shutdown
+  const cleanupGodViewTimers = () => {
+    clearInterval(godViewStatusInterval);
+    clearInterval(godViewActivityInterval);
+    if (godViewHealthRefreshTimeout) clearTimeout(godViewHealthRefreshTimeout);
+    for (const t of godViewOutputDebounce.values()) clearTimeout(t);
+    godViewOutputDebounce.clear();
+  };
+  process.once('SIGTERM', cleanupGodViewTimers);
+  process.once('SIGINT', cleanupGodViewTimers);
 
   console.log('God View Socket.io streaming started (PAN-341)');
   // ──────────────────────────────────────────────────────────────────────────
