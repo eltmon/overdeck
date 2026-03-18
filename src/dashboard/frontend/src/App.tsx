@@ -6,23 +6,21 @@ import { AgentList } from './components/AgentList';
 import { TerminalView } from './components/TerminalView';
 import { HealthDashboard } from './components/HealthDashboard';
 import { SkillsList } from './components/SkillsList';
-import { WorkspacePanel } from './components/WorkspacePanel';
-// IssueDetailPanel functionality is now unified into WorkspacePanel
 import { ActivityPanel } from './components/ActivityPanel';
 import { ConvoyPanel } from './components/ConvoyPanel';
-import { CloisterStatusBar } from './components/CloisterStatusBar';
 import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
-import { MetricsSummary } from './components/MetricsSummary';
+import { MetricsSummaryRow } from './components/MetricsSummaryRow';
 import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
 import { MissionControl } from './components/MissionControl';
 import { ResourcesPanel } from './components/ResourcesPanel';
-import { Eye, LayoutGrid, Users, Activity, BookOpen, Terminal, Maximize2, Minimize2, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, AlertTriangle, Server } from 'lucide-react';
+import { Header, Tab } from './components/Header';
+import { DetailPanelLayout } from './components/DetailPanelLayout';
+import { AlertTriangle } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useTheme } from './hooks/useTheme';
 import { useSocketIssues } from './hooks/useSocketIssues';
 
 interface TrackerStatusItem {
@@ -38,8 +36,6 @@ interface TrackerStatus {
   secondary?: string;
   configured: TrackerStatusItem[];
 }
-
-type Tab = 'mission-control' | 'kanban' | 'agents' | 'resources' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
 
 const TAB_PATHS: Record<Tab, string> = {
   'mission-control': '/',
@@ -64,10 +60,6 @@ function getTabFromPath(): Tab {
   const path = window.location.pathname;
   return PATH_TO_TAB[path] || 'mission-control';
 }
-
-const MIN_PANEL_WIDTH = 400;
-const MAX_PANEL_WIDTH = 1200;
-const DEFAULT_PANEL_WIDTH = 700;
 
 async function fetchAgents(): Promise<Agent[]> {
   const res = await fetch('/api/agents');
@@ -106,16 +98,9 @@ export default function App() {
   const [activeTab, setActiveTabState] = useState<Tab>(getTabFromPath);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
-  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Theme management
-  const { theme, toggleTheme, initTheme } = useTheme();
 
   // Real-time issue updates via socket.io
   useSocketIssues();
@@ -124,16 +109,11 @@ export default function App() {
   const { data: trackerStatus } = useQuery({
     queryKey: ['tracker-status'],
     queryFn: fetchTrackerStatus,
-    refetchInterval: 60000, // Check every minute
+    refetchInterval: 60000,
     retry: false,
   });
 
   const missingKeyTrackers = trackerStatus?.configured.filter(t => !t.hasKey) || [];
-
-  // Initialize theme on mount
-  useEffect(() => {
-    initTheme();
-  }, [initTheme]);
 
   // URL-synced tab navigation
   const setActiveTab = useCallback((tab: Tab) => {
@@ -170,7 +150,7 @@ export default function App() {
   const { data: confirmations = [] } = useQuery({
     queryKey: ['confirmations'],
     queryFn: fetchConfirmations,
-    refetchInterval: 2000, // Poll every 2 seconds
+    refetchInterval: 2000,
   });
 
   // Show the most recent confirmation request
@@ -200,7 +180,6 @@ export default function App() {
       }
     }
 
-    // Clear notifications for agents that no longer need input
     for (const key of notifiedPlanningInputRef.current) {
       const agentId = key.replace('-input', '');
       const agent = agents.find((a) => a.id === agentId);
@@ -219,42 +198,6 @@ export default function App() {
   const selectedIssueData = selectedIssue
     ? issues.find((i) => i.identifier.toLowerCase() === selectedIssue.toLowerCase())
     : null;
-
-  // Handle resize drag
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing || !containerRef.current) return;
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const newWidth = containerRect.right - e.clientX;
-    setPanelWidth(Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, newWidth)));
-  }, [isResizing]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    }
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizing, handleMouseMove, handleMouseUp]);
-
-  const toggleExpand = useCallback(() => {
-    setIsExpanded((prev) => !prev);
-  }, []);
 
   const handleConfirm = useCallback(async () => {
     if (!currentConfirmation) return;
@@ -283,7 +226,6 @@ export default function App() {
   // Global keyboard shortcut for search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Open search with '/' key (but not when typing in an input/textarea)
       if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
         e.preventDefault();
         setIsSearchOpen(true);
@@ -296,63 +238,16 @@ export default function App() {
 
   const handleSelectIssueFromSearch = useCallback((issueId: string) => {
     setSelectedIssue(issueId);
-    setActiveTab('kanban'); // Switch to kanban tab for detail view
+    setActiveTab('kanban');
   }, []);
 
-  // Calculate actual panel width (expanded = full width minus a small margin for kanban)
-  const actualPanelWidth = isExpanded ? 'calc(100% - 300px)' : `${panelWidth}px`;
-
   return (
-    <div className="h-screen bg-surface flex flex-col overflow-hidden transition-colors duration-150">
-      <header className="bg-surface-raised border-b border-divider px-4 py-2 shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setActiveTab('mission-control')}
-            className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
-            title="Go to Mission Control"
-          >
-            <Eye className="w-5 h-5 text-blue-400" />
-            <h1 className="text-lg font-bold text-content whitespace-nowrap">Panopticon</h1>
-          </button>
-          <CloisterStatusBar />
-          <nav className="flex gap-0.5 overflow-x-auto min-w-0 scrollbar-hide">
-            {([
-              { id: 'mission-control', label: 'Mission Control', icon: Compass },
-              { id: 'kanban', label: 'Board', icon: LayoutGrid },
-              { id: 'agents', label: 'Agents', icon: Users },
-              { id: 'resources', label: 'Resources', icon: Server },
-              { id: 'convoys', label: 'Convoys', icon: Users },
-              { id: 'handoffs', label: 'Handoffs', icon: ArrowRightLeft },
-              { id: 'activity', label: 'Activity', icon: Terminal },
-              { id: 'metrics', label: 'Metrics', icon: BarChart3 },
-              { id: 'costs', label: 'Costs', icon: DollarSign },
-              { id: 'skills', label: 'Skills', icon: BookOpen },
-              { id: 'health', label: 'Health', icon: Activity },
-              { id: 'settings', label: 'Settings', icon: Settings },
-            ] as const).map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors ${
-                  activeTab === id
-                    ? 'bg-blue-600 text-white'
-                    : 'text-content-subtle hover:text-content hover:bg-surface-overlay'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {label}
-              </button>
-            ))}
-          </nav>
-          <button
-            onClick={toggleTheme}
-            className="ml-auto px-2.5 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors text-content-subtle hover:text-content hover:bg-surface-overlay"
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-      </header>
+    <div className="h-screen flex flex-col overflow-hidden transition-colors duration-150" style={{ backgroundColor: '#101622' }}>
+      <Header
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onSearchOpen={() => setIsSearchOpen(true)}
+      />
 
       {/* Missing Tracker API Key Banner */}
       {missingKeyTrackers.length > 0 && !trackerBannerDismissed && (
@@ -377,12 +272,12 @@ export default function App() {
             className="text-amber-400/60 hover:text-amber-400 shrink-0"
             title="Dismiss"
           >
-            <span className="material-symbols-outlined text-[18px]">close</span>
+            ✕
           </button>
         </div>
       )}
 
-      <main ref={containerRef} className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex overflow-hidden">
         {activeTab === 'mission-control' && (
           <div className="w-full h-full">
             <MissionControl issues={issues} />
@@ -391,39 +286,20 @@ export default function App() {
         {activeTab === 'kanban' && (
           <>
             <div className={`flex-1 overflow-auto p-6 ${selectedIssue ? '' : 'w-full'}`}>
-              <MetricsSummary />
+              <MetricsSummaryRow />
               <KanbanBoard
                 selectedIssue={selectedIssue}
                 onSelectIssue={setSelectedIssue}
               />
             </div>
             {selectedIssue && selectedIssueData && (
-              <>
-                {/* Resize handle */}
-                <div
-                  onMouseDown={handleMouseDown}
-                  className={`w-1 hover:w-1.5 bg-surface-overlay hover:bg-blue-500 cursor-col-resize transition-colors shrink-0 ${
-                    isResizing ? 'bg-blue-500' : ''
-                  }`}
-                />
-                <div style={{ width: actualPanelWidth }} className="relative shrink-0 h-full flex flex-col">
-                  {/* Expand/collapse button */}
-                  <button
-                    onClick={toggleExpand}
-                    className="absolute top-2 left-2 z-10 p-1.5 bg-surface-overlay hover:bg-surface-emphasis rounded text-content-subtle hover:text-content"
-                    title={isExpanded ? 'Collapse panel' : 'Expand panel'}
-                  >
-                    {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                  </button>
-                  <WorkspacePanel
-                    agent={selectedIssueAgent ?? undefined}
-                    issueId={selectedIssue}
-                    issueUrl={selectedIssueData.url}
-                    issue={selectedIssueData}
-                    onClose={() => setSelectedIssue(null)}
-                  />
-                </div>
-              </>
+              <DetailPanelLayout
+                agent={selectedIssueAgent ?? undefined}
+                issueId={selectedIssue}
+                issueUrl={selectedIssueData.url}
+                issue={selectedIssueData}
+                onClose={() => setSelectedIssue(null)}
+              />
             )}
           </>
         )}
