@@ -918,7 +918,7 @@ When an issue moves (local → remote, or developer A → developer B):
 **Step 1: Sync before leaving (source machine)**
 ```bash
 bd sync                              # Export beads DB → JSONL
-git add .beads/issues.jsonl .planning/
+git add .beads/issues.jsonl && git add -f .planning/
 git commit -m "Sync state for MIN-667 handoff"
 git push
 ```
