@@ -677,7 +677,7 @@ COMPOSE_EOF`);
 
       // Add and commit
       const msg = commitMessage || 'Sync beads from planning session';
-      await this.ssh(vmName, `cd ${workspacePath} && git add .beads/ .planning/ 2>/dev/null || true`);
+      await this.ssh(vmName, `cd ${workspacePath} && git add .beads/ && git add -f .planning/ 2>/dev/null || true`);
       await this.ssh(vmName, `cd ${workspacePath} && git commit -m "${msg}" 2>/dev/null || true`);
 
       // Push - use -u to set upstream if not already set
