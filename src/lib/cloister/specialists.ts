@@ -12,6 +12,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { PANOPTICON_HOME } from '../paths.js';
+import { getDevrootPath } from '../config.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import { loadSettings, type ModelId } from '../settings.js';
@@ -590,7 +591,13 @@ export async function spawnEphemeralSpecialist(
 
   // Spawn tmux session
   const tmuxSession = getTmuxSessionName(specialistType, projectKey);
-  const cwd = homedir();
+  const cwd = getDevrootPath() || homedir();
+
+  // Pre-trust cwd so specialists don't hit the trust prompt
+  try {
+    const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
+    preTrustDirectory(cwd);
+  } catch { /* non-fatal */ }
 
   try {
     // Check if session already exists (stale from previous run)
@@ -1688,7 +1695,13 @@ export async function wakeSpecialist(
       };
     }
 
-    const cwd = process.env.HOME || '/home/eltmon';
+    const cwd = getDevrootPath() || process.env.HOME || '/home/eltmon';
+
+    // Pre-trust cwd so specialists don't hit the trust prompt
+    try {
+      const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
+      preTrustDirectory(cwd);
+    } catch { /* non-fatal */ }
 
     try {
       // Resolve model from work type router (respects config.yaml overrides)
