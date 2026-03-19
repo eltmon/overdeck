@@ -475,6 +475,50 @@ async function transitionIssueToInProgress(issueId: string, workspacePath?: stri
   }
 }
 
+/**
+ * Transitions an issue to "in_review" state in the configured issue tracker.
+ * Fire-and-forget — logs warnings on failure but never blocks the pipeline.
+ */
+export async function transitionIssueToInReview(issueId: string, workspacePath?: string): Promise<void> {
+  const config = loadConfig();
+  const trackersConfig = config.trackers;
+
+  // Try primary/secondary trackers (may not be configured)
+  if (trackersConfig?.primary) {
+    const trackerTypes: TrackerType[] = [trackersConfig.primary];
+    if (trackersConfig.secondary) {
+      trackerTypes.push(trackersConfig.secondary);
+    }
+
+    for (const trackerType of trackerTypes) {
+      try {
+        const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+        await tracker.transitionIssue(issueId, 'in_review');
+        console.log(`[agents] Transitioned ${issueId} to in_review via ${trackerType}`);
+        return;
+      } catch {
+        // Issue not found in this tracker or transition failed, try next
+      }
+    }
+  }
+
+  // Fall back to the project's own tracker derived from the workspace path.
+  if (workspacePath) {
+    const projectConfig = findProjectByPath(workspacePath);
+    if (projectConfig?.github_repo) {
+      const [owner, repo] = projectConfig.github_repo.split('/');
+      try {
+        const tracker = createTracker({ type: 'github', owner, repo });
+        await tracker.transitionIssue(issueId, 'in_review');
+        console.log(`[agents] Transitioned ${issueId} to in_review via project GitHub (${projectConfig.github_repo})`);
+        return;
+      } catch (err: any) {
+        console.warn(`[agents] Could not transition via project GitHub (${projectConfig.github_repo}): ${err.message}`);
+      }
+    }
+  }
+}
+
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = `agent-${options.issueId.toLowerCase()}`;
 

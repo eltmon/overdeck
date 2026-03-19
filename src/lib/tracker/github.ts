@@ -181,16 +181,34 @@ export class GitHubTracker implements IssueTracker {
         issue_number: issueNumber,
         labels: ['in-progress'],
       });
+    } else if (state === 'in_review') {
+      // Swap in-progress label for in-review label
+      await this.ensureLabelExists('in-review', 'In review', 'e4e669');
+      await this.octokit.issues.addLabels({
+        owner: this.owner,
+        repo: this.repo,
+        issue_number: issueNumber,
+        labels: ['in-review'],
+      });
+      // Remove in-progress label if present
+      await this.octokit.issues.removeLabel({
+        owner: this.owner,
+        repo: this.repo,
+        issue_number: issueNumber,
+        name: 'in-progress',
+      }).catch(() => {/* label may not exist, ignore */});
     } else {
-      // Remove in-progress label when moving to open or closed
+      // Remove in-progress and in-review labels when moving to open or closed
       const issue = await this.getIssue(id);
-      if (issue.labels?.includes('in-progress')) {
-        await this.octokit.issues.removeLabel({
-          owner: this.owner,
-          repo: this.repo,
-          issue_number: issueNumber,
-          name: 'in-progress',
-        }).catch(() => {/* label may not exist, ignore */});
+      for (const label of ['in-progress', 'in-review']) {
+        if (issue.labels?.includes(label)) {
+          await this.octokit.issues.removeLabel({
+            owner: this.owner,
+            repo: this.repo,
+            issue_number: issueNumber,
+            name: label,
+          }).catch(() => {/* label may not exist, ignore */});
+        }
       }
       await this.updateIssue(id, { state });
     }
