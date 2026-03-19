@@ -84,7 +84,7 @@ function formatTokens(tokens: number): string {
 }
 
 import { Issue } from '../types';
-import type { WorkspaceInfo, ContainerStatus } from './inspector/types';
+import type { WorkspaceInfo } from './inspector/types';
 import { getFriendlyModelName } from './inspector/utils';
 
 interface IssueDetailPanelProps {

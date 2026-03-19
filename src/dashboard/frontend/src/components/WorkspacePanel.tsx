@@ -36,7 +36,7 @@ import ReactMarkdown from 'react-markdown';
 import { Agent, Issue } from '../types';
 import { BeadsDialog } from './BeadsDialog';
 import { useConfirm } from './DialogProvider';
-import type { StatusHistoryEntry, ReviewStatus, WorkspaceInfo } from './inspector/types';
+import type { StatusHistoryEntry, ReviewStatus, WorkspaceInfo, ContainerStatus } from './inspector/types';
 import { formatRelativeTime, getFriendlyModelName, isStale } from './inspector/utils';
 
 // Clipboard helper that works without HTTPS
