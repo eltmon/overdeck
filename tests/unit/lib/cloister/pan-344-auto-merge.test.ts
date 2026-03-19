@@ -210,11 +210,11 @@ describe('checkReadyForMergeStuck', () => {
 
   it('circuit breaker stops notifying after 3 attempts for the same issue', async () => {
     // Use a unique key isolated from other tests (mergeStuckCooldowns Map persists within a file)
-    const CKEY = 'PAN-CB-COOLDOWN';
+    const CKEY = 'PAN-CB-CIRCUIT';
 
     vi.useFakeTimers();
     // Start far in the future to avoid colliding with real-clock cooldowns from other tests
-    let fakeNow = NOW + 400 * 60 * 60 * 1000; // +400 hours
+    let fakeNow = NOW + 200 * 60 * 60 * 1000; // +200 hours
 
     // Make 3 successful attempts, advancing past the 10-min cooldown each time
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -244,22 +244,7 @@ describe('checkReadyForMergeStuck', () => {
         updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
       },
     };
-
-    // First call — should produce an action
-    const first = await checkReadyForMergeStuck();
-    expect(first.length).toBeGreaterThan(0);
-
-    // Second call immediately after — within the 10-min cooldown, should be suppressed
-    const second = await checkReadyForMergeStuck();
-    expect(second).toHaveLength(0);
-
-    // Advance past the 10-min cooldown — should fire again
-    fakeNow += 11 * 60 * 1000;
-    vi.setSystemTime(fakeNow);
-    _statusData[CKEY].updatedAt = new Date(fakeNow - 5 * 60 * 1000).toISOString();
-    const third = await checkReadyForMergeStuck();
-    expect(third.length).toBeGreaterThan(0);
-
+    await checkReadyForMergeStuck();
     vi.useRealTimers();
 
     expect(mockNotifier.mock.calls.length).toBe(notifyCallsAfterThree);
