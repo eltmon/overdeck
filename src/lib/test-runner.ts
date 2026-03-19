@@ -302,6 +302,7 @@ export async function runTests(options: RunTestsOptions): Promise<TestRunResult>
     DOMAIN: workspaceConfig?.dns?.domain || 'localhost',
     PROJECT_NAME: basename(projectConfig.path),
     PROJECT_PATH: projectConfig.path,
+    PROJECTS_DIR: join(projectConfig.path, '..'),
     WORKSPACE_PATH: workspacePath,
   };
 
