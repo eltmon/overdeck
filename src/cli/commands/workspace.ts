@@ -23,7 +23,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 import { loadConfig } from '../../lib/config.js';
-import { createExeProvider, isRemoteAvailable } from '../../lib/remote/index.js';
+import { createFlyProviderFromConfig, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import {
   saveWorkspaceMetadata,
@@ -139,7 +139,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--labels <labels>', 'Comma-separated labels for routing (e.g., docs,marketing)')
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .option('--docker', 'Start Docker containers after workspace creation')
-    .option('--remote', 'Create workspace on remote VM (exe.dev)')
+    .option('--remote', 'Create workspace on remote VM (Fly.io)')
     .option('--local', 'Create workspace locally (explicit override)')
     .action(createCommand);
 
@@ -764,7 +764,7 @@ async function destroyCommand(issueId: string, options: DestroyOptions): Promise
 // ============================================================================
 
 /**
- * Create a remote workspace on exe.dev
+ * Create a remote workspace on Fly.io
  */
 async function createRemoteWorkspace(
   issueId: string,
@@ -792,8 +792,7 @@ async function createRemoteWorkspace(
     process.exit(1);
   }
 
-  const infraVm = remoteConfig.exe?.infra_vm || 'pan-infra';
-  const exe = createExeProvider({ infraVm });
+  const fly = createFlyProviderFromConfig(remoteConfig);
 
   // Determine project context first (needed for VM naming)
   const teamPrefix = extractTeamPrefix(issueId);
@@ -821,7 +820,6 @@ async function createRemoteWorkspace(
   }
 
   // VM names must be valid hostnames (start with letter, alphanumeric + hyphens)
-  // exe.dev reserves names ending in bare numbers (e.g., "foo-123"), so add "-ws" suffix
   // Include project ID to avoid collisions across projects
   const vmName = `${projectId}-${normalizedId}-ws`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
@@ -831,7 +829,6 @@ async function createRemoteWorkspace(
     console.log(chalk.bold('Would create:'));
     console.log(`  VM:        ${chalk.cyan(vmName)}`);
     console.log(`  Project:   ${chalk.dim(projectId)}`);
-    console.log(`  Infra:     ${chalk.dim(infraVm)}`);
     console.log(`  Branch:    ${chalk.dim(branchName)}`);
     return;
   }
@@ -839,7 +836,7 @@ async function createRemoteWorkspace(
   try {
     // Step 1: Create VM
     spinner.text = 'Creating VM (this may take 1-2 minutes)...';
-    await exe.createVm(vmName);
+    const vmInfo = await fly.createVm(vmName);
 
     // Get git remote URL
     let repoUrl = '';
@@ -854,7 +851,7 @@ async function createRemoteWorkspace(
       console.log('');
       console.log(chalk.dim('Make sure you are in a git repository with a remote origin.'));
       // Clean up VM
-      await exe.deleteVm(vmName);
+      await fly.deleteVm(vmName);
       process.exit(1);
     }
 
@@ -867,9 +864,9 @@ async function createRemoteWorkspace(
     const gitHost = isGitHub ? 'github.com' : isGitLab ? 'gitlab.com' : null;
 
     // Add SSH host keys to known_hosts for the detected host
-    await exe.ssh(vmName, 'mkdir -p ~/.ssh && chmod 700 ~/.ssh');
+    await fly.ssh(vmName, 'mkdir -p ~/.ssh && chmod 700 ~/.ssh');
     if (gitHost) {
-      await exe.ssh(vmName, `ssh-keyscan -t ed25519,rsa ${gitHost} >> ~/.ssh/known_hosts 2>/dev/null`);
+      await fly.ssh(vmName, `ssh-keyscan -t ed25519,rsa ${gitHost} >> ~/.ssh/known_hosts 2>/dev/null`);
     }
 
     // Inject SSH key for git access if available
@@ -884,17 +881,17 @@ async function createRemoteWorkspace(
       const sshKeyBase64 = Buffer.from(readFileSync(sshKeyPath, 'utf-8')).toString('base64');
       // Determine key type from filename for remote VM
       const keyFilename = sshKeyPath.includes('id_rsa') ? 'id_rsa' : 'id_ed25519';
-      await exe.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/${keyFilename} && chmod 600 ~/.ssh/${keyFilename}`);
+      await fly.ssh(vmName, `echo '${sshKeyBase64}' | base64 -d > ~/.ssh/${keyFilename} && chmod 600 ~/.ssh/${keyFilename}`);
     }
 
     // Sync git CLI auth for the detected host
     if (isGitHub) {
       // GitHub: sync gh CLI auth
-      await exe.syncGitHubAuth(vmName);
+      await fly.syncGitHubAuth(vmName);
     } else if (isGitLab) {
       // GitLab: sync glab CLI auth
       spinner.text = 'Syncing GitLab credentials...';
-      await exe.syncGitLabAuth(vmName);
+      await fly.syncGitLabAuth(vmName);
     }
 
     // Check if this is a polyrepo project
@@ -903,7 +900,7 @@ async function createRemoteWorkspace(
     if (isPolyrepo) {
       // Polyrepo: Clone each repo separately
       spinner.text = 'Cloning repositories (polyrepo)...';
-      await exe.ssh(vmName, 'mkdir -p ~/workspace');
+      await fly.ssh(vmName, 'mkdir -p ~/workspace');
 
       for (const repo of projectConfig!.workspace!.repos!) {
         spinner.text = `Cloning ${repo.name}...`;
@@ -925,7 +922,7 @@ async function createRemoteWorkspace(
         }
 
         // Clone this repo on the remote VM
-        const cloneResult = await exe.ssh(vmName, `git clone ${repoRemoteUrl} ~/workspace/${repo.name}`);
+        const cloneResult = await fly.ssh(vmName, `git clone ${repoRemoteUrl} ~/workspace/${repo.name}`);
         if (cloneResult.exitCode !== 0) {
           throw new Error(`Failed to clone ${repo.name}: ${cloneResult.stderr}`);
         }
@@ -933,10 +930,10 @@ async function createRemoteWorkspace(
         // Create feature branch for this repo
         const repoBranchPrefix = repo.branch_prefix || 'feature/';
         const repoBranchName = `${repoBranchPrefix}${normalizedId}`;
-        const branchResult = await exe.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout -b ${repoBranchName}`);
+        const branchResult = await fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout -b ${repoBranchName}`);
         if (branchResult.exitCode !== 0) {
           // Branch might already exist remotely
-          await exe.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout ${repoBranchName} || git checkout -b ${repoBranchName}`);
+          await fly.ssh(vmName, `cd ~/workspace/${repo.name} && git checkout ${repoBranchName} || git checkout -b ${repoBranchName}`);
         }
       }
 
@@ -947,26 +944,26 @@ async function createRemoteWorkspace(
       // Remote VMs use SSH keys, not interactive HTTPS credentials
       const sshRepoUrl = convertToSshUrl(repoUrl);
 
-      const cloneResult = await exe.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`);
+      const cloneResult = await fly.ssh(vmName, `git clone ${sshRepoUrl} ~/workspace`);
       if (cloneResult.exitCode !== 0) {
         throw new Error(`Failed to clone: ${cloneResult.stderr}`);
       }
 
       // Step 4: Create feature branch
       spinner.text = 'Creating feature branch...';
-      const branchResult = await exe.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
+      const branchResult = await fly.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
       if (branchResult.exitCode !== 0) {
         // Branch might already exist remotely
-        await exe.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+        await fly.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
       }
     }
 
     // Step 4.5: Create /workspace symlink for consistent paths
-    await exe.ssh(vmName, `sudo ln -sf /home/exedev/workspace /workspace 2>/dev/null || true`);
+    await fly.ssh(vmName, `sudo ln -sf ~/workspace /workspace 2>/dev/null || true`);
 
     // Step 4.6: Configure Claude Code - copy credentials and skip onboarding
     spinner.text = 'Configuring Claude Code...';
-    await exe.ssh(vmName, `mkdir -p ~/.claude`);
+    await fly.ssh(vmName, `mkdir -p ~/.claude`);
 
     // Copy credentials from macOS Keychain to remote
     try {
@@ -976,7 +973,7 @@ async function createRemoteWorkspace(
       );
       if (credentials && credentials.trim()) {
         const credsBase64 = Buffer.from(credentials.trim()).toString('base64');
-        await exe.ssh(vmName, `echo '${credsBase64}' | base64 -d > ~/.claude/.credentials.json`);
+        await fly.ssh(vmName, `echo '${credsBase64}' | base64 -d > ~/.claude/.credentials.json`);
       }
     } catch {
       spinner.warn('Could not copy Claude credentials - you may need to login on the VM');
@@ -998,7 +995,7 @@ with open(path, "w") as f:
     json.dump(data, f, indent=2)
 `;
     const patchBase64 = Buffer.from(onboardingPatch).toString('base64');
-    await exe.ssh(vmName, `echo '${patchBase64}' | base64 -d | python3`);
+    await fly.ssh(vmName, `echo '${patchBase64}' | base64 -d | python3`);
 
     // Set theme preference and bypass permissions in settings.json
     const claudeSettings = JSON.stringify({
@@ -1008,96 +1005,31 @@ with open(path, "w") as f:
       },
     });
     const settingsBase64 = Buffer.from(claudeSettings).toString('base64');
-    await exe.ssh(vmName, `echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
+    await fly.ssh(vmName, `echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
 
     // Configure Claude Code for autonomous operation (bypass permissions + skip onboarding)
-    await exe.configureClaudeCode(vmName);
+    await fly.configureClaudeCode(vmName);
 
     // Step 4.7: Copy essential skills to remote VM
     spinner.text = 'Copying skills to remote VM...';
-    await exe.copySkillsToVm(vmName);
+    await fly.copySkillsToVm(vmName);
 
-    // Step 5: Configure environment for shared infra
-    spinner.text = 'Configuring environment...';
-    const envContent = `
-# Panopticon Remote Workspace
-WORKSPACE_ID=${normalizedId}
-ISSUE_ID=${issueId.toUpperCase()}
-
-# Shared Infrastructure
-POSTGRES_HOST=${infraVm}
-POSTGRES_PORT=5432
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=\${PAN_POSTGRES_PASSWORD:-panopticon}
-DATABASE_NAME=myn_${normalizedId.replace(/-/g, '_')}
-
-REDIS_HOST=${infraVm}
-REDIS_PORT=6379
-REDIS_DATABASE=0
-
-# Spring Boot (if applicable)
-SPRING_DATASOURCE_URL=jdbc:postgresql://${infraVm}:5432/myn_${normalizedId.replace(/-/g, '_')}
-SPRING_DATA_REDIS_HOST=${infraVm}
-`;
-
-    await exe.ssh(vmName, `cat > ~/workspace/.env.remote << 'EOF'
-${envContent}
-EOF`);
-
-    // Step 6: Create database on shared postgres (if infra VM is running)
-    spinner.text = 'Creating database on shared postgres...';
-    const dbName = `myn_${normalizedId.replace(/-/g, '_')}`;
-    await exe.ssh(infraVm, `docker exec pan-postgres psql -U postgres -c "CREATE DATABASE ${dbName}" 2>/dev/null || true`);
-
-    // Step 6.5: Install beads CLI on remote VM
+    // Step 5: Install beads CLI on remote VM
     spinner.text = 'Installing beads CLI...';
-    const bdInstalled = await exe.installBeads(vmName);
+    const bdInstalled = await fly.installBeads(vmName);
     if (bdInstalled) {
-      await exe.initBeads(vmName, '~/workspace');
+      await fly.initBeads(vmName, '~/workspace');
     }
 
-    // Step 7: Install dependencies and start containers if docker compose exists
-    spinner.text = 'Checking for Docker Compose...';
-    const composeCheck = await exe.ssh(vmName, 'ls ~/workspace/docker-compose.yml ~/workspace/.devcontainer/docker-compose.yml 2>/dev/null | head -1');
-
-    let containersStarted = false;
-    let frontendUrl = '';
-    let apiUrl = '';
-
-    if (composeCheck.stdout.trim()) {
-      spinner.text = 'Starting containers...';
-      const composeDir = composeCheck.stdout.includes('.devcontainer')
-        ? '~/workspace/.devcontainer'
-        : '~/workspace';
-
-      const upResult = await exe.ssh(vmName, `cd ${composeDir} && docker compose up -d 2>&1`);
-      containersStarted = upResult.exitCode === 0;
-
-      // Expose ports
-      if (containersStarted) {
-        spinner.text = 'Exposing ports...';
-        try {
-          frontendUrl = await exe.exposePort(vmName, 4173);
-          apiUrl = await exe.exposePort(vmName, 7000);
-        } catch {
-          // Port exposure failed - not critical
-        }
-      }
-    }
-
-    // Step 8: Save workspace metadata
+    // Step 6: Save workspace metadata
     const metadata: RemoteWorkspaceMetadata = {
       id: normalizedId,
       issue: issueId.toUpperCase(),
-      provider: 'exe',
+      provider: 'fly',
       vmName,
-      infraVm,
-      database: dbName,
-      redisDb: 0,
-      urls: {
-        frontend: frontendUrl || undefined,
-        api: apiUrl || undefined,
-      },
+      machineId: vmInfo.machineId,
+      appName: fly.getAppName(),
+      urls: {},
       created: new Date(),
       location: 'remote',
     };
@@ -1111,20 +1043,8 @@ EOF`);
     console.log(`  Issue:    ${chalk.green(issueId.toUpperCase())}`);
     console.log(`  VM:       ${chalk.cyan(vmName)}`);
     console.log(`  Branch:   ${chalk.dim(branchName)}`);
-    console.log(`  Location: ${chalk.yellow('Remote (exe.dev)')}`);
+    console.log(`  Location: ${chalk.yellow('Remote (Fly.io)')}`);
     console.log('');
-
-    if (containersStarted) {
-      console.log(chalk.bold('Services:'));
-      console.log(`  Status: ${chalk.green('Running')}`);
-      if (frontendUrl) {
-        console.log(`  Frontend: ${chalk.cyan(frontendUrl)}`);
-      }
-      if (apiUrl) {
-        console.log(`  API:      ${chalk.cyan(apiUrl)}`);
-      }
-      console.log('');
-    }
 
     console.log(chalk.bold('Commands:'));
     console.log(`  SSH:    ${chalk.dim(`pan workspace ssh ${issueId}`)}`);
@@ -1136,7 +1056,7 @@ EOF`);
     spinner.fail(`Failed to create remote workspace: ${error.message}`);
     // Try to clean up
     try {
-      await exe.deleteVm(vmName);
+      await fly.deleteVm(vmName);
     } catch {
       // Ignore cleanup errors
     }
@@ -1215,10 +1135,10 @@ async function syncAuthCommand(issueId: string): Promise<void> {
   }
 
   try {
-    const exe = createExeProvider({ infraVm: metadata.infraVm });
+    const fly = createFlyProviderFromConfig(loadConfig().remote);
 
     // Sync all credentials (Claude, GitHub, etc.)
-    const synced = await exe.syncAllCredentials(metadata.vmName);
+    const synced = await fly.syncAllCredentials(metadata.vmName);
 
     const allSynced = synced.claude && synced.github;
     if (allSynced) {
@@ -1265,8 +1185,9 @@ async function sshCommand(issueId: string): Promise<void> {
 
   const { spawn } = await import('child_process');
 
-  // Spawn interactive SSH session
-  const child = spawn('exe', ['ssh', metadata.vmName], {
+  // Spawn interactive SSH session via Fly CLI
+  const appName = metadata.appName || 'pan-workspaces';
+  const child = spawn('fly', ['ssh', 'console', '-a', appName], {
     stdio: 'inherit',
   });
 
@@ -1290,12 +1211,8 @@ async function startCommand(issueId: string): Promise<void> {
   }
 
   try {
-    const exe = createExeProvider({ infraVm: metadata.infraVm });
-    await exe.startVm(metadata.vmName);
-
-    // Start containers
-    spinner.text = 'Starting containers...';
-    await exe.ssh(metadata.vmName, 'cd ~/workspace && docker compose up -d 2>/dev/null || true');
+    const fly = createFlyProviderFromConfig(loadConfig().remote);
+    await fly.startVm(metadata.vmName);
 
     spinner.succeed(`Workspace ${issueId} started`);
 
@@ -1327,15 +1244,11 @@ async function stopCommand(issueId: string): Promise<void> {
   }
 
   try {
-    const exe = createExeProvider({ infraVm: metadata.infraVm });
-
-    // Stop containers first
-    spinner.text = 'Stopping containers...';
-    await exe.ssh(metadata.vmName, 'docker compose down 2>/dev/null || true');
+    const fly = createFlyProviderFromConfig(loadConfig().remote);
 
     // Stop VM
     spinner.text = 'Hibernating VM...';
-    await exe.stopVm(metadata.vmName);
+    await fly.stopVm(metadata.vmName);
 
     spinner.succeed(`Workspace ${issueId} stopped (hibernated)`);
     console.log(chalk.dim('  Start again with: pan workspace start ' + issueId));
@@ -1356,34 +1269,19 @@ async function destroyRemoteWorkspace(
   spinner: Ora,
   options: DestroyOptions
 ): Promise<void> {
-  const config = loadConfig();
-  const exe = createExeProvider({ infraVm: metadata.infraVm });
+  const fly = createFlyProviderFromConfig(loadConfig().remote);
 
   try {
     // Step 1: Kill any running agent
     spinner.text = 'Stopping agent...';
     const agentId = `agent-${normalizedId}`;
-    await exe.ssh(metadata.vmName, `tmux kill-session -t ${agentId} 2>/dev/null || true`);
+    await fly.ssh(metadata.vmName, `tmux kill-session -t ${agentId} 2>/dev/null || true`);
 
-    // Step 2: Stop containers
-    spinner.text = 'Stopping containers...';
-    await exe.ssh(metadata.vmName, 'cd ~/workspace && docker compose down 2>/dev/null || true');
-
-    // Step 3: Delete VM
+    // Step 2: Delete VM
     spinner.text = 'Deleting VM...';
-    await exe.deleteVm(metadata.vmName);
+    await fly.deleteVm(metadata.vmName);
 
-    // Step 4: Drop database on shared postgres (if infra VM is running)
-    if (metadata.database && metadata.infraVm) {
-      spinner.text = 'Cleaning up database...';
-      try {
-        await exe.ssh(metadata.infraVm, `docker exec pan-postgres psql -U postgres -c "DROP DATABASE IF EXISTS ${metadata.database}" 2>/dev/null || true`);
-      } catch {
-        // Non-fatal - database cleanup failed
-      }
-    }
-
-    // Step 5: Remove workspace metadata file
+    // Step 3: Remove workspace metadata file
     const metadataFile = join(WORKSPACES_DIR, `${normalizedId}.yaml`);
     if (existsSync(metadataFile)) {
       rmSync(metadataFile);
@@ -1391,7 +1289,7 @@ async function destroyRemoteWorkspace(
 
     spinner.succeed(`Remote workspace ${issueId} destroyed`);
     console.log('');
-    console.log(chalk.dim('  VM deleted, database dropped, metadata removed.'));
+    console.log(chalk.dim('  VM deleted, metadata removed.'));
 
   } catch (error: any) {
     spinner.fail(`Failed to destroy remote workspace: ${error.message}`);
