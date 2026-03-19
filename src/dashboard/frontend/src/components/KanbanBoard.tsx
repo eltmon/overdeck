@@ -2263,21 +2263,23 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
           ) : (
             <button
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-purple-400 hover:text-purple-300'}`}
             >
               <FileText className="w-3.5 h-3.5" />
-              Plan
+              {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             </button>
           )}
-          <button
-            onClick={handleStartAgent}
-            disabled={startAgentMutation.isPending}
-            className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-content-muted hover:text-content-subtle'}`}
-            title="Plan first recommended"
-          >
-            {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
-          </button>
+          {issue.labels?.some(l => l.toLowerCase() === 'planned') && (
+            <button
+              onClick={handleStartAgent}
+              disabled={startAgentMutation.isPending}
+              className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
+              title="Start implementation agent"
+            >
+              {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
+            </button>
+          )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
           {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
           <CancelButton issue={issue} />
