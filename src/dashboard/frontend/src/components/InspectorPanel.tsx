@@ -1149,15 +1149,15 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
               </span>
             )}
 
-            {/* Review & Test */}
+            {/* Review & Test — always clickable (queues work), only disable during HTTP call */}
             <button
               data-testid="review-test-btn"
               onClick={handleReview}
-              disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
+              disabled={reviewMutation.isPending}
               className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-blue-400 hover:bg-blue-900/20"
               style={{ backgroundColor: 'rgba(59,130,246,0.15)' }}
             >
-              {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
+              {reviewMutation.isPending ?
                 <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
               {reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test'}
             </button>
