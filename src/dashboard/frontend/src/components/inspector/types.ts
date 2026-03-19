@@ -1,3 +1,5 @@
+import type { GitStatus } from '../../types';
+
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge';
   status: string;
@@ -49,6 +51,14 @@ export interface WorkspaceInfo {
   canContainerize?: boolean;
   pendingOperation?: PendingOperation | null;
   location?: 'local' | 'remote';
+  mrUrl?: string | null;
+  hasAgent?: boolean;
+  agentSessionId?: string | null;
+  agentModel?: string;
+  agentModelFull?: string;
+  git?: GitStatus;
+  repoGit?: { frontend: GitStatus | null; api: GitStatus | null };
+  services?: { name: string; url?: string }[];
 }
 
 export interface ContainerMenuState {
