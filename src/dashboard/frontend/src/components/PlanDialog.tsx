@@ -560,7 +560,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                               }}
                               className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
                             />
-                            <span className="text-sm text-content-body">Remote (exe.dev)</span>
+                            <span className="text-sm text-content-body">Remote (Fly.io)</span>
                           </label>
                         </div>
                       </div>

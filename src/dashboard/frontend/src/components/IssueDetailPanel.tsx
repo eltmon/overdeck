@@ -604,7 +604,7 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
                           ? 'bg-cyan-900/50 text-cyan-400'
                           : 'bg-surface-overlay text-content-subtle'
                       }`}
-                      title={workspace.location === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
+                      title={workspace.location === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
                     >
                       {workspace.location === 'remote' ? (
                         <Cloud className="w-3 h-3" />
@@ -673,7 +673,7 @@ export function IssueDetailPanel({ issue, onClose, onStartAgent }: IssueDetailPa
                           ? 'bg-cyan-900/50 text-cyan-400'
                           : 'bg-surface-overlay text-content-subtle'
                       }`}
-                      title={workspace.location === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
+                      title={workspace.location === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
                     >
                       {workspace.location === 'remote' ? (
                         <Cloud className="w-3 h-3" />

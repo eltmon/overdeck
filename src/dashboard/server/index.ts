@@ -1,4 +1,5 @@
 import express from 'express';
+import * as yaml from 'yaml';
 import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -8309,8 +8310,8 @@ app.post('/api/agents', async (req, res) => {
 
       // Sync credentials and spawn remote agent
       const { spawnRemoteAgent } = await import('../../lib/remote/remote-agents.js');
-      const exe = createFlyProviderFromConfig(loadPanConfig().remote);
-      await exe.syncAllCredentials(workspaceMetadata.vmName);
+      const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+      await fly.syncAllCredentials(workspaceMetadata.vmName);
 
       // Generate initial prompt for the agent
       const { buildWorkAgentPrompt, getTrackerContext } = await import('../../lib/cloister/work-agent-prompt.js');
@@ -9183,8 +9184,8 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
 
       // Also kill remote session if we're starting a remote agent
       if (isRemotePlanning && remoteWorkspaceMetadata) {
-        const exe = createFlyProviderFromConfig(loadPanConfig().remote);
-        await exe.ssh(remoteWorkspaceMetadata.vmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+        await fly.ssh(remoteWorkspaceMetadata.vmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
       }
 
       // Create planning prompt file - store IN workspace if exists (for git-backed planning)
@@ -9406,12 +9407,12 @@ Start by exploring the codebase to understand the context, then begin the discov
         // ===== REMOTE PLANNING AGENT =====
         console.log(`[start-planning] Spawning remote planning agent on ${remoteWorkspaceMetadata.vmName}`);
 
-        const exe = createFlyProviderFromConfig(loadPanConfig().remote);
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
         const vmName = remoteWorkspaceMetadata.vmName;
 
         // Sync all credentials before spawning (tokens may have expired)
         console.log(`[start-planning] Syncing credentials to ${vmName}...`);
-        await exe.syncAllCredentials(vmName);
+        await fly.syncAllCredentials(vmName);
 
         // Also write planning prompt LOCALLY for debugging and consistency
         console.log(`[start-planning] Writing planning prompt locally to ${planningPromptPath}`);
@@ -9419,32 +9420,32 @@ Start by exploring the codebase to understand the context, then begin the discov
 
         // Install bd (beads CLI) on remote if not present
         console.log(`[start-planning] Ensuring bd (beads CLI) is available on ${vmName}...`);
-        const bdInstalled = await exe.installBeads(vmName);
+        const bdInstalled = await fly.installBeads(vmName);
         if (!bdInstalled) {
           console.warn(`[start-planning] bd installation failed on ${vmName} - beads tasks may not work`);
         }
 
         // Initialize beads on remote workspace
         console.log(`[start-planning] Initializing beads on ${vmName}...`);
-        await exe.initBeads(vmName, '/workspace');
+        await fly.initBeads(vmName, '/workspace');
 
         // Write planning prompt to remote VM
         const remotePlanningDir = '/workspace/.planning';
         const remotePlanningPromptPath = `${remotePlanningDir}/PLANNING_PROMPT.md`;
 
         console.log(`[start-planning] Step 1: mkdir -p ${remotePlanningDir}`);
-        await exe.ssh(vmName, `mkdir -p ${remotePlanningDir}`);
+        await fly.ssh(vmName, `mkdir -p ${remotePlanningDir}`);
         console.log(`[start-planning] Step 1 complete`);
 
         // Clear stale STATE.md on remote
         console.log(`[start-planning] Step 2: rm -f STATE.md`);
-        await exe.ssh(vmName, `rm -f ${remotePlanningDir}/STATE.md`);
+        await fly.ssh(vmName, `rm -f ${remotePlanningDir}/STATE.md`);
         console.log(`[start-planning] Step 2 complete`);
 
         // Write planning prompt to remote using base64 to avoid heredoc escaping issues
         console.log(`[start-planning] Step 3: write planning prompt`);
         const promptBase64 = Buffer.from(planningPrompt).toString('base64');
-        await exe.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${remotePlanningPromptPath}`);
+        await fly.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${remotePlanningPromptPath}`);
         console.log(`[start-planning] Step 3 complete`);
 
         // Create launcher script on remote
@@ -9453,11 +9454,11 @@ Start by exploring the codebase to understand the context, then begin the discov
         const remoteLauncherScript = `/workspace/.panopticon/prompts/${sessionName}-launcher.sh`;
 
         console.log(`[start-planning] Step 4: create launcher files`);
-        await exe.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
+        await fly.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
 
         // Write init message using base64
         const initMsgBase64 = Buffer.from(initMessage).toString('base64');
-        await exe.ssh(vmName, `echo '${initMsgBase64}' | base64 -d > ${remotePromptFile}`);
+        await fly.ssh(vmName, `echo '${initMsgBase64}' | base64 -d > ${remotePromptFile}`);
 
         // Write launcher script using base64
         const launcherContent = `#!/bin/bash
@@ -9476,18 +9477,18 @@ prompt=$(cat "${remotePromptFile}")
 exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
 `;
         const launcherBase64 = Buffer.from(launcherContent).toString('base64');
-        await exe.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${remoteLauncherScript}`);
+        await fly.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${remoteLauncherScript}`);
         console.log(`[start-planning] Step 4 complete`);
-        await exe.ssh(vmName, `chmod +x ${remoteLauncherScript}`);
+        await fly.ssh(vmName, `chmod +x ${remoteLauncherScript}`);
 
         // Step 5: Configure Claude Code for autonomous operation (bypass permissions + skip onboarding)
         console.log(`[start-planning] Step 5: configure Claude Code`);
-        await exe.configureClaudeCode(vmName);
+        await fly.configureClaudeCode(vmName);
         console.log(`[start-planning] Step 5 complete`);
 
         // Step 5.1: Copy essential skills to remote VM
         console.log(`[start-planning] Step 5.1: copy skills to ${vmName}`);
-        await exe.copySkillsToVm(vmName);
+        await fly.copySkillsToVm(vmName);
         console.log(`[start-planning] Step 5.1 complete`);
 
         // Step 5.5: Configure tmux for proper terminal handling
@@ -9500,18 +9501,18 @@ set -g mouse on
 set -s escape-time 0
 `;
         const tmuxConfBase64 = Buffer.from(tmuxConf).toString('base64');
-        await exe.ssh(vmName, `grep -q "Panopticon tmux settings" ~/.tmux.conf 2>/dev/null || echo '${tmuxConfBase64}' | base64 -d >> ~/.tmux.conf`);
+        await fly.ssh(vmName, `grep -q "Panopticon tmux settings" ~/.tmux.conf 2>/dev/null || echo '${tmuxConfBase64}' | base64 -d >> ~/.tmux.conf`);
         console.log(`[start-planning] Step 5.5 complete`);
 
         // Start tmux session on remote VM with proper terminal settings
-        const tmuxResult = await exe.ssh(vmName, `TERM=xterm-256color tmux new-session -d -s ${sessionName} -c /workspace "bash '${remoteLauncherScript}'"`);
+        const tmuxResult = await fly.ssh(vmName, `TERM=xterm-256color tmux new-session -d -s ${sessionName} -c /workspace "bash '${remoteLauncherScript}'"`);
 
         if (tmuxResult.exitCode !== 0) {
           throw new Error(`Failed to start remote planning agent: ${tmuxResult.stderr}`);
         }
 
         // Resize remote tmux window
-        await exe.ssh(vmName, `tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null || true`);
+        await fly.ssh(vmName, `tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null || true`);
 
         // Write agent state file with remote info
         writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
@@ -10352,7 +10353,6 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
     // Check if this was a remote planning session
     let isRemotePlanning = false;
     let remoteVmName: string | null = null;
-    let remoteInfraVm: string | null = null;
 
     try {
       const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
@@ -10364,7 +10364,6 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
         if (agentState.location === 'remote' && agentState.vmName) {
           isRemotePlanning = true;
           remoteVmName = agentState.vmName;
-          remoteInfraVm = '';
           console.log(`[complete-planning] Detected remote planning session on ${remoteVmName}`);
         }
       }
@@ -10377,7 +10376,6 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           if (remoteMetadata.vmName) {
             isRemotePlanning = true;
             remoteVmName = remoteMetadata.vmName;
-            remoteInfraVm = '';
             console.log(`[complete-planning] Detected remote planning session on ${remoteVmName}`);
           }
         }
@@ -10397,8 +10395,8 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
     // Also kill remote session if applicable
     if (isRemotePlanning && remoteVmName) {
       try {
-        const exe = createFlyProviderFromConfig(loadPanConfig().remote);
-        await exe.ssh(remoteVmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+        await fly.ssh(remoteVmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
         console.log(`[complete-planning] Killed remote tmux session on ${remoteVmName}`);
       } catch (err) {
         console.log(`[complete-planning] Could not kill remote session: ${err}`);
@@ -10441,10 +10439,10 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
     if (isRemotePlanning && remoteVmName) {
       console.log(`[complete-planning] Syncing beads from remote VM ${remoteVmName}...`);
       try {
-        const exe = createFlyProviderFromConfig(loadPanConfig().remote);
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
 
         // Sync beads on remote (export to JSONL), commit, and push
-        const syncResult = await exe.syncBeadsToGit(remoteVmName, '/workspace', `Complete planning for ${id}`);
+        const syncResult = await fly.syncBeadsToGit(remoteVmName, '/workspace', `Complete planning for ${id}`);
         beadsSynced = syncResult;
 
         if (syncResult) {
@@ -11553,7 +11551,6 @@ app.get('/api/issues/:id/beads', async (req, res) => {
     // Check if this is a remote workspace
     let isRemoteWorkspace = false;
     let remoteVmName: string | null = null;
-    let remoteInfraVm: string | null = null;
 
     // Check agent state for remote metadata (for active planning sessions)
     const sessionName = `planning-${issueLower}`;
@@ -11567,7 +11564,6 @@ app.get('/api/issues/:id/beads', async (req, res) => {
         if (agentState.location === 'remote' && agentState.vmName) {
           isRemoteWorkspace = true;
           remoteVmName = agentState.vmName;
-          remoteInfraVm = '';
         }
       } catch (err) {
         // Ignore parse errors
@@ -11583,7 +11579,6 @@ app.get('/api/issues/:id/beads', async (req, res) => {
           if (remoteMetadata.vmName) {
             isRemoteWorkspace = true;
             remoteVmName = remoteMetadata.vmName;
-            remoteInfraVm = '';
           }
         } catch (err) {
           // Ignore parse errors
@@ -11599,7 +11594,6 @@ app.get('/api/issues/:id/beads', async (req, res) => {
         if (wsMetadata?.vmName) {
           isRemoteWorkspace = true;
           remoteVmName = wsMetadata.vmName;
-          remoteInfraVm = '';
         }
       } catch (err) {
         // Not a remote workspace
@@ -11612,10 +11606,10 @@ app.get('/api/issues/:id/beads', async (req, res) => {
     // Try remote query first if this is a remote workspace
     if (isRemoteWorkspace && remoteVmName) {
       try {
-        const exe = createFlyProviderFromConfig(loadPanConfig().remote);
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
 
         console.log(`[beads-api] Querying beads on remote VM ${remoteVmName} for ${id}`);
-        beads = await exe.queryBeads(remoteVmName, id, '/workspace');
+        beads = await fly.queryBeads(remoteVmName, id, '/workspace');
         querySource = 'remote';
         console.log(`[beads-api] Found ${beads.length} beads on remote`);
       } catch (remoteErr: any) {
@@ -12915,7 +12909,6 @@ function loadRemoteWorkspaceMetadata(issueId: string): any | null {
   }
 
   try {
-    const yaml = require('yaml');
     const content = readFileSync(metadataPath, 'utf-8');
     return yaml.parse(content);
   } catch {
@@ -12928,7 +12921,6 @@ function getFlyAppName(vmName: string): string {
   try {
     const workspacesDir = join(process.env.HOME || '', '.panopticon', 'workspaces');
     if (existsSync(workspacesDir)) {
-      const yaml = require('yaml');
       for (const file of readdirSync(workspacesDir)) {
         if (!file.endsWith('.yaml')) continue;
         try {
@@ -12965,7 +12957,6 @@ function listRemoteWorkspaceMetadata(): any[] {
   }
 
   try {
-    const yaml = require('yaml');
     const files = readdirSync(workspacesDir).filter(f => f.endsWith('.yaml'));
     const workspaces: any[] = [];
 
@@ -13012,8 +13003,8 @@ app.get('/api/remote/status', async (_req, res) => {
       });
     }
 
-    const exe = createFlyProviderFromConfig(remoteConfig);
-    const vms = await exe.listVms();
+    const fly = createFlyProviderFromConfig(remoteConfig);
+    const vms = await fly.listVms();
 
     res.json({
       enabled: true,
@@ -13036,11 +13027,11 @@ app.get('/api/remote/workspaces', async (_req, res) => {
 
     // Enrich with VM status if possible
     const config = loadPanConfig();
-    const exe = createFlyProviderFromConfig(config.remote);
+    const fly = createFlyProviderFromConfig(config.remote);
 
     let vms: any[] = [];
     try {
-      vms = await exe.listVms();
+      vms = await fly.listVms();
     } catch {
       // Can't get VM status - return workspaces without status
     }
@@ -13071,11 +13062,11 @@ app.get('/api/remote/workspaces/:issueId', async (req, res) => {
 
     // Get VM status
     const config = loadPanConfig();
-    const exe = createFlyProviderFromConfig(config.remote);
+    const fly = createFlyProviderFromConfig(config.remote);
 
     let vmStatus = 'unknown';
     try {
-      vmStatus = await exe.getStatus(metadata.vmName);
+      vmStatus = await fly.getStatus(metadata.vmName);
     } catch {
       // Ignore - status unknown
     }
@@ -13116,12 +13107,12 @@ app.post('/api/remote/workspaces/:issueId/start', async (req, res) => {
     }
 
     const config = loadPanConfig();
-    const exe = createFlyProviderFromConfig(config.remote);
+    const fly = createFlyProviderFromConfig(config.remote);
 
-    await exe.startVm(metadata.vmName);
+    await fly.startVm(metadata.vmName);
 
     // Start containers
-    await exe.ssh(metadata.vmName, 'cd /workspace && docker compose up -d 2>/dev/null || true');
+    await fly.ssh(metadata.vmName, 'cd /workspace && docker compose up -d 2>/dev/null || true');
 
     res.json({ success: true, message: `Workspace ${issueId} started` });
   } catch (error: any) {
@@ -13140,13 +13131,13 @@ app.post('/api/remote/workspaces/:issueId/stop', async (req, res) => {
     }
 
     const config = loadPanConfig();
-    const exe = createFlyProviderFromConfig(config.remote);
+    const fly = createFlyProviderFromConfig(config.remote);
 
     // Stop containers first
-    await exe.ssh(metadata.vmName, 'docker compose down 2>/dev/null || true');
+    await fly.ssh(metadata.vmName, 'docker compose down 2>/dev/null || true');
 
     // Stop VM
-    await exe.stopVm(metadata.vmName);
+    await fly.stopVm(metadata.vmName);
 
     res.json({ success: true, message: `Workspace ${issueId} stopped` });
   } catch (error: any) {
@@ -13166,8 +13157,8 @@ app.post('/api/remote/workspaces/:issueId/agent/start', async (req, res) => {
     }
 
     // Sync all credentials before spawning (tokens may have expired)
-    const exe = createFlyProviderFromConfig(loadPanConfig().remote);
-    await exe.syncAllCredentials(metadata.vmName);
+    const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+    await fly.syncAllCredentials(metadata.vmName);
 
     const state = await spawnRemoteAgent({
       issueId,

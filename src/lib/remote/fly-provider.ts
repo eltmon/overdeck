@@ -245,6 +245,9 @@ export class FlyProvider implements RemoteProvider {
     for await (const chunk of child.stdout) {
       yield chunk.toString();
     }
+    for await (const chunk of child.stderr) {
+      yield chunk.toString();
+    }
 
     await new Promise<void>((resolve, reject) => {
       child.on('close', resolve);
@@ -258,24 +261,26 @@ export class FlyProvider implements RemoteProvider {
     const b64 = content.toString('base64');
     const dirPath = remotePath.substring(0, remotePath.lastIndexOf('/'));
     if (dirPath) {
-      await this.ssh(vm, `mkdir -p ${dirPath}`);
+      await this.ssh(vm, `mkdir -p ${JSON.stringify(dirPath)}`);
     }
-    await this.ssh(vm, `echo '${b64}' | base64 -d > ${remotePath}`);
+    await this.ssh(vm, `echo '${b64}' | base64 -d > ${JSON.stringify(remotePath)}`);
   }
 
   /** Copy a file from VM to local path */
   async copyFromVm(vm: string, remotePath: string, localPath: string): Promise<void> {
     const { appName } = await this.resolveVm(vm);
-    await execAsync(`fly ssh sftp get -a ${appName} ${remotePath} ${localPath}`, {
-      timeout: 60000,
-    });
+    await execAsync(
+      `fly ssh sftp get -a ${JSON.stringify(appName)} ${JSON.stringify(remotePath)} ${JSON.stringify(localPath)}`,
+      { timeout: 60000 }
+    );
   }
 
-  /** Expose a port — Fly machines have no automatic port forwarding, return placeholder */
+  /** Expose a port — not supported by Fly.io provider */
   async exposePort(_vm: string, _port: number): Promise<string> {
-    // Fly.io doesn't auto-expose ports like exe.dev does.
-    // Users configure services in fly.toml or via the API.
-    return '';
+    throw new Error(
+      'exposePort is not supported by the Fly.io provider. ' +
+      'Configure services in fly.toml or via the Fly Machines API config.'
+    );
   }
 
   /** Create a fly proxy tunnel to the machine */
@@ -431,6 +436,48 @@ with open(path, "w") as f:
       }
     } catch {
       // Non-fatal: skills are optional
+    }
+  }
+
+  /** Sync beads from remote VM to git: exports JSONL, commits, and pushes */
+  async syncBeadsToGit(
+    vmName: string,
+    workspacePath: string = '/workspace',
+    commitMessage?: string
+  ): Promise<boolean> {
+    const msg = commitMessage ?? 'chore: sync beads from remote';
+
+    // Export beads to JSONL
+    const exportResult = await this.ssh(
+      vmName,
+      `cd ${workspacePath} && bd export --output .beads/issues.jsonl 2>&1`
+    );
+    if (exportResult.exitCode !== 0) {
+      return false;
+    }
+
+    // Commit and push
+    const gitResult = await this.ssh(
+      vmName,
+      `cd ${workspacePath} && git add .beads/ && git diff --cached --quiet || (git commit -m ${JSON.stringify(msg)} && git push origin HEAD) 2>&1`
+    );
+    return gitResult.exitCode === 0;
+  }
+
+  /** Query beads on a remote VM via bd search */
+  async queryBeads(
+    vmName: string,
+    searchTerm: string,
+    workspacePath: string = '/workspace'
+  ): Promise<any[]> {
+    const result = await this.ssh(
+      vmName,
+      `cd ${workspacePath} && bd search ${JSON.stringify(searchTerm)} --json 2>/dev/null || echo '[]'`
+    );
+    try {
+      return JSON.parse(result.stdout.trim() || '[]');
+    } catch {
+      return [];
     }
   }
 

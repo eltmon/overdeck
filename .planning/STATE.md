@@ -177,3 +177,8 @@ Issue assigned
 | Cold start latency (5-20s) | Use auto-stop instead of destroy for active issues; restart is <1s |
 | Large blast radius (16 files) | Well-defined interface contract limits cascading changes |
 | CI image build failures | Local Dockerfile build/test before CI; multi-stage build for reliability |
+
+## Specialist Feedback
+
+- **[2026-03-19T21:50Z] review-agent → VERIFICATION-FAILED** — `.planning/feedback/001-review-agent-verification-failed.md`
+- **[2026-03-19T21:58Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
