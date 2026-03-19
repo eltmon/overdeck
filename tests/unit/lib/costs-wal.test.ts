@@ -176,7 +176,7 @@ describe('syncWalFromDir', () => {
 
   it('returns empty stats for non-existent directory', async () => {
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = syncWalFromDir(join(tmpDir, 'no-such-dir'));
+    const stats = await syncWalFromDir(join(tmpDir, 'no-such-dir'));
     expect(stats.imported).toBe(0);
     expect(stats.duplicates).toBe(0);
     expect(stats.files).toBe(0);
@@ -189,7 +189,7 @@ describe('syncWalFromDir', () => {
     insertCostEvents.mockReturnValue({ inserted: 1, duplicates: 0 });
 
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = syncWalFromDir(tmpDir);
+    const stats = await syncWalFromDir(tmpDir);
 
     expect(insertCostEvents).toHaveBeenCalledOnce();
     expect(stats.imported).toBe(1);
@@ -205,7 +205,7 @@ describe('syncWalFromDir', () => {
     insertCostEvents.mockReturnValue({ inserted: 1, duplicates: 0 });
 
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    syncWalFromDir(tmpDir);
+    await syncWalFromDir(tmpDir);
 
     expect(insertCostEvents).toHaveBeenCalledWith(expect.any(Array), walFile);
   });
@@ -216,7 +216,7 @@ describe('syncWalFromDir', () => {
     insertCostEvents.mockReturnValue({ inserted: 0, duplicates: 1 });
 
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = syncWalFromDir(tmpDir);
+    const stats = await syncWalFromDir(tmpDir);
 
     expect(stats.imported).toBe(0);
     expect(stats.duplicates).toBe(1);
@@ -231,7 +231,7 @@ describe('syncWalFromDir', () => {
     insertCostEvents.mockReturnValue({ inserted: 1, duplicates: 0 });
 
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = syncWalFromDir(tmpDir);
+    const stats = await syncWalFromDir(tmpDir);
 
     // The valid event should still be imported; malformed line silently skipped
     expect(stats.imported).toBe(1);
@@ -242,7 +242,7 @@ describe('syncWalFromDir', () => {
     writeFileSync(join(tmpDir, 'PAN-335.jsonl'), '{"ts":"2026-01-01"}\n');
     // No valid events → insertCostEvents not called
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = syncWalFromDir(tmpDir);
+    const stats = await syncWalFromDir(tmpDir);
 
     expect(insertCostEvents).not.toHaveBeenCalled();
     expect(stats.imported).toBe(0);
@@ -251,7 +251,7 @@ describe('syncWalFromDir', () => {
   it('ignores non-jsonl files', async () => {
     writeFileSync(join(tmpDir, 'README.txt'), 'not events');
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
-    const stats = syncWalFromDir(tmpDir);
+    const stats = await syncWalFromDir(tmpDir);
 
     expect(insertCostEvents).not.toHaveBeenCalled();
     expect(stats.files).toBe(0);
@@ -286,7 +286,7 @@ describe('syncWalFromAllProjects', () => {
   it('returns empty result when no projects are registered', async () => {
     listProjects.mockReturnValue([]);
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = syncWalFromAllProjects();
+    const result = await syncWalFromAllProjects();
 
     expect(result.imported).toBe(0);
     expect(result.duplicates).toBe(0);
@@ -299,7 +299,7 @@ describe('syncWalFromAllProjects', () => {
       { key: 'PAN', config: { path: join(tmpDir, 'no-such-repo') } },
     ]);
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = syncWalFromAllProjects();
+    const result = await syncWalFromAllProjects();
 
     expect(result.filesScanned).toBe(0);
     expect(insertCostEvents).not.toHaveBeenCalled();
@@ -324,7 +324,7 @@ describe('syncWalFromAllProjects', () => {
     insertCostEvents.mockReturnValue({ inserted: 1, duplicates: 0 });
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = syncWalFromAllProjects();
+    const result = await syncWalFromAllProjects();
 
     expect(result.filesScanned).toBe(2);
     expect(result.imported).toBe(2);
@@ -344,7 +344,7 @@ describe('syncWalFromAllProjects', () => {
     insertCostEvents.mockImplementation(() => { throw new Error('DB write failed'); });
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = syncWalFromAllProjects();
+    const result = await syncWalFromAllProjects();
 
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.errors[0]).toContain('import failed');
