@@ -6799,7 +6799,13 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
       const testBranch = req.body.branch || `feature/${issueLower}`;
 
       const { autoQueueTestAgentAndNotify } = await import('../../lib/cloister/test-agent-queue.js');
-      await autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent);
+      try {
+        await autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent);
+      } catch (err) {
+        console.error(`[review-status] Unhandled error in autoQueueTestAgentAndNotify for ${issueId}:`, err);
+        // autoQueueTestAgentAndNotify already sets dispatch_failed status internally;
+        // catching here prevents the endpoint from failing due to test dispatch errors
+      }
     }
 
     // Immediately process next queued item (don't wait for deacon patrol)
