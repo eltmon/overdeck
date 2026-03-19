@@ -153,6 +153,61 @@ function formatTokens(tokens: number): string {
   return tokens.toString();
 }
 
+/**
+ * Compute the label and disabled state for the Review & Test button (PAN-366).
+ * Exported for unit testing.
+ */
+export interface ReviewButtonState {
+  label: string;
+  /** true when the button should be disabled (specialist active or queued) */
+  disabled: boolean;
+  /** true when the spinner should animate (actively processing) */
+  spinning: boolean;
+}
+
+export function getReviewButtonState(
+  reviewStatus: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'queuePosition' | 'activeSpecialist' | 'readyForMerge'> | undefined,
+  mutationPending: boolean
+): ReviewButtonState {
+  const isActive = mutationPending
+    || reviewStatus?.queuePosition === 0
+    || reviewStatus?.reviewStatus === 'reviewing'
+    || reviewStatus?.testStatus === 'testing';
+
+  const isQueued = reviewStatus?.queuePosition != null
+    && reviewStatus.queuePosition !== 0;
+
+  if (isActive) {
+    const label =
+      reviewStatus?.activeSpecialist === 'test' || reviewStatus?.testStatus === 'testing'
+        ? 'Testing...'
+        : 'Reviewing...';
+    return { label, disabled: true, spinning: true };
+  }
+
+  if (isQueued) {
+    const pos = reviewStatus!.queuePosition!;
+    let ordinal: string;
+    if (pos === 1) {
+      ordinal = '';  // "Queued" — no position needed for next-up
+    } else {
+      const mod100 = pos % 100;
+      const mod10 = pos % 10;
+      const suffix =
+        (mod100 >= 11 && mod100 <= 13) ? 'th' :
+        mod10 === 1 ? 'st' :
+        mod10 === 2 ? 'nd' :
+        mod10 === 3 ? 'rd' : 'th';
+      ordinal = `${pos}${suffix}`;
+    }
+    const label = ordinal ? `Queued (${ordinal})` : 'Queued';
+    return { label, disabled: true, spinning: false };
+  }
+
+  const label = reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test';
+  return { label, disabled: false, spinning: false };
+}
+
 function getFriendlyModelName(fullModel: string): string {
   if (fullModel.includes('opus-4-6') || fullModel.includes('opus-4.6')) return 'Opus 4.6';
   if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
@@ -1153,36 +1208,19 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
             {/* Review & Test */}
             {(() => {
-              const isActive = reviewMutation.isPending
-                || reviewStatus?.queuePosition === 0
-                || reviewStatus?.reviewStatus === 'reviewing'
-                || reviewStatus?.testStatus === 'testing';
-              const isQueued = (reviewStatus?.queuePosition ?? null) !== null && reviewStatus?.queuePosition !== 0;
-              const queuePos = reviewStatus?.queuePosition;
-
-              let label: string;
-              if (isActive) {
-                if (reviewStatus?.activeSpecialist === 'test' || reviewStatus?.testStatus === 'testing') {
-                  label = 'Testing...';
-                } else {
-                  label = 'Reviewing...';
-                }
-              } else if (isQueued) {
-                label = queuePos === 1 ? 'Queued' : `Queued (${queuePos === 2 ? '2nd' : queuePos === 3 ? '3rd' : `${queuePos}th`})`;
-              } else {
-                label = reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test';
-              }
-
+              const btnState = getReviewButtonState(reviewStatus, reviewMutation.isPending);
               return (
                 <button
                   data-testid="review-test-btn"
                   onClick={handleReview}
-                  disabled={isActive || isQueued}
+                  disabled={btnState.disabled}
                   className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-blue-400 hover:bg-blue-900/20"
                   style={{ backgroundColor: 'rgba(59,130,246,0.15)' }}
                 >
-                  {(isActive || isQueued) ? <Loader2 className={`w-3 h-3 ${isActive ? 'animate-spin' : 'opacity-50'}`} /> : <RefreshCw className="w-3 h-3" />}
-                  {label}
+                  {btnState.disabled
+                    ? <Loader2 className={`w-3 h-3 ${btnState.spinning ? 'animate-spin' : 'opacity-50'}`} />
+                    : <RefreshCw className="w-3 h-3" />}
+                  {btnState.label}
                 </button>
               );
             })()}
