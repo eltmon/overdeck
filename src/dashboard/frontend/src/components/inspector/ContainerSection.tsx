@@ -1,18 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Box, Database, Loader2, RefreshCw, Square, Play } from 'lucide-react';
-
-interface ContainerStatus {
-  running: boolean;
-  uptime: string | null;
-  status?: string;
-}
-
-interface ContainerMenuState {
-  x: number;
-  y: number;
-  containerName: string;
-  isRunning: boolean;
-}
+import type { ContainerStatus, ContainerMenuState } from './types';
 
 interface ContainerSectionProps {
   containers: Record<string, ContainerStatus>;

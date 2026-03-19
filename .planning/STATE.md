@@ -33,3 +33,7 @@
 
 ## Remaining Work
 None
+
+## Specialist Feedback
+
+- **[2026-03-19T03:23Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/024-review-agent-changes-requested.md`
