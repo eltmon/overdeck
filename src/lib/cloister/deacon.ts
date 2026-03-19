@@ -1223,14 +1223,26 @@ const MERGE_STUCK_MAX_ATTEMPTS = 3;
 // cooldowns are a performance optimisation, not critical state)
 const mergeStuckCooldowns = new Map<string, number>();
 
+// Callback set by the server layer to emit Socket.io merge:ready notifications.
+// Deacon is a library module and does not own the Socket.io instance directly.
+let mergeReadyNotifier: ((issueId: string) => void) | null = null;
+
+/**
+ * Register a callback that deacon will call when it detects an issue stuck in
+ * readyForMerge state. The server layer uses this to emit a Socket.io event
+ * so the dashboard can alert the user to click MERGE.
+ */
+export function setMergeReadyNotifier(fn: (issueId: string) => void): void {
+  mergeReadyNotifier = fn;
+}
+
 /**
  * Safety-net patrol: find issues that are readyForMerge but not yet merging/merged
  * and whose readyForMerge status is older than MERGE_STUCK_STALENESS_MS.
  *
- * The primary merge trigger fires in the setReviewStatus wrapper when
- * becameReadyForMerge transitions to true.  This check catches cases where
- * that primary trigger failed (e.g. server restart between review passing and
- * the trigger running, or a transient merge error that left readyForMerge=true).
+ * Previously this auto-triggered the merge API. Now it is notify-only: it emits
+ * a merge:ready Socket.io event so the dashboard can prompt the user to click
+ * the MERGE button. The MERGE button is the sole merge trigger (PAN-354).
  *
  * Guards:
  *   - Staleness: status must be at least 2 min old (avoids racing with primary trigger)
@@ -1254,7 +1266,6 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
     }> = JSON.parse(content);
 
     const now = Date.now();
-    const apiPort = process.env.API_PORT || process.env.PORT || '3011';
     const state = loadState();
     const attemptCounts = state.mergeStuckAttempts ?? {};
     let stateModified = false;
@@ -1283,32 +1294,23 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
 
       const issueId = status.issueId || key;
       const ageMin = Math.round((now - new Date(status.updatedAt).getTime()) / 60000);
-      console.log(`[deacon] readyForMerge stuck for ${key} (age: ${ageMin}m, attempts: ${attempts}), triggering merge...`);
+      console.warn(`[deacon] readyForMerge stuck for ${key} (age: ${ageMin}m, attempts: ${attempts}) — merge requires manual action via MERGE button`);
 
-      // Record attempt before the call so a crash doesn't leave us in a retry loop
+      // Record attempt before notifying so a crash doesn't leave us in a retry loop
       mergeStuckCooldowns.set(key, now);
       attemptCounts[key] = attempts + 1;
       stateModified = true;
 
-      try {
-        const response = await fetch(`http://localhost:${apiPort}/api/workspaces/${issueId}/merge`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const body = await response.json() as { error?: string };
-        if (response.ok) {
-          const msg = `Stuck-merge trigger: initiated merge for ${key}`;
-          actions.push(msg);
-          console.log(`[deacon] ${msg}`);
-        } else {
-          const msg = `Stuck-merge trigger: merge API returned ${response.status} for ${key}: ${body.error ?? ''}`;
-          actions.push(msg);
-          console.warn(`[deacon] ${msg}`);
-        }
-      } catch (fetchErr: unknown) {
-        const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-        console.error(`[deacon] Stuck-merge trigger fetch failed for ${key}:`, msg);
-        actions.push(`Stuck-merge trigger failed for ${key}: ${msg}`);
+      // Notify the dashboard via Socket.io so the user knows to click MERGE.
+      // Auto-triggering merge was removed in PAN-354; the MERGE button is the sole trigger.
+      const msg = `Stuck-merge: ${key} has been readyForMerge for ${ageMin}m — click MERGE to proceed`;
+      if (mergeReadyNotifier) {
+        mergeReadyNotifier(issueId);
+        actions.push(msg);
+        console.log(`[deacon] merge:ready notification sent for ${key}`);
+      } else {
+        actions.push(msg);
+        console.warn(`[deacon] No mergeReadyNotifier registered — dashboard will not be notified for ${key}`);
       }
     }
 
