@@ -1,8 +1,8 @@
-import { Eye, LayoutGrid, Users, Terminal, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, Search, Cpu, Activity, Server } from 'lucide-react';
+import { Eye, LayoutGrid, Users, Terminal, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, Search, Cpu, Activity, Server, Zap } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { useTheme } from '../hooks/useTheme';
 
-export type Tab = 'mission-control' | 'kanban' | 'agents' | 'resources' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings';
+export type Tab = 'mission-control' | 'kanban' | 'agents' | 'resources' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings' | 'god-view';
 
 const NAV_ITEMS = [
   { id: 'mission-control' as Tab, label: 'Mission Control', icon: Compass },
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { id: 'skills' as Tab, label: 'Skills', icon: Cpu },
   { id: 'health' as Tab, label: 'Health', icon: Activity },
   { id: 'settings' as Tab, label: 'Settings', icon: Settings },
+  { id: 'god-view' as Tab, label: 'God View', icon: Zap },
 ] as const;
 
 interface HeaderProps {
