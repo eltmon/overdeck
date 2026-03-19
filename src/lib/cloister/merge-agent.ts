@@ -1359,8 +1359,13 @@ Report any issues or conflicts you encountered.`;
 
       // Check if merge-agent is still running
       if (!(await isRunning('merge-agent', mergeProjectKey ?? undefined))) {
-        console.error(`[merge-agent] Specialist stopped unexpectedly`);
+        console.error(`[merge-agent] Specialist stopped unexpectedly — checking for stranded merge commit`);
         logActivity('merge_error', 'Specialist stopped unexpectedly');
+
+        // Salvage: if the specialist merged locally but died before pushing, push it ourselves
+        const salvageResult = await salvageStrandedMerge(projectPath, targetBranch, headBefore, issueId, logActivity);
+        if (salvageResult) return salvageResult;
+
         return {
           success: false,
           reason: 'merge-agent specialist stopped before completing the merge',
@@ -1373,13 +1378,80 @@ Report any issues or conflicts you encountered.`;
     }
   }
 
-  // Timeout
-  console.error(`[merge-agent] Timeout waiting for merge completion`);
+  // Timeout — same salvage check
+  console.error(`[merge-agent] Timeout waiting for merge completion — checking for stranded merge commit`);
   logActivity('merge_timeout', 'Timeout waiting for specialist to complete merge');
+
+  const salvageResult = await salvageStrandedMerge(projectPath, targetBranch, headBefore, issueId, logActivity);
+  if (salvageResult) return salvageResult;
+
   return {
     success: false,
     reason: 'Timeout waiting for merge-agent specialist to complete merge (15 minutes)',
   };
+}
+
+/**
+ * Salvage a stranded merge commit — if the specialist merged locally but died
+ * before pushing, detect the unpushed merge and push it ourselves.
+ *
+ * Returns a success result if salvaged, or null if nothing to salvage.
+ */
+async function salvageStrandedMerge(
+  projectPath: string,
+  targetBranch: string,
+  headBefore: string,
+  issueId: string,
+  logActivity: (action: string, detail: string) => void,
+): Promise<{ success: boolean; reason?: string } | null> {
+  try {
+    const { stdout: currentHeadRaw } = await execAsync('git rev-parse HEAD', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    const currentHead = currentHeadRaw.trim();
+
+    if (currentHead === headBefore) {
+      // No local merge happened — nothing to salvage
+      return null;
+    }
+
+    // Local HEAD changed — check if it's ahead of remote
+    await execAsync(`git fetch origin ${targetBranch}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: 10000,
+    }).catch(() => {});
+
+    const { stdout: remoteHeadRaw } = await execAsync(`git rev-parse origin/${targetBranch}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+
+    if (remoteHeadRaw.trim() === currentHead) {
+      // Already pushed (maybe by another process)
+      console.log(`[merge-agent] Salvage check: merge already pushed`);
+      return { success: true };
+    }
+
+    // Stranded merge detected — push it
+    console.log(`[merge-agent] SALVAGING stranded merge for ${issueId}: local HEAD ${currentHead.slice(0, 8)} != remote ${remoteHeadRaw.trim().slice(0, 8)}`);
+    logActivity('merge_salvage', `Pushing stranded merge commit ${currentHead.slice(0, 8)} for ${issueId}`);
+
+    await execAsync(`git push origin ${targetBranch}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: 30000,
+    });
+
+    console.log(`[merge-agent] Salvage push successful for ${issueId}`);
+    logActivity('merge_salvage_success', `Stranded merge pushed successfully`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[merge-agent] Salvage failed: ${error.message}`);
+    logActivity('merge_salvage_failed', `Salvage push failed: ${error.message}`);
+    return null;
+  }
 }
 
 /**

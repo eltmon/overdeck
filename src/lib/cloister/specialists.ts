@@ -1342,7 +1342,21 @@ export async function isRunning(name: SpecialistType, projectKey?: string): Prom
 
   try {
     await execAsync(`tmux has-session -t ${tmuxSession}`);
-    return true;
+    // Session exists — but check if the pane actually has a running process.
+    // When Claude Code crashes, the pane's process exits but the tmux session persists,
+    // making has-session return success even though nothing is running.
+    const { stdout } = await execAsync(
+      `tmux list-panes -t ${tmuxSession} -F "#{pane_pid}" 2>/dev/null`,
+      { encoding: 'utf-8' }
+    );
+    const panePid = stdout.trim();
+    if (!panePid) return false;
+    // Check if the pane's process has any child processes (Claude Code / bash)
+    const { stdout: children } = await execAsync(
+      `ps --ppid ${panePid} --no-headers 2>/dev/null || echo ""`,
+      { encoding: 'utf-8' }
+    );
+    return children.trim().length > 0;
   } catch {
     return false;
   }
