@@ -2050,22 +2050,22 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
                 {getFriendlyModelName(activeAgent.model)}
               </span>
             )}
-            {/* Workspace location badge - shows if running locally or on remote VM */}
-            {activeAgent && activeAgent.workspaceLocation && (
+            {/* Workspace location badge - shows for any agent with a workspace */}
+            {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
               <span
-                className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium ${
-                  activeAgent.workspaceLocation === 'remote'
+                className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                  (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
                     ? 'bg-cyan-900/50 text-cyan-400'
-                    : 'bg-surface-emphasis text-content-body'
+                    : 'bg-gray-800/60 text-gray-400 border border-gray-600/30'
                 }`}
-                title={activeAgent.workspaceLocation === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
+                title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
               >
-                {activeAgent.workspaceLocation === 'remote' ? (
+                {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? (
                   <Cloud className="w-3 h-3" />
                 ) : (
                   <Monitor className="w-3 h-3" />
                 )}
-                {activeAgent.workspaceLocation}
+                {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Fly.io' : 'Local'}
               </span>
             )}
             {/* Review Ready badge - prominent indicator that agent completed work */}
