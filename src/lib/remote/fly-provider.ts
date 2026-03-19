@@ -100,7 +100,7 @@ export class FlyProvider implements RemoteProvider {
    * Resolve vmName to {appName, machineId} by scanning workspace metadata.
    * Falls back to listing machines in the app.
    */
-  private async resolveVm(vmName: string): Promise<{ appName: string; machineId: string }> {
+  async resolveVm(vmName: string): Promise<{ appName: string; machineId: string }> {
     const workspacesDir = join(homedir(), '.panopticon', 'workspaces');
     if (existsSync(workspacesDir)) {
       for (const file of readdirSync(workspacesDir)) {
@@ -368,12 +368,12 @@ export class FlyProvider implements RemoteProvider {
     if (check.exitCode === 0 && check.stdout.trim()) return true;
 
     // Install via npm
-    const result = await this.ssh(vmName, 'npm install -g @beads-dev/beads 2>&1 || true');
+    const result = await this.ssh(vmName, 'npm install -g @beads-dev/beads 2>&1');
     if (result.exitCode !== 0) {
       // Try alternative install
       const alt = await this.ssh(
         vmName,
-        'curl -fsSL https://raw.githubusercontent.com/beads-dev/beads/main/install.sh | bash 2>&1 || true'
+        'curl -fsSL https://raw.githubusercontent.com/beads-dev/beads/main/install.sh | bash 2>&1'
       );
       return alt.exitCode === 0;
     }
@@ -469,7 +469,7 @@ with open(path, "w") as f:
     vmName: string,
     searchTerm: string,
     workspacePath: string = '/workspace'
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const result = await this.ssh(
       vmName,
       `cd ${workspacePath} && bd search ${JSON.stringify(searchTerm)} --json 2>/dev/null || echo '[]'`

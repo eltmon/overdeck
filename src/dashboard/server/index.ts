@@ -373,8 +373,9 @@ async function ensurePRExists(issueId: string): Promise<{ created: boolean; prUr
       );
 
       // Create PR from remote
+      const safeTitleForShell = issueTitle.replace(/'/g, "'\\''");
       const { stdout } = await execAsync(
-        flyExecCmd(workspaceInfo.vmName, `cd /workspace && gh pr create --title '${issueTitle} (${issueId})' --body 'Closes #${issueId.replace(/^PAN-/i, '')}
+        flyExecCmd(workspaceInfo.vmName, `cd /workspace && gh pr create --title '${safeTitleForShell} (${issueId})' --body 'Closes #${issueId.replace(/^PAN-/i, '')}
 
 ## Summary
 Auto-created PR for ${issueId}
@@ -12949,7 +12950,7 @@ function flyExecCmd(vmName: string, command: string): string {
 }
 
 // Helper to list all remote workspace metadata files
-function listRemoteWorkspaceMetadata(): any[] {
+function listRemoteWorkspaceMetadata(): unknown[] {
   const workspacesDir = join(process.env.HOME || '', '.panopticon', 'workspaces');
 
   if (!existsSync(workspacesDir)) {
@@ -12958,7 +12959,7 @@ function listRemoteWorkspaceMetadata(): any[] {
 
   try {
     const files = readdirSync(workspacesDir).filter(f => f.endsWith('.yaml'));
-    const workspaces: any[] = [];
+    const workspaces: unknown[] = [];
 
     for (const file of files) {
       try {

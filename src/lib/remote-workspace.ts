@@ -39,7 +39,7 @@ export async function createRemoteWorkspace(
 
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const branchName = `feature/${normalizedId}`;
-  const exe = createFlyProviderFromConfig(config.remote);
+  const fly = createFlyProviderFromConfig(config.remote);
 
   // Determine project context
   const teamPrefix = extractTeamPrefix(issueId);
@@ -92,16 +92,16 @@ export async function createRemoteWorkspace(
   }
 
   // Step 1: Create VM
-  await exe.createVm(vmName);
+  await fly.createVm(vmName);
 
   // Step 2: Add GitHub host key and clone repository on VM
   if (options.spinner) {
     options.spinner.text = 'Cloning repository on VM...';
   }
-  await exe.ssh(vmName, 'mkdir -p ~/.ssh && ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null');
-  const cloneResult = await exe.ssh(vmName, `git clone ${repoUrl} ~/workspace`);
+  await fly.ssh(vmName, 'mkdir -p ~/.ssh && ssh-keyscan -t ed25519,rsa github.com >> ~/.ssh/known_hosts 2>/dev/null');
+  const cloneResult = await fly.ssh(vmName, `git clone ${repoUrl} ~/workspace`);
   if (cloneResult.exitCode !== 0) {
-    await exe.deleteVm(vmName);
+    await fly.deleteVm(vmName);
     throw new Error(`Failed to clone: ${cloneResult.stderr}`);
   }
 
@@ -109,9 +109,9 @@ export async function createRemoteWorkspace(
   if (options.spinner) {
     options.spinner.text = 'Creating feature branch...';
   }
-  const branchResult = await exe.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
+  const branchResult = await fly.ssh(vmName, `cd ~/workspace && git checkout -b ${branchName}`);
   if (branchResult.exitCode !== 0) {
-    await exe.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
+    await fly.ssh(vmName, `cd ~/workspace && git checkout ${branchName} || git checkout -b ${branchName}`);
   }
 
   // Step 4: Configure environment for shared infra
@@ -124,7 +124,7 @@ ISSUE_ID=${issueId.toUpperCase()}
 DATABASE_NAME=${dbName}
 `;
 
-  await exe.ssh(vmName, `cat > ~/workspace/.env.remote << 'EOF'
+  await fly.ssh(vmName, `cat > ~/workspace/.env.remote << 'EOF'
 ${envContent}
 EOF`);
 
@@ -132,23 +132,23 @@ EOF`);
   if (options.spinner) {
     options.spinner.text = 'Installing beads CLI...';
   }
-  const bdInstalled = await exe.installBeads(vmName);
+  const bdInstalled = await fly.installBeads(vmName);
   if (bdInstalled) {
-    await exe.initBeads(vmName, '~/workspace');
+    await fly.initBeads(vmName, '~/workspace');
   }
 
   // Step 6.5: Copy essential skills to remote VM
   if (options.spinner) {
     options.spinner.text = 'Copying skills to remote VM...';
   }
-  await exe.copySkillsToVm(vmName);
+  await fly.copySkillsToVm(vmName);
 
   // Step 7: Start containers if docker compose exists
   let containersStarted = false;
   let frontendUrl = '';
   let apiUrl = '';
 
-  const composeCheck = await exe.ssh(vmName, 'ls ~/workspace/docker-compose.yml ~/workspace/.devcontainer/docker-compose.yml 2>/dev/null | head -1');
+  const composeCheck = await fly.ssh(vmName, 'ls ~/workspace/docker-compose.yml ~/workspace/.devcontainer/docker-compose.yml 2>/dev/null | head -1');
 
   if (composeCheck.stdout.trim()) {
     if (options.spinner) {
@@ -158,7 +158,7 @@ EOF`);
       ? '~/workspace/.devcontainer'
       : '~/workspace';
 
-    const upResult = await exe.ssh(vmName, `cd ${composeDir} && docker compose up -d 2>&1`);
+    const upResult = await fly.ssh(vmName, `cd ${composeDir} && docker compose up -d 2>&1`);
     containersStarted = upResult.exitCode === 0;
 
     if (containersStarted) {
@@ -166,8 +166,8 @@ EOF`);
         options.spinner.text = 'Exposing ports...';
       }
       try {
-        frontendUrl = await exe.exposePort(vmName, 4173);
-        apiUrl = await exe.exposePort(vmName, 7000);
+        frontendUrl = await fly.exposePort(vmName, 4173);
+        apiUrl = await fly.exposePort(vmName, 7000);
       } catch {
         // Port exposure failed - not critical
       }
