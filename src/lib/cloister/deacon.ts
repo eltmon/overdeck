@@ -1281,13 +1281,14 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
         continue;
       }
 
-      const issueId = status.issueId || key;
       const ageMin = Math.round((now - new Date(status.updatedAt).getTime()) / 60000);
       // PAN-354: Do NOT auto-merge. Only log that it's ready.
       // Merges require human approval via the MERGE button.
       const msg = `${key} is readyForMerge (age: ${ageMin}m) — waiting for human approval`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
+      // Update cooldown so we don't spam the log on every deacon tick
+      mergeStuckCooldowns.set(key, now);
     }
 
     // Persist updated attempt counts so circuit breaker survives server restarts

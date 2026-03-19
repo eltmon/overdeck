@@ -20,6 +20,46 @@ import {
   readIssueCosts,
   summarizeCosts,
 } from '../../lib/cost.js';
+import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
+
+/**
+ * Run the cost sync action (shared by `pan cost sync` and `pan sync-costs`).
+ */
+export async function runCostSync(): Promise<void> {
+  try {
+    console.log(chalk.bold('Syncing cost events from project WAL files...'));
+    const result = await syncWalFromAllProjects();
+
+    if (result.filesScanned === 0) {
+      console.log(chalk.yellow('No WAL files found. Make sure projects are registered and have cost events.'));
+      return;
+    }
+
+    console.log();
+    console.log(`Files scanned: ${result.filesScanned}`);
+    console.log(`Imported:     ${chalk.green(result.imported)} new events`);
+    console.log(`Duplicates:   ${chalk.dim(result.duplicates)} skipped`);
+
+    if (Object.keys(result.byProject).length > 0) {
+      console.log();
+      console.log(chalk.bold('By Project:'));
+      for (const [project, stats] of Object.entries(result.byProject)) {
+        console.log(`  ${project}: ${chalk.green(stats.imported)} imported, ${stats.files} file(s)`);
+      }
+    }
+
+    if (result.errors.length > 0) {
+      console.log();
+      console.log(chalk.yellow(`Warnings (${result.errors.length}):`));
+      for (const err of result.errors) {
+        console.log(`  ${chalk.dim(err)}`);
+      }
+    }
+  } catch (error: unknown) {
+    console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
 
 export function createCostCommand(): Command {
   const cost = new Command('cost')
@@ -72,8 +112,8 @@ export function createCostCommand(): Command {
             }
           }
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -111,8 +151,8 @@ export function createCostCommand(): Command {
             console.log(`  ${issue}: ${formatCost(cost)}`);
           }
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -158,8 +198,8 @@ export function createCostCommand(): Command {
             console.log(`  ${issue}: ${formatCost(cost)}`);
           }
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -181,8 +221,8 @@ export function createCostCommand(): Command {
 
         const report = generateReport(start, end);
         console.log(report);
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -216,8 +256,8 @@ export function createCostCommand(): Command {
             console.log(`  ${model}: ${formatCost(cost)}`);
           }
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -251,8 +291,8 @@ export function createCostCommand(): Command {
         console.log(`  Type: ${newBudget.type}`);
         console.log(`  Limit: ${formatCost(newBudget.limit)}`);
         console.log(`  Alert at: ${(newBudget.alertThreshold * 100).toFixed(0)}%`);
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -292,8 +332,8 @@ export function createCostCommand(): Command {
           console.log(`  Remaining: ${formatCost(status.remaining)}`);
           console.log();
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -331,8 +371,8 @@ export function createCostCommand(): Command {
         console.log(`Spent: ${statusColor(formatCost(b.spent))} (${statusColor(percentStr)})`);
         console.log(`Remaining: ${formatCost(status.remaining)}`);
         console.log(`Alert Threshold: ${(b.alertThreshold * 100).toFixed(0)}%`);
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -351,11 +391,17 @@ export function createCostCommand(): Command {
           console.log(chalk.red('Budget not found:'), id);
           process.exit(1);
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
+
+  // Sync cost events from all project WAL files
+  cost
+    .command('sync')
+    .description('Import cost events from per-project WAL files into the local database')
+    .action(runCostSync);
 
   return cost;
 }
