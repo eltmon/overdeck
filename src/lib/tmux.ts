@@ -139,15 +139,20 @@ const execAsync = promisify(exec);
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = `/tmp/pan-sendkeys-${process.pid}-${Date.now()}.txt`;
+  // Use a unique named buffer per call to prevent race conditions.
+  // The default (unnamed) paste buffer is global — concurrent load-buffer
+  // calls from different specialist wakes clobber each other.
+  const bufferName = `pan-${process.pid}-${Date.now()}`;
+  const tmpFile = `/tmp/pan-sendkeys-${bufferName}.txt`;
   try {
     writeFileSync(tmpFile, keys);
-    await execAsync(`tmux load-buffer ${tmpFile}`);
-    await execAsync(`tmux paste-buffer -t ${sessionName}`);
+    await execAsync(`tmux load-buffer -b ${bufferName} ${tmpFile}`);
+    await execAsync(`tmux paste-buffer -b ${bufferName} -t ${sessionName} -d`);
     await new Promise(r => setTimeout(r, 300));
     await execAsync(`tmux send-keys -t ${sessionName} C-m`);
   } finally {
     try { unlinkSync(tmpFile); } catch {}
+    try { await execAsync(`tmux delete-buffer -b ${bufferName} 2>/dev/null`); } catch {}
   }
 }
 
@@ -245,9 +250,14 @@ export async function confirmDelivery(
     // Claude is processing if: new output lines appeared (tool calls: ●, results: ⎿, etc.)
     if (afterLineCount > beforeLineCount + 1) return true;
 
-    // Or if we can see tool invocation markers in the new output
+    // Or if we can see activity markers in the new output
     const newOutput = afterLines.slice(beforeLineCount).join('\n');
-    if (newOutput.includes('●') || newOutput.includes('⎿') || newOutput.includes('Read')) return true;
+    if (
+      newOutput.includes('●') || newOutput.includes('⎿') || newOutput.includes('Read') ||
+      newOutput.includes('✻') || newOutput.includes('·') || newOutput.includes('✶') ||
+      newOutput.includes('✽') || newOutput.includes('✢') || newOutput.includes('Generating') ||
+      newOutput.includes('thinking') || newOutput.includes('thought for')
+    ) return true;
   }
   return false;
 }
