@@ -12213,9 +12213,9 @@ app.get('/api/costs/by-agent', (req, res) => {
 });
 
 // POST /api/costs/sync-wal - Import WAL files from all project repos
-app.post('/api/costs/sync-wal', (_req, res) => {
+app.post('/api/costs/sync-wal', async (_req, res) => {
   try {
-    const result = syncWalFromAllProjects();
+    const result = await syncWalFromAllProjects();
     res.json({ success: true, ...result });
   } catch (error: any) {
     console.error('Error syncing WAL:', error);
@@ -14684,9 +14684,9 @@ server.listen(PORT, '0.0.0.0', async () => {
   }
 
   // Import WAL cost events from all project repos on startup (deferred — non-blocking)
-  setImmediate(() => {
+  setImmediate(async () => {
     try {
-      const walResult = syncWalFromAllProjects();
+      const walResult = await syncWalFromAllProjects();
       if (walResult.imported > 0) {
         console.log(`WAL sync: imported ${walResult.imported} cost events (${walResult.duplicates} duplicates skipped)`);
       }

@@ -52,7 +52,7 @@ import { registerBeadsCommands } from './commands/beads.js';
 import { migrateConfigCommand } from './commands/migrate-config.js';
 import { registerRemoteCommands } from './commands/remote/index.js';
 import { registerConfigCommand } from './commands/config.js';
-import { createCostCommand, runCostSync } from './commands/cost.js';
+import { createCostCommand } from './commands/cost.js';
 
 const program = new Command();
 
@@ -532,7 +532,10 @@ program.addCommand(createCostCommand());
 program
   .command('sync-costs')
   .description('Import cost events from per-project WAL files (alias for: pan cost sync)')
-  .action(runCostSync);
+  .action(async () => {
+    // Forward to subcommand — avoids duplicating logic
+    await program.parseAsync(['cost', 'sync'], { from: 'user' });
+  });
 
 // Parse and execute
-program.parse();
+await program.parseAsync();

@@ -6,7 +6,8 @@
  * - By `pan sync-costs` CLI command for on-demand sync
  */
 
-import { existsSync, readdirSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
+import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { listProjects } from '../projects.js';
 import { insertCostEvents } from '../database/cost-events-db.js';
@@ -31,7 +32,7 @@ export interface SyncResult {
  * Scan all project repos for WAL files and import new events into SQLite.
  * Deduplication is handled by the UNIQUE index on request_id in cost_events.
  */
-export function syncWalFromAllProjects(): SyncResult {
+export async function syncWalFromAllProjects(): Promise<SyncResult> {
   const result: SyncResult = {
     imported: 0,
     duplicates: 0,
@@ -53,7 +54,7 @@ export function syncWalFromAllProjects(): SyncResult {
 
     let files: string[];
     try {
-      files = readdirSync(eventsDir).filter(f => f.endsWith('.jsonl'));
+      files = (await readdir(eventsDir)).filter(f => f.endsWith('.jsonl'));
     } catch (err) {
       result.errors.push(`${key}: failed to read events dir: ${err}`);
       continue;
@@ -61,7 +62,7 @@ export function syncWalFromAllProjects(): SyncResult {
 
     for (const file of files) {
       const filePath = join(eventsDir, file);
-      const events = parseWalFile(filePath, result.errors);
+      const events = await parseWalFile(filePath, result.errors);
       if (events.length === 0) continue;
 
       try {
@@ -89,14 +90,14 @@ export function syncWalFromAllProjects(): SyncResult {
  * Import WAL files from a specific directory.
  * Used for targeted sync of a single project or directory.
  */
-export function syncWalFromDir(eventsDir: string): { imported: number; duplicates: number; files: number; errors: string[] } {
+export async function syncWalFromDir(eventsDir: string): Promise<{ imported: number; duplicates: number; files: number; errors: string[] }> {
   const stats = { imported: 0, duplicates: 0, files: 0, errors: [] as string[] };
 
   if (!existsSync(eventsDir)) return stats;
 
   let files: string[];
   try {
-    files = readdirSync(eventsDir).filter(f => f.endsWith('.jsonl'));
+    files = (await readdir(eventsDir)).filter(f => f.endsWith('.jsonl'));
   } catch (err) {
     stats.errors.push(`Failed to read dir ${eventsDir}: ${err}`);
     return stats;
@@ -104,7 +105,7 @@ export function syncWalFromDir(eventsDir: string): { imported: number; duplicate
 
   for (const file of files) {
     const filePath = join(eventsDir, file);
-    const events = parseWalFile(filePath, stats.errors);
+    const events = await parseWalFile(filePath, stats.errors);
     if (events.length === 0) continue;
 
     try {
@@ -122,10 +123,10 @@ export function syncWalFromDir(eventsDir: string): { imported: number; duplicate
 
 // ============== Helpers ==============
 
-function parseWalFile(filePath: string, errors: string[]): CostEvent[] {
+async function parseWalFile(filePath: string, errors: string[]): Promise<CostEvent[]> {
   let content: string;
   try {
-    content = readFileSync(filePath, 'utf-8');
+    content = await readFile(filePath, 'utf-8');
   } catch (err) {
     errors.push(`Failed to read ${filePath}: ${err}`);
     return [];

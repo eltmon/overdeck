@@ -25,10 +25,10 @@ import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
 /**
  * Run the cost sync action (shared by `pan cost sync` and `pan sync-costs`).
  */
-export function runCostSync(): void {
+export async function runCostSync(): Promise<void> {
   try {
     console.log(chalk.bold('Syncing cost events from project WAL files...'));
-    const result = syncWalFromAllProjects();
+    const result = await syncWalFromAllProjects();
 
     if (result.filesScanned === 0) {
       console.log(chalk.yellow('No WAL files found. Make sure projects are registered and have cost events.'));
