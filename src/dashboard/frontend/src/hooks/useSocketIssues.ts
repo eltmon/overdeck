@@ -62,6 +62,14 @@ export function useSocketIssues(): void {
       }
     });
 
+    // Merge ready notification — server signals that an issue is ready to merge.
+    // Invalidate the review-status cache so the dashboard re-fetches and shows the MERGE button.
+    socket.on('merge:ready', ({ issueId }: { issueId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['review-status', issueId] });
+      // Also refresh the issues list in case the status column needs updating
+      queryClient.invalidateQueries({ queryKey: ['issues'], exact: false });
+    });
+
     // Tab visibility: request snapshot on re-focus
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && socket.connected) {

@@ -31,6 +31,7 @@ import { performHandoff } from '../../lib/cloister/handoff.js';
 import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getHandoffStats } from '../../lib/cloister/handoff-logger.js';
 import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../lib/cloister/specialist-handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
+import { setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent, messageAgent, stopAgent } from '../../lib/agents.js';
 import { sendKeysAsync } from '../../lib/tmux.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
@@ -250,9 +251,10 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
       console.error(`[status] Error updating Linear to In Review for ${issueId}:`, err);
     });
 
-    // PAN-354: Do NOT auto-merge. Only notify that the issue is ready.
-    // Merges require human approval via the MERGE button in the dashboard.
-    console.log(`[merge] ${issueId} is ready for merge — waiting for human approval via MERGE button`);
+    // Notify the dashboard that this issue is ready to merge.
+    // Auto-triggering merge was removed in PAN-354; the MERGE button is the sole trigger.
+    console.log(`[merge] ${issueId} is ready for merge — emitting merge:ready notification`);
+    socketIo.emit('merge:ready', { issueId });
   }
 
   return updated;
@@ -12552,6 +12554,11 @@ const socketIo = new SocketIOServer(server, {
   path: '/socket.io',
   cors: { origin: '*' },
 });
+
+// Wire deacon merge:ready notifications to Socket.io (PAN-354).
+// Deacon is a library module that cannot own the Socket.io instance directly,
+// so we register a callback that emits the event when deacon detects a stuck merge.
+setMergeReadyNotifier((issueId) => socketIo.emit('merge:ready', { issueId }));
 
 // Route upgrade requests: /ws/terminal → raw WSS, everything else → Socket.io
 server.on('upgrade', (request, socket, head) => {

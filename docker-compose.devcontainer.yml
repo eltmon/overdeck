@@ -1,8 +1,8 @@
 # Panopticon Dashboard Dev Container
-# Feature workspace: feature-pan-341
+# Feature workspace: feature-pan-354
 # URLs:
-#   Frontend: https://feature-pan-341.pan.localhost
-#   API: https://api-feature-pan-341.pan.localhost
+#   Frontend: https://feature-pan-354.pan.localhost
+#   API: https://api-feature-pan-354.pan.localhost
 
 services:
   # Combined dev container for VS Code attach
@@ -81,16 +81,16 @@ services:
       - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
     environment:
       - CI=true
-      - VITE_API_URL=https://api-feature-pan-341.pan.localhost
+      - VITE_API_URL=https://api-feature-pan-354.pan.localhost
     networks:
       - devnet
       - panopticon
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pan-fe-feature-pan-341.rule=Host(`feature-pan-341.pan.localhost`)"
-      - "traefik.http.routers.pan-fe-feature-pan-341.entrypoints=websecure"
-      - "traefik.http.routers.pan-fe-feature-pan-341.tls=true"
-      - "traefik.http.services.pan-fe-feature-pan-341.loadbalancer.server.port=3010"
+      - "traefik.http.routers.pan-fe-feature-pan-354.rule=Host(`feature-pan-354.pan.localhost`)"
+      - "traefik.http.routers.pan-fe-feature-pan-354.entrypoints=websecure"
+      - "traefik.http.routers.pan-fe-feature-pan-354.tls=true"
+      - "traefik.http.services.pan-fe-feature-pan-354.loadbalancer.server.port=3010"
 
   # Backend API server (with watch mode)
   # NOTE: Server imports from ../../lib/ which needs root node_modules
@@ -133,10 +133,10 @@ services:
       - panopticon
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pan-api-feature-pan-341.rule=Host(`api-feature-pan-341.pan.localhost`)"
-      - "traefik.http.routers.pan-api-feature-pan-341.entrypoints=websecure"
-      - "traefik.http.routers.pan-api-feature-pan-341.tls=true"
-      - "traefik.http.services.pan-api-feature-pan-341.loadbalancer.server.port=3011"
+      - "traefik.http.routers.pan-api-feature-pan-354.rule=Host(`api-feature-pan-354.pan.localhost`)"
+      - "traefik.http.routers.pan-api-feature-pan-354.entrypoints=websecure"
+      - "traefik.http.routers.pan-api-feature-pan-354.tls=true"
+      - "traefik.http.services.pan-api-feature-pan-354.loadbalancer.server.port=3011"
 
 volumes:
   npm-cache:
