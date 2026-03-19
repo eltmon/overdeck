@@ -1,7 +1,8 @@
 import chalk from 'chalk';
 import { stopAgent, getAgentState } from '../../../lib/agents.js';
 import { sessionExists } from '../../../lib/tmux.js';
-import { createExeProvider, isRemoteAvailable } from '../../../lib/remote/index.js';
+import { createFlyProviderFromConfig, isRemoteAvailable } from '../../../lib/remote/index.js';
+import { loadConfig } from '../../../lib/config.js';
 
 interface KillOptions {
   force?: boolean;
@@ -29,10 +30,10 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
     try {
       const availability = await isRemoteAvailable();
       if (availability.available) {
-        const exe = createExeProvider({ infraVm: state.infraVm || 'pan-infra' });
+        const fly = createFlyProviderFromConfig(loadConfig().remote);
 
         // Kill remote tmux session
-        await exe.ssh(state.vmName, `tmux kill-session -t ${agentId} 2>/dev/null || true`);
+        await fly.ssh(state.vmName, `tmux kill-session -t ${agentId} 2>/dev/null || true`);
         console.log(chalk.green(`Killed remote agent: ${agentId}`));
 
         // Update local state file

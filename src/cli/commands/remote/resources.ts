@@ -1,13 +1,13 @@
 /**
  * pan remote resources
  *
- * Show RAM/disk usage across exe.dev VMs.
+ * Show RAM/disk usage across Fly.io machines.
  */
 
 import chalk from 'chalk';
 import ora from 'ora';
 import { loadConfig } from '../../../lib/config.js';
-import { createExeProvider } from '../../../lib/remote/index.js';
+import { createFlyProviderFromConfig } from '../../../lib/remote/index.js';
 
 interface ResourcesOptions {
   json?: boolean;
@@ -34,20 +34,19 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
       return;
     }
 
-    const infraVm = config.remote.exe?.infra_vm || 'pan-infra';
-    const exe = createExeProvider({ infraVm });
+    const fly = createFlyProviderFromConfig(config.remote);
 
     // Check authentication
-    const isAuth = await exe.isAuthenticated();
+    const isAuth = await fly.isAuthenticated();
     if (!isAuth) {
-      spinner.fail('Not authenticated with exe.dev');
+      spinner.fail('Not authenticated with Fly.io');
       console.log('');
-      console.log(chalk.dim('Run: exe auth login'));
+      console.log(chalk.dim('Run: fly auth login  or  export FLY_API_TOKEN=<token>'));
       return;
     }
 
     // Get VM list
-    const vms = await exe.listVms();
+    const vms = await fly.listVms();
 
     // Collect resource usage for running VMs
     const resources: VmResources[] = [];
@@ -61,7 +60,7 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
           status: vm.status,
           memoryMB: 0,
           diskMB: 0,
-          isInfra: vm.name === infraVm,
+          isInfra: false,
         });
         continue;
       }
@@ -70,11 +69,11 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
 
       try {
         // Get memory usage via SSH
-        const memResult = await exe.ssh(vm.name, "free -m | awk '/^Mem:/ {print $3}'");
+        const memResult = await fly.ssh(vm.name, "free -m | awk '/^Mem:/ {print $3}'");
         const memMB = parseInt(memResult.stdout.trim(), 10) || 0;
 
         // Get disk usage
-        const diskResult = await exe.ssh(vm.name, "df -m / | awk 'NR==2 {print $3}'");
+        const diskResult = await fly.ssh(vm.name, "df -m / | awk 'NR==2 {print $3}'");
         const diskMB = parseInt(diskResult.stdout.trim(), 10) || 0;
 
         resources.push({
@@ -82,7 +81,7 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
           status: vm.status,
           memoryMB: memMB,
           diskMB: diskMB,
-          isInfra: vm.name === infraVm,
+          isInfra: false,
         });
 
         totalMemory += memMB;
@@ -93,7 +92,7 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
           status: vm.status,
           memoryMB: 0,
           diskMB: 0,
-          isInfra: vm.name === infraVm,
+          isInfra: false,
         });
       }
     }
@@ -119,13 +118,13 @@ export async function resourcesCommand(options: ResourcesOptions): Promise<void>
     console.log(chalk.bold('Remote Resource Usage'));
     console.log('');
 
-    // Plan info (hardcoded for now - could be fetched from exe.dev API)
+    // Plan info (hardcoded for now - could be fetched from Fly.io API)
     const planMemoryGB = 16;
     const planMaxVms = 30;
     const usedMemoryGB = totalMemory / 1024;
     const memoryPercent = Math.round((usedMemoryGB / planMemoryGB) * 100);
 
-    console.log(chalk.dim(`  exe.dev Plan: Enterprise (${planMemoryGB}GB RAM, ${planMaxVms} VMs)`));
+    console.log(chalk.dim(`  Fly.io: ${planMemoryGB}GB RAM capacity, up to ${planMaxVms} machines`));
     console.log('');
 
     // Memory bar

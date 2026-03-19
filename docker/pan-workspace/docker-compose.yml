@@ -1,0 +1,21 @@
+# Local build and test compose file for pan-workspace image
+version: '3.8'
+
+services:
+  pan-workspace:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pan-workspace:local
+    container_name: pan-workspace-test
+    ports:
+      - "2222:22"
+    volumes:
+      - workspace_data:/workspace
+    environment:
+      - WORKSPACE_ID=test
+    stdin_open: true
+    tty: true
+
+volumes:
+  workspace_data:

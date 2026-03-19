@@ -1,12 +1,12 @@
 /**
  * Remote Agent Management
  *
- * Spawn and manage Claude agents on remote exe.dev VMs.
+ * Spawn and manage Claude agents on remote Fly.io machines.
  * Agents run in tmux sessions for persistence and monitoring.
  */
 
-import { ExeProvider, createExeProvider } from './exe-provider.js';
-import type { RemoteWorkspaceMetadata } from './interface.js';
+import { createFlyProvider } from './fly-provider.js';
+import type { RemoteProvider, RemoteWorkspaceMetadata } from './interface.js';
 import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
@@ -60,11 +60,11 @@ export function loadRemoteAgentState(agentId: string): RemoteAgentState | null {
  * Check if remote agent session exists
  */
 async function remoteSessionExists(
-  exe: ExeProvider,
+  provider: RemoteProvider,
   vmName: string,
   sessionName: string
 ): Promise<boolean> {
-  const result = await exe.ssh(vmName, `tmux has-session -t ${sessionName} 2>/dev/null && echo exists || echo not-found`);
+  const result = await provider.ssh(vmName, `tmux has-session -t ${sessionName} 2>/dev/null && echo exists || echo not-found`);
   return result.stdout.trim() === 'exists';
 }
 
@@ -85,16 +85,16 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
   const agentId = `agent-${issueId.toLowerCase()}`;
   const vmName = workspace.vmName;
 
-  const exe = createExeProvider({ infraVm: workspace.infraVm });
+  const fly = createFlyProvider();
 
   // Check if VM is running
-  const vmStatus = await exe.getStatus(vmName);
+  const vmStatus = await fly.getStatus(vmName);
   if (vmStatus !== 'running') {
     throw new Error(`VM ${vmName} is not running. Start it with: pan workspace start ${issueId}`);
   }
 
   // Check if agent already exists
-  if (await remoteSessionExists(exe, vmName, agentId)) {
+  if (await remoteSessionExists(fly, vmName, agentId)) {
     throw new Error(`Agent ${agentId} already running on ${vmName}. Use 'pan work tell' to message it.`);
   }
 
@@ -117,9 +117,9 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
   if (prompt) {
     // Write prompt to file on VM using base64 to avoid escaping issues
     const promptFile = `/workspace/.panopticon/prompts/${agentId}.md`;
-    await exe.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
+    await fly.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
     const promptBase64 = Buffer.from(prompt).toString('base64');
-    await exe.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${promptFile}`);
+    await fly.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${promptFile}`);
 
     // Create launcher script using base64 to avoid shell interpretation
     const launcherScript = `/workspace/.panopticon/prompts/${agentId}-launcher.sh`;
@@ -129,7 +129,7 @@ prompt=\$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --model ${model} "\$prompt"
 `;
     const launcherBase64 = Buffer.from(launcherContent).toString('base64');
-    await exe.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${launcherScript} && chmod +x ${launcherScript}`);
+    await fly.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${launcherScript} && chmod +x ${launcherScript}`);
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
@@ -138,7 +138,7 @@ exec claude --dangerously-skip-permissions --model ${model} "\$prompt"
 
   // Create tmux session on remote VM
   const tmuxCmd = `tmux new-session -d -s ${agentId} -c /workspace '${claudeCmd}'`;
-  const result = await exe.ssh(vmName, tmuxCmd);
+  const result = await fly.ssh(vmName, tmuxCmd);
 
   if (result.exitCode !== 0) {
     state.status = 'error';
@@ -161,9 +161,9 @@ export async function getRemoteAgentOutput(
   vmName: string,
   lines: number = 100
 ): Promise<string> {
-  const exe = createExeProvider();
+  const fly = createFlyProvider();
 
-  const result = await exe.ssh(vmName, `tmux capture-pane -t ${agentId} -p -S -${lines}`);
+  const result = await fly.ssh(vmName, `tmux capture-pane -t ${agentId} -p -S -${lines}`);
   return result.stdout;
 }
 
@@ -175,14 +175,14 @@ export async function sendToRemoteAgent(
   vmName: string,
   message: string
 ): Promise<void> {
-  const exe = createExeProvider();
+  const fly = createFlyProvider();
 
   // Escape message for shell
   const escapedMessage = message.replace(/'/g, "'\\''");
 
   // Send keys to tmux session (send message then Enter)
-  await exe.ssh(vmName, `tmux send-keys -t ${agentId} '${escapedMessage}'`);
-  await exe.ssh(vmName, `tmux send-keys -t ${agentId} C-m`);
+  await fly.ssh(vmName, `tmux send-keys -t ${agentId} '${escapedMessage}'`);
+  await fly.ssh(vmName, `tmux send-keys -t ${agentId} C-m`);
 }
 
 /**
@@ -192,8 +192,8 @@ export async function isRemoteAgentRunning(
   agentId: string,
   vmName: string
 ): Promise<boolean> {
-  const exe = createExeProvider();
-  return remoteSessionExists(exe, vmName, agentId);
+  const fly = createFlyProvider();
+  return remoteSessionExists(fly, vmName, agentId);
 }
 
 /**
@@ -203,8 +203,8 @@ export async function killRemoteAgent(
   agentId: string,
   vmName: string
 ): Promise<void> {
-  const exe = createExeProvider();
-  await exe.ssh(vmName, `tmux kill-session -t ${agentId} 2>/dev/null || true`);
+  const fly = createFlyProvider();
+  await fly.ssh(vmName, `tmux kill-session -t ${agentId} 2>/dev/null || true`);
 
   // Update state
   const state = loadRemoteAgentState(agentId);
@@ -218,9 +218,9 @@ export async function killRemoteAgent(
  * Get list of running remote agents on a VM
  */
 export async function listRemoteAgents(vmName: string): Promise<string[]> {
-  const exe = createExeProvider();
+  const fly = createFlyProvider();
 
-  const result = await exe.ssh(vmName, `tmux list-sessions -F "#{session_name}" 2>/dev/null | grep "^agent-" || true`);
+  const result = await fly.ssh(vmName, `tmux list-sessions -F "#{session_name}" 2>/dev/null | grep "^agent-" || true`);
   if (!result.stdout.trim()) {
     return [];
   }
@@ -240,10 +240,10 @@ export async function pollRemoteAgentStatus(
   lastOutput: string;
   toolUses: string[];
 }> {
-  const exe = createExeProvider();
+  const fly = createFlyProvider();
 
   // Check if session exists
-  const isRunning = await remoteSessionExists(exe, vmName, agentId);
+  const isRunning = await remoteSessionExists(fly, vmName, agentId);
 
   if (!isRunning) {
     return { isRunning: false, lastOutput: '', toolUses: [] };

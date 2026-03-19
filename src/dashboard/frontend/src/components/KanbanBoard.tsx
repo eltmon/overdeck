@@ -2048,7 +2048,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
                     ? 'bg-cyan-900/50 text-cyan-400'
                     : 'bg-surface-emphasis text-content-body'
                 }`}
-                title={activeAgent.workspaceLocation === 'remote' ? 'Running on remote VM (exe.dev)' : 'Running locally'}
+                title={activeAgent.workspaceLocation === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
               >
                 {activeAgent.workspaceLocation === 'remote' ? (
                   <Cloud className="w-3 h-3" />

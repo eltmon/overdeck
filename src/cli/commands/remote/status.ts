@@ -1,13 +1,13 @@
 /**
  * pan remote status
  *
- * Shows exe.dev connection status and list of VMs.
+ * Shows Fly.io connection status and list of machines.
  */
 
 import chalk from 'chalk';
 import ora from 'ora';
 import { loadConfig } from '../../../lib/config.js';
-import { createExeProvider, isRemoteAvailable } from '../../../lib/remote/index.js';
+import { createFlyProviderFromConfig, isRemoteAvailable } from '../../../lib/remote/index.js';
 
 interface StatusOptions {
   json?: boolean;
@@ -22,8 +22,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     // Check if remote is enabled
     const enabled = remoteConfig?.enabled ?? false;
-    const provider = remoteConfig?.provider ?? 'exe';
-    const infraVm = remoteConfig?.exe?.infra_vm;
+    const provider = remoteConfig?.provider ?? 'fly';
 
     // Check availability
     const availability = await isRemoteAvailable();
@@ -57,10 +56,10 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     }
 
     // Get VM list
-    const exe = createExeProvider({ infraVm });
-    const vms = await exe.listVms();
+    const fly = createFlyProviderFromConfig(remoteConfig);
+    const vms = await fly.listVms();
 
-    spinner.succeed('Connected to exe.dev');
+    spinner.succeed('Connected to Fly.io');
 
     if (options.json) {
       console.log(JSON.stringify({
@@ -68,7 +67,6 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
         provider,
         authenticated: true,
         available: true,
-        infraVm,
         vms,
       }, null, 2));
       return;
@@ -80,7 +78,6 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log(`  Provider:       ${chalk.cyan(provider)}`);
     console.log(`  Enabled:        ${enabled ? chalk.green('Yes') : chalk.dim('No')}`);
     console.log(`  Authenticated:  ${chalk.green('Yes')}`);
-    console.log(`  Infra VM:       ${infraVm ? chalk.cyan(infraVm) : chalk.dim('Not configured')}`);
     console.log('');
 
     if (vms.length === 0) {
@@ -97,7 +94,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
             ? chalk.yellow('○')
             : chalk.dim('◌');
 
-        const isInfra = vm.name === infraVm ? chalk.dim(' (infra)') : '';
+        const isInfra = '';
         console.log(`    ${statusIcon} ${vm.name}${isInfra} - ${vm.status}`);
       }
     }
