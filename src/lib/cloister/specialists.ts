@@ -13,6 +13,7 @@ import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getDevrootPath } from '../config.js';
+import { getProject } from '../projects.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import { loadSettings, type ModelId } from '../settings.js';
@@ -589,9 +590,10 @@ export async function spawnEphemeralSpecialist(
     console.log(`[specialist] Using promptOverride for ${projectKey}/${task.issueId} (${taskPrompt.length} chars)`);
   }
 
-  // Spawn tmux session
+  // Spawn tmux session — use project path so specialist has correct context
   const tmuxSession = getTmuxSessionName(specialistType, projectKey);
-  const cwd = getDevrootPath() || homedir();
+  const project = getProject(projectKey);
+  const cwd = project?.path || getDevrootPath() || homedir();
 
   // Pre-trust cwd so specialists don't hit the trust prompt
   try {
@@ -1695,7 +1697,8 @@ export async function wakeSpecialist(
       };
     }
 
-    const cwd = getDevrootPath() || process.env.HOME || '/home/eltmon';
+    // Use devroot (~/Projects) — already trusted in Claude Code
+    const cwd = getDevrootPath() || join(process.env.HOME || '/home/eltmon', 'Projects');
 
     // Pre-trust cwd so specialists don't hit the trust prompt
     try {
