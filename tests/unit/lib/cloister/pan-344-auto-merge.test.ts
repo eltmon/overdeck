@@ -1,14 +1,18 @@
 /**
- * Tests for PAN-344: auto-merge trigger and stuck-merge patrol check.
+ * Tests for PAN-344 / PAN-354: merge-stuck patrol check (notify-only, PAN-354).
  *
  * Coverage:
- *  1. checkReadyForMergeStuck finds a stuck issue and calls the merge API
+ *  1. checkReadyForMergeStuck notifies for a stuck issue older than 2 min
  *  2. checkReadyForMergeStuck skips issues where mergeStatus=merging
  *  3. checkReadyForMergeStuck skips issues where mergeStatus=merged
  *  4. checkReadyForMergeStuck skips issues where mergeStatus=failed
  *  5. Staleness check: status younger than 2 min is skipped
  *  6. Staleness check: missing updatedAt is skipped
- *  7. Circuit breaker stops after MERGE_STUCK_MAX_ATTEMPTS (3)
+ *  7. Circuit breaker stops notifying after MERGE_STUCK_MAX_ATTEMPTS (3)
+ *
+ * PAN-354: checkReadyForMergeStuck no longer auto-triggers the merge API.
+ * Instead it calls the mergeReadyNotifier callback (set by the server layer)
+ * so the dashboard can alert the user to click MERGE.
  *
  * The tests mock fs.existsSync and fs.readFileSync so they never touch
  * the real ~/.panopticon/review-status.json file.
@@ -86,12 +90,8 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn(),
 }));
 
-// Mock global fetch
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
-
 // Import after mocks are in place
-import { checkReadyForMergeStuck } from '../../../../src/lib/cloister/deacon.js';
+import { checkReadyForMergeStuck, setMergeReadyNotifier } from '../../../../src/lib/cloister/deacon.js';
 
 // ---------------------------------------------------------------------------
 // Timestamp helpers
@@ -105,17 +105,17 @@ const ONE_MIN_AGO  = new Date(NOW - 1 * 60 * 1000).toISOString();
 // ---------------------------------------------------------------------------
 
 describe('checkReadyForMergeStuck', () => {
+  const mockNotifier = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
     _statusData = {};
     _statusExists = true;
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true }),
-    } as any);
+    // Register a mock notifier so we can verify notify-only behavior (PAN-354)
+    setMergeReadyNotifier(mockNotifier);
   });
 
-  it('triggers merge for a stuck readyForMerge issue older than 2 min', async () => {
+  it('notifies for a stuck readyForMerge issue older than 2 min (no auto-merge, PAN-354)', async () => {
     _statusData = {
       'PAN-344': {
         issueId: 'PAN-344',
@@ -127,10 +127,9 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).toHaveBeenCalledOnce();
-    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toMatch(/\/api\/workspaces\/PAN-344\/merge/);
-    expect(opts.method).toBe('POST');
+    // Must notify via callback, not by calling the merge API
+    expect(mockNotifier).toHaveBeenCalledOnce();
+    expect(mockNotifier).toHaveBeenCalledWith('PAN-344');
     expect(actions.length).toBeGreaterThan(0);
     expect(actions[0]).toContain('PAN-344');
   });
@@ -142,7 +141,7 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -153,7 +152,7 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -164,7 +163,7 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -175,7 +174,7 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -186,11 +185,11 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
-  it('circuit breaker stops triggering after 3 attempts for the same issue', async () => {
+  it('circuit breaker stops notifying after 3 attempts for the same issue', async () => {
     // Use a unique key isolated from other tests (mergeStuckCooldowns Map persists within a file)
     const CKEY = 'PAN-CB-CIRCUIT';
 
@@ -213,8 +212,8 @@ describe('checkReadyForMergeStuck', () => {
       fakeNow += 11 * 60 * 1000; // advance 11 min (past the 10-min cooldown)
     }
 
-    const callsAfterThree = mockFetch.mock.calls.length;
-    expect(callsAfterThree).toBeGreaterThanOrEqual(3);
+    const notifyCallsAfterThree = mockNotifier.mock.calls.length;
+    expect(notifyCallsAfterThree).toBeGreaterThanOrEqual(3);
 
     // 4th attempt — should be blocked by the circuit breaker
     vi.setSystemTime(fakeNow);
@@ -229,6 +228,6 @@ describe('checkReadyForMergeStuck', () => {
     await checkReadyForMergeStuck();
     vi.useRealTimers();
 
-    expect(mockFetch.mock.calls.length).toBe(callsAfterThree);
+    expect(mockNotifier.mock.calls.length).toBe(notifyCallsAfterThree);
   });
 });
