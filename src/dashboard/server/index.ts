@@ -6655,7 +6655,7 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
       const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-      const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\nFix these issues, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\nDo NOT stop until review passes.`;
+      const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above BEFORE resubmitting\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests to verify your fixes\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.`;
       try {
         const { writeFeedbackFile } = await import('../../lib/cloister/feedback-writer.js');
         const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -6721,7 +6721,7 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
     if (testStatus === 'failed' && testNotes) {
       const agentId = `agent-${issueId.toLowerCase()}`;
       const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-      const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\nFix the failing tests, commit and push, then RESUBMIT for review by running:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\nDo NOT stop until review passes.`;
+      const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\n## REQUIRED: Fix ALL test failures BEFORE resubmitting\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite to verify your fixes pass\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.`;
       try {
         const { writeFeedbackFile } = await import('../../lib/cloister/feedback-writer.js');
         const wsInfo = getWorkspaceInfoForIssue(issueId);
