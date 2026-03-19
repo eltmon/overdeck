@@ -1,0 +1,210 @@
+/**
+ * Tests for review-status-db.ts module functions.
+ * Uses an in-memory SQLite database injected via vi.mock.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import Database from 'better-sqlite3';
+import { initSchema } from '../../../../src/lib/database/schema.js';
+import type { ReviewStatus } from '../../../../src/lib/review-status.js';
+
+// ============== In-memory DB injection ==============
+
+let testDb: Database.Database;
+
+vi.mock('../../../../src/lib/database/index.js', () => ({
+  getDatabase: () => testDb,
+}));
+
+beforeEach(() => {
+  testDb = new Database(':memory:');
+  testDb.pragma('foreign_keys = ON');
+  initSchema(testDb);
+});
+
+afterEach(() => {
+  testDb.close();
+});
+
+// ============== Imports (after mock is set up) ==============
+
+import {
+  upsertReviewStatus,
+  deleteReviewStatus,
+  getReviewStatusFromDb,
+  getAllReviewStatusesFromDb,
+} from '../../../../src/lib/database/review-status-db.js';
+
+// ============== Helpers ==============
+
+function makeStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
+  return {
+    issueId: 'PAN-TEST-1',
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    updatedAt: new Date().toISOString(),
+    readyForMerge: false,
+    ...overrides,
+  };
+}
+
+// ============== upsertReviewStatus ==============
+
+describe('upsertReviewStatus', () => {
+  it('inserts a new status record', () => {
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-U-1' }));
+    const row = testDb.prepare('SELECT * FROM review_status WHERE issue_id = ?').get('PAN-U-1') as any;
+    expect(row).toBeTruthy();
+    expect(row.review_status).toBe('pending');
+    expect(row.ready_for_merge).toBe(0);
+  });
+
+  it('updates an existing record on conflict', () => {
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-U-2', reviewStatus: 'pending' }));
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-U-2', reviewStatus: 'passed', readyForMerge: true }));
+
+    const row = testDb.prepare('SELECT * FROM review_status WHERE issue_id = ?').get('PAN-U-2') as any;
+    expect(row.review_status).toBe('passed');
+    expect(row.ready_for_merge).toBe(1);
+  });
+
+  it('stores history entries', () => {
+    const ts = new Date().toISOString();
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-U-3',
+      history: [
+        { type: 'review', status: 'reviewing', timestamp: ts },
+      ],
+    }));
+
+    const rows = testDb.prepare('SELECT * FROM status_history WHERE issue_id = ?').all('PAN-U-3') as any[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('reviewing');
+  });
+
+  it('deduplicates history entries via INSERT OR IGNORE', () => {
+    const ts = new Date().toISOString();
+    const entry = { type: 'review' as const, status: 'passed', timestamp: ts };
+
+    // Insert same history entry twice
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-U-4', history: [entry] }));
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-U-4', history: [entry] }));
+
+    const rows = testDb.prepare('SELECT * FROM status_history WHERE issue_id = ?').all('PAN-U-4') as any[];
+    expect(rows).toHaveLength(1);
+  });
+
+  it('stores optional fields (mergeStatus, prUrl, verificationNotes)', () => {
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-U-5',
+      mergeStatus: 'merged',
+      prUrl: 'https://github.com/example/pr/1',
+      verificationNotes: 'All good',
+    }));
+
+    const row = testDb.prepare('SELECT * FROM review_status WHERE issue_id = ?').get('PAN-U-5') as any;
+    expect(row.merge_status).toBe('merged');
+    expect(row.pr_url).toBe('https://github.com/example/pr/1');
+    expect(row.verification_notes).toBe('All good');
+  });
+});
+
+// ============== deleteReviewStatus ==============
+
+describe('deleteReviewStatus', () => {
+  it('removes the review status row', () => {
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-D-1' }));
+    deleteReviewStatus('PAN-D-1');
+    const row = testDb.prepare('SELECT * FROM review_status WHERE issue_id = ?').get('PAN-D-1');
+    expect(row).toBeUndefined();
+  });
+
+  it('cascades delete to status_history', () => {
+    const ts = new Date().toISOString();
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-D-2',
+      history: [{ type: 'review', status: 'pending', timestamp: ts }],
+    }));
+    deleteReviewStatus('PAN-D-2');
+    const history = testDb.prepare('SELECT * FROM status_history WHERE issue_id = ?').all('PAN-D-2');
+    expect(history).toHaveLength(0);
+  });
+
+  it('does not throw when issue does not exist', () => {
+    expect(() => deleteReviewStatus('PAN-NOEXIST')).not.toThrow();
+  });
+});
+
+// ============== getReviewStatusFromDb ==============
+
+describe('getReviewStatusFromDb', () => {
+  it('returns null for unknown issue', () => {
+    expect(getReviewStatusFromDb('PAN-UNKNOWN')).toBeNull();
+  });
+
+  it('returns a fully mapped ReviewStatus', () => {
+    const ts = new Date().toISOString();
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-G-1',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      updatedAt: ts,
+    }));
+
+    const result = getReviewStatusFromDb('PAN-G-1');
+    expect(result).not.toBeNull();
+    expect(result!.issueId).toBe('PAN-G-1');
+    expect(result!.reviewStatus).toBe('passed');
+    expect(result!.readyForMerge).toBe(true);
+    expect(result!.updatedAt).toBe(ts);
+  });
+
+  it('includes history when present', () => {
+    const ts = new Date().toISOString();
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-G-2',
+      history: [{ type: 'review', status: 'reviewing', timestamp: ts }],
+    }));
+
+    const result = getReviewStatusFromDb('PAN-G-2');
+    expect(result!.history).toHaveLength(1);
+    expect(result!.history![0].status).toBe('reviewing');
+  });
+
+  it('returns undefined history when no history exists', () => {
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-G-3' }));
+    const result = getReviewStatusFromDb('PAN-G-3');
+    expect(result!.history).toBeUndefined();
+  });
+});
+
+// ============== getAllReviewStatusesFromDb ==============
+
+describe('getAllReviewStatusesFromDb', () => {
+  it('returns empty object when no statuses', () => {
+    expect(getAllReviewStatusesFromDb()).toEqual({});
+  });
+
+  it('returns all statuses keyed by issueId', () => {
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-A-1', reviewStatus: 'pending' }));
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-A-2', reviewStatus: 'passed' }));
+
+    const all = getAllReviewStatusesFromDb();
+    expect(Object.keys(all)).toContain('PAN-A-1');
+    expect(Object.keys(all)).toContain('PAN-A-2');
+    expect(all['PAN-A-1'].reviewStatus).toBe('pending');
+    expect(all['PAN-A-2'].reviewStatus).toBe('passed');
+  });
+
+  it('includes history in each status', () => {
+    const ts = new Date().toISOString();
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-A-3',
+      history: [{ type: 'test', status: 'passed', timestamp: ts }],
+    }));
+
+    const all = getAllReviewStatusesFromDb();
+    expect(all['PAN-A-3'].history).toHaveLength(1);
+  });
+});
