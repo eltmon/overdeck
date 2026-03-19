@@ -6175,7 +6175,10 @@ app.post('/api/workspaces/:issueId/containers/:containerName/:action', async (re
     'fe': ['fe', 'frontend'],
   };
 
-  const serviceNames = serviceMap[containerName.toLowerCase()] || [containerName.toLowerCase()];
+  const serviceNames = serviceMap[containerName.toLowerCase()];
+  if (!serviceNames) {
+    return res.status(400).json({ error: `Unknown container: ${containerName}. Valid: ${Object.keys(serviceMap).join(', ')}` });
+  }
 
   try {
     // Get the project name from compose
