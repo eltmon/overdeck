@@ -19,10 +19,13 @@ import type { HookItem } from '../hooks.js';
  * Attempt to wake or queue the test-agent for a given issue, then notify
  * the work agent when delivery succeeds.
  *
- * On wake failure: falls back to submitToSpecialistQueue so the deacon
- * retries on the next patrol cycle. The work-agent notification is gated
- * on successful delivery — if the entire queuing block throws, the agent
- * is NOT notified (testTaskDelivered safety invariant).
+ * Retry strategy:
+ * - One immediate retry with 2s delay if the first wake attempt fails.
+ * - Falls back to submitToSpecialistQueue after both attempts fail so the
+ *   deacon can retry on the next patrol cycle.
+ * - testStatus is only set to 'testing' AFTER confirming delivery or queuing.
+ * - On total failure (wake + queue submission both throw): sets
+ *   testStatus='dispatch_failed' so the deacon orphan detector can recover.
  *
  * @param issueId     - Issue identifier (e.g. "PAN-343")
  * @param workspace   - Absolute path to the workspace directory
@@ -51,22 +54,37 @@ export async function autoQueueTestAgentAndNotify(
       setReviewStatus(issueId, { testStatus: 'testing' });
       testTaskDelivered = true;
     } else {
-      const testResult = await wakeSpecialistOrQueue(
+      // Attempt 1
+      let testResult = await wakeSpecialistOrQueue(
         'test-agent',
         { issueId, workspace, branch },
         { priority: 'normal', source: 'review-passed-auto' },
       );
 
+      // Retry once on failure with 2s delay (handles transient post-reboot tmux issues)
+      if (!testResult.success) {
+        console.log(
+          `[review-status] First wake attempt failed for ${issueId}: ${testResult.message}. Retrying in 2s...`,
+        );
+        await new Promise((r) => setTimeout(r, 2000));
+        testResult = await wakeSpecialistOrQueue(
+          'test-agent',
+          { issueId, workspace, branch },
+          { priority: 'normal', source: 'review-passed-auto-retry' },
+        );
+      }
+
       if (testResult.success) {
+        // Only set testStatus after confirming success
         setReviewStatus(issueId, { testStatus: 'testing' });
         testTaskDelivered = true;
         console.log(
           `[review-status] Auto-queued test-agent for ${issueId}: ${testResult.queued ? 'queued' : 'woken'} - ${testResult.message}`,
         );
       } else {
-        // Wake failed — submit to queue so deacon can retry on next patrol cycle
+        // Both wake attempts failed — submit to queue for deacon retry
         console.error(
-          `[review-status] Test-agent wake failed for ${issueId}: ${testResult.message}. Submitting to queue for deacon retry.`,
+          `[review-status] Both wake attempts failed for ${issueId}: ${testResult.message}. Submitting to queue for deacon retry.`,
         );
         submitToSpecialistQueue('test-agent', {
           priority: 'normal',
@@ -75,15 +93,27 @@ export async function autoQueueTestAgentAndNotify(
           workspace,
           branch,
         });
+        // Only set testStatus after queue submission succeeds
         setReviewStatus(issueId, { testStatus: 'testing' });
         testTaskDelivered = true;
         console.log(
-          `[review-status] Test-agent task queued for ${issueId} after wake failure (deacon will retry)`,
+          `[review-status] Test-agent task queued for ${issueId} after wake failures (deacon will retry)`,
         );
       }
     }
   } catch (err) {
-    console.error(`[review-status] Failed to auto-queue test-agent for ${issueId}:`, err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[review-status] Failed to dispatch test-agent for ${issueId}:`, err);
+    // Set dispatch_failed so the deacon orphan detector can detect and retry
+    try {
+      setReviewStatus(issueId, {
+        testStatus: 'dispatch_failed',
+        testNotes: `Dispatch failed: ${msg}`,
+      });
+    } catch (statusErr) {
+      // Don't let status update failure mask the original error
+      console.error(`[review-status] Failed to set dispatch_failed status for ${issueId}:`, statusErr);
+    }
     // testTaskDelivered stays false — work agent will not be falsely notified
   }
 

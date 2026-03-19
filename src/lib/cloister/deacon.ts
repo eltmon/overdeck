@@ -53,6 +53,7 @@ import {
   wakeSpecialist,
   clearSessionId,
   checkSpecialistQueue,
+  submitToSpecialistQueue,
   getNextSpecialistTask,
   wakeSpecialistWithTask,
   completeSpecialistTask,
@@ -1186,12 +1187,68 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         actions.push(`Reset orphaned review for ${issueId} (review-agent not active)`);
       }
 
-      // Check for orphaned testing status
-      if (status.testStatus === 'testing' && !testAgentActive && !hasPassedTest && !status.readyForMerge) {
-        console.log(`[deacon] Orphaned test detected: ${issueId} shows 'testing' but test-agent is not active`);
-        status.testStatus = 'pending';
-        modified = true;
-        actions.push(`Reset orphaned test for ${issueId} (test-agent not active)`);
+      // Check for orphaned testing status (includes dispatch_failed from PAN-369)
+      if (
+        (status.testStatus === 'testing' || status.testStatus === 'dispatch_failed') &&
+        !testAgentActive &&
+        !hasPassedTest &&
+        !status.readyForMerge
+      ) {
+        console.log(
+          `[deacon] Orphaned test detected: ${issueId} shows '${status.testStatus}' but test-agent is not active`,
+        );
+
+        // Check if the issue is already in the test-agent queue
+        const testQueue = checkSpecialistQueue('test-agent');
+        const alreadyQueued = testQueue.items.some(
+          (item) => item.payload?.issueId?.toLowerCase() === issueId.toLowerCase(),
+        );
+
+        if (alreadyQueued) {
+          // Queue item exists — keep testStatus as 'testing' so the deacon patrol dispatches it
+          if (status.testStatus !== 'testing') {
+            status.testStatus = 'testing';
+            modified = true;
+          }
+          actions.push(
+            `Retained queued test for ${issueId}: task in queue, deacon patrol will dispatch`,
+          );
+          console.log(`[deacon] Test task for ${issueId} is in queue — setting testStatus=testing for deacon dispatch`);
+        } else {
+          // No queue item — re-submit using workspace from agent state
+          const agentId = `agent-${issueId.toLowerCase()}`;
+          const agentState = getAgentState(agentId);
+          const workspace = agentState?.workspace;
+
+          if (workspace) {
+            const branch = `feature/${issueId.toLowerCase()}`;
+            submitToSpecialistQueue('test-agent', {
+              priority: 'normal',
+              source: 'deacon-orphan-recovery',
+              issueId,
+              workspace,
+              branch,
+            });
+            status.testStatus = 'testing';
+            modified = true;
+            actions.push(
+              `Re-queued orphaned test for ${issueId}: submitted to test-agent queue (deacon-orphan-recovery)`,
+            );
+            console.log(
+              `[deacon] Re-queued test task for ${issueId} after orphan detection (workspace: ${workspace})`,
+            );
+          } else {
+            // Cannot derive workspace — reset to pending so user can re-trigger
+            status.testStatus = 'pending';
+            modified = true;
+            actions.push(
+              `Reset orphaned test for ${issueId}: no queue item and agent state unavailable`,
+            );
+            console.log(
+              `[deacon] Reset orphaned test for ${issueId} to pending (no queue item, agent state unavailable)`,
+            );
+          }
+        }
       }
     }
 

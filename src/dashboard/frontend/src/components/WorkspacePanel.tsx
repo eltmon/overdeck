@@ -1253,11 +1253,13 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                 <span className={
                   reviewStatus.testStatus === 'passed' ? 'text-green-400' :
                   reviewStatus.testStatus === 'failed' ? 'text-red-400' :
+                  reviewStatus.testStatus === 'dispatch_failed' ? 'text-red-400' :
                   reviewStatus.testStatus === 'testing' ? 'text-yellow-400' :
                   'text-content-muted'
                 }>
                   {reviewStatus.testStatus === 'passed' ? '✓ Passed' :
                    reviewStatus.testStatus === 'failed' ? '✗ Failed' :
+                   reviewStatus.testStatus === 'dispatch_failed' ? '✗ Dispatch Failed' :
                    reviewStatus.testStatus === 'testing' ? '⟳ Testing...' :
                    reviewStatus.testStatus === 'skipped' ? '⊘ Skipped' :
                    'Pending'}

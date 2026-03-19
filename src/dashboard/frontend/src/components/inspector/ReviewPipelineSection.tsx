@@ -38,10 +38,12 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
         <span className={
           reviewStatus.testStatus === 'passed' ? 'text-green-400' :
           reviewStatus.testStatus === 'failed' ? 'text-red-400' :
+          reviewStatus.testStatus === 'dispatch_failed' ? 'text-red-400' :
           reviewStatus.testStatus === 'testing' ? 'text-yellow-400' : 'text-gray-500'
         }>
           {reviewStatus.testStatus === 'passed' ? '✓ Passed' :
            reviewStatus.testStatus === 'failed' ? '✗ Failed' :
+           reviewStatus.testStatus === 'dispatch_failed' ? '✗ Dispatch Failed' :
            reviewStatus.testStatus === 'testing' ? '⟳ Testing...' :
            reviewStatus.testStatus === 'skipped' ? '⊘ Skipped' : 'Pending'}
         </span>
