@@ -1,25 +1,7 @@
 import { GitBranch, GitMerge, Folder, Cloud, Monitor, Loader2 } from 'lucide-react';
 import { Agent } from '../../types';
-
-interface WorkspaceInfo {
-  exists: boolean;
-  path?: string;
-  location?: 'local' | 'remote';
-}
-
-function getFriendlyModelName(fullModel: string): string {
-  if (fullModel.includes('opus-4-6') || fullModel.includes('opus-4.6')) return 'Opus 4.6';
-  if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
-  if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
-  if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus 4';
-  if (fullModel.includes('sonnet-4-6') || fullModel.includes('sonnet-4.6')) return 'Sonnet 4.6';
-  if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
-  if (fullModel.includes('sonnet-4') || fullModel.includes('sonnet')) return 'Sonnet 4';
-  if (fullModel.includes('haiku-4-5') || fullModel.includes('haiku-4.5')) return 'Haiku 4.5';
-  if (fullModel.includes('haiku-3')) return 'Haiku 3';
-  if (fullModel.includes('haiku')) return 'Haiku 4.5';
-  return fullModel;
-}
+import type { WorkspaceInfo } from './types';
+import { getFriendlyModelName } from './utils';
 
 interface AgentInfoSectionProps {
   agent: Agent;
@@ -81,7 +63,7 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
         </div>
       )}
 
-      {/* Workspace path */}
+      {/* Workspace path (agent view) */}
       {agent.workspace && (
         <div className="px-3 py-2 border-b border-pan-border text-xs">
           <div className="flex items-center gap-1.5 text-pan-text-secondary">
@@ -93,7 +75,7 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
         </div>
       )}
 
-      {/* Workspace path (no-agent view) */}
+      {/* Workspace path (no-agent view with location badge) */}
       {!agent.workspace && workspace?.exists && workspace.path && (
         <div className="px-3 py-2 border-b border-pan-border text-xs">
           <div className="flex items-center gap-1.5 text-pan-text-secondary">

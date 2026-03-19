@@ -21,57 +21,13 @@ import {
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue } from '../types';
+import type { ContainerStatus, ReviewStatus, WorkspaceInfo } from './inspector/types';
+import { getFriendlyModelName } from './inspector/utils';
 import { BeadsDialog } from './BeadsDialog';
 import { useConfirm } from './DialogProvider';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
-
-interface ContainerStatus {
-  running: boolean;
-  uptime: string | null;
-  status?: string;
-}
-
-interface PendingOperation {
-  type: 'approve' | 'close' | 'containerize' | 'start' | 'review' | 'merge';
-  issueId: string;
-  startedAt: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  error?: string;
-}
-
-interface ReviewStatus {
-  issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
-  mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  verificationNotes?: string;
-  verificationCycleCount?: number;
-  verificationMaxCycles?: number;
-  reviewNotes?: string;
-  testNotes?: string;
-  updatedAt: string;
-  readyForMerge: boolean;
-  autoRequeueCount?: number;
-  history?: Array<{ type: 'review' | 'test' | 'merge'; status: string; timestamp: string; notes?: string }>;
-}
-
-interface WorkspaceInfo {
-  exists: boolean;
-  corrupted?: boolean;
-  message?: string;
-  issueId: string;
-  path?: string;
-  frontendUrl?: string;
-  apiUrl?: string;
-  containers?: Record<string, ContainerStatus> | null;
-  hasDocker?: boolean;
-  canContainerize?: boolean;
-  pendingOperation?: PendingOperation | null;
-  location?: 'local' | 'remote';
-}
 
 interface SessionCost {
   id: string;
@@ -114,20 +70,6 @@ function formatTokens(tokens: number): string {
   if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(2)}M`;
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
   return tokens.toString();
-}
-
-function getFriendlyModelName(fullModel: string): string {
-  if (fullModel.includes('opus-4-6') || fullModel.includes('opus-4.6')) return 'Opus 4.6';
-  if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
-  if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
-  if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus 4';
-  if (fullModel.includes('sonnet-4-6') || fullModel.includes('sonnet-4.6')) return 'Sonnet 4.6';
-  if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
-  if (fullModel.includes('sonnet-4') || fullModel.includes('sonnet')) return 'Sonnet 4';
-  if (fullModel.includes('haiku-4-5') || fullModel.includes('haiku-4.5')) return 'Haiku 4.5';
-  if (fullModel.includes('haiku-3')) return 'Haiku 3';
-  if (fullModel.includes('haiku')) return 'Haiku 4.5';
-  return fullModel;
 }
 
 function copyToClipboard(text: string): boolean {

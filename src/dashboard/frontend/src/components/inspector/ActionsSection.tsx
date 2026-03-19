@@ -1,56 +1,29 @@
 import {
   XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X,
 } from 'lucide-react';
+import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent } from '../../types';
+import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
 
-interface ReviewStatus {
-  issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
-  mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  verificationNotes?: string;
-  verificationCycleCount?: number;
-  verificationMaxCycles?: number;
-  reviewNotes?: string;
-  testNotes?: string;
-  updatedAt: string;
-  readyForMerge: boolean;
-  autoRequeueCount?: number;
-  history?: Array<{ type: 'review' | 'test' | 'merge'; status: string; timestamp: string; notes?: string }>;
-}
-
-interface WorkspaceInfo {
-  exists: boolean;
-  pendingOperation?: {
-    type: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    error?: string;
-  } | null;
-}
-
-interface MutationState<TData = unknown> {
-  isPending: boolean;
-  isSuccess?: boolean;
-  isError?: boolean;
-  error?: Error | null;
-  data?: TData;
-}
+// Convenience alias — most mutations use void variables and unknown data
+type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
+type ReopenMutation = UseMutationResult<unknown, Error, string | undefined, unknown>;
+type SyncMutation = UseMutationResult<{ alreadyUpToDate?: boolean; commitCount?: number }, Error, void, unknown>;
 
 interface ActionsSectionProps {
   agent?: Agent;
   reviewStatus?: ReviewStatus;
   workspace?: WorkspaceInfo;
-  mergeMutation: MutationState;
-  reviewMutation: MutationState;
-  killMutation: MutationState;
-  closeMutation: MutationState;
-  reopenMutation: MutationState;
-  resetReviewMutation: MutationState;
-  startAgentMutation: MutationState;
-  createWorkspaceMutation: MutationState;
-  syncMainMutation: MutationState<{ alreadyUpToDate?: boolean; commitCount?: number }>;
+  mergeMutation: AnyMutation;
+  reviewMutation: AnyMutation;
+  killMutation: AnyMutation;
+  closeMutation: AnyMutation;
+  reopenMutation: ReopenMutation;
+  resetReviewMutation: AnyMutation;
+  startAgentMutation: AnyMutation;
+  createWorkspaceMutation: AnyMutation;
+  syncMainMutation: SyncMutation;
   onMerge: () => void;
   onReview: () => void;
   onKill: () => void;
@@ -136,8 +109,7 @@ export function ActionsSection({
           data-testid="review-test-btn"
           onClick={onReview}
           disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
-          className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-blue-400 hover:bg-blue-900/20"
-          style={{ backgroundColor: 'rgba(59,130,246,0.15)' }}
+          className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-blue-400 bg-blue-900/20 hover:bg-blue-900/30"
         >
           {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
             <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -149,8 +121,7 @@ export function ActionsSection({
           <button
             onClick={onKill}
             disabled={killMutation.isPending}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 rounded hover:bg-red-900/20"
-            style={{ backgroundColor: 'rgba(239,68,68,0.15)' }}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 rounded bg-red-900/20 hover:bg-red-900/30"
           >
             <Square className="w-3 h-3" />Stop
           </button>
@@ -160,8 +131,7 @@ export function ActionsSection({
         <button
           onClick={onClose}
           disabled={closeMutation.isPending}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-orange-400 rounded hover:bg-orange-900/20 disabled:opacity-50"
-          style={{ backgroundColor: 'rgba(249,115,22,0.15)' }}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-orange-400 rounded bg-orange-900/20 hover:bg-orange-900/30 disabled:opacity-50"
         >
           {closeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
           Close
