@@ -39,8 +39,8 @@ interface TrackerStatus {
 }
 
 const TAB_PATHS: Record<Tab, string> = {
-  'mission-control': '/',
-  kanban: '/kanban',
+  kanban: '/',
+  'mission-control': '/mission-control',
   agents: '/agents',
   resources: '/resources',
   convoys: '/convoys',
@@ -60,7 +60,7 @@ const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
 
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
-  return PATH_TO_TAB[path] || 'mission-control';
+  return PATH_TO_TAB[path] || 'kanban';
 }
 
 async function fetchAgents(): Promise<Agent[]> {

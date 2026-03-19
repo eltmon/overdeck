@@ -12177,26 +12177,14 @@ app.get('/api/costs/summary', (_req, res) => {
   }
 });
 
-// GET /api/costs/by-issue - Costs grouped by issue (from event-sourced cache)
+// GET /api/costs/by-issue - Costs grouped by issue (SQLite-backed, PAN-335 fix)
 app.get('/api/costs/by-issue', async (_req, res) => {
   try {
-    // Check if migration is needed and run it
-    if (needsMigration()) {
-      console.log('Running cost migration on first request...');
-      const stats = migrateIfNeeded();
-      if (stats) {
-        console.log(`Migration complete: ${stats.eventsCreated} events created, ${stats.errors.length} errors`);
-      }
-    }
+    // Read directly from SQLite — the authoritative cost store
+    const dbIssues = getCostsByIssueFromDb();
 
-    // Sync cache with latest events (fast incremental update)
-    const cache = syncCache();
-
-    // Get cache status
-    const cacheStatus = getCacheStatus();
-
-    // Convert cache data to API response format
-    const issues = Object.entries(cache.issues).map(([issueId, data]) => ({
+    // Convert to API response format
+    const issues = Object.entries(dbIssues).map(([issueId, data]) => ({
       issueId,
       totalCost: data.totalCost,
       tokenCount: data.inputTokens + data.outputTokens + data.cacheReadTokens + data.cacheWriteTokens,
@@ -12204,24 +12192,21 @@ app.get('/api/costs/by-issue', async (_req, res) => {
       outputTokens: data.outputTokens,
       cacheReadTokens: data.cacheReadTokens,
       cacheWriteTokens: data.cacheWriteTokens,
-      // Legacy fields (keep for backward compatibility)
+      // Per-model breakdown
       models: data.models,
-      providers: data.providers,
-      // New per-model breakdown (PAN-105)
       byModel: Object.fromEntries(
         Object.entries(data.models).map(([model, stats]) => [
           model,
           { cost: stats.cost, tokens: stats.tokens }
         ])
       ),
-      // New per-stage breakdown (PAN-105)
+      // Per-stage breakdown
       byStage: Object.fromEntries(
         Object.entries(data.stages || {}).map(([stage, stats]) => [
           stage,
           { cost: stats.cost, tokens: stats.tokens }
         ])
       ),
-      budget: data.budget,
       budgetWarning: data.budgetWarning,
       lastUpdated: data.lastUpdated,
     }));
@@ -12230,9 +12215,8 @@ app.get('/api/costs/by-issue', async (_req, res) => {
     issues.sort((a, b) => b.totalCost - a.totalCost);
 
     res.json({
-      status: cacheStatus.status,
-      lastEventTs: cacheStatus.lastEventTs,
-      eventCount: cacheStatus.eventCount,
+      status: 'live',
+      eventCount: issues.length,
       issues,
     });
   } catch (error: any) {

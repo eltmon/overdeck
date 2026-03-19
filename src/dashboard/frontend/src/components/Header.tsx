@@ -5,8 +5,8 @@ import { useTheme } from '../hooks/useTheme';
 export type Tab = 'mission-control' | 'kanban' | 'agents' | 'resources' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings' | 'god-view';
 
 const NAV_ITEMS = [
-  { id: 'mission-control' as Tab, label: 'Mission Control', icon: Compass },
   { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
+  { id: 'mission-control' as Tab, label: 'Mission Control', icon: Compass },
   { id: 'agents' as Tab, label: 'Agents', icon: Users },
   { id: 'resources' as Tab, label: 'Resources', icon: Server },
   { id: 'convoys' as Tab, label: 'Convoys', icon: Users },
@@ -36,9 +36,9 @@ export function Header({ activeTab, onTabChange, onSearchOpen }: HeaderProps) {
     >
       {/* Logo + Title */}
       <button
-        onClick={() => onTabChange('mission-control')}
+        onClick={() => onTabChange('kanban')}
         className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
-        title="Go to Mission Control"
+        title="Go to Board"
       >
         <Eye className="w-5 h-5" style={{ color: '#2769ec' }} />
         <span

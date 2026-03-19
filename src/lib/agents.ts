@@ -827,6 +827,8 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         PANOPTICON_AGENT_ID: normalizedId,
+        PANOPTICON_ISSUE_ID: agentState.issueId || '',
+        PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
       }
@@ -934,6 +936,8 @@ export function recoverAgent(agentId: string): AgentState | null {
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
+      PANOPTICON_ISSUE_ID: state.issueId || '',
+      PANOPTICON_SESSION_TYPE: state.phase || 'implementation',
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       ...providerEnv
     }

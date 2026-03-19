@@ -126,6 +126,18 @@ function formatCost(cost: number): string {
 }
 
 // Get cost badge color based on amount
+function getLabelStyle(label: string): string {
+  const l = label.toLowerCase();
+  if (l === 'bug') return 'bg-red-900/40 text-red-400 border border-red-500/30';
+  if (l === 'security') return 'bg-red-900/40 text-red-300 border border-red-500/30';
+  if (l === 'enhancement') return 'bg-blue-900/40 text-blue-400 border border-blue-500/30';
+  if (l === 'improvement') return 'bg-cyan-900/40 text-cyan-400 border border-cyan-500/30';
+  if (l === 'planning' || l === 'in-planning') return 'bg-purple-900/40 text-purple-400 border border-purple-500/30';
+  if (l === 'in-progress') return 'bg-blue-900/40 text-blue-400 border border-blue-500/30';
+  if (l === 'in-review') return 'bg-amber-900/40 text-amber-400 border border-amber-500/30';
+  return 'bg-gray-800/60 text-gray-400 border border-gray-600/30';
+}
+
 function getCostColor(cost: number): string {
   if (cost >= 50) return 'bg-red-900/50 text-red-400';
   if (cost >= 20) return 'bg-orange-900/50 text-orange-400';
@@ -2118,7 +2130,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
               return difficulty ? <DifficultyBadge level={difficulty} /> : null;
             })()}
             {/* Merged badge — prominent indicator for verified merges on Done cards */}
-            {issue.mergeStatus === 'merged' && (
+            {(issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged')) && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-green-900/60 text-green-300 border border-green-500/40 uppercase tracking-wide"
                 title="Branch verified merged into main"
@@ -2160,14 +2172,13 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
           </span>
         )}
         {(issue.labels || [])
-          .filter((label) => typeof label === 'string' && label.toLowerCase() !== 'review ready' && label.toLowerCase() !== 'needs-close-out') // Hide badges shown separately
+          .filter((label) => typeof label === 'string' && !['review ready', 'needs-close-out', 'merged', 'closed-out'].includes(label.toLowerCase()))
           .slice(0, 2)
           .map((label) => (
             <span
               key={label}
-              className="inline-flex items-center gap-1 text-xs bg-surface-emphasis text-content-body px-2 py-0.5 rounded"
+              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${getLabelStyle(label)}`}
             >
-              <Tag className="w-3 h-3" />
               {label}
             </span>
           ))}
