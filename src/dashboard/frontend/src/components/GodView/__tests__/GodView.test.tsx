@@ -7,7 +7,7 @@
  * - Activity feed aggregation logic
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 // ─── useGodViewStore ──────────────────────────────────────────────────────────
 

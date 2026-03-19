@@ -1,5 +1,6 @@
+import * as React from 'react';
 import { motion } from 'framer-motion';
-import { X, Clock, Cpu, GitBranch } from 'lucide-react';
+import { X } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
 import { BeadsKanban } from './BeadsKanban';
 import { FileActivityTree } from './FileActivityTree';
@@ -45,7 +46,7 @@ export function AgentFocusView({ agent, onClose }: FocusViewProps) {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(10, 14, 26, 0.85)', backdropFilter: 'blur(8px)' }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={(e: React.MouseEvent) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
