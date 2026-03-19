@@ -307,6 +307,30 @@ export async function postMergeLifecycle(issueId: string, projectPath: string): 
     console.warn(`[merge-agent] Beads compaction failed: ${err}`);
   }
 
+  // 5. Kill work agent tmux session to free resources (non-fatal)
+  // Stopped agents with live tmux sessions leak memory (Claude + MCP processes stay resident)
+  try {
+    const { getAgentState, saveAgentState } = await import('../agents.js');
+    const { killSession, sessionExists } = await import('../tmux.js');
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    const agentState = getAgentState(agentId);
+    if (agentState && sessionExists(agentId)) {
+      killSession(agentId);
+      agentState.status = 'stopped';
+      saveAgentState(agentState);
+      console.log(`[merge-agent] ✓ Killed work agent session ${agentId} to free resources`);
+      logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
+    }
+    // Also kill planning agent if it exists
+    const planningId = `planning-${issueId.toLowerCase()}`;
+    if (sessionExists(planningId)) {
+      killSession(planningId);
+      console.log(`[merge-agent] ✓ Killed planning agent session ${planningId}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not kill agent sessions: ${err}`);
+  }
+
   // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
   _completedPostMerge.add(issueId);
 
