@@ -223,18 +223,36 @@ export class LinearTracker implements IssueTracker {
     }
 
     const states = await team.states();
-    const targetStateType = this.reverseMapState(state);
 
-    // Find a state matching the target type.
-    // Multiple states can share the same type (e.g., "In Planning", "In Progress", "In Review"
-    // are all type "started"). Prefer the one with the lowest position (most basic/default state
-    // for that type), which matches Linear's convention.
-    const matchingStates = states.nodes
-      .filter((s: any) => s.type === targetStateType)
-      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
-    const targetState = matchingStates[0];
-    if (!targetState) {
-      throw new Error(`No state found matching type: ${targetStateType}`);
+    let targetState: any;
+    if (state === 'in_review') {
+      // Find a state named "In Review" (case-insensitive) — more precise than matching by type,
+      // since "In Progress" and "In Review" are both type "started" in Linear.
+      targetState = states.nodes.find((s: any) => s.name.toLowerCase() === 'in review');
+      if (!targetState) {
+        // Fall back to lowest-position "started" state if no "In Review" state exists
+        const startedStates = states.nodes
+          .filter((s: any) => s.type === 'started')
+          .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+        targetState = startedStates[0];
+        if (!targetState) {
+          throw new Error('No "In Review" or "started" state found in Linear');
+        }
+      }
+    } else {
+      const targetStateType = this.reverseMapState(state);
+
+      // Find a state matching the target type.
+      // Multiple states can share the same type (e.g., "In Planning", "In Progress", "In Review"
+      // are all type "started"). Prefer the one with the lowest position (most basic/default state
+      // for that type), which matches Linear's convention.
+      const matchingStates = states.nodes
+        .filter((s: any) => s.type === targetStateType)
+        .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+      targetState = matchingStates[0];
+      if (!targetState) {
+        throw new Error(`No state found matching type: ${targetStateType}`);
+      }
     }
 
     await this.client.updateIssue(linearIssue.id, {
