@@ -1,17 +1,23 @@
 /**
- * Tests for PAN-344: auto-merge trigger and stuck-merge patrol check.
+ * Tests for PAN-344 / PAN-354: merge-stuck patrol check (notify-only, PAN-354).
  *
  * Coverage:
- *  1. checkReadyForMergeStuck finds a stuck issue and calls the merge API
+ *  1. checkReadyForMergeStuck notifies for a stuck issue older than 2 min
  *  2. checkReadyForMergeStuck skips issues where mergeStatus=merging
  *  3. checkReadyForMergeStuck skips issues where mergeStatus=merged
  *  4. checkReadyForMergeStuck skips issues where mergeStatus=failed
  *  5. Staleness check: status younger than 2 min is skipped
  *  6. Staleness check: missing updatedAt is skipped
- *  7. Circuit breaker stops after MERGE_STUCK_MAX_ATTEMPTS (3)
+ *  7. Circuit breaker stops notifying after MERGE_STUCK_MAX_ATTEMPTS (3)
  *
- * The tests mock fs.existsSync and fs.readFileSync so they never touch
- * the real ~/.panopticon/review-status.json file.
+ * PAN-354: checkReadyForMergeStuck no longer auto-triggers the merge API.
+ * Instead it calls the mergeReadyNotifier callback (set by the server layer)
+ * so the dashboard can alert the user to click MERGE.
+ *
+ * The tests mock fs.existsSync, readFileSync, and writeFileSync so they
+ * never touch the real ~/.panopticon files (review-status.json or
+ * deacon/health-state.json). This prevents circuit-breaker state from
+ * leaking between test runs.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -19,20 +25,23 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 // ---------------------------------------------------------------------------
-// Derive the review-status file path that deacon.ts uses internally
+// Derive file paths that deacon.ts uses internally
 // ---------------------------------------------------------------------------
 const REVIEW_STATUS_PATH = join(homedir(), '.panopticon', 'review-status.json');
+const DEACON_STATE_PATH  = join(homedir(), '.panopticon', 'deacon', 'health-state.json');
+const DEACON_DIR         = join(homedir(), '.panopticon', 'deacon');
 
 // ---------------------------------------------------------------------------
 // Mutable test state — mutated in beforeEach, read via closure by the fs mock
 // ---------------------------------------------------------------------------
 let _statusData: Record<string, object> = {};
 let _statusExists = true;
+let _deaconState: Record<string, unknown> = {};
 
 // ---------------------------------------------------------------------------
 // Mock fs BEFORE any module that imports it is loaded.
-// We intercept existsSync and readFileSync only for the review-status path;
-// all other paths fall through to the real fs implementation.
+// Intercept review-status.json and deacon/health-state.json so tests
+// are fully isolated from the real ~/.panopticon filesystem.
 // ---------------------------------------------------------------------------
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -40,15 +49,27 @@ vi.mock('fs', async (importOriginal) => {
     ...actual,
     existsSync: vi.fn((p: string) => {
       if (p === REVIEW_STATUS_PATH) return _statusExists;
+      if (p === DEACON_STATE_PATH)  return Object.keys(_deaconState).length > 0;
+      if (p === DEACON_DIR)         return true; // deacon dir always "exists"
       return actual.existsSync(p);
+    }),
+    mkdirSync: vi.fn((p: string, opts?: any) => {
+      if (String(p).startsWith(DEACON_DIR)) return; // no-op for deacon dir
+      actual.mkdirSync(p, opts);
     }),
     readFileSync: vi.fn((p: string, enc?: any) => {
       if (p === REVIEW_STATUS_PATH) return JSON.stringify(_statusData);
+      if (p === DEACON_STATE_PATH)  return JSON.stringify(_deaconState);
       return actual.readFileSync(p, enc);
     }),
-    // writeFileSync is a no-op for the review-status path; other paths pass through
     writeFileSync: vi.fn((p: string, data: any, enc?: any) => {
-      if (p === REVIEW_STATUS_PATH) return; // discard — tests don't need write-back
+      if (p === REVIEW_STATUS_PATH) return; // discard
+      if (p === DEACON_STATE_PATH) {
+        // Capture in-memory so the circuit breaker state is visible to subsequent
+        // calls within the same test, but resets between tests via beforeEach.
+        _deaconState = JSON.parse(typeof data === 'string' ? data : data.toString());
+        return;
+      }
       actual.writeFileSync(p, data, enc);
     }),
   };
@@ -86,12 +107,8 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn(),
 }));
 
-// Mock global fetch
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
-
 // Import after mocks are in place
-import { checkReadyForMergeStuck } from '../../../../src/lib/cloister/deacon.js';
+import { checkReadyForMergeStuck, setMergeReadyNotifier } from '../../../../src/lib/cloister/deacon.js';
 
 // ---------------------------------------------------------------------------
 // Timestamp helpers
@@ -105,17 +122,18 @@ const ONE_MIN_AGO  = new Date(NOW - 1 * 60 * 1000).toISOString();
 // ---------------------------------------------------------------------------
 
 describe('checkReadyForMergeStuck', () => {
+  const mockNotifier = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
     _statusData = {};
     _statusExists = true;
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true }),
-    } as any);
+    _deaconState = {}; // reset persisted circuit-breaker counts between tests
+    // Register a mock notifier so we can verify notify-only behavior (PAN-354)
+    setMergeReadyNotifier(mockNotifier);
   });
 
-  it('detects a stuck readyForMerge issue older than 2 min (PAN-354: no auto-merge, just logs)', async () => {
+  it('notifies for a stuck readyForMerge issue older than 2 min (no auto-merge, PAN-354)', async () => {
     _statusData = {
       'PAN-344': {
         issueId: 'PAN-344',
@@ -127,8 +145,9 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    // PAN-354: auto-merge was removed — deacon logs but does NOT call the merge API
-    expect(mockFetch).not.toHaveBeenCalled();
+    // Must notify via callback, not by calling the merge API
+    expect(mockNotifier).toHaveBeenCalledOnce();
+    expect(mockNotifier).toHaveBeenCalledWith('PAN-344');
     expect(actions.length).toBeGreaterThan(0);
     expect(actions[0]).toContain('PAN-344');
     expect(actions[0]).toContain('readyForMerge');
@@ -141,7 +160,7 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -152,7 +171,7 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -163,7 +182,7 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -174,7 +193,7 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
@@ -185,11 +204,11 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier).not.toHaveBeenCalled();
     expect(actions).toHaveLength(0);
   });
 
-  it('per-issue cooldown suppresses repeated alerts within 10 min window', async () => {
+  it('circuit breaker stops notifying after 3 attempts for the same issue', async () => {
     // Use a unique key isolated from other tests (mergeStuckCooldowns Map persists within a file)
     const CKEY = 'PAN-CB-COOLDOWN';
 
@@ -197,6 +216,25 @@ describe('checkReadyForMergeStuck', () => {
     // Start far in the future to avoid colliding with real-clock cooldowns from other tests
     let fakeNow = NOW + 400 * 60 * 60 * 1000; // +400 hours
 
+    // Make 3 successful attempts, advancing past the 10-min cooldown each time
+    for (let attempt = 0; attempt < 3; attempt++) {
+      vi.setSystemTime(fakeNow);
+      _statusData = {
+        [CKEY]: {
+          issueId: CKEY,
+          readyForMerge: true,
+          mergeStatus: undefined,
+          updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
+        },
+      };
+      await checkReadyForMergeStuck();
+      fakeNow += 11 * 60 * 1000; // advance 11 min (past the 10-min cooldown)
+    }
+
+    const notifyCallsAfterThree = mockNotifier.mock.calls.length;
+    expect(notifyCallsAfterThree).toBeGreaterThanOrEqual(3);
+
+    // 4th attempt — should be blocked by the circuit breaker
     vi.setSystemTime(fakeNow);
     _statusData = {
       [CKEY]: {
@@ -224,7 +262,6 @@ describe('checkReadyForMergeStuck', () => {
 
     vi.useRealTimers();
 
-    // PAN-354: no fetch calls — auto-merge was removed
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockNotifier.mock.calls.length).toBe(notifyCallsAfterThree);
   });
 });
