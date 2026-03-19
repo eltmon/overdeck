@@ -1572,11 +1572,11 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string, issueLab
         // Match against prefix or uppercase repo name
         const repoPrefix = prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '');
         if (repoPrefix.toUpperCase() === issuePrefix.toUpperCase()) {
-          // GitHub repos - look in ~/projects/{repo}/ or ~/projects/{owner}/{repo}/
+          // GitHub repos - look in ~/Projects/{repo}/ (case-sensitive on Linux — PAN-358)
           const possiblePaths = [
-            join(homedir(), 'projects', repo),
-            join(homedir(), 'projects', repo.replace(/-cli$/, '')),
-            join(homedir(), 'projects', owner, repo),
+            join(homedir(), 'Projects', repo),
+            join(homedir(), 'Projects', repo.replace(/-cli$/, '')),
+            join(homedir(), 'Projects', owner, repo),
           ];
           for (const path of possiblePaths) {
             if (existsSync(path)) {
@@ -6254,11 +6254,12 @@ app.post('/api/workspaces/:issueId/containers/:containerName/:action', async (re
     return res.status(400).json({ error: 'Invalid action. Must be start, stop, or restart.' });
   }
 
-  // Find workspace and compose file
-  const projectPaths = [
-    join(homedir(), 'projects/myn/workspaces', `feature-${issueId.toLowerCase()}`),
-    join(homedir(), 'projects/panopticon/workspaces', `feature-${issueId.toLowerCase()}`),
-  ];
+  // Find workspace from projects.yaml (never hardcode paths — PAN-358)
+  const teamPrefix = extractTeamPrefix(issueId);
+  const containerProjectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const projectPaths = containerProjectConfig
+    ? [join(containerProjectConfig.path, 'workspaces', `feature-${issueId.toLowerCase()}`)]
+    : listProjects().map(p => join(p.path, 'workspaces', `feature-${issueId.toLowerCase()}`));
 
   let workspacePath: string | null = null;
   let composeFile: string | null = null;
@@ -9888,32 +9889,18 @@ app.post('/api/planning/:issueId/message', async (req, res) => {
     let planningDir = '';
     let workspacePath = '';
 
-    // Determine project path
+    // Determine project path from projects.yaml (never hardcode paths — PAN-358)
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
     } else {
-      // Linear issue - check common paths
-      const possiblePaths = [
-        join(homedir(), 'projects', 'panopticon'),
-        join(homedir(), 'projects', 'myn'),
-      ];
-      for (const p of possiblePaths) {
-        // Check workspace first
-        if (existsSync(join(p, 'workspaces', `feature-${issueLower}`, '.planning'))) {
-          projectPath = p;
-          break;
-        }
-        // Then legacy
-        if (existsSync(join(p, '.planning', issueLower))) {
-          projectPath = p;
-          break;
-        }
-      }
+      const teamPrefix = extractTeamPrefix(issueId);
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+      projectPath = projectConfig?.path || '';
     }
 
     if (!projectPath) {
-      return res.status(404).json({ error: 'Could not find project path' });
+      return res.status(404).json({ error: `Could not find project path for ${issueId}. Check projects.yaml.` });
     }
 
     // Check workspace planning first (git-backed)
@@ -10101,7 +10088,8 @@ Continue the PLANNING session. Do NOT implement anything.
     writeFileSync(continuationPromptPath, continuationPrompt);
 
     // Determine working directory
-    const agentCwd = existsSync(workspacePath) ? workspacePath : projectPath;
+    // Always use workspace path — never fall back to project root (PAN-358)
+    const agentCwd = workspacePath;
 
     // Backup old output for the new session
     if (existsSync(outputFile)) {
@@ -10570,28 +10558,14 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
     let projectPath = '';
     let planningDir = '';
 
-    // Determine project path
+    // Determine project path from projects.yaml (never hardcode paths — PAN-358)
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
     } else {
-      // Linear issue - check common paths
-      const possiblePaths = [
-        join(homedir(), 'projects', 'panopticon'),
-        join(homedir(), 'projects', 'myn'),
-      ];
-      for (const p of possiblePaths) {
-        // Check workspace first
-        if (existsSync(join(p, 'workspaces', `feature-${issueLower}`, '.planning'))) {
-          projectPath = p;
-          break;
-        }
-        // Then legacy
-        if (existsSync(join(p, '.planning', issueLower))) {
-          projectPath = p;
-          break;
-        }
-      }
+      const teamPrefix = extractTeamPrefix(id);
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+      projectPath = projectConfig?.path || '';
     }
 
     // For remote planning, sync beads from remote VM first
