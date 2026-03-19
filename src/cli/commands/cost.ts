@@ -112,8 +112,8 @@ export function createCostCommand(): Command {
             }
           }
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -151,8 +151,8 @@ export function createCostCommand(): Command {
             console.log(`  ${issue}: ${formatCost(cost)}`);
           }
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -198,8 +198,8 @@ export function createCostCommand(): Command {
             console.log(`  ${issue}: ${formatCost(cost)}`);
           }
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -221,8 +221,8 @@ export function createCostCommand(): Command {
 
         const report = generateReport(start, end);
         console.log(report);
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -256,8 +256,8 @@ export function createCostCommand(): Command {
             console.log(`  ${model}: ${formatCost(cost)}`);
           }
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -291,8 +291,8 @@ export function createCostCommand(): Command {
         console.log(`  Type: ${newBudget.type}`);
         console.log(`  Limit: ${formatCost(newBudget.limit)}`);
         console.log(`  Alert at: ${(newBudget.alertThreshold * 100).toFixed(0)}%`);
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -332,8 +332,8 @@ export function createCostCommand(): Command {
           console.log(`  Remaining: ${formatCost(status.remaining)}`);
           console.log();
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -371,8 +371,8 @@ export function createCostCommand(): Command {
         console.log(`Spent: ${statusColor(formatCost(b.spent))} (${statusColor(percentStr)})`);
         console.log(`Remaining: ${formatCost(status.remaining)}`);
         console.log(`Alert Threshold: ${(b.alertThreshold * 100).toFixed(0)}%`);
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
@@ -391,8 +391,8 @@ export function createCostCommand(): Command {
           console.log(chalk.red('Budget not found:'), id);
           process.exit(1);
         }
-      } catch (error: any) {
-        console.error(chalk.red('Error:'), error.message);
+      } catch (error: unknown) {
+        console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
     });
