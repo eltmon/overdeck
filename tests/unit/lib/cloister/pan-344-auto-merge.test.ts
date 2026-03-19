@@ -14,8 +14,10 @@
  * Instead it calls the mergeReadyNotifier callback (set by the server layer)
  * so the dashboard can alert the user to click MERGE.
  *
- * The tests mock fs.existsSync and fs.readFileSync so they never touch
- * the real ~/.panopticon/review-status.json file.
+ * The tests mock fs.existsSync, readFileSync, and writeFileSync so they
+ * never touch the real ~/.panopticon files (review-status.json or
+ * deacon/health-state.json). This prevents circuit-breaker state from
+ * leaking between test runs.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -23,20 +25,23 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 // ---------------------------------------------------------------------------
-// Derive the review-status file path that deacon.ts uses internally
+// Derive file paths that deacon.ts uses internally
 // ---------------------------------------------------------------------------
 const REVIEW_STATUS_PATH = join(homedir(), '.panopticon', 'review-status.json');
+const DEACON_STATE_PATH  = join(homedir(), '.panopticon', 'deacon', 'health-state.json');
+const DEACON_DIR         = join(homedir(), '.panopticon', 'deacon');
 
 // ---------------------------------------------------------------------------
 // Mutable test state — mutated in beforeEach, read via closure by the fs mock
 // ---------------------------------------------------------------------------
 let _statusData: Record<string, object> = {};
 let _statusExists = true;
+let _deaconState: Record<string, unknown> = {};
 
 // ---------------------------------------------------------------------------
 // Mock fs BEFORE any module that imports it is loaded.
-// We intercept existsSync and readFileSync only for the review-status path;
-// all other paths fall through to the real fs implementation.
+// Intercept review-status.json and deacon/health-state.json so tests
+// are fully isolated from the real ~/.panopticon filesystem.
 // ---------------------------------------------------------------------------
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -44,15 +49,27 @@ vi.mock('fs', async (importOriginal) => {
     ...actual,
     existsSync: vi.fn((p: string) => {
       if (p === REVIEW_STATUS_PATH) return _statusExists;
+      if (p === DEACON_STATE_PATH)  return Object.keys(_deaconState).length > 0;
+      if (p === DEACON_DIR)         return true; // deacon dir always "exists"
       return actual.existsSync(p);
+    }),
+    mkdirSync: vi.fn((p: string, opts?: any) => {
+      if (String(p).startsWith(DEACON_DIR)) return; // no-op for deacon dir
+      actual.mkdirSync(p, opts);
     }),
     readFileSync: vi.fn((p: string, enc?: any) => {
       if (p === REVIEW_STATUS_PATH) return JSON.stringify(_statusData);
+      if (p === DEACON_STATE_PATH)  return JSON.stringify(_deaconState);
       return actual.readFileSync(p, enc);
     }),
-    // writeFileSync is a no-op for the review-status path; other paths pass through
     writeFileSync: vi.fn((p: string, data: any, enc?: any) => {
-      if (p === REVIEW_STATUS_PATH) return; // discard — tests don't need write-back
+      if (p === REVIEW_STATUS_PATH) return; // discard
+      if (p === DEACON_STATE_PATH) {
+        // Capture in-memory so the circuit breaker state is visible to subsequent
+        // calls within the same test, but resets between tests via beforeEach.
+        _deaconState = JSON.parse(typeof data === 'string' ? data : data.toString());
+        return;
+      }
       actual.writeFileSync(p, data, enc);
     }),
   };
@@ -111,6 +128,7 @@ describe('checkReadyForMergeStuck', () => {
     vi.clearAllMocks();
     _statusData = {};
     _statusExists = true;
+    _deaconState = {}; // reset persisted circuit-breaker counts between tests
     // Register a mock notifier so we can verify notify-only behavior (PAN-354)
     setMergeReadyNotifier(mockNotifier);
   });
