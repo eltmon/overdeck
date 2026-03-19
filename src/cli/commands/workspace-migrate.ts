@@ -1,7 +1,7 @@
 /**
  * Workspace Migration Command
  *
- * Migrates workspaces between local and remote (exe.dev) environments.
+ * Migrates workspaces between local and remote (Fly.io) environments.
  *
  * Usage:
  *   pan workspace migrate <issue-id> --to-remote   # Local -> Remote
@@ -28,11 +28,11 @@ import {
   deleteWorkspaceMetadata,
 } from '../../lib/remote/workspace-metadata.js';
 import {
-  createExeProvider,
+  createFlyProviderFromConfig,
 } from '../../lib/remote/index.js';
 import { createWorkspace, removeWorkspace } from '../../lib/workspace-manager.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
-import type { ExeProvider } from '../../lib/remote/exe-provider.js';
+import type { RemoteProvider } from '../../lib/remote/interface.js';
 
 const execAsync = promisify(exec);
 
@@ -151,7 +151,7 @@ async function pushLocalBranches(
  * Clone repositories on remote VM
  */
 async function cloneReposOnVm(
-  provider: ExeProvider,
+  provider: RemoteProvider,
   vmName: string,
   localPath: string,
   issueId: string,
@@ -238,56 +238,6 @@ async function cloneReposOnVm(
 }
 
 /**
- * Configure Vite for remote hosting by adding .exe.xyz to allowedHosts
- * This allows the Vite dev/preview server to accept requests from exe.dev domains
- */
-async function configureViteForRemote(
-  provider: ExeProvider,
-  vmName: string
-): Promise<boolean> {
-  try {
-    // Find vite config files in workspace
-    const findResult = await provider.ssh(vmName,
-      "find ~/workspace -maxdepth 3 -name 'vite.config.*' -type f 2>/dev/null | head -5"
-    );
-
-    if (findResult.exitCode !== 0 || !findResult.stdout.trim()) {
-      return false; // No vite config found
-    }
-
-    const configFiles = findResult.stdout.trim().split('\n').filter(Boolean);
-    let configured = false;
-
-    for (const configFile of configFiles) {
-      // Check if file has allowedHosts that doesn't already include .exe.xyz
-      const grepResult = await provider.ssh(vmName,
-        `grep -l "allowedHosts.*\\[" "${configFile}" 2>/dev/null`
-      );
-
-      if (grepResult.exitCode === 0 && grepResult.stdout.trim()) {
-        // Check if .exe.xyz is already in the list
-        const hasExeXyz = await provider.ssh(vmName,
-          `grep -l "\\.exe\\.xyz" "${configFile}" 2>/dev/null`
-        );
-
-        if (hasExeXyz.exitCode !== 0) {
-          // Add .exe.xyz to allowedHosts array
-          // This sed command finds allowedHosts: [...] and adds '.exe.xyz' before the closing bracket
-          await provider.ssh(vmName,
-            `sed -i "s/\\(allowedHosts:\\s*\\[[^]]*\\)\\]/\\1, '.exe.xyz']/" "${configFile}"`
-          );
-          configured = true;
-        }
-      }
-    }
-
-    return configured;
-  } catch {
-    return false; // Non-fatal - continue with migration
-  }
-}
-
-/**
  * Convert HTTPS URL to SSH URL
  */
 function convertToSshUrl(url: string): string {
@@ -307,7 +257,7 @@ function convertToSshUrl(url: string): string {
  * Copy planning state (.planning/ and beads) to remote VM
  */
 async function copyPlanningStateToRemote(
-  provider: ExeProvider,
+  provider: RemoteProvider,
   vmName: string,
   localPath: string,
   issueId: string,
@@ -403,7 +353,7 @@ PLANEOF`);
  * Copy planning state (.planning/ and beads) from remote VM to local
  */
 async function copyPlanningStateFromRemote(
-  provider: ExeProvider,
+  provider: RemoteProvider,
   vmName: string,
   localPath: string,
   issueId: string,
@@ -482,7 +432,7 @@ async function copyPlanningStateFromRemote(
 }
 
 /**
- * Migrate local workspace to remote (exe.dev)
+ * Migrate local workspace to remote (Fly.io)
  */
 export async function migrateLocalToRemote(
   issueId: string,
@@ -524,17 +474,15 @@ export async function migrateLocalToRemote(
       return result;
     }
 
-    const provider = createExeProvider({
-      infraVm: config.remote.exe?.infra_vm,
-    });
+    const provider = createFlyProviderFromConfig(config.remote);
 
     const isAuth = await provider.isAuthenticated();
     if (!isAuth) {
-      spinner.fail('Not authenticated with exe.dev');
-      result.errors.push('Not authenticated with exe.dev. Run: ssh exe.dev');
+      spinner.fail('Not authenticated with Fly.io');
+      result.errors.push('Not authenticated with Fly.io. Run: flyctl auth login');
       return result;
     }
-    result.steps.push('Authenticated with exe.dev');
+    result.steps.push('Authenticated with Fly.io');
 
     // 4. Get project info for VM naming
     const resolved = resolveProjectFromIssue(issueId, []);
@@ -659,13 +607,6 @@ export async function migrateLocalToRemote(
       return result;
     }
 
-    // 11.5. Configure Vite for remote hosting (add .exe.xyz to allowedHosts)
-    spinner.text = 'Configuring Vite for remote hosting...';
-    const viteConfigured = await configureViteForRemote(provider, vmName);
-    if (viteConfigured) {
-      result.steps.push('Configured Vite allowedHosts for exe.xyz');
-    }
-
     // 11.55. Sync env files (if configured in project)
     const envFiles = (projectConfig?.workspace?.env as any)?.files;
     if (envFiles && envFiles.length > 0) {
@@ -681,20 +622,6 @@ export async function migrateLocalToRemote(
       } catch (error: any) {
         result.errors.push(`Warning: env file sync failed: ${error.message}`);
       }
-    }
-
-    // 11.6. Setup nginx reverse proxy (exe.dev only exposes one port)
-    spinner.text = 'Setting up nginx reverse proxy...';
-    try {
-      const nginxSuccess = await (provider as any).setupStandardWorkspaceProxy(vmName);
-      if (nginxSuccess) {
-        result.steps.push('Configured nginx reverse proxy on port 8080');
-        result.steps.push('Set exe.dev share to port 8080 (public)');
-      } else {
-        result.errors.push('Warning: nginx proxy setup failed - manual configuration may be needed');
-      }
-    } catch (error: any) {
-      result.errors.push(`Warning: nginx proxy setup failed: ${error.message}`);
     }
 
     // 11.7. Setup runtime environment (Phase 1: install Java/Node)
@@ -739,17 +666,15 @@ export async function migrateLocalToRemote(
     }
 
     // 13. Save workspace metadata
-    // Use the share URL (nginx proxies both frontend and API on one port)
     // Note: shareUrl already defined above in step 11.8
     const metadata: RemoteWorkspaceMetadata = {
       id: issueId.toLowerCase(),
       issue: issueId,
-      provider: 'exe',
+      provider: 'fly',
       vmName,
-      infraVm: config.remote.exe?.infra_vm,
       urls: {
         frontend: shareUrl,
-        api: shareUrl,  // API is at same URL, nginx routes /api/* to backend
+        api: shareUrl,
       },
       created: new Date(),
       location: 'remote',
@@ -781,7 +706,7 @@ export async function migrateLocalToRemote(
 
     spinner.succeed(`Migrated ${issueId} to remote`);
     result.success = true;
-    result.message = `Workspace migrated to ${vmName}.exe.xyz`;
+    result.message = `Workspace migrated to ${vmName}`;
 
   } catch (error: any) {
     spinner.fail('Migration failed');
@@ -827,16 +752,14 @@ export async function migrateRemoteToLocal(
 
     // 3. Get provider
     const config = loadConfig();
-    const provider = createExeProvider({
-      infraVm: config.remote?.exe?.infra_vm,
-    });
+    const provider = createFlyProviderFromConfig(config.remote);
 
     // 4. Verify VM is accessible
     spinner.text = 'Checking remote VM...';
     const vmStatus = await provider.getStatus(remoteMetadata.vmName);
     if (vmStatus === 'unknown') {
       spinner.fail('Remote VM not found');
-      result.errors.push(`VM ${remoteMetadata.vmName} not found on exe.dev`);
+      result.errors.push(`VM ${remoteMetadata.vmName} not found on Fly.io`);
       return result;
     }
     result.steps.push(`VM status: ${vmStatus}`);

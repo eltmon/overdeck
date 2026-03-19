@@ -1,10 +1,9 @@
 import express from 'express';
+import * as yaml from 'yaml';
 import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
-// ssh2 is loaded dynamically only when remote sessions are used
-let SSHClient: any = null;
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFileSync, existsSync, readdirSync, appendFileSync, writeFileSync, renameSync, unlinkSync, statSync, mkdirSync, rmSync, symlinkSync, chmodSync } from 'fs';
@@ -365,13 +364,14 @@ async function ensurePRExists(issueId: string): Promise<{ created: boolean; prUr
 
       // First ensure branch is pushed
       await execAsync(
-        `ssh -A ${workspaceInfo.vmName}.exe.xyz "cd /workspace && git push -u origin ${branchName} 2>&1 || true"`,
+        flyExecCmd(workspaceInfo.vmName, `cd /workspace && git push -u origin ${branchName} 2>&1 || true`),
         { encoding: 'utf-8' }
       );
 
       // Create PR from remote
+      const safeTitleForShell = issueTitle.replace(/'/g, "'\\''");
       const { stdout } = await execAsync(
-        `ssh -A ${workspaceInfo.vmName}.exe.xyz "cd /workspace && gh pr create --title '${issueTitle} (${issueId})' --body 'Closes #${issueId.replace(/^PAN-/i, '')}
+        flyExecCmd(workspaceInfo.vmName, `cd /workspace && gh pr create --title '${safeTitleForShell} (${issueId})' --body 'Closes #${issueId.replace(/^PAN-/i, '')}
 
 ## Summary
 Auto-created PR for ${issueId}
@@ -380,7 +380,7 @@ Auto-created PR for ${issueId}
 - [x] Review passed
 - [x] Tests passed
 
-🤖 Generated with Panopticon' --base main --head ${branchName} 2>&1"`,
+🤖 Generated with Panopticon' --base main --head ${branchName} 2>&1`),
         { encoding: 'utf-8' }
       );
       prUrl = stdout.trim();
@@ -2016,9 +2016,9 @@ app.get('/api/agents/:id/output', async (req, res) => {
 
     let stdout: string;
     if (isRemote && vmName) {
-      // Capture output from remote VM via SSH
+      // Capture output from remote VM via Fly.io
       const result = await execAsync(
-        `ssh -A ${vmName}.exe.xyz "tmux capture-pane -t '${id}' -p -S -${lines} 2>/dev/null || echo 'Session not found'"`,
+        flyExecCmd(vmName, `tmux capture-pane -t '${id}' -p -S -${lines} 2>/dev/null || echo 'Session not found'`),
         { maxBuffer: 10 * 1024 * 1024, timeout: 15000 }
       );
       stdout = result.stdout;
@@ -2094,11 +2094,11 @@ app.post('/api/agents/:id/message', async (req, res) => {
     }
 
     if (isRemote && vmName) {
-      // Send message to remote agent via SSH
+      // Send message to remote agent via Fly.io
       // Use -l for literal text to avoid key interpretation issues
       const escapedMessage = message.replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/"/g, '\\"');
       await execAsync(
-        `ssh -A ${vmName}.exe.xyz "tmux send-keys -t '${id}' -l '${escapedMessage}' && tmux send-keys -t '${id}' Enter"`,
+        flyExecCmd(vmName, `tmux send-keys -t '${id}' -l '${escapedMessage}' && tmux send-keys -t '${id}' Enter`),
         { timeout: 15000 }
       );
       res.json({ success: true, remote: true });
@@ -5379,7 +5379,7 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
       agentId: workspaceInfo.agentId,
       path: `${workspaceInfo.vmName}:${workspaceInfo.remotePath}`,
       location: 'remote',
-      message: `Workspace is on remote VM: ${workspaceInfo.vmName}.exe.xyz`,
+      message: `Workspace is on remote Fly machine: ${workspaceInfo.vmName}`,
     });
   }
 
@@ -7136,12 +7136,12 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     // 2. Push the feature branch to remote first
     try {
       if (workspaceInfo.isRemote && workspaceInfo.vmName) {
-        // Push from remote VM via SSH
+        // Push from remote VM via Fly.io
         await execAsync(
-          `ssh -A ${workspaceInfo.vmName}.exe.xyz "cd ${workspacePath} && git push origin ${branchName} 2>&1 || true"`,
+          flyExecCmd(workspaceInfo.vmName, `cd ${workspacePath} && git push origin ${branchName} 2>&1 || true`),
           { encoding: 'utf-8', timeout: 30000 }
         );
-        console.log(`Pushed ${branchName} to remote (via SSH to ${workspaceInfo.vmName})`);
+        console.log(`Pushed ${branchName} to remote (via Fly.io to ${workspaceInfo.vmName})`);
       } else {
         await execAsync(`git push origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8' });
         console.log(`Pushed ${branchName} to remote`);
@@ -7197,11 +7197,12 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
 
     // Build workspace access instructions based on local vs remote
     const isRemoteWorkspace = workspaceInfo.isRemote && workspaceInfo.vmName;
-    const sshPrefix = isRemoteWorkspace ? `ssh -A ${workspaceInfo.vmName}.exe.xyz "` : '';
+    const flyAppName = isRemoteWorkspace ? getFlyAppName(workspaceInfo.vmName!) : '';
+    const sshPrefix = isRemoteWorkspace ? `fly ssh console -a ${flyAppName} -C "` : '';
     const sshSuffix = isRemoteWorkspace ? '"' : '';
     const cdPrefix = isRemoteWorkspace ? `cd ${workspacePath} && ` : '';
     const workspaceAccessInstructions = isRemoteWorkspace
-      ? `**REMOTE WORKSPACE** - SSH to access:\n   ssh -A ${workspaceInfo.vmName}.exe.xyz\n   cd ${workspacePath}`
+      ? `**REMOTE WORKSPACE** - Fly.io to access:\n   fly ssh console -a ${flyAppName}\n   cd ${workspacePath}`
       : `cd ${workspacePath}`;
 
     // If review-agent is busy, queue this task instead
@@ -7242,7 +7243,7 @@ ISSUE: ${issueId}
 WORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}
 BRANCH: ${branchName}
 PROJECT: ${projectPath}
-${isRemoteWorkspace ? `REMOTE VM: ${workspaceInfo.vmName}.exe.xyz` : ''}
+${isRemoteWorkspace ? `REMOTE VM: ${workspaceInfo.vmName} (Fly machine)` : ''}
 
 === WORKSPACE ACCESS ===
 ${workspaceAccessInstructions}
@@ -7273,7 +7274,7 @@ ${workspaceAccessInstructions}
 - Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
 - Queue test-agent (DO NOT use pan specialists wake directly):
 
-curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","isRemote":${workspaceInfo.isRemote},"vmName":"${workspaceInfo.vmName || ''}","customPrompt":"TEST for ${issueId}:\\nWORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}\\nBRANCH: ${branchName}\\n\\n1. ${isRemoteWorkspace ? `SSH: ssh -A ${workspaceInfo.vmName}.exe.xyz then cd ${workspacePath}` : `cd ${workspacePath}`}\\n2. Run tests: npm test\\n3. Update status:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Just update status. Human will click Merge."}'`;
+curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","isRemote":${workspaceInfo.isRemote},"vmName":"${workspaceInfo.vmName || ''}","customPrompt":"TEST for ${issueId}:\\nWORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}\\nBRANCH: ${branchName}\\n\\n1. ${isRemoteWorkspace ? `fly ssh console -a ${flyAppName} then cd ${workspacePath}` : `cd ${workspacePath}`}\\n2. Run tests: npm test\\n3. Update status:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Just update status. Human will click Merge."}'`;
 
     // Use per-project ephemeral specialist when possible (PAN-300)
     let reviewResult: { success: boolean; message: string };
@@ -8530,10 +8531,9 @@ app.post('/api/agents', async (req, res) => {
       console.log(`[start-agent] Spawning REMOTE agent for ${issueId} on ${workspaceMetadata.vmName}`);
 
       // Sync credentials and spawn remote agent
-      const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
       const { spawnRemoteAgent } = await import('../../lib/remote/remote-agents.js');
-      const exe = createExeProvider({ infraVm: workspaceMetadata.infraVm });
-      await exe.syncAllCredentials(workspaceMetadata.vmName);
+      const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+      await fly.syncAllCredentials(workspaceMetadata.vmName);
 
       // Generate initial prompt for the agent
       const { buildWorkAgentPrompt, getTrackerContext } = await import('../../lib/cloister/work-agent-prompt.js');
@@ -9367,7 +9367,7 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       console.log(`[start-planning] Verifying remote workspace on ${remoteWorkspaceMetadata.vmName}...`);
       try {
         const { stdout } = await execAsync(
-          `ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ${remoteWorkspaceMetadata.vmName}.exe.xyz "test -d /workspace/.git && echo 'ready' || echo 'not-ready'"`,
+          flyExecCmd(remoteWorkspaceMetadata.vmName, `test -d /workspace/.git && echo 'ready' || echo 'not-ready'`),
           { timeout: 15000 }
         );
         if (stdout.trim() === 'ready') {
@@ -9406,9 +9406,8 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
 
       // Also kill remote session if we're starting a remote agent
       if (isRemotePlanning && remoteWorkspaceMetadata) {
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteWorkspaceMetadata.infraVm });
-        await exe.ssh(remoteWorkspaceMetadata.vmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+        await fly.ssh(remoteWorkspaceMetadata.vmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
       }
 
       // Create planning prompt file - store IN workspace if exists (for git-backed planning)
@@ -9631,13 +9630,12 @@ Start by exploring the codebase to understand the context, then begin the discov
         // ===== REMOTE PLANNING AGENT =====
         console.log(`[start-planning] Spawning remote planning agent on ${remoteWorkspaceMetadata.vmName}`);
 
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteWorkspaceMetadata.infraVm });
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
         const vmName = remoteWorkspaceMetadata.vmName;
 
         // Sync all credentials before spawning (tokens may have expired)
         console.log(`[start-planning] Syncing credentials to ${vmName}...`);
-        await exe.syncAllCredentials(vmName);
+        await fly.syncAllCredentials(vmName);
 
         // Also write planning prompt LOCALLY for debugging and consistency
         console.log(`[start-planning] Writing planning prompt locally to ${planningPromptPath}`);
@@ -9645,32 +9643,32 @@ Start by exploring the codebase to understand the context, then begin the discov
 
         // Install bd (beads CLI) on remote if not present
         console.log(`[start-planning] Ensuring bd (beads CLI) is available on ${vmName}...`);
-        const bdInstalled = await exe.installBeads(vmName);
+        const bdInstalled = await fly.installBeads(vmName);
         if (!bdInstalled) {
           console.warn(`[start-planning] bd installation failed on ${vmName} - beads tasks may not work`);
         }
 
         // Initialize beads on remote workspace
         console.log(`[start-planning] Initializing beads on ${vmName}...`);
-        await exe.initBeads(vmName, '/workspace');
+        await fly.initBeads(vmName, '/workspace');
 
         // Write planning prompt to remote VM
         const remotePlanningDir = '/workspace/.planning';
         const remotePlanningPromptPath = `${remotePlanningDir}/PLANNING_PROMPT.md`;
 
         console.log(`[start-planning] Step 1: mkdir -p ${remotePlanningDir}`);
-        await exe.ssh(vmName, `mkdir -p ${remotePlanningDir}`);
+        await fly.ssh(vmName, `mkdir -p ${remotePlanningDir}`);
         console.log(`[start-planning] Step 1 complete`);
 
         // Clear stale STATE.md on remote
         console.log(`[start-planning] Step 2: rm -f STATE.md`);
-        await exe.ssh(vmName, `rm -f ${remotePlanningDir}/STATE.md`);
+        await fly.ssh(vmName, `rm -f ${remotePlanningDir}/STATE.md`);
         console.log(`[start-planning] Step 2 complete`);
 
         // Write planning prompt to remote using base64 to avoid heredoc escaping issues
         console.log(`[start-planning] Step 3: write planning prompt`);
         const promptBase64 = Buffer.from(planningPrompt).toString('base64');
-        await exe.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${remotePlanningPromptPath}`);
+        await fly.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${remotePlanningPromptPath}`);
         console.log(`[start-planning] Step 3 complete`);
 
         // Create launcher script on remote
@@ -9679,11 +9677,11 @@ Start by exploring the codebase to understand the context, then begin the discov
         const remoteLauncherScript = `/workspace/.panopticon/prompts/${sessionName}-launcher.sh`;
 
         console.log(`[start-planning] Step 4: create launcher files`);
-        await exe.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
+        await fly.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
 
         // Write init message using base64
         const initMsgBase64 = Buffer.from(initMessage).toString('base64');
-        await exe.ssh(vmName, `echo '${initMsgBase64}' | base64 -d > ${remotePromptFile}`);
+        await fly.ssh(vmName, `echo '${initMsgBase64}' | base64 -d > ${remotePromptFile}`);
 
         // Write launcher script using base64
         const launcherContent = `#!/bin/bash
@@ -9702,18 +9700,18 @@ prompt=$(cat "${remotePromptFile}")
 exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
 `;
         const launcherBase64 = Buffer.from(launcherContent).toString('base64');
-        await exe.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${remoteLauncherScript}`);
+        await fly.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${remoteLauncherScript}`);
         console.log(`[start-planning] Step 4 complete`);
-        await exe.ssh(vmName, `chmod +x ${remoteLauncherScript}`);
+        await fly.ssh(vmName, `chmod +x ${remoteLauncherScript}`);
 
         // Step 5: Configure Claude Code for autonomous operation (bypass permissions + skip onboarding)
         console.log(`[start-planning] Step 5: configure Claude Code`);
-        await exe.configureClaudeCode(vmName);
+        await fly.configureClaudeCode(vmName);
         console.log(`[start-planning] Step 5 complete`);
 
         // Step 5.1: Copy essential skills to remote VM
         console.log(`[start-planning] Step 5.1: copy skills to ${vmName}`);
-        await exe.copySkillsToVm(vmName);
+        await fly.copySkillsToVm(vmName);
         console.log(`[start-planning] Step 5.1 complete`);
 
         // Step 5.5: Configure tmux for proper terminal handling
@@ -9726,18 +9724,18 @@ set -g mouse on
 set -s escape-time 0
 `;
         const tmuxConfBase64 = Buffer.from(tmuxConf).toString('base64');
-        await exe.ssh(vmName, `grep -q "Panopticon tmux settings" ~/.tmux.conf 2>/dev/null || echo '${tmuxConfBase64}' | base64 -d >> ~/.tmux.conf`);
+        await fly.ssh(vmName, `grep -q "Panopticon tmux settings" ~/.tmux.conf 2>/dev/null || echo '${tmuxConfBase64}' | base64 -d >> ~/.tmux.conf`);
         console.log(`[start-planning] Step 5.5 complete`);
 
         // Start tmux session on remote VM with proper terminal settings
-        const tmuxResult = await exe.ssh(vmName, `TERM=xterm-256color tmux new-session -d -s ${sessionName} -c /workspace "bash '${remoteLauncherScript}'"`);
+        const tmuxResult = await fly.ssh(vmName, `TERM=xterm-256color tmux new-session -d -s ${sessionName} -c /workspace "bash '${remoteLauncherScript}'"`);
 
         if (tmuxResult.exitCode !== 0) {
           throw new Error(`Failed to start remote planning agent: ${tmuxResult.stderr}`);
         }
 
         // Resize remote tmux window
-        await exe.ssh(vmName, `tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null || true`);
+        await fly.ssh(vmName, `tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null || true`);
 
         // Write agent state file with remote info
         writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
@@ -9751,7 +9749,6 @@ set -s escape-time 0
           type: 'planning',
           location: 'remote',
           vmName: vmName,
-          infraVm: remoteWorkspaceMetadata.infraVm,
         }, null, 2));
 
         console.log(`Started remote planning agent ${sessionName} on ${vmName}`);
@@ -9900,12 +9897,12 @@ app.get('/api/planning/:issueId/status', async (req, res) => {
     let sessionExists = false;
     if (isRemote && vmName) {
       try {
-        const { stdout } = await execAsync(`ssh -A -o ConnectTimeout=5 ${vmName}.exe.xyz "tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''"`, { timeout: 10000 });
+        const { stdout } = await execAsync(flyExecCmd(vmName, `tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''`), { timeout: 10000 });
         const sessions = stdout.trim().split('\n').filter(Boolean);
         sessionExists = sessions.includes(sessionName);
       } catch (err) {
-        // SSH failed - session might still exist but VM unreachable
-        console.log(`[planning status] SSH to ${vmName} failed:`, err);
+        // Fly SSH failed - session might still exist but VM unreachable
+        console.log(`[planning status] Fly SSH to ${vmName} failed:`, err);
       }
     } else {
       const { stdout: sessionsOutput } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""', {
@@ -10023,11 +10020,11 @@ app.post('/api/planning/:issueId/message', async (req, res) => {
     let sessionExists = false;
     if (isRemote && vmName) {
       try {
-        const { stdout } = await execAsync(`ssh -A -o ConnectTimeout=5 ${vmName}.exe.xyz "tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''"`, { timeout: 10000 });
+        const { stdout } = await execAsync(flyExecCmd(vmName, `tmux list-sessions -F '#{session_name}' 2>/dev/null || echo ''`), { timeout: 10000 });
         const sessions = stdout.trim().split('\n').filter(Boolean);
         sessionExists = sessions.includes(sessionName);
       } catch (err) {
-        console.log(`[planning message] SSH to ${vmName} failed:`, err);
+        console.log(`[planning message] Fly SSH to ${vmName} failed:`, err);
       }
     } else {
       try {
@@ -10583,7 +10580,6 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
     // Check if this was a remote planning session
     let isRemotePlanning = false;
     let remoteVmName: string | null = null;
-    let remoteInfraVm: string | null = null;
 
     try {
       const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
@@ -10595,7 +10591,6 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
         if (agentState.location === 'remote' && agentState.vmName) {
           isRemotePlanning = true;
           remoteVmName = agentState.vmName;
-          remoteInfraVm = agentState.infraVm;
           console.log(`[complete-planning] Detected remote planning session on ${remoteVmName}`);
         }
       }
@@ -10608,7 +10603,6 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           if (remoteMetadata.vmName) {
             isRemotePlanning = true;
             remoteVmName = remoteMetadata.vmName;
-            remoteInfraVm = remoteMetadata.infraVm;
             console.log(`[complete-planning] Detected remote planning session on ${remoteVmName}`);
           }
         }
@@ -10628,9 +10622,8 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
     // Also kill remote session if applicable
     if (isRemotePlanning && remoteVmName) {
       try {
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteInfraVm || undefined });
-        await exe.ssh(remoteVmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+        await fly.ssh(remoteVmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
         console.log(`[complete-planning] Killed remote tmux session on ${remoteVmName}`);
       } catch (err) {
         console.log(`[complete-planning] Could not kill remote session: ${err}`);
@@ -10659,11 +10652,10 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
     if (isRemotePlanning && remoteVmName) {
       console.log(`[complete-planning] Syncing beads from remote VM ${remoteVmName}...`);
       try {
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteInfraVm || undefined });
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
 
         // Sync beads on remote (export to JSONL), commit, and push
-        const syncResult = await exe.syncBeadsToGit(remoteVmName, '/workspace', `Complete planning for ${id}`);
+        const syncResult = await fly.syncBeadsToGit(remoteVmName, '/workspace', `Complete planning for ${id}`);
         beadsSynced = syncResult;
 
         if (syncResult) {
@@ -10888,12 +10880,12 @@ app.post('/api/issues/:id/reset', async (req, res) => {
       // No state file, try to detect from session name patterns
     }
 
-    // If no state file, try common exe.dev VM patterns
+    // If no state file, try common Fly machine patterns
     if (!vmName) {
       const vmPatterns = [`pan-${issueLower}-ws`, `pan-${id.replace('-', '-')}-ws`];
       for (const pattern of vmPatterns) {
         try {
-          await execAsync(`ssh ${pattern}.exe.xyz "echo ok" 2>/dev/null`, { timeout: 5000 });
+          await execAsync(flyExecCmd(pattern, 'echo ok'), { timeout: 5000 });
           vmName = pattern;
           break;
         } catch {
@@ -10906,7 +10898,7 @@ app.post('/api/issues/:id/reset', async (req, res) => {
     if (vmName) {
       for (const session of localSessions) {
         try {
-          await execAsync(`ssh ${vmName}.exe.xyz "tmux kill-session -t ${session}" 2>/dev/null || true`, { timeout: 10000 });
+          await execAsync(`${flyExecCmd(vmName, `tmux kill-session -t ${session}`)} 2>/dev/null || true`, { timeout: 10000 });
           cleanupLog.push(`Killed remote tmux on ${vmName}: ${session}`);
         } catch {
           // Session might not exist
@@ -11776,7 +11768,6 @@ app.get('/api/issues/:id/beads', async (req, res) => {
     // Check if this is a remote workspace
     let isRemoteWorkspace = false;
     let remoteVmName: string | null = null;
-    let remoteInfraVm: string | null = null;
 
     // Check agent state for remote metadata (for active planning sessions)
     const sessionName = `planning-${issueLower}`;
@@ -11790,7 +11781,6 @@ app.get('/api/issues/:id/beads', async (req, res) => {
         if (agentState.location === 'remote' && agentState.vmName) {
           isRemoteWorkspace = true;
           remoteVmName = agentState.vmName;
-          remoteInfraVm = agentState.infraVm;
         }
       } catch (err) {
         // Ignore parse errors
@@ -11806,7 +11796,6 @@ app.get('/api/issues/:id/beads', async (req, res) => {
           if (remoteMetadata.vmName) {
             isRemoteWorkspace = true;
             remoteVmName = remoteMetadata.vmName;
-            remoteInfraVm = remoteMetadata.infraVm;
           }
         } catch (err) {
           // Ignore parse errors
@@ -11822,7 +11811,6 @@ app.get('/api/issues/:id/beads', async (req, res) => {
         if (wsMetadata?.vmName) {
           isRemoteWorkspace = true;
           remoteVmName = wsMetadata.vmName;
-          remoteInfraVm = wsMetadata.infraVm;
         }
       } catch (err) {
         // Not a remote workspace
@@ -11835,11 +11823,10 @@ app.get('/api/issues/:id/beads', async (req, res) => {
     // Try remote query first if this is a remote workspace
     if (isRemoteWorkspace && remoteVmName) {
       try {
-        const { createExeProvider } = await import('../../lib/remote/exe-provider.js');
-        const exe = createExeProvider({ infraVm: remoteInfraVm || undefined });
+        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
 
         console.log(`[beads-api] Querying beads on remote VM ${remoteVmName} for ${id}`);
-        beads = await exe.queryBeads(remoteVmName, id, '/workspace');
+        beads = await fly.queryBeads(remoteVmName, id, '/workspace');
         querySource = 'remote';
         console.log(`[beads-api] Found ${beads.length} beads on remote`);
       } catch (remoteErr: any) {
@@ -12908,7 +12895,7 @@ wss.on('connection', (ws: WebSocket, req) => {
     // Check if tmux session exists (local or remote)
     try {
       if (isRemote) {
-        const { stdout } = await execAsync(`ssh -A ${vmName}.exe.xyz "tmux list-sessions -F \\"#{session_name}\\" 2>/dev/null || echo \\"\\""`, { timeout: 10000 });
+        const { stdout } = await execAsync(flyExecCmd(vmName, `tmux list-sessions -F "#{session_name}" 2>/dev/null || echo ""`), { timeout: 10000 });
         const sessions = stdout.trim().split('\n').filter(Boolean);
         if (!sessions.includes(sessionName)) {
           ws.close(1008, `Remote session ${sessionName} not found on ${vmName}`);
@@ -12961,171 +12948,66 @@ wss.on('connection', (ws: WebSocket, req) => {
       // Fix: Wait for the client to send its dimensions FIRST, then start SSH
       // with the correct dimensions from the beginning.
 
-      // Lazy-load ssh2 only when remote sessions are actually used
-      if (!SSHClient) {
-        try {
-          const ssh2 = await import('ssh2');
-          SSHClient = ssh2.Client;
-        } catch (e) {
-          console.error('[ssh2] ssh2 package is not installed. Install it with: npm install ssh2');
-          ws.close(1011, 'ssh2 package not installed - required for remote sessions');
-          return;
-        }
-      }
-
-      let sshClient: InstanceType<typeof SSHClient> | null = null;
-      let sshStream: any = null;
+      // Use fly ssh console as a PTY subprocess for remote sessions
+      const flyApp = getFlyAppName(vmName);
       let currentCols = 120;
       let currentRows = 29;
-      let sshStarted = false;
-      let pendingInput: string[] = [];  // Buffer input until SSH is ready
+      let flyStarted = false;
+      let pendingInput: string[] = [];  // Buffer input until PTY is ready
+      let flyPty: pty.IPty | null = null;
 
-      // Read the SSH private key for exe.xyz hosts (do this early)
-      const sshKeyPath = join(homedir(), '.ssh', 'id_ed25519_exedev');
-      let privateKey: Buffer | undefined;
-      try {
-        privateKey = readFileSync(sshKeyPath);
-        console.log(`[ssh2] Using private key: ${sshKeyPath}`);
-      } catch (e) {
-        console.error(`[ssh2] Failed to read SSH key ${sshKeyPath}:`, e);
-        ws.close(1011, 'SSH key not found');
-        return;
-      }
-
-      // Function to start SSH connection with correct dimensions
-      const startSSH = async (cols: number, rows: number) => {
-        if (sshStarted) return;
-        sshStarted = true;
+      // Function to start fly ssh console PTY with correct dimensions
+      const startFly = (cols: number, rows: number) => {
+        if (flyStarted) return;
+        flyStarted = true;
 
         currentCols = cols;
         currentRows = rows;
 
-        console.log(`[ssh2] Starting SSH with client dimensions: ${cols}x${rows}`);
+        console.log(`[fly-ssh] Starting fly ssh console for ${vmName} (app: ${flyApp}) at ${cols}x${rows}`);
 
-        // Pre-resize tmux window BEFORE attaching with CLIENT dimensions
-        await execAsync(`ssh -A ${vmName}.exe.xyz "tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true"`, { timeout: 10000 })
+        // Pre-resize tmux window BEFORE attaching with client dimensions
+        execAsync(flyExecCmd(vmName, `tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`), { timeout: 10000 })
           .catch(() => {});
 
-        sshClient = new SSHClient();
-
-        sshClient.on('ready', () => {
-          console.log(`[ssh2] Connected to ${vmName}.exe.xyz for ${sessionName}`);
-
-          // Use exec() with PTY to directly attach to tmux
-          // Use the client's dimensions, not hardcoded values
-          const tmuxCmd = `TERM=xterm-256color COLORTERM=truecolor LANG=en_US.UTF-8 tmux attach-session -t ${sessionName}`;
-          sshClient!.exec(tmuxCmd, {
-            pty: {
-              term: 'xterm-256color',
-              cols: currentCols,  // Use client dimensions
-              rows: currentRows,
-              modes: {
-                // Input modes
-                ECHO: 1,        // Enable echo
-                ICANON: 0,      // Disable canonical mode (raw input)
-                ICRNL: 0,       // Don't map CR to NL (raw)
-                ISIG: 1,        // Enable signals
-                IEXTEN: 0,      // Disable extended input
-                // Output modes - DISABLE post-processing to let escape sequences through raw
-                OPOST: 0,       // Disable output processing - pass escape sequences through raw
-                ONLCR: 0,       // Don't map NL to CR-NL
-              }
-            }
-          }, (err, stream) => {
-            if (err) {
-              console.error(`[ssh2] Exec error:`, err);
-              ws.close(1011, 'Failed to exec tmux');
-              return;
-            }
-
-            sshStream = stream;
-            console.log(`[ssh2] Tmux attached for ${sessionName} at ${currentCols}x${currentRows}`);
-
-            // Flush any pending input that arrived before SSH was ready
-            if (pendingInput.length > 0) {
-              console.log(`[ssh2] Flushing ${pendingInput.length} pending inputs`);
-              for (const input of pendingInput) {
-                sshStream.write(input);
-              }
-              pendingInput = [];
-            }
-
-            // DEBUG: Enable detailed logging to diagnose terminal corruption
-            const DEBUG_TERMINAL = process.env.DEBUG_TERMINAL === '1';
-            let debugMsgCount = 0;
-            let sshInCount = 0;
-
-            // Helper to show escape sequences in readable form
-            const escapeForLog = (buf: Buffer): string => {
-              return buf.toString('utf8').replace(/[\x00-\x1f\x7f-\xff]/g, (c) => {
-                const code = c.charCodeAt(0);
-                if (code === 0x1b) return '\\e';
-                if (code === 0x0a) return '\\n';
-                if (code === 0x0d) return '\\r';
-                return `\\x${code.toString(16).padStart(2, '0')}`;
-              });
-            };
-
-            // Send data immediately like WebSSH2 does
-            stream.on('data', (data: Buffer) => {
-              // DEBUG: Log incoming SSH data chunks
-              if (DEBUG_TERMINAL) {
-                sshInCount++;
-                debugMsgCount++;
-                if (sshInCount <= 50 || sshInCount % 100 === 0) {
-                  console.log(`[ssh2-debug] SSH-IN #${sshInCount} len=${data.length}`);
-                  console.log(`[ssh2-debug]   DATA: ${escapeForLog(data).slice(0, 200)}${data.length > 200 ? '...' : ''}`);
-                }
-              }
-
-              // Send immediately as UTF-8 string (like WebSSH2)
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(data.toString('utf8'));
-              }
-            });
-
-            if (DEBUG_TERMINAL) {
-              console.log(`[ssh2-debug] Terminal debug logging enabled for ${sessionName}`);
-            }
-
-            stream.on('close', () => {
-              console.log(`[ssh2] Stream closed for ${sessionName}`);
-              sshClient?.end();
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.close(1000, 'Session ended');
-              }
-            });
-
-            stream.stderr.on('data', (data: Buffer) => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(data.toString('utf8'));
-              }
-            });
-          });
+        // Spawn fly ssh console as a PTY process that attaches to the tmux session
+        flyPty = pty.spawn('fly', ['ssh', 'console', '-a', flyApp, '-C',
+          `TERM=xterm-256color COLORTERM=truecolor LANG=en_US.UTF-8 tmux attach-session -t ${sessionName}`
+        ], {
+          name: 'xterm-256color',
+          cols: currentCols,
+          rows: currentRows,
+          cwd: homedir(),
+          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
         });
 
-        sshClient.on('error', (err) => {
-          console.error(`[ssh2] Connection error:`, err);
-          ws.close(1011, 'SSH connection failed');
+        console.log(`[fly-ssh] PTY spawned for ${sessionName}`);
+
+        // Flush any pending input that arrived before PTY was ready
+        if (pendingInput.length > 0) {
+          console.log(`[fly-ssh] Flushing ${pendingInput.length} pending inputs`);
+          for (const input of pendingInput) {
+            flyPty.write(input);
+          }
+          pendingInput = [];
+        }
+
+        flyPty.onData((data: string) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(data);
+          }
         });
 
-        sshClient.on('close', () => {
-          console.log(`[ssh2] Connection closed for ${sessionName}`);
-        });
-
-        // Connect using private key (exe.xyz hosts use id_ed25519_exedev)
-        sshClient.connect({
-          host: `${vmName}.exe.xyz`,
-          port: 22,
-          username: process.env.USER || 'root',
-          privateKey: privateKey,
-          algorithms: {
-            serverHostKey: ['rsa-sha2-512', 'rsa-sha2-256', 'ssh-rsa', 'ecdsa-sha2-nistp256', 'ssh-ed25519'],
-          },
+        flyPty.onExit(({ exitCode }) => {
+          console.log(`[fly-ssh] PTY exited for ${sessionName} with code ${exitCode}`);
+          flyPty = null;
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close(1000, 'Session ended');
+          }
         });
       };
 
-      // Handle WebSocket messages - wait for resize before starting SSH
+      // Handle WebSocket messages - wait for resize before starting fly ssh console
       // Use the messageHandler pattern to process buffered early messages
       const handleMessage = (message: string) => {
         console.log(`[ws] Processing message for ${sessionName}: ${message.slice(0, 100)}${message.length > 100 ? '...' : ''}`);
@@ -13134,18 +13016,17 @@ wss.on('connection', (ws: WebSocket, req) => {
           try {
             const parsed = JSON.parse(message);
             if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
-              if (!sshStarted) {
-                // First resize message - start SSH with these dimensions
-                startSSH(parsed.cols, parsed.rows);
+              if (!flyStarted) {
+                // First resize message - start fly ssh with these dimensions
+                startFly(parsed.cols, parsed.rows);
               } else {
                 // Subsequent resize - update dimensions
                 currentCols = parsed.cols;
                 currentRows = parsed.rows;
-                if (sshStream) {
-                  // Resize the SSH PTY
-                  sshStream.setWindow(parsed.rows, parsed.cols, 0, 0);
-                  // ALSO resize the tmux window to match
-                  execAsync(`ssh -A ${vmName}.exe.xyz "tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true"`, { timeout: 5000 })
+                if (flyPty) {
+                  flyPty.resize(parsed.cols, parsed.rows);
+                  // Also resize the tmux window to match
+                  execAsync(flyExecCmd(vmName, `tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`), { timeout: 5000 })
                     .catch(() => {}); // Ignore errors - best effort
                 }
               }
@@ -13157,10 +13038,10 @@ wss.on('connection', (ws: WebSocket, req) => {
         }
 
         // Terminal input
-        if (sshStream) {
-          sshStream.write(message);
+        if (flyPty) {
+          flyPty.write(message);
         } else {
-          // Buffer input until SSH is ready
+          // Buffer input until PTY is ready
           pendingInput.push(message);
         }
       };
@@ -13175,17 +13056,15 @@ wss.on('connection', (ws: WebSocket, req) => {
 
       ws.on('close', () => {
         console.log(`WebSocket closed for session: ${sessionName}`);
-        if (sshStream) {
-          sshStream.write('\x02d'); // Ctrl-b d to detach
-          setTimeout(() => sshClient?.end(), 100);
-        } else {
-          sshClient?.end();
+        if (flyPty) {
+          flyPty.write('\x02d'); // Ctrl-b d to detach
+          setTimeout(() => flyPty?.kill(), 100);
         }
       });
 
       ws.on('error', (err) => {
         console.error(`WebSocket error for ${sessionName}:`, err);
-        sshClient?.end();
+        flyPty?.kill();
       });
 
       return;
@@ -13274,11 +13153,11 @@ wss.on('connection', (ws: WebSocket, req) => {
 });
 
 // ============================================================================
-// Remote Workspaces API (exe.dev)
+// Remote Workspaces API (Fly.io)
 // ============================================================================
 
 import {
-  createExeProvider,
+  createFlyProviderFromConfig,
   isRemoteAvailable,
   loadRemoteAgentState,
   listRemoteAgents,
@@ -13299,7 +13178,6 @@ function loadRemoteWorkspaceMetadata(issueId: string): any | null {
   }
 
   try {
-    const yaml = require('yaml');
     const content = readFileSync(metadataPath, 'utf-8');
     return yaml.parse(content);
   } catch {
@@ -13307,8 +13185,40 @@ function loadRemoteWorkspaceMetadata(issueId: string): any | null {
   }
 }
 
+/** Resolve vmName to Fly app name from workspace metadata or pan config */
+function getFlyAppName(vmName: string): string {
+  try {
+    const workspacesDir = join(process.env.HOME || '', '.panopticon', 'workspaces');
+    if (existsSync(workspacesDir)) {
+      for (const file of readdirSync(workspacesDir)) {
+        if (!file.endsWith('.yaml')) continue;
+        try {
+          const content = readFileSync(join(workspacesDir, file), 'utf-8');
+          const meta = yaml.parse(content) as { vmName?: string; appName?: string };
+          if (meta.vmName === vmName && meta.appName) return meta.appName;
+        } catch {
+          // Skip invalid files
+        }
+      }
+    }
+  } catch {
+    // Fall through to default
+  }
+  try {
+    return loadPanConfig().remote?.fly?.app ?? 'pan-workspaces';
+  } catch {
+    return 'pan-workspaces';
+  }
+}
+
+/** Build a fly ssh console command string for executing a command on a remote VM */
+function flyExecCmd(vmName: string, command: string): string {
+  const appName = getFlyAppName(vmName);
+  return `fly ssh console -a ${appName} -C ${JSON.stringify(command)}`;
+}
+
 // Helper to list all remote workspace metadata files
-function listRemoteWorkspaceMetadata(): any[] {
+function listRemoteWorkspaceMetadata(): unknown[] {
   const workspacesDir = join(process.env.HOME || '', '.panopticon', 'workspaces');
 
   if (!existsSync(workspacesDir)) {
@@ -13316,9 +13226,8 @@ function listRemoteWorkspaceMetadata(): any[] {
   }
 
   try {
-    const yaml = require('yaml');
     const files = readdirSync(workspacesDir).filter(f => f.endsWith('.yaml'));
-    const workspaces: any[] = [];
+    const workspaces: unknown[] = [];
 
     for (const file of files) {
       try {
@@ -13363,18 +13272,16 @@ app.get('/api/remote/status', async (_req, res) => {
       });
     }
 
-    const exe = createExeProvider({ infraVm: remoteConfig?.exe?.infra_vm });
-    const vms = await exe.listVms();
+    const fly = createFlyProviderFromConfig(remoteConfig);
+    const vms = await fly.listVms();
 
     res.json({
       enabled: true,
       available: true,
-      provider: remoteConfig?.provider || 'exe',
-      infraVm: remoteConfig?.exe?.infra_vm,
+      provider: remoteConfig?.provider || 'fly',
       vms: vms.map(vm => ({
         name: vm.name,
         status: vm.status,
-        isInfra: vm.name === remoteConfig?.exe?.infra_vm,
       })),
     });
   } catch (error: any) {
@@ -13389,11 +13296,11 @@ app.get('/api/remote/workspaces', async (_req, res) => {
 
     // Enrich with VM status if possible
     const config = loadPanConfig();
-    const exe = createExeProvider({ infraVm: config.remote?.exe?.infra_vm });
+    const fly = createFlyProviderFromConfig(config.remote);
 
     let vms: any[] = [];
     try {
-      vms = await exe.listVms();
+      vms = await fly.listVms();
     } catch {
       // Can't get VM status - return workspaces without status
     }
@@ -13424,11 +13331,11 @@ app.get('/api/remote/workspaces/:issueId', async (req, res) => {
 
     // Get VM status
     const config = loadPanConfig();
-    const exe = createExeProvider({ infraVm: config.remote?.exe?.infra_vm });
+    const fly = createFlyProviderFromConfig(config.remote);
 
     let vmStatus = 'unknown';
     try {
-      vmStatus = await exe.getStatus(metadata.vmName);
+      vmStatus = await fly.getStatus(metadata.vmName);
     } catch {
       // Ignore - status unknown
     }
@@ -13469,12 +13376,12 @@ app.post('/api/remote/workspaces/:issueId/start', async (req, res) => {
     }
 
     const config = loadPanConfig();
-    const exe = createExeProvider({ infraVm: config.remote?.exe?.infra_vm });
+    const fly = createFlyProviderFromConfig(config.remote);
 
-    await exe.startVm(metadata.vmName);
+    await fly.startVm(metadata.vmName);
 
     // Start containers
-    await exe.ssh(metadata.vmName, 'cd /workspace && docker compose up -d 2>/dev/null || true');
+    await fly.ssh(metadata.vmName, 'cd /workspace && docker compose up -d 2>/dev/null || true');
 
     res.json({ success: true, message: `Workspace ${issueId} started` });
   } catch (error: any) {
@@ -13493,13 +13400,13 @@ app.post('/api/remote/workspaces/:issueId/stop', async (req, res) => {
     }
 
     const config = loadPanConfig();
-    const exe = createExeProvider({ infraVm: config.remote?.exe?.infra_vm });
+    const fly = createFlyProviderFromConfig(config.remote);
 
     // Stop containers first
-    await exe.ssh(metadata.vmName, 'docker compose down 2>/dev/null || true');
+    await fly.ssh(metadata.vmName, 'docker compose down 2>/dev/null || true');
 
     // Stop VM
-    await exe.stopVm(metadata.vmName);
+    await fly.stopVm(metadata.vmName);
 
     res.json({ success: true, message: `Workspace ${issueId} stopped` });
   } catch (error: any) {
@@ -13519,8 +13426,8 @@ app.post('/api/remote/workspaces/:issueId/agent/start', async (req, res) => {
     }
 
     // Sync all credentials before spawning (tokens may have expired)
-    const exe = createExeProvider({ infraVm: metadata.infraVm });
-    await exe.syncAllCredentials(metadata.vmName);
+    const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+    await fly.syncAllCredentials(metadata.vmName);
 
     const state = await spawnRemoteAgent({
       issueId,

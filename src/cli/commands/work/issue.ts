@@ -74,7 +74,7 @@ import {
 import {
   spawnRemoteAgent,
   isRemoteAgentRunning,
-  createExeProvider,
+  createFlyProviderFromConfig,
 } from '../../../lib/remote/index.js';
 import { isRemoteAvailable } from '../../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../../lib/remote/interface.js';
@@ -296,8 +296,8 @@ async function handleRemoteWorkspace(
 
   // Sync all credentials before spawning (tokens may have expired)
   spinner.text = 'Syncing credentials (Claude, GitHub)...';
-  const exe = createExeProvider({ infraVm: remoteMetadata.infraVm });
-  const credsSynced = await exe.syncAllCredentials(remoteMetadata.vmName);
+  const fly = createFlyProviderFromConfig(config.remote);
+  const credsSynced = await fly.syncAllCredentials(remoteMetadata.vmName);
   if (!credsSynced.claude) {
     spinner.warn('Could not sync Claude credentials - agent may need to re-authenticate');
   }
@@ -357,7 +357,7 @@ async function handleRemoteWorkspace(
     console.log(chalk.bold('Agent Details:'));
     console.log(`  Session:    ${chalk.cyan(remoteAgent.id)}`);
     console.log(`  VM:         ${chalk.cyan(remoteMetadata.vmName)}`);
-    console.log(`  Location:   ${chalk.yellow('Remote (exe.dev)')}`);
+    console.log(`  Location:   ${chalk.yellow('Remote (Fly.io)')}`);
     console.log(`  Model:      ${remoteAgent.model}`);
 
     if (remoteMetadata.urls.frontend || remoteMetadata.urls.api) {

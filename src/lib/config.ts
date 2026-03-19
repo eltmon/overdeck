@@ -44,30 +44,38 @@ export interface TrackersConfig {
   rally?: RallyConfig;
 }
 
-export interface RemoteExeConfig {
-  /** Shared infrastructure VM for postgres/redis/traefik */
-  infra_vm?: string;
-  /** Postgres settings on infra VM */
-  postgres_host?: string;
-  postgres_port?: number;
-  postgres_user?: string;
-  postgres_password_env?: string;
-  /** Redis settings on infra VM */
-  redis_host?: string;
-  redis_port?: number;
+export interface RemoteFlyConfig {
+  /** Fly.io app name for workspace machines */
+  app?: string;
+  /** Fly.io org slug */
+  org?: string;
+  /** Default region (e.g. 'iad') */
+  region?: string;
+  /** Machine size (e.g. 'shared-cpu-2x') */
+  vm_size?: string;
+  /** Memory in MB */
+  vm_memory?: number;
+  /** Docker image for workspace machines */
+  image?: string;
+  /** Stop machine when agent is idle */
+  auto_stop?: boolean;
+  /** Seconds of inactivity before stop */
+  auto_stop_timeout?: number;
+  /** Env var name for API token (default: FLY_API_TOKEN) */
+  api_token_env?: string;
 }
 
 export interface RemoteConfig {
   /** Enable remote workspace support */
   enabled: boolean;
   /** Remote provider type */
-  provider?: 'exe';
+  provider?: 'fly';
   /** Default location for new workspaces */
   default_location?: 'local' | 'remote';
   /** Auto-hibernate idle workspaces after N minutes (0 = disabled) */
   auto_hibernate_minutes?: number;
-  /** exe.dev specific configuration */
-  exe?: RemoteExeConfig;
+  /** Fly.io specific configuration */
+  fly?: RemoteFlyConfig;
 }
 
 export interface ShadowConfig {

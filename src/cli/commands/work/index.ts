@@ -38,7 +38,7 @@ export function registerWorkCommands(program: Command): void {
     .option('--dry-run', 'Show what would be created')
     .option('--shadow', 'Enable shadow mode (track status locally, don\'t update tracker)')
     .option('--no-shadow', 'Disable shadow mode (override config/env settings)')
-    .option('--remote', 'Use remote workspace (exe.dev)')
+    .option('--remote', 'Use remote workspace (Fly.io)')
     .option('--local', 'Use local workspace (explicit override)')
     .option('--phase <phase>', 'Work phase for model routing (exploration/implementation/documentation/review-response)')
     .action(issueCommand);

@@ -6,7 +6,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { stopAgent, getAgentState } from '../../../lib/agents.js';
 import { sessionExists, killSession } from '../../../lib/tmux.js';
-import { createExeProvider } from '../../../lib/remote/index.js';
+import { createFlyProviderFromConfig } from '../../../lib/remote/index.js';
+import { loadConfig } from '../../../lib/config.js';
 import { loadWorkspaceMetadata, deleteWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 
 const execAsync = promisify(exec);
@@ -68,11 +69,11 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     console.log(chalk.gray(`  → Found remote workspace on VM: ${vmName}`));
 
     try {
-      const exe = createExeProvider({ infraVm: workspaceMetadata.infraVm || 'pan-infra' });
+      const fly = createFlyProviderFromConfig(loadConfig().remote);
 
       // Kill all processes on VM (tmux, claude, etc.)
       try {
-        await exe.ssh(vmName, `tmux kill-server 2>/dev/null || true; pkill -f claude 2>/dev/null || true`);
+        await fly.ssh(vmName, `tmux kill-server 2>/dev/null || true; pkill -f claude 2>/dev/null || true`);
         cleanupLog.push(`Killed processes on VM: ${vmName}`);
         console.log(chalk.green(`  ✓ Killed processes on VM: ${vmName}`));
       } catch (e) {
@@ -81,7 +82,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
 
       // DELETE the VM (deep wipe = full cleanup)
       try {
-        await exe.deleteVm(vmName);
+        await fly.deleteVm(vmName);
         cleanupLog.push(`Deleted remote VM: ${vmName}`);
         console.log(chalk.green(`  ✓ Deleted remote VM: ${vmName}`));
       } catch (e: any) {
@@ -104,12 +105,12 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
       if (state?.location === 'remote' && state?.vmName) {
         console.log(chalk.gray(`  → Found remote agent on VM: ${state.vmName}`));
         try {
-          const exe = createExeProvider({ infraVm: state.infraVm || 'pan-infra' });
+          const fly = createFlyProviderFromConfig(loadConfig().remote);
 
           // Kill processes and delete VM
           try {
-            await exe.ssh(state.vmName, `tmux kill-server 2>/dev/null || true; pkill -f claude 2>/dev/null || true`);
-            await exe.deleteVm(state.vmName);
+            await fly.ssh(state.vmName, `tmux kill-server 2>/dev/null || true; pkill -f claude 2>/dev/null || true`);
+            await fly.deleteVm(state.vmName);
             cleanupLog.push(`Deleted remote VM: ${state.vmName}`);
             console.log(chalk.green(`  ✓ Deleted remote VM: ${state.vmName}`));
           } catch (e: any) {

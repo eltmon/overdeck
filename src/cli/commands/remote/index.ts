@@ -3,7 +3,7 @@
  *
  * pan remote <command>
  *
- * Commands for managing remote workspaces on exe.dev VMs.
+ * Commands for managing remote workspaces on Fly.io machines.
  */
 
 import { Command } from 'commander';
@@ -15,20 +15,22 @@ import { setupCommand } from './setup.js';
 export function registerRemoteCommands(program: Command): void {
   const remote = program
     .command('remote')
-    .description('Remote workspace management (exe.dev)');
+    .description('Remote workspace management (Fly.io)');
 
   // pan remote status
   remote
     .command('status')
-    .description('Show exe.dev connection and VM status')
+    .description('Show Fly.io connection and machine status')
     .option('--json', 'Output in JSON format')
     .action(statusCommand);
 
   // pan remote init
   remote
     .command('init')
-    .description('Initialize shared infrastructure VM (postgres, redis, traefik)')
-    .option('--name <name>', 'Infrastructure VM name', 'pan-infra')
+    .description('Initialize Fly.io app for workspace machines')
+    .option('--app <app>', 'Fly app name', 'pan-workspaces')
+    .option('--org <org>', 'Fly org slug', 'personal')
+    .option('--region <region>', 'Default region', 'iad')
     .action(initCommand);
 
   // pan remote resources
@@ -41,6 +43,6 @@ export function registerRemoteCommands(program: Command): void {
   // pan remote setup
   remote
     .command('setup')
-    .description('Setup exe.dev integration (install CLI, configure SSH)')
+    .description('Setup Fly.io integration (install flyctl, configure auth)')
     .action(setupCommand);
 }

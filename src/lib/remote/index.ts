@@ -1,8 +1,8 @@
 /**
  * Remote Workspace Module
  *
- * Provides support for running workspaces on remote VMs (exe.dev, etc.)
- * to offload Docker containers and Claude agents from local machine.
+ * Provides support for running workspaces on remote Fly.io Machines
+ * to offload Claude agents from the local machine.
  */
 
 export type {
@@ -14,8 +14,8 @@ export type {
   RemoteWorkspaceMetadata,
 } from './interface.js';
 
-export { ExeProvider, createExeProvider } from './exe-provider.js';
-export type { ExeProviderConfig } from './exe-provider.js';
+export { FlyProvider, createFlyProvider } from './fly-provider.js';
+export type { FlyProviderConfig } from './fly-provider.js';
 
 // Remote agent management
 export {
@@ -40,10 +40,10 @@ export {
   WORKSPACES_DIR,
 } from './workspace-metadata.js';
 
-import { ExeProvider, createExeProvider } from './exe-provider.js';
+import { FlyProvider, createFlyProvider } from './fly-provider.js';
 import type { RemoteProvider, RemoteProviderConfig } from './interface.js';
 
-export type ProviderType = 'exe';
+export type ProviderType = 'fly';
 
 /**
  * Get a remote provider by type
@@ -53,10 +53,8 @@ export function getRemoteProvider(
   config?: RemoteProviderConfig
 ): RemoteProvider {
   switch (type) {
-    case 'exe':
-      return createExeProvider({
-        infraVm: config?.infraVm,
-      });
+    case 'fly':
+      return createFlyProvider();
     default:
       throw new Error(`Unknown remote provider type: ${type}`);
   }
@@ -66,21 +64,48 @@ export function getRemoteProvider(
  * Check if remote providers are available
  */
 export async function isRemoteAvailable(): Promise<{ available: boolean; reason?: string }> {
-  const exe = createExeProvider();
+  const fly = createFlyProvider();
 
   try {
-    const isAuth = await exe.isAuthenticated();
+    const isAuth = await fly.isAuthenticated();
     if (!isAuth) {
       return {
         available: false,
-        reason: 'Not authenticated with exe.dev. Run: exe auth login',
+        reason: 'Not authenticated with Fly.io. Set FLY_API_TOKEN or run: fly auth login',
       };
     }
     return { available: true };
   } catch (error: any) {
     return {
       available: false,
-      reason: `exe.dev CLI not installed or not working: ${error.message}`,
+      reason: `Fly.io not available: ${error.message}`,
     };
   }
+}
+
+/**
+ * Create a FlyProvider from config settings
+ */
+export function createFlyProviderFromConfig(remoteConfig?: {
+  fly?: {
+    app?: string;
+    org?: string;
+    region?: string;
+    vm_size?: string;
+    vm_memory?: number;
+    image?: string;
+    api_token_env?: string;
+  };
+}): FlyProvider {
+  const fly = remoteConfig?.fly;
+  const tokenEnv = fly?.api_token_env ?? 'FLY_API_TOKEN';
+  return createFlyProvider({
+    app: fly?.app,
+    org: fly?.org,
+    region: fly?.region,
+    vmSize: fly?.vm_size,
+    vmMemory: fly?.vm_memory,
+    image: fly?.image,
+    apiToken: process.env[tokenEnv],
+  });
 }

@@ -1,7 +1,7 @@
 /**
  * Remote Provider Interface
  *
- * Defines the contract for remote workspace providers (e.g., exe.dev, AWS, etc.)
+ * Defines the contract for remote workspace providers (e.g., Fly.io)
  * Remote providers manage VM lifecycle and enable offloading workloads from local machine.
  */
 
@@ -12,6 +12,7 @@ export interface VmInfo {
   status: VmStatus;
   created?: Date;
   ipAddress?: string;
+  machineId?: string;
   // Memory usage in MB
   memoryUsed?: number;
   memoryTotal?: number;
@@ -25,7 +26,6 @@ export interface ExecResult {
 
 export interface RemoteProviderConfig {
   name: string;
-  infraVm?: string;
   defaultLocation?: 'local' | 'remote';
   autoHibernateMinutes?: number;
 }
@@ -94,9 +94,8 @@ export interface RemoteWorkspaceMetadata {
   issue: string;
   provider: string;
   vmName: string;
-  infraVm?: string;
-  database?: string;
-  redisDb?: number;
+  machineId?: string;
+  appName?: string;
   urls: {
     frontend?: string;
     api?: string;
