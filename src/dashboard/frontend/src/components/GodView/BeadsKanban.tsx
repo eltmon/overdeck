@@ -11,7 +11,7 @@ interface BeadsKanbanProps {
   workspace?: string;
 }
 
-export function BeadsKanban({ agentId, workspace }: BeadsKanbanProps) {
+export function BeadsKanban({ agentId }: BeadsKanbanProps) {
   const { data } = useQuery({
     queryKey: ['beads', agentId],
     queryFn: async () => {

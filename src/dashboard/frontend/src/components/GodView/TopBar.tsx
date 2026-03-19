@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Zap } from 'lucide-react';
 import { useGodViewStore } from '../../hooks/useGodViewSocket';
 import type { Agent } from '../../types';
@@ -46,16 +45,6 @@ export function GodViewTopBar({ agents }: TopBarProps) {
   const systemHealth = useGodViewStore((s) => s.systemHealth);
   const activeCount = agents.filter((a) => a.status !== 'stopped' && a.status !== 'dead').length;
 
-  const { data: costData } = useQuery({
-    queryKey: ['god-view-costs'],
-    queryFn: async () => {
-      const res = await fetch('/api/agents');
-      if (!res.ok) return null;
-      return res.json();
-    },
-    refetchInterval: 30000,
-    staleTime: 25000,
-  });
 
   return (
     <div
