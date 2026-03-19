@@ -721,6 +721,57 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     return;
   }
 
+  // Check if agent is stopped — auto-restart to deliver feedback (PAN-367)
+  const agentState = getAgentState(normalizedId);
+  if (agentState && agentState.status === 'stopped' && !sessionExists(normalizedId)) {
+    console.log(`[agents] Auto-restarting stopped agent ${normalizedId} to deliver feedback`);
+
+    const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
+    if (agentState.model) {
+      const provider = getProviderForModel(agentState.model as ModelId);
+      if (provider.authType === 'credential-file') {
+        setupCredentialFileAuth(provider, agentState.workspace);
+      } else {
+        clearCredentialFileAuth(agentState.workspace);
+      }
+    }
+
+    clearReadySignal(normalizedId);
+    const claudeCmd = `claude --dangerously-skip-permissions --model ${agentState.model || 'claude-sonnet-4-6'} "You are resuming work on ${agentState.issueId}. Check .planning/feedback/ for specialist feedback that arrived while you were stopped, then continue working."`;
+    createSession(normalizedId, agentState.workspace, claudeCmd, {
+      env: {
+        PANOPTICON_AGENT_ID: normalizedId,
+        PANOPTICON_ISSUE_ID: agentState.issueId || '',
+        PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+        ...providerEnv
+      }
+    });
+
+    agentState.status = 'running';
+    agentState.lastActivity = new Date().toISOString();
+    saveAgentState(agentState);
+
+    // Wait for ready, then deliver the message
+    const ready = await waitForReadySignal(normalizedId, 30);
+    if (ready) {
+      await sendKeysAsync(normalizedId, message);
+      console.log(`[agents] Restarted ${normalizedId} and delivered feedback`);
+    } else {
+      console.warn(`[agents] Restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
+    }
+
+    // Save to mail queue regardless
+    const mailDir = join(getAgentDir(normalizedId), 'mail');
+    mkdirSync(mailDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    writeFileSync(
+      join(mailDir, `${timestamp}.md`),
+      `# Message\n\n${message}\n`
+    );
+    return;
+  }
+
   // Check if this is a remote agent
   const { loadRemoteAgentState, sendToRemoteAgent } = await import('./remote/remote-agents.js');
   const remoteState = loadRemoteAgentState(normalizedId);
