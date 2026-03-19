@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * Initialize the complete database schema.
@@ -88,6 +88,10 @@ export function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_status_history_issue
       ON status_history(issue_id, timestamp);
 
+    -- UNIQUE constraint enables INSERT OR IGNORE deduplication in upsertReviewStatus
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_status_history_unique
+      ON status_history(issue_id, type, status, timestamp);
+
     -- ===== Health Events =====
     CREATE TABLE IF NOT EXISTS health_events (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,8 +154,20 @@ export function runMigrations(db: Database.Database): void {
     return;
   }
 
-  // Future migrations go here:
-  // if (currentVersion < 2) { ... apply v1→v2 migration ... }
+  // v1 → v2: add UNIQUE index on status_history for INSERT OR IGNORE dedup
+  if (currentVersion < 2) {
+    // Remove duplicate rows before adding the unique index (keep lowest id per unique key)
+    db.exec(`
+      DELETE FROM status_history
+      WHERE id NOT IN (
+        SELECT MIN(id)
+        FROM status_history
+        GROUP BY issue_id, type, status, timestamp
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_status_history_unique
+        ON status_history(issue_id, type, status, timestamp);
+    `);
+  }
 
   // After all migrations, set the version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);

@@ -142,10 +142,15 @@ export function queryCostEvents(opts: {
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  // LIMIT and OFFSET appended to params — SQLite supports bound ? for both
-  const limitClause = opts.limit !== undefined ? 'LIMIT ?' : '';
+  // SQLite requires LIMIT before OFFSET. Use LIMIT -1 (unlimited) when only offset is set.
+  let limitClause = '';
+  if (opts.limit !== undefined) {
+    limitClause = 'LIMIT ?';
+    params.push(Math.max(0, Math.floor(opts.limit)));
+  } else if (opts.offset !== undefined) {
+    limitClause = 'LIMIT -1'; // unlimited — required to precede OFFSET in SQLite
+  }
   const offsetClause = opts.offset !== undefined ? 'OFFSET ?' : '';
-  if (opts.limit !== undefined) params.push(Math.max(0, Math.floor(opts.limit)));
   if (opts.offset !== undefined) params.push(Math.max(0, Math.floor(opts.offset)));
 
   const sql = `

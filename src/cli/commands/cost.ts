@@ -55,8 +55,8 @@ export async function runCostSync(): Promise<void> {
         console.log(`  ${chalk.dim(err)}`);
       }
     }
-  } catch (error: any) {
-    console.error(chalk.red('Error:'), error.message);
+  } catch (error: unknown) {
+    console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
