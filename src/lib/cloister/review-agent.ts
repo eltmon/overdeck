@@ -235,7 +235,7 @@ async function sendFeedbackToWorkAgent(
 
   if (result.reviewResult === 'CHANGES_REQUESTED') {
     const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
-    body += `\n## Required Actions\n\nFix the issues above, commit and push, then resubmit for review:\n\`\`\`bash\ncurl -X POST ${apiUrl}/api/workspaces/${context.issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\`\`\`\nDo NOT stop until review passes.\n`;
+    body += `\n## REQUIRED: Fix ALL issues above BEFORE resubmitting\n\n1. Read each issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests to verify your fixes\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\n\`\`\`bash\ncurl -X POST ${apiUrl}/api/workspaces/${context.issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\`\`\`\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.\n`;
   } else if (result.reviewResult === 'APPROVED') {
     body += `\n## Next Steps\n\nCode approved. It will proceed to testing.\n`;
   }
