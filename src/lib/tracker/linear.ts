@@ -313,6 +313,7 @@ export class LinearTracker implements IssueTracker {
       case 'open':
         return 'unstarted';
       case 'in_progress':
+      case 'in_review':
         return 'started';
       case 'closed':
         return 'completed';
