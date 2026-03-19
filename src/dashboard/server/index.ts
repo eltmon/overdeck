@@ -11014,10 +11014,14 @@ app.post('/api/issues/:id/cancel', async (req, res) => {
             const team = await issue.team;
             if (team) {
               const states = await team.states();
+              // Match by name first (exact), then by type as fallback.
+              // Linear teams may have multiple states with type='canceled'
+              // (e.g. "Canceled" and "Duplicate") — prefer the one named "Canceled".
               const canceledState = states.nodes.find(s =>
                 s.name.toLowerCase() === 'canceled' ||
-                s.name.toLowerCase() === 'cancelled' ||
-                s.type === 'canceled'
+                s.name.toLowerCase() === 'cancelled'
+              ) || states.nodes.find(s =>
+                s.type === 'canceled' && s.name.toLowerCase() !== 'duplicate'
               );
               if (canceledState) {
                 await issue.update({ stateId: canceledState.id });
