@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import type { QualityGateConfig } from '../workspace-config.js';
+import { loadConfig } from '../config.js';
 
 const execAsync = promisify(exec);
 
@@ -404,7 +405,8 @@ export async function runQualityGates(
       if (gate.command.includes('"')) {
         throw new Error(`Gate "${name}" command contains double quotes which are unsafe in SSH context`);
       }
-      resolvedCommand = `ssh -A ${opts.vmName}.exe.xyz "cd ${cwd} && ${gate.command}"`;
+      const flyAppName = loadConfig().remote?.fly?.app ?? 'pan-workspaces';
+      resolvedCommand = `fly ssh console -a ${flyAppName} -C "cd ${cwd} && ${gate.command}"`;
     } else {
       resolvedCommand = gate.command;
     }

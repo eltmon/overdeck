@@ -57,7 +57,7 @@ describe('runQualityGates — SSH remote support', () => {
     });
 
     const calls = execMock.mock.calls.map(c => c[0] as string);
-    expect(calls.every(cmd => cmd.startsWith('ssh -A my-vm.exe.xyz "cd /tmp/test-workspace &&'))).toBe(true);
+    expect(calls.every(cmd => cmd.startsWith('fly ssh console -a'))).toBe(true);
   });
 
   it('does not set cwd for remote workspaces', async () => {

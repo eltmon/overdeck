@@ -11,7 +11,7 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { loadConfig } from './config.js';
-import { createExeProvider } from './remote/exe-provider.js';
+import { createFlyProviderFromConfig } from './remote/index.js';
 import { saveWorkspaceMetadata } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from './projects.js';
@@ -24,7 +24,7 @@ export interface CreateRemoteWorkspaceOptions {
 }
 
 /**
- * Create a remote workspace on exe.dev
+ * Create a remote workspace on Fly.io
  */
 export async function createRemoteWorkspace(
   issueId: string,
@@ -39,8 +39,7 @@ export async function createRemoteWorkspace(
 
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const branchName = `feature/${normalizedId}`;
-  const infraVm = remoteConfig.exe?.infra_vm || 'pan-infra';
-  const exe = createExeProvider({ infraVm });
+  const exe = createFlyProviderFromConfig(config.remote);
 
   // Determine project context
   const teamPrefix = extractTeamPrefix(issueId);
@@ -72,7 +71,6 @@ export async function createRemoteWorkspace(
     console.log(chalk.bold('Would create remote workspace:'));
     console.log(`  VM:        ${chalk.cyan(vmName)}`);
     console.log(`  Project:   ${chalk.dim(projectId)}`);
-    console.log(`  Infra:     ${chalk.dim(infraVm)}`);
     console.log(`  Branch:    ${chalk.dim(branchName)}`);
     throw new Error('Dry run - not implemented in this module');
   }
@@ -117,38 +115,18 @@ export async function createRemoteWorkspace(
   }
 
   // Step 4: Configure environment for shared infra
+  const dbName = `myn_${normalizedId.replace(/-/g, '_')}`;
   const envContent = `
 # Panopticon Remote Workspace
 WORKSPACE_ID=${normalizedId}
 ISSUE_ID=${issueId.toUpperCase()}
 
-# Shared Infrastructure
-POSTGRES_HOST=${infraVm}
-POSTGRES_PORT=5432
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=\${PAN_POSTGRES_PASSWORD:-panopticon}
-DATABASE_NAME=myn_${normalizedId.replace(/-/g, '_')}
-
-REDIS_HOST=${infraVm}
-REDIS_PORT=6379
-REDIS_DATABASE=0
-
-# Spring Boot (if applicable)
-SPRING_DATASOURCE_URL=jdbc:postgresql://${infraVm}:5432/myn_${normalizedId.replace(/-/g, '_')}
-SPRING_DATA_REDIS_HOST=${infraVm}
+DATABASE_NAME=${dbName}
 `;
 
   await exe.ssh(vmName, `cat > ~/workspace/.env.remote << 'EOF'
 ${envContent}
 EOF`);
-
-  // Step 5: Create database on shared postgres
-  const dbName = `myn_${normalizedId.replace(/-/g, '_')}`;
-  try {
-    await exe.ssh(infraVm, `docker exec pan-postgres psql -U postgres -c "CREATE DATABASE ${dbName}" 2>/dev/null || true`);
-  } catch {
-    // Non-fatal - database might already exist
-  }
 
   // Step 6: Install beads CLI globally on remote VM
   if (options.spinner) {
@@ -200,9 +178,8 @@ EOF`);
   const metadata: RemoteWorkspaceMetadata = {
     id: normalizedId,
     issue: issueId.toUpperCase(),
-    provider: 'exe',
+    provider: 'fly',
     vmName,
-    infraVm,
     database: dbName,
     redisDb: 0,
     urls: {
