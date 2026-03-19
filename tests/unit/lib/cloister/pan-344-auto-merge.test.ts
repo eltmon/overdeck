@@ -115,7 +115,7 @@ describe('checkReadyForMergeStuck', () => {
     } as any);
   });
 
-  it('triggers merge for a stuck readyForMerge issue older than 2 min', async () => {
+  it('detects a stuck readyForMerge issue older than 2 min (PAN-354: no auto-merge, just logs)', async () => {
     _statusData = {
       'PAN-344': {
         issueId: 'PAN-344',
@@ -127,12 +127,11 @@ describe('checkReadyForMergeStuck', () => {
 
     const actions = await checkReadyForMergeStuck();
 
-    expect(mockFetch).toHaveBeenCalledOnce();
-    const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toMatch(/\/api\/workspaces\/PAN-344\/merge/);
-    expect(opts.method).toBe('POST');
+    // PAN-354: auto-merge was removed — deacon logs but does NOT call the merge API
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(actions.length).toBeGreaterThan(0);
     expect(actions[0]).toContain('PAN-344');
+    expect(actions[0]).toContain('readyForMerge');
   });
 
   it('skips an issue where mergeStatus is already "merging"', async () => {
@@ -190,33 +189,14 @@ describe('checkReadyForMergeStuck', () => {
     expect(actions).toHaveLength(0);
   });
 
-  it('circuit breaker stops triggering after 3 attempts for the same issue', async () => {
+  it('per-issue cooldown suppresses repeated alerts within 10 min window', async () => {
     // Use a unique key isolated from other tests (mergeStuckCooldowns Map persists within a file)
-    const CKEY = 'PAN-CB-CIRCUIT';
+    const CKEY = 'PAN-CB-COOLDOWN';
 
     vi.useFakeTimers();
     // Start far in the future to avoid colliding with real-clock cooldowns from other tests
-    let fakeNow = NOW + 200 * 60 * 60 * 1000; // +200 hours
+    let fakeNow = NOW + 400 * 60 * 60 * 1000; // +400 hours
 
-    // Make 3 successful attempts, advancing past the 10-min cooldown each time
-    for (let attempt = 0; attempt < 3; attempt++) {
-      vi.setSystemTime(fakeNow);
-      _statusData = {
-        [CKEY]: {
-          issueId: CKEY,
-          readyForMerge: true,
-          mergeStatus: undefined,
-          updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
-        },
-      };
-      await checkReadyForMergeStuck();
-      fakeNow += 11 * 60 * 1000; // advance 11 min (past the 10-min cooldown)
-    }
-
-    const callsAfterThree = mockFetch.mock.calls.length;
-    expect(callsAfterThree).toBeGreaterThanOrEqual(3);
-
-    // 4th attempt — should be blocked by the circuit breaker
     vi.setSystemTime(fakeNow);
     _statusData = {
       [CKEY]: {
@@ -226,9 +206,25 @@ describe('checkReadyForMergeStuck', () => {
         updatedAt: new Date(fakeNow - 5 * 60 * 1000).toISOString(),
       },
     };
-    await checkReadyForMergeStuck();
+
+    // First call — should produce an action
+    const first = await checkReadyForMergeStuck();
+    expect(first.length).toBeGreaterThan(0);
+
+    // Second call immediately after — within the 10-min cooldown, should be suppressed
+    const second = await checkReadyForMergeStuck();
+    expect(second).toHaveLength(0);
+
+    // Advance past the 10-min cooldown — should fire again
+    fakeNow += 11 * 60 * 1000;
+    vi.setSystemTime(fakeNow);
+    _statusData[CKEY].updatedAt = new Date(fakeNow - 5 * 60 * 1000).toISOString();
+    const third = await checkReadyForMergeStuck();
+    expect(third.length).toBeGreaterThan(0);
+
     vi.useRealTimers();
 
-    expect(mockFetch.mock.calls.length).toBe(callsAfterThree);
+    // PAN-354: no fetch calls — auto-merge was removed
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
