@@ -1053,66 +1053,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
                   <span>Status may be stale ({formatRelativeTime(reviewStatus.updatedAt)})</span>
                 </div>
               )}
-              <div className="flex items-center gap-2 mb-1">
-                <span style={{ color: textSecondary }}>Review:</span>
-                <span className={
-                  reviewStatus.reviewStatus === 'passed' ? 'text-green-400' :
-                  reviewStatus.reviewStatus === 'blocked' || reviewStatus.reviewStatus === 'failed' ? 'text-red-400' :
-                  reviewStatus.reviewStatus === 'reviewing' ? 'text-yellow-400' : 'text-gray-500'
-                }>
-                  {reviewStatus.reviewStatus === 'passed' ? '✓ Passed' :
-                   reviewStatus.reviewStatus === 'blocked' ? '✗ Blocked' :
-                   reviewStatus.reviewStatus === 'failed' ? '✗ Failed' :
-                   reviewStatus.reviewStatus === 'reviewing' ? '⟳ Reviewing...' : 'Pending'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mb-1">
-                <span style={{ color: textSecondary }}>Tests:</span>
-                <span className={
-                  reviewStatus.testStatus === 'passed' ? 'text-green-400' :
-                  reviewStatus.testStatus === 'failed' ? 'text-red-400' :
-                  reviewStatus.testStatus === 'testing' ? 'text-yellow-400' : 'text-gray-500'
-                }>
-                  {reviewStatus.testStatus === 'passed' ? '✓ Passed' :
-                   reviewStatus.testStatus === 'failed' ? '✗ Failed' :
-                   reviewStatus.testStatus === 'testing' ? '⟳ Testing...' :
-                   reviewStatus.testStatus === 'skipped' ? '⊘ Skipped' : 'Pending'}
-                </span>
-              </div>
-              {/* Verification status */}
-              {reviewStatus.verificationStatus && reviewStatus.verificationStatus !== 'pending' && (
-                <div className={`flex items-center gap-2 mb-1 ${
-                  reviewStatus.verificationStatus === 'failed'
-                    ? 'bg-red-900/20 rounded px-1 -mx-1'
-                    : reviewStatus.verificationStatus === 'running'
-                    ? 'bg-yellow-900/10 rounded px-1 -mx-1'
-                    : ''
-                }`}>
-                  <span style={{ color: textSecondary }}>Verify:</span>
-                  <span className={
-                    reviewStatus.verificationStatus === 'passed' ? 'text-green-400' :
-                    reviewStatus.verificationStatus === 'failed' ? 'text-red-400' :
-                    reviewStatus.verificationStatus === 'skipped' ? 'text-gray-500' :
-                    'text-yellow-400'
-                  }>
-                    {reviewStatus.verificationStatus === 'passed' ? '✓ Passed' :
-                     reviewStatus.verificationStatus === 'failed' ? '✗ Failed' :
-                     reviewStatus.verificationStatus === 'skipped' ? '⊘ Skipped' :
-                     '⟳ Running...'}
-                  </span>
-                  {(reviewStatus.verificationCycleCount ?? 0) > 0 && (
-                    <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= (reviewStatus.verificationMaxCycles ?? 3) ? 'text-red-400' : 'text-gray-500'}`}>
-                      Attempt {reviewStatus.verificationCycleCount}/{reviewStatus.verificationMaxCycles ?? 3}
-                    </span>
-                  )}
-                </div>
-              )}
-              {reviewStatus.verificationStatus === 'failed' && reviewStatus.verificationNotes && (
-                <div className="text-[10px] text-red-300 mt-0.5 ml-2">{reviewStatus.verificationNotes}</div>
-              )}
+              {/* Cycle count — top line for immediate context */}
               {(reviewStatus.autoRequeueCount ?? 0) > 0 && (
-                <div className="flex items-center gap-2 mt-1">
-                  <span style={{ color: textSecondary }}>Cycles:</span>
+                <div className="flex items-center gap-2 mb-1.5 pb-1.5 border-b border-gray-700/50">
+                  <span style={{ color: textSecondary }}>Cycle:</span>
                   <span className={(reviewStatus.autoRequeueCount ?? 0) >= 3 ? 'text-red-400 font-medium' : 'text-white'}>
                     {reviewStatus.autoRequeueCount}/3
                   </span>
@@ -1123,8 +1067,65 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
                   )}
                 </div>
               )}
-              {reviewStatus.reviewNotes && <div className="mt-1 text-xs" style={{ color: textSecondary }}>{reviewStatus.reviewNotes}</div>}
-              {reviewStatus.testNotes && <div className="mt-1 text-xs" style={{ color: textSecondary }}>{reviewStatus.testNotes}</div>}
+              {/* Pipeline in execution order: Verify → Review → Tests */}
+              <div className={`flex items-center gap-2 mb-1 ${
+                reviewStatus.verificationStatus === 'failed'
+                  ? 'bg-red-900/20 rounded px-1 -mx-1'
+                  : reviewStatus.verificationStatus === 'running'
+                  ? 'bg-yellow-900/10 rounded px-1 -mx-1'
+                  : ''
+              }`}>
+                <span style={{ color: textSecondary }}>Verify:</span>
+                <span className={
+                  !reviewStatus.verificationStatus || reviewStatus.verificationStatus === 'pending' ? 'text-gray-500' :
+                  reviewStatus.verificationStatus === 'passed' ? 'text-green-400' :
+                  reviewStatus.verificationStatus === 'failed' ? 'text-red-400' :
+                  reviewStatus.verificationStatus === 'skipped' ? 'text-gray-500' :
+                  'text-yellow-400'
+                }>
+                  {!reviewStatus.verificationStatus || reviewStatus.verificationStatus === 'pending' ? '○ Pending' :
+                   reviewStatus.verificationStatus === 'passed' ? '✓ Passed' :
+                   reviewStatus.verificationStatus === 'failed' ? '✗ Failed' :
+                   reviewStatus.verificationStatus === 'skipped' ? '⊘ Skipped' :
+                   '⟳ Running...'}
+                </span>
+                {(reviewStatus.verificationCycleCount ?? 0) > 0 && (
+                  <span className={`text-[10px] ${(reviewStatus.verificationCycleCount ?? 0) >= (reviewStatus.verificationMaxCycles ?? 3) ? 'text-red-400' : 'text-gray-500'}`}>
+                    ({reviewStatus.verificationCycleCount}/{reviewStatus.verificationMaxCycles ?? 3})
+                  </span>
+                )}
+              </div>
+              {reviewStatus.verificationStatus === 'failed' && reviewStatus.verificationNotes && (
+                <div className="text-[10px] text-red-300 mt-0.5 mb-1 ml-2">{reviewStatus.verificationNotes}</div>
+              )}
+              <div className="flex items-center gap-2 mb-1">
+                <span style={{ color: textSecondary }}>Review:</span>
+                <span className={
+                  reviewStatus.reviewStatus === 'passed' ? 'text-green-400' :
+                  reviewStatus.reviewStatus === 'blocked' || reviewStatus.reviewStatus === 'failed' ? 'text-red-400' :
+                  reviewStatus.reviewStatus === 'reviewing' ? 'text-yellow-400' : 'text-gray-500'
+                }>
+                  {reviewStatus.reviewStatus === 'passed' ? '✓ Passed' :
+                   reviewStatus.reviewStatus === 'blocked' ? '✗ Blocked' :
+                   reviewStatus.reviewStatus === 'failed' ? '✗ Failed' :
+                   reviewStatus.reviewStatus === 'reviewing' ? '⟳ Reviewing...' : '○ Pending'}
+                </span>
+              </div>
+              {reviewStatus.reviewNotes && <div className="text-[10px] mt-0.5 mb-1 ml-2" style={{ color: textSecondary }}>{reviewStatus.reviewNotes}</div>}
+              <div className="flex items-center gap-2 mb-1">
+                <span style={{ color: textSecondary }}>Tests:</span>
+                <span className={
+                  reviewStatus.testStatus === 'passed' ? 'text-green-400' :
+                  reviewStatus.testStatus === 'failed' ? 'text-red-400' :
+                  reviewStatus.testStatus === 'testing' ? 'text-yellow-400' : 'text-gray-500'
+                }>
+                  {reviewStatus.testStatus === 'passed' ? '✓ Passed' :
+                   reviewStatus.testStatus === 'failed' ? '✗ Failed' :
+                   reviewStatus.testStatus === 'testing' ? '⟳ Testing...' :
+                   reviewStatus.testStatus === 'skipped' ? '⊘ Skipped' : '○ Pending'}
+                </span>
+              </div>
+              {reviewStatus.testNotes && <div className="text-[10px] mt-0.5 mb-1 ml-2" style={{ color: textSecondary }}>{reviewStatus.testNotes}</div>}
               {reviewStatus.history && reviewStatus.history.length > 0 && <StatusHistory history={reviewStatus.history} />}
             </div>
           )}
