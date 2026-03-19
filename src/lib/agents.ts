@@ -420,7 +420,7 @@ function determineModel(options: SpawnOptions): string {
 }
 
 /**
- * Transition an issue to "in_progress" in its tracker.
+ * Shared tracker resolution logic for issue state transitions.
  *
  * Resolution order:
  * 1. Primary tracker from global config (e.g. Linear)
@@ -431,7 +431,7 @@ function determineModel(options: SpawnOptions): string {
  * This means projects that only have a github_repo (no linear_team) will
  * still get their issues transitioned correctly without any extra config.
  */
-async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
+async function transitionIssueState(issueId: string, state: IssueState, workspacePath?: string): Promise<void> {
   const config = loadConfig();
   const trackersConfig = config.trackers;
 
@@ -445,8 +445,8 @@ async function transitionIssueToInProgress(issueId: string, workspacePath?: stri
     for (const trackerType of trackerTypes) {
       try {
         const tracker = createTrackerFromConfig(trackersConfig, trackerType);
-        await tracker.transitionIssue(issueId, 'in_progress');
-        console.log(`[agents] Transitioned ${issueId} to in_progress via ${trackerType}`);
+        await tracker.transitionIssue(issueId, state);
+        console.log(`[agents] Transitioned ${issueId} to ${state} via ${trackerType}`);
         return;
       } catch {
         // Issue not found in this tracker or transition failed, try next
@@ -455,24 +455,27 @@ async function transitionIssueToInProgress(issueId: string, workspacePath?: stri
   }
 
   // Fall back to the project's own tracker derived from the workspace path.
-  // This handles projects with github_repo or gitlab_repo but no linear_team.
   if (workspacePath) {
     const projectConfig = findProjectByPath(workspacePath);
     if (projectConfig?.github_repo) {
       const [owner, repo] = projectConfig.github_repo.split('/');
       try {
         const tracker = createTracker({ type: 'github', owner, repo });
-        await tracker.transitionIssue(issueId, 'in_progress');
-        console.log(`[agents] Transitioned ${issueId} to in_progress via project GitHub (${projectConfig.github_repo})`);
+        await tracker.transitionIssue(issueId, state);
+        console.log(`[agents] Transitioned ${issueId} to ${state} via project GitHub (${projectConfig.github_repo})`);
         return;
       } catch (err: any) {
         console.warn(`[agents] Could not transition via project GitHub (${projectConfig.github_repo}): ${err.message}`);
       }
     }
     if (projectConfig?.gitlab_repo) {
-      console.warn(`[agents] GitLab project detected (${projectConfig.gitlab_repo}) but GitLab does not support in_progress label transitions`);
+      console.warn(`[agents] GitLab project detected (${projectConfig.gitlab_repo}) but GitLab does not support ${state} label transitions`);
     }
   }
+}
+
+async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
+  return transitionIssueState(issueId, 'in_progress', workspacePath);
 }
 
 /**
@@ -480,43 +483,7 @@ async function transitionIssueToInProgress(issueId: string, workspacePath?: stri
  * Fire-and-forget — logs warnings on failure but never blocks the pipeline.
  */
 export async function transitionIssueToInReview(issueId: string, workspacePath?: string): Promise<void> {
-  const config = loadConfig();
-  const trackersConfig = config.trackers;
-
-  // Try primary/secondary trackers (may not be configured)
-  if (trackersConfig?.primary) {
-    const trackerTypes: TrackerType[] = [trackersConfig.primary];
-    if (trackersConfig.secondary) {
-      trackerTypes.push(trackersConfig.secondary);
-    }
-
-    for (const trackerType of trackerTypes) {
-      try {
-        const tracker = createTrackerFromConfig(trackersConfig, trackerType);
-        await tracker.transitionIssue(issueId, 'in_review');
-        console.log(`[agents] Transitioned ${issueId} to in_review via ${trackerType}`);
-        return;
-      } catch {
-        // Issue not found in this tracker or transition failed, try next
-      }
-    }
-  }
-
-  // Fall back to the project's own tracker derived from the workspace path.
-  if (workspacePath) {
-    const projectConfig = findProjectByPath(workspacePath);
-    if (projectConfig?.github_repo) {
-      const [owner, repo] = projectConfig.github_repo.split('/');
-      try {
-        const tracker = createTracker({ type: 'github', owner, repo });
-        await tracker.transitionIssue(issueId, 'in_review');
-        console.log(`[agents] Transitioned ${issueId} to in_review via project GitHub (${projectConfig.github_repo})`);
-        return;
-      } catch (err: any) {
-        console.warn(`[agents] Could not transition via project GitHub (${projectConfig.github_repo}): ${err.message}`);
-      }
-    }
-  }
+  return transitionIssueState(issueId, 'in_review', workspacePath);
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
