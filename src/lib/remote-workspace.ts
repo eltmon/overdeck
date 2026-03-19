@@ -180,8 +180,6 @@ EOF`);
     issue: issueId.toUpperCase(),
     provider: 'fly',
     vmName,
-    database: dbName,
-    redisDb: 0,
     urls: {
       frontend: frontendUrl || undefined,
       api: apiUrl || undefined,
