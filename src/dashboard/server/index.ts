@@ -7282,8 +7282,37 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
     });
   }
 
-  // Guard: no-op if review already passed (prevents redundant re-review requests)
+  // If review already passed but tests failed, re-queue tests instead of short-circuiting.
+  // This handles the case where an agent fixes a test failure and resubmits.
   if (existingStatus?.reviewStatus === 'passed') {
+    if (existingStatus.testStatus === 'failed') {
+      console.log(`[request-review] ${issueId}: review passed but tests failed — re-queuing test specialist`);
+      setReviewStatus(issueId, { testStatus: 'pending' });
+      // Fire test specialist queue (same as post-review flow)
+      try {
+        const teamPrefix = extractTeamPrefix(issueId);
+        const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+        const projectPath = projectConfig?.path || '';
+        const workspacesDir = projectConfig?.workspace?.workspaces_dir || 'workspaces';
+        const workspacePath = join(projectPath, workspacesDir, `feature-${issueId.toLowerCase()}`);
+        const branchName = `feature/${issueId.toLowerCase()}`;
+        setReviewStatus(issueId, { testStatus: 'testing' });
+        const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
+        const wakeResult = await wakeSpecialistOrQueue('test-agent', {
+          issueId,
+          workspace: workspacePath,
+          branch: branchName,
+        });
+        console.log(`[request-review] Test specialist ${wakeResult.success ? 'woken' : 'failed'} for ${issueId}`);
+      } catch (err: any) {
+        console.warn(`[request-review] Failed to queue test specialist for ${issueId}: ${err.message}`);
+      }
+      return res.json({
+        success: true,
+        requeued: true,
+        message: `Tests re-queued for ${issueId} (review already passed)`,
+      });
+    }
     console.log(`[request-review] ${issueId}: review already passed — returning success no-op`);
     return res.json({
       success: true,
