@@ -32,6 +32,7 @@ import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getH
 import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../lib/cloister/specialist-handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
 import { setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { checkSpecialistQueue } from '../../lib/cloister/specialists.js';
 import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent, messageAgent, stopAgent } from '../../lib/agents.js';
 import { sendKeysAsync } from '../../lib/tmux.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
@@ -204,6 +205,10 @@ import {
   getReviewStatus,
   clearReviewStatus,
 } from './review-status.js';
+import {
+  computeQueuePositionFromStatus,
+  findPositionInQueue,
+} from '../../lib/queue-position.js';
 
 // Wrapper that adds auto-PR creation, Linear status update, and auto-merge trigger
 // on top of the base setReviewStatus.
@@ -1786,6 +1791,14 @@ app.get('/api/agents', async (_req, res) => {
         const runtimeState = getAgentRuntimeState(name);
         const isIdle = runtimeState?.state === 'idle' || (runtimeState?.currentTool === 'AskUserQuestion' && pendingQuestions.length === 0);
 
+        // Suppress INPUT badge during active specialist phases (PAN-366)
+        // The work agent IS idle during review/test/merge — that's expected.
+        // INPUT should only fire when human attention is genuinely needed.
+        const issueReviewStatus = getReviewStatus(issueId);
+        const hasActiveSpecialist = issueReviewStatus?.reviewStatus === 'reviewing'
+          || issueReviewStatus?.testStatus === 'testing'
+          || issueReviewStatus?.mergeStatus === 'merging';
+
         // Check workspace location (local vs remote)
         const workspaceLocation = getWorkspaceLocation(issueId);
 
@@ -1820,7 +1833,7 @@ app.get('/api/agents', async (_req, res) => {
           git: gitStatus,
           type: 'agent',
           agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
-          hasPendingQuestion: pendingQuestions.length > 0 || isIdle || runtimeState?.resolution === 'needs_input',
+          hasPendingQuestion: !hasActiveSpecialist && (pendingQuestions.length > 0 || isIdle || runtimeState?.resolution === 'needs_input'),
           pendingQuestionCount: pendingQuestions.length,
           resolution: runtimeState?.resolution || 'working',
           resolutionCount: runtimeState?.resolutionCount || 0,
@@ -6712,16 +6725,50 @@ async function processSpecialistQueueImmediate(
   }
 }
 
-// Get review status for a workspace
+// Get review status for a workspace (PAN-366: includes queuePosition + activeSpecialist)
 app.get('/api/workspaces/:issueId/review-status', (req, res) => {
   const { issueId } = req.params;
   const status = getReviewStatus(issueId);
-  res.json(status || {
+  const base = status || {
     issueId,
     reviewStatus: 'pending',
     testStatus: 'pending',
     readyForMerge: false,
-  });
+  };
+
+  // Compute queue position and active specialist (PAN-366)
+  let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
+
+  if (queuePosition === null) {
+    // Not actively processing — check specialist queues for pending items
+    try {
+      const reviewQueue = checkSpecialistQueue('review-agent');
+      const reviewPos = findPositionInQueue(issueId, reviewQueue.items);
+      if (reviewPos > 0) {
+        queuePosition = reviewPos;
+        activeSpecialist = 'review';
+      } else {
+        const testQueue = checkSpecialistQueue('test-agent');
+        const testPos = findPositionInQueue(issueId, testQueue.items);
+        if (testPos > 0) {
+          queuePosition = testPos;
+          activeSpecialist = 'test';
+        } else {
+          const mergeQueue = checkSpecialistQueue('merge-agent');
+          const mergePos = findPositionInQueue(issueId, mergeQueue.items);
+          if (mergePos > 0) {
+            queuePosition = mergePos;
+            activeSpecialist = 'merge';
+          }
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[review-status] Queue lookup failed for ${issueId} (non-fatal): ${msg}`);
+    }
+  }
+
+  res.json({ ...base, queuePosition, activeSpecialist });
 });
 
 // Update review status (called by specialists via CLI)
@@ -14831,6 +14878,74 @@ async function migrateCleanupAgentState(): Promise<void> {
   }
 }
 
+/**
+ * On startup, reset any review statuses stuck in 'reviewing' or 'testing'
+ * when no corresponding specialist tmux session is running (PAN-366).
+ *
+ * This handles crashes/restarts where the server died while a specialist
+ * was active, leaving the status permanently stuck in an active phase.
+ */
+async function cleanStaleSpecialistStatuses(): Promise<void> {
+  // Get live tmux sessions
+  let tmuxSessions: Set<string>;
+  try {
+    const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
+    tmuxSessions = new Set(stdout.trim().split('\n').filter(Boolean));
+  } catch {
+    return; // Cannot determine sessions — skip cleanup
+  }
+
+  // No sessions at all — nothing to do
+  if (tmuxSessions.size === 0) return;
+
+  const statuses = loadReviewStatuses();
+  let resetCount = 0;
+
+  for (const [key, status] of Object.entries(statuses)) {
+    const updates: Partial<ReviewStatus> = {};
+
+    if (status.reviewStatus === 'reviewing') {
+      // Match legacy "specialist-review-agent" and per-project "specialist-<key>-review-agent"
+      const hasReviewSession = [...tmuxSessions].some(
+        s => s === 'specialist-review-agent' || /^specialist-.+-review-agent$/.test(s)
+      );
+      if (!hasReviewSession) {
+        updates.reviewStatus = 'pending';
+        console.log(`[startup] Resetting stale reviewStatus 'reviewing' for ${key} (no review-agent session)`);
+      }
+    }
+
+    if (status.testStatus === 'testing') {
+      const hasTestSession = [...tmuxSessions].some(
+        s => s === 'specialist-test-agent' || /^specialist-.+-test-agent$/.test(s)
+      );
+      if (!hasTestSession) {
+        updates.testStatus = 'pending';
+        console.log(`[startup] Resetting stale testStatus 'testing' for ${key} (no test-agent session)`);
+      }
+    }
+
+    if (status.mergeStatus === 'merging') {
+      const hasMergeSession = [...tmuxSessions].some(
+        s => s === 'specialist-merge-agent' || /^specialist-.+-merge-agent$/.test(s)
+      );
+      if (!hasMergeSession) {
+        updates.mergeStatus = 'pending';
+        console.log(`[startup] Resetting stale mergeStatus 'merging' for ${key} (no merge-agent session)`);
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setReviewStatus(key, updates);
+      resetCount++;
+    }
+  }
+
+  if (resetCount > 0) {
+    console.log(`[startup] Reset ${resetCount} stale specialist status(es)`);
+  }
+}
+
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Panopticon API server running on http://0.0.0.0:${PORT}`);
   console.log(`WebSocket terminal available at ws://0.0.0.0:${PORT}/ws/terminal`);
@@ -14841,6 +14956,13 @@ server.listen(PORT, '0.0.0.0', async () => {
     await migrateCleanupAgentState();
   } catch (error: any) {
     console.error('Agent state cleanup failed:', error.message);
+  }
+
+  // Reset stale specialist statuses (PAN-366)
+  try {
+    await cleanStaleSpecialistStatuses();
+  } catch (error: any) {
+    console.error('Stale specialist status cleanup failed (non-fatal):', error.message);
   }
 
   // Import WAL cost events from all project repos on startup (deferred — non-blocking)
