@@ -60,7 +60,7 @@ export default {
       animation: {
         'fade-in': 'fade-in 0.3s ease-out',
         'slide-in-right': 'slide-in-right 0.2s ease-out',
-        'slide-out-right': 'slide-out-right 0.15s ease-in',
+        'slide-out-right': 'slide-out-right 0.2s ease-in',
       },
     },
   },

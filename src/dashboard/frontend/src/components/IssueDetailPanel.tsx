@@ -83,51 +83,9 @@ function formatTokens(tokens: number): string {
   return tokens.toString();
 }
 
-// Get friendly model name from full model ID
-function getFriendlyModelName(fullModel: string): string {
-  if (fullModel.includes('opus-4-6') || fullModel.includes('opus-4.6')) return 'Opus 4.6';
-  if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
-  if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus 4';
-  if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
-  if (fullModel.includes('sonnet-4') || fullModel.includes('sonnet')) return 'Sonnet 4';
-  if (fullModel.includes('haiku-4-5') || fullModel.includes('haiku-4.5')) return 'Haiku 4.5';
-  if (fullModel.includes('haiku-3')) return 'Haiku 3';
-  if (fullModel.includes('haiku')) return 'Haiku 4.5';
-  return fullModel;  // Return as-is if unknown
-}
-import { Issue, GitStatus } from '../types';
-
-interface ContainerStatus {
-  running: boolean;
-  uptime: string | null;
-}
-
-interface RepoGitStatus {
-  frontend: GitStatus | null;
-  api: GitStatus | null;
-}
-
-interface WorkspaceInfo {
-  exists: boolean;
-  corrupted?: boolean;
-  message?: string;
-  issueId: string;
-  path?: string;
-  frontendUrl?: string;
-  apiUrl?: string;
-  mrUrl?: string | null;
-  hasAgent?: boolean;
-  agentSessionId?: string | null;
-  agentModel?: string;
-  agentModelFull?: string;
-  git?: GitStatus;
-  repoGit?: RepoGitStatus;
-  services?: { name: string; url?: string }[];
-  containers?: Record<string, ContainerStatus> | null;
-  hasDocker?: boolean;
-  canContainerize?: boolean;
-  location?: 'local' | 'remote';
-}
+import { Issue } from '../types';
+import type { WorkspaceInfo } from './inspector/types';
+import { getFriendlyModelName } from './inspector/utils';
 
 interface IssueDetailPanelProps {
   issue: Issue;

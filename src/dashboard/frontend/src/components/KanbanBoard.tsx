@@ -18,24 +18,13 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
+import { getFriendlyModelName } from './inspector/utils';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban, XCircle, AlertCircle } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 
-// Model name formatting
-function getFriendlyModelName(fullModel: string): string {
-  if (fullModel.includes('opus-4-6') || fullModel.includes('opus-4.6')) return 'Opus 4.6';
-  if (fullModel.includes('opus-4-5') || fullModel.includes('opus-4.5')) return 'Opus 4.5';
-  if (fullModel.includes('opus-4-1')) return 'Opus 4.1';
-  if (fullModel.includes('opus-4') || fullModel.includes('opus')) return 'Opus';
-  if (fullModel.includes('sonnet-4-5') || fullModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
-  if (fullModel.includes('sonnet-4') || fullModel.includes('sonnet')) return 'Sonnet';
-  if (fullModel.includes('haiku-4-5') || fullModel.includes('haiku-4.5')) return 'Haiku 4.5';
-  if (fullModel.includes('haiku')) return 'Haiku';
-  return fullModel;
-}
 
 // Difficulty badge colors
 const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
@@ -1974,8 +1963,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
         isSelected
           ? 'ring-2 ring-blue-500'
           : 'hover:border-pan-border/80'
-      } ${isRunning ? 'bg-blue-900/20' : ''}`}
-      style={{ backgroundColor: isRunning ? undefined : '#0d1117' }}
+      } ${isRunning ? 'bg-blue-900/20' : 'bg-pan-panel-right'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
