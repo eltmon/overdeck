@@ -8168,21 +8168,6 @@ app.post('/api/agents', async (req, res) => {
       console.log(`[start-agent] Found PRD draft for ${issueId}`);
     }
 
-    // SAFEGUARD: Require beads tasks before work begins (planning must create them)
-    const workspaceBeadsDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.beads');
-    const hasBeads = existsSync(join(workspaceBeadsDir, 'issues.jsonl'));
-    if (hasBeads) {
-      const beadCount = readdirSync(workspaceBeadsDir).filter(f => f.endsWith('.md')).length;
-      console.log(`[start-agent] Found ${beadCount} beads tasks for ${issueId}`);
-    } else {
-      console.warn(`[start-agent] BLOCKED: No beads tasks found for ${issueId}`);
-      return res.status(422).json({
-        error: `No beads tasks found for ${issueId}. Planning must create task breakdown before work begins.`,
-        hint: 'Run planning again and ensure it creates beads with "bd create". The planning prompt requires this.',
-        issueId,
-      });
-    }
-
     // Ensure workspace exists — create it if missing (e.g. after deep-wipe)
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
@@ -8237,6 +8222,35 @@ app.post('/api/agents', async (req, res) => {
       } catch (copyErr) {
         console.warn(`[start-agent] Could not copy planning artifacts: ${copyErr}`);
       }
+    }
+
+    // Copy beads from project root to workspace if planning created them there
+    const workspaceBeadsDir = join(workspacePath, '.beads');
+    if (!existsSync(join(workspaceBeadsDir, 'issues.jsonl'))) {
+      // Check project root for beads (planning agent may have run from project root)
+      const projectRootBeadsDir = join(projectPath, '.beads');
+      if (existsSync(join(projectRootBeadsDir, 'issues.jsonl'))) {
+        try {
+          await execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, { encoding: 'utf-8' });
+          console.log(`[start-agent] Copied beads from project root to workspace for ${issueId}`);
+        } catch (copyErr) {
+          console.warn(`[start-agent] Could not copy beads: ${copyErr}`);
+        }
+      }
+    }
+
+    // SAFEGUARD: Require beads tasks before work begins (planning must create them)
+    const hasBeads = existsSync(join(workspaceBeadsDir, 'issues.jsonl'));
+    if (hasBeads) {
+      const beadCount = readdirSync(workspaceBeadsDir).filter(f => f.endsWith('.md')).length;
+      console.log(`[start-agent] Found ${beadCount} beads tasks for ${issueId}`);
+    } else {
+      console.warn(`[start-agent] BLOCKED: No beads tasks found for ${issueId}`);
+      return res.status(422).json({
+        error: `No beads tasks found for ${issueId}. Planning must create task breakdown before work begins.`,
+        hint: 'Run planning again and ensure it creates beads with "bd create". The planning prompt requires this.',
+        issueId,
+      });
     }
 
     if (planningDir) {
