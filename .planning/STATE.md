@@ -75,3 +75,8 @@ When wake returns `{success: false}` (not an exception), the code:
 - Refactoring the entire specialist queue system
 - Adding a general retry framework
 - Changing the review→test handoff architecture (just making the existing one reliable)
+
+## Specialist Feedback
+
+- **[2026-03-19T22:06Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-03-19T22:08Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`

@@ -1,5 +1,6 @@
 /**
  * Tests for PAN-343: test-agent delivery failure silently treated as success.
+ * Updated for PAN-369: retry logic, dispatch_failed status.
  *
  * Tests the exported `autoQueueTestAgentAndNotify` function from
  * src/lib/cloister/test-agent-queue.ts — the production code extracted from
@@ -8,12 +9,11 @@
  * Coverage:
  *  1. Wake succeeds (queued=false): testStatus='testing', agent notified
  *  2. Wake succeeds (queued=true, specialist busy): testStatus='testing', agent notified
- *  3. Wake fails: submitToSpecialistQueue called as fallback, agent notified
- *  4. Wake fails: testStatus still set to 'testing' via fallback path
+ *  3. Wake fails both attempts: retry sources verified, submitToSpecialistQueue called
+ *  4. Wake fails both attempts: testStatus still set to 'testing' via fallback path
  *  5. Already queued: no wake/re-queue, testStatus refreshed, agent notified
- *  6. Exception path: specialists module throws → testTaskDelivered=false,
- *     agent NOT notified (core PAN-343 safety invariant)
- *  7. Already-queued path calls setReviewStatus to refresh stale testStatus (B3)
+ *  6. Exception path: catch block sets testStatus='dispatch_failed' and does NOT notify agent
+ *  7. Exception + setReviewStatus throws: nested catch prevents outer throw, agent NOT notified
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -87,7 +87,7 @@ function queueAlreadyHasIssue() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('autoQueueTestAgentAndNotify (PAN-343)', () => {
+describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -118,7 +118,8 @@ describe('autoQueueTestAgentAndNotify (PAN-343)', () => {
     expect(notify).toHaveBeenCalled();
   });
 
-  it('falls back to submitToSpecialistQueue when wake fails', async () => {
+  it('retries once with different source then falls back to queue when both wake attempts fail', async () => {
+    vi.useFakeTimers();
     queueWithoutIssue();
     mockWakeSpecialistOrQueue.mockResolvedValue({
       success: false,
@@ -127,8 +128,27 @@ describe('autoQueueTestAgentAndNotify (PAN-343)', () => {
     });
     const notify = makeNotify();
 
-    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    const promise = autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await vi.advanceTimersByTimeAsync(2000);
+    await promise;
+    vi.useRealTimers();
 
+    // Both wake attempts must be made
+    expect(mockWakeSpecialistOrQueue).toHaveBeenCalledTimes(2);
+    // First attempt uses the primary source
+    expect(mockWakeSpecialistOrQueue).toHaveBeenNthCalledWith(
+      1,
+      'test-agent',
+      expect.objectContaining({ issueId: ISSUE }),
+      expect.objectContaining({ source: 'review-passed-auto' }),
+    );
+    // Retry uses a distinct source so logs are traceable
+    expect(mockWakeSpecialistOrQueue).toHaveBeenNthCalledWith(
+      2,
+      'test-agent',
+      expect.objectContaining({ issueId: ISSUE }),
+      expect.objectContaining({ source: 'review-passed-auto-retry' }),
+    );
     expect(mockSubmitToSpecialistQueue).toHaveBeenCalledWith('test-agent', {
       priority: 'normal',
       source: 'review-passed-delivery-retry',
@@ -138,7 +158,8 @@ describe('autoQueueTestAgentAndNotify (PAN-343)', () => {
     });
   });
 
-  it('sets testStatus to testing after wake-failure fallback', async () => {
+  it('sets testStatus to testing and notifies agent after both wake failures + queue fallback', async () => {
+    vi.useFakeTimers();
     queueWithoutIssue();
     mockWakeSpecialistOrQueue.mockResolvedValue({
       success: false,
@@ -147,8 +168,12 @@ describe('autoQueueTestAgentAndNotify (PAN-343)', () => {
     });
     const notify = makeNotify();
 
-    await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    const promise = autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await vi.advanceTimersByTimeAsync(2000);
+    await promise;
+    vi.useRealTimers();
 
+    // testStatus must only be set AFTER queue submission succeeds (not before)
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
     expect(notify).toHaveBeenCalledWith(
       `agent-${ISSUE.toLowerCase()}`,
@@ -169,8 +194,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343)', () => {
     expect(notify).toHaveBeenCalled();
   });
 
-  it('does NOT notify agent when specialists module throws (exception path safety invariant)', async () => {
-    // Simulate an unrecoverable error in the queuing block
+  it('sets testStatus to dispatch_failed and does NOT notify agent when specialists module throws', async () => {
     mockCheckSpecialistQueue.mockImplementation(() => {
       throw new Error('specialists module unavailable');
     });
@@ -178,7 +202,27 @@ describe('autoQueueTestAgentAndNotify (PAN-343)', () => {
 
     await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    // The core PAN-343 invariant: exception must NOT advance the pipeline
+    // Core PAN-343 invariant: exception must NOT advance the pipeline
+    expect(notify).not.toHaveBeenCalled();
+    // PAN-369: exception must set dispatch_failed so deacon can recover
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
+      testStatus: 'dispatch_failed',
+      testNotes: expect.stringContaining('specialists module unavailable'),
+    });
+  });
+
+  it('does not throw and does not notify agent when setReviewStatus itself throws in the catch block', async () => {
+    mockCheckSpecialistQueue.mockImplementation(() => {
+      throw new Error('specialists unavailable');
+    });
+    // setReviewStatus throws when trying to persist dispatch_failed
+    mockSetReviewStatus.mockImplementation(() => {
+      throw new Error('status file write failed');
+    });
+    const notify = makeNotify();
+
+    // The nested catch must prevent this from propagating
+    await expect(autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify)).resolves.toBeUndefined();
     expect(notify).not.toHaveBeenCalled();
   });
 });
