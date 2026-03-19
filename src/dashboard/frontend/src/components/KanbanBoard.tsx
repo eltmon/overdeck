@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
@@ -1923,10 +1923,20 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
     },
   });
 
-  const handleStartAgent = async (e: React.MouseEvent) => {
+  const [confirmingStart, setConfirmingStart] = useState(false);
+  const confirmingStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleStartAgent = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (await confirm({ title: 'Start Agent', message: `Start agent for ${issue.identifier}?`, confirmLabel: 'Start' })) {
+    if (confirmingStart) {
+      // Second click — confirmed
+      setConfirmingStart(false);
+      if (confirmingStartTimer.current) clearTimeout(confirmingStartTimer.current);
       startAgentMutation.mutate();
+    } else {
+      // First click — show inline confirm, auto-reset after 3s
+      setConfirmingStart(true);
+      confirmingStartTimer.current = setTimeout(() => setConfirmingStart(false), 3000);
     }
   };
 
@@ -2262,11 +2272,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
           <button
             onClick={handleStartAgent}
             disabled={startAgentMutation.isPending}
-            className="flex items-center gap-1 text-xs text-content-muted hover:text-content-subtle transition-colors disabled:opacity-50"
+            className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-content-muted hover:text-content-subtle'}`}
             title="Plan first recommended"
           >
             {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {startAgentMutation.isPending ? 'Starting...' : 'Start Agent'}
+            {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
           </button>
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
           {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
@@ -2305,10 +2315,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
           </button>
           <button
             onClick={handleStartAgent}
-            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            disabled={startAgentMutation.isPending}
+            className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
           >
-            <Play className="w-3.5 h-3.5" />
-            Resume Agent
+            {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Resume Agent'}
           </button>
           <button
             onClick={async (e) => {
