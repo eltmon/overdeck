@@ -5846,13 +5846,17 @@ app.post('/api/workspaces/:issueId/start', async (req, res) => {
   }
 
   // Copy planning artifacts and beads from project root if planning ran there
+  // Planning agent sometimes runs at project root instead of workspace, leaving
+  // artifacts at projectPath/.planning/issue-id/ instead of workspace/.planning/
   const workspacePlanningDir = join(workspacePath, '.planning');
-  if (!existsSync(workspacePlanningDir)) {
+  if (!existsSync(join(workspacePlanningDir, 'STATE.md'))) {
     const legacyPlanningDir = join(projectPath, '.planning', issueLower);
     if (existsSync(legacyPlanningDir)) {
       try {
-        await execAsync(`cp -r "${legacyPlanningDir}" "${workspacePlanningDir}"`, { encoding: 'utf-8' });
-        console.log(`[workspace/start] Copied planning from project root to workspace for ${issueId}`);
+        mkdirSync(workspacePlanningDir, { recursive: true });
+        // Copy contents (not the dir itself) so STATE.md lands at .planning/STATE.md
+        await execAsync(`cp -r "${legacyPlanningDir}/"* "${workspacePlanningDir}/"`, { encoding: 'utf-8', shell: '/bin/bash' });
+        console.log(`[workspace/start] Copied planning from ${legacyPlanningDir} to workspace for ${issueId}`);
       } catch (e) { console.warn(`[workspace/start] Could not copy planning: ${e}`); }
     }
   }
@@ -9217,10 +9221,11 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       }
 
       // Create planning prompt file - store IN workspace if exists (for git-backed planning)
-      // For remote workspaces, we'll write to the remote VM later
-      const planningDir = workspaceCreated && !isRemotePlanning
-        ? join(workspacePath, '.planning')
-        : join(projectPath, '.planning', issueLower);
+      // For remote workspaces, we'll write to the remote VM later.
+      // For local: always use workspace (abort above ensures it exists). PAN-358.
+      const planningDir = isRemotePlanning
+        ? join(projectPath, '.planning', issueLower)
+        : join(workspacePath, '.planning');
       if (!existsSync(planningDir)) {
         await execAsync(`mkdir -p "${planningDir}"`, { encoding: 'utf-8' });
       }
@@ -9562,10 +9567,27 @@ set -s escape-time 0
 
       } else {
         // ===== LOCAL PLANNING AGENT =====
-        writeFileSync(planningPromptPath, planningPrompt);
 
-        // Determine working directory - use workspace if created, otherwise project root
-        const agentCwd = workspaceCreated ? workspacePath : projectPath;
+        // CRITICAL: workspace MUST exist for local planning. If creation failed,
+        // abort — never fall back to project root, which causes beads and planning
+        // artifacts to land in the wrong place (PAN-358).
+        if (!workspaceCreated && !skipWorkspace) {
+          console.error(`[start-planning] ABORTING: workspace creation failed for ${issue.identifier}. Error: ${workspaceError || 'unknown'}`);
+          writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+            id: sessionName,
+            issueId: issue.identifier,
+            workspace: workspacePath,
+            status: 'failed',
+            error: `Workspace creation failed: ${workspaceError || 'unknown'}`,
+            startedAt: new Date().toISOString(),
+            type: 'planning',
+            location: 'local',
+          }, null, 2));
+          return; // Exit the background async block
+        }
+
+        const agentCwd = workspacePath;
+        writeFileSync(planningPromptPath, planningPrompt);
 
         // Start tmux session with Claude Code for planning (interactive TUI mode)
         // Use a launcher script to safely pass the prompt (avoids shell escaping issues)
