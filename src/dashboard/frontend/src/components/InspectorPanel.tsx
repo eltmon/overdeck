@@ -72,7 +72,8 @@ function formatTokens(tokens: number): string {
   return tokens.toString();
 }
 
-export { ReviewButtonState, getReviewButtonState } from './inspector/utils';
+export type { ReviewButtonState } from './inspector/utils';
+export { getReviewButtonState } from './inspector/utils';
 
 function copyToClipboard(text: string): boolean {
   if (navigator.clipboard && window.isSecureContext) {
