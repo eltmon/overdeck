@@ -1,0 +1,154 @@
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus } from 'lucide-react';
+import { CanvasTerminal } from './CanvasTerminal';
+import { useGodViewStore } from '../../hooks/useGodViewSocket';
+import type { Agent } from '../../types';
+
+interface AgentCardProps {
+  agent: Agent;
+  onClick: () => void;
+  'data-agent-id'?: string;
+}
+
+const STATUS_ICONS: Record<string, React.ReactNode> = {
+  healthy: <CheckCircle className="w-3 h-3" />,
+  warning: <AlertTriangle className="w-3 h-3" />,
+  stuck: <AlertTriangle className="w-3 h-3" />,
+  dead: <XCircle className="w-3 h-3" />,
+  stopped: <Minus className="w-3 h-3" />,
+};
+
+const STATUS_GLOW: Record<string, string> = {
+  healthy: 'gv-breathe-healthy',
+  warning: 'gv-breathe-warning',
+  stuck: 'gv-breathe-stuck',
+  dead: 'gv-breathe-dead',
+  stopped: 'gv-breathe-dead',
+};
+
+const PHASE_COLORS: Record<string, string> = {
+  planning: 'var(--gv-amber)',
+  implementation: 'var(--gv-blue)',
+  exploration: 'var(--gv-purple)',
+  testing: 'var(--gv-green)',
+};
+
+function UptimeCounter({ startedAt }: { startedAt: string }) {
+  const [elapsed, setElapsed] = useState('');
+  useEffect(() => {
+    const update = () => {
+      const ms = Date.now() - new Date(startedAt).getTime();
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      setElapsed(h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`);
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [startedAt]);
+  return <span className="gv-mono text-[10px]" style={{ color: 'var(--gv-text-secondary)' }}>{elapsed}</span>;
+}
+
+export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: AgentCardProps) {
+  const terminalLines = useGodViewStore((s) => s.agentOutput[agent.id] || []);
+  const liveStatus = useGodViewStore((s) => s.agentStatuses[agent.id] || agent.status);
+
+  const phaseColor = agent.agentPhase ? PHASE_COLORS[agent.agentPhase] || 'var(--gv-blue)' : 'var(--gv-blue)';
+
+  return (
+    <motion.div
+      data-agent-id={dataAgentId || agent.id}
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      whileHover={{ scale: 1.02, transition: { duration: 0.15 } }}
+      transition={{ duration: 0.2 }}
+      onClick={onClick}
+      className={`gv-glass cursor-pointer p-3 flex flex-col gap-2 relative overflow-hidden ${STATUS_GLOW[liveStatus] || ''}`}
+      style={{ borderColor: phaseColor + '44' }}
+    >
+      {/* Project color border accent (left) */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-0.5"
+        style={{ backgroundColor: phaseColor }}
+      />
+
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-2 pl-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span
+            className="text-xs font-bold truncate"
+            style={{ color: phaseColor, fontFamily: 'var(--gv-font-mono)' }}
+          >
+            {agent.issueId || agent.id}
+          </span>
+          {agent.agentPhase && (
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded font-medium uppercase"
+              style={{ color: phaseColor, background: phaseColor + '22' }}
+            >
+              {agent.agentPhase}
+            </span>
+          )}
+        </div>
+
+        {/* Status pill */}
+        <div className={`gv-status-pill ${liveStatus}`}>
+          {STATUS_ICONS[liveStatus]}
+          {liveStatus}
+        </div>
+      </div>
+
+      {/* Canvas terminal preview */}
+      <div className="pl-2">
+        {terminalLines.length > 0 ? (
+          <CanvasTerminal lines={terminalLines} rows={3} fontSize={10} />
+        ) : (
+          <div
+            className="h-10 rounded flex items-center justify-center text-[10px]"
+            style={{ background: 'rgba(10, 14, 26, 0.6)', color: 'var(--gv-text-dim)' }}
+          >
+            no output
+          </div>
+        )}
+      </div>
+
+      {/* Git branch */}
+      {agent.git?.branch && (
+        <div className="flex items-center gap-1 pl-2">
+          <GitBranch className="w-3 h-3 shrink-0" style={{ color: 'var(--gv-text-dim)' }} />
+          <span className="text-[10px] gv-mono truncate" style={{ color: 'var(--gv-text-secondary)' }}>
+            {agent.git.branch}
+          </span>
+        </div>
+      )}
+
+      {/* Bottom row: model, cost, uptime */}
+      <div className="flex items-center justify-between pl-2 mt-auto">
+        <div className="flex items-center gap-1.5">
+          <Cpu className="w-3 h-3" style={{ color: 'var(--gv-text-dim)' }} />
+          <span className="text-[10px] gv-mono" style={{ color: 'var(--gv-text-dim)' }}>
+            {agent.model?.replace('claude-', '').replace('-20251022', '').replace('-20250514', '') || 'unknown'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <Clock className="w-3 h-3" style={{ color: 'var(--gv-text-dim)' }} />
+          <UptimeCounter startedAt={agent.startedAt} />
+        </div>
+      </div>
+
+      {/* Pending question indicator */}
+      {agent.hasPendingQuestion && (
+        <div
+          className="absolute top-1 right-1 w-2 h-2 rounded-full"
+          style={{ backgroundColor: 'var(--gv-amber)', animation: 'gv-pulse 1s ease-in-out infinite' }}
+          title="Agent needs input"
+        />
+      )}
+    </motion.div>
+  );
+}
