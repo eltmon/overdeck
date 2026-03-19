@@ -1,0 +1,148 @@
+/**
+ * Tests for PAN-366: Review & Test button state logic in InspectorPanel.
+ *
+ * Tests the exported getReviewButtonState() helper for all relevant
+ * queuePosition / reviewStatus / testStatus combinations.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { getReviewButtonState } from './InspectorPanel';
+
+describe('getReviewButtonState', () => {
+  // ---------------------------------------------------------------------------
+  // Active (position === 0 or status === reviewing/testing)
+  // ---------------------------------------------------------------------------
+
+  it('shows "Reviewing..." and is disabled+spinning when queuePosition === 0 and specialist is review', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'reviewing', testStatus: 'pending', queuePosition: 0, activeSpecialist: 'review', readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Reviewing...');
+    expect(state.disabled).toBe(true);
+    expect(state.spinning).toBe(true);
+  });
+
+  it('shows "Testing..." when activeSpecialist is test', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'passed', testStatus: 'testing', queuePosition: 0, activeSpecialist: 'test', readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Testing...');
+    expect(state.disabled).toBe(true);
+    expect(state.spinning).toBe(true);
+  });
+
+  it('shows "Testing..." when testStatus is "testing" (legacy path without queuePosition)', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'testing', queuePosition: undefined, activeSpecialist: null, readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Testing...');
+    expect(state.disabled).toBe(true);
+    expect(state.spinning).toBe(true);
+  });
+
+  it('shows "Reviewing..." when reviewStatus is "reviewing" (legacy path)', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'reviewing', testStatus: 'pending', queuePosition: undefined, activeSpecialist: null, readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Reviewing...');
+    expect(state.disabled).toBe(true);
+    expect(state.spinning).toBe(true);
+  });
+
+  it('is disabled and spinning when mutation is pending', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: null, activeSpecialist: null, readyForMerge: false },
+      true // mutation pending
+    );
+    expect(state.disabled).toBe(true);
+    expect(state.spinning).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Queued (position >= 1)
+  // ---------------------------------------------------------------------------
+
+  it('shows "Queued" for position 1', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 1, activeSpecialist: 'review', readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Queued');
+    expect(state.disabled).toBe(true);
+    expect(state.spinning).toBe(false);
+  });
+
+  it('shows "Queued (2nd)" for position 2', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 2, activeSpecialist: 'review', readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Queued (2nd)');
+  });
+
+  it('shows "Queued (3rd)" for position 3', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 3, activeSpecialist: 'review', readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Queued (3rd)');
+  });
+
+  it('shows "Queued (4th)" for position 4', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 4, activeSpecialist: 'review', readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Queued (4th)');
+  });
+
+  it('shows "Queued (11th)" for position 11 (teens exception)', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 11, activeSpecialist: 'review', readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Queued (11th)');
+  });
+
+  it('shows "Queued (21st)" for position 21', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: 21, activeSpecialist: 'review', readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Queued (21st)');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Normal (not queued, not active)
+  // ---------------------------------------------------------------------------
+
+  it('shows "Review & Test" when idle and not ready for merge', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'pending', testStatus: 'pending', queuePosition: null, activeSpecialist: null, readyForMerge: false },
+      false
+    );
+    expect(state.label).toBe('Review & Test');
+    expect(state.disabled).toBe(false);
+    expect(state.spinning).toBe(false);
+  });
+
+  it('shows "Re-Review" when readyForMerge is true', () => {
+    const state = getReviewButtonState(
+      { reviewStatus: 'passed', testStatus: 'passed', queuePosition: null, activeSpecialist: null, readyForMerge: true },
+      false
+    );
+    expect(state.label).toBe('Re-Review');
+    expect(state.disabled).toBe(false);
+  });
+
+  it('shows "Review & Test" when reviewStatus is undefined', () => {
+    const state = getReviewButtonState(undefined, false);
+    expect(state.label).toBe('Review & Test');
+    expect(state.disabled).toBe(false);
+    expect(state.spinning).toBe(false);
+  });
+});

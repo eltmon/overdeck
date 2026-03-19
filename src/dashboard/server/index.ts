@@ -32,6 +32,7 @@ import { readHandoffEvents, readIssueHandoffEvents, readAgentHandoffEvents, getH
 import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../lib/cloister/specialist-handoff-logger.js';
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
 import { setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { checkSpecialistQueue } from '../../lib/cloister/specialists.js';
 import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent, messageAgent, stopAgent } from '../../lib/agents.js';
 import { sendKeysAsync } from '../../lib/tmux.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
@@ -204,6 +205,11 @@ import {
   getReviewStatus,
   clearReviewStatus,
 } from './review-status.js';
+import {
+  SPECIALIST_ACTIVE_POSITION,
+  computeQueuePositionFromStatus,
+  findPositionInQueue,
+} from '../../lib/queue-position.js';
 
 // Wrapper that adds auto-PR creation, Linear status update, and auto-merge trigger
 // on top of the base setReviewStatus.
@@ -6721,7 +6727,7 @@ async function processSpecialistQueueImmediate(
 }
 
 // Get review status for a workspace (PAN-366: includes queuePosition + activeSpecialist)
-app.get('/api/workspaces/:issueId/review-status', async (req, res) => {
+app.get('/api/workspaces/:issueId/review-status', (req, res) => {
   const { issueId } = req.params;
   const status = getReviewStatus(issueId);
   const base = status || {
@@ -6732,39 +6738,29 @@ app.get('/api/workspaces/:issueId/review-status', async (req, res) => {
   };
 
   // Compute queue position and active specialist (PAN-366)
-  let queuePosition: number | null = null;
-  let activeSpecialist: 'review' | 'test' | 'merge' | null = null;
+  let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
 
-  if (status?.reviewStatus === 'reviewing') {
-    queuePosition = 0;
-    activeSpecialist = 'review';
-  } else if (status?.testStatus === 'testing') {
-    queuePosition = 0;
-    activeSpecialist = 'test';
-  } else if (status?.mergeStatus === 'merging') {
-    queuePosition = 0;
-    activeSpecialist = 'merge';
-  } else {
-    // Check specialist queues for pending items matching this issueId
+  if (queuePosition === null) {
+    // Not actively processing — check specialist queues for pending items
     try {
-      const { checkSpecialistQueue } = await import('../../lib/cloister/specialists.js');
-      const issueIdUpper = issueId.toUpperCase();
-
       const reviewQueue = checkSpecialistQueue('review-agent');
-      const reviewIdx = reviewQueue.items.findIndex(
-        item => item.payload?.issueId?.toUpperCase() === issueIdUpper
-      );
-      if (reviewIdx >= 0) {
-        queuePosition = reviewIdx + 1;
+      const reviewPos = findPositionInQueue(issueId, reviewQueue.items);
+      if (reviewPos > 0) {
+        queuePosition = reviewPos;
         activeSpecialist = 'review';
       } else {
         const testQueue = checkSpecialistQueue('test-agent');
-        const testIdx = testQueue.items.findIndex(
-          item => item.payload?.issueId?.toUpperCase() === issueIdUpper
-        );
-        if (testIdx >= 0) {
-          queuePosition = testIdx + 1;
+        const testPos = findPositionInQueue(issueId, testQueue.items);
+        if (testPos > 0) {
+          queuePosition = testPos;
           activeSpecialist = 'test';
+        } else {
+          const mergeQueue = checkSpecialistQueue('merge-agent');
+          const mergePos = findPositionInQueue(issueId, mergeQueue.items);
+          if (mergePos > 0) {
+            queuePosition = mergePos;
+            activeSpecialist = 'merge';
+          }
         }
       }
     } catch {
@@ -14909,8 +14905,10 @@ async function cleanStaleSpecialistStatuses(): Promise<void> {
     const updates: Partial<ReviewStatus> = {};
 
     if (status.reviewStatus === 'reviewing') {
-      // Check if any review-agent session (legacy or per-project) is alive
-      const hasReviewSession = [...tmuxSessions].some(s => s.includes('review-agent'));
+      // Match legacy "specialist-review-agent" and per-project "specialist-<key>-review-agent"
+      const hasReviewSession = [...tmuxSessions].some(
+        s => s === 'specialist-review-agent' || /^specialist-.+-review-agent$/.test(s)
+      );
       if (!hasReviewSession) {
         updates.reviewStatus = 'pending';
         console.log(`[startup] Resetting stale reviewStatus 'reviewing' for ${key} (no review-agent session)`);
@@ -14918,10 +14916,22 @@ async function cleanStaleSpecialistStatuses(): Promise<void> {
     }
 
     if (status.testStatus === 'testing') {
-      const hasTestSession = [...tmuxSessions].some(s => s.includes('test-agent'));
+      const hasTestSession = [...tmuxSessions].some(
+        s => s === 'specialist-test-agent' || /^specialist-.+-test-agent$/.test(s)
+      );
       if (!hasTestSession) {
         updates.testStatus = 'pending';
         console.log(`[startup] Resetting stale testStatus 'testing' for ${key} (no test-agent session)`);
+      }
+    }
+
+    if (status.mergeStatus === 'merging') {
+      const hasMergeSession = [...tmuxSessions].some(
+        s => s === 'specialist-merge-agent' || /^specialist-.+-merge-agent$/.test(s)
+      );
+      if (!hasMergeSession) {
+        updates.mergeStatus = 'pending';
+        console.log(`[startup] Resetting stale mergeStatus 'merging' for ${key} (no merge-agent session)`);
       }
     }
 
