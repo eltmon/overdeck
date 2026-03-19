@@ -206,7 +206,6 @@ import {
   clearReviewStatus,
 } from './review-status.js';
 import {
-  SPECIALIST_ACTIVE_POSITION,
   computeQueuePositionFromStatus,
   findPositionInQueue,
 } from '../../lib/queue-position.js';
@@ -6763,8 +6762,9 @@ app.get('/api/workspaces/:issueId/review-status', (req, res) => {
           }
         }
       }
-    } catch {
-      // Non-fatal — queue info is optional
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[review-status] Queue lookup failed for ${issueId} (non-fatal): ${msg}`);
     }
   }
 
