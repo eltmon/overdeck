@@ -5845,6 +5845,28 @@ app.post('/api/workspaces/:issueId/start', async (req, res) => {
     return res.status(400).json({ error: 'Workspace does not exist' });
   }
 
+  // Copy planning artifacts and beads from project root if planning ran there
+  const workspacePlanningDir = join(workspacePath, '.planning');
+  if (!existsSync(workspacePlanningDir)) {
+    const legacyPlanningDir = join(projectPath, '.planning', issueLower);
+    if (existsSync(legacyPlanningDir)) {
+      try {
+        await execAsync(`cp -r "${legacyPlanningDir}" "${workspacePlanningDir}"`, { encoding: 'utf-8' });
+        console.log(`[workspace/start] Copied planning from project root to workspace for ${issueId}`);
+      } catch (e) { console.warn(`[workspace/start] Could not copy planning: ${e}`); }
+    }
+  }
+  const workspaceBeadsDir = join(workspacePath, '.beads');
+  if (!existsSync(join(workspaceBeadsDir, 'issues.jsonl'))) {
+    const projectRootBeadsDir = join(projectPath, '.beads');
+    if (existsSync(join(projectRootBeadsDir, 'issues.jsonl'))) {
+      try {
+        await execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, { encoding: 'utf-8' });
+        console.log(`[workspace/start] Copied beads from project root to workspace for ${issueId}`);
+      } catch (e) { console.warn(`[workspace/start] Could not copy beads: ${e}`); }
+    }
+  }
+
   // Check for ./dev script - repair if needed (older workspaces may lack symlink)
   const devScript = join(workspacePath, 'dev');
   const devScriptInContainer = join(workspacePath, '.devcontainer', 'dev');
