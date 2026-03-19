@@ -1292,7 +1292,6 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
         continue;
       }
 
-      const issueId = status.issueId || key;
       const ageMin = Math.round((now - new Date(status.updatedAt).getTime()) / 60000);
       console.warn(`[deacon] readyForMerge stuck for ${key} (age: ${ageMin}m, attempts: ${attempts}) — merge requires manual action via MERGE button`);
 
@@ -1305,7 +1304,7 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
       // Auto-triggering merge was removed in PAN-354; the MERGE button is the sole trigger.
       const msg = `Stuck-merge: ${key} has been readyForMerge for ${ageMin}m — click MERGE to proceed`;
       if (mergeReadyNotifier) {
-        mergeReadyNotifier(issueId);
+        mergeReadyNotifier(status.issueId ?? key);
         actions.push(msg);
         console.log(`[deacon] merge:ready notification sent for ${key}`);
       } else {
