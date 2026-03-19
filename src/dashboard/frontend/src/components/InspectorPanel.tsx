@@ -71,6 +71,9 @@ interface ReviewStatus {
   readyForMerge: boolean;
   autoRequeueCount?: number;
   history?: StatusHistoryEntry[];
+  // PAN-366: queue position info
+  queuePosition?: number | null;
+  activeSpecialist?: 'review' | 'test' | 'merge' | null;
 }
 
 interface WorkspaceInfo {
@@ -1149,17 +1152,40 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
             )}
 
             {/* Review & Test */}
-            <button
-              data-testid="review-test-btn"
-              onClick={handleReview}
-              disabled={reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing'}
-              className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-blue-400 hover:bg-blue-900/20"
-              style={{ backgroundColor: 'rgba(59,130,246,0.15)' }}
-            >
-              {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
-                <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-              {reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test'}
-            </button>
+            {(() => {
+              const isActive = reviewMutation.isPending
+                || reviewStatus?.queuePosition === 0
+                || reviewStatus?.reviewStatus === 'reviewing'
+                || reviewStatus?.testStatus === 'testing';
+              const isQueued = (reviewStatus?.queuePosition ?? null) !== null && reviewStatus?.queuePosition !== 0;
+              const queuePos = reviewStatus?.queuePosition;
+
+              let label: string;
+              if (isActive) {
+                if (reviewStatus?.activeSpecialist === 'test' || reviewStatus?.testStatus === 'testing') {
+                  label = 'Testing...';
+                } else {
+                  label = 'Reviewing...';
+                }
+              } else if (isQueued) {
+                label = queuePos === 1 ? 'Queued' : `Queued (${queuePos === 2 ? '2nd' : queuePos === 3 ? '3rd' : `${queuePos}th`})`;
+              } else {
+                label = reviewStatus?.readyForMerge ? 'Re-Review' : 'Review & Test';
+              }
+
+              return (
+                <button
+                  data-testid="review-test-btn"
+                  onClick={handleReview}
+                  disabled={isActive || isQueued}
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-50 text-blue-400 hover:bg-blue-900/20"
+                  style={{ backgroundColor: 'rgba(59,130,246,0.15)' }}
+                >
+                  {(isActive || isQueued) ? <Loader2 className={`w-3 h-3 ${isActive ? 'animate-spin' : 'opacity-50'}`} /> : <RefreshCw className="w-3 h-3" />}
+                  {label}
+                </button>
+              );
+            })()}
 
             {/* Stop Agent */}
             {agent && agent.status !== 'stopped' && (
