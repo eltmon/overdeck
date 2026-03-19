@@ -184,3 +184,66 @@ describe('createFlyProvider', () => {
     expect(p.getAppName()).toBe('pan-workspaces');
   });
 });
+
+import { createFlyProviderFromConfig } from '../../../src/lib/remote/index.js';
+
+describe('createFlyProviderFromConfig', () => {
+  beforeEach(() => {
+    process.env.FLY_API_TOKEN = 'test-token';
+  });
+
+  it('creates FlyProvider with defaults when no config provided', () => {
+    const fly = createFlyProviderFromConfig();
+    expect(fly).toBeInstanceOf(FlyProvider);
+    expect(fly.getAppName()).toBe('pan-workspaces');
+  });
+
+  it('maps fly config fields to FlyProvider options', () => {
+    const fly = createFlyProviderFromConfig({
+      fly: {
+        app: 'my-app',
+        org: 'my-org',
+        region: 'lax',
+        vm_size: 'shared-cpu-4x',
+        vm_memory: 2048,
+        image: 'registry.fly.io/custom:v1',
+        api_token_env: 'FLY_API_TOKEN',
+      },
+    });
+    expect(fly.getAppName()).toBe('my-app');
+  });
+
+  it('uses api_token_env to resolve token', () => {
+    process.env.CUSTOM_FLY_TOKEN = 'custom-token';
+    const fly = createFlyProviderFromConfig({
+      fly: { api_token_env: 'CUSTOM_FLY_TOKEN' },
+    });
+    expect(fly).toBeInstanceOf(FlyProvider);
+    delete process.env.CUSTOM_FLY_TOKEN;
+  });
+});
+
+describe('resolveVm — public method', () => {
+  let provider: FlyProvider;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.FLY_API_TOKEN = 'test-token';
+    provider = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad' });
+  });
+
+  it('falls back to API listing when no workspace metadata found', async () => {
+    mockApi.listMachines.mockResolvedValue([
+      { id: 'machine-1', name: 'test-vm', state: 'started', region: 'iad' }
+    ]);
+    // resolveVm is now public
+    const result = await provider.resolveVm('test-vm');
+    expect(result.appName).toBe('test-app');
+    expect(result.machineId).toBe('machine-1');
+  });
+
+  it('throws when vm not found', async () => {
+    mockApi.listMachines.mockResolvedValue([]);
+    await expect(provider.resolveVm('nonexistent')).rejects.toThrow('No Fly machine found');
+  });
+});
