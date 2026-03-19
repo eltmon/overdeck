@@ -1,17 +1,16 @@
 /**
- * Tests for PAN-366: queue position utilities and startup stale cleanup logic.
+ * Tests for PAN-366: queue position utilities.
  *
  * Coverage:
- *  - ordinalSuffix: 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st, 22nd, 101st
- *  - formatQueueLabel: position 1 → "Queued", 2+ → "Queued (Nth)"
  *  - computeQueuePositionFromStatus: reviewing/testing/merging → pos=0, null status → null
  *  - findPositionInQueue: found/not-found, case-insensitive
+ *
+ * Note: ordinal formatting is tested via InspectorPanel.test.tsx (getReviewButtonState),
+ * as the ordinal helpers live inside InspectorPanel.tsx for frontend-only use.
  */
 
 import { describe, it, expect } from 'vitest';
 import {
-  ordinalSuffix,
-  formatQueueLabel,
   computeQueuePositionFromStatus,
   findPositionInQueue,
   SPECIALIST_ACTIVE_POSITION,
@@ -32,74 +31,6 @@ function makeItem(issueId: string, idx = 0): HookItem {
     createdAt: new Date().toISOString(),
   };
 }
-
-// ---------------------------------------------------------------------------
-// ordinalSuffix
-// ---------------------------------------------------------------------------
-
-describe('ordinalSuffix', () => {
-  it('returns st for 1', () => expect(ordinalSuffix(1)).toBe('st'));
-  it('returns nd for 2', () => expect(ordinalSuffix(2)).toBe('nd'));
-  it('returns rd for 3', () => expect(ordinalSuffix(3)).toBe('rd'));
-  it('returns th for 4-10', () => {
-    for (const n of [4, 5, 6, 7, 8, 9, 10]) {
-      expect(ordinalSuffix(n)).toBe('th');
-    }
-  });
-  it('returns th for 11, 12, 13 (teens exception)', () => {
-    expect(ordinalSuffix(11)).toBe('th');
-    expect(ordinalSuffix(12)).toBe('th');
-    expect(ordinalSuffix(13)).toBe('th');
-  });
-  it('returns st for 21, 31, 101', () => {
-    expect(ordinalSuffix(21)).toBe('st');
-    expect(ordinalSuffix(31)).toBe('st');
-    expect(ordinalSuffix(101)).toBe('st');
-  });
-  it('returns nd for 22, 32', () => {
-    expect(ordinalSuffix(22)).toBe('nd');
-    expect(ordinalSuffix(32)).toBe('nd');
-  });
-  it('returns rd for 23, 33', () => {
-    expect(ordinalSuffix(23)).toBe('rd');
-    expect(ordinalSuffix(33)).toBe('rd');
-  });
-  it('returns th for 111, 112, 113', () => {
-    expect(ordinalSuffix(111)).toBe('th');
-    expect(ordinalSuffix(112)).toBe('th');
-    expect(ordinalSuffix(113)).toBe('th');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// formatQueueLabel
-// ---------------------------------------------------------------------------
-
-describe('formatQueueLabel', () => {
-  it('returns "Queued" for position 1', () => {
-    expect(formatQueueLabel(1)).toBe('Queued');
-  });
-
-  it('returns "Queued (2nd)" for position 2', () => {
-    expect(formatQueueLabel(2)).toBe('Queued (2nd)');
-  });
-
-  it('returns "Queued (3rd)" for position 3', () => {
-    expect(formatQueueLabel(3)).toBe('Queued (3rd)');
-  });
-
-  it('returns "Queued (4th)" for position 4', () => {
-    expect(formatQueueLabel(4)).toBe('Queued (4th)');
-  });
-
-  it('returns "Queued (11th)" for position 11', () => {
-    expect(formatQueueLabel(11)).toBe('Queued (11th)');
-  });
-
-  it('returns "Queued (21st)" for position 21', () => {
-    expect(formatQueueLabel(21)).toBe('Queued (21st)');
-  });
-});
 
 // ---------------------------------------------------------------------------
 // computeQueuePositionFromStatus
@@ -149,9 +80,7 @@ describe('computeQueuePositionFromStatus', () => {
     expect(result.activeSpecialist).toBeNull();
   });
 
-  it('reviewing takes precedence when both reviewing and testing would apply', () => {
-    // In practice both can't be true simultaneously, but the function should
-    // prioritise reviewing first per the evaluation order.
+  it('reviewing takes precedence when both reviewing and testing are set', () => {
     const result = computeQueuePositionFromStatus({
       reviewStatus: 'reviewing',
       testStatus: 'testing',

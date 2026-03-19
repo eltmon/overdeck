@@ -11,31 +11,6 @@ import type { HookItem } from './hooks.js';
 /** Sentinel value meaning the specialist is actively processing this issue now. */
 export const SPECIALIST_ACTIVE_POSITION = 0;
 
-/**
- * Return the English ordinal suffix for a positive integer.
- * Handles edge cases like 11th, 12th, 13th, 21st, 22nd, etc.
- */
-export function ordinalSuffix(n: number): string {
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return 'th';
-  const mod10 = n % 10;
-  if (mod10 === 1) return 'st';
-  if (mod10 === 2) return 'nd';
-  if (mod10 === 3) return 'rd';
-  return 'th';
-}
-
-/**
- * Format a queue position into a human-readable label.
- *
- * - Position 1  → "Queued"         (next up; no ordinal needed)
- * - Position 2+ → "Queued (2nd)", "Queued (3rd)", etc.
- */
-export function formatQueueLabel(pos: number): string {
-  if (pos === 1) return 'Queued';
-  return `Queued (${pos}${ordinalSuffix(pos)})`;
-}
-
 export interface QueuePositionResult {
   /** null = not queued; 0 = actively processing; 1+ = position in queue */
   queuePosition: number | null;
