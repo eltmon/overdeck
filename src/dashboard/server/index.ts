@@ -32,7 +32,7 @@ import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../lib/clo
 import { checkAllTriggers } from '../../lib/cloister/triggers.js';
 import { setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { checkSpecialistQueue } from '../../lib/cloister/specialists.js';
-import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent, messageAgent, stopAgent } from '../../lib/agents.js';
+import { getAgentState, getAgentRuntimeState, saveAgentRuntimeState, getActivity, appendActivity, saveSessionId, getSessionId, resumeAgent, messageAgent, stopAgent, transitionIssueToInReview } from '../../lib/agents.js';
 import { sendKeysAsync } from '../../lib/tmux.js';
 import { getAgentHealth } from '../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../lib/runtimes/index.js';
@@ -250,11 +250,6 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
       });
     }
 
-    // Update Linear status to "In Review"
-    updateLinearIssueStatus(issueId, 'In Review').catch(err => {
-      console.error(`[status] Error updating Linear to In Review for ${issueId}:`, err);
-    });
-
     // Notify the dashboard that this issue is ready to merge.
     // Auto-triggering merge was removed in PAN-354; the MERGE button is the sole trigger.
     console.log(`[merge] ${issueId} is ready for merge — emitting merge:ready notification`);
@@ -262,55 +257,6 @@ function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): Review
   }
 
   return updated;
-}
-
-/**
- * Update a Linear issue's status (state) by name.
- * No-op for GitHub issues or if LINEAR_API_KEY is not set.
- */
-async function updateLinearIssueStatus(issueId: string, statusName: string): Promise<void> {
-  if (resolveGitHubIssueShared(issueId).isGitHub) return;
-
-  const linearApiKey = getLinearApiKey();
-  if (!linearApiKey) {
-    console.warn(`[status] LINEAR_API_KEY not set, cannot update ${issueId} to ${statusName}`);
-    return;
-  }
-
-  const getIssueQuery = `
-    query GetIssue($id: String!) {
-      issue(id: $id) {
-        id
-        team { states { nodes { id name type } } }
-      }
-    }
-  `;
-  const issueResponse = await fetch('https://api.linear.app/graphql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': linearApiKey },
-    body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
-  });
-  const issueJson = await issueResponse.json() as any;
-  const states = issueJson.data?.issue?.team?.states?.nodes || [];
-  const linearId = issueJson.data?.issue?.id;
-  const targetState = states.find((s: any) => s.name.toLowerCase() === statusName.toLowerCase());
-
-  if (!linearId || !targetState) {
-    console.warn(`[status] Could not find Linear issue or "${statusName}" state for ${issueId}`);
-    return;
-  }
-
-  const updateMutation = `
-    mutation UpdateIssue($id: String!, $stateId: String!) {
-      issueUpdate(id: $id, input: { stateId: $stateId }) { success }
-    }
-  `;
-  await fetch('https://api.linear.app/graphql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': linearApiKey },
-    body: JSON.stringify({ query: updateMutation, variables: { id: linearId, stateId: targetState.id } }),
-  });
-  console.log(`[status] Updated ${issueId} to ${statusName} in Linear`);
 }
 
 /**
@@ -7129,9 +7075,10 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       return res.status(400).json({ error: 'Workspace does not exist' });
     }
 
-    // Note: Linear status is NOT updated here. "In Review" is set when
-    // readyForMerge becomes true (after both review and test pass), not
-    // when the review-agent starts.
+    // Transition issue to "In Review" now that the pipeline has started (fire-and-forget)
+    transitionIssueToInReview(issueId, workspacePath).catch((err) => {
+      console.warn(`[review] Could not transition ${issueId} to in_review: ${err.message}`);
+    });
 
     // 2. Push the feature branch to remote first
     try {
@@ -7408,6 +7355,11 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
       error: 'Workspace does not exist',
     });
   }
+
+  // Transition issue to "In Review" now that the pipeline is re-entering (fire-and-forget)
+  transitionIssueToInReview(issueId, workspacePath).catch((err) => {
+    console.warn(`[request-review] Could not transition ${issueId} to in_review: ${err.message}`);
+  });
 
   // Increment counter and queue for review
   const newCount = currentCount + 1;

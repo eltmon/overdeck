@@ -9,7 +9,7 @@
 export type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
 
 // Normalized issue state (lowest common denominator)
-export type IssueState = 'open' | 'in_progress' | 'closed';
+export type IssueState = 'open' | 'in_progress' | 'in_review' | 'closed';
 
 // Normalized issue format
 export interface Issue {
