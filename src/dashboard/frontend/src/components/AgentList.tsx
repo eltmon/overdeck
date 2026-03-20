@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Brain, Cpu, RotateCcw, Loader2, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle } from 'lucide-react';
-import { SpecialistAgentCard, type SpecialistAgent, type IssueInfo } from './SpecialistAgentCard';
+import { Brain, Cpu, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle } from 'lucide-react';
+import { type SpecialistAgent } from './SpecialistAgentCard';
 import { IssueAgentCard, type IssueAgent, type CloisterHealth } from './IssueAgentCard';
-import { useConfirm, useAlert } from './DialogProvider';
 
 interface CloisterHealthResponse {
   agents: CloisterHealth[];
@@ -32,12 +31,6 @@ interface ActivityEntry {
   command?: string;
   issueId?: string;
   output?: string;
-}
-
-interface Issue {
-  id: string;
-  identifier: string;
-  title: string;
 }
 
 interface AgentListProps {
@@ -97,12 +90,6 @@ async function fetchActivity(): Promise<ActivityEntry[]> {
   return res.json();
 }
 
-async function fetchIssues(): Promise<Issue[]> {
-  const res = await fetch('/api/issues');
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.issues || [];
-}
 
 async function startCloister(): Promise<void> {
   const res = await fetch('/api/cloister/start', { method: 'POST' });
@@ -127,21 +114,9 @@ function formatTimeAgo(timestamp: string | null): string {
   return `${Math.floor(diffMins / 60)}h ago`;
 }
 
-async function resetAllSpecialists(): Promise<void> {
-  const res = await fetch('/api/specialists/reset-all', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || 'Failed to reset specialists');
-  }
-}
 
 export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   const queryClient = useQueryClient();
-  const confirm = useConfirm();
-  const showAlert = useAlert();
   const { data: agents, isLoading: agentsLoading, error: agentsError } = useQuery({
     queryKey: ['agents'],
     queryFn: fetchAgents,
@@ -178,12 +153,6 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
     refetchInterval: 5000,
   });
 
-  const { data: issues } = useQuery({
-    queryKey: ['issues'],
-    queryFn: fetchIssues,
-    refetchInterval: 30000, // Less frequent - issues don't change often
-  });
-
   const startCloisterMutation = useMutation({
     mutationFn: startCloister,
     onSuccess: () => {
@@ -197,31 +166,6 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
       queryClient.invalidateQueries({ queryKey: ['cloister-status'] });
     },
   });
-
-  const resetAllMutation = useMutation({
-    mutationFn: resetAllSpecialists,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['specialists'] });
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-    },
-    onError: (error: Error) => {
-      showAlert({ message: `Failed to reset specialists: ${error.message}`, variant: 'error' });
-    },
-  });
-
-  const handleResetAll = async () => {
-    if (await confirm({ title: 'Reset Specialists', message: 'Reset ALL specialist agents?\n\nThis will kill any running specialists and clear their session files.', variant: 'destructive', confirmLabel: 'Reset All' })) {
-      resetAllMutation.mutate();
-    }
-  };
-
-  // Helper to get issue info from currentIssue ID
-  const getIssueInfo = (issueId?: string): IssueInfo | undefined => {
-    if (!issueId || !issues) return undefined;
-    const issue = issues.find(i => i.identifier.toLowerCase() === issueId.toLowerCase());
-    if (!issue) return undefined;
-    return { id: issue.id, identifier: issue.identifier, title: issue.title };
-  };
 
   // Check if any specialist is actually active (running tmux session)
   const anySpecialistActive = specialists?.some(s => s.isRunning) || false;
@@ -247,7 +191,6 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   }
 
   const runningAgents = agents?.filter((a) => a.status !== 'dead') || [];
-  const enabledSpecialists = specialists?.filter((s) => s.enabled) || [];
 
   return (
     <div className="space-y-4">
@@ -361,52 +304,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
         </div>
       )}
 
-      {/* Specialist Agents Section */}
-      <div className="bg-surface-raised rounded-lg">
-        <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
-          <h2 className="font-semibold text-content flex items-center gap-2">
-            <Brain className="w-5 h-5 text-purple-400" />
-            Specialist Agents ({enabledSpecialists.length})
-          </h2>
-          <button
-            onClick={handleResetAll}
-            disabled={resetAllMutation.isPending}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs text-content-subtle hover:text-yellow-400 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
-            title="Reset all specialists (kill & clear sessions)"
-          >
-            {resetAllMutation.isPending ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <RotateCcw className="w-3.5 h-3.5" />
-            )}
-            Reset All
-          </button>
-        </div>
-
-        <div className="divide-y divide-gray-700">
-          {enabledSpecialists.length === 0 ? (
-            <div className="p-8 text-center text-content-muted">
-              No specialist agents configured.
-            </div>
-          ) : (
-            enabledSpecialists.map((specialist) => (
-              <SpecialistAgentCard
-                key={specialist.name}
-                specialist={specialist}
-                issueInfo={getIssueInfo(specialist.currentIssue)}
-                onSelect={() =>
-                  onSelectAgent(
-                    specialist.tmuxSession === selectedAgent ? null : specialist.tmuxSession
-                  )
-                }
-                isSelected={specialist.tmuxSession === selectedAgent}
-              />
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Active Ephemeral Specialists Section */}
+      {/* Per-Project Specialists Section (PAN-378: replaced global specialist pool) */}
       {runningProjectSpecialists && runningProjectSpecialists.length > 0 && (
         <div className="bg-surface-raised rounded-lg">
           <div className="px-4 py-3 border-b border-divider">

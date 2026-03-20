@@ -7233,11 +7233,8 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
         promptOverride: reviewPrompt,
       });
     } else {
-      reviewResult = await wakeSpecialist('review-agent', reviewPrompt, {
-        waitForReady: true,
-        startIfNotRunning: true,
-        skipBusyGuard: true, // We already checked idle + set active above
-      });
+      console.error(`[review] Could not resolve project for ${issueId} — cannot spawn review specialist`);
+      reviewResult = { success: false, message: `No project configured for ${issueId}. Add it to projects.yaml.` };
     }
 
     if (!reviewResult.success) {
@@ -7300,13 +7297,19 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
         const workspacePath = join(projectPath, workspacesDir, `feature-${issueId.toLowerCase()}`);
         const branchName = `feature/${issueId.toLowerCase()}`;
         setReviewStatus(issueId, { testStatus: 'testing' });
-        const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
-        const wakeResult = await wakeSpecialistOrQueue('test-agent', {
-          issueId,
-          workspace: workspacePath,
-          branch: branchName,
-        });
-        console.log(`[request-review] Test specialist ${wakeResult.success ? 'woken' : 'failed'} for ${issueId}`);
+        const testProjectKey = projectConfig?.key || teamPrefix || '';
+        if (testProjectKey) {
+          const { spawnEphemeralSpecialist } = await import('../../lib/cloister/specialists.js');
+          const testResult = await spawnEphemeralSpecialist(testProjectKey, 'test-agent', {
+            issueId,
+            workspace: workspacePath,
+            branch: branchName,
+          });
+          console.log(`[request-review] Test specialist ${testResult.success ? 'spawned' : 'failed'} for ${issueId}`);
+        } else {
+          console.error(`[request-review] No project key for ${issueId} — cannot spawn test specialist`);
+          setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: 'No project configured' });
+        }
       } catch (err: any) {
         console.warn(`[request-review] Failed to queue test specialist for ${issueId}: ${err.message}`);
       }
@@ -7410,36 +7413,39 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
 
   console.log(`[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`);
 
-  // Queue for review-agent (same logic as human-initiated review)
+  // Spawn per-project ephemeral review specialist
   try {
-    const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
+    const { spawnEphemeralSpecialist } = await import('../../lib/cloister/specialists.js');
+    const { resolveProjectFromIssue } = await import('../../lib/projects.js');
+    const resolved = resolveProjectFromIssue(issueId);
 
-    const result = await wakeSpecialistOrQueue('review-agent', {
+    if (!resolved) {
+      return res.status(500).json({
+        success: false,
+        error: `No project configured for ${issueId}. Add it to projects.yaml.`,
+        autoRequeueCount: newCount,
+      });
+    }
+
+    const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
       issueId,
       workspace: workspacePath,
       branch: branchName,
-      isRemote: workspaceInfo.isRemote,
-      vmName: workspaceInfo.vmName,
-    }, {
-      priority: 'normal',
-      source: 'agent-request',
     });
 
     if (result.success) {
-      console.log(`[request-review] Queued ${issueId} for review-agent`);
+      console.log(`[request-review] Spawned review specialist for ${issueId}`);
       return res.json({
         success: true,
-        queued: result.queued,
-        message: result.queued
-          ? `Review queued (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`
-          : `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
+        queued: false,
+        message: `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
         autoRequeueCount: newCount,
         remainingRequeues: MAX_AUTO_REQUEUE - newCount,
       });
     } else {
       return res.status(500).json({
         success: false,
-        error: result.error || 'Failed to queue review',
+        error: result.error || 'Failed to spawn review specialist',
         autoRequeueCount: newCount,
       });
     }

@@ -1738,13 +1738,22 @@ export async function runPatrol(): Promise<PatrolResult> {
   state.patrolCycle++;
   state.lastPatrol = new Date().toISOString();
 
-  const enabled = getEnabledSpecialists();
+  // PAN-378: Global specialists removed. All work done by per-project ephemeral specialists.
   const results: HealthCheckResult[] = [];
   const actions: string[] = [];
 
-  addLog('info', `Patrol cycle ${state.patrolCycle} — checking ${enabled.length} specialists`, state.patrolCycle);
-  console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking ${enabled.length} specialists`);
+  addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
+  console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
+  /* PAN-378: Global specialist patrol removed. All specialist work now goes through
+   * per-project ephemeral specialists via spawnEphemeralSpecialist(). The global
+   * merge-agent, review-agent, and test-agent singletons are no longer used.
+   * The patrol below handles per-project ephemeral specialist cleanup. */
+
+  // Legacy code removed — was: for (const specialist of enabled) { checkSpecialistHealth... }
+  // Keeping empty results array for compatibility with downstream code
+  if (false as boolean) { // Type guard to avoid unreachable code errors
+  const enabled = getEnabledSpecialists();
   for (const specialist of enabled) {
     const result = await checkSpecialistHealth(specialist.name, state);
     results.push(result);
@@ -1859,6 +1868,7 @@ export async function runPatrol(): Promise<PatrolResult> {
       }
     }
   }
+  } // End of `if (false)` dead code block — global specialist patrol disabled (PAN-378)
 
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
   const suspendActions = await checkAndSuspendIdleAgents();
