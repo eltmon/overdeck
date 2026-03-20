@@ -656,19 +656,48 @@ export async function spawnEphemeralSpecialist(
     const promptFile = join(agentDir, 'task-prompt.md');
     writeFileSync(promptFile, taskPrompt);
 
+    // PAN-376: Resume previous session for project context continuity
+    const existingSessionId = getSessionId(specialistType, projectKey);
+    let sessionFlag: string;
+    let deliverPromptSeparately = false;
+    if (existingSessionId) {
+      sessionFlag = `--resume "${existingSessionId}"`;
+      deliverPromptSeparately = true; // Send task as message after session loads
+      console.log(`[specialist] Resuming session ${existingSessionId.slice(0, 8)}... for ${projectKey}/${specialistType}`);
+    } else {
+      const newSessionId = randomUUID();
+      sessionFlag = `--session-id "${newSessionId}"`;
+      setSessionId(specialistType, newSessionId, projectKey);
+    }
+
     // Create launcher script that pipes output to log file
     const launcherScript = join(agentDir, 'launcher.sh');
-    writeFileSync(launcherScript, `#!/bin/bash
+    if (deliverPromptSeparately) {
+      // Resume mode: start session without prompt, deliver via tmux later
+      writeFileSync(launcherScript, `#!/bin/bash
 cd "${cwd}"
-prompt=$(cat "${promptFile}")
 
-# Run Claude and tee output to log file
-claude ${permissionFlags} --model ${model} "$prompt" 2>&1 | tee -a "${logFilePath}"
+# Resume previous session and tee output to log file
+claude ${permissionFlags} ${sessionFlag} --model ${model} 2>&1 | tee -a "${logFilePath}"
 
 # Signal completion
 echo ""
 echo "## Specialist completed task"
 `, { mode: 0o755 });
+    } else {
+      // Fresh session: pass prompt directly
+      writeFileSync(launcherScript, `#!/bin/bash
+cd "${cwd}"
+prompt=$(cat "${promptFile}")
+
+# Run Claude and tee output to log file
+claude ${permissionFlags} ${sessionFlag} --model ${model} "$prompt" 2>&1 | tee -a "${logFilePath}"
+
+# Signal completion
+echo ""
+echo "## Specialist completed task"
+`, { mode: 0o755 });
+    }
 
     // Spawn Claude Code via launcher script (with provider env vars)
     await execAsync(
@@ -684,7 +713,18 @@ echo "## Specialist completed task"
       currentIssue: task.issueId,
     });
 
-    console.log(`[specialist] Spawned ephemeral ${specialistType} for ${projectKey}/${task.issueId} (run: ${runId})`);
+    // PAN-376: If resuming, deliver the task prompt after session loads
+    if (deliverPromptSeparately) {
+      const ready = await waitForClaudePrompt(tmuxSession, 20000);
+      if (ready) {
+        await sendKeysAsync(tmuxSession, taskPrompt);
+        console.log(`[specialist] Resumed ${specialistType} for ${projectKey}/${task.issueId} and delivered task (run: ${runId})`);
+      } else {
+        console.warn(`[specialist] Resumed ${specialistType} but prompt not detected — task in prompt file: ${promptFile}`);
+      }
+    } else {
+      console.log(`[specialist] Spawned ephemeral ${specialistType} for ${projectKey}/${task.issueId} (run: ${runId})`);
+    }
 
     return {
       success: true,
