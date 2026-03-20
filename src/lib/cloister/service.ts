@@ -216,20 +216,9 @@ export class CloisterService {
       console.error('  ✗ Failed to initialize panopticon database:', error);
     }
 
-    // Auto-initialize enabled specialists
-    try {
-      console.log('  → Checking specialists...');
-      const results = await initializeEnabledSpecialists();
-      for (const result of results) {
-        if (result.success) {
-          console.log(`    ✓ ${result.name}: ${result.message}`);
-        } else {
-          console.log(`    ✗ ${result.name}: ${result.message}`);
-        }
-      }
-    } catch (error) {
-      console.error('  ✗ Failed to initialize specialists:', error);
-    }
+    // PAN-378: Global specialists removed — per-project ephemeral specialists handle all work.
+    // No initialization needed; specialists are spawned on-demand via spawnEphemeralSpecialist().
+    console.log('  → Specialists: per-project ephemeral mode (no global pool)');
 
     // Start deacon health monitor for specialists
     try {

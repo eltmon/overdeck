@@ -1,31 +1,16 @@
 /**
  * Auto-queue logic for triggering the test-agent after review passes.
  *
- * Extracted from the POST /api/workspaces/:issueId/review-status handler
- * (PAN-343) so it can be unit-tested independently. The route handler
- * delegates to `autoQueueTestAgentAndNotify`, passing `messageAgent` as
- * the notify callback.
+ * Uses per-project ephemeral specialists (no global test-agent pool).
  */
 
 import { setReviewStatus } from '../review-status.js';
-import {
-  wakeSpecialistOrQueue,
-  checkSpecialistQueue,
-  submitToSpecialistQueue,
-} from './specialists.js';
-import type { HookItem } from '../hooks.js';
+import { spawnEphemeralSpecialist } from './specialists.js';
+import { resolveProjectFromIssue } from '../projects.js';
 
 /**
- * Attempt to wake or queue the test-agent for a given issue, then notify
+ * Spawn an ephemeral test specialist for the given issue, then notify
  * the work agent when delivery succeeds.
- *
- * Retry strategy:
- * - One immediate retry with 2s delay if the first wake attempt fails.
- * - Falls back to submitToSpecialistQueue after both attempts fail so the
- *   deacon can retry on the next patrol cycle.
- * - testStatus is only set to 'testing' AFTER confirming delivery or queuing.
- * - On total failure (wake + queue submission both throw): sets
- *   testStatus='dispatch_failed' so the deacon orphan detector can recover.
  *
  * @param issueId     - Issue identifier (e.g. "PAN-343")
  * @param workspace   - Absolute path to the workspace directory
@@ -41,94 +26,72 @@ export async function autoQueueTestAgentAndNotify(
   let testTaskDelivered = false;
 
   try {
-    // Dedup: skip if test-agent already has this issue queued
-    const testQueue = checkSpecialistQueue('test-agent');
-    const alreadyQueued = testQueue.items.some(
-      (item: HookItem) =>
-        item.payload?.issueId?.toLowerCase() === issueId.toLowerCase(),
-    );
+    const resolved = resolveProjectFromIssue(issueId);
+    if (!resolved) {
+      console.error(`[test-queue] No project configured for ${issueId} — cannot spawn test specialist`);
+      setReviewStatus(issueId, {
+        testStatus: 'dispatch_failed',
+        testNotes: `No project configured for ${issueId}. Add it to projects.yaml.`,
+      });
+      return;
+    }
 
-    if (alreadyQueued) {
-      console.log(`[review-status] Test-agent already has ${issueId} queued, skipping`);
-      // Refresh testStatus so dashboard doesn't show stale 'pending'
+    const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
+      issueId,
+      workspace,
+      branch,
+    });
+
+    if (result.success) {
       setReviewStatus(issueId, { testStatus: 'testing' });
       testTaskDelivered = true;
+      console.log(`[test-queue] Spawned test specialist for ${issueId} (${resolved.projectKey})`);
     } else {
-      // Attempt 1
-      let testResult = await wakeSpecialistOrQueue(
-        'test-agent',
-        { issueId, workspace, branch },
-        { priority: 'normal', source: 'review-passed-auto' },
-      );
+      // Retry once after 2s
+      console.log(`[test-queue] First spawn failed for ${issueId}: ${result.message}. Retrying in 2s...`);
+      await new Promise((r) => setTimeout(r, 2000));
 
-      // Retry once on failure with 2s delay (handles transient post-reboot tmux issues)
-      if (!testResult.success) {
-        console.log(
-          `[review-status] First wake attempt failed for ${issueId}: ${testResult.message}. Retrying in 2s...`,
-        );
-        await new Promise((r) => setTimeout(r, 2000));
-        testResult = await wakeSpecialistOrQueue(
-          'test-agent',
-          { issueId, workspace, branch },
-          { priority: 'normal', source: 'review-passed-auto-retry' },
-        );
-      }
+      const retry = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
+        issueId,
+        workspace,
+        branch,
+      });
 
-      if (testResult.success) {
-        // Only set testStatus after confirming success
+      if (retry.success) {
         setReviewStatus(issueId, { testStatus: 'testing' });
         testTaskDelivered = true;
-        console.log(
-          `[review-status] Auto-queued test-agent for ${issueId}: ${testResult.queued ? 'queued' : 'woken'} - ${testResult.message}`,
-        );
+        console.log(`[test-queue] Spawned test specialist for ${issueId} on retry`);
       } else {
-        // Both wake attempts failed — submit to queue for deacon retry
-        console.error(
-          `[review-status] Both wake attempts failed for ${issueId}: ${testResult.message}. Submitting to queue for deacon retry.`,
-        );
-        submitToSpecialistQueue('test-agent', {
-          priority: 'normal',
-          source: 'review-passed-delivery-retry',
-          issueId,
-          workspace,
-          branch,
+        console.error(`[test-queue] Both spawn attempts failed for ${issueId}: ${retry.message}`);
+        setReviewStatus(issueId, {
+          testStatus: 'dispatch_failed',
+          testNotes: `Test specialist spawn failed: ${retry.message}`,
         });
-        // Only set testStatus after queue submission succeeds
-        setReviewStatus(issueId, { testStatus: 'testing' });
-        testTaskDelivered = true;
-        console.log(
-          `[review-status] Test-agent task queued for ${issueId} after wake failures (deacon will retry)`,
-        );
       }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[review-status] Failed to dispatch test-agent for ${issueId}:`, err);
-    // Set dispatch_failed so the deacon orphan detector can detect and retry
+    console.error(`[test-queue] Failed to dispatch test specialist for ${issueId}:`, err);
     try {
       setReviewStatus(issueId, {
         testStatus: 'dispatch_failed',
         testNotes: `Dispatch failed: ${msg}`,
       });
     } catch (statusErr) {
-      // Don't let status update failure mask the original error
-      console.error(`[review-status] Failed to set dispatch_failed status for ${issueId}:`, statusErr);
+      console.error(`[test-queue] Failed to set dispatch_failed status for ${issueId}:`, statusErr);
     }
-    // testTaskDelivered stays false — work agent will not be falsely notified
   }
 
-  // Only notify work agent when test task was successfully delivered or queued
+  // Only notify work agent when test task was successfully delivered
   if (testTaskDelivered) {
     try {
       await notifyAgent(
         `agent-${issueId.toLowerCase()}`,
         `REVIEW PASSED for ${issueId}. Tests have been queued automatically. Do NOT poll or check status — you will be notified when tests complete.`,
       );
-      console.log(`[review-status] Notified agent-${issueId.toLowerCase()} that review passed`);
     } catch (err) {
-      // Agent may not be running — that's fine
       console.log(
-        `[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`,
+        `[test-queue] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`,
       );
     }
   }
