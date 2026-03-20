@@ -656,18 +656,24 @@ export async function spawnEphemeralSpecialist(
     const promptFile = join(agentDir, 'task-prompt.md');
     writeFileSync(promptFile, taskPrompt);
 
-    // PAN-376: Resume previous session for project context continuity
+    // PAN-376: Resume previous session for project context continuity.
+    // Use deterministic session ID so the same specialist for the same project
+    // always resumes the same Claude session, accumulating project context.
+    const deterministicSessionId = `specialist-${projectKey}-${specialistType}`;
     const existingSessionId = getSessionId(specialistType, projectKey);
     let sessionFlag: string;
     let deliverPromptSeparately = false;
-    if (existingSessionId) {
+
+    if (existingSessionId && existingSessionId === deterministicSessionId) {
+      // Same deterministic session — resume it
       sessionFlag = `--resume "${existingSessionId}"`;
-      deliverPromptSeparately = true; // Send task as message after session loads
-      console.log(`[specialist] Resuming session ${existingSessionId.slice(0, 8)}... for ${projectKey}/${specialistType}`);
+      deliverPromptSeparately = true;
+      console.log(`[specialist] Resuming session ${existingSessionId} for ${projectKey}/${specialistType}`);
     } else {
-      const newSessionId = randomUUID();
-      sessionFlag = `--session-id "${newSessionId}"`;
-      setSessionId(specialistType, newSessionId, projectKey);
+      // First run or migrating from random UUID — use deterministic ID
+      sessionFlag = `--session-id "${deterministicSessionId}"`;
+      setSessionId(specialistType, deterministicSessionId, projectKey);
+      console.log(`[specialist] New session ${deterministicSessionId} for ${projectKey}/${specialistType}`);
     }
 
     // Create launcher script that pipes output to log file

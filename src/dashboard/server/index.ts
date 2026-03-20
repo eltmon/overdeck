@@ -4681,6 +4681,28 @@ app.post('/api/specialists/:project/:type/complete', async (req, res) => {
 });
 
 // Clean up old logs for a specific project/specialist
+// GET latest run log for a per-project specialist
+app.get('/api/specialists/:project/:type/latest-log', async (req, res) => {
+  const { project, type } = req.params;
+  try {
+    const runsDir = join(homedir(), '.panopticon', 'specialists', project, type, 'runs');
+    if (!existsSync(runsDir)) {
+      return res.json({ log: null, message: 'No runs found' });
+    }
+    const files = readdirSync(runsDir)
+      .filter(f => f.endsWith('.log'))
+      .sort()
+      .reverse();
+    if (files.length === 0) {
+      return res.json({ log: null, message: 'No run logs found' });
+    }
+    const latestLog = readFileSync(join(runsDir, files[0]), 'utf-8');
+    return res.json({ log: latestLog, file: files[0], totalRuns: files.length });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/specialists/:project/:type/logs/cleanup', async (req, res) => {
   const { project, type } = req.params;
 
