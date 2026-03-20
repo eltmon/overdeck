@@ -1777,25 +1777,26 @@ export async function runPatrol(): Promise<PatrolResult> {
         }
       }
     } else if (!result.wasRunning && !result.inCooldown) {
-      // Specialist should be running but isn't - auto-start
-      // PAN-246: Use wakeSpecialist instead of initializeSpecialist.
-      // initializeSpecialist rejects with 'already_initialized' if session file exists
-      // (even when tmux session is dead), causing an infinite retry loop.
-      // wakeSpecialist handles both fresh starts and resuming dead sessions.
-      // Clear session ID so we get a fresh session, not a stale resume of the old context.
-      console.log(`[deacon] ${specialist.name} not running, auto-starting with fresh session...`);
-      clearSessionId(specialist.name);
-      const wakeResult = await wakeSpecialist(specialist.name, '', {
-        waitForReady: true,
-        startIfNotRunning: true,
-      });
-      if (wakeResult.success) {
-        actions.push(`Auto-started ${specialist.name}`);
-        addLog('action', `Auto-started ${specialist.name}`, state.patrolCycle);
-      } else {
-        actions.push(`Failed to start ${specialist.name}: ${wakeResult.message}`);
-        addLog('error', `Failed to start ${specialist.name}: ${wakeResult.message}`, state.patrolCycle);
+      // PAN-378: Only auto-start global specialists if they have queued work.
+      // Per-project ephemeral specialists handle real work now — global specialists
+      // sitting idle just waste resources. Start them on-demand when tasks arrive.
+      const globalQueue = checkSpecialistQueue(specialist.name);
+      if (globalQueue.hasWork) {
+        console.log(`[deacon] ${specialist.name} not running but has queued work, auto-starting with fresh session...`);
+        clearSessionId(specialist.name);
+        const wakeResult = await wakeSpecialist(specialist.name, '', {
+          waitForReady: true,
+          startIfNotRunning: true,
+        });
+        if (wakeResult.success) {
+          actions.push(`Auto-started ${specialist.name} (queued work)`);
+          addLog('action', `Auto-started ${specialist.name} (queued work)`, state.patrolCycle);
+        } else {
+          actions.push(`Failed to start ${specialist.name}: ${wakeResult.message}`);
+          addLog('error', `Failed to start ${specialist.name}: ${wakeResult.message}`, state.patrolCycle);
+        }
       }
+      // Otherwise: specialist is idle with no queue — don't waste resources starting it
     }
 
     // Check for queued work if specialist is idle or suspended (PAN-74, updated for PAN-80)
@@ -1916,7 +1917,7 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   // Patrol per-project ephemeral specialists (PAN-300)
   // Ephemeral specialists are spawned on-demand and are not auto-restarted by the deacon.
-  // Patrol only detects stuck sessions and kills them to prevent tmux leaks.
+  // Patrol detects stuck sessions, dead sessions, and auto-completes successful merges (PAN-375).
   try {
     const projectSpecialists = await getAllProjectSpecialistStatuses();
     for (const projSpec of projectSpecialists) {
@@ -1930,6 +1931,44 @@ export async function runPatrol(): Promise<PatrolResult> {
           actions.push(msg);
           addLog('action', msg, state.patrolCycle);
           console.log(`[deacon] ${msg}`);
+
+          // PAN-375: If merge specialist died while merging, check if merge actually succeeded
+          if (projSpec.specialistType === 'merge-agent' && runtimeState.currentIssue) {
+            const issueId = runtimeState.currentIssue;
+            try {
+              if (!existsSync(REVIEW_STATUS_FILE)) continue;
+              const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+              const rs = statuses[issueId];
+              if (rs?.mergeStatus === 'merging') {
+                const { resolveProjectFromIssue } = await import('../projects.js');
+                const resolved = resolveProjectFromIssue(issueId);
+                if (resolved) {
+                  const branch = `feature/${issueId.toLowerCase()}`;
+                  const { stdout } = await execAsync(
+                    `git -C "${resolved.projectPath}" log --oneline origin/main --grep="Merge branch '${branch}'" 2>/dev/null | head -1`,
+                    { encoding: 'utf-8' }
+                  );
+                  if (stdout.trim()) {
+                    console.log(`[deacon] PAN-375: merge specialist died but ${issueId} IS merged (${stdout.trim()}). Auto-completing.`);
+                    statuses[issueId].mergeStatus = 'merged';
+                    statuses[issueId].readyForMerge = false;
+                    writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
+                    const { postMergeLifecycle } = await import('./merge-agent.js');
+                    postMergeLifecycle(issueId, resolved.projectPath).catch(err =>
+                      console.warn(`[deacon] postMergeLifecycle failed for ${issueId}: ${err}`)
+                    );
+                    actions.push(`Auto-completed stale merge for ${issueId}`);
+                  } else {
+                    console.log(`[deacon] Merge specialist died and ${issueId} NOT merged. Resetting to readyForMerge.`);
+                    statuses[issueId].mergeStatus = 'pending';
+                    writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn(`[deacon] PAN-375 check failed for ${issueId}: ${err}`);
+            }
+          }
         }
         continue;
       }

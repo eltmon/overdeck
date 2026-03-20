@@ -75,7 +75,8 @@ async function fetchProjectSpecialists(): Promise<ProjectSpecialistStatus[]> {
   const res = await fetch('/api/specialists');
   if (!res.ok) throw new Error('Failed to fetch specialists');
   const data = await res.json();
-  return (data.projects ?? []).filter((p: ProjectSpecialistStatus) => p.isRunning);
+  // PAN-377: Show all project specialists (running + completed), not just running
+  return (data.projects ?? []).filter((p: ProjectSpecialistStatus) => p.isRunning || p.metadata?.currentRun || p.metadata?.lastRunAt);
 }
 
 async function fetchCloisterHealth(): Promise<CloisterHealthResponse> {
