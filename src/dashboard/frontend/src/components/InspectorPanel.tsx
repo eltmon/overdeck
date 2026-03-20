@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Box,
   Play,
+  GitMerge,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -351,10 +352,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
   });
 
   const resetReviewMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (options?: { rerun?: boolean }) => {
       const res = await fetch(`/api/workspaces/${issueId}/reset-review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rerun: options?.rerun ?? false }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -498,11 +500,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
   const handleResetReview = async () => {
     if (await confirm({
-      title: 'Reset Review Cycles',
-      message: `Reset all review/test/merge cycles for ${issueId}?\n\nThis will:\n- Clear review, test, and merge status\n- Reset the circuit breaker counter\n- Remove queued specialist tasks\n\nThe agent can then request review when ready.\nTracker status will NOT change.`,
-      confirmLabel: 'Reset Cycles',
+      title: 'Reset & Re-run Pipeline',
+      message: `Reset all review/test/merge cycles for ${issueId}?\n\nThis will:\n- Clear review, test, and merge status\n- Reset the circuit breaker counter\n- Remove queued specialist tasks\n- Re-dispatch to review specialist\n\nTracker status will NOT change.`,
+      confirmLabel: 'Reset & Re-run',
     })) {
-      resetReviewMutation.mutate();
+      resetReviewMutation.mutate({ rerun: true });
     }
   };
 
@@ -598,6 +600,37 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
             {issue.assignee.email && (
               <span className="text-[10px] truncate text-pan-text-secondary">{issue.assignee.email}</span>
             )}
+          </div>
+        )}
+
+        {/* Merged status banner for issues without workspaces */}
+        {!agent && !workspace?.exists && issue?.labels?.some(l => l.toLowerCase() === 'merged') && (
+          <div className="px-3 py-3 border-b border-pan-border">
+            <div className="flex items-center gap-2 mb-2">
+              <GitMerge className="w-4 h-4 text-green-400" />
+              <span className="text-xs font-medium text-green-400">Merged to Main</span>
+            </div>
+            <p className="text-[10px] text-pan-text-secondary">
+              This issue was completed and merged outside of Panopticon's workspace pipeline.
+              No workspace, agent, or pipeline state is available.
+            </p>
+            {costData && costData.totalCost > 0 && (
+              <div className="mt-2 flex items-center gap-2 text-[10px]">
+                <DollarSign className="w-3 h-3 text-green-400" />
+                <span className="text-pan-text-secondary">Total cost:</span>
+                <span className="text-green-400 font-medium">{formatCost(costData.totalCost)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Not merged, no workspace, no agent — show status */}
+        {!agent && !workspace?.exists && !issue?.labels?.some(l => l.toLowerCase() === 'merged') && issue && (
+          <div className="px-3 py-3 border-b border-pan-border">
+            <div className="text-[10px] text-pan-text-secondary">
+              No workspace created yet. Use <strong>Plan</strong> to create a workspace and plan this issue,
+              or <strong>Create Workspace</strong> below.
+            </div>
           </div>
         )}
 
