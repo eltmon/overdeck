@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
 import { AgentList } from './components/AgentList';
-import { TerminalView } from './components/TerminalView';
+import { AgentOutputPanel } from './components/AgentOutputPanel';
 import { HealthDashboard } from './components/HealthDashboard';
 import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
@@ -312,7 +312,7 @@ export default function App() {
                 selectedAgent={selectedAgent}
                 onSelectAgent={setSelectedAgent}
               />
-              {selectedAgent && <TerminalView agentId={selectedAgent} />}
+              {selectedAgent && <AgentOutputPanel agentId={selectedAgent} />}
             </div>
           </div>
         )}
