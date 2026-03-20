@@ -412,7 +412,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
           <div className="px-4 py-3 border-b border-divider">
             <h2 className="font-semibold text-content flex items-center gap-2">
               <Brain className="w-5 h-5 text-green-400" />
-              Active Ephemeral Specialists ({runningProjectSpecialists.length})
+              Per-Project Specialists ({runningProjectSpecialists.length})
             </h2>
           </div>
           <div className="divide-y divide-gray-700">
@@ -432,15 +432,23 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                         {ps.projectKey.toUpperCase()}
                       </span>
                       {ps.specialistType.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Running" />
+                      {ps.isRunning ? (
+                        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Running" />
+                      ) : (
+                        <span className="w-2 h-2 rounded-full bg-gray-500" title="Completed" />
+                      )}
                     </div>
-                    <div className="text-xs text-content-muted font-mono mt-0.5">{ps.tmuxSession}</div>
+                    <div className="text-xs text-content-muted font-mono mt-0.5">
+                      {ps.metadata?.currentRun ? `Run: ${ps.metadata.currentRun.split('-').slice(-1)[0] || ps.metadata.currentRun}` : ps.tmuxSession}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right text-xs text-content-subtle">
-                    <div className="text-green-400">● Running</div>
-                    {ps.metadata.lastRunAt && (
+                    <div className={ps.isRunning ? 'text-green-400' : 'text-gray-400'}>
+                      {ps.isRunning ? '● Running' : '○ Completed'}
+                    </div>
+                    {ps.metadata?.lastRunAt && (
                       <div className="text-content-muted">{formatTimeAgo(ps.metadata.lastRunAt)}</div>
                     )}
                   </div>
