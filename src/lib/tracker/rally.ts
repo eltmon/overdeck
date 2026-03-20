@@ -584,7 +584,8 @@ export class RallyTracker implements IssueTracker {
       // Features / PortfolioItems use State: Discovering, Developing, Done
       switch (state) {
         case 'open': return 'Discovering';
-        case 'in_progress': return 'Developing';
+        case 'in_progress':
+        case 'in_review': return 'Developing';
         case 'closed': return 'Done';
         default: return 'Discovering';
       }
@@ -593,7 +594,8 @@ export class RallyTracker implements IssueTracker {
       // Defects use State: Submitted, Open, Fixed, Closed
       switch (state) {
         case 'open': return 'Submitted';
-        case 'in_progress': return 'Open';
+        case 'in_progress':
+        case 'in_review': return 'Open';
         case 'closed': return 'Closed';
         default: return 'Submitted';
       }
@@ -601,7 +603,8 @@ export class RallyTracker implements IssueTracker {
     // User Stories / Tasks use ScheduleState: Defined, In-Progress, Completed
     switch (state) {
       case 'open': return 'Defined';
-      case 'in_progress': return 'In-Progress';
+      case 'in_progress':
+      case 'in_review': return 'In-Progress';
       case 'closed': return 'Completed';
       default: return 'Defined';
     }
