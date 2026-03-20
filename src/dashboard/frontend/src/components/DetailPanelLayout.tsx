@@ -167,6 +167,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose }: 
       ) : (
         <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
           <InspectorPanel
+            key={issueId}
             agent={agent}
             issueId={issueId}
             issueUrl={issueUrl}
