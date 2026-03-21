@@ -568,7 +568,7 @@ export function ListIssueRow({
   // Auto-scroll into view when selected via search
   useEffect(() => {
     if (isSelected && rowRef.current) {
-      rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      rowRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     }
   }, [isSelected]);
 
@@ -1845,7 +1845,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   // Auto-scroll into view when selected via search
   useEffect(() => {
     if (isSelected && cardRef.current) {
-      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      cardRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     }
   }, [isSelected]);
 

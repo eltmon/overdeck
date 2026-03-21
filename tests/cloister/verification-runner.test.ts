@@ -250,7 +250,7 @@ describe('runVerificationForIssue', () => {
         expect.any(Object), // gates (DEFAULT_GATES since findProjectByPath returns null)
         workspacePath,
         'pre_push',
-        { isRemote: true, vmName: 'my-vm' }
+        expect.objectContaining({ isRemote: true, vmName: 'my-vm' })
       );
     });
   });
