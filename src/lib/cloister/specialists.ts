@@ -660,7 +660,14 @@ ${basePrompt}`;
 
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
     const providerEnv = getProviderEnvForModel(model);
-    const envFlags = buildTmuxEnvFlags(providerEnv);
+    // Add Panopticon cost attribution env vars so heartbeat hook records correct stage/issue
+    const sessionTypeLabel = specialistType.replace('-agent', ''); // review-agent → review
+    const panopticonEnv: Record<string, string> = {
+      PANOPTICON_AGENT_ID: tmuxSession,
+      PANOPTICON_ISSUE_ID: task.issueId,
+      PANOPTICON_SESSION_TYPE: sessionTypeLabel,
+    };
+    const envFlags = buildTmuxEnvFlags({ ...providerEnv, ...panopticonEnv });
 
     // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
     // For all other providers, clear stale apiKeyHelper from previous runs.
@@ -707,6 +714,9 @@ ${basePrompt}`;
     writeFileSync(innerScript, `#!/bin/bash
 set -o pipefail
 cd "${cwd}"
+export PANOPTICON_AGENT_ID="${tmuxSession}"
+export PANOPTICON_ISSUE_ID="${task.issueId}"
+export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
 prompt=$(cat "${promptFile}")
 
 # Resume existing session (normal case — accumulates context over time)
@@ -1780,7 +1790,16 @@ export async function wakeSpecialist(
 
       // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
       const providerEnv = getProviderEnvForModel(model);
-      const envFlags = buildTmuxEnvFlags(providerEnv);
+      // Add Panopticon cost attribution env vars
+      const wakeSessionType = name.replace('-agent', ''); // review-agent → review
+      const wakePanEnv: Record<string, string> = {
+        PANOPTICON_AGENT_ID: tmuxSession,
+        PANOPTICON_SESSION_TYPE: wakeSessionType,
+      };
+      if (issueId) {
+        wakePanEnv.PANOPTICON_ISSUE_ID = issueId;
+      }
+      const envFlags = buildTmuxEnvFlags({ ...providerEnv, ...wakePanEnv });
 
       // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
       // For all other providers, clear stale apiKeyHelper from previous runs.
