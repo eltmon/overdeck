@@ -105,26 +105,47 @@ if [ -n "$ACTIVITY_ENTRY" ]; then
   fi
 fi
 
+# Extract Claude Code session ID from tool info (needed for runtime + cost tracking)
+CLAUDE_SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
+
 # Update agent runtime state in runtime.json (NOT state.json — prevents corrupting AgentState config)
 RUNTIME_FILE="$AGENT_DIR/runtime.json"
 TIMESTAMP="$(date -Iseconds)"
 
 if [ -f "$RUNTIME_FILE" ]; then
-  # Update existing runtime state
+  # Update existing runtime state (include active Claude session ID)
   TEMP_RUNTIME="$RUNTIME_FILE.tmp"
-  jq --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" \
-    '.lastActivity = $ts | .currentTool = $tool | .state = "active"' \
+  jq --arg ts "$TIMESTAMP" --arg tool "$TOOL_NAME" --arg sid "$CLAUDE_SESSION_ID" \
+    '.lastActivity = $ts | .currentTool = $tool | .state = "active" | .claudeSessionId = $sid' \
     "$RUNTIME_FILE" > "$TEMP_RUNTIME" 2>/dev/null && mv "$TEMP_RUNTIME" "$RUNTIME_FILE" 2>/dev/null || true
 else
   # Create initial runtime state
   jq -n \
     --arg ts "$TIMESTAMP" \
     --arg tool "$TOOL_NAME" \
+    --arg sid "$CLAUDE_SESSION_ID" \
     '{
       state: "active",
       lastActivity: $ts,
-      currentTool: $tool
+      currentTool: $tool,
+      claudeSessionId: $sid
     }' > "$RUNTIME_FILE" 2>/dev/null || true
+fi
+
+# Maintain session history — append-only list of all Claude session UUIDs this agent has used
+# The reconciler uses this to map transcript files back to agents
+SESSIONS_FILE="$AGENT_DIR/sessions.json"
+if [ "$CLAUDE_SESSION_ID" != "unknown" ]; then
+  if [ -f "$SESSIONS_FILE" ]; then
+    # Only append if not already in the list
+    if ! jq -e --arg sid "$CLAUDE_SESSION_ID" 'any(.[]; . == $sid)' "$SESSIONS_FILE" >/dev/null 2>&1; then
+      TEMP_SESSIONS="$SESSIONS_FILE.tmp"
+      jq --arg sid "$CLAUDE_SESSION_ID" '. + [$sid]' "$SESSIONS_FILE" > "$TEMP_SESSIONS" 2>/dev/null && \
+        mv "$TEMP_SESSIONS" "$SESSIONS_FILE" 2>/dev/null || true
+    fi
+  else
+    echo "[\"$CLAUDE_SESSION_ID\"]" > "$SESSIONS_FILE" 2>/dev/null || true
+  fi
 fi
 
 # Record cost event from tool usage (PAN-81)
@@ -140,14 +161,14 @@ if [ -n "$COST_SCRIPT" ] && [ -f "$COST_SCRIPT" ]; then
   # Infer issue ID from git branch if not set by Panopticon agent launcher
   # Matches branches like: feature/pan-208, feature-min-665, pan-142
   if [ -z "$PANOPTICON_ISSUE_ID" ]; then
-    if [[ "$GIT_BRANCH" =~ (pan|min|aud|PAN|MIN|AUD)[-]([0-9]+) ]]; then
+    if [[ "$GIT_BRANCH" =~ (pan|min|aud|krux|cli|PAN|MIN|AUD|KRUX|CLI)[-]([0-9]+) ]]; then
       PANOPTICON_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
     fi
   fi
 
   # Fallback: infer from workspace path (e.g., /workspaces/feature-pan-208/)
   if [ -z "$PANOPTICON_ISSUE_ID" ]; then
-    if [[ "$WORKSPACE" =~ (pan|min|aud|PAN|MIN|AUD)[-]([0-9]+) ]]; then
+    if [[ "$WORKSPACE" =~ (pan|min|aud|krux|cli|PAN|MIN|AUD|KRUX|CLI)[-]([0-9]+) ]]; then
       PANOPTICON_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
     fi
   fi
@@ -163,8 +184,7 @@ if [ -n "$COST_SCRIPT" ] && [ -f "$COST_SCRIPT" ]; then
   # only one process reads/updates the offset at a time per session.
   STATE_DIR="$HOME/.panopticon/costs/state"
   mkdir -p "$STATE_DIR"
-  SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
-  LOCK_FILE="$STATE_DIR/${SESSION_ID}.lock"
+  LOCK_FILE="$STATE_DIR/${CLAUDE_SESSION_ID}.lock"
 
   {
     flock -x -w 30 200

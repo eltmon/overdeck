@@ -45,6 +45,12 @@ export {
   type MigrationStats,
 } from './migration.js';
 
+// Cost reconciler — periodic catch-up sweep
+export {
+  reconcile,
+  type ReconcileResult,
+} from './reconciler.js';
+
 // Event retention
 export {
   pruneOldEvents,

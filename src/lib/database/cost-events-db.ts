@@ -21,9 +21,10 @@ export function insertCostEvent(event: CostEvent, sourceFile?: string): number |
       INSERT OR IGNORE INTO cost_events (
         ts, agent_id, issue_id, session_type, provider, model,
         input, output, cache_read, cache_write, cost, request_id,
+        session_id,
         tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
         source_file
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       event.ts,
       event.agentId,
@@ -37,6 +38,7 @@ export function insertCostEvent(event: CostEvent, sourceFile?: string): number |
       event.cacheWrite,
       event.cost,
       event.requestId ?? null,
+      event.sessionId ?? null,
       event.tldrInterceptions ?? null,
       event.tldrBypasses ?? null,
       event.tldrTokensSaved ?? null,
@@ -68,9 +70,10 @@ export function insertCostEvents(
     INSERT OR IGNORE INTO cost_events (
       ts, agent_id, issue_id, session_type, provider, model,
       input, output, cache_read, cache_write, cost, request_id,
+      session_id,
       tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
       source_file
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertMany = db.transaction((evs: CostEvent[]) => {
@@ -88,6 +91,7 @@ export function insertCostEvents(
         ev.cacheWrite,
         ev.cost,
         ev.requestId ?? null,
+        ev.sessionId ?? null,
         ev.tldrInterceptions ?? null,
         ev.tldrBypasses ?? null,
         ev.tldrTokensSaved ?? null,

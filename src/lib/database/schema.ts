@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * Initialize the complete database schema.
@@ -31,6 +31,7 @@ export function initSchema(db: Database.Database): void {
       cache_write   INTEGER NOT NULL DEFAULT 0,
       cost          REAL    NOT NULL DEFAULT 0,
       request_id    TEXT,
+      session_id    TEXT,    -- Claude Code session UUID (for reconciler offset tracking)
       -- TLDR metrics
       tldr_interceptions INTEGER,
       tldr_bypasses      INTEGER,
@@ -51,6 +52,9 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_cost_ts
       ON cost_events(ts);
+
+    CREATE INDEX IF NOT EXISTS idx_cost_session_id
+      ON cost_events(session_id) WHERE session_id IS NOT NULL;
 
     -- ===== Review Status =====
     CREATE TABLE IF NOT EXISTS review_status (
@@ -109,11 +113,15 @@ export function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_health_timestamp
       ON health_events(timestamp);
 
-    -- ===== Processed Sessions (for cost migration dedup) =====
+    -- ===== Processed Sessions (for reconciler offset tracking) =====
     CREATE TABLE IF NOT EXISTS processed_sessions (
-      session_id   TEXT PRIMARY KEY,
-      processed_at TEXT NOT NULL,
-      event_count  INTEGER NOT NULL DEFAULT 0
+      session_id     TEXT PRIMARY KEY,
+      agent_id       TEXT,
+      issue_id       TEXT,
+      transcript_path TEXT,           -- full path to the .jsonl file
+      byte_offset    INTEGER NOT NULL DEFAULT 0,  -- bytes consumed so far
+      processed_at   TEXT NOT NULL,
+      event_count    INTEGER NOT NULL DEFAULT 0
     );
 
     -- ===== API Cache =====
@@ -167,6 +175,36 @@ export function runMigrations(db: Database.Database): void {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_status_history_unique
         ON status_history(issue_id, type, status, timestamp);
     `);
+  }
+
+  // v2 → v3: add session_id to cost_events, extend processed_sessions for reconciler
+  if (currentVersion < 3) {
+    // Add session_id column to cost_events (nullable, no data loss)
+    try {
+      db.exec(`ALTER TABLE cost_events ADD COLUMN session_id TEXT`);
+    } catch {
+      // Column may already exist if schema was manually applied
+    }
+
+    // Add index on session_id
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_cost_session_id
+        ON cost_events(session_id) WHERE session_id IS NOT NULL;
+    `);
+
+    // Extend processed_sessions with new columns for reconciler
+    try {
+      db.exec(`ALTER TABLE processed_sessions ADD COLUMN agent_id TEXT`);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`ALTER TABLE processed_sessions ADD COLUMN issue_id TEXT`);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`ALTER TABLE processed_sessions ADD COLUMN transcript_path TEXT`);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`ALTER TABLE processed_sessions ADD COLUMN byte_offset INTEGER NOT NULL DEFAULT 0`);
+    } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

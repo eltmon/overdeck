@@ -44,7 +44,7 @@ import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parser
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../lib/tracker-utils.js';
-import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents } from '../../lib/costs/index.js';
+import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents, reconcile } from '../../lib/costs/index.js';
 import { getCostsByIssueFromDb, getCostForIssueFromDb, getDailyTrends, getModelRollup, getAgentRollup } from '../../lib/database/cost-events-db.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
 import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
@@ -4325,10 +4325,10 @@ app.post('/api/specialists/:project/:type/kill', async (req, res) => {
   }
 
   try {
-    const { getTmuxSessionName, clearSessionId } = await import('../../lib/cloister/specialists.js');
+    const { getTmuxSessionName } = await import('../../lib/cloister/specialists.js');
     const tmuxSession = getTmuxSessionName(type, project);
     await execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {});
-    clearSessionId(type, project);
+    // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
     saveAgentRuntimeState(tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
     res.json({ success: true, message: `Killed ${type} (${project})` });
   } catch (error: unknown) {
@@ -6636,62 +6636,9 @@ app.post('/api/workspaces/:issueId/refresh-db', async (req, res) => {
  * @param isStale - optional predicate to skip stale items beyond the default merged check
  * @param onWake - optional callback after successful wake (e.g. to set testStatus)
  */
-async function processSpecialistQueueImmediate(
-  specialistName: string,
-  isStale?: (taskStatus: ReviewStatus | null) => boolean,
-  onWake?: (issueId: string) => void,
-): Promise<void> {
-  try {
-    const { checkSpecialistQueue: checkQueue, wakeSpecialistWithTask, completeSpecialistTask: completeTask, getTmuxSessionName } = await import('../../lib/cloister/specialists.js');
-
-    // Only process if specialist is idle
-    const session = getTmuxSessionName(specialistName);
-    const state = getAgentRuntimeState(session);
-    if (state?.state && state.state !== 'idle' && state.state !== 'suspended') return;
-
-    const queue = checkQueue(specialistName);
-    if (!queue.hasWork) return;
-
-    for (const task of queue.items) {
-      const taskIssueId = task.payload?.issueId;
-      if (!taskIssueId) {
-        completeTask(specialistName, task.id);
-        console.log(`[pipeline] Removed ${specialistName} queue item with no issueId`);
-        continue;
-      }
-
-      const taskStatus = getReviewStatus(taskIssueId);
-      if (taskStatus?.mergeStatus === 'merged') {
-        completeTask(specialistName, task.id);
-        console.log(`[pipeline] Skipping stale ${specialistName} queue item: ${taskIssueId} (already merged)`);
-        continue;
-      }
-      if (isStale && isStale(taskStatus)) {
-        completeTask(specialistName, task.id);
-        console.log(`[pipeline] Skipping stale ${specialistName} queue item: ${taskIssueId}`);
-        continue;
-      }
-
-      console.log(`[pipeline] Immediately waking ${specialistName} for next queued task: ${taskIssueId}`);
-      const taskDetails = {
-        issueId: taskIssueId,
-        branch: task.payload.context?.branch,
-        workspace: task.payload.context?.workspace,
-      };
-      const wakeResult = await wakeSpecialistWithTask(specialistName, taskDetails);
-      if (wakeResult.success) {
-        completeTask(specialistName, task.id);
-        if (onWake) onWake(taskIssueId);
-        console.log(`[pipeline] ${specialistName} woken for ${taskIssueId}`);
-      } else {
-        console.error(`[pipeline] Failed to wake ${specialistName} for next task: ${wakeResult.error}`);
-      }
-      break;
-    }
-  } catch (err) {
-    console.error(`[pipeline] Error processing ${specialistName} queue:`, err);
-  }
-}
+// PAN-378: processSpecialistQueueImmediate removed — global specialist queue processing
+// is no longer needed. Per-project ephemeral specialists handle all work via
+// spawnEphemeralSpecialist() and autoQueueTestAgentAndNotify().
 
 // Get review status for a workspace (PAN-366: includes queuePosition + activeSpecialist)
 app.get('/api/workspaces/:issueId/review-status', (req, res) => {
@@ -6823,11 +6770,6 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
       }
     }
 
-    // Immediately process next queued item (don't wait for deacon patrol)
-    await processSpecialistQueueImmediate(
-      'review-agent',
-      (s) => s?.reviewStatus === 'passed',
-    );
   }
 
   if (testStatus && ['passed', 'failed', 'skipped'].includes(testStatus)) {
@@ -6886,12 +6828,6 @@ app.post('/api/workspaces/:issueId/review-status', async (req, res) => {
       }
     }
 
-    // Immediately process next queued item for test-agent
-    await processSpecialistQueueImmediate(
-      'test-agent',
-      (s) => s?.testStatus === 'passed',
-      (issueId) => setReviewStatus(issueId, { testStatus: 'testing' }),
-    );
   }
 
   res.json(status);
@@ -7312,25 +7248,25 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
       setReviewStatus(issueId, { testStatus: 'pending' });
       // Fire test specialist queue (same as post-review flow)
       try {
-        const teamPrefix = extractTeamPrefix(issueId);
-        const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
-        const projectPath = projectConfig?.path || '';
-        const workspacesDir = projectConfig?.workspace?.workspaces_dir || 'workspaces';
-        const workspacePath = join(projectPath, workspacesDir, `feature-${issueId.toLowerCase()}`);
-        const branchName = `feature/${issueId.toLowerCase()}`;
-        setReviewStatus(issueId, { testStatus: 'testing' });
-        const testProjectKey = projectConfig?.key || teamPrefix || '';
-        if (testProjectKey) {
+        const resolved = resolveProjectFromIssue(issueId);
+        if (!resolved) {
+          console.error(`[request-review] No project configured for ${issueId} — cannot spawn test specialist`);
+          setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: 'No project configured' });
+        } else {
+          const workspacesDir = 'workspaces';
+          const workspacePath = join(resolved.projectPath, workspacesDir, `feature-${issueId.toLowerCase()}`);
+          const branchName = `feature/${issueId.toLowerCase()}`;
+          setReviewStatus(issueId, { testStatus: 'testing' });
           const { spawnEphemeralSpecialist } = await import('../../lib/cloister/specialists.js');
-          const testResult = await spawnEphemeralSpecialist(testProjectKey, 'test-agent', {
+          const testResult = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
             issueId,
             workspace: workspacePath,
             branch: branchName,
           });
           console.log(`[request-review] Test specialist ${testResult.success ? 'spawned' : 'failed'} for ${issueId}`);
-        } else {
-          console.error(`[request-review] No project key for ${issueId} — cannot spawn test specialist`);
-          setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: 'No project configured' });
+          if (!testResult.success) {
+            setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `Test dispatch failed: ${testResult.error || testResult.message}` });
+          }
         }
       } catch (err: any) {
         console.warn(`[request-review] Failed to queue test specialist for ${issueId}: ${err.message}`);
@@ -7465,6 +7401,9 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
         remainingRequeues: MAX_AUTO_REQUEUE - newCount,
       });
     } else {
+      // Rollback: dispatch failed — don't leave status stuck at 'reviewing'
+      console.warn(`[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${result.error}`);
+      setReviewStatus(issueId, { reviewStatus: 'dispatch_failed', reviewNotes: `Dispatch failed: ${result.error || result.message}` });
       return res.status(500).json({
         success: false,
         error: result.error || 'Failed to spawn review specialist',
@@ -7473,6 +7412,8 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
     }
   } catch (error: any) {
     console.error(`[request-review] Error:`, error);
+    // Rollback: exception during dispatch — don't leave status stuck at 'reviewing'
+    setReviewStatus(issueId, { reviewStatus: 'dispatch_failed', reviewNotes: `Dispatch error: ${error.message}` });
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -7533,9 +7474,51 @@ app.post('/api/workspaces/:issueId/reset-review', async (req, res) => {
 
     console.log(`[reset-review] Pipeline state reset for ${issueId} — awaiting agent to request review`);
 
+    // Optionally re-dispatch to review specialist immediately
+    const rerun = req.body?.rerun === true;
+    if (rerun) {
+      try {
+        const { dispatchToSpecialist } = await import('../../lib/cloister/specialists.js');
+        const resolved = resolveProjectFromIssue(issueId);
+        if (resolved) {
+          const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+          const issueLower = issueId.toLowerCase();
+          const workspacePath = workspaceInfo.localPath || join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
+
+          setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+
+          // Fire-and-forget dispatch
+          dispatchToSpecialist({
+            specialistType: 'review-agent',
+            projectKey: resolved.projectKey,
+            issueId,
+            workspacePath,
+            projectPath: resolved.projectPath,
+          }).then(result => {
+            if (result.success) {
+              console.log(`[reset-review] Re-dispatched review for ${issueId}`);
+            } else {
+              console.warn(`[reset-review] Re-dispatch failed for ${issueId}: ${result.error}`);
+              setReviewStatus(issueId, { reviewStatus: 'pending' });
+            }
+          }).catch(err => {
+            console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${err}`);
+            setReviewStatus(issueId, { reviewStatus: 'pending' });
+          });
+        } else {
+          console.warn(`[reset-review] Could not resolve project for ${issueId}, skipping re-dispatch`);
+        }
+      } catch (rerunErr) {
+        console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${rerunErr}`);
+      }
+    }
+
     return res.json({
       success: true,
-      message: `Review cycles reset for ${issueId}. Agent can now request review when ready.`,
+      message: rerun
+        ? `Pipeline reset and review re-dispatched for ${issueId}.`
+        : `Review cycles reset for ${issueId}. Agent can now request review when ready.`,
+      rerun,
     });
   } catch (error: any) {
     console.error(`[reset-review] Error:`, error);
@@ -11733,8 +11716,9 @@ app.get('/api/issues/:id/beads', async (req, res) => {
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    } else {
-      // Use getProjectPath for consistent path resolution (respects project config)
+    }
+    // Fall through to getProjectPath if GitHub local paths didn't resolve (or for non-GitHub issues)
+    if (!projectPath) {
       const issuePrefix = id.split('-')[0];
       try {
         projectPath = getProjectPath(undefined, issuePrefix);
@@ -12395,6 +12379,18 @@ app.post('/api/costs/sync-wal', async (_req, res) => {
   } catch (error: any) {
     console.error('Error syncing WAL:', error);
     res.status(500).json({ error: 'Failed to sync WAL: ' + error.message });
+  }
+});
+
+// POST /api/costs/reconcile - Run cost reconciler to catch up missed events
+app.post('/api/costs/reconcile', async (_req, res) => {
+  try {
+    const result = await reconcile();
+    console.log(`[reconciler] Sweep complete: ${result.eventsImported} imported, ${result.duplicatesSkipped} dupes, ${result.sessionsScanned} sessions scanned`);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('Error running reconciler:', error);
+    res.status(500).json({ error: 'Failed to run reconciler: ' + error.message });
   }
 });
 
@@ -14870,6 +14866,33 @@ server.listen(PORT, '0.0.0.0', async () => {
     }
   });
 
+  // Run cost reconciler on startup — catches any events missed by the live hook
+  setImmediate(async () => {
+    try {
+      const reconcileResult = await reconcile();
+      if (reconcileResult.eventsImported > 0) {
+        console.log(`[reconciler] Startup sweep: ${reconcileResult.eventsImported} events imported, ${reconcileResult.duplicatesSkipped} dupes skipped, ${reconcileResult.sessionsScanned} sessions scanned`);
+      }
+      if (reconcileResult.errors.length > 0) {
+        console.warn(`[reconciler] ${reconcileResult.errors.length} errors during startup sweep`);
+      }
+    } catch (error: any) {
+      console.error('Reconciler startup sweep failed (non-fatal):', error.message);
+    }
+  });
+
+  // Run reconciler periodically (every 5 minutes) as ongoing safety net
+  setInterval(async () => {
+    try {
+      const result = await reconcile();
+      if (result.eventsImported > 0) {
+        console.log(`[reconciler] Periodic sweep: ${result.eventsImported} events imported`);
+      }
+    } catch (error: any) {
+      console.error('[reconciler] Periodic sweep failed:', error.message);
+    }
+  }, 5 * 60 * 1000);
+
   // Start IssueDataService for background polling + real-time push
   try {
     await issueDataService.start();
@@ -14933,14 +14956,8 @@ server.listen(PORT, '0.0.0.0', async () => {
       if (event.type === 'status_changed') {
         socketIo.emit('pipeline:status', event.status);
       }
-      if (event.type === 'task_queued') {
-        // Immediate queue processing — don't wait for deacon patrol
-        processSpecialistQueueImmediate(event.specialist).catch((err) => {
-          console.error(`[pipeline] Failed to process ${event.specialist} queue:`, err);
-        });
-      }
     });
-    console.log('Pipeline event handler wired (Socket.io push + immediate queue processing)');
+    console.log('Pipeline event handler wired (Socket.io push)');
   } catch (error: any) {
     console.error('Failed to wire pipeline handler:', error.message);
   }

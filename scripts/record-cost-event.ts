@@ -127,7 +127,7 @@ if (!issueId || issueId === 'UNKNOWN') {
       timeout: 2000,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    const branchMatch = branch.match(/(pan|min|aud)[-](\d+)/i);
+    const branchMatch = branch.match(/(pan|min|aud|krux|cli)[-](\d+)/i);
     if (branchMatch) {
       issueId = `${branchMatch[1].toUpperCase()}-${branchMatch[2]}`;
     }
@@ -241,6 +241,7 @@ for (const line of lines) {
       cacheWrite: cacheWriteTokens,
       cost,
       ...(requestId ? { requestId } : {}),
+      sessionId,
       ...tldrFields,
     });
   } catch {
