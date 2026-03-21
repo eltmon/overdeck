@@ -327,7 +327,7 @@ async function resetIssueToTodo(ctx: LifecycleContext): Promise<StepResult> {
         { encoding: 'utf-8' },
       ).catch(() => {});  // May already be open
       // Remove lifecycle labels
-      const labelsToRemove = ['in-review', 'in-progress', 'Review: Approved', 'Review: Failed', 'ready-for-merge'];
+      const labelsToRemove = ['in-review', 'in-progress', 'planned', 'planning', 'Review: Approved', 'Review: Failed', 'ready-for-merge'];
       for (const label of labelsToRemove) {
         await execAsync(
           `gh issue edit ${number} --repo ${owner}/${repo} --remove-label "${label}"`,
