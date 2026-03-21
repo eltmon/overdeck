@@ -34,6 +34,7 @@ export interface CostEvent {
   tldrBypassReasons?: Record<string, number>; // e.g. { "offset-limit": 3, "recently-edited": 1 }
 
   requestId?: string;                      // Claude Code transcript request ID — used for precise dedup (PAN-238)
+  sessionId?: string;                      // Claude Code session UUID — maps to transcript filename
 }
 
 export interface EventMetadata {

@@ -46,16 +46,8 @@ function updateTestStatusToTesting(issueId: string): void {
 }
 import {
   SpecialistType,
-  getEnabledSpecialists,
   getTmuxSessionName,
-  isRunning,
-  initializeSpecialist,
-  wakeSpecialist,
-  clearSessionId,
   checkSpecialistQueue,
-  submitToSpecialistQueue,
-  getNextSpecialistTask,
-  wakeSpecialistWithTask,
   completeSpecialistTask,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
@@ -526,8 +518,8 @@ export interface PatrolResult {
  */
 export async function checkAndSuspendIdleAgents(): Promise<string[]> {
   const actions: string[] = [];
-  const specialists = getEnabledSpecialists();
-  const specialistNames = new Set(specialists.map(s => getTmuxSessionName(s.name)));
+  // Specialist sessions (global or per-project) all start with "specialist-"
+  const isSpecialistSession = (id: string) => id.startsWith('specialist-');
 
   // Get all running agents
   const agents = listRunningAgents();
@@ -574,7 +566,7 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
     const idleMinutes = idleMs / (1000 * 60);
 
     // Determine timeout based on agent type
-    const isSpecialist = specialistNames.has(agent.id);
+    const isSpecialist = isSpecialistSession(agent.id);
 
     // NEVER auto-suspend work agents — they wait for review/test feedback
     // and must stay alive to receive results. Only suspend specialists.
@@ -941,15 +933,15 @@ function parseThinkingDuration(tmuxOutput: string): number | null {
 export async function checkStuckWorkAgents(): Promise<string[]> {
   const actions: string[] = [];
   const agents = listRunningAgents();
-  const specialists = getEnabledSpecialists();
-  const specialistNames = new Set(specialists.map(s => getTmuxSessionName(s.name)));
+  // Specialist sessions (global or per-project) all start with "specialist-"
+  const isSpecialistSession = (id: string) => id.startsWith('specialist-');
   const now = Date.now();
 
   for (const agent of agents) {
     if (!agent.tmuxActive) continue;
 
     // Only check work agents, not specialists (specialists have their own health checks)
-    const isWorkAgent = agent.id.startsWith('agent-') && !specialistNames.has(agent.id);
+    const isWorkAgent = agent.id.startsWith('agent-') && !isSpecialistSession(agent.id);
     if (!isWorkAgent) continue;
 
     // Check cooldown
@@ -1153,17 +1145,35 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
     const statuses: Record<string, { reviewStatus?: string; testStatus?: string; readyForMerge?: boolean; history?: Array<{ type: string; status: string }> }> = JSON.parse(content);
 
-    // Check review-agent status
-    const reviewAgentSession = getTmuxSessionName('review-agent');
-    const reviewAgentRunning = sessionExists(reviewAgentSession);
-    const reviewAgentState = getAgentRuntimeState(reviewAgentSession);
-    const reviewAgentActive = reviewAgentRunning && reviewAgentState?.state === 'active';
+    // Build a set of all active specialist sessions (global + per-project)
+    // so we can check if ANY specialist is working on review/test tasks.
+    const activeReviewSessions = new Set<string>(); // issue IDs being reviewed
+    const activeTestSessions = new Set<string>(); // issue IDs being tested
 
-    // Check test-agent status
-    const testAgentSession = getTmuxSessionName('test-agent');
-    const testAgentRunning = sessionExists(testAgentSession);
-    const testAgentState = getAgentRuntimeState(testAgentSession);
-    const testAgentActive = testAgentRunning && testAgentState?.state === 'active';
+    // Check global specialists
+    for (const type of ['review-agent', 'test-agent'] as const) {
+      const session = getTmuxSessionName(type);
+      if (sessionExists(session)) {
+        const rState = getAgentRuntimeState(session);
+        if (rState?.state === 'active' && rState.currentIssue) {
+          (type === 'review-agent' ? activeReviewSessions : activeTestSessions).add(rState.currentIssue.toUpperCase());
+        }
+      }
+    }
+
+    // Check per-project ephemeral specialists
+    const projectStatuses = await getAllProjectSpecialistStatuses();
+    for (const projSpec of projectStatuses) {
+      if (!projSpec.isRunning) continue;
+      const rState = getAgentRuntimeState(projSpec.tmuxSession);
+      if (rState?.state === 'active' && rState.currentIssue) {
+        if (projSpec.specialistType === 'review-agent') {
+          activeReviewSessions.add(rState.currentIssue.toUpperCase());
+        } else if (projSpec.specialistType === 'test-agent') {
+          activeTestSessions.add(rState.currentIssue.toUpperCase());
+        }
+      }
+    }
 
     let modified = false;
 
@@ -1179,15 +1189,17 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         (h) => h.type === 'test' && (h.status === 'passed' || h.status === 'failed')
       );
 
-      // Check for orphaned reviewing status
+      // Check for orphaned reviewing status — no specialist (global or per-project) is actively reviewing this issue
+      const reviewAgentActive = activeReviewSessions.has(issueId.toUpperCase());
       if (status.reviewStatus === 'reviewing' && !reviewAgentActive && !hasPassedReview) {
-        console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but review-agent is not active`);
+        console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but no review-agent is working on it`);
         status.reviewStatus = 'pending';
         modified = true;
-        actions.push(`Reset orphaned review for ${issueId} (review-agent not active)`);
+        actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);
       }
 
       // Check for orphaned testing status (includes dispatch_failed from PAN-369)
+      const testAgentActive = activeTestSessions.has(issueId.toUpperCase());
       if (
         (status.testStatus === 'testing' || status.testStatus === 'dispatch_failed') &&
         !testAgentActive &&
@@ -1215,28 +1227,49 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           );
           console.log(`[deacon] Test task for ${issueId} is in queue — setting testStatus=testing for deacon dispatch`);
         } else {
-          // No queue item — re-submit using workspace from agent state
+          // No queue item — re-dispatch using per-project ephemeral specialist
           const agentId = `agent-${issueId.toLowerCase()}`;
           const agentState = getAgentState(agentId);
           const workspace = agentState?.workspace;
 
           if (workspace) {
             const branch = `feature/${issueId.toLowerCase()}`;
-            submitToSpecialistQueue('test-agent', {
-              priority: 'normal',
-              source: 'deacon-orphan-recovery',
-              issueId,
-              workspace,
-              branch,
-            });
-            status.testStatus = 'testing';
-            modified = true;
-            actions.push(
-              `Re-queued orphaned test for ${issueId}: submitted to test-agent queue (deacon-orphan-recovery)`,
-            );
-            console.log(
-              `[deacon] Re-queued test task for ${issueId} after orphan detection (workspace: ${workspace})`,
-            );
+            const { resolveProjectFromIssue } = await import('../projects.js');
+            const resolved = resolveProjectFromIssue(issueId);
+
+            if (resolved) {
+              const { spawnEphemeralSpecialist } = await import('./specialists.js');
+              const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
+                issueId,
+                workspace,
+                branch,
+              });
+              if (result.success) {
+                status.testStatus = 'testing';
+                modified = true;
+                actions.push(
+                  `Re-dispatched orphaned test for ${issueId} via ${resolved.projectKey}/test-agent (deacon-orphan-recovery)`,
+                );
+                console.log(
+                  `[deacon] Re-dispatched test for ${issueId} after orphan detection (project: ${resolved.projectKey})`,
+                );
+              } else {
+                status.testStatus = 'dispatch_failed';
+                modified = true;
+                actions.push(
+                  `Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+                );
+                console.log(
+                  `[deacon] Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
+                );
+              }
+            } else {
+              status.testStatus = 'pending';
+              modified = true;
+              actions.push(
+                `Reset orphaned test for ${issueId}: no project configured`,
+              );
+            }
           } else {
             // Cannot derive workspace — reset to pending so user can re-trigger
             status.testStatus = 'pending';
@@ -1666,11 +1699,11 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
   try {
     const agents = listRunningAgents();
-    const specialists = getEnabledSpecialists();
-    const specialistNames = new Set(specialists.map(s => getTmuxSessionName(s.name)));
+    // Specialist sessions (global or per-project) all start with "specialist-"
+    const isSpecialistSession = (id: string) => id.startsWith('specialist-');
 
     for (const agent of agents) {
-      if (!agent.id.startsWith('agent-') || specialistNames.has(agent.id)) continue;
+      if (!agent.id.startsWith('agent-') || isSpecialistSession(agent.id)) continue;
 
       const runtimeState = getAgentRuntimeState(agent.id);
       if (!runtimeState?.resolution || runtimeState.resolution === 'working' || runtimeState.resolution === 'completed') continue;
@@ -1750,125 +1783,9 @@ export async function runPatrol(): Promise<PatrolResult> {
    * merge-agent, review-agent, and test-agent singletons are no longer used.
    * The patrol below handles per-project ephemeral specialist cleanup. */
 
-  // Legacy code removed — was: for (const specialist of enabled) { checkSpecialistHealth... }
-  // Keeping empty results array for compatibility with downstream code
-  if (false as boolean) { // Type guard to avoid unreachable code errors
-  const enabled = getEnabledSpecialists();
-  for (const specialist of enabled) {
-    const result = await checkSpecialistHealth(specialist.name, state);
-    results.push(result);
-
-    // Handle stuck specialists
-    if (result.shouldForceKill) {
-      addLog('warn', `${specialist.name} stuck (${result.consecutiveFailures} failures), force-killing`, state.patrolCycle);
-      console.log(`[deacon] ${specialist.name} stuck (${result.consecutiveFailures} failures), force-killing`);
-      const killResult = await forceKillSpecialist(specialist.name, state);
-      actions.push(`Force-killed ${specialist.name}: ${killResult.message}`);
-
-      // Auto-restart after force-kill (PAN-246: use wakeSpecialist, not initializeSpecialist)
-      // Clear session ID so we get a fresh session, not a stale resume of the old context
-      // Reset runtime state so queue processing doesn't think the specialist is still busy
-      if (killResult.success) {
-        console.log(`[deacon] Auto-restarting ${specialist.name} with fresh session...`);
-        clearSessionId(specialist.name);
-        const specialistSession = getTmuxSessionName(specialist.name);
-        saveAgentRuntimeState(specialistSession, { state: 'idle', lastActivity: new Date().toISOString() });
-        const wakeResult = await wakeSpecialist(specialist.name, '', {
-          waitForReady: true,
-          startIfNotRunning: true,
-        });
-        if (wakeResult.success) {
-          actions.push(`Auto-restarted ${specialist.name}`);
-          addLog('action', `Auto-restarted ${specialist.name}`, state.patrolCycle);
-        } else {
-          actions.push(`Failed to restart ${specialist.name}: ${wakeResult.message}`);
-          addLog('error', `Failed to restart ${specialist.name}: ${wakeResult.message}`, state.patrolCycle);
-        }
-      }
-    } else if (!result.wasRunning && !result.inCooldown) {
-      // PAN-378: Only auto-start global specialists if they have queued work.
-      // Per-project ephemeral specialists handle real work now — global specialists
-      // sitting idle just waste resources. Start them on-demand when tasks arrive.
-      const globalQueue = checkSpecialistQueue(specialist.name);
-      if (globalQueue.hasWork) {
-        console.log(`[deacon] ${specialist.name} not running but has queued work, auto-starting with fresh session...`);
-        clearSessionId(specialist.name);
-        const wakeResult = await wakeSpecialist(specialist.name, '', {
-          waitForReady: true,
-          startIfNotRunning: true,
-        });
-        if (wakeResult.success) {
-          actions.push(`Auto-started ${specialist.name} (queued work)`);
-          addLog('action', `Auto-started ${specialist.name} (queued work)`, state.patrolCycle);
-        } else {
-          actions.push(`Failed to start ${specialist.name}: ${wakeResult.message}`);
-          addLog('error', `Failed to start ${specialist.name}: ${wakeResult.message}`, state.patrolCycle);
-        }
-      }
-      // Otherwise: specialist is idle with no queue — don't waste resources starting it
-    }
-
-    // Check for queued work if specialist is idle or suspended (PAN-74, updated for PAN-80)
-    const specialistSession = getTmuxSessionName(specialist.name);
-    const runtimeState = getAgentRuntimeState(specialistSession);
-    const queue = checkSpecialistQueue(specialist.name);
-
-    // Auto-resume suspended specialists if they have queued work (PAN-80)
-    if (runtimeState?.state === 'suspended' && queue.hasWork) {
-      const nextTask = getNextSpecialistTask(specialist.name);
-      if (nextTask) {
-        console.log(`[deacon] Auto-resuming suspended ${specialist.name} for queued task: ${nextTask.payload.issueId}`);
-        try {
-          const { resumeAgent } = await import('../agents.js');
-          const message = `# Queued Work\n\nProcessing queued task: ${nextTask.payload.issueId}`;
-          const resumeResult = await resumeAgent(specialistSession, message);
-
-          if (resumeResult.success) {
-            actions.push(`Auto-resumed ${specialist.name} for queued task: ${nextTask.payload.issueId}`);
-            completeSpecialistTask(specialist.name, nextTask.id);
-          } else {
-            console.error(`[deacon] Failed to auto-resume ${specialist.name}: ${resumeResult.error}`);
-          }
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error(`[deacon] Error auto-resuming ${specialist.name}:`, msg);
-        }
-      }
-    }
-    // Wake idle specialists if they have queued work
-    else if (result.wasRunning && runtimeState?.state === 'idle' && queue.hasWork) {
-      const nextTask = getNextSpecialistTask(specialist.name);
-      if (nextTask) {
-        console.log(`[deacon] ${specialist.name} idle with queued work, waking for ${nextTask.payload.issueId}`);
-        try {
-          // Extract task details from payload
-          // Note: branch, workspace, prUrl are stored in context by submitToSpecialistQueue
-          const taskDetails = {
-            issueId: nextTask.payload.issueId || '',
-            branch: nextTask.payload.context?.branch,
-            workspace: nextTask.payload.context?.workspace,
-            prUrl: nextTask.payload.context?.prUrl,
-            context: nextTask.payload.context,
-          };
-          const wakeResult = await wakeSpecialistWithTask(specialist.name, taskDetails);
-          if (wakeResult.success) {
-            completeSpecialistTask(specialist.name, nextTask.id);
-            // Update testStatus when deacon wakes the test-agent for a queued task
-            if (specialist.name === 'test-agent' && nextTask.payload.issueId) {
-              updateTestStatusToTesting(nextTask.payload.issueId);
-            }
-            actions.push(`Processed queued task for ${specialist.name}: ${nextTask.payload.issueId}`);
-          } else {
-            console.error(`[deacon] Failed to wake ${specialist.name} for queued task: ${wakeResult.error}`);
-          }
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error(`[deacon] Error processing queue for ${specialist.name}:`, msg);
-        }
-      }
-    }
-  }
-  } // End of `if (false)` dead code block — global specialist patrol disabled (PAN-378)
+  // PAN-378: Global specialist patrol removed. All specialist work is handled by
+  // per-project ephemeral specialists via spawnEphemeralSpecialist().
+  // Per-project ephemeral specialist patrol is below (dead session + stuck detection).
 
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
   const suspendActions = await checkAndSuspendIdleAgents();
@@ -1995,7 +1912,9 @@ export async function runPatrol(): Promise<PatrolResult> {
         console.log(`[deacon] Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing ${projSpec.tmuxSession}`);
         try {
           await execAsync(`tmux kill-session -t "${projSpec.tmuxSession}"`);
-          clearSessionId(projSpec.specialistType, projSpec.projectKey);
+          // Do NOT clearSessionId — the Claude session still exists in storage
+          // and should be resumed on next dispatch. Clearing causes --session-id
+          // "already in use" errors.
           saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
           actions.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
         } catch {

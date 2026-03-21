@@ -1,291 +1,393 @@
-# Cost Tracking System (PAN-81)
+# Cost Tracking Architecture — Complete System Design
 
-## Overview
+## Source of Truth
 
-Panopticon now uses an event-sourced architecture for cost tracking, providing:
-- ⚡ **Fast queries** - <100ms instead of 5-30 seconds
-- 📊 **Per-model breakdown** - See costs by Claude model (Sonnet, Opus, Haiku)
-- 🔄 **Real-time updates** - Live cost tracking as agents work
-- 🎯 **Subagent costs** - Now includes nested subagent costs (previously missed)
-- 💰 **Budget tracking** - Set and monitor budgets per issue
-- 🌐 **Multi-provider** - Support for Anthropic, OpenAI, and Google
-
-## Architecture
-
-### Event-Sourced Design
-
-Instead of re-parsing session files on every request, costs are recorded in real-time and cached:
+Claude Code writes a transcript JSONL file for every session. The file is stored at:
 
 ```
-┌─────────────────┐     ┌──────────────────────┐
-│  Claude Code    │────▶│   heartbeat-hook     │
-│  (agent)        │     │  (PostToolUse)       │
-└─────────────────┘     └──────────┬───────────┘
-                                   │ writes
-                                   ▼
-                        ┌──────────────────────┐
-                        │ ~/.panopticon/costs/ │
-                        │  events.jsonl        │  ← Append-only log
-                        │  by-issue.json       │  ← Pre-computed cache
-                        └──────────┬───────────┘
-                                   │ reads (O(1))
-                                   ▼
-                        ┌──────────────────────┐
-                        │  Dashboard API       │
-                        │  /api/costs/by-issue │
-                        └──────────────────────┘
+~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl
 ```
 
-### Components
-
-1. **events.jsonl** - Append-only event log
-   - Location: `~/.panopticon/costs/events.jsonl`
-   - Each line is a JSON cost event
-   - Includes: timestamp, issue, agent, model, provider, tokens, cost
-
-2. **by-issue.json** - Pre-computed cache
-   - Location: `~/.panopticon/costs/by-issue.json`
-   - Fast O(1) lookups by issue
-   - Includes per-model breakdown, provider costs, budget status
-
-3. **heartbeat-hook** - Real-time cost recording
-   - Fires after every Claude API call
-   - Extracts token usage and calculates cost
-   - Appends event to events.jsonl
-
-4. **Migration** - One-time historical import
-   - Parses existing session files on first run
-   - Includes subagent sessions (previously missed)
-   - Best-effort: continues on errors
-
-## Setup
-
-### Initial Setup
-
-The cost tracking system is automatically initialized when you start the dashboard. On first run:
-
-1. **Migration runs automatically** - Historical session data is imported
-2. **Cache is built** - by-issue.json is created
-3. **Hook is activated** - New costs are tracked in real-time
-
-### Manual Migration
-
-If you need to rebuild the cache:
-
-```bash
-# Via API
-curl -X POST http://localhost:3011/api/costs/rebuild
-
-# Or restart the dashboard (migration runs if needed)
-pan dashboard
-```
-
-## API Endpoints
-
-### GET /api/costs/by-issue
-
-Returns costs grouped by issue with full breakdown.
-
-**Response:**
-```json
-{
-  "status": "live",
-  "lastEventTs": "2026-02-03T20:00:00Z",
-  "eventCount": 1234,
-  "issues": [
-    {
-      "issueId": "PAN-81",
-      "totalCost": 107.60,
-      "inputTokens": 30000000,
-      "outputTokens": 8000000,
-      "cacheReadTokens": 24947,
-      "cacheWriteTokens": 1000,
-      "models": {
-        "claude-sonnet-4": {
-          "cost": 95.0,
-          "calls": 150,
-          "tokens": 25000000
-        },
-        "claude-haiku-4.5": {
-          "cost": 12.6,
-          "calls": 200,
-          "tokens": 12500000
-        }
-      },
-      "providers": {
-        "anthropic": 107.60,
-        "openai": 0,
-        "google": 0
-      },
-      "budget": 150.00,
-      "budgetWarning": false,
-      "lastUpdated": "2026-02-03T19:30:00Z"
-    }
-  ]
-}
-```
-
-### GET /api/issues/:id/costs
-
-Returns costs for a specific issue.
-
-**Response:**
-```json
-{
-  "issueId": "PAN-81",
-  "totalCost": 107.60,
-  "totalTokens": 38024947,
-  "inputTokens": 30000000,
-  "outputTokens": 8000000,
-  "cacheReadTokens": 24947,
-  "cacheWriteTokens": 1000,
-  "models": { ... },
-  "providers": { ... },
-  "budget": 150.00,
-  "budgetWarning": false
-}
-```
-
-### POST /api/costs/rebuild
-
-Manually trigger migration and cache rebuild.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Cost cache rebuilt successfully",
-  "migration": {
-    "eventsCreated": 1234,
-    "totalCost": 543.21,
-    "errors": 0,
-    "warnings": 0
-  },
-  "cache": {
-    "issueCount": 45,
-    "eventCount": 1234,
-    "lastEventTs": "2026-02-03T20:00:00Z"
-  }
-}
-```
-
-### GET /api/costs/stream
-
-Returns recent cost events for real-time updates.
-
-**Query Parameters:**
-- `since` - ISO timestamp, only return events after this time
-- `limit` - Max events to return (default: 50)
-
-**Response:**
-```json
-{
-  "events": [
-    {
-      "ts": "2026-02-03T20:00:00Z",
-      "model": "claude-sonnet-4",
-      "provider": "anthropic",
-      "cost": 0.0234,
-      "tokens": 5000
-    }
-  ],
-  "byIssue": {
-    "PAN-81": [ ... ]
-  },
-  "count": 50
-}
-```
-
-## Budget Tracking
-
-### Setting Budgets
-
-Budgets are set per issue in the cache file or via the dashboard UI.
-
-**Budget States:**
-- **Good** (0-79% used) - Green indicator
-- **Warning** (80-99% used) - Yellow indicator, `budgetWarning: true`
-- **Over** (100%+ used) - Red indicator
-
-**Note:** Budgets are tracking only - they do NOT block agent execution.
-
-## Data Retention
-
-Events are retained for **90 days** by default. Older events are automatically pruned.
-
-**Retention Settings:**
-- Location: `~/.panopticon/costs/by-issue.json`
-- Field: `retentionDays` (default: 90)
-- Pruning: Automatic, runs daily
-
-## Troubleshooting
-
-### Dashboard shows "Stale" status
-
-This means the cache is out of sync with the event log.
-
-**Solution:**
-```bash
-curl -X POST http://localhost:3011/api/costs/rebuild
-```
-
-### Costs seem too low
-
-Check if historical data was migrated:
-1. Check `~/.panopticon/costs/events.jsonl` exists
-2. Check event count in dashboard
-3. Manually rebuild if needed
-
-### Missing subagent costs
-
-Subagent costs should now be included. If they're missing:
-1. Ensure you're running the latest version with PAN-81
-2. Rebuild the cache to re-import historical data
-3. Check that hooks are installed: `pan setup hooks`
-
-### Migration errors
-
-Migration is best-effort and logs warnings for corrupted files. Check logs:
-- Dashboard console output
-- `~/.panopticon/costs/by-issue.json` status field
-
-## File Locations
+Where `<encoded-cwd>` is derived from the **current working directory when `claude` was launched** — strip the leading `/`, replace all `/` with `-`, prefix with `-`. For example:
 
 ```
-~/.panopticon/costs/
-  ├── events.jsonl          # Append-only event log
-  └── by-issue.json         # Pre-computed cache
+cwd: /home/eltmon/Projects/krux/workspaces/feature-krux-4
+  → ~/.claude/projects/-home-eltmon-Projects-krux-workspaces-feature-krux-4/<uuid>.jsonl
 
-~/.panopticon/bin/
-  ├── heartbeat-hook        # Updated with cost tracking
-  └── record-cost-event.js  # Cost recording script
-
-~/.claude/projects/
-  └── -<workspace>/         # Session files (legacy)
-      ├── *.jsonl           # Main session files
-      └── subagents/*.jsonl # Subagent session files
+cwd: /home/eltmon/Projects/krux
+  → ~/.claude/projects/-home-eltmon-Projects-krux/<uuid>.jsonl
 ```
 
-## Performance Comparison
+Each transcript entry for an assistant message contains:
+- `requestId` — unique Claude API request ID (e.g., `req_011CZDBPvH99CWcNNsQoLEC3`)
+- `message.model` — model used (e.g., `claude-opus-4-6`)
+- `message.usage` — token counts: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`
 
-| Metric | Before (Session Parsing) | After (Event-Sourced) |
-|--------|-------------------------|----------------------|
-| Query time | 5-30 seconds | <100ms |
-| I/O per request | Read 100MB+ | Read ~10KB |
-| Subagent costs | ❌ Missing | ✅ Included |
-| Per-model breakdown | ❌ No | ✅ Yes |
-| Real-time updates | ❌ No | ✅ Yes |
-| Scales with history | ❌ Gets slower | ✅ Constant time |
+The transcript files are the canonical, immutable source of truth for all cost data.
 
-## Implementation Details
+## Where Sessions Live on Disk
 
-For implementation details, see:
-- `src/lib/costs/` - Core cost tracking modules
-- `src/dashboard/server/index.ts` - API endpoints
-- `src/dashboard/frontend/src/components/CostsPage.tsx` - UI component
-- `scripts/heartbeat-hook` - Real-time cost recording
-- `scripts/record-cost-event.js` - Cost calculation logic
+A single issue can have **multiple agents**, each started from **different directories**, producing sessions in **different Claude project directories**:
 
-## Related Issues
+| Agent Type | Typical cwd | Claude Project Dir |
+|-----------|-------------|-------------------|
+| Planning agent | Main project dir (before workspace exists) | `~/.claude/projects/-home-...-Projects-krux/` |
+| Work agent | Git worktree workspace | `~/.claude/projects/-home-...-Projects-krux-workspaces-feature-krux-4/` |
+| Review specialist | Workspace (per-project ephemeral) | Same as work agent, OR specialist-specific |
+| Test specialist | Workspace | Same pattern |
+| Merge specialist | Workspace | Same pattern |
+| Interactive (user) | Anywhere | Wherever the user ran `claude` |
 
-- **PAN-105**: Per-model cost breakdown in API responses (enabled by PAN-81)
+An agent can also produce **multiple sessions** over its lifetime (compactions, restarts, handoffs). Each session gets a unique UUID and its own `.jsonl` file, but they all land in the same Claude project directory (since the cwd doesn't change).
+
+Subagent transcripts are stored in a `subagents/` subdirectory within the Claude project directory.
+
+### Workspace Cleanup
+
+When workspaces are cleaned up after merge (git worktree removed), the Claude session directory at `~/.claude/projects/` is **NOT deleted** — it survives workspace cleanup. This is critical for cost recovery.
+
+## Session-to-Agent Mapping
+
+The core attribution problem: given a transcript file `<uuid>.jsonl`, which Panopticon agent created it?
+
+### Where the Mapping Is Stored
+
+**Runtime state** (`~/.panopticon/agents/<agent-id>/runtime.json`):
+- The heartbeat hook fires on every tool use and receives both `session_id` (from Claude Code) and `PANOPTICON_AGENT_ID` (from env)
+- It writes the current active `session_id` to `runtime.json` — this is the "what's active now" mapping
+
+**Session history** (`~/.panopticon/agents/<agent-id>/sessions.json`):
+- Append-only list of all Claude Code session UUIDs this agent has ever used
+- The heartbeat hook appends new session IDs as they appear
+- This is the "what sessions belong to this agent historically" mapping — exactly what the reconciler needs
+
+**SQLite `processed_sessions` table**:
+- Maps session UUIDs to agent IDs, issue IDs, transcript paths, and byte offsets
+- Populated by both the live hook and the reconciler
+- Serves as the reconciler's progress tracker
+
+**SQLite `cost_events.session_id` column**:
+- Each cost event records which Claude Code session produced it
+- Enables querying costs by session for debugging and attribution
+
+### Why Both Stores Matter
+
+- `runtime.json` + `sessions.json` = "which agent owns which session" (needed for attribution)
+- `processed_sessions` = "how far have we read each session's transcript" (needed for incremental processing)
+- `cost_events.session_id` = "which session produced this cost" (needed for breakdown/analysis)
+
+## SQLite Schema — cost_events Table
+
+```sql
+CREATE TABLE cost_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts            TEXT    NOT NULL,
+    agent_id      TEXT    NOT NULL,
+    issue_id      TEXT    NOT NULL,
+    session_type  TEXT    NOT NULL DEFAULT 'unknown',  -- planning, implementation, review, test, merge, interactive
+    provider      TEXT    NOT NULL DEFAULT 'anthropic',
+    model         TEXT    NOT NULL,
+    input         INTEGER NOT NULL DEFAULT 0,
+    output        INTEGER NOT NULL DEFAULT 0,
+    cache_read    INTEGER NOT NULL DEFAULT 0,
+    cache_write   INTEGER NOT NULL DEFAULT 0,
+    cost          REAL    NOT NULL DEFAULT 0,
+    request_id    TEXT,
+    session_id    TEXT,    -- Claude Code session UUID
+    tldr_interceptions INTEGER,
+    tldr_bypasses      INTEGER,
+    tldr_tokens_saved  INTEGER,
+    tldr_bypass_reasons TEXT,  -- JSON string
+    source_file   TEXT
+);
+
+CREATE UNIQUE INDEX idx_cost_request_id ON cost_events(request_id) WHERE request_id IS NOT NULL;
+CREATE INDEX idx_cost_issue_id ON cost_events(issue_id, ts);
+CREATE INDEX idx_cost_agent_id ON cost_events(agent_id, ts);
+CREATE INDEX idx_cost_ts ON cost_events(ts);
+CREATE INDEX idx_cost_session_id ON cost_events(session_id) WHERE session_id IS NOT NULL;
+```
+
+**CRITICAL**: Nothing in this table ever gets deleted. It is append-only.
+
+The `request_id` unique index is the primary dedup mechanism. Each Claude API request has a globally unique ID. `INSERT OR IGNORE` skips duplicates.
+
+## SQLite Schema — processed_sessions Table
+
+```sql
+CREATE TABLE processed_sessions (
+    session_id      TEXT PRIMARY KEY,     -- Claude Code session UUID
+    agent_id        TEXT,                 -- Panopticon agent that owns this session
+    issue_id        TEXT,                 -- Issue this session is attributed to
+    transcript_path TEXT,                 -- Full path to the .jsonl file
+    byte_offset     INTEGER NOT NULL DEFAULT 0,  -- Bytes consumed so far
+    processed_at    TEXT NOT NULL,
+    event_count     INTEGER NOT NULL DEFAULT 0
+);
+```
+
+## Path 1: Live Recording (Real-Time)
+
+This is the hot path that records costs as agents work.
+
+### Flow
+
+1. Claude Code fires a `PostToolUse` hook after every tool use
+2. The hook payload includes `session_id` and `transcript_path`
+3. `~/.panopticon/bin/heartbeat-hook` (bash) receives this, does heartbeat/activity tracking, then calls `record-cost-event.js`
+4. `record-cost-event.js` (esbuild-bundled TypeScript):
+   - Reads the byte offset it last processed for this session from `~/.panopticon/costs/state/<session-id>.offset`
+   - Opens the transcript JSONL file and reads only NEW bytes from that offset
+   - Parses each new line looking for `type: "assistant"` entries with `message.usage`
+   - Deduplicates by `requestId` (tracks seen IDs in `~/.panopticon/costs/state/<session-id>.seen`)
+   - Calculates cost using pricing tables
+   - Calls `appendCostEvent()` which triple-writes:
+     - `~/.panopticon/costs/events.jsonl` (append-only JSONL log)
+     - SQLite `cost_events` table (via `INSERT OR IGNORE` with `request_id` dedup)
+     - Per-project WAL file (for cross-developer sharing via git)
+   - Saves the new byte offset
+
+### Session-to-Agent Mapping (Live Path)
+
+The heartbeat hook has both `session_id` (from PostToolUse payload) and `PANOPTICON_AGENT_ID` (from env, set by agent launcher). It should:
+1. Write the current `session_id` to `runtime.json` (active session)
+2. Append the `session_id` to `sessions.json` if not already present (session history)
+3. Pass `session_id` through to `record-cost-event.js` which stores it in `cost_events.session_id`
+
+### Issue ID Resolution
+
+The hook resolves issue IDs in this order:
+1. `$PANOPTICON_AGENT_ID` / `$PANOPTICON_ISSUE_ID` env vars (set by agent launcher)
+2. Git branch name regex: `(pan|min|aud|krux|cli)-(\d+)`
+3. Workspace path regex: same pattern
+4. Fallback: `UNKNOWN`
+
+### Build Requirements
+
+The `record-cost-event.js` is bundled with esbuild. Because it imports `better-sqlite3` (CJS native module) and runs as ESM, the build MUST include:
+- `createRequire` banner for CJS compatibility
+- NO `--external:better-sqlite3` (the script runs standalone from `~/.panopticon/bin/` where `node_modules` is not available)
+
+Build config: `scripts/build-cost-script.mjs`
+
+### Error Handling Concern
+
+The heartbeat hook silently swallows errors from `record-cost-event.js` (`2>/dev/null || true`). If the script is broken (as happened with the esbuild bundling issue), costs silently stop recording with NO visible indication. This needs to be addressed:
+- The deacon should monitor cost event freshness
+- The dashboard should show a banner when no cost events have been recorded recently
+- The hook should log errors somewhere visible
+
+## Path 2: Reconciler (Catch-Up Safety Net)
+
+The reconciler is a periodic sweep that ensures completeness. It catches anything the live hook missed — whether from hook failures, process crashes, system reboots, or any other reason.
+
+### How It Works (Current — v1)
+
+The current reconciler scans agent state files to find transcript paths:
+
+1. Scans `~/.panopticon/agents/` for all agent directories (`agent-*`, `planning-*`)
+2. For each agent, reads `state.json` to get the `workspace` path
+3. Maps workspace path to Claude session directory: `~/.claude/projects/<encoded-path>/`
+4. Lists all `.jsonl` transcript files in that directory
+5. For each transcript file, checks the stored byte offset in `processed_sessions`
+6. Reads only unprocessed bytes from the transcript
+7. Parses assistant messages, extracts usage, calculates cost
+8. Inserts into SQLite with `INSERT OR IGNORE` on `request_id` — natural dedup
+9. Updates the processed offset in `processed_sessions`
+
+### How It Should Work (Future — v2)
+
+The v1 approach misses sessions because it only looks at directories reachable from agent `state.json` workspace paths. This misses:
+- **Planning agents started from main project dirs** (before workspace creation)
+- **Interactive/manual Claude sessions** (no agent, no state.json)
+- **Sessions where the agent dir was cleaned up** but Claude session dir persists
+- **Specialist sessions** that don't have state.json files
+
+The v2 reconciler should scan `~/.claude/projects/` directly:
+
+1. Scan all directories under `~/.claude/projects/`
+2. For each directory, list all `.jsonl` transcript files
+3. For each transcript file, check `processed_sessions` for existing offset
+4. Read only new bytes, extract cost events with `requestId`
+5. For **attribution** (agent ID, issue ID, session type):
+   - Check `sessions.json` files across all agents to find which agent owns this session UUID
+   - If no agent mapping found, infer issue ID from the encoded directory path (e.g., `feature-min-787` in the path → `MIN-787`)
+   - If no issue can be inferred, attribute as `UNKNOWN` / `unattributed`
+6. Insert with dedup, update offset
+
+This approach catches **everything** — every transcript file on disk gets processed, regardless of how it was created.
+
+### Key Properties
+
+- **Idempotent**: Can run any number of times without creating duplicates (dedup on `request_id`)
+- **Incremental**: Only processes new bytes in each transcript (offset tracking)
+- **Non-destructive**: Never deletes anything from SQLite. Append-only.
+- **Catches everything**: Any transcript entry with a `requestId` not in SQLite gets imported
+- **Survives workspace cleanup**: Claude session dirs persist after git worktree removal
+
+### When It Runs
+
+- On dashboard startup (via `setImmediate` — non-blocking)
+- Periodically (every 5 minutes via dashboard server)
+- On-demand via API endpoint: `POST /api/costs/reconcile`
+- Should become a proper managed background job (integrated with deacon or its own service)
+
+## Path 3: Original Migration (Historical, Kept for Reference)
+
+The original migration (`src/lib/costs/migration.ts`) was a one-time backfill for agents that ran before the live recording system existed. Key differences from the reconciler:
+
+- Did NOT set `requestId` on events — no dedup protection
+- Did NOT track session IDs or byte offsets
+- Was designed to run once (`migrateIfNeeded()` skips if events already exist)
+- Generated events with `agent_id: "recovered"` or `"recovered-deep"`
+
+This code is preserved in `src/lib/costs/migration.ts` but the reconciler supersedes it for all ongoing use.
+
+## Cost Attribution by Stage (PAN-77, PAN-42)
+
+For the cost breakdown modal (PAN-77), costs need to be attributed by pipeline stage:
+
+| Stage | Source | `session_type` value |
+|-------|--------|---------------------|
+| Planning | Planning agent session | `planning` |
+| Implementation | Work agent session | `implementation` |
+| Review | Review specialist session | `review` |
+| Testing | Test specialist session | `test` |
+| Merge | Merge specialist session | `merge` |
+| Interactive | Manual user sessions | `interactive` |
+
+### Current State
+
+- Work agents and planning agents set `PANOPTICON_SESSION_TYPE` via env vars at launch
+- Specialists do NOT have `state.json` and are ephemeral (PAN-378 refactoring)
+- Specialist sessions work across many issues, so per-issue attribution requires knowing which issue the specialist was working on at each point in the transcript
+- The `session_type` column in `cost_events` tracks this, but only when the live hook captures it
+
+### What's Needed
+
+1. **Session-to-agent mapping** (described above) — heartbeat hook writes `session_id` to `runtime.json` and `sessions.json`
+2. **Specialist cost attribution** — specialists need to set `PANOPTICON_ISSUE_ID` and `PANOPTICON_SESSION_TYPE` when they start working on a specific issue
+3. **Reconciler v2** — scan `~/.claude/projects/` directly, use `sessions.json` for attribution
+
+## Related Open Issues
+
+| Issue | Title | Relevance |
+|-------|-------|-----------|
+| **PAN-77** | Cost breakdown modal: show costs by stage and model | Needs proper session_type attribution |
+| **PAN-317** | Track non-agent Claude Code session costs ($545 unattributed) | Reconciler v2 direct scan solves this |
+| **PAN-42** | Track costs at each stage of agent lifecycle | Needs session_type tracking on all agent types |
+| **PAN-55** | Track specialist costs with time period filtering | Needs specialist session attribution |
+| **PAN-206** | Persist cost data across environment rebuilds | SQLite + reconciler makes this resilient |
+| **PAN-104** | Cost alerts/notifications when spending exceeds thresholds | Builds on accurate cost data |
+| **PAN-106** | Cost prediction/estimation for in-progress work | Builds on per-stage cost history |
+
+## Dashboard Integration
+
+### Kanban Board Cost Display
+
+- `fetchIssueCosts()` calls `GET /api/costs/by-issue` every 30 seconds
+- Endpoint reads from SQLite via `getCostsByIssueFromDb()` — aggregates `cost_events` by `UPPER(issue_id)`
+- `IssueCard` component renders cost badge with color coding (green < $5, yellow < $20, orange < $50, red >= $50)
+
+### Per-Agent Cost (Detail Pane)
+
+- `useAgentCost()` hook calls `GET /api/agents/:id/cost`
+- This endpoint reads directly from Claude transcript JSONL files (NOT from SQLite)
+- Used in `IssueAgentCard` for the detail pane
+
+### Cost Breakdown Modal (PAN-77, not yet built)
+
+- Click cost badge → modal showing breakdown by stage and model
+- `GET /api/costs/issue/:id` returns `byModel` and `byStage` from SQLite
+- Requires accurate `session_type` attribution to be meaningful
+
+## Bugs Found and Fixed (2026-03-20)
+
+### 1. record-cost-event.js esbuild bundle broken
+
+The `build:scripts` command in `package.json` used `--format=esm` without the `createRequire` banner. `better-sqlite3` uses CJS `require("fs")` internally, which fails in ESM without the polyfill. The script crashed with `Dynamic require of "fs" is not supported` but the heartbeat hook swallowed the error silently.
+
+**Fix**: Created `scripts/build-cost-script.mjs` with proper esbuild config matching the server build pattern.
+
+### 2. Deacon patrolWorkAgentResolutions — getEnabledSpecialists not defined
+
+The PAN-378 per-project specialist refactoring missed updating `patrolWorkAgentResolutions()` in `deacon.ts`. Two other functions (`checkAndSuspendIdleAgents`, `checkStuckWorkAgents`) were correctly updated to use `const isSpecialistSession = (id: string) => id.startsWith('specialist-')` but this one still referenced the removed `getEnabledSpecialists()` import.
+
+**Fix**: Applied same pattern — replaced `getEnabledSpecialists()` call with inline `isSpecialistSession` function.
+
+### 3. Issue ID regex missing prefixes
+
+The heartbeat hook and record-cost-event.ts only matched `pan|min|aud` in git branch/workspace path regexes. `krux` and `cli` prefixed issues were not matched, falling through to `UNKNOWN`.
+
+**Fix**: Updated regexes in both `scripts/heartbeat-hook` and `scripts/record-cost-event.ts` to include `krux|cli`.
+
+## File Inventory
+
+| File | Purpose |
+|------|---------|
+| `scripts/record-cost-event.ts` | Live recording script source |
+| `scripts/record-cost-event.js` | Built bundle (deployed to `~/.panopticon/bin/`) |
+| `scripts/build-cost-script.mjs` | esbuild config for the recording script |
+| `scripts/heartbeat-hook` | Bash hook source (deployed to `~/.panopticon/bin/`) |
+| `src/lib/costs/events.ts` | `appendCostEvent()` — triple-write to JSONL, SQLite, WAL |
+| `src/lib/costs/migration.ts` | Original one-time migration (preserved, superseded by reconciler) |
+| `src/lib/costs/reconciler.ts` | Periodic catch-up sweep (v1 — agent state.json based) |
+| `src/lib/costs/sync-wal.ts` | WAL file import from project repos |
+| `src/lib/database/cost-events-db.ts` | SQLite cost_events CRUD and aggregation queries |
+| `src/lib/database/schema.ts` | Schema definitions and migrations (currently v3) |
+| `src/lib/cost.ts` | Pricing tables and cost calculation |
+| `src/dashboard/server/index.ts` | API endpoints for `/api/costs/*` and `/api/agents/:id/cost` |
+| `src/dashboard/frontend/src/components/KanbanBoard.tsx` | `IssueCard` cost badge rendering |
+| `src/dashboard/frontend/src/hooks/useHandoffData.ts` | `useAgentCost()` hook |
+
+## Data Flow Diagram
+
+```
+Claude Code Agent (tmux session)
+  │
+  ├─ writes transcript ──► ~/.claude/projects/<encoded-cwd>/<session>.jsonl
+  │                           (source of truth: requestId, model, usage)
+  │                           NOTE: <encoded-cwd> is based on WHERE claude was launched,
+  │                           NOT on agent state.json. Planning agents started from the
+  │                           main project dir write to a DIFFERENT Claude project dir
+  │                           than work agents started from a worktree workspace.
+  │
+  ├─ fires PostToolUse hook
+  │     │
+  │     ▼
+  │   heartbeat-hook (bash)
+  │     ├─► runtime.json   (active session_id)
+  │     ├─► sessions.json  (append session_id to history)
+  │     │
+  │     ▼
+  │   record-cost-event.js ──► reads NEW bytes from transcript
+  │     │                       │
+  │     │                       ├─► events.jsonl (append-only log)
+  │     │                       ├─► SQLite cost_events (INSERT OR IGNORE on request_id)
+  │     │                       └─► per-project WAL (for git sharing)
+  │     │
+  │     └─► offset file: ~/.panopticon/costs/state/<session>.offset
+  │
+  └─ (transcript persists after workspace cleanup)
+
+Reconciler (periodic sweep — safety net)
+  │
+  ├─ v1 (current): scans agent state.json → workspace paths → Claude project dirs
+  │   (misses planning sessions from main project dir, interactive sessions, specialists)
+  │
+  ├─ v2 (planned): scans ~/.claude/projects/ directly
+  │   ├─ finds ALL transcript files regardless of source
+  │   ├─ uses sessions.json for agent attribution
+  │   ├─ infers issue ID from directory path as fallback
+  │   └─ catches everything: planning, work, specialist, interactive
+  │
+  ├─ reads from last known offset per session
+  ├─ extracts usage, calculates cost
+  └─► SQLite cost_events (INSERT OR IGNORE on request_id — natural dedup)
+
+Dashboard
+  │
+  ├─ GET /api/costs/by-issue ──► SQLite aggregate query → kanban cost badges
+  ├─ GET /api/agents/:id/cost ──► reads transcript JSONL directly → detail pane
+  └─ GET /api/costs/issue/:id ──► SQLite per-issue breakdown (PAN-77 modal)
+```
