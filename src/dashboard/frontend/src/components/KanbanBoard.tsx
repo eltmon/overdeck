@@ -24,6 +24,7 @@ import { PlanDialog } from './PlanDialog';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
+import { CostBreakdownModal } from './CostBreakdownModal';
 
 
 // Difficulty badge colors
@@ -1819,6 +1820,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
+  const [showCostModal, setShowCostModal] = useState(false);
 
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
@@ -2147,11 +2149,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
                 Needs Review
               </span>
             )}
-            {/* Cost badge */}
+            {/* Cost badge — click for breakdown modal */}
             {cost && cost.totalCost > 0 && (
               <span
-                className={`ml-auto px-1.5 py-0.5 rounded text-xs font-medium ${getCostColor(cost.totalCost)}`}
-                title={`${(cost.tokenCount / 1000000).toFixed(2)}M tokens${cost.model ? ` • ${cost.model.replace('claude-', '').replace(/-20[0-9]{6}$/, '')}` : ''}${cost.durationMinutes ? ` • ${Math.round(cost.durationMinutes)}min` : ''}`}
+                onClick={(e) => { e.stopPropagation(); setShowCostModal(true); }}
+                className={`ml-auto px-1.5 py-0.5 rounded text-xs font-medium cursor-pointer hover:ring-1 hover:ring-white/20 transition-all ${getCostColor(cost.totalCost)}`}
+                title="Click for cost breakdown"
               >
                 <DollarSign className="w-3 h-3 inline -mt-0.5" />
                 {formatCost(cost.totalCost).slice(1)}
@@ -2377,6 +2380,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
         </div>
       )}
 
+      {/* Cost breakdown modal */}
+      <CostBreakdownModal
+        issueId={issue.identifier}
+        isOpen={showCostModal}
+        onClose={() => setShowCostModal(false)}
+      />
     </div>
   );
 }
