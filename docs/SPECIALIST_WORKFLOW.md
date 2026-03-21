@@ -107,16 +107,41 @@ The archive step (`renameSync → .archived`) prevents this while preserving the
 
 ### Agent Environment Variables
 
-All agents spawned by Panopticon receive these environment variables:
+All agents spawned by Panopticon receive these environment variables via tmux `-e` flags:
+
+**Work and Planning Agents:**
 
 | Variable | Value | Purpose |
 |----------|-------|---------|
 | `PANOPTICON_AGENT_ID` | `agent-min-693` | Agent identifier for heartbeat, status, messaging |
 | `PANOPTICON_ISSUE_ID` | `MIN-693` | Issue being worked on |
-| `PANOPTICON_SESSION_TYPE` | `implementation` / `planning` / `exploration` | Current phase |
+| `PANOPTICON_SESSION_TYPE` | `implementation` / `planning` / `exploration` | Current phase — used for cost attribution by stage |
 | `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` | `false` | Disables suggested prompts for autonomous agents (PAN-251) |
 
+**Specialist Agents (review, test, merge):**
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `PANOPTICON_AGENT_ID` | `specialist-panopticon-cli-review-agent` | Specialist tmux session name |
+| `PANOPTICON_ISSUE_ID` | `PAN-379` | Issue being reviewed/tested/merged |
+| `PANOPTICON_SESSION_TYPE` | `review` / `test` / `merge` | Specialist type — used for cost attribution by stage |
+
+Specialist env vars are set both in tmux `-e` flags and as `export` statements in the inner run script (belt-and-suspenders for env inheritance).
+
 Provider-specific variables (`BASE_URL`, `AUTH_TOKEN`) are also injected based on the model's provider configuration.
+
+### Session-to-Agent Mapping
+
+The heartbeat hook (PostToolUse) maintains a mapping between Claude Code session UUIDs and Panopticon agents:
+
+- **`runtime.json`** — `claudeSessionId` field tracks the currently active Claude session
+- **`sessions.json`** — Append-only array of all Claude session UUIDs this agent has ever used
+
+This mapping is used by the cost reconciler to attribute transcript files to the correct agent and issue.
+
+### Specialist Busy Handling
+
+When a specialist is dispatched but already running a task, `spawnEphemeralSpecialist` returns `{ error: 'specialist_busy' }`. The review and request-review endpoints handle this by reverting `reviewStatus` to `pending` (not `failed`), so the deacon can retry the dispatch later. This prevents fake review feedback from being sent to work agents.
 
 ## Worker Agent Integration
 

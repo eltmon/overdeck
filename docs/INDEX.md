@@ -43,7 +43,7 @@
 | [BUILD.md](./BUILD.md) | Build pipeline, esbuild config, `__dirname` resolution, prompt template copying |
 | [ARCHITECTURE-CACHING.md](./ARCHITECTURE-CACHING.md) | Dashboard API caching, real-time push, and rate limit management |
 | [DNS_SETUP.md](./DNS_SETUP.md) | Local DNS resolution for development |
-| [cost-tracking.md](./cost-tracking.md) | Event-sourced cost tracking system |
+| [cost-tracking.md](./cost-tracking.md) | Cost tracking: live recording, reconciler, session-to-agent mapping, SQLite schema |
 | [TLDR.md](./TLDR.md) | TLDR code analysis — architecture, hooks, index lifecycle, API |
 | [CONFIGURATION.md § External Services](./CONFIGURATION.md#external-service-integrations) | Cloudflare tunnels, Hume EVI, and adding new integrations |
 
