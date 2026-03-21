@@ -414,7 +414,7 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       existsSync(resolvedPlanning)
     ) {
       rmSync(resolvedPlanning, { recursive: true, force: true });
-      steps.push('Removed stale .planning/ directory from previous issue');
+      console.log('  Removed stale .planning/ directory from previous issue');
     }
 
     // Initialize fresh beads for this workspace (remove inherited beads from main)
