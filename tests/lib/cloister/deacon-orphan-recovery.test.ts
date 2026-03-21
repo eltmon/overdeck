@@ -23,6 +23,7 @@ import { homedir } from 'os';
 const mockCheckSpecialistQueue = vi.fn();
 const mockSubmitToSpecialistQueue = vi.fn();
 const mockGetTmuxSessionName = vi.fn();
+const mockSpawnEphemeralSpecialist = vi.fn();
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   getEnabledSpecialists: vi.fn().mockReturnValue([]),
@@ -33,6 +34,7 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   clearSessionId: vi.fn(),
   checkSpecialistQueue: (...args: unknown[]) => mockCheckSpecialistQueue(...args),
   submitToSpecialistQueue: (...args: unknown[]) => mockSubmitToSpecialistQueue(...args),
+  spawnEphemeralSpecialist: (...args: unknown[]) => mockSpawnEphemeralSpecialist(...args),
   getNextSpecialistTask: vi.fn(),
   wakeSpecialistWithTask: vi.fn(),
   completeSpecialistTask: vi.fn(),
@@ -57,6 +59,13 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getAgentDir: vi.fn().mockReturnValue('/tmp'),
   getAgentState: (...args: unknown[]) => mockGetAgentState(...args),
   saveAgentState: vi.fn(),
+}));
+
+const mockResolveProjectFromIssue = vi.fn();
+
+vi.mock('../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
+  findProjectByPath: vi.fn().mockReturnValue(null),
 }));
 
 // Import after mocks are in place
@@ -179,7 +188,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   // Branch (b): no queue item, workspace available from agent state
   // -------------------------------------------------------------------------
 
-  it('(b) re-submits to specialist queue and sets testStatus=testing when workspace is available', async () => {
+  it('(b) re-dispatches via spawnEphemeralSpecialist and sets testStatus=testing when workspace is available', async () => {
     const workspace = '/workspaces/feature-pan-369-test';
 
     writeStatusFile({
@@ -197,18 +206,22 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     // Agent state has the workspace
     mockGetAgentState.mockReturnValue({ workspace });
 
+    // resolveProjectFromIssue returns a valid project
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+
+    // spawnEphemeralSpecialist succeeds
+    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: true, message: 'spawned' });
+
     const actions = await checkOrphanedReviewStatuses();
 
-    expect(mockSubmitToSpecialistQueue).toHaveBeenCalledWith('test-agent', {
-      priority: 'normal',
-      source: 'deacon-orphan-recovery',
+    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledWith('panopticon-cli', 'test-agent', {
       issueId: ISSUE_ID,
       workspace,
       branch: `feature/${ISSUE_ID.toLowerCase()}`,
     });
 
     expect(actions).toHaveLength(1);
-    expect(actions[0]).toMatch(/Re-queued orphaned test for/);
+    expect(actions[0]).toMatch(/Re-dispatched orphaned test for/);
     expect(actions[0]).toContain(ISSUE_ID);
 
     // File must be rewritten with updated testStatus
@@ -238,8 +251,8 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
 
     const actions = await checkOrphanedReviewStatuses();
 
-    // Cannot re-queue without workspace — must not submit
-    expect(mockSubmitToSpecialistQueue).not.toHaveBeenCalled();
+    // Cannot re-dispatch without workspace — must not spawn
+    expect(mockSpawnEphemeralSpecialist).not.toHaveBeenCalled();
 
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/Reset orphaned test for/);
