@@ -4,8 +4,8 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync } from 'fs';
-import { join, dirname, basename, extname } from 'path';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync } from 'fs';
+import { join, dirname, basename, extname, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -429,6 +429,24 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       result.errors.push(worktreeResult.message);
       result.success = false; // Fail the entire workspace creation if worktree fails
     }
+  }
+
+  // Remove stale .planning/ directory inherited from main branch.
+  // This contains STATE.md and other planning artifacts from a PREVIOUS issue.
+  // If left in place, the new agent reads it and works on the wrong issue.
+  // SAFETY: resolve() to absolute path and verify it's under a known workspace prefix
+  // to prevent path traversal from ever reaching rmSync.
+  const resolvedWorkspace = resolve(workspacePath);
+  const resolvedPlanning = resolve(resolvedWorkspace, '.planning');
+  const isUnderWorkspacesDir = resolvedWorkspace.match(/\/workspaces\/feature-[a-z0-9-]+$/);
+  if (
+    isUnderWorkspacesDir &&
+    resolvedPlanning === join(resolvedWorkspace, '.planning') &&
+    existsSync(join(resolvedWorkspace, '.git')) &&
+    existsSync(resolvedPlanning)
+  ) {
+    rmSync(resolvedPlanning, { recursive: true, force: true });
+    result.steps.push('Removed stale .planning/ directory from previous issue');
   }
 
   // Sanitize any docker-compose files in the workspace to use platform-agnostic paths
