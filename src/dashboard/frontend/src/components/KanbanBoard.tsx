@@ -128,11 +128,8 @@ function getLabelStyle(label: string): string {
   return 'bg-gray-800/60 text-gray-400 border border-gray-600/30';
 }
 
-function getCostColor(cost: number): string {
-  if (cost >= 50) return 'bg-red-900/50 text-red-400';
-  if (cost >= 20) return 'bg-orange-900/50 text-orange-400';
-  if (cost >= 5) return 'bg-yellow-900/50 text-yellow-400';
-  return 'bg-green-900/50 text-green-400';
+function getCostColor(_cost: number): string {
+  return 'bg-surface-overlay text-content-subtle';
 }
 
 async function fetchIssues(cycle: string = 'current', includeCompleted: boolean = false): Promise<Issue[]> {
@@ -550,6 +547,7 @@ export function ListIssueRow({
   agents,
   specialists,
   issueCosts,
+  costsLoading,
   selectedIssue,
   onSelectIssue,
   onPlan,
@@ -558,6 +556,7 @@ export function ListIssueRow({
   agents: Agent[];
   specialists: SpecialistAgent[];
   issueCosts: Record<string, IssueCost>;
+  costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
   onPlan: (issue: Issue) => void;
@@ -628,8 +627,11 @@ export function ListIssueRow({
       )}
 
       {/* Cost */}
+      {costsLoading && !cost && (
+        <span className="w-10 h-4 bg-surface-overlay rounded animate-pulse shrink-0" />
+      )}
       {cost && cost.totalCost > 0 && (
-        <span className={`text-xs px-1.5 py-0.5 rounded ${getCostColor(cost.totalCost)}`}>
+        <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${getCostColor(cost.totalCost)}`}>
           {formatCost(cost.totalCost)}
         </span>
       )}
@@ -975,7 +977,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   };
 
   // Fetch costs for all issues
-  const { data: issueCosts = {} } = useQuery({
+  const { data: issueCosts = {}, isLoading: costsLoading } = useQuery({
     queryKey: ['issueCosts'],
     queryFn: fetchIssueCosts,
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -1186,6 +1188,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
+                    costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
@@ -1218,6 +1221,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
+                    costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
@@ -1252,6 +1256,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
+                    costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
@@ -1289,6 +1294,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
+                    costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
@@ -1359,6 +1365,7 @@ function ColumnContent({
   agents,
   specialists,
   issueCosts,
+  costsLoading,
   selectedIssue,
   onSelectIssue,
   onPlan,
@@ -1368,6 +1375,7 @@ function ColumnContent({
   agents: Agent[];
   specialists: SpecialistAgent[];
   issueCosts: Record<string, IssueCost>;
+  costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
   onPlan: (issue: Issue) => void;
@@ -1411,6 +1419,7 @@ function ColumnContent({
           planningAgent={planningAgent}
           specialists={issueSpecialists}
           cost={issueCosts[issue.identifier.toLowerCase()]}
+          costsLoading={costsLoading}
           isSelected={selectedIssue === issue.identifier}
           onSelect={() => onSelectIssue(
             selectedIssue === issue.identifier ? null : issue.identifier
@@ -1810,13 +1819,14 @@ interface IssueCardProps {
   planningAgent?: Agent;
   specialists?: SpecialistAgent[];
   cost?: IssueCost;
+  costsLoading?: boolean;
   isSelected: boolean;
   onSelect: () => void;
   onPlan: () => void; // Lifted to parent to survive re-renders
   onViewBeads?: (issue: Issue) => void;
 }
 
-function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
+function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -2150,6 +2160,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
               </span>
             )}
             {/* Cost badge — click for breakdown modal */}
+            {costsLoading && !cost && (
+              <span className="ml-auto w-12 h-4 bg-surface-overlay rounded animate-pulse" />
+            )}
             {cost && cost.totalCost > 0 && (
               <span
                 onClick={(e) => { e.stopPropagation(); setShowCostModal(true); }}
