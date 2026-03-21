@@ -14,7 +14,6 @@ import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresRouter } from './providers.js';
 import { loadConfig } from './config.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
-import type { TrackerType } from './tracker/interface.js';
 import { findProjectByPath } from './projects.js';
 
 const execAsync = promisify(exec);
@@ -432,69 +431,41 @@ function determineModel(options: SpawnOptions): string {
  * still get their issues transitioned correctly without any extra config.
  */
 async function transitionIssueState(issueId: string, state: IssueState, workspacePath?: string): Promise<void> {
-  // Resolve the project first — its configured tracker is authoritative.
-  // The global tracker config uses a single repo (e.g., eltmon/panopticon-cli),
-  // so issue numbers from other repos (KRUX-4, MIN-574) would incorrectly
-  // match issues in the wrong repo.
-  if (workspacePath) {
-    const projectConfig = findProjectByPath(workspacePath);
-    if (projectConfig) {
-      // Project has a Linear team — use Linear tracker
-      if (projectConfig.linear_team) {
-        const config = loadConfig();
-        const trackersConfig = config.trackers;
-        if (trackersConfig?.linear) {
-          try {
-            const tracker = createTrackerFromConfig(trackersConfig, 'linear');
-            await tracker.transitionIssue(issueId, state);
-            console.log(`[agents] Transitioned ${issueId} to ${state} via Linear (team: ${projectConfig.linear_team})`);
-            return;
-          } catch (err: any) {
-            console.warn(`[agents] Could not transition ${issueId} via Linear: ${err.message}`);
-          }
-        }
-      }
-
-      // Project has a GitHub repo — use project-specific GitHub tracker
-      if (projectConfig.github_repo) {
-        const [owner, repo] = projectConfig.github_repo.split('/');
-        try {
-          const tracker = createTracker({ type: 'github', owner, repo });
-          await tracker.transitionIssue(issueId, state);
-          console.log(`[agents] Transitioned ${issueId} to ${state} via GitHub (${projectConfig.github_repo})`);
-          return;
-        } catch (err: any) {
-          console.warn(`[agents] Could not transition ${issueId} via GitHub (${projectConfig.github_repo}): ${err.message}`);
-        }
-      }
-
-      if (projectConfig.gitlab_repo) {
-        console.warn(`[agents] GitLab project detected (${projectConfig.gitlab_repo}) but GitLab does not support ${state} label transitions`);
-      }
-      return;
-    }
+  // Resolve the project from workspacePath — its configured tracker is authoritative.
+  // Every issue MUST belong to a registered project with a tracker configured.
+  const projectConfig = workspacePath ? findProjectByPath(workspacePath) : null;
+  if (!projectConfig) {
+    throw new Error(`Cannot transition ${issueId}: no project config found for workspace ${workspacePath || '(none)'}. Register the project in projects.yaml.`);
   }
 
-  // No project config found — fall back to global trackers (legacy behavior)
-  const config = loadConfig();
-  const trackersConfig = config.trackers;
-  if (trackersConfig?.primary) {
-    const trackerTypes: TrackerType[] = [trackersConfig.primary];
-    if (trackersConfig.secondary) {
-      trackerTypes.push(trackersConfig.secondary);
+  // Project has a Linear team — use Linear tracker
+  if (projectConfig.linear_team) {
+    const config = loadConfig();
+    const trackersConfig = config.trackers;
+    if (!trackersConfig?.linear) {
+      throw new Error(`Project ${projectConfig.name} uses Linear (team: ${projectConfig.linear_team}) but no Linear tracker is configured in config.yaml`);
     }
-
-    for (const trackerType of trackerTypes) {
-      try {
-        const tracker = createTrackerFromConfig(trackersConfig, trackerType);
-        await tracker.transitionIssue(issueId, state);
-        console.log(`[agents] Transitioned ${issueId} to ${state} via global ${trackerType} (no project config)`);
-        return;
-      } catch {
-        // Issue not found in this tracker or transition failed, try next
-      }
-    }
+    const tracker = createTrackerFromConfig(trackersConfig, 'linear');
+    await tracker.transitionIssue(issueId, state);
+    console.log(`[agents] Transitioned ${issueId} to ${state} via Linear (team: ${projectConfig.linear_team})`);
+    return;
   }
+
+  // Project has a GitHub repo — use project-specific GitHub tracker
+  if (projectConfig.github_repo) {
+    const [owner, repo] = projectConfig.github_repo.split('/');
+    const tracker = createTracker({ type: 'github', owner, repo });
+    await tracker.transitionIssue(issueId, state);
+    console.log(`[agents] Transitioned ${issueId} to ${state} via GitHub (${projectConfig.github_repo})`);
+    return;
+  }
+
+  if (projectConfig.gitlab_repo) {
+    console.warn(`[agents] GitLab project detected (${projectConfig.gitlab_repo}) but GitLab does not support ${state} label transitions`);
+    return;
+  }
+
+  throw new Error(`Project ${projectConfig.name} has no tracker configured (need linear_team or github_repo in projects.yaml)`);
 }
 
 async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
