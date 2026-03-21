@@ -121,18 +121,20 @@ function buildSessionIndex(): Map<string, SessionMapping> {
       } catch { /* skip */ }
     }
 
-    // Read state.json for issue/workspace context
+    // Read state.json for issue/workspace context and phase
     const stateFile = join(agentPath, 'state.json');
     let issueId = inferIssueId(agentDir) || 'UNKNOWN';
+    let statePhase: string | undefined;
     if (existsSync(stateFile)) {
       try {
         const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
         if (state.issueId) issueId = state.issueId;
+        if (state.phase) statePhase = state.phase;
       } catch { /* use inferred */ }
     }
 
-    // Determine session type from agent directory name
-    let sessionType = 'implementation';
+    // Determine session type: prefer state.json phase, then infer from agent directory name
+    let sessionType = statePhase || 'implementation';
     if (agentDir.startsWith('planning-')) {
       sessionType = 'planning';
     } else if (agentDir.includes('review')) {
