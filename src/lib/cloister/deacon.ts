@@ -47,6 +47,7 @@ function updateTestStatusToTesting(issueId: string): void {
 import {
   SpecialistType,
   getTmuxSessionName,
+  isRunning,
   checkSpecialistQueue,
   completeSpecialistTask,
   getAllProjectSpecialistStatuses,

@@ -14,6 +14,7 @@ import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresRouter } from './providers.js';
 import { loadConfig } from './config.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
+import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath } from './projects.js';
 
 const execAsync = promisify(exec);
