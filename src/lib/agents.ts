@@ -460,12 +460,25 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
     return;
   }
 
+  // Project has a Rally project — use Rally tracker
+  if (projectConfig.rally_project) {
+    const config = loadConfig();
+    const trackersConfig = config.trackers;
+    if (!trackersConfig?.rally) {
+      throw new Error(`Project ${projectConfig.name} uses Rally (project: ${projectConfig.rally_project}) but no Rally tracker is configured in config.yaml`);
+    }
+    const tracker = createTrackerFromConfig(trackersConfig, 'rally');
+    await tracker.transitionIssue(issueId, state);
+    console.log(`[agents] Transitioned ${issueId} to ${state} via Rally (project: ${projectConfig.rally_project})`);
+    return;
+  }
+
   if (projectConfig.gitlab_repo) {
     console.warn(`[agents] GitLab project detected (${projectConfig.gitlab_repo}) but GitLab does not support ${state} label transitions`);
     return;
   }
 
-  throw new Error(`Project ${projectConfig.name} has no tracker configured (need linear_team or github_repo in projects.yaml)`);
+  throw new Error(`Project ${projectConfig.name} has no tracker configured (need linear_team, github_repo, or rally_project in projects.yaml)`);
 }
 
 async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
