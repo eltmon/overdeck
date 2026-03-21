@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'fs';
-import { join, basename } from 'path';
+import { join, basename, resolve } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
 import { mergeSkillsIntoWorkspace, applyProjectTemplateOverlay } from '../../lib/skills-merge.js';
@@ -398,6 +398,24 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     // Create worktree
     spinner.text = 'Creating git worktree...';
     createWorktree(projectRoot, workspacePath, branchName);
+
+    // Remove stale .planning/ directory inherited from main branch.
+    // This contains STATE.md and other planning artifacts from a PREVIOUS issue.
+    // If left in place, the new agent reads it and works on the wrong issue.
+    // SAFETY: resolve() to absolute path and verify it's under a known workspace prefix
+    // to prevent path traversal from ever reaching rmSync.
+    const resolvedWorkspace = resolve(workspacePath);
+    const resolvedPlanning = resolve(resolvedWorkspace, '.planning');
+    const isUnderWorkspacesDir = resolvedWorkspace.match(/\/workspaces\/feature-[a-z0-9-]+$/);
+    if (
+      isUnderWorkspacesDir &&
+      resolvedPlanning === join(resolvedWorkspace, '.planning') &&
+      existsSync(join(resolvedWorkspace, '.git')) &&
+      existsSync(resolvedPlanning)
+    ) {
+      rmSync(resolvedPlanning, { recursive: true, force: true });
+      steps.push('Removed stale .planning/ directory from previous issue');
+    }
 
     // Initialize fresh beads for this workspace (remove inherited beads from main)
     spinner.text = 'Initializing workspace beads...';
