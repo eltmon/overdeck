@@ -40,6 +40,9 @@ interface PlanningStatus {
   error?: string;
   isRemote?: boolean;
   vmName?: string;
+  hasPromptFile?: boolean;
+  hasStateFile?: boolean;
+  hasCompletionMarker?: boolean;
 }
 
 type Step = 'checking' | 'ready' | 'starting' | 'planning' | 'complete' | 'error';
@@ -248,9 +251,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
             // Planning was done but not marked complete - go directly to complete step
             // This allows user to click "Done Planning" without restarting
             setStep('complete');
-          } else if (data.sessionName && ['In Planning', 'Planning', 'Discovery'].includes(issue.status)) {
-            // Issue is in planning state with a known session — show terminal view
-            // even if session is dead (terminal will show reconnection state)
+          } else if (data.sessionName && data.hasPromptFile && ['In Planning', 'Planning', 'Discovery'].includes(issue.status)) {
+            // Issue is in planning state with a known session that actually started work
+            // (hasPromptFile confirms workspace was created successfully)
             hasConnectedToSession.current = true;
             setStep('planning');
           } else {
@@ -472,19 +475,20 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         </ul>
                       </div>
 
-                      {/* Watch planning option */}
-                      <label className="flex items-center gap-3 mb-4 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={watchPlanning}
-                          onChange={(e) => setWatchPlanning(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
-                        />
-                        <span className="text-sm text-content-body">
-                          Stay and watch planning
-                          <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
-                        </span>
-                      </label>
+                      <div className="w-full max-w-md mb-6">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={watchPlanning}
+                            onChange={(e) => setWatchPlanning(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                          />
+                          <span className="text-sm text-content-body">
+                            Stay and watch planning
+                            <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
+                          </span>
+                        </label>
+                      </div>
 
                       <div className="flex gap-3">
                         <button
@@ -530,85 +534,86 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         </ul>
                       </div>
 
-                      {/* Workspace location option */}
-                      <div className="mb-4 w-full max-w-md">
-                        <label className="text-sm font-medium text-content-body mb-2 block">Workspace Location</label>
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="workspaceLocation"
-                              value="local"
-                              checked={workspaceLocation === 'local'}
-                              onChange={() => {
-                                setWorkspaceLocation('local');
-                                localStorage.setItem('panopticon.planning.workspaceLocation', 'local');
-                              }}
-                              className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
-                            />
-                            <span className="text-sm text-content-body">Local</span>
-                          </label>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="workspaceLocation"
-                              value="remote"
-                              checked={workspaceLocation === 'remote'}
-                              onChange={() => {
-                                setWorkspaceLocation('remote');
-                                localStorage.setItem('panopticon.planning.workspaceLocation', 'remote');
-                              }}
-                              className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
-                            />
-                            <span className="text-sm text-content-body">Remote (Fly.io)</span>
-                          </label>
+                      {/* Options section */}
+                      <div className="w-full max-w-md space-y-4 mb-6">
+                        {/* Workspace location */}
+                        <div>
+                          <label className="text-sm font-medium text-content-body mb-2 block">Workspace Location</label>
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="workspaceLocation"
+                                value="local"
+                                checked={workspaceLocation === 'local'}
+                                onChange={() => {
+                                  setWorkspaceLocation('local');
+                                  localStorage.setItem('panopticon.planning.workspaceLocation', 'local');
+                                }}
+                                className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                              />
+                              <span className="text-sm text-content-body">Local</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="workspaceLocation"
+                                value="remote"
+                                checked={workspaceLocation === 'remote'}
+                                onChange={() => {
+                                  setWorkspaceLocation('remote');
+                                  localStorage.setItem('panopticon.planning.workspaceLocation', 'remote');
+                                }}
+                                className="w-4 h-4 border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                              />
+                              <span className="text-sm text-content-body">Remote (Fly.io)</span>
+                            </label>
+                          </div>
                         </div>
+
+                        {/* Checkboxes */}
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={shadowMode}
+                            onChange={(e) => setShadowMode(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                          />
+                          <span className="text-sm text-content-body">
+                            Shadow Engineering
+                            <span className="text-content-muted ml-1">(AI observes your workflow, doesn&apos;t modify code)</span>
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={startDocker}
+                            onChange={(e) => {
+                              setStartDocker(e.target.checked);
+                              localStorage.setItem('panopticon.planning.startDocker', String(e.target.checked));
+                            }}
+                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                          />
+                          <span className="text-sm text-content-body">
+                            Start Docker containers
+                            <span className="text-content-muted ml-1">(dev environment ready for testing)</span>
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={watchPlanning}
+                            onChange={(e) => setWatchPlanning(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                          />
+                          <span className="text-sm text-content-body">
+                            Stay and watch planning
+                            <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
+                          </span>
+                        </label>
                       </div>
-
-                      {/* Shadow Engineering option */}
-                      <label className="flex items-center gap-3 mb-4 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={shadowMode}
-                          onChange={(e) => setShadowMode(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
-                        />
-                        <span className="text-sm text-content-body">
-                          Shadow Engineering
-                          <span className="text-content-muted ml-1">(AI observes your workflow, doesn&apos;t modify code)</span>
-                        </span>
-                      </label>
-
-                      {/* Docker option */}
-                      <label className="flex items-center gap-3 mb-4 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={startDocker}
-                          onChange={(e) => {
-                            setStartDocker(e.target.checked);
-                            localStorage.setItem('panopticon.planning.startDocker', String(e.target.checked));
-                          }}
-                          className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
-                        />
-                        <span className="text-sm text-content-body">
-                          Start Docker containers
-                          <span className="text-content-muted ml-1">(dev environment ready for testing)</span>
-                        </span>
-                      </label>
-
-                      {/* Watch planning option */}
-                      <label className="flex items-center gap-3 mb-6 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={watchPlanning}
-                          onChange={(e) => setWatchPlanning(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
-                        />
-                        <span className="text-sm text-content-body">
-                          Stay and watch planning
-                          <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
-                        </span>
-                      </label>
 
                       <button
                         onClick={handleStartPlanning}

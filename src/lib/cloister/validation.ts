@@ -11,7 +11,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import type { QualityGateConfig } from '../workspace-config.js';
+import type { QualityGateConfig, TemplatePlaceholders } from '../workspace-config.js';
+import { replacePlaceholders } from '../workspace-config.js';
 import { loadConfig } from '../config.js';
 
 const execAsync = promisify(exec);
@@ -317,6 +318,8 @@ export interface QualityGateRunOptions {
   isRemote?: boolean;
   /** VM name for SSH connections (required when isRemote is true) */
   vmName?: string;
+  /** Template placeholders for resolving container names (e.g., {{FEATURE_FOLDER}}) */
+  placeholders?: TemplatePlaceholders;
 }
 
 /**
@@ -407,14 +410,32 @@ export async function runQualityGates(
       }
       const flyAppName = loadConfig().remote?.fly?.app ?? 'pan-workspaces';
       resolvedCommand = `fly ssh console -a ${flyAppName} -C "cd ${cwd} && ${gate.command}"`;
+    } else if (gate.container && gate.container_name) {
+      // Run inside Docker container — resolve container name from placeholders
+      let containerName = gate.container_name;
+      if (opts.placeholders) {
+        containerName = replacePlaceholders(containerName, opts.placeholders);
+      }
+      // Use -w to set working directory inside the container.
+      // The container mounts workspace code at /workspaces/feature/<subdir>,
+      // so map the gate.path (e.g., 'fe') to the container's working directory.
+      const containerWorkdir = gate.path ? `/workspaces/feature/${gate.path}` : '/workspaces/feature';
+      // Pass gate.env as -e flags so env vars reach the container process
+      const envFlags = gate.env
+        ? Object.entries(gate.env).map(([k, v]) => `-e ${k}="${v}"`).join(' ')
+        : '';
+      resolvedCommand = `docker exec ${envFlags} -w "${containerWorkdir}" "${containerName}" ${gate.command}`;
+      console.log(`[quality-gate] Running in container: ${containerName} (workdir: ${containerWorkdir})`);
     } else {
       resolvedCommand = gate.command;
     }
 
     try {
+      // When running in container, don't set host cwd (irrelevant)
+      const useHostCwd = !isRemote && !(gate.container && gate.container_name);
       const env = { ...process.env, ...gate.env };
       const { stdout, stderr } = await execAsync(resolvedCommand, {
-        cwd: isRemote ? undefined : cwd,
+        cwd: useHostCwd ? cwd : undefined,
         env,
         maxBuffer: 10 * 1024 * 1024, // 10MB
         timeout: 5 * 60 * 1000, // 5 minute timeout per gate

@@ -111,6 +111,10 @@ export interface QualityGateConfig {
   wait?: number;
   /** Expected HTTP status code (http_health only, default: 200) */
   expect_status?: number;
+  /** Run command inside a Docker container (uses docker exec) */
+  container?: boolean;
+  /** Container name pattern (supports {{FEATURE_FOLDER}} etc.) */
+  container_name?: string;
 }
 
 export interface DatabaseConfig {

@@ -8,11 +8,14 @@
  * Extracted from dashboard/server to be independently testable.
  */
 
+import { basename, dirname } from 'path';
+import { homedir } from 'os';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { messageAgent } from '../agents.js';
 import { findProjectByPath } from '../projects.js';
+import type { TemplatePlaceholders } from '../workspace-config.js';
 
 export const VERIFICATION_MAX_CYCLES = 3;
 
@@ -62,9 +65,28 @@ export async function runVerificationForIssue(
         : DEFAULT_GATES;
     console.log(`[${logPrefix}] Project: ${projectConfig?.name || 'NOT FOUND'}, gates: [${Object.keys(gates).join(', ')}], workspace: ${workspacePath}`);
 
+    // Build template placeholders for container name resolution
+    const featureFolder = basename(workspacePath);  // e.g., 'feature-min-574'
+    const featureName = featureFolder.replace(/^feature-/, '');  // e.g., 'min-574'
+    const projectPath = projectConfig?.path || dirname(dirname(workspacePath));
+    const domain = projectConfig?.workspace?.dns?.domain || 'localhost';
+    const placeholders: TemplatePlaceholders = {
+      FEATURE_NAME: featureName,
+      FEATURE_FOLDER: featureFolder,
+      BRANCH_NAME: `feature/${featureName}`,
+      COMPOSE_PROJECT: `${basename(projectPath)}-${featureFolder}`,
+      DOMAIN: domain,
+      PROJECT_NAME: basename(projectPath),
+      PROJECT_PATH: projectPath,
+      PROJECTS_DIR: dirname(projectPath),
+      WORKSPACE_PATH: workspacePath,
+      HOME: homedir(),
+    };
+
     const gateResults = await runQualityGates(gates, workspacePath, 'pre_push', {
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
+      placeholders,
     });
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);
