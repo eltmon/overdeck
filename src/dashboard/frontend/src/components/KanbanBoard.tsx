@@ -563,6 +563,14 @@ export function ListIssueRow({
 }) {
   const isSelected = selectedIssue === issue.id;
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll into view when selected via search
+  useEffect(() => {
+    if (isSelected && rowRef.current) {
+      rowRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isSelected]);
 
   // Status indicator color
   const statusColor = canonical === 'done' ? 'bg-green-400' :
@@ -591,6 +599,7 @@ export function ListIssueRow({
 
   return (
     <div
+      ref={rowRef}
       onClick={() => onSelectIssue(isSelected ? null : issue.id)}
       className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-overlay/50 transition-colors cursor-pointer ${
         isSelected ? 'bg-surface-overlay' : ''
@@ -1831,6 +1840,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const confirm = useConfirm();
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll into view when selected via search
+  useEffect(() => {
+    if (isSelected && cardRef.current) {
+      cardRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isSelected]);
 
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
@@ -1980,6 +1997,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
   return (
     <div
+      ref={cardRef}
       onClick={onSelect}
       className={`rounded-lg p-3 border border-pan-border border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
         isSelected
