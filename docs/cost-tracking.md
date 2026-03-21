@@ -181,41 +181,24 @@ The heartbeat hook silently swallows errors from `record-cost-event.js` (`2>/dev
 
 The reconciler is a periodic sweep that ensures completeness. It catches anything the live hook missed — whether from hook failures, process crashes, system reboots, or any other reason.
 
-### How It Works (Current — v1)
+### How It Works
 
-The current reconciler scans agent state files to find transcript paths:
-
-1. Scans `~/.panopticon/agents/` for all agent directories (`agent-*`, `planning-*`)
-2. For each agent, reads `state.json` to get the `workspace` path
-3. Maps workspace path to Claude session directory: `~/.claude/projects/<encoded-path>/`
-4. Lists all `.jsonl` transcript files in that directory
-5. For each transcript file, checks the stored byte offset in `processed_sessions`
-6. Reads only unprocessed bytes from the transcript
-7. Parses assistant messages, extracts usage, calculates cost
-8. Inserts into SQLite with `INSERT OR IGNORE` on `request_id` — natural dedup
-9. Updates the processed offset in `processed_sessions`
-
-### How It Should Work (Future — v2)
-
-The v1 approach misses sessions because it only looks at directories reachable from agent `state.json` workspace paths. This misses:
-- **Planning agents started from main project dirs** (before workspace creation)
-- **Interactive/manual Claude sessions** (no agent, no state.json)
-- **Sessions where the agent dir was cleaned up** but Claude session dir persists
-- **Specialist sessions** that don't have state.json files
-
-The v2 reconciler should scan `~/.claude/projects/` directly:
+The reconciler scans `~/.claude/projects/` directly — no indirection through agent state files:
 
 1. Scan all directories under `~/.claude/projects/`
-2. For each directory, list all `.jsonl` transcript files
-3. For each transcript file, check `processed_sessions` for existing offset
-4. Read only new bytes, extract cost events with `requestId`
-5. For **attribution** (agent ID, issue ID, session type):
-   - Check `sessions.json` files across all agents to find which agent owns this session UUID
+2. Build a reverse session-to-agent index from `~/.panopticon/agents/*/sessions.json` files
+3. For each directory, list all `.jsonl` transcript files
+4. For each transcript file, check `processed_sessions` for existing byte offset
+5. Read only new bytes, extract cost events with `requestId`
+6. For **attribution** (agent ID, issue ID, session type):
+   - Check `sessions.json` reverse index to find which agent owns this session UUID
+   - Read `state.json` for the agent's `phase` field (used as `session_type`)
    - If no agent mapping found, infer issue ID from the encoded directory path (e.g., `feature-min-787` in the path → `MIN-787`)
    - If no issue can be inferred, attribute as `UNKNOWN` / `unattributed`
-6. Insert with dedup, update offset
+7. Insert with dedup via `INSERT OR IGNORE` on `request_id`
+8. Update byte offset in `processed_sessions`
 
-This approach catches **everything** — every transcript file on disk gets processed, regardless of how it was created.
+This approach catches **everything** — planning sessions from main project dirs, work agent sessions from worktree workspaces, specialist sessions, and interactive/manual Claude sessions.
 
 ### Key Properties
 
@@ -372,14 +355,10 @@ Claude Code Agent (tmux session)
 
 Reconciler (periodic sweep — safety net)
   │
-  ├─ v1 (current): scans agent state.json → workspace paths → Claude project dirs
-  │   (misses planning sessions from main project dir, interactive sessions, specialists)
-  │
-  ├─ v2 (planned): scans ~/.claude/projects/ directly
-  │   ├─ finds ALL transcript files regardless of source
-  │   ├─ uses sessions.json for agent attribution
-  │   ├─ infers issue ID from directory path as fallback
-  │   └─ catches everything: planning, work, specialist, interactive
+  ├─ scans ~/.claude/projects/ directly (ALL transcript files)
+  ├─ builds reverse index from ~/.panopticon/agents/*/sessions.json
+  ├─ reads state.json for phase (session_type attribution)
+  ├─ infers issue ID from directory path as fallback
   │
   ├─ reads from last known offset per session
   ├─ extracts usage, calculates cost
