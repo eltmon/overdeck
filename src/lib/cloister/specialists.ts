@@ -10,7 +10,7 @@ import { join, basename } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getDevrootPath } from '../config.js';
 import { getProject } from '../projects.js';
@@ -324,6 +324,18 @@ export function saveRegistry(registry: SpecialistRegistry): void {
 }
 
 /**
+ * Generate a deterministic UUID from a string.
+ * Uses SHA-256 hash formatted as a UUID v4-compatible string.
+ * This ensures the same specialist+project always gets the same session ID
+ * while satisfying Claude Code's UUID format requirement.
+ */
+function deterministicUUID(input: string): string {
+  const hash = createHash('sha256').update(input).digest('hex');
+  // Format as UUID: 8-4-4-4-12
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
+}
+
+/**
  * Get session file path for a specialist.
  * Per-project specialists use a project-scoped subdirectory to prevent
  * session ID collision when multiple projects share the same specialist type.
@@ -354,7 +366,16 @@ export function getSessionId(name: SpecialistType, projectKey?: string): string 
   }
 
   try {
-    return readFileSync(sessionFile, 'utf-8').trim();
+    const sessionId = readFileSync(sessionFile, 'utf-8').trim();
+    // Validate UUID format — Claude Code requires valid UUIDs for --resume and --session-id.
+    // Old deterministic IDs (e.g., "specialist-mind-your-now-review-agent") are not valid UUIDs.
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(sessionId)) {
+      console.warn(`[specialist] Invalid session ID format for ${name} (${projectKey ?? 'global'}): ${sessionId} — discarding`);
+      unlinkSync(sessionFile);
+      return null;
+    }
+    return sessionId;
   } catch (error) {
     console.error(`Failed to read session file for ${name} (${projectKey ?? 'global'}):`, error);
     return null;
@@ -584,11 +605,17 @@ export async function spawnEphemeralSpecialist(
   incrementProjectRunCount(projectKey, specialistType);
 
   // Build task prompt (use override if provided, otherwise build from template)
-  const taskPrompt = task.promptOverride ?? await buildTaskPrompt(projectKey, specialistType, task, contextDigest);
+  const basePrompt = task.promptOverride ?? await buildTaskPrompt(projectKey, specialistType, task, contextDigest);
 
   if (task.promptOverride) {
-    console.log(`[specialist] Using promptOverride for ${projectKey}/${task.issueId} (${taskPrompt.length} chars)`);
+    console.log(`[specialist] Using promptOverride for ${projectKey}/${task.issueId} (${basePrompt.length} chars)`);
   }
+
+  // Prepend session-aware preamble: specialists accumulate context via --resume,
+  // so they may have seen this issue before. They MUST re-execute fresh every time.
+  const taskPrompt = `IMPORTANT: This is a NEW task dispatch. You may have context from prior runs in this session — that is useful background knowledge, but you MUST execute this task fresh RIGHT NOW. Do NOT skip steps or report cached results. Read the code, run the commands, and call the status update APIs as instructed below. Prior results are stale — the code may have changed.
+
+${basePrompt}`;
 
   // Spawn tmux session — use project path so specialist has correct context
   const tmuxSession = getTmuxSessionName(specialistType, projectKey);
@@ -656,54 +683,52 @@ export async function spawnEphemeralSpecialist(
     const promptFile = join(agentDir, 'task-prompt.md');
     writeFileSync(promptFile, taskPrompt);
 
-    // PAN-376: Resume previous session for project context continuity.
-    // Use deterministic session ID so the same specialist for the same project
-    // always resumes the same Claude session, accumulating project context.
-    const deterministicSessionId = `specialist-${projectKey}-${specialistType}`;
-    const existingSessionId = getSessionId(specialistType, projectKey);
-    let sessionFlag: string;
-    let deliverPromptSeparately = false;
+    // Deterministic session ID: same specialist + project always gets the same UUID.
+    // The UUID is computed from the identity string — no session file needed for dispatch.
+    // --resume is always the default (session exists from prior runs).
+    // On very first cold start, --resume fails and the launcher falls back to --session-id.
+    const sessionName = `specialist-${projectKey}-${specialistType}`;
+    const sessionId = deterministicUUID(sessionName);
 
-    if (existingSessionId && existingSessionId === deterministicSessionId) {
-      // Same deterministic session — resume it
-      sessionFlag = `--resume "${existingSessionId}"`;
-      deliverPromptSeparately = true;
-      console.log(`[specialist] Resuming session ${existingSessionId} for ${projectKey}/${specialistType}`);
-    } else {
-      // First run or migrating from random UUID — use deterministic ID
-      sessionFlag = `--session-id "${deterministicSessionId}"`;
-      setSessionId(specialistType, deterministicSessionId, projectKey);
-      console.log(`[specialist] New session ${deterministicSessionId} for ${projectKey}/${specialistType}`);
-    }
+    // Write session file for informational purposes (pan specialists list)
+    setSessionId(specialistType, sessionId, projectKey);
 
-    // Create launcher script that pipes output to log file
+    console.log(`[specialist] Dispatching ${specialistType} for ${projectKey}/${task.issueId} (session: ${sessionId.slice(0, 8)}...)`);
+
+    // Single launcher script: always try --resume first (normal case).
+    // Falls back to --session-id only on first cold start (session not in Claude's storage).
+    // Prompt is always passed as CLI argument — no tmux key delivery needed.
+    // Inner script runs Claude; outer launcher wraps with script(1) for real-time PTY output
+    // so tmux capture-pane (God View) can see output while also logging to file.
     const launcherScript = join(agentDir, 'launcher.sh');
-    if (deliverPromptSeparately) {
-      // Resume mode: start session without prompt, deliver via tmux later
-      writeFileSync(launcherScript, `#!/bin/bash
-cd "${cwd}"
+    const innerScript = join(agentDir, 'run-claude.sh');
 
-# Resume previous session and tee output to log file
-claude ${permissionFlags} ${sessionFlag} --model ${model} 2>&1 | tee -a "${logFilePath}"
-
-# Signal completion
-echo ""
-echo "## Specialist completed task"
-`, { mode: 0o755 });
-    } else {
-      // Fresh session: pass prompt directly
-      writeFileSync(launcherScript, `#!/bin/bash
+    // Inner script: the actual Claude invocation with resume/fallback logic
+    writeFileSync(innerScript, `#!/bin/bash
+set -o pipefail
 cd "${cwd}"
 prompt=$(cat "${promptFile}")
 
-# Run Claude and tee output to log file
-claude ${permissionFlags} ${sessionFlag} --model ${model} "$prompt" 2>&1 | tee -a "${logFilePath}"
+# Resume existing session (normal case — accumulates context over time)
+claude ${permissionFlags} --resume "${sessionId}" --model ${model} "$prompt"
+exit_code=$?
+
+# First cold start: session doesn't exist yet in Claude's storage
+if [ $exit_code -ne 0 ]; then
+  echo "[launcher] First run — creating session"
+  claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"
+fi
 
 # Signal completion
 echo ""
 echo "## Specialist completed task"
 `, { mode: 0o755 });
-    }
+
+    // Outer launcher: wraps inner script with script(1) for PTY + tee for log file.
+    // script -qfec forces a PTY so Claude outputs in real time (visible in tmux pane + God View).
+    writeFileSync(launcherScript, `#!/bin/bash
+script -qfec "bash '${innerScript}'" /dev/null 2>&1 | tee -a "${logFilePath}"
+`, { mode: 0o755 });
 
     // Spawn Claude Code via launcher script (with provider env vars)
     await execAsync(
@@ -719,18 +744,8 @@ echo "## Specialist completed task"
       currentIssue: task.issueId,
     });
 
-    // PAN-376: If resuming, deliver the task prompt after session loads
-    if (deliverPromptSeparately) {
-      const ready = await waitForClaudePrompt(tmuxSession, 20000);
-      if (ready) {
-        await sendKeysAsync(tmuxSession, taskPrompt);
-        console.log(`[specialist] Resumed ${specialistType} for ${projectKey}/${task.issueId} and delivered task (run: ${runId})`);
-      } else {
-        console.warn(`[specialist] Resumed ${specialistType} but prompt not detected — task in prompt file: ${promptFile}`);
-      }
-    } else {
-      console.log(`[specialist] Spawned ephemeral ${specialistType} for ${projectKey}/${task.issueId} (run: ${runId})`);
-    }
+    console.log(`[specialist] Spawned ${specialistType} for ${projectKey}/${task.issueId} (run: ${runId})`);
+
 
     return {
       success: true,

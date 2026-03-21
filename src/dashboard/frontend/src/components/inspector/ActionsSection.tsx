@@ -9,6 +9,7 @@ import { ReviewPipelineSection } from './ReviewPipelineSection';
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
 type ReopenMutation = UseMutationResult<unknown, Error, string | undefined, unknown>;
+type ResetReviewMutation = UseMutationResult<unknown, Error, { rerun?: boolean } | undefined, unknown>;
 type SyncMutation = UseMutationResult<{ alreadyUpToDate?: boolean; commitCount?: number }, Error, void, unknown>;
 
 interface ActionsSectionProps {
@@ -20,7 +21,7 @@ interface ActionsSectionProps {
   killMutation: AnyMutation;
   closeMutation: AnyMutation;
   reopenMutation: ReopenMutation;
-  resetReviewMutation: AnyMutation;
+  resetReviewMutation: ResetReviewMutation;
   startAgentMutation: AnyMutation;
   createWorkspaceMutation: AnyMutation;
   syncMainMutation: SyncMutation;
@@ -158,7 +159,7 @@ export function ActionsSection({
             className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-900/30 text-amber-400 rounded hover:bg-amber-900/50 disabled:opacity-50"
           >
             {resetReviewMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
-            {resetReviewMutation.isPending ? 'Resetting...' : 'Reset Reviews'}
+            {resetReviewMutation.isPending ? 'Resetting...' : 'Reset Pipeline'}
           </button>
         )}
 

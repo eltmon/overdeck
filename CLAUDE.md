@@ -68,6 +68,18 @@ before waking the review-agent. If typecheck/lint/test fail, feedback is sent to
 agent's tmux session and the completion marker is NOT processed (allowing retry).
 After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
 
+## Project Resolution from Issue IDs
+
+Issue IDs are resolved to projects via `resolveProjectFromIssue()` in `src/lib/projects.ts`
+and `parseGitHubRepos()` in `src/lib/tracker-utils.ts`. Resolution order:
+
+1. Match `linear_team` field in `projects.yaml` (e.g., `linear_team: MIN` matches `MIN-123`)
+2. For GitHub-only projects without `linear_team`, derive prefix from the project key
+   (e.g., project key `krux` → prefix `KRUX` matches `KRUX-3`)
+
+When adding a new project to `projects.yaml`, either set `linear_team` explicitly or
+ensure the project key (uppercased, hyphens removed) matches the issue prefix you want.
+
 ## Beads Enforcement
 
 Work agents cannot start without beads tasks in the workspace. The start-agent endpoint
@@ -80,6 +92,14 @@ returns 422 if `.beads/issues.jsonl` does not exist. Planning must create beads 
 infinite loops. NEVER remove these guards. The loop: specialists/done → onMergeComplete
 → postMergeLifecycle → (re-trigger) → specialists/done burned 24,626 Linear API calls
 before guards were added (PAN-328).
+
+## postMergeLifecycle Docker Cleanup
+
+`postMergeLifecycle()` in `merge-agent.ts` stops Docker containers and networks after
+merge (step 6). This prevents Docker network pool exhaustion — orphaned networks from
+merged workspaces accumulate and eventually block new workspace creation with
+"all predefined address pools have been fully subnetted". Docker's default pool only
+supports ~31 bridge networks. NEVER remove this cleanup step.
 
 ## CRITICAL: Deep-Wipe Destroys Everything — NEVER Run Without Explicit User Confirmation
 

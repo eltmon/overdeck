@@ -3,7 +3,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
-import { join, dirname, relative } from 'path';
+import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
@@ -329,6 +329,26 @@ export async function postMergeLifecycle(issueId: string, projectPath: string): 
     }
   } catch (err) {
     console.warn(`[merge-agent] Could not kill agent sessions: ${err}`);
+  }
+
+  // 6. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
+  // Orphaned Docker networks accumulate when workspaces are merged but containers are never
+  // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.
+  try {
+    const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
+    const { stopWorkspaceDocker } = await import('../workspace-manager.js');
+    const issueLower = issueId.toLowerCase();
+    const workspacePath = findWorkspacePath(projectPath, issueLower);
+    if (workspacePath) {
+      const projName = basename(projectPath);
+      const dockerResult = await stopWorkspaceDocker(workspacePath, projName, issueLower);
+      if (dockerResult.containersFound) {
+        console.log(`[merge-agent] ✓ Stopped Docker containers: ${dockerResult.steps.join('; ')}`);
+        logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
+      }
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
   }
 
   // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
