@@ -111,6 +111,8 @@
 - **"cloister"** → AGENTS.md, PRD-CLOISTER.md
 - **"handoff"** / **"handoffs"** → SPECIALIST_WORKFLOW.md
 - **"stuck detection"** → AGENTS.md, SPECIALIST_WORKFLOW.md
+- **"session ID"** / **"session persistence"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
+- **"deterministic UUID"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
 - **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
 - **"deacon"** / **"health monitor"** → SPECIALIST_WORKFLOW.md (Deacon Health Monitor section)
@@ -123,7 +125,8 @@
 
 ### Infrastructure
 - **"workspace"** / **"workspaces"** → README.md, PRD-REMOTE-WORKSPACES.md
-- **"Docker"** → README.md, DNS_SETUP.md
+- **"Docker"** / **"Docker networks"** / **"network pool"** → README.md, DNS_SETUP.md, CLAUDE.md (postMergeLifecycle Docker Cleanup)
+- **"project resolution"** / **"issue prefix"** / **"linear_team"** → CLAUDE.md (Project Resolution from Issue IDs)
 - **"Hume"** / **"EVI"** / **"voice"** / **"BYOLLM"** → CONFIGURATION.md (External Service Integrations)
 - **"tunnel"** / **"Cloudflare"** → CONFIGURATION.md (External Service Integrations)
 - **"external services"** / **"integrations"** → CONFIGURATION.md (External Service Integrations)

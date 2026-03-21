@@ -289,7 +289,7 @@ export function resolveProjectFromIssue(
 
   const config = loadProjectsConfig();
 
-  // Find project by team prefix
+  // Find project by team prefix (check linear_team first, then derive from project key)
   for (const [key, projectConfig] of Object.entries(config.projects)) {
     if (projectConfig.linear_team?.toUpperCase() === teamPrefix) {
       const resolvedPath = resolveProjectPath(projectConfig, labels);
@@ -299,6 +299,19 @@ export function resolveProjectFromIssue(
         projectPath: resolvedPath,
         linearTeam: projectConfig.linear_team,
       };
+    }
+    // For GitHub-only projects without linear_team, derive prefix from project key
+    if (!projectConfig.linear_team && projectConfig.github_repo) {
+      const derivedPrefix = key.toUpperCase().replace(/-/g, '');
+      if (derivedPrefix === teamPrefix) {
+        const resolvedPath = resolveProjectPath(projectConfig, labels);
+        return {
+          projectKey: key,
+          projectName: projectConfig.name,
+          projectPath: resolvedPath,
+          linearTeam: undefined,
+        };
+      }
     }
   }
 

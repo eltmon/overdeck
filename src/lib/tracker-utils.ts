@@ -56,10 +56,11 @@ export function parseGitHubRepos(): GitHubRepoConfig[] {
   if (repos.length === 0) {
     try {
       const { projects } = loadProjectsConfig();
-      for (const [, project] of Object.entries(projects)) {
+      for (const [key, project] of Object.entries(projects)) {
         if (project.github_repo) {
           const [owner, repo] = project.github_repo.split('/');
-          const prefix = project.linear_team || '';
+          // Derive prefix: linear_team if set, otherwise uppercase project key
+          const prefix = project.linear_team || key.toUpperCase().replace(/-/g, '');
           if (owner && repo && prefix) {
             repos.push({ owner, repo, prefix: prefix.toUpperCase() });
           }

@@ -383,10 +383,12 @@ Specialist agents maintain persistent sessions across invocations, accumulating 
 
 ### How It Works
 
-Each specialist stores a session ID in `~/.panopticon/specialists/<name>.session`. When a specialist is woken up:
+Each specialist stores a session ID in `~/.panopticon/specialists/<name>.session` (global) or `~/.panopticon/specialists/projects/<projectKey>/<name>.session` (per-project). When a specialist is dispatched:
 
-1. **First wake** (no session file): A new UUID is generated, Claude Code starts with `--session-id <uuid>`, and the ID is persisted to disk.
-2. **Subsequent wakes**: The saved session ID is read and Claude Code starts with `--resume <sessionId>`, restoring the full conversation history.
+1. **First dispatch** (no session file): A deterministic UUID is generated from the specialist's identity string (e.g., `specialist-mind-your-now-review-agent` → SHA-256 → UUID format). Claude Code starts with `--session-id <uuid>`, and the ID is persisted to disk.
+2. **Subsequent dispatches**: The saved session ID is read and Claude Code starts with `--resume <sessionId>`, restoring the full conversation history.
+
+**Important**: Claude Code requires valid UUID format for both `--session-id` and `--resume`. Session IDs are generated via `deterministicUUID()` which hashes the specialist name with SHA-256 and formats the result as a UUID. This ensures the same specialist for the same project always gets the same session ID. A validation guard in `getSessionId()` discards any stored session IDs that aren't valid UUIDs (e.g., from older formats).
 
 This means the merge-agent remembers every merge it has performed, the review-agent accumulates knowledge of code patterns and past review decisions, and the test-agent retains awareness of flaky tests and project-specific test configurations.
 
@@ -421,12 +423,17 @@ Without session persistence, every specialist wake starts from zero — the merg
 To clear a specialist's accumulated context and start fresh:
 
 ```bash
-# Delete the session file — next wake will create a new session
+# Delete the session file — next dispatch will create a new session with the same deterministic UUID
 rm ~/.panopticon/specialists/merge-agent.session
+
+# For per-project specialists:
+rm ~/.panopticon/specialists/projects/mind-your-now/review-agent.session
 
 # Or reset via CLI
 pan specialists reset merge-agent
 ```
+
+Note: resetting only clears the session file. The next dispatch will regenerate the same deterministic UUID from the specialist name, creating a fresh Claude session with a new conversation history.
 
 ## Review Cycle Circuit Breaker
 

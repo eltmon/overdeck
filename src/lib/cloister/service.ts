@@ -22,7 +22,8 @@ import {
   getLatestHealthEvent,
 } from '../database/health-events-db.js';
 import { getDatabase, closeDatabase } from '../database/index.js';
-import { initializeEnabledSpecialists } from './specialists.js';
+// PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
+// are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgents, getAgentState, getAgentRuntimeState } from '../agents.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';

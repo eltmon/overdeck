@@ -2270,15 +2270,25 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
             </button>
           )}
           {issue.labels?.some(l => l.toLowerCase() === 'planned') && (
-            <button
-              onClick={handleStartAgent}
-              disabled={startAgentMutation.isPending}
-              className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
-              title="Start implementation agent"
-            >
-              {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
-            </button>
+            <>
+              <button
+                onClick={() => onViewBeads && onViewBeads(issue)}
+                className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+                title="View tasks for this issue"
+              >
+                <List className="w-3.5 h-3.5" />
+                Tasks
+              </button>
+              <button
+                onClick={handleStartAgent}
+                disabled={startAgentMutation.isPending}
+                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
+                title="Start implementation agent"
+              >
+                {startAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                {startAgentMutation.isPending ? 'Starting...' : confirmingStart ? 'Click to confirm' : 'Start Agent'}
+              </button>
+            </>
           )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
           {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
@@ -2301,10 +2311,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
           ) : (
             <button
               onClick={handlePlan}
-              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+              className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-purple-400 hover:text-purple-300'}`}
             >
               <FileText className="w-3.5 h-3.5" />
-              Re-plan
+              {issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'Re-plan' : 'Plan'}
             </button>
           )}
           <button
@@ -2348,9 +2358,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
         </div>
       )}
 
-      {/* In Review items - Reopen + Deep Wipe */}
+      {/* In Review items - Reset Pipeline + Reopen + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'in_review' && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
+          <ResetPipelineButton issue={issue} />
           <ReopenSection issue={issue} inline />
           <CancelButton issue={issue} />
           <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
@@ -2367,6 +2378,51 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, is
       )}
 
     </div>
+  );
+}
+
+// Reset pipeline button - resets review/test/merge state and optionally re-dispatches
+function ResetPipelineButton({ issue }: { issue: Issue }) {
+  const confirm = useConfirm();
+  const queryClient = useQueryClient();
+  const [isPending, setIsPending] = useState(false);
+
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        if (await confirm({
+          title: 'Reset & Re-run Pipeline',
+          message: `Reset review/test pipeline for ${issue.identifier}?\n\nThis will:\n• Clear review, test, and merge status\n• Reset circuit breaker counters\n• Remove queued specialist tasks\n• Re-dispatch to review specialist`,
+          confirmLabel: 'Reset & Re-run',
+        })) {
+          setIsPending(true);
+          try {
+            const res = await fetch(`/api/workspaces/${issue.identifier}/reset-review`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ rerun: true }),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              console.error('Pipeline reset failed:', err);
+            }
+            await queryClient.refetchQueries({ queryKey: ['issues'] });
+            await queryClient.refetchQueries({ queryKey: ['review-status'] });
+          } catch (err) {
+            console.error('Pipeline reset error:', err);
+          } finally {
+            setIsPending(false);
+          }
+        }
+      }}
+      disabled={isPending}
+      className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
+      title="Reset pipeline state and re-run review & test"
+    >
+      {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+      {isPending ? 'Resetting...' : 'Reset Pipeline'}
+    </button>
   );
 }
 
