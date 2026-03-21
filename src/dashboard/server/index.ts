@@ -7196,6 +7196,13 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
     }
 
     if (!reviewResult.success) {
+      // Distinguish between "specialist is busy" (transient) and real dispatch failures
+      if (reviewResult.error === 'specialist_busy') {
+        console.warn(`[review] review-agent busy for ${issueId}, reverting to pending for retry`);
+        completePendingOperation(issueId, null);
+        setReviewStatus(issueId, { reviewStatus: 'pending' });
+        return res.status(409).json({ error: 'Review specialist busy, will retry', retryable: true });
+      }
       console.warn(`[review] review-agent failed to wake: ${reviewResult.message}`);
       completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
       setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: reviewResult.message });
@@ -7399,6 +7406,16 @@ app.post('/api/workspaces/:issueId/request-review', async (req, res) => {
         message: `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
         autoRequeueCount: newCount,
         remainingRequeues: MAX_AUTO_REQUEUE - newCount,
+      });
+    } else if (result.error === 'specialist_busy') {
+      // Specialist is busy — revert to pending so deacon can retry later
+      console.warn(`[request-review] Review specialist busy for ${issueId}, reverting to pending`);
+      setReviewStatus(issueId, { reviewStatus: 'pending' });
+      return res.status(409).json({
+        success: false,
+        error: 'Review specialist busy, will retry',
+        retryable: true,
+        autoRequeueCount: newCount,
       });
     } else {
       // Rollback: dispatch failed — don't leave status stuck at 'reviewing'
