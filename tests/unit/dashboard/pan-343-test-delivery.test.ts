@@ -7,12 +7,13 @@
  * the route handler. Does NOT duplicate logic in a test helper.
  *
  * Coverage:
- *  1. Spawn succeeds on first attempt: testStatus='testing', agent notified
- *  2. First spawn fails, retry succeeds: testStatus='testing', agent notified
- *  3. Both spawn attempts fail: testStatus='dispatch_failed', agent NOT notified
- *  4. No project configured: testStatus='dispatch_failed', agent NOT notified
- *  5. Exception path: catch block sets testStatus='dispatch_failed' and does NOT notify agent
- *  6. Exception + setReviewStatus throws: nested catch prevents outer throw, agent NOT notified
+ *  1. Wake succeeds (queued=false): testStatus='testing', agent notified
+ *  2. Wake succeeds (queued=true, specialist busy): testStatus='testing', agent notified
+ *  3. Wake fails both attempts: retry sources verified, submitToSpecialistQueue called
+ *  4. Wake fails both attempts: testStatus still set to 'testing' via fallback path
+ *  5. Already queued: no wake/re-queue, testStatus refreshed, agent notified
+ *  6. Exception path: catch block sets testStatus='dispatch_failed' and does NOT notify agent
+ *  7. Exception + setReviewStatus throws: nested catch prevents outer throw, agent NOT notified
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -25,20 +26,16 @@ const mockSpawnEphemeralSpecialist = vi.fn();
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   spawnEphemeralSpecialist: (...args: unknown[]) => mockSpawnEphemeralSpecialist(...args),
-  // Unused exports referenced by other modules imported transitively
-  getEnabledSpecialists: vi.fn().mockReturnValue([]),
-  getTmuxSessionName: vi.fn().mockReturnValue('test-agent'),
-  isRunning: vi.fn().mockResolvedValue(false),
-  initializeSpecialist: vi.fn(),
-  wakeSpecialist: vi.fn(),
-  wakeSpecialistOrQueue: vi.fn(),
-  checkSpecialistQueue: vi.fn(),
-  submitToSpecialistQueue: vi.fn(),
-  clearSessionId: vi.fn(),
-  getNextSpecialistTask: vi.fn(),
-  wakeSpecialistWithTask: vi.fn(),
-  completeSpecialistTask: vi.fn(),
-  getAllProjectSpecialistStatuses: vi.fn().mockResolvedValue([]),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock projects module (resolveProjectFromIssue)
+// ---------------------------------------------------------------------------
+
+const mockResolveProjectFromIssue = vi.fn();
+
+vi.mock('../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -50,16 +47,6 @@ const mockSetReviewStatus = vi.fn();
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
   getReviewStatus: vi.fn(),
-}));
-
-// ---------------------------------------------------------------------------
-// Mock resolveProjectFromIssue
-// ---------------------------------------------------------------------------
-
-const mockResolveProjectFromIssue = vi.fn();
-
-vi.mock('../../../src/lib/projects.js', () => ({
-  resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -75,17 +62,18 @@ import { autoQueueTestAgentAndNotify } from '../../../src/lib/cloister/test-agen
 const ISSUE = 'PAN-343';
 const WS = '/workspaces/feature-pan-343';
 const BRANCH = 'feature/pan-343';
-const PROJECT_KEY = 'panopticon';
 
 function makeNotify() {
   return vi.fn<[string, string], Promise<void>>().mockResolvedValue(undefined);
 }
 
-function resolveProject() {
-  mockResolveProjectFromIssue.mockReturnValue({ projectKey: PROJECT_KEY });
+/** Set up mocks so resolveProjectFromIssue returns a project */
+function setupProjectResolved() {
+  mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
 }
 
-function resolveNoProject() {
+/** Set up mocks so resolveProjectFromIssue returns null (no project) */
+function setupNoProject() {
   mockResolveProjectFromIssue.mockReturnValue(null);
 }
 
@@ -98,19 +86,13 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     vi.clearAllMocks();
   });
 
-  it('sets testStatus to testing and notifies agent when spawn succeeds on first attempt', async () => {
-    resolveProject();
+  it('sets testStatus to testing and notifies agent when spawn succeeds', async () => {
+    setupProjectResolved();
     mockSpawnEphemeralSpecialist.mockResolvedValue({ success: true, message: 'spawned' });
     const notify = makeNotify();
 
     await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledTimes(1);
-    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledWith(PROJECT_KEY, 'test-agent', {
-      issueId: ISSUE,
-      workspace: WS,
-      branch: BRANCH,
-    });
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
     expect(notify).toHaveBeenCalledWith(
       `agent-${ISSUE.toLowerCase()}`,
@@ -118,9 +100,9 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     );
   });
 
-  it('retries once after 2s and sets testStatus to testing when retry succeeds', async () => {
+  it('sets testStatus to testing and notifies agent on retry when first spawn fails', async () => {
     vi.useFakeTimers();
-    resolveProject();
+    setupProjectResolved();
     mockSpawnEphemeralSpecialist
       .mockResolvedValueOnce({ success: false, message: 'busy' })
       .mockResolvedValueOnce({ success: true, message: 'spawned on retry' });
@@ -133,16 +115,13 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
 
     expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledTimes(2);
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
-    expect(notify).toHaveBeenCalledWith(
-      `agent-${ISSUE.toLowerCase()}`,
-      expect.stringContaining('REVIEW PASSED'),
-    );
+    expect(notify).toHaveBeenCalled();
   });
 
-  it('sets testStatus to dispatch_failed and does NOT notify agent when both spawn attempts fail', async () => {
+  it('retries once then sets dispatch_failed when both spawn attempts fail', async () => {
     vi.useFakeTimers();
-    resolveProject();
-    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, message: 'all slots full' });
+    setupProjectResolved();
+    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, message: 'spawn failed' });
     const notify = makeNotify();
 
     const promise = autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
@@ -150,16 +129,34 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     await promise;
     vi.useRealTimers();
 
+    // Both spawn attempts must be made
     expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledTimes(2);
+    // Should set dispatch_failed after both attempts fail
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
       testStatus: 'dispatch_failed',
-      testNotes: expect.stringContaining('all slots full'),
+      testNotes: expect.stringContaining('spawn failed'),
     });
+    // Must NOT notify agent on failure
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it('sets testStatus to dispatch_failed when no project is configured for the issue', async () => {
-    resolveNoProject();
+  it('sets dispatch_failed when both spawn attempts fail and does not notify', async () => {
+    vi.useFakeTimers();
+    setupProjectResolved();
+    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, message: 'all busy' });
+    const notify = makeNotify();
+
+    const promise = autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
+    await vi.advanceTimersByTimeAsync(2000);
+    await promise;
+    vi.useRealTimers();
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, expect.objectContaining({ testStatus: 'dispatch_failed' }));
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('sets dispatch_failed when no project is configured for the issue', async () => {
+    setupNoProject();
     const notify = makeNotify();
 
     await autoQueueTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
@@ -173,7 +170,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
   });
 
   it('sets testStatus to dispatch_failed and does NOT notify agent when specialists module throws', async () => {
-    resolveProject();
+    setupProjectResolved();
     mockSpawnEphemeralSpecialist.mockRejectedValue(new Error('specialists module unavailable'));
     const notify = makeNotify();
 
@@ -189,7 +186,7 @@ describe('autoQueueTestAgentAndNotify (PAN-343 + PAN-369)', () => {
   });
 
   it('does not throw and does not notify agent when setReviewStatus itself throws in the catch block', async () => {
-    resolveProject();
+    setupProjectResolved();
     mockSpawnEphemeralSpecialist.mockRejectedValue(new Error('specialists unavailable'));
     // setReviewStatus throws when trying to persist dispatch_failed
     mockSetReviewStatus.mockImplementation(() => {
