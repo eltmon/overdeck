@@ -1268,6 +1268,40 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
                   <span className="text-content-muted text-[10px]">{formatRelativeTime(reviewStatus.updatedAt)}</span>
                 )}
               </div>
+              {/* Inspect Status */}
+              {reviewStatus.inspectStatus && reviewStatus.inspectStatus !== 'pending' && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-content-subtle">Inspect:</span>
+                  <span className={
+                    reviewStatus.inspectStatus === 'passed' ? 'text-green-400' :
+                    reviewStatus.inspectStatus === 'failed' ? 'text-red-400' :
+                    reviewStatus.inspectStatus === 'inspecting' ? 'text-yellow-400' :
+                    'text-content-muted'
+                  }>
+                    {reviewStatus.inspectStatus === 'passed' ? '✓ Passed' :
+                     reviewStatus.inspectStatus === 'failed' ? '✗ Blocked' :
+                     reviewStatus.inspectStatus === 'inspecting' ? '⟳ Inspecting...' :
+                     'Pending'}
+                  </span>
+                </div>
+              )}
+              {/* UAT Status */}
+              {reviewStatus.uatStatus && reviewStatus.uatStatus !== 'pending' && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-content-subtle">UAT:</span>
+                  <span className={
+                    reviewStatus.uatStatus === 'passed' ? 'text-green-400' :
+                    reviewStatus.uatStatus === 'failed' ? 'text-red-400' :
+                    reviewStatus.uatStatus === 'testing' ? 'text-yellow-400' :
+                    'text-content-muted'
+                  }>
+                    {reviewStatus.uatStatus === 'passed' ? '✓ Passed' :
+                     reviewStatus.uatStatus === 'failed' ? '✗ Blocked' :
+                     reviewStatus.uatStatus === 'testing' ? '⟳ Testing...' :
+                     'Pending'}
+                  </span>
+                </div>
+              )}
               {/* Review cycle count */}
               {(reviewStatus.autoRequeueCount ?? 0) > 0 && (
                 <div className="flex items-center gap-2 mt-1">

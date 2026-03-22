@@ -1,7 +1,7 @@
 import type { GitStatus } from '../../types';
 
 export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge';
+  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'verification';
   status: string;
   timestamp: string;
   notes?: string;
@@ -12,6 +12,10 @@ export interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
+  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed';
+  inspectNotes?: string;
+  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
+  uatNotes?: string;
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   verificationNotes?: string;
   verificationCycleCount?: number;
