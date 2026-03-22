@@ -10818,10 +10818,36 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
       }
     }
 
-    // Update issue state (Linear or GitHub)
+    // Update issue state (Linear or GitHub) — but ONLY if the issue is still in a
+    // planning state. If it's already In Progress (agent running), don't regress the status.
+    // The stop-hook calls complete-planning automatically when planning agents finish,
+    // which can race with the agent already being started.
+    let skipStateUpdate = false;
+    const apiKey = getLinearApiKey();
+    if (apiKey && !githubCheck?.isGitHub) {
+      try {
+        const checkQuery = `query { issue(id: "${id}") { state { name type } } }`;
+        const checkRes = await fetch('https://api.linear.app/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
+          body: JSON.stringify({ query: checkQuery }),
+        });
+        const checkData = await checkRes.json();
+        const currentState = checkData.data?.issue?.state;
+        if (currentState?.type === 'started') {
+          // Issue is already in a started state (In Progress, In Review, etc.) — don't regress
+          console.log(`[complete-planning] Issue ${id} is already '${currentState.name}' — skipping state update`);
+          skipStateUpdate = true;
+        }
+      } catch { /* non-fatal, proceed with update */ }
+    }
+
     let newState = 'Planned';
 
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+    if (skipStateUpdate) {
+      // Issue is already past planning — don't touch the tracker state
+      newState = 'Skipped (already in progress)';
+    } else if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
       // GitHub: Remove "planning" label, add "planned" label
       const config = getGitHubConfig();
       if (config) {
