@@ -16,7 +16,7 @@ import { resolveProjectFromIssue } from '../projects.js';
 export interface WriteFeedbackOptions {
   issueId: string;
   workspacePath?: string;
-  specialist: 'review-agent' | 'test-agent' | 'merge-agent';
+  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent';
   outcome: string;
   summary: string;
   markdownBody: string;

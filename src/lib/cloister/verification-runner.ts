@@ -114,8 +114,8 @@ export async function runVerificationForIssue(
         const fileResult = await writeFeedbackFile({
           issueId,
           workspacePath,
-          specialist: 'review-agent',
-          outcome: 'verification-failed',
+          specialist: 'verification-gate',
+          outcome: 'failed',
           summary: `Verification FAILED at ${failedCheck} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
           markdownBody: feedbackBody,
         });
