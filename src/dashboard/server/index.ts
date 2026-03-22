@@ -7002,6 +7002,28 @@ app.post('/api/specialists/done', async (req, res) => {
     firePostMergeLifecycle(normalizedIssueId);
   }
 
+  // When any specialist reports failure, transition issue back to In Progress
+  // so the agent knows it needs to fix issues (was In Review while specialists ran)
+  if (status === 'failed' && specialist !== 'inspect') {
+    // Inspect failures don't change Linear status — they're mid-implementation gates.
+    // Review/test/UAT failures mean the work needs rework → back to In Progress.
+    try {
+      const { resolveProjectFromIssue } = await import('../../lib/projects.js');
+      const project = resolveProjectFromIssue(normalizedIssueId);
+      if (project) {
+        const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
+        const workspace = findWorkspaceForIssue(normalizedIssueId);
+        const { transitionIssueToInProgress } = await import('../../lib/agents.js');
+        transitionIssueToInProgress(normalizedIssueId, workspace?.path).catch((err: any) => {
+          console.warn(`[specialists/done] Could not transition ${normalizedIssueId} back to in_progress: ${err.message}`);
+        });
+        console.log(`[specialists/done] ${specialist} failed → transitioning ${normalizedIssueId} back to In Progress`);
+      }
+    } catch (err: any) {
+      console.warn(`[specialists/done] Could not transition issue back to in_progress:`, err.message);
+    }
+  }
+
   res.json({
     success: true,
     specialist,

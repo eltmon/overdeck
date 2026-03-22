@@ -482,7 +482,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
   throw new Error(`Project ${projectConfig.name} has no tracker configured (need linear_team, github_repo, or rally_project in projects.yaml)`);
 }
 
-async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
+export async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
   return transitionIssueState(issueId, 'in_progress', workspacePath);
 }
 
