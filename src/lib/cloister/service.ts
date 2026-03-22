@@ -566,7 +566,10 @@ export class CloisterService {
     const config = this.config.auto_restart;
     if (!config?.enabled) return;
 
-    // Check if agent was intentionally stopped or suspended (not a crash)
+    // Check if agent was intentionally stopped or suspended (not a crash).
+    // Both state.json and runtime.json must be checked — stopAgent writes both,
+    // but a race between the CLI kill and this health check poll could see one
+    // but not the other if only one file is consulted.
     const agentState = getAgentState(agentId);
     if (!agentState || agentState.status === 'stopped') {
       console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
@@ -575,6 +578,10 @@ export class CloisterService {
     const runtimeState = getAgentRuntimeState(agentId);
     if (runtimeState?.state === 'suspended') {
       console.log(`🔔 Agent ${agentId} is suspended, skipping restart`);
+      return;
+    }
+    if (runtimeState?.state === 'stopped') {
+      console.log(`🔔 Agent ${agentId} runtime is stopped, skipping restart`);
       return;
     }
 

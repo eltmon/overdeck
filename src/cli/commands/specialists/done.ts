@@ -11,46 +11,11 @@
  */
 
 import chalk from 'chalk';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
-
-const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
-
-interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge';
-  status: string;
-  timestamp: string;
-  notes?: string;
-}
-
-interface ReviewStatus {
-  issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped';
-  mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
-  reviewNotes?: string;
-  testNotes?: string;
-  updatedAt: string;
-  readyForMerge: boolean;
-  autoRequeueCount?: number;
-  history?: StatusHistoryEntry[];
-}
-
-function loadReviewStatuses(): Record<string, ReviewStatus> {
-  try {
-    if (existsSync(REVIEW_STATUS_FILE)) {
-      return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-    }
-  } catch (error) {
-    console.error(chalk.yellow('Warning: Could not load review statuses'));
-  }
-  return {};
-}
-
-function saveReviewStatuses(statuses: Record<string, ReviewStatus>): void {
-  writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2));
-}
+import {
+  setReviewStatus,
+  getReviewStatus,
+  type ReviewStatus,
+} from '../../../lib/review-status.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed';
@@ -84,29 +49,16 @@ export async function doneCommand(
   // Normalize issue ID (e.g., min-665 -> MIN-665)
   const normalizedIssueId = issueId.toUpperCase();
 
-  // Load current statuses
-  const statuses = loadReviewStatuses();
+  // Build the atomic update — setReviewStatus handles history, SQLite,
+  // computed readyForMerge, and JSON persistence in one call.
+  // This eliminates the read-modify-write race that caused duplicate
+  // specialist runs to overwrite each other's results.
+  const update: Partial<ReviewStatus> = {};
 
-  // Get or create status entry
-  let status = statuses[normalizedIssueId];
-  if (!status) {
-    status = {
-      issueId: normalizedIssueId,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      updatedAt: new Date().toISOString(),
-      readyForMerge: false,
-    };
-  }
-
-  // Update based on specialist type
   switch (specialist) {
     case 'review':
-      status.reviewStatus = options.status;
-      if (options.notes) {
-        status.reviewNotes = options.notes;
-      }
-      // If review passed, test can proceed (but don't auto-mark ready for merge yet)
+      update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
+      if (options.notes) update.reviewNotes = options.notes;
       console.log(chalk.green(`✓ Review ${options.status} for ${normalizedIssueId}`));
       if (options.status === 'passed') {
         console.log(chalk.dim('  Test agent can now proceed'));
@@ -114,44 +66,32 @@ export async function doneCommand(
       break;
 
     case 'test':
-      status.testStatus = options.status;
-      if (options.notes) {
-        status.testNotes = options.notes;
-      }
-      // If both review and test passed, mark ready for merge
-      if (options.status === 'passed' && status.reviewStatus === 'passed') {
-        status.readyForMerge = true;
-        console.log(chalk.green(`✓ Tests ${options.status} for ${normalizedIssueId}`));
-        console.log(chalk.green('✓ Ready for merge!'));
-      } else if (options.status === 'passed') {
+      update.testStatus = options.status as ReviewStatus['testStatus'];
+      if (options.notes) update.testNotes = options.notes;
+      if (options.status === 'passed') {
         console.log(chalk.green(`✓ Tests ${options.status} for ${normalizedIssueId}`));
       } else {
         console.log(chalk.yellow(`✗ Tests ${options.status} for ${normalizedIssueId}`));
-        status.readyForMerge = false;
       }
       break;
 
     case 'merge':
-      // Map passed/failed to merged/failed for mergeStatus type
-      status.mergeStatus = options.status === 'passed' ? 'merged' : 'failed';
+      update.mergeStatus = (options.status === 'passed' ? 'merged' : 'failed') as ReviewStatus['mergeStatus'];
       if (options.status === 'passed') {
+        update.readyForMerge = false;
         console.log(chalk.green(`✓ Merge completed for ${normalizedIssueId}`));
-        // Clear readyForMerge since it's done
-        status.readyForMerge = false;
       } else {
         console.log(chalk.red(`✗ Merge failed for ${normalizedIssueId}`));
       }
       break;
   }
 
-  // Update timestamp
-  status.updatedAt = new Date().toISOString();
+  const status = setReviewStatus(normalizedIssueId, update);
 
-  // Save
-  statuses[normalizedIssueId] = status;
-  saveReviewStatuses(statuses);
+  if (specialist === 'test' && status.readyForMerge) {
+    console.log(chalk.green('✓ Ready for merge!'));
+  }
 
-  // Print notes if provided
   if (options.notes) {
     console.log(chalk.dim(`  Notes: ${options.notes}`));
   }

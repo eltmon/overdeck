@@ -1186,8 +1186,11 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       const hasPassedReview = status.history?.some(
         (h) => h.type === 'review' && h.status === 'passed'
       );
+      // Only skip re-dispatch if tests actually passed — a prior 'failed' result
+      // should NOT prevent re-dispatch, because the agent may have fixed the failures
+      // and resubmitted. The current testStatus (dispatch_failed) is what matters.
       const hasPassedTest = status.history?.some(
-        (h) => h.type === 'test' && (h.status === 'passed' || h.status === 'failed')
+        (h) => h.type === 'test' && h.status === 'passed'
       );
 
       // Check for orphaned reviewing status — no specialist (global or per-project) is actively reviewing this issue
