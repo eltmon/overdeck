@@ -23,7 +23,7 @@ interface ResetOptions {
   all?: boolean;
 }
 
-const ALL_SPECIALISTS: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
+const ALL_SPECIALISTS: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'];
 
 export async function resetCommand(name: string | undefined, options: ResetOptions): Promise<void> {
   // Handle --all flag

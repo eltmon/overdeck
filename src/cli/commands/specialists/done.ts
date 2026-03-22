@@ -27,7 +27,7 @@ export async function doneCommand(
   issueId: string,
   options: DoneOptions
 ): Promise<void> {
-  const validSpecialists = ['review', 'test', 'merge', 'inspect'];
+  const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat'];
 
   if (!validSpecialists.includes(specialist)) {
     console.error(chalk.red(`Invalid specialist: ${specialist}`));
@@ -96,6 +96,19 @@ export async function doneCommand(
         console.log(chalk.dim('  Agent must fix issues and re-request inspection'));
       }
       break;
+
+    case 'uat':
+      update.uatStatus = options.status as ReviewStatus['uatStatus'];
+      if (options.notes) update.uatNotes = options.notes;
+      if (options.status === 'passed') {
+        update.readyForMerge = true;
+        console.log(chalk.green(`✓ UAT passed for ${normalizedIssueId}`));
+        console.log(chalk.dim('  Ready for merge'));
+      } else {
+        console.log(chalk.yellow(`✗ UAT blocked for ${normalizedIssueId}`));
+        console.log(chalk.dim('  Agent must fix issues — visual/functional verification failed'));
+      }
+      break;
   }
 
   const status = setReviewStatus(normalizedIssueId, update);
@@ -116,6 +129,9 @@ export async function doneCommand(
   }
   console.log(`  Review: ${formatStatus(status.reviewStatus)}`);
   console.log(`  Test:   ${formatStatus(status.testStatus)}`);
+  if (status.uatStatus) {
+    console.log(`  UAT:    ${formatStatus(status.uatStatus)}`);
+  }
   if (status.mergeStatus) {
     console.log(`  Merge:  ${formatStatus(status.mergeStatus)}`);
   }

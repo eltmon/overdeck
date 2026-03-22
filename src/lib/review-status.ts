@@ -10,7 +10,7 @@ import {
 } from './database/review-status-db.js';
 
 export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect';
+  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat';
   status: string;
   timestamp: string;
   notes?: string;
@@ -23,6 +23,8 @@ export interface ReviewStatus {
   mergeStatus?: 'pending' | 'merging' | 'merged' | 'failed';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed';
   inspectNotes?: string;
+  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
+  uatNotes?: string;
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   verificationNotes?: string;
   verificationCycleCount?: number;
@@ -104,14 +106,25 @@ export function setReviewStatus(
   if (update.testStatus && update.testStatus !== existing.testStatus) {
     history.push({ type: 'test', status: update.testStatus, timestamp: now, notes: update.testNotes });
   }
+  if (update.uatStatus && update.uatStatus !== existing.uatStatus) {
+    history.push({ type: 'uat', status: update.uatStatus, timestamp: now, notes: update.uatNotes });
+  }
   if (update.mergeStatus && update.mergeStatus !== existing.mergeStatus) {
     history.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
   }
   while (history.length > 10) history.shift();
 
+  // readyForMerge is true when all required gates pass.
+  // If uatStatus exists (UAT specialist has been involved), it must also be 'passed'.
   const readyForMerge = update.readyForMerge !== undefined
     ? update.readyForMerge
-    : (merged.reviewStatus === 'passed' && merged.testStatus === 'passed' && merged.mergeStatus !== 'merged');
+    : (
+        merged.reviewStatus === 'passed' &&
+        merged.testStatus === 'passed' &&
+        merged.mergeStatus !== 'merged' &&
+        // If UAT has been initiated, it must pass too
+        (merged.uatStatus === undefined || merged.uatStatus === 'passed')
+      );
 
   const updated: ReviewStatus = {
     ...merged,

@@ -52,7 +52,7 @@ interface WakeOptions {
 
 export async function wakeCommand(name: string, options: WakeOptions): Promise<void> {
   // Validate specialist name
-  const validNames: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
+  const validNames: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'];
   if (!validNames.includes(name as SpecialistType)) {
     console.log(chalk.red(`\nError: Unknown specialist '${name}'`));
     console.log(`Valid specialists: ${validNames.join(', ')}\n`);
