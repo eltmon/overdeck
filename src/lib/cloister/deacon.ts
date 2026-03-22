@@ -1782,7 +1782,7 @@ async function checkSpecialistQueues(): Promise<string[]> {
       isRunning,
     } = await import('./specialists.js');
     const { getAgentRuntimeState } = await import('../agents.js');
-    const { getProjects } = await import('../projects.js');
+    const { resolveProjectFromIssue } = await import('../projects.js');
 
     const specialistTypes = ['review-agent', 'test-agent', 'inspect-agent', 'uat-agent'] as const;
 
@@ -1790,47 +1790,38 @@ async function checkSpecialistQueues(): Promise<string[]> {
       const queue = checkSpecialistQueue(specialistType);
       if (!queue.hasWork) continue;
 
-      // Check each project's specialist state
-      const projects = getProjects();
-      for (const [projectKey, project] of Object.entries(projects)) {
-        const tmuxSession = getTmuxSessionName(specialistType, projectKey);
-        const running = await isRunning(specialistType, projectKey);
-        const state = getAgentRuntimeState(tmuxSession);
-        const isIdle = state?.state === 'idle' || state?.state === 'suspended' || !running;
+      // Take the oldest queue item and resolve its project
+      const item = queue.items[0];
+      const issueId = item.payload?.issueId || '';
+      if (!issueId) continue;
 
-        if (!isIdle) continue;
+      const project = resolveProjectFromIssue(issueId);
+      if (!project) continue;
 
-        // Find a queue item for this project
-        const item = queue.items.find((i: any) => {
-          const issueId = i.payload?.issueId || '';
-          // Simple heuristic: check if the issue belongs to this project
-          const { resolveProjectFromIssue } = require('../projects.js');
-          const resolved = resolveProjectFromIssue(issueId);
-          return resolved?.key === projectKey;
+      // Check if this specialist is idle for this project
+      const tmuxSession = getTmuxSessionName(specialistType, project.key);
+      const running = await isRunning(specialistType, project.key);
+      const state = getAgentRuntimeState(tmuxSession);
+      const isIdle = state?.state === 'idle' || state?.state === 'suspended' || !running;
+
+      if (!isIdle) continue;
+
+      console.log(`[deacon] Dispatching queued ${specialistType} work for ${issueId} (project: ${project.key})`);
+
+      try {
+        const { findWorkspaceForIssue } = await import('../workspace-manager.js');
+        const workspace = findWorkspaceForIssue(issueId);
+
+        await spawnEphemeralSpecialist(project.key, specialistType, {
+          issueId,
+          workspace: workspace?.path,
+          branch: item.payload?.branch,
+          context: item.payload,
         });
 
-        if (!item) continue;
-
-        const issueId = item.payload?.issueId || 'unknown';
-        console.log(`[deacon] Dispatching queued ${specialistType} work for ${issueId} (project: ${projectKey})`);
-
-        try {
-          const { findWorkspaceForIssue } = await import('../workspace-manager.js');
-          const workspace = findWorkspaceForIssue(issueId);
-
-          await spawnEphemeralSpecialist(projectKey, specialistType, {
-            issueId,
-            workspace: workspace?.path,
-            branch: item.payload?.branch,
-            context: item.payload,
-          });
-
-          actions.push(`Dispatched queued ${specialistType} for ${issueId}`);
-          // Only dispatch one per specialist per patrol cycle to avoid overwhelming
-          break;
-        } catch (err: any) {
-          console.error(`[deacon] Failed to dispatch ${specialistType} for ${issueId}:`, err.message);
-        }
+        actions.push(`Dispatched queued ${specialistType} for ${issueId}`);
+      } catch (err: any) {
+        console.error(`[deacon] Failed to dispatch ${specialistType} for ${issueId}:`, err.message);
       }
     }
   } catch (err: any) {
