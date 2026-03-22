@@ -10922,6 +10922,51 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
       }
     }
 
+    // Add "planned" label to Linear issues so the dashboard knows planning is complete.
+    // The frontend checks for this label to show "Start Agent" instead of "Plan".
+    if (!githubCheck?.isGitHub) {
+      const labelApiKey = getLinearApiKey();
+      if (labelApiKey) {
+        try {
+          // Find or create "planned" label on the team
+          const issueQuery2 = `query { issue(id: "${id}") { id team { id labels { nodes { id name } } } } }`;
+          const issueRes2 = await fetch('https://api.linear.app/graphql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': labelApiKey },
+            body: JSON.stringify({ query: issueQuery2 }),
+          });
+          const issueData2 = await issueRes2.json();
+          const team = issueData2.data?.issue?.team;
+          let plannedLabel = team?.labels?.nodes?.find((l: any) => l.name.toLowerCase() === 'planned');
+
+          if (!plannedLabel && team?.id) {
+            // Create "planned" label on the team
+            const createMut = `mutation { issueLabelCreate(input: { name: "planned", teamId: "${team.id}" }) { success issueLabel { id name } } }`;
+            const createRes = await fetch('https://api.linear.app/graphql', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': labelApiKey },
+              body: JSON.stringify({ query: createMut }),
+            });
+            const createData = await createRes.json();
+            plannedLabel = createData.data?.issueLabelCreate?.issueLabel;
+          }
+
+          if (plannedLabel) {
+            // Add label to issue
+            const addLabelMut = `mutation { issueAddLabel(id: "${id}", labelId: "${plannedLabel.id}") { success } }`;
+            await fetch('https://api.linear.app/graphql', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': labelApiKey },
+              body: JSON.stringify({ query: addLabelMut }),
+            });
+            console.log(`[complete-planning] Added 'planned' label to ${id}`);
+          }
+        } catch (labelErr) {
+          console.warn(`[complete-planning] Could not add 'planned' label:`, labelErr);
+        }
+      }
+    }
+
     notifyStateChange(id, newState || 'Planned');
     res.json({
       success: true,
