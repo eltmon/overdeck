@@ -15035,12 +15035,61 @@ server.listen(PORT, '0.0.0.0', async () => {
   // Wire pipeline event handler — bridges library state mutations to Socket.io push
   try {
     const { setPipelineHandler } = await import('../../lib/pipeline-notifier.js');
-    setPipelineHandler((event) => {
+    setPipelineHandler(async (event) => {
       if (event.type === 'status_changed') {
         socketIo.emit('pipeline:status', event.status);
       }
+
+      // PAN-384: When a task is queued, check if the specialist is idle/sleeping
+      // and spawn it immediately. PAN-378 removed processSpecialistQueueImmediate()
+      // but didn't replace it, leaving queued tasks stuck indefinitely.
+      if (event.type === 'task_queued') {
+        const specialistName = event.specialist as any;
+        try {
+          const {
+            getTmuxSessionName,
+            isRunning: isSpecialistRunning,
+            checkSpecialistQueue,
+            spawnEphemeralSpecialist,
+          } = await import('../../lib/cloister/specialists.js');
+          const { resolveProjectFromIssue } = await import('../../lib/projects.js');
+
+          const project = resolveProjectFromIssue(event.issueId);
+          if (!project) {
+            console.log(`[pipeline] task_queued: could not resolve project for ${event.issueId}`);
+            return;
+          }
+
+          const tmuxSession = getTmuxSessionName(specialistName, project.key);
+          const running = await isSpecialistRunning(specialistName, project.key);
+          const state = getAgentRuntimeState(tmuxSession);
+          const isIdle = state?.state === 'idle' || state?.state === 'suspended' || !running;
+
+          if (isIdle) {
+            const queue = checkSpecialistQueue(specialistName);
+            if (queue.hasWork) {
+              const nextTask = queue.items[0];
+              console.log(`[pipeline] task_queued: ${specialistName} is idle, spawning for ${nextTask.payload?.issueId || event.issueId}`);
+
+              const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
+              const workspace = findWorkspaceForIssue(event.issueId);
+
+              await spawnEphemeralSpecialist(project.key, specialistName, {
+                issueId: event.issueId,
+                workspace: workspace?.path,
+                branch: nextTask.payload?.branch,
+                context: nextTask.payload,
+              });
+            }
+          } else {
+            console.log(`[pipeline] task_queued: ${specialistName} is busy (state=${state?.state}), task remains queued for ${event.issueId}`);
+          }
+        } catch (err) {
+          console.error(`[pipeline] task_queued handler error:`, err);
+        }
+      }
     });
-    console.log('Pipeline event handler wired (Socket.io push)');
+    console.log('Pipeline event handler wired (Socket.io push + queue dispatch)');
   } catch (error: any) {
     console.error('Failed to wire pipeline handler:', error.message);
   }
