@@ -156,7 +156,7 @@ export function saveAgentState(state: AgentState): void {
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear';
 
 export interface AgentRuntimeState {
-  state: 'active' | 'idle' | 'suspended' | 'uninitialized';
+  state: 'active' | 'idle' | 'suspended' | 'stopped' | 'uninitialized';
   lastActivity: string;
   currentTool?: string;
   sessionId?: string;
