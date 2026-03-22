@@ -52,6 +52,7 @@ import { registerBeadsCommands } from './commands/beads.js';
 import { migrateConfigCommand } from './commands/migrate-config.js';
 import { registerRemoteCommands } from './commands/remote/index.js';
 import { registerConfigCommand } from './commands/config.js';
+import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 
 const program = new Command();
@@ -136,6 +137,9 @@ registerRemoteCommands(program);
 
 // Register config commands (pan config shadow)
 registerConfigCommand(program);
+
+// Register inspect command (pan inspect <issueId> --bead <beadId>)
+registerInspectCommand(program);
 
 // Config migration
 program

@@ -21,7 +21,7 @@ interface ClearQueueOptions {
   resetStatus?: boolean;
 }
 
-const ALL_SPECIALISTS: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent'];
+const ALL_SPECIALISTS: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
 const REVIEW_STATUS_FILE = join(PANOPTICON_HOME, 'review-status.json');
 
 export async function clearQueueCommand(name: string, options: ClearQueueOptions): Promise<void> {

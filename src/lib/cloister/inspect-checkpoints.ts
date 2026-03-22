@@ -1,0 +1,151 @@
+/**
+ * PAN-382: Inspection checkpoint system.
+ *
+ * Tracks commit SHAs where inspections passed, scoping subsequent
+ * inspection diffs to only the changes since the last checkpoint.
+ *
+ * First inspection: diff from branch base (main...HEAD)
+ * Subsequent: diff from last checkpoint SHA to HEAD
+ */
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+import { execSync } from 'child_process';
+
+const PANOPTICON_HOME = join(homedir(), '.panopticon');
+
+export interface InspectCheckpoint {
+  beadId: string;
+  commitSha: string;
+  passedAt: string; // ISO 8601
+}
+
+export interface InspectCheckpointFile {
+  issueId: string;
+  checkpoints: InspectCheckpoint[];
+}
+
+/**
+ * Get the directory for a project's inspect checkpoints.
+ */
+function getCheckpointDir(projectKey: string): string {
+  return join(PANOPTICON_HOME, 'specialists', projectKey, 'inspect-agent', 'checkpoints');
+}
+
+/**
+ * Get the checkpoint file path for an issue.
+ */
+function getCheckpointPath(projectKey: string, issueId: string): string {
+  return join(getCheckpointDir(projectKey), `${issueId.toUpperCase()}.json`);
+}
+
+/**
+ * Load checkpoints for an issue. Returns null if no checkpoints exist.
+ */
+export function loadCheckpoints(projectKey: string, issueId: string): InspectCheckpointFile | null {
+  const filePath = getCheckpointPath(projectKey, issueId);
+  if (!existsSync(filePath)) return null;
+
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get the last checkpoint for an issue, or null if none exist.
+ */
+export function getLastCheckpoint(projectKey: string, issueId: string): InspectCheckpoint | null {
+  const data = loadCheckpoints(projectKey, issueId);
+  if (!data || data.checkpoints.length === 0) return null;
+  return data.checkpoints[data.checkpoints.length - 1];
+}
+
+/**
+ * Save a new checkpoint after a successful inspection.
+ */
+export function saveCheckpoint(
+  projectKey: string,
+  issueId: string,
+  beadId: string,
+  commitSha: string
+): InspectCheckpoint {
+  const dir = getCheckpointDir(projectKey);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  const data = loadCheckpoints(projectKey, issueId) || {
+    issueId: issueId.toUpperCase(),
+    checkpoints: [],
+  };
+
+  const checkpoint: InspectCheckpoint = {
+    beadId,
+    commitSha,
+    passedAt: new Date().toISOString(),
+  };
+
+  data.checkpoints.push(checkpoint);
+  writeFileSync(getCheckpointPath(projectKey, issueId), JSON.stringify(data, null, 2));
+
+  return checkpoint;
+}
+
+/**
+ * Get the diff base for an inspection.
+ *
+ * - If a previous checkpoint exists, diff from that commit
+ * - Otherwise, diff from the merge-base with main (full branch diff)
+ *
+ * Returns the commit SHA or ref to diff from.
+ */
+export function getDiffBase(projectKey: string, issueId: string, workspacePath: string): string {
+  const lastCheckpoint = getLastCheckpoint(projectKey, issueId);
+
+  if (lastCheckpoint) {
+    return lastCheckpoint.commitSha;
+  }
+
+  // No checkpoint — use the merge-base with main
+  try {
+    const mergeBase = execSync('git merge-base main HEAD', {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+    }).trim();
+    return mergeBase;
+  } catch {
+    // Fallback to 'main' if merge-base fails
+    return 'main';
+  }
+}
+
+/**
+ * Get the diff stats (files changed, insertions, deletions) for the inspection scope.
+ */
+export function getDiffStats(workspacePath: string, diffBase: string): string {
+  try {
+    const stats = execSync(`git diff --stat ${diffBase}...HEAD`, {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+    }).trim();
+    return stats || 'No changes detected';
+  } catch {
+    return 'Unable to compute diff stats';
+  }
+}
+
+/**
+ * Get the current HEAD commit SHA.
+ */
+export function getCurrentHead(workspacePath: string): string {
+  try {
+    return execSync('git rev-parse HEAD', {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+    }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
