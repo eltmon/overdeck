@@ -1802,7 +1802,25 @@ async function checkSpecialistQueues(): Promise<string[]> {
       const tmuxSession = getTmuxSessionName(specialistType, resolved.projectKey);
       const running = await isRunning(specialistType, resolved.projectKey);
       const state = getAgentRuntimeState(tmuxSession);
-      const isIdle = state?.state === 'idle' || state?.state === 'suspended' || !running;
+      let isIdle = state?.state === 'idle' || state?.state === 'suspended' || !running;
+
+      // Stale session detection: if the specialist has a tmux session but hasn't
+      // had activity in 10+ minutes, it's probably stuck (trust prompt, crashed, etc.).
+      // Kill the stale session and treat as idle.
+      if (!isIdle && running && state?.lastActivity) {
+        const lastActivityAge = Date.now() - new Date(state.lastActivity).getTime();
+        const tenMinutes = 10 * 60 * 1000;
+        if (lastActivityAge > tenMinutes) {
+          console.log(`[deacon] Stale specialist detected: ${tmuxSession} (last activity: ${Math.round(lastActivityAge / 60000)}m ago) — killing and treating as idle`);
+          try {
+            const { exec } = await import('child_process');
+            const { promisify } = await import('util');
+            const execAsync = promisify(exec);
+            await execAsync(`tmux kill-session -t "${tmuxSession}"`, { encoding: 'utf-8' }).catch(() => {});
+          } catch { /* non-fatal */ }
+          isIdle = true;
+        }
+      }
 
       if (!isIdle) continue;
 
