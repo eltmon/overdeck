@@ -182,8 +182,28 @@ This re-submits for review automatically. Do NOT poll specialist APIs or wait fo
 
 1. Read the context files listed above
 2. **FIRST:** Check STATE.md for completion status (see above)
-3. If not complete, continue implementing the planned work
-4. Close beads as you finish them: `bd close <task-id> --reason="what you did"` (this triggers automated inspection)
+3. If not complete, continue implementing the planned work using the per-bead workflow below
+
+## MANDATORY: One Bead At A Time
+
+An automated **Inspect Specialist** runs in parallel with you. It verifies each bead's
+implementation matches its specification. It needs a **scoped diff** — one bead per commit.
+If you batch multiple beads into one commit, the inspector cannot verify them individually
+and your work will be rejected.
+
+**Workflow for EVERY bead:**
+1. `bd ready` — find the next unblocked bead
+2. `bd update <bead-id> --claim` — claim it
+3. Implement ONLY that bead's work
+4. `git add` and `git commit` — one bead = one commit
+5. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
+6. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
+7. `INSPECTION PASSED` → proceed to step 1
+8. `INSPECTION BLOCKED` → fix, commit, `bd close` again
+
+**Do NOT implement multiple beads before committing and closing.** Each bead must be
+a separate commit with a separate `bd close`. The inspection fires automatically on
+`bd close` — you do not need to call `pan inspect` manually.
 
 ## CRITICAL: Keep STATE.md Updated
 
