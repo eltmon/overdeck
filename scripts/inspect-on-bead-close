@@ -19,9 +19,9 @@ if [ "$TOOL_NAME" != "Bash" ]; then
   exit 0
 fi
 
-# Check if the command was "bd close"
+# Check if the command contains "bd close" (may be prefixed with "cd /path &&")
 TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input.command // ""' 2>/dev/null || echo "")
-if ! echo "$TOOL_INPUT" | grep -qE "^bd close |^bd close$"; then
+if ! echo "$TOOL_INPUT" | grep -qE "bd close "; then
   exit 0
 fi
 
