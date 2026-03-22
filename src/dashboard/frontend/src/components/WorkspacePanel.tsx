@@ -1217,7 +1217,12 @@ export function WorkspacePanel({ agent, issueId, issueUrl, issue, onClose }: Wor
               )}
             </div>
           )}
-          {/* Review Status Display */}
+          {/* Pipeline Status Display */}
+          {reviewStatus && reviewStatus.reviewStatus === 'pending' && reviewStatus.testStatus === 'pending' && (
+            <div className="mb-2 p-2 rounded text-xs bg-surface/30 text-content-muted">
+              Pipeline not started — click <span className="text-content-subtle font-medium">Review &amp; Test</span> to run verification, review, tests, and UAT.
+            </div>
+          )}
           {reviewStatus && (reviewStatus.reviewStatus !== 'pending' || reviewStatus.testStatus !== 'pending') && (
             <div className={`mb-2 p-2 rounded text-xs ${
               reviewStatus.updatedAt && isStale(reviewStatus.updatedAt)
