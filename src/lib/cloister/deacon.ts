@@ -1768,6 +1768,79 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 }
 
 /**
+ * PAN-384: Check specialist queues for pending work and dispatch to idle specialists.
+ * Safety net for task_queued events that were missed (dashboard restart, old queue items).
+ */
+async function checkSpecialistQueues(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const {
+      checkSpecialistQueue,
+      spawnEphemeralSpecialist,
+      getTmuxSessionName,
+      isRunning,
+    } = await import('./specialists.js');
+    const { getAgentRuntimeState } = await import('../agents.js');
+    const { getProjects } = await import('../projects.js');
+
+    const specialistTypes = ['review-agent', 'test-agent', 'inspect-agent', 'uat-agent'] as const;
+
+    for (const specialistType of specialistTypes) {
+      const queue = checkSpecialistQueue(specialistType);
+      if (!queue.hasWork) continue;
+
+      // Check each project's specialist state
+      const projects = getProjects();
+      for (const [projectKey, project] of Object.entries(projects)) {
+        const tmuxSession = getTmuxSessionName(specialistType, projectKey);
+        const running = await isRunning(specialistType, projectKey);
+        const state = getAgentRuntimeState(tmuxSession);
+        const isIdle = state?.state === 'idle' || state?.state === 'suspended' || !running;
+
+        if (!isIdle) continue;
+
+        // Find a queue item for this project
+        const item = queue.items.find((i: any) => {
+          const issueId = i.payload?.issueId || '';
+          // Simple heuristic: check if the issue belongs to this project
+          const { resolveProjectFromIssue } = require('../projects.js');
+          const resolved = resolveProjectFromIssue(issueId);
+          return resolved?.key === projectKey;
+        });
+
+        if (!item) continue;
+
+        const issueId = item.payload?.issueId || 'unknown';
+        console.log(`[deacon] Dispatching queued ${specialistType} work for ${issueId} (project: ${projectKey})`);
+
+        try {
+          const { findWorkspaceForIssue } = await import('../workspace-manager.js');
+          const workspace = findWorkspaceForIssue(issueId);
+
+          await spawnEphemeralSpecialist(projectKey, specialistType, {
+            issueId,
+            workspace: workspace?.path,
+            branch: item.payload?.branch,
+            context: item.payload,
+          });
+
+          actions.push(`Dispatched queued ${specialistType} for ${issueId}`);
+          // Only dispatch one per specialist per patrol cycle to avoid overwhelming
+          break;
+        } catch (err: any) {
+          console.error(`[deacon] Failed to dispatch ${specialistType} for ${issueId}:`, err.message);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('[deacon] checkSpecialistQueues error:', err.message);
+  }
+
+  return actions;
+}
+
+/**
  * Run a single patrol cycle
  */
 export async function runPatrol(): Promise<PatrolResult> {
@@ -1800,6 +1873,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
   for (const a of orphanActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-384: Check specialist queues and dispatch pending work.
+  // This is the safety net for task_queued events that were missed (e.g., dashboard restart,
+  // event handler not yet wired, or old queue items from before the fix).
+  const queueActions = await checkSpecialistQueues();
+  actions.push(...queueActions);
+  for (const a of queueActions) addLog('action', a, state.patrolCycle);
 
   // Detect dead-end agents: review blocked or tests failed but agent is idle
   const deadEndActions = await checkDeadEndAgents();
