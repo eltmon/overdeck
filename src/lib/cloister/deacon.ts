@@ -1795,26 +1795,27 @@ async function checkSpecialistQueues(): Promise<string[]> {
       const issueId = item.payload?.issueId || '';
       if (!issueId) continue;
 
-      const project = resolveProjectFromIssue(issueId);
-      if (!project) continue;
+      const resolved = resolveProjectFromIssue(issueId);
+      if (!resolved) continue;
 
       // Check if this specialist is idle for this project
-      const tmuxSession = getTmuxSessionName(specialistType, project.key);
-      const running = await isRunning(specialistType, project.key);
+      const tmuxSession = getTmuxSessionName(specialistType, resolved.projectKey);
+      const running = await isRunning(specialistType, resolved.projectKey);
       const state = getAgentRuntimeState(tmuxSession);
       const isIdle = state?.state === 'idle' || state?.state === 'suspended' || !running;
 
       if (!isIdle) continue;
 
-      console.log(`[deacon] Dispatching queued ${specialistType} work for ${issueId} (project: ${project.key})`);
+      console.log(`[deacon] Dispatching queued ${specialistType} work for ${issueId} (project: ${resolved.projectKey})`);
 
       try {
-        const { findWorkspaceForIssue } = await import('../workspace-manager.js');
-        const workspace = findWorkspaceForIssue(issueId);
+        // Find workspace path: look for workspaces/feature-<issue>/ under project path
+        const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
+        const workspacePath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
 
-        await spawnEphemeralSpecialist(project.key, specialistType, {
+        await spawnEphemeralSpecialist(resolved.projectKey, specialistType, {
           issueId,
-          workspace: workspace?.path,
+          workspace: workspacePath || undefined,
           branch: item.payload?.branch,
           context: item.payload,
         });
