@@ -64,5 +64,22 @@ if [ -x "$WORK_AGENT_HOOK" ]; then
   "$WORK_AGENT_HOOK" &
 fi
 
+# Auto-mark planning complete when a planning agent finishes.
+# The planning agent creates STATE.md + beads but the .planning-complete marker
+# is only written by the dashboard "Done" button. If the user doesn't click it
+# (or the system crashes), the marker is never created and Panopticon shows
+# "Plan" instead of "Start Agent". This hook fixes that by calling
+# complete-planning automatically when a planning-* agent stops.
+if [[ "$AGENT_ID" == planning-* ]]; then
+  # Extract issue ID from agent ID (planning-min-796 → MIN-796)
+  ISSUE_ID=$(echo "$AGENT_ID" | sed 's/^planning-//' | tr '[:lower:]' '[:upper:]')
+  if [ -n "$ISSUE_ID" ]; then
+    # Fire and forget — don't block the stop hook
+    curl -s -X POST "http://localhost:3011/api/issues/$ISSUE_ID/complete-planning" \
+      -H "Content-Type: application/json" \
+      -d '{}' > /dev/null 2>&1 &
+  fi
+fi
+
 # Always exit successfully
 exit 0
