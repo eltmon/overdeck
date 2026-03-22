@@ -723,6 +723,11 @@ export function stopAgent(agentId: string): void {
     state.status = 'stopped';
     saveAgentState(state);
   }
+
+  // Also mark runtime.json as stopped so Cloister/Deacon won't auto-restart.
+  // state.json and runtime.json are separate files — both must agree the agent
+  // was intentionally stopped to prevent race conditions with health check polls.
+  saveAgentRuntimeState(normalizedId, { state: 'stopped' });
 }
 
 export async function messageAgent(agentId: string, message: string): Promise<void> {
