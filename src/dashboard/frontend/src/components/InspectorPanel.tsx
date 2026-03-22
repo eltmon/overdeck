@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X,
@@ -271,17 +271,25 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
     },
   });
 
+  const forceReviewRef = useRef(false);
   const reviewMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/review`, {
+      const url = forceReviewRef.current
+        ? `/api/workspaces/${issueId}/review?force=true`
+        : `/api/workspaces/${issueId}/review`;
+      forceReviewRef.current = false;
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to start review');
+        throw new Error(data.error || 'Failed to start review');
       }
-      return res.json();
+      if (data.success === false) {
+        throw new Error(data.message || 'Review was not started');
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
@@ -463,6 +471,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       ? `Re-run review & test pipeline for ${issueId}?`
       : `Start review & test pipeline for ${issueId}?`;
     if (await confirm({ title: isReReview ? 'Re-run Review' : 'Start Review', message, confirmLabel: isReReview ? 'Re-run' : 'Start Review' })) {
+      forceReviewRef.current = !!isReReview;
       reviewMutation.mutate();
     }
   };
