@@ -1793,6 +1793,7 @@ async function checkSpecialistQueues(): Promise<string[]> {
       // Take the oldest queue item and resolve its project
       const item = queue.items[0];
       const issueId = item.payload?.issueId || '';
+      console.log(`[deacon] Queue check: ${specialistType} has ${queue.items.length} items, first issue: ${issueId || 'none'}`);
       if (!issueId) continue;
 
       const resolved = resolveProjectFromIssue(issueId);
