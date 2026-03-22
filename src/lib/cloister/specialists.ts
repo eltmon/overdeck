@@ -741,8 +741,9 @@ script -qfec "bash '${innerScript}'" /dev/null 2>&1 | tee -a "${logFilePath}"
 `, { mode: 0o755 });
 
     // Spawn Claude Code via launcher script (with provider env vars)
+    // -c sets tmux session working directory to project path (prevents trust prompt — PAN-384)
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}"${envFlags} "bash '${launcherScript}'"`,
+      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
     );
 
@@ -1608,8 +1609,9 @@ exec claude --dangerously-skip-permissions --session-id "${newSessionId}" --mode
     setSessionId(name, newSessionId);
 
     // Spawn Claude Code via launcher script (with provider env vars)
+    // -c sets tmux session working directory to project path (prevents trust prompt)
     await execAsync(
-      `tmux new-session -d -s "${tmuxSession}"${envFlags} "bash '${launcherScript}'"`,
+      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
     );
 
