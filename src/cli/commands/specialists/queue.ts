@@ -17,7 +17,7 @@ interface QueueOptions {
 
 export function queueCommand(name: string, options: QueueOptions): void {
   // Validate specialist name
-  const validNames: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent'];
+  const validNames: SpecialistType[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
   if (!validNames.includes(name as SpecialistType)) {
     console.log(chalk.red(`\nError: Unknown specialist '${name}'`));
     console.log(`Valid specialists: ${validNames.join(', ')}\n`);

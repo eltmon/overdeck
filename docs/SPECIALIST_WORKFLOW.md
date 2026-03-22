@@ -1,59 +1,116 @@
 # Specialist Workflow Guide
 
-This document explains how worker agents interact with specialist agents (review-agent, test-agent, merge-agent) through the queue system.
+This document explains how worker agents interact with specialist agents (inspect-agent, review-agent, test-agent, merge-agent) through the queue system.
 
 ## Overview
 
-Specialist agents are long-running Claude Code sessions that handle specific tasks:
+Specialist agents are ephemeral Claude Code sessions that handle specific tasks:
 
-- **review-agent (Sonnet)**: Code review, security checks, quality analysis
+- **inspect-agent (Sonnet)**: Per-bead verification — checks implementation matches spec and constraints
+- **review-agent (Sonnet)**: Full MR code review, security checks, quality analysis
 - **test-agent (Haiku)**: Test execution, failure analysis, simple fixes
 - **merge-agent (Sonnet)**: Merge conflict resolution, CI handling
 
-Worker agents (issue-specific agents like `agent-pan-42`) submit work to specialist queues. Specialists process work items one at a time, maintaining context across tasks.
-
 ## Architecture
 
+### Full Pipeline
+
 ```
-┌─────────────────┐
-│  Worker Agent   │
-│  (agent-pan-42) │
-└────────┬────────┘
-         │
-         │ 1. Creates PR
-         │ 2. Submits to review queue
-         ▼
-┌─────────────────────────────┐
-│   Review Queue              │
-│   ~/.panopticon/agents/     │
-│   review-agent/hook.json    │
-└────────┬────────────────────┘
-         │
-         │ 3. review-agent processes
-         ▼
-┌─────────────────────────────┐
-│   review-agent (Sonnet)     │
-│   - Reviews code            │
-│   - Checks security         │
-│   - Approves/Requests Changes│
-└────────┬────────────────────┘
-         │
-         │ 4. If approved, submits to merge queue
-         ▼
-┌─────────────────────────────┐
-│   Merge Queue               │
-│   ~/.panopticon/agents/     │
-│   merge-agent/hook.json     │
-└────────┬────────────────────┘
-         │
-         │ 5. merge-agent processes
-         ▼
-┌─────────────────────────────┐
-│   merge-agent (Sonnet)      │
-│   - Merges PR               │
-│   - Resolves conflicts      │
-│   - Handles CI              │
-└─────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  DURING IMPLEMENTATION (per-bead)                               │
+│                                                                 │
+│  Agent finishes bead                                            │
+│       │                                                         │
+│       │ pan inspect <issueId> --bead <beadId>                   │
+│       ▼                                                         │
+│  ┌──────────────────────────┐                                   │
+│  │  inspect-agent (Sonnet)  │                                   │
+│  │  - Spec fidelity check   │──── BLOCKED ──→ Agent fixes       │
+│  │  - Constraint compliance │                  and re-requests   │
+│  │  - Compile + smoke       │                                   │
+│  └──────────┬───────────────┘                                   │
+│             │ PASS                                               │
+│             │ (checkpoint saved)                                 │
+│             ▼                                                    │
+│       Agent continues to next bead                              │
+│       ... repeat for each bead ...                              │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  AFTER ALL BEADS COMPLETE                                       │
+│                                                                 │
+│  Agent signals completion → Verification Gate                   │
+│       │                                                         │
+│       ▼                                                         │
+│  ┌──────────────────────────┐                                   │
+│  │  review-agent (Sonnet)   │                                   │
+│  │  - Full MR code review   │──── CHANGES_REQUESTED ──→ Agent   │
+│  │  - Security + perf       │                                   │
+│  │  - Test coverage         │                                   │
+│  └──────────┬───────────────┘                                   │
+│             │ APPROVED                                           │
+│             ▼                                                    │
+│  ┌──────────────────────────┐                                   │
+│  │  test-agent (Haiku)      │                                   │
+│  │  - Run test suite        │──── FAILED ──→ Agent fixes        │
+│  │  - Analyze failures      │                                   │
+│  └──────────┬───────────────┘                                   │
+│             │ PASSED                                             │
+│             ▼                                                    │
+│  ┌──────────────────────────┐                                   │
+│  │  merge-agent (Sonnet)    │                                   │
+│  │  - Resolve conflicts     │                                   │
+│  │  - Validate + push       │                                   │
+│  │  - Post-merge cleanup    │                                   │
+│  └──────────────────────────┘                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Inspect Specialist (PAN-382)
+
+The inspect specialist runs **during** implementation, after each bead. It catches architectural deviations early — before they cascade through subsequent beads.
+
+**Jidoka principle: never pass a defect downstream.**
+
+### Agent Workflow
+
+After completing each bead, agents must request inspection:
+
+```bash
+# After closing a bead
+bd close <beadId> --reason="Implemented X"
+
+# Request inspection before starting next bead
+pan inspect <issueId> --bead <beadId>
+
+# Wait for result — delivered via pan work tell
+# INSPECTION PASSED → proceed to next bead
+# INSPECTION BLOCKED → fix issues, then re-request
+```
+
+### What Inspect Checks
+
+1. **Spec fidelity** — Does the diff implement what the bead described?
+2. **Constraint compliance** — Are CLAUDE.md/PRD constraints violated?
+3. **Compile + smoke** — Does the code compile and lint?
+
+### Checkpoint System
+
+Inspections use commit checkpoints to scope diffs:
+
+- First inspection: `main...HEAD` (full branch diff)
+- Subsequent inspections: `checkpoint_n...HEAD` (only new changes)
+- On PASS: current HEAD saved as new checkpoint
+- On BLOCKED: same checkpoint, agent fixes and re-requests
+
+Checkpoints stored at: `~/.panopticon/specialists/<project>/inspect-agent/checkpoints/<ISSUE>.json`
+
+### CLI Reference
+
+```bash
+pan inspect <issueId> --bead <beadId>           # Request inspection
+pan inspect <issueId> --bead <beadId> --workspace /path  # With explicit workspace
+pan specialists done inspect <issueId> --status passed   # Signal completion (specialist only)
 ```
 
 ## Planning → Implementation Transition

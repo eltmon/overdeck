@@ -3936,10 +3936,10 @@ app.get('/api/specialists/:name/queue', async (req, res) => {
 
   try {
     const { checkSpecialistQueue } = await import('../../lib/cloister/specialists.js');
-    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -3967,10 +3967,10 @@ app.post('/api/specialists/:name/queue', async (req, res) => {
 
   try {
     const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
-    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -4010,10 +4010,10 @@ app.delete('/api/specialists/:name/queue/:itemId', async (req, res) => {
 
   try {
     const { completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
-    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -4048,7 +4048,7 @@ app.put('/api/specialists/:name/queue/reorder', async (req, res) => {
     const { reorderHookItems } = await import('../../lib/hooks.js');
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -4092,10 +4092,10 @@ app.post('/api/specialists/:name/auto-complete', async (req, res) => {
       submitToSpecialistQueue,
     } = await import('../../lib/cloister/specialists.js');
 
-    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent';
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -6842,7 +6842,7 @@ app.post('/api/specialists/done', async (req, res) => {
   const { specialist, issueId, status, notes } = req.body;
 
   // Validate specialist type
-  const validSpecialists = ['review', 'test', 'merge'];
+  const validSpecialists = ['review', 'test', 'merge', 'inspect'];
   if (!validSpecialists.includes(specialist)) {
     return res.status(400).json({
       error: `Invalid specialist: ${specialist}. Valid: ${validSpecialists.join(', ')}`,
@@ -6896,6 +6896,11 @@ app.post('/api/specialists/done', async (req, res) => {
     case 'merge':
       update.mergeStatus = status === 'passed' ? 'merged' : 'failed';
       break;
+
+    case 'inspect':
+      update.inspectStatus = status;
+      if (notes) update.inspectNotes = notes;
+      break;
   }
 
   // Apply the update (this triggers all the side effects like idle state, queue processing)
@@ -6924,6 +6929,28 @@ app.post('/api/specialists/done', async (req, res) => {
     }
   } catch (err) {
     console.error(`[specialists/done] Error managing specialist state:`, err);
+  }
+
+  // When inspect specialist reports success, save checkpoint
+  if (specialist === 'inspect' && status === 'passed') {
+    try {
+      const { onInspectComplete } = await import('../../lib/cloister/inspect-agent.js');
+      // Extract beadId from notes (format: "Bead <beadId> matches spec...")
+      const beadMatch = notes?.match(/[Bb]ead\s+(\S+)/);
+      const beadId = beadMatch?.[1] || 'unknown';
+      // Resolve project to get workspace path
+      const { resolveProjectFromIssue } = await import('../../lib/projects.js');
+      const project = resolveProjectFromIssue(normalizedIssueId);
+      if (project) {
+        const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
+        const workspace = findWorkspaceForIssue(normalizedIssueId);
+        if (workspace) {
+          onInspectComplete(project.key, normalizedIssueId, beadId, 'passed', workspace.path);
+        }
+      }
+    } catch (err) {
+      console.error(`[specialists/done] Error saving inspect checkpoint:`, err);
+    }
   }
 
   // When merge specialist reports success, run post-merge lifecycle ONCE.

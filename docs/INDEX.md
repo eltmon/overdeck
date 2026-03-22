@@ -18,7 +18,7 @@
 | Document | Description |
 |----------|-------------|
 | [AGENTS.md](../AGENTS.md) | Agent system architecture and lifecycle |
-| [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | How worker and specialist agents interact |
+| [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | How worker and specialist agents interact (includes inspect, review, test, merge specialists) |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |
 | [PRD-CLOISTER.md](./PRD-CLOISTER.md) | Cloister lifecycle manager requirements |
