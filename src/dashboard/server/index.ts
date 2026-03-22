@@ -7114,17 +7114,41 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
   }
 
   // Mark review as starting (human-initiated: reset autoRequeueCount and verificationCycleCount)
+  // When force re-reviewing, reset the full lifecycle including readyForMerge and mergeStatus
+  // so the regression guard in setReviewStatus allows passed → reviewing transition.
   setPendingOperation(issueId, 'review');
-  setReviewStatus(issueId, { reviewStatus: 'reviewing', testStatus: 'pending', autoRequeueCount: 0, verificationCycleCount: 0, verificationStatus: 'pending', verificationNotes: undefined });
+  const reviewReset: Record<string, unknown> = {
+    reviewStatus: 'reviewing', testStatus: 'pending',
+    autoRequeueCount: 0, verificationCycleCount: 0,
+    verificationStatus: 'pending', verificationNotes: undefined,
+  };
+  if (forceReview) {
+    reviewReset.readyForMerge = false;
+    reviewReset.mergeStatus = 'pending';
+    reviewReset.reviewNotes = undefined;
+    reviewReset.testNotes = undefined;
+  }
+  setReviewStatus(issueId, reviewReset);
 
+  // 1. Check workspace exists (local or remote) — synchronous check before responding
+  if (!workspaceInfo.exists) {
+    completePendingOperation(issueId, 'Workspace does not exist');
+    setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: 'Workspace does not exist' });
+    return res.status(400).json({ error: 'Workspace does not exist' });
+  }
+
+  // Respond immediately — the pipeline runs in the background.
+  // Status updates are tracked via review-status and pending operations.
+  res.json({
+    success: true,
+    message: `Review pipeline starting for ${issueId}`,
+    pipeline: 'verification → review → test',
+    note: 'Watch the status panel for progress.',
+  });
+
+  // Run the rest of the pipeline in the background
+  (async () => {
   try {
-    // 1. Check workspace exists (local or remote)
-    if (!workspaceInfo.exists) {
-      completePendingOperation(issueId, 'Workspace does not exist');
-      setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: 'Workspace does not exist' });
-      return res.status(400).json({ error: 'Workspace does not exist' });
-    }
-
     // Transition issue to "In Review" now that the pipeline has started (fire-and-forget)
     transitionIssueToInReview(issueId, workspacePath).catch((err) => {
       console.warn(`[review] Could not transition ${issueId} to in_review: ${err.message}`);
@@ -7163,18 +7187,13 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
     const verifyOutcome = await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'review');
     if (verifyOutcome.outcome === 'failed') {
       completePendingOperation(issueId, `Verification failed at ${verifyOutcome.failedCheck}`);
-      return res.json({
-        success: false,
-        verificationFailed: true,
-        failedCheck: verifyOutcome.failedCheck,
-        message: `Verification failed at ${verifyOutcome.failedCheck} — agent notified to fix and resubmit`,
-        cycleCount: verifyOutcome.cycleCount,
-        maxCycles: verifyOutcome.maxCycles,
-      });
+      setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: `Verification failed at ${verifyOutcome.failedCheck}` });
+      return;
     }
     if (verifyOutcome.outcome === 'error') {
       completePendingOperation(issueId, `Verification infrastructure error: ${verifyOutcome.message}`);
-      return res.status(500).json({ error: `Verification infrastructure error: ${verifyOutcome.message}` });
+      setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: `Verification error: ${verifyOutcome.message}` });
+      return;
     }
     if (verifyOutcome.outcome === 'skipped') {
       console.log(`[review] Verification skipped for ${issueId} (${verifyOutcome.reason}) — proceeding to review-agent`);
@@ -7215,12 +7234,7 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
         vmName: workspaceInfo.vmName,
       });
       completePendingOperation(issueId, null);
-      return res.json({
-        success: true,
-        queued: true,
-        message: `Review queued for ${issueId} - review-agent is busy`,
-        isRemote: workspaceInfo.isRemote,
-      });
+      return;
     }
 
     // Set state to active IMMEDIATELY to prevent concurrent wakes (PAN-88)
@@ -7293,30 +7307,23 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
         console.warn(`[review] review-agent busy for ${issueId}, reverting to pending for retry`);
         completePendingOperation(issueId, null);
         setReviewStatus(issueId, { reviewStatus: 'pending' });
-        return res.status(409).json({ error: 'Review specialist busy, will retry', retryable: true });
+        return;
       }
       console.warn(`[review] review-agent failed to wake: ${reviewResult.message}`);
       completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
       setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: reviewResult.message });
-      return res.status(500).json({ error: `Failed to start review: ${reviewResult.message}` });
+      return;
     }
 
     console.log(`[review] Review pipeline started for ${issueId}`);
     completePendingOperation(issueId, null);
 
-    return res.json({
-      success: true,
-      message: `Review started for ${issueId}`,
-      pipeline: 'review → test',
-      note: 'Watch the specialists panel for progress. MERGE button will appear when review+test pass.',
-    });
-
   } catch (error: any) {
     console.error(`[review] Error starting review:`, error);
     completePendingOperation(issueId, error.message);
     setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: error.message });
-    return res.status(500).json({ error: error.message });
   }
+  })(); // end background pipeline
 });
 
 // Agent-initiated re-review request with circuit breaker (PAN-90)
