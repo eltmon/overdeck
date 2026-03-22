@@ -104,7 +104,26 @@ Tasks created during planning (check STATE.md for which are complete):
 
 {{BEADS_TASKS}}
 
-Use `bd show <task-id>` to see task details, `bd update <task-id> --status in_progress` to start work.
+### MANDATORY: One Bead At A Time
+
+An automated **Inspect Specialist** runs in parallel with you. It verifies each bead's
+implementation matches its specification. It needs a **scoped diff** — one bead per commit.
+If you batch multiple beads, the inspector cannot verify them individually and your work
+will be rejected.
+
+**Workflow for EVERY bead:**
+1. `bd ready` — find the next unblocked bead
+2. `bd update <bead-id> --claim` — claim it
+3. Implement ONLY that bead's work
+4. `git add` and `git commit` — one bead = one commit
+5. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
+6. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
+7. `INSPECTION PASSED` → proceed to step 1
+8. `INSPECTION BLOCKED` → fix, commit, `bd close` again
+
+**Do NOT implement multiple beads before committing and closing.** Each bead must be
+a separate commit with a separate `bd close`. The inspection fires automatically on
+`bd close` — you do not need to call `pan inspect` manually.
 {{/if}}
 
 {{#if STITCH_DESIGNS}}
@@ -164,7 +183,7 @@ This re-submits for review automatically. Do NOT poll specialist APIs or wait fo
 1. Read the context files listed above
 2. **FIRST:** Check STATE.md for completion status (see above)
 3. If not complete, continue implementing the planned work
-4. Mark beads tasks as complete as you finish them: `bd update <task-id> --status closed`
+4. Close beads as you finish them: `bd close <task-id> --reason="what you did"` (this triggers automated inspection)
 
 ## CRITICAL: Keep STATE.md Updated
 
@@ -199,12 +218,13 @@ but STATE.md provides the narrative context and current state that beads alone c
 {{/env}}
 
 ✅ **ALWAYS do this instead:**
-- Complete ALL phases of the plan from start to finish
+- Work through beads ONE AT A TIME — claim, implement, commit, close, wait for inspection
+- Complete ALL beads from start to finish — but each one individually
 - Fix ALL failing tests, not just "high-impact" ones
 - If something is broken, fix it - don't document it
 - If tests fail, debug and fix them until they pass
 - Work autonomously until the issue is FULLY resolved
-- The only acceptable end state is: all tests pass, all code committed, pushed
+- The only acceptable end state is: all beads closed with passing inspections, all tests pass, all code committed, pushed
 {{#env REMOTE}}
 - When one task is done, immediately move to the next unblocked task. Keep going until every task is finished.
 {{/env}}
