@@ -7089,7 +7089,8 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
   }
 
   // Skip issues that already passed review (prevents re-reviewing stale completion markers)
-  if (existingStatus?.reviewStatus === 'passed') {
+  // Human-initiated re-reviews pass force=true to bypass this guard
+  if (existingStatus?.reviewStatus === 'passed' && !forceReview) {
     console.log(`[review] Skipping ${issueId}: already passed review`);
     return res.json({
       success: false,
@@ -7097,6 +7098,9 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       message: `Review already passed for ${issueId}`,
       hint: 'Issue already passed review — proceed to testing or merge',
     });
+  }
+  if (existingStatus?.reviewStatus === 'passed' && forceReview) {
+    console.log(`[review] Force re-review for ${issueId} (human-initiated)`);
   }
 
   // Skip issues that are already merged
