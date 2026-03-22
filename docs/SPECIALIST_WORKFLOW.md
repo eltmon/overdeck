@@ -1,6 +1,6 @@
 # Specialist Workflow Guide
 
-This document explains how worker agents interact with specialist agents (inspect-agent, review-agent, test-agent, merge-agent) through the queue system.
+This document explains how worker agents interact with specialist agents (inspect-agent, review-agent, test-agent, uat-agent, merge-agent) through the queue system.
 
 ## Overview
 
@@ -9,6 +9,7 @@ Specialist agents are ephemeral Claude Code sessions that handle specific tasks:
 - **inspect-agent (Sonnet)**: Per-bead verification — checks implementation matches spec and constraints
 - **review-agent (Sonnet)**: Full MR code review, security checks, quality analysis
 - **test-agent (Haiku)**: Test execution, failure analysis, simple fixes
+- **uat-agent (Sonnet)**: Browser-based requirement verification via Playwright — visual quality, CORS, auth flows
 - **merge-agent (Sonnet)**: Merge conflict resolution, CI handling
 
 ## Architecture
@@ -54,6 +55,15 @@ Specialist agents are ephemeral Claude Code sessions that handle specific tasks:
 │  │  test-agent (Haiku)      │                                   │
 │  │  - Run test suite        │──── FAILED ──→ Agent fixes        │
 │  │  - Analyze failures      │                                   │
+│  └──────────┬───────────────┘                                   │
+│             │ PASSED                                             │
+│             ▼                                                    │
+│  ┌──────────────────────────┐                                   │
+│  │  uat-agent (Sonnet)      │                                   │
+│  │  - Real browser (PW)     │──── BLOCKED ──→ Agent fixes       │
+│  │  - CORS verification     │                                   │
+│  │  - Visual quality audit  │                                   │
+│  │  - Requirement check     │                                   │
 │  └──────────┬───────────────┘                                   │
 │             │ PASSED                                             │
 │             ▼                                                    │
@@ -111,6 +121,41 @@ Checkpoints stored at: `~/.panopticon/specialists/<project>/inspect-agent/checkp
 pan inspect <issueId> --bead <beadId>           # Request inspection
 pan inspect <issueId> --bead <beadId> --workspace /path  # With explicit workspace
 pan specialists done inspect <issueId> --status passed   # Signal completion (specialist only)
+```
+
+## UAT Specialist (PAN-383)
+
+The UAT specialist runs **after tests pass**, using Playwright in a real browser to verify the application works from a user's perspective.
+
+### Why UAT Exists
+
+E2E tests bypass CORS (they use direct HTTP calls via `apiUtils`). The test specialist can pass while the actual browser experience is broken. The UAT specialist catches:
+- **CORS errors** — real browser enforces preflight headers
+- **Visual regressions** — broken layouts, wrong colors, overflow
+- **Auth flow failures** — real login flow, not API shortcuts
+- **Console errors** — unhandled exceptions, missing resources
+- **Mobile responsiveness** — tests at desktop, tablet, and mobile viewports
+
+### Four Verification Phases
+
+1. **Smoke test** — Backend health, frontend loads, test-token auth in real browser, console clean, CORS works
+2. **Requirement verification** — Read PRD, navigate to each feature, interact, verify, screenshot
+3. **Visual quality audit** — Desktop (1920), tablet (768), mobile (375) viewport screenshots
+4. **Console & network audit** — Final check for errors, failed requests, CORS blocks
+
+### Auth Flow
+
+UAT authenticates via test token (magic link email can't be intercepted by Playwright):
+1. Fetch test token server-side: `curl -H "X-API-KEY: myn_test_e2e" <apiUrl>/api/v1/customers/retrieve-test-token`
+2. Navigate in browser: `<frontendUrl>/magic-login?directtoken=<token>`
+3. All subsequent API calls go through real browser CORS enforcement
+
+### Pipeline Trigger
+
+UAT is automatically spawned when the test specialist signals `passed`. No manual trigger needed.
+
+```bash
+pan specialists done uat <issueId> --status passed   # Signal completion (specialist only)
 ```
 
 ## Planning → Implementation Transition

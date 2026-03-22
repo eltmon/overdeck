@@ -108,7 +108,7 @@ const TASKS_DIR = join(SPECIALISTS_DIR, 'tasks');
 /**
  * Supported specialist types
  */
-export type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
+export type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
 
 /**
  * Specialist state

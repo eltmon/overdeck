@@ -3936,10 +3936,10 @@ app.get('/api/specialists/:name/queue', async (req, res) => {
 
   try {
     const { checkSpecialistQueue } = await import('../../lib/cloister/specialists.js');
-    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -3967,10 +3967,10 @@ app.post('/api/specialists/:name/queue', async (req, res) => {
 
   try {
     const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
-    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -4010,10 +4010,10 @@ app.delete('/api/specialists/:name/queue/:itemId', async (req, res) => {
 
   try {
     const { completeSpecialistTask } = await import('../../lib/cloister/specialists.js');
-    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -4048,7 +4048,7 @@ app.put('/api/specialists/:name/queue/reorder', async (req, res) => {
     const { reorderHookItems } = await import('../../lib/hooks.js');
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -4092,10 +4092,10 @@ app.post('/api/specialists/:name/auto-complete', async (req, res) => {
       submitToSpecialistQueue,
     } = await import('../../lib/cloister/specialists.js');
 
-    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent';
+    type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
 
     // Validate specialist name
-    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent'];
+    const validNames: string[] = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'];
     if (!validNames.includes(name)) {
       return res.status(400).json({ error: `Invalid specialist name: ${name}` });
     }
@@ -6842,7 +6842,7 @@ app.post('/api/specialists/done', async (req, res) => {
   const { specialist, issueId, status, notes } = req.body;
 
   // Validate specialist type
-  const validSpecialists = ['review', 'test', 'merge', 'inspect'];
+  const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat'];
   if (!validSpecialists.includes(specialist)) {
     return res.status(400).json({
       error: `Invalid specialist: ${specialist}. Valid: ${validSpecialists.join(', ')}`,
@@ -6901,6 +6901,14 @@ app.post('/api/specialists/done', async (req, res) => {
       update.inspectStatus = status;
       if (notes) update.inspectNotes = notes;
       break;
+
+    case 'uat':
+      update.uatStatus = status;
+      if (notes) update.uatNotes = notes;
+      if (status === 'passed') {
+        update.readyForMerge = true;
+      }
+      break;
   }
 
   // Apply the update (this triggers all the side effects like idle state, queue processing)
@@ -6950,6 +6958,37 @@ app.post('/api/specialists/done', async (req, res) => {
       }
     } catch (err) {
       console.error(`[specialists/done] Error saving inspect checkpoint:`, err);
+    }
+  }
+
+  // When test specialist reports success, spawn UAT specialist for browser verification.
+  // UAT sets readyForMerge=true on pass — the computed readyForMerge in review-status.ts
+  // requires uatStatus=passed once UAT has been initiated (uatStatus !== undefined).
+  if (specialist === 'test' && status === 'passed') {
+    try {
+      const { resolveProjectFromIssue } = await import('../../lib/projects.js');
+      const project = resolveProjectFromIssue(normalizedIssueId);
+      if (project) {
+        const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
+        const workspace = findWorkspaceForIssue(normalizedIssueId);
+        if (workspace) {
+          const { buildUatContext, spawnUatAgent } = await import('../../lib/cloister/uat-agent.js');
+          const uatContext = await buildUatContext(
+            project.key,
+            project.path,
+            normalizedIssueId,
+            workspace.path
+          );
+          const uatResult = await spawnUatAgent(uatContext);
+          if (uatResult.success) {
+            console.log(`[specialists/done] UAT specialist spawned for ${normalizedIssueId} after test passed`);
+          } else {
+            console.error(`[specialists/done] Failed to spawn UAT specialist: ${uatResult.message}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[specialists/done] Error spawning UAT specialist:`, err);
     }
   }
 
