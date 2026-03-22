@@ -1,0 +1,71 @@
+#!/bin/bash
+# ~/.panopticon/bin/inspect-on-bead-close
+# PostToolUse hook: auto-triggers pan inspect when agent closes a bead
+#
+# When a Bash command matches "bd close <beadId>", this hook:
+# 1. Extracts the bead ID
+# 2. Triggers pan inspect for the current issue
+# 3. Outputs a message telling the agent to WAIT for inspection results
+#
+# This makes inspection mechanical — the agent doesn't need to remember
+# to call pan inspect. The framework does it automatically.
+
+# Don't use set -e - never break Claude Code execution
+TOOL_INFO=$(cat 2>/dev/null || echo '{}')
+
+# Only care about Bash tool
+TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"' 2>/dev/null || echo "unknown")
+if [ "$TOOL_NAME" != "Bash" ]; then
+  exit 0
+fi
+
+# Check if the command was "bd close"
+TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input.command // ""' 2>/dev/null || echo "")
+if ! echo "$TOOL_INPUT" | grep -qE "^bd close |^bd close$"; then
+  exit 0
+fi
+
+# Extract bead ID(s) from the command
+# bd close myn-80 --reason="..."
+# bd close myn-80 myn-81 --reason="..."
+BEAD_IDS=$(echo "$TOOL_INPUT" | sed 's/bd close //' | grep -oE '[a-zA-Z]+-[a-zA-Z0-9]+' | head -5)
+if [ -z "$BEAD_IDS" ]; then
+  exit 0
+fi
+
+# Get issue ID from env (set by pan work issue)
+ISSUE_ID="${PANOPTICON_ISSUE_ID:-}"
+if [ -z "$ISSUE_ID" ]; then
+  exit 0
+fi
+
+# Get first bead ID for inspection
+FIRST_BEAD=$(echo "$BEAD_IDS" | head -1)
+
+# Check if multiple beads were closed at once — this is a problem
+BEAD_COUNT=$(echo "$BEAD_IDS" | wc -l)
+if [ "$BEAD_COUNT" -gt 1 ]; then
+  echo ""
+  echo "⚠️  WARNING: You closed $BEAD_COUNT beads at once. The Inspect Specialist needs"
+  echo "one bead per commit to verify each change individually. Close beads ONE AT A TIME."
+  echo ""
+fi
+
+# Dispatch inspection (fire and forget — don't block the hook)
+pan inspect "$ISSUE_ID" --bead "$FIRST_BEAD" > /dev/null 2>&1 &
+
+# Output message that gets injected into the agent's conversation
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔍 INSPECTION DISPATCHED for bead $FIRST_BEAD"
+echo ""
+echo "The Inspect Specialist is now reviewing your changes against"
+echo "the bead specification. It is working in YOUR workspace —"
+echo "do NOT make changes or start the next bead until you receive:"
+echo ""
+echo "  INSPECTION PASSED  → proceed to next bead"
+echo "  INSPECTION BLOCKED → fix issues, commit fix, close bead again"
+echo ""
+echo "WAIT for the inspection result message."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
