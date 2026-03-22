@@ -25,10 +25,12 @@ if ! echo "$TOOL_INPUT" | grep -qE "bd close "; then
   exit 0
 fi
 
-# Extract bead ID(s) from the command
-# bd close myn-80 --reason="..."
-# bd close myn-80 myn-81 --reason="..."
-BEAD_IDS=$(echo "$TOOL_INPUT" | sed 's/bd close //' | grep -oE '[a-zA-Z]+-[a-zA-Z0-9]+' | head -5)
+# Extract bead ID(s) from the command — only the arguments after "bd close"
+# Handles: "bd close myn-80 --reason=...", "cd /path && bd close MIN-796-14 --reason=..."
+# Extract everything after "bd close " up to the first flag (--) or end of string
+BD_CLOSE_ARGS=$(echo "$TOOL_INPUT" | sed 's/.*bd close //' | sed 's/ --.*//')
+# Bead IDs are space-separated tokens (myn-80, MIN-796-14, panopticon-abc123)
+BEAD_IDS=$(echo "$BD_CLOSE_ARGS" | tr ' ' '\n' | grep -E '^[a-zA-Z]' | head -5)
 if [ -z "$BEAD_IDS" ]; then
   exit 0
 fi
