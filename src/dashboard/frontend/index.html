@@ -11,10 +11,7 @@
     <script>
       // Flash prevention: Apply theme class before React mounts
       (function() {
-        var theme = localStorage.getItem('panopticon.ui.theme');
-        if (!theme) {
-          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
+        var theme = localStorage.getItem('panopticon.ui.theme') || 'dark';
         if (theme === 'light') {
           document.documentElement.classList.add('light');
         }
