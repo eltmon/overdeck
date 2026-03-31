@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { createShadowState } from '../../../lib/shadow-state.js';
-import { resolveGitHubIssue } from '../../../lib/tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import {
   findPRDFiles,
   analyzeComplexity,
@@ -213,10 +213,11 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
 
   try {
     // Resolve tracker type from project config
+    const trackerType = resolveTrackerType(id);
     const ghResolution = resolveGitHubIssue(id);
     let issueData: PlanIssue;
 
-    if (ghResolution.isGitHub) {
+    if (trackerType === 'github' && ghResolution.isGitHub) {
       // Fetch from GitHub
       spinner.text = 'Fetching issue from GitHub...';
       const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
@@ -244,6 +245,39 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
         labels: (ghIssue.labels || []).map(l => ({ name: typeof l === 'string' ? l : l.name || '' })),
         assignee: ghIssue.assignee ? { name: ghIssue.assignee.login } : undefined,
       };
+    } else if (trackerType === 'rally') {
+      // Fetch from Rally using the tracker factory
+      spinner.text = 'Fetching issue from Rally...';
+      const { createTracker } = await import('../../../lib/tracker/factory.js');
+      const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+
+      const project = resolveProjectFromIssue(id);
+      const rallyProject = project
+        ? (await import('../../../lib/projects.js')).getProject(project.projectKey)?.rally_project
+        : undefined;
+
+      try {
+        const tracker = createTracker({
+          type: 'rally',
+          project: rallyProject || undefined,
+        });
+        const rallyIssue = await tracker.getIssue(id);
+
+        issueData = {
+          id: rallyIssue.id,
+          identifier: rallyIssue.ref,
+          title: rallyIssue.title,
+          description: rallyIssue.description || undefined,
+          url: rallyIssue.url,
+          state: { name: rallyIssue.state === 'open' ? 'Todo' : rallyIssue.state === 'closed' ? 'Done' : 'In Progress' },
+          priority: rallyIssue.priority || 0,
+          labels: rallyIssue.labels.map(l => ({ name: l })),
+          assignee: rallyIssue.assignee ? { name: rallyIssue.assignee } : undefined,
+        };
+      } catch (err: any) {
+        spinner.fail(`Rally error: ${err.message}`);
+        process.exit(1);
+      }
     } else {
       // Fetch from Linear
       const apiKey = getLinearApiKey();
