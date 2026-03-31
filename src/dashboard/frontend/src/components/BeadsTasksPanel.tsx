@@ -136,7 +136,6 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
               item={selectedItem}
               doc={planDoc}
               beads={beadsData?.tasks ?? []}
-              issueId={issueId}
             />
           )}
         </div>
@@ -222,10 +221,9 @@ interface PlanItemDetailProps {
   item: VBriefItem;
   doc: VBriefDocument;
   beads: BeadTask[];
-  issueId: string;
 }
 
-function PlanItemDetail({ item, doc, beads, issueId }: PlanItemDetailProps) {
+function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
   // Beads are created with title "{plan.id}: {item.title}" — match using plan.id, not issueId
   const titlePattern = `${doc.plan.id}: ${item.title}`.toLowerCase();
   const matchedBead = beads.find(b => b.name.toLowerCase() === titlePattern);
