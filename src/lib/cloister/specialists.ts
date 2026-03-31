@@ -836,17 +836,8 @@ Update status via API:
 - If review passes: POST with {"reviewStatus":"passed"} then queue test-agent`;
       break;
 
-    case 'test-agent':
-      prompt += `Your task:
-1. Run the full test suite
-2. Analyze any failures in detail
-3. Identify root causes
-4. Update status via API when done
-
-Update status via API:
-- If tests pass: POST to /api/workspaces/${task.issueId}/review-status with {"testStatus":"passed"}
-- If tests fail: POST with {"testStatus":"failed","testNotes":"..."}`;
-      break;
+    // test-agent: detailed prompt is in the second switch block below (line ~2173)
+    // Do NOT add an inline stub here — it would shadow the detailed template.
 
     case 'merge-agent': {
       const bInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
