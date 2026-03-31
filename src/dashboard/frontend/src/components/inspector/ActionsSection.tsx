@@ -15,6 +15,7 @@ type SyncMutation = UseMutationResult<{ alreadyUpToDate?: boolean; commitCount?:
 interface ActionsSectionProps {
   agent?: Agent;
   reviewStatus?: ReviewStatus;
+  reviewStatusLoading?: boolean;
   workspace?: WorkspaceInfo;
   mergeMutation: AnyMutation;
   reviewMutation: AnyMutation;
@@ -39,6 +40,7 @@ interface ActionsSectionProps {
 export function ActionsSection({
   agent,
   reviewStatus,
+  reviewStatusLoading,
   workspace,
   mergeMutation,
   reviewMutation,
@@ -59,6 +61,19 @@ export function ActionsSection({
   onStartAgent,
   onCreateWorkspace,
 }: ActionsSectionProps) {
+  if (reviewStatusLoading) {
+    return (
+      <div className="px-3 py-2 border-b border-pan-border" data-testid="workspace-actions">
+        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-pan-text-secondary">Actions</div>
+        <div className="flex flex-wrap gap-1.5">
+          <div className="h-6 w-24 rounded bg-pan-border/50 animate-pulse" />
+          <div className="h-6 w-16 rounded bg-pan-border/50 animate-pulse" />
+          <div className="h-6 w-20 rounded bg-pan-border/50 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="px-3 py-2 border-b border-pan-border" data-testid="workspace-actions">
       <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-pan-text-secondary">Actions</div>
