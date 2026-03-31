@@ -915,6 +915,17 @@ export class CloisterService {
         // (Priority: stuck > planning > test > completion)
         if (triggers.length > 0) {
           const trigger = triggers[0];
+
+          // task_complete triggers with a specialist name (e.g. 'test-agent') as suggestedModel
+          // are handled by the `pan work done` → completion marker → specialist pipeline flow.
+          // Do NOT perform a model-swap handoff here — it passes the specialist name as a model ID
+          // which is invalid and causes the agent to respawn with an unusable model.
+          const specialistNames = ['review-agent', 'test-agent', 'merge-agent', 'inspect-agent', 'uat-agent'];
+          if (trigger.type === 'task_complete' && specialistNames.includes(trigger.suggestedModel || '')) {
+            console.log(`[cloister] Skipping handoff for ${health.agentId}: task_complete triggers specialist dispatch via completion marker, not model swap`);
+            continue;
+          }
+
           this.emit({ type: 'handoff_triggered', agentId: health.agentId, trigger });
 
           console.log(`🔔 Handoff triggered for ${health.agentId}: ${trigger.reason}`);

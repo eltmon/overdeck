@@ -3966,7 +3966,7 @@ app.post('/api/specialists/:name/queue', async (req, res) => {
   const { issueId, workspace, branch, customPrompt, priority = 'normal' } = req.body;
 
   try {
-    const { wakeSpecialistOrQueue } = await import('../../lib/cloister/specialists.js');
+    const { spawnEphemeralSpecialist, submitToSpecialistQueue } = await import('../../lib/cloister/specialists.js');
     type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
 
     // Validate specialist name
@@ -3979,22 +3979,35 @@ app.post('/api/specialists/:name/queue', async (req, res) => {
       return res.status(400).json({ error: 'issueId is required' });
     }
 
-    const result = await wakeSpecialistOrQueue(
-      name as SpecialistType,
-      {
+    // Resolve project from issue ID for per-project ephemeral dispatch (PAN-300)
+    const resolved = resolveProjectFromIssue(issueId);
+    if (!resolved) {
+      return res.status(400).json({ error: `No project configured for ${issueId}. Add it to projects.yaml.` });
+    }
+
+    // Spawn per-project ephemeral specialist (handles busy/queue internally)
+    const result = await spawnEphemeralSpecialist(resolved.projectKey, name as SpecialistType, {
+      issueId,
+      workspace,
+      branch,
+      promptOverride: customPrompt,
+    });
+
+    if (!result.success && result.error === 'specialist_busy') {
+      // Specialist busy — queue the task
+      submitToSpecialistQueue(name as SpecialistType, {
+        priority: priority as 'urgent' | 'normal' | 'low',
+        source: 'api-queue',
         issueId,
         workspace,
         branch,
-        customPrompt,
-      },
-      {
-        priority: priority as 'urgent' | 'normal' | 'low',
-        source: 'api-queue',
-      }
-    );
+      });
+      return res.json({ success: true, queued: true, message: `${name} busy, task queued for ${issueId}` });
+    }
 
     res.json({
-      success: true,
+      success: result.success,
+      queued: false,
       ...result,
     });
   } catch (error: unknown) {
@@ -5949,10 +5962,13 @@ app.post('/api/workspaces/:issueId/start', async (req, res) => {
       } catch (e) { console.warn(`[workspace/start] Could not copy planning: ${e}`); }
     }
   }
+  // Beads with Dolt backend: worktrees share the database via the Dolt server automatically.
+  // No file copying needed — all workspaces see the same beads data.
+  // Only copy .beads/ if the workspace somehow lacks it (e.g., non-worktree workspace).
   const workspaceBeadsDir = join(workspacePath, '.beads');
-  if (!existsSync(join(workspaceBeadsDir, 'issues.jsonl'))) {
+  if (!existsSync(workspaceBeadsDir)) {
     const projectRootBeadsDir = join(projectPath, '.beads');
-    if (existsSync(join(projectRootBeadsDir, 'issues.jsonl'))) {
+    if (existsSync(projectRootBeadsDir)) {
       try {
         await execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, { encoding: 'utf-8' });
         console.log(`[workspace/start] Copied beads from project root to workspace for ${issueId}`);
@@ -6947,13 +6963,11 @@ app.post('/api/specialists/done', async (req, res) => {
       const beadMatch = notes?.match(/[Bb]ead\s+(\S+)/);
       const beadId = beadMatch?.[1] || 'unknown';
       // Resolve project to get workspace path
-      const { resolveProjectFromIssue } = await import('../../lib/projects.js');
       const project = resolveProjectFromIssue(normalizedIssueId);
       if (project) {
-        const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
-        const workspace = findWorkspaceForIssue(normalizedIssueId);
-        if (workspace) {
-          onInspectComplete(project.key, normalizedIssueId, beadId, 'passed', workspace.path);
+        const workspacePath = join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
+        if (existsSync(workspacePath)) {
+          onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath);
         }
       }
     } catch (err) {
@@ -6961,30 +6975,16 @@ app.post('/api/specialists/done', async (req, res) => {
     }
   }
 
-  // When test specialist reports success, spawn UAT specialist for browser verification.
-  // UAT sets readyForMerge=true on pass — the computed readyForMerge in review-status.ts
-  // requires uatStatus=passed once UAT has been initiated (uatStatus !== undefined).
+  // When test specialist reports success, mark as ready for merge.
+  // UAT specialist is disabled for now — the human reviews and clicks merge.
   if (specialist === 'test' && status === 'passed') {
     try {
-      const { resolveProjectFromIssue } = await import('../../lib/projects.js');
       const project = resolveProjectFromIssue(normalizedIssueId);
       if (project) {
-        const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
-        const workspace = findWorkspaceForIssue(normalizedIssueId);
-        if (workspace) {
-          const { buildUatContext, spawnUatAgent } = await import('../../lib/cloister/uat-agent.js');
-          const uatContext = await buildUatContext(
-            project.key,
-            project.path,
-            normalizedIssueId,
-            workspace.path
-          );
-          const uatResult = await spawnUatAgent(uatContext);
-          if (uatResult.success) {
-            console.log(`[specialists/done] UAT specialist spawned for ${normalizedIssueId} after test passed`);
-          } else {
-            console.error(`[specialists/done] Failed to spawn UAT specialist: ${uatResult.message}`);
-          }
+        const workspacePath = join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
+        if (existsSync(workspacePath)) {
+          setReviewStatus(normalizedIssueId, { readyForMerge: true });
+          console.log(`[specialists/done] ${normalizedIssueId} marked ready for merge after tests passed`);
         }
       }
     } catch (err) {
@@ -7008,13 +7008,12 @@ app.post('/api/specialists/done', async (req, res) => {
     // Inspect failures don't change Linear status — they're mid-implementation gates.
     // Review/test/UAT failures mean the work needs rework → back to In Progress.
     try {
-      const { resolveProjectFromIssue } = await import('../../lib/projects.js');
       const project = resolveProjectFromIssue(normalizedIssueId);
       if (project) {
-        const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
-        const workspace = findWorkspaceForIssue(normalizedIssueId);
+        const workspacePath = join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
+        const wsPath = existsSync(workspacePath) ? workspacePath : undefined;
         const { transitionIssueToInProgress } = await import('../../lib/agents.js');
-        transitionIssueToInProgress(normalizedIssueId, workspace?.path).catch((err: any) => {
+        transitionIssueToInProgress(normalizedIssueId, wsPath).catch((err: any) => {
           console.warn(`[specialists/done] Could not transition ${normalizedIssueId} back to in_progress: ${err.message}`);
         });
         console.log(`[specialists/done] ${specialist} failed → transitioning ${normalizedIssueId} back to In Progress`);
@@ -8521,12 +8520,12 @@ app.post('/api/agents', async (req, res) => {
       }
     }
 
-    // Copy beads from project root to workspace if planning created them there
+    // Beads with Dolt backend: worktrees share the database via the Dolt server automatically.
+    // Only copy .beads/ if the workspace somehow lacks it (e.g., non-worktree workspace).
     const workspaceBeadsDir = join(workspacePath, '.beads');
-    if (!existsSync(join(workspaceBeadsDir, 'issues.jsonl'))) {
-      // Check project root for beads (planning agent may have run from project root)
+    if (!existsSync(workspaceBeadsDir)) {
       const projectRootBeadsDir = join(projectPath, '.beads');
-      if (existsSync(join(projectRootBeadsDir, 'issues.jsonl'))) {
+      if (existsSync(projectRootBeadsDir)) {
         try {
           await execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, { encoding: 'utf-8' });
           console.log(`[start-agent] Copied beads from project root to workspace for ${issueId}`);
@@ -8537,17 +8536,59 @@ app.post('/api/agents', async (req, res) => {
     }
 
     // SAFEGUARD: Require beads tasks before work begins (planning must create them)
-    const hasBeads = existsSync(join(workspaceBeadsDir, 'issues.jsonl'));
-    if (hasBeads) {
-      const beadCount = readdirSync(workspaceBeadsDir).filter(f => f.endsWith('.md')).length;
-      console.log(`[start-agent] Found ${beadCount} beads tasks for ${issueId}`);
-    } else {
-      console.warn(`[start-agent] BLOCKED: No beads tasks found for ${issueId}`);
-      return res.status(422).json({
-        error: `No beads tasks found for ${issueId}. Planning must create task breakdown before work begins.`,
-        hint: 'Run planning again and ensure it creates beads with "bd create". The planning prompt requires this.',
-        issueId,
-      });
+    // Query beads database directly (storage-backend agnostic — works with Dolt, SQLite, or JSONL)
+    let hasBeads = false;
+    try {
+      const { stdout: bdOutput } = await execAsync(
+        `bd list --json -l ${issueId.toLowerCase()} --limit 1`,
+        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+      );
+      const bdTasks = JSON.parse(bdOutput.trim() || '[]');
+      hasBeads = bdTasks.length > 0;
+      if (hasBeads) {
+        // Get full count for logging
+        const { stdout: countOutput } = await execAsync(
+          `bd list --json -l ${issueId.toLowerCase()} --limit 0`,
+          { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+        );
+        const allTasks = JSON.parse(countOutput.trim() || '[]');
+        console.log(`[start-agent] Found ${allTasks.length} beads tasks for ${issueId}`);
+      }
+    } catch (bdErr) {
+      // bd CLI unavailable — fall back to .beads directory existence
+      console.warn(`[start-agent] bd list failed, falling back to directory check: ${bdErr}`);
+      hasBeads = existsSync(join(workspaceBeadsDir, '.beads'));
+    }
+    if (!hasBeads) {
+      // If no planning was done (no .planning/ directory), this is a simple issue —
+      // auto-create a bead from the issue ID so the agent can start without full planning.
+      // This bridges the gap where Phase 0.5 (pan-oversee) correctly skips planning for
+      // simple issues but the beads gate blocks agent spawn.
+      const hasPlanningDir = existsSync(join(workspacePath, '.planning'));
+      if (!hasPlanningDir) {
+        console.log(`[start-agent] No beads and no planning for ${issueId} — auto-creating bead for simple issue`);
+        try {
+          const nodeDir = dirname(process.execPath);
+          await execAsync(
+            `bd create "${issueId}: Implement issue" --type task -l "${issueId.toLowerCase()},difficulty:simple"`,
+            { cwd: workspacePath, encoding: 'utf-8', timeout: 10000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
+          );
+          hasBeads = true;
+          console.log(`[start-agent] Auto-created bead for ${issueId}`);
+        } catch (bdCreateErr) {
+          console.warn(`[start-agent] Failed to auto-create bead: ${bdCreateErr}`);
+        }
+      }
+
+      if (!hasBeads) {
+        // Planning was done but no beads created — that's a planning bug, block agent start
+        console.warn(`[start-agent] BLOCKED: No beads tasks found for ${issueId}`);
+        return res.status(422).json({
+          error: `No beads tasks found for ${issueId}. Planning must create task breakdown before work begins.`,
+          hint: 'Run planning again and ensure it creates beads with "bd create". The planning prompt requires this.',
+          issueId,
+        });
+      }
     }
 
     if (planningDir) {
@@ -9687,8 +9728,57 @@ bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -
 When discovery is complete:
 1. Create STATE.md with decisions made
 2. Copy STATE.md to implementation plan at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
-3. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
-4. Summarize the plan and STOP
+3. Create a vBRIEF plan file at \`.planning/plan.vbrief.json\` (structured machine-readable plan — see format below)
+4. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
+5. Summarize the plan and STOP
+
+### vBRIEF Plan Format
+
+Create \`.planning/plan.vbrief.json\` — a structured plan with items and dependency edges.
+This file will be used to visualize the dependency graph and eventually to generate beads programmatically.
+
+\`\`\`json
+{
+  "vBRIEFInfo": { "version": "0.5", "created": "<ISO 8601 timestamp>" },
+  "plan": {
+    "id": "${issue.identifier}",
+    "title": "<issue title>",
+    "status": "approved",
+    "author": "opus-plan",
+    "tags": ["<relevant tags>"],
+    "narratives": {
+      "Problem": "<what problem this solves>",
+      "Proposal": "<the approach chosen>",
+      "Constraint": "<limitations and boundaries>",
+      "Risk": "<potential issues and mitigations>",
+      "Alternative": "<other options considered and why rejected>"
+    },
+    "items": [
+      {
+        "id": "<short-kebab-id>",
+        "title": "<task title>",
+        "status": "pending",
+        "priority": "high|medium|low",
+        "metadata": {
+          "difficulty": "trivial|simple|medium|complex|expert",
+          "issueLabel": "${issueLower}"
+        },
+        "narrative": { "Action": "<what needs to be done>" },
+        "subItems": []
+      }
+    ],
+    "edges": [
+      { "from": "<source-item-id>", "to": "<target-item-id>", "type": "blocks|informs|invalidates|suggests" }
+    ]
+  }
+}
+\`\`\`
+
+**Edge types:**
+- \`blocks\` — target MUST wait for source to complete (hard dependency)
+- \`informs\` — target benefits from source context (soft dependency)
+- \`invalidates\` — source completion makes target unnecessary
+- \`suggests\` — weak recommendation, no dependency
 
 **IMPORTANT:** Create the plan file BEFORE creating beads tasks.
 **NOTE:** \`*-spec.md\` files are human-written specs — do NOT overwrite them. Your output is \`*-plan.md\`.
@@ -15164,8 +15254,8 @@ server.listen(PORT, '0.0.0.0', async () => {
             return;
           }
 
-          const tmuxSession = getTmuxSessionName(specialistName, project.key);
-          const running = await isSpecialistRunning(specialistName, project.key);
+          const tmuxSession = getTmuxSessionName(specialistName, project.projectKey);
+          const running = await isSpecialistRunning(specialistName, project.projectKey);
           const state = getAgentRuntimeState(tmuxSession);
           const isIdle = state?.state === 'idle' || state?.state === 'suspended' || !running;
 
@@ -15175,14 +15265,13 @@ server.listen(PORT, '0.0.0.0', async () => {
               const nextTask = queue.items[0];
               console.log(`[pipeline] task_queued: ${specialistName} is idle, spawning for ${nextTask.payload?.issueId || event.issueId}`);
 
-              const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
-              const workspace = findWorkspaceForIssue(event.issueId);
+              const workspacePath = join(project.projectPath, 'workspaces', `feature-${event.issueId.toLowerCase()}`);
+              const wsPath = existsSync(workspacePath) ? workspacePath : undefined;
 
-              await spawnEphemeralSpecialist(project.key, specialistName, {
+              await spawnEphemeralSpecialist(project.projectKey, specialistName, {
                 issueId: event.issueId,
-                workspace: workspace?.path,
+                workspace: wsPath,
                 branch: nextTask.payload?.branch,
-                context: nextTask.payload,
               });
             }
           } else {

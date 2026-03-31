@@ -458,10 +458,24 @@ import {
 
 /**
  * Check whether a workspace has beads tasks (planning must create them before work begins).
+ * Uses `bd list` to query the beads database directly (storage-backend agnostic).
  * Exported for testing.
  */
 export function hasBeadsTasks(workspacePath: string): boolean {
-  return existsSync(join(workspacePath, '.beads', 'issues.jsonl'));
+  try {
+    const { execSync } = require('child_process');
+    const output = execSync('bd list --json --limit 1', {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+      timeout: 10000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const tasks = JSON.parse(output.trim() || '[]');
+    return tasks.length > 0;
+  } catch {
+    // Fallback: check for .beads directory existence (bd not installed or server down)
+    return existsSync(join(workspacePath, '.beads'));
+  }
 }
 
 /**
@@ -611,14 +625,33 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
     if (!hasBeadsTasks(workspace)) {
-      spinner.fail(`No beads tasks found for ${id}`);
-      console.log('');
-      console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
-      console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
-      console.log('');
-      console.log(chalk.bold('To re-run planning:'));
-      console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
-      process.exit(1);
+      // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
+      const hasPlanningDir = existsSync(join(workspace, '.planning'));
+      if (!hasPlanningDir) {
+        spinner.text = `Auto-creating bead for simple issue ${id}...`;
+        try {
+          const { execSync } = require('child_process');
+          execSync(`bd create "${id}: Implement issue" --type task -l "${id.toLowerCase()},difficulty:simple"`, {
+            cwd: workspace,
+            encoding: 'utf-8',
+            timeout: 10000,
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+        } catch (bdErr) {
+          spinner.fail(`No beads tasks found for ${id} and auto-create failed`);
+          process.exit(1);
+        }
+      } else {
+        // Planning was done but no beads created — that's a planning bug
+        spinner.fail(`No beads tasks found for ${id}`);
+        console.log('');
+        console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
+        console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
+        console.log('');
+        console.log(chalk.bold('To re-run planning:'));
+        console.log(`  ${chalk.cyan(`pan work plan ${id}`)}`);
+        process.exit(1);
+      }
     }
 
     spinner.text = 'Building agent prompt with planning context...';
