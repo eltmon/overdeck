@@ -57,6 +57,8 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../lib/paths.js';
 import type { Issue } from '../frontend/src/types.js';
+import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
+import { findPlan } from '../../lib/vbrief/io.js';
 
 // Read package version once at startup — version never changes at runtime
 // In built output (dist/dashboard/server.js), import.meta.url resolves to dist/dashboard/,
@@ -10911,6 +10913,24 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           const gitRoot = planningDir.includes('/workspaces/')
             ? join(projectPath, 'workspaces', `feature-${issueLower}`)
             : projectPath;
+
+          // If a vBRIEF plan exists, create beads programmatically from it.
+          // This replaces LLM-generated `bd create` calls with deterministic conversion.
+          if (findPlan(gitRoot)) {
+            try {
+              console.log(`[complete-planning] vBRIEF plan found — creating beads from plan`);
+              const beadsResult = await createBeadsFromVBrief(gitRoot);
+              if (beadsResult.created.length > 0) {
+                console.log(`[complete-planning] Created ${beadsResult.created.length} beads from vBRIEF plan`);
+              }
+              if (beadsResult.errors.length > 0) {
+                console.warn(`[complete-planning] Bead creation errors: ${beadsResult.errors.join('; ')}`);
+              }
+            } catch (vbriefErr: any) {
+              console.warn(`[complete-planning] createBeadsFromVBrief failed: ${vbriefErr.message}`);
+              // Non-fatal: fall through to existing beads if any were created by the agent
+            }
+          }
 
           // Run bd sync locally first to export beads to JSONL
           try {
