@@ -58,6 +58,8 @@ export interface VBriefDocument {
     items: VBriefItem[];
     edges: VBriefEdge[];
   };
+  /** Computed by server: ordered IDs of the longest dependency chain */
+  criticalPath?: string[];
 }
 
 // ── Status styling ──
@@ -324,12 +326,28 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }:
     );
   }
 
+  // Use server-computed critical path (from API response) or caller override
+  const effectiveCriticalPath = criticalPath ?? doc.criticalPath ?? [];
+
+  // Show critical path length in header when available
+  const cpLength = effectiveCriticalPath.length;
+
   return (
-    <PlanDAG
-      doc={doc}
-      criticalPath={criticalPath}
-      onNodeClick={onNodeClick}
-      className={className}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {cpLength > 1 && (
+        <div style={{ padding: '4px 8px', fontSize: 10, color: '#f97316', background: '#1f2937', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontWeight: 600 }}>Critical path:</span>
+          {cpLength} steps
+        </div>
+      )}
+      <div style={{ flex: 1 }}>
+        <PlanDAG
+          doc={doc}
+          criticalPath={effectiveCriticalPath}
+          onNodeClick={onNodeClick}
+          className={className}
+        />
+      </div>
+    </div>
   );
 }
