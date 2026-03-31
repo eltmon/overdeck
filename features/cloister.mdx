@@ -8,10 +8,10 @@ description: AI lifecycle manager with intelligent model routing
 
 Cloister is Panopticon's intelligent agent lifecycle manager. It monitors all running agents and automatically handles:
 
-- **Model Routing** - Routes tasks to appropriate models based on complexity
+- **Model Routing** - Routes tasks to appropriate models based on complexity, across multiple providers
 - **Stuck Detection** - Identifies agents that have stopped making progress
 - **Automatic Handoffs** - Escalates to specialists when needed
-- **Specialist Coordination** - Manages test-agent, review-agent, and merge-agent
+- **Specialist Coordination** - Manages review-agent, test-agent, inspect-agent, uat-agent, and merge-agent
 
 ## How Cloister Works
 
@@ -27,7 +27,7 @@ Cloister is Panopticon's intelligent agent lifecycle manager. It monitors all ru
 │         ▼                  ▼                  ▼             │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
 │  │   Agent     │    │  Complexity │    │ Specialists │     │
-│  │   Health    │    │   Analysis  │    │             │     │
+│  │   Health    │    │   Analysis  │    │  (5 types)  │     │
 │  └─────────────┘    └─────────────┘    └─────────────┘     │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -48,49 +48,17 @@ pan cloister stop
 
 ## Specialists
 
-Cloister manages specialized agents that handle specific phases of the development lifecycle:
+Cloister manages five specialized agents that handle specific phases of the development lifecycle:
 
 | Specialist | Purpose | Trigger |
 |------------|---------|---------|
-| **test-agent** | Runs test suite after implementation | `implementation_complete` signal |
-| **review-agent** | Code review before merge | After tests pass (manual trigger) |
+| **review-agent** | Code review before merge | Human clicks "Review" |
+| **test-agent** | Runs test suite after review | After review passes |
+| **inspect-agent** | Per-step verification during implementation | After each bead completion |
+| **uat-agent** | Browser-based requirement verification | After tests pass |
 | **merge-agent** | Handles git merge and conflict resolution | "Approve & Merge" button |
 
 See the [Specialists feature guide](/features/specialists) for detailed information on specialist agents.
-
-### Merge Agent Workflow
-
-The merge-agent is a specialist that handles **ALL** merges, not just conflicts. This ensures:
-- It sees all code changes coming through the pipeline
-- It builds context about the codebase over time
-- When conflicts DO occur, it has better understanding for intelligent resolution
-- Tests are always run before completing the merge
-
-**Workflow:**
-
-1. **Pull latest main** - Ensures local main is up-to-date
-2. **Analyze incoming changes** - Reviews what the feature branch contains
-3. **Perform merge** - Merges feature branch into main
-4. **Resolve conflicts** - If conflicts exist, uses AI to resolve them intelligently
-5. **Run tests** - Verifies the merge didn't break anything
-6. **Commit merge** - Commits the merge with descriptive message
-7. **Report results** - Returns success/failure with details
-
-**Triggering merge-agent:**
-
-```bash
-# Via dashboard - click "Approve & Merge" on an issue card
-# merge-agent is ALWAYS invoked, regardless of whether conflicts exist
-
-# Via CLI
-pan specialists wake merge-agent --issue MIN-123
-```
-
-The merge-agent uses a specialized prompt template that instructs it to:
-- Never force-push
-- Always run tests before completing
-- Document conflict resolution decisions
-- Provide detailed feedback on what was merged
 
 ### Review Pipeline Flow
 
@@ -109,6 +77,12 @@ Human clicks "Review"
 ┌───────────────────┐
 │    test-agent     │ Runs test suite, analyzes failures
 └─────────┬─────────┘
+          │ If PASSED: queues uat-agent
+          │ If FAILED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│    uat-agent      │ Browser-based requirement verification
+└─────────┬─────────┘
           │ If PASSED: marks ready for merge
           │ If FAILED: sends feedback to work-agent
           ▼
@@ -122,11 +96,13 @@ Human clicks "Review"
 └───────────────────┘
 ```
 
+Additionally, **inspect-agent** runs during implementation (between beads), not as part of this post-implementation pipeline.
+
 **Key Points:**
 - **Human-initiated start** - A human must click "Review" to start the pipeline
-- **Automatic handoffs** - review-agent → test-agent happens automatically
+- **Automatic handoffs** - review-agent → test-agent → uat-agent happens automatically
 - **Human approval for merge** - Merge is NOT automatic; human clicks "Approve & Merge"
-- **Feedback loops** - Failed reviews/tests send feedback back to the work-agent
+- **Feedback loops** - Failed reviews/tests/UAT send feedback back to the work-agent
 
 ### Queue Processing
 
@@ -178,7 +154,7 @@ This prevents infinite loops where an agent repeatedly fails review.
 
 ### Specialist Auto-Initialization
 
-When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures the test-agent, review-agent, and merge-agent are ready to receive wake signals without manual setup.
+When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures all five specialists are ready to receive wake signals without manual setup.
 
 ## Automatic Handoffs
 
@@ -188,7 +164,7 @@ Cloister detects situations that require intervention:
 |---------|-----------|--------|
 | **stuck_escalation** | No activity for 30+ minutes | Escalate to more capable model |
 | **complexity_upgrade** | Task complexity exceeds model capability | Route to Opus |
-| **implementation_complete** | Agent signals work is done | Wake test-agent |
+| **implementation_complete** | Agent signals work is done | Wake review-agent |
 | **test_failure** | Tests fail repeatedly | Escalate model or request help |
 | **planning_complete** | Planning session finishes | Transition to implementation |
 | **merge_requested** | User clicks "Approve & Merge" | Wake merge-agent |
@@ -200,7 +176,7 @@ Cloister supports two handoff methods, automatically selected based on agent typ
 | Method | When Used | How It Works |
 |--------|-----------|--------------|
 | **Kill & Spawn** | General agents (agent-min-123, etc.) | 1. Captures full context (STATE.md, beads, git state)<br />2. Kills tmux session<br />3. Spawns new agent with handoff prompt<br />4. New agent continues work with preserved context |
-| **Specialist Wake** | Permanent specialists (merge-agent, test-agent) | 1. Captures handoff context<br />2. Sends wake message to existing session<br />3. Specialist resumes with context injection |
+| **Specialist Wake** | Permanent specialists (merge-agent, test-agent, etc.) | 1. Captures handoff context<br />2. Sends wake message to existing session<br />3. Specialist resumes with context injection |
 
 **Kill & Spawn** is used for temporary agents that work on specific issues. It creates a clean handoff by:
 - Capturing the agent's current understanding (from STATE.md)
@@ -218,7 +194,7 @@ When a handoff occurs, Cloister captures:
 {
   "agentId": "agent-min-123",
   "issueId": "MIN-123",
-  "currentModel": "sonnet",
+  "currentModel": "kimi-k2.5",
   "targetModel": "opus",
   "reason": "stuck_escalation",
   "handoffCount": 1,
@@ -307,8 +283,10 @@ Cloister configuration lives in `~/.panopticon/cloister/config.json`:
     "health_check_interval_ms": 30000
   },
   "specialists": {
-    "test_agent": { "enabled": true, "auto_wake": true },
     "review_agent": { "enabled": true, "auto_wake": false },
+    "test_agent": { "enabled": true, "auto_wake": true },
+    "inspect_agent": { "enabled": true },
+    "uat_agent": { "enabled": true },
     "merge_agent": { "enabled": true, "auto_wake": false }
   },
   "triggers": {
@@ -320,17 +298,19 @@ Cloister configuration lives in `~/.panopticon/cloister/config.json`:
 
 ## Model Routing & Complexity Detection
 
-Cloister automatically routes tasks to the appropriate model based on detected complexity, optimizing for cost while ensuring quality.
+Cloister automatically routes tasks to the appropriate model based on detected complexity, optimizing for cost while ensuring quality. Model routing supports multiple providers: Anthropic, OpenAI, Google, Kimi, and Zhipu.
 
 ### Complexity Levels
 
-| Level | Model | Use Case |
-|-------|-------|----------|
+| Level | Default Model | Use Case |
+|-------|---------------|----------|
 | **trivial** | Haiku | Typos, comments, documentation updates |
 | **simple** | Haiku | Small fixes, test additions, minor changes |
-| **medium** | Sonnet | Features, components, integrations |
-| **complex** | Sonnet/Opus | Refactors, migrations, redesigns |
+| **medium** | Kimi | Features, components, integrations |
+| **complex** | Kimi | Refactors, migrations, redesigns |
 | **expert** | Opus | Architecture, security, performance optimization |
+
+The default implementation model is configurable per-project. Kimi is the current default for medium/complex tasks, providing a cost-effective alternative to Sonnet with strong coding performance.
 
 ### Complexity Detection Signals
 
@@ -355,22 +335,32 @@ Complexity is detected from multiple signals (in priority order):
 
 ### Configuring Model Routing
 
-Edit `~/.panopticon/cloister/config.json`:
+Model routing is configured via the dashboard Settings page or `~/.panopticon/cloister/config.json`:
 
 ```json
 {
   "model_selection": {
-    "default_model": "sonnet",
+    "default_model": "kimi-k2.5",
     "complexity_routing": {
       "trivial": "haiku",
       "simple": "haiku",
-      "medium": "sonnet",
-      "complex": "sonnet",
+      "medium": "kimi-k2.5",
+      "complex": "kimi-k2.5",
       "expert": "opus"
     }
   }
 }
 ```
+
+### Supported Providers
+
+| Provider | Models | Use Case |
+|----------|--------|----------|
+| **Anthropic** | Opus, Sonnet, Haiku | Planning (Opus), review, general |
+| **OpenAI** | GPT-4o, o1 | Alternative implementation |
+| **Google** | Gemini | Alternative implementation |
+| **Kimi** | Kimi K2.5 | Cost-effective implementation (default) |
+| **Zhipu** | GLM-4 | Alternative implementation |
 
 ### Cost Optimization
 
@@ -379,12 +369,13 @@ Model routing helps optimize costs:
 | Model | Relative Cost | Best For |
 |-------|---------------|----------|
 | Haiku | 1x (cheapest) | Simple tasks, bulk operations |
-| Sonnet | 3x | Most development work |
-| Opus | 15x | Complex architecture, critical fixes |
+| Kimi | ~2x | Most implementation work (default) |
+| Sonnet | 3x | Review, complex implementation |
+| Opus | 15x | Planning, architecture, critical fixes |
 
 A typical agent run might:
-1. Start on Haiku for initial exploration
-2. Escalate to Sonnet for implementation
+1. Plan with Opus (high-quality strategic decisions)
+2. Implement with Kimi (cost-effective coding)
 3. Escalate to Opus only if stuck or complexity detected
 
 ## Related Guides
