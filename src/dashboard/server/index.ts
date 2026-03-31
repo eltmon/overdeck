@@ -9778,23 +9778,19 @@ Consider these factors:
 - **Risk level**: Low (simple), Medium (medium), High (expert)
 - **Domain knowledge**: Standard (simple), Research needed (medium), Deep expertise (expert)
 
-When creating beads tasks, include difficulty labels:
-\`\`\`bash
-bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -d "Description"
-\`\`\`
-
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
 1. Create STATE.md with decisions made
 2. Copy STATE.md to implementation plan at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
 3. Create a vBRIEF plan file at \`.planning/plan.vbrief.json\` (structured machine-readable plan — see format below)
-4. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
-5. Summarize the plan and STOP
+4. Summarize the plan and STOP
+
+**DO NOT run \`bd create\` commands.** Beads tasks are created automatically from \`plan.vbrief.json\` by Cloister when planning completes. Your job is to produce the vBRIEF plan — the system handles beads creation mechanically.
 
 ### vBRIEF Plan Format
 
 Create \`.planning/plan.vbrief.json\` — a structured plan with items and dependency edges.
-This file will be used to visualize the dependency graph and eventually to generate beads programmatically.
+Cloister converts this file into beads tasks with proper dependency links automatically.
 
 \`\`\`json
 {
