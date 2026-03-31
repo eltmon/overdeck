@@ -187,18 +187,21 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
  * - Bead ID not found in issues.jsonl
  * - No matching vBRIEF item found
  */
+/**
+ * Returns the vBRIEF item ID that was updated, or null if no match was found.
+ */
 export function syncBeadStatusToVBrief(
   beadId: string,
   workspacePath: string,
   status: VBriefItemStatus = 'completed'
-): void {
+): string | null {
   try {
     const doc = readWorkspacePlan(workspacePath);
-    if (!doc) return;
+    if (!doc) return null;
 
     // Read bead title from .beads/issues.jsonl
     const beadsFile = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(beadsFile)) return;
+    if (!existsSync(beadsFile)) return null;
 
     const lines = readFileSync(beadsFile, 'utf-8').split('\n').filter(Boolean);
     let beadTitle: string | null = null;
@@ -214,7 +217,7 @@ export function syncBeadStatusToVBrief(
       }
     }
 
-    if (!beadTitle) return;
+    if (!beadTitle) return null;
 
     // Strip issue prefix: "{PLAN_ID}: {item.title}" → "{item.title}"
     const planId = doc.plan.id;
@@ -229,12 +232,14 @@ export function syncBeadStatusToVBrief(
       i => i.title.toLowerCase() === itemTitleLower
     );
 
-    if (!matchingItem) return;
+    if (!matchingItem) return null;
 
     updateItemStatus(workspacePath, matchingItem.id, status);
     console.log(`[vbrief-sync] Updated item "${matchingItem.id}" to "${status}" from bead ${beadId}`);
+    return matchingItem.id;
   } catch (err: any) {
     // Non-fatal: log and continue
     console.warn(`[vbrief-sync] Failed to sync bead ${beadId}: ${err.message}`);
+    return null;
   }
 }

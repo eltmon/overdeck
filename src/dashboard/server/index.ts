@@ -57,7 +57,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../lib/paths.js';
 import type { Issue } from '../frontend/src/types.js';
-import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
+import { createBeadsFromVBrief, syncBeadStatusToVBrief } from '../../lib/vbrief/beads.js';
 import { findPlan, readPlan } from '../../lib/vbrief/io.js';
 
 // Read package version once at startup — version never changes at runtime
@@ -6992,6 +6992,20 @@ app.post('/api/specialists/done', async (req, res) => {
         const workspacePath = join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
         if (existsSync(workspacePath)) {
           onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath);
+
+          // Sync bead completion to vBRIEF plan and emit live update event
+          try {
+            const updatedItemId = syncBeadStatusToVBrief(beadId, workspacePath, 'completed');
+            if (updatedItemId) {
+              socketIo.emit('plan:item-status-changed', {
+                issueId: normalizedIssueId,
+                itemId: updatedItemId,
+                status: 'completed',
+              });
+            }
+          } catch (syncErr: any) {
+            console.warn(`[specialists/done] vBRIEF sync failed: ${syncErr.message}`);
+          }
         }
       }
     } catch (err) {
