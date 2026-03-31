@@ -23,10 +23,12 @@ describe('hasBeadsTasks', () => {
     expect(hasBeadsTasks(tmpDir)).toBe(false);
   });
 
-  it('returns false when .beads directory exists but issues.jsonl is missing', async () => {
+  it('returns true when .beads directory exists (fallback: bd not available)', async () => {
+    // When bd CLI is unavailable, hasBeadsTasks falls back to checking .beads directory existence.
+    // This is deliberately permissive — better to let the agent start than block it.
     const { hasBeadsTasks } = await import('../../../../src/cli/commands/work/issue.js');
     mkdirSync(join(tmpDir, '.beads'));
-    expect(hasBeadsTasks(tmpDir)).toBe(false);
+    expect(hasBeadsTasks(tmpDir)).toBe(true);
   });
 
   it('returns true when .beads/issues.jsonl exists', async () => {
