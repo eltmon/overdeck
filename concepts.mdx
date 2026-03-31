@@ -13,7 +13,7 @@ The default dashboard view. Project tree on the left, activity timeline on the r
 
 ## Cloister
 
-The lifecycle manager. Cloister routes tasks to models based on capabilities, detects stuck agents, triggers specialist handoffs, and tracks costs. It runs a patrol loop that checks agent health and manages the specialist queue.
+The lifecycle manager. Cloister routes tasks to models based on capabilities, detects stuck agents, triggers specialist handoffs, and tracks costs. It runs a patrol loop that checks agent health and manages the specialist queue. Supports multi-provider routing across Anthropic, OpenAI, Google, Kimi, and Zhipu.
 
 ## PRD-Driven Workflow
 
@@ -31,7 +31,7 @@ Agents are autonomous AI coding assistants that work independently on tasks. Pan
 Agent types:
 - **Implementation agents** — Work on features, bugs, refactoring in isolated worktrees
 - **Planning agents** — Explore codebases and create PRDs with Opus
-- **Specialist agents** — Dedicated review, test, and merge agents triggered by Cloister
+- **Specialist agents** — Dedicated review, test, inspect, UAT, and merge agents triggered by Cloister
 
 ## Workspaces
 
@@ -45,27 +45,31 @@ Agent types:
 
 This allows multiple agents to work on different features simultaneously without conflicts.
 
+Workspaces support both local execution and remote execution via Fly.io for cloud-hosted agent environments.
+
 ### Main Project Branch Convention
 
 The main project directory should **always** stay on the `main` branch. All feature work happens in workspaces (git worktrees), never in the main project. This ensures specialists (review-agent, test-agent) always find the correct code, and merge operations have a clean target.
 
 ### Docker Integration
 
-Workspaces can include Docker containers for full development environments. Supports both local execution and remote execution via exe.dev.
+Workspaces can include Docker containers for full development environments. Supports both local execution and remote execution via Fly.io.
 
 ## Specialists
 
-Dedicated agents for code review, testing, and merging. Triggered automatically by Cloister when an agent signals completion. The pipeline is fully automated:
+Dedicated agents for code review, testing, inspection, UAT, and merging. Triggered automatically by Cloister when an agent signals completion. The pipeline is fully automated:
 
 1. **Review Agent** — Performs comprehensive code review (correctness, security, performance)
 2. **Test Agent** — Runs tests and validates functionality
-3. **Merge Agent** — Handles PR/MR creation and merging
+3. **Inspect Agent** — Per-step verification after each bead, ensuring implementation matches the spec
+4. **UAT Agent** — Browser-based requirement verification using Playwright after tests pass
+5. **Merge Agent** — Handles PR/MR creation and merging
 
 The only manual step is clicking **MERGE** when you're satisfied with the results.
 
 ## Skills
 
-Universal SKILL.md format works across Claude Code, Codex, Cursor, and Gemini CLI. 67+ skills ship out of the box covering:
+Universal SKILL.md format works across Claude Code, Codex, Cursor, Gemini CLI, and Google Antigravity. 70+ skills ship out of the box covering:
 
 - Development workflows (feature work, bug fixing, refactoring)
 - Code review (correctness, security, performance)
@@ -85,12 +89,11 @@ Run parallel agents on related issues. Useful for security audits, performance r
 
 ## Issue Tracker Integration
 
-Panopticon integrates with 5 issue trackers:
+Panopticon integrates with 4 issue trackers:
 
 - **GitHub Issues** — Full integration with PRs and status updates
 - **Linear** — Full integration with cycles, labels, and status updates
 - **GitLab Issues** — Issue tracking and MR management
-- **Jira** — Enterprise issue tracking
 - **Rally (CA Agile Central)** — Enterprise issue tracking
 
 The dashboard displays issues from all configured trackers in a unified Kanban board with cost badges, agent status indicators, and workspace controls.

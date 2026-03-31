@@ -14,7 +14,7 @@ The Panopticon CLI is designed around a few key principles:
 1. **Agent-centric** - Commands focus on spawning, monitoring, and controlling AI agents
 2. **Workspace isolation** - Each issue gets its own git worktree workspace
 3. **Multi-project support** - Manage multiple projects from a single installation
-4. **Integration-first** - Works seamlessly with Linear, GitHub, GitLab, and Rally
+4. **Integration-first** - Works seamlessly with GitHub, Linear, GitLab, and Rally
 
 ## Command Structure
 
@@ -27,6 +27,8 @@ Panopticon commands are organized into logical groups:
 | **Workspace** | Workspace lifecycle | `pan workspace create`, `pan workspace destroy` |
 | **Convoy** | Multi-agent orchestration | `pan convoy start`, `pan convoy status` |
 | **Project** | Project registry | `pan project add`, `pan project list` |
+| **Specialists** | Specialist agent management | `pan specialists status`, `pan specialists wake` |
+| **Remote** | Remote workspace management | `pan remote init`, `pan remote status` |
 | **Cloister** | AI lifecycle manager | `pan cloister start`, `pan cloister status` |
 
 ## Installation & Setup
@@ -73,7 +75,7 @@ pan workspace destroy MIN-123        # Clean up workspace
 Many operations can be performed either via CLI or dashboard:
 
 ```bash
-pan up    # Start dashboard at localhost:3010
+pan up    # Start dashboard at localhost:3011
 ```
 
 The dashboard provides a visual interface for all CLI operations.

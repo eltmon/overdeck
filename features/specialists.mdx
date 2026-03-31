@@ -1,6 +1,6 @@
 ---
 title: Specialist Agents
-description: Dedicated agents for review, testing, and merging
+description: Dedicated agents for review, testing, inspection, UAT, and merging
 ---
 
 # Specialist Agents
@@ -19,12 +19,14 @@ Specialist agents are **permanent, long-lived agents** that handle specific phas
 
 ## Types of Specialists
 
-Panopticon includes three built-in specialists:
+Panopticon includes five built-in specialists:
 
 | Specialist | Purpose | Trigger |
 |------------|---------|---------|
 | **review-agent** | Code review before merge | Human clicks "Review" in dashboard |
 | **test-agent** | Runs test suite after implementation | Automatically after review passes |
+| **inspect-agent** | Per-step verification against spec | After each bead completion during implementation |
+| **uat-agent** | Browser-based requirement verification | Automatically after tests pass |
 | **merge-agent** | Handles git merge and conflict resolution | Human clicks "Approve & Merge" |
 
 ## Review Agent
@@ -58,10 +60,10 @@ The test-agent runs the full test suite and analyzes failures. It's automaticall
 1. Runs all configured test suites (backend, frontend, integration, e2e)
 2. Analyzes test failures to understand root causes
 3. Reports results with actionable feedback
-4. If tests pass, marks issue ready for merge
+4. If tests pass, queues UAT agent (if enabled) or marks ready for merge
 
 **Test outcomes:**
-- **PASSED** - All tests pass, ready for human to approve merge
+- **PASSED** - All tests pass, queues UAT or marks ready for merge
 - **FAILED** - Tests failing, sends detailed feedback to work-agent
 - **SKIPPED** - Tests not applicable or already run
 
@@ -84,6 +86,64 @@ projects:
       e2e:
         command: "npm run test:e2e"
         timeout: 600000
+```
+
+## Inspect Agent
+
+The inspect-agent performs **per-step verification** during implementation. After an agent completes each bead (task unit), the inspect specialist verifies that the implementation matches the spec before the agent proceeds to the next bead.
+
+**What it does:**
+1. Reads the current bead's requirements from the PRD
+2. Inspects the code changes made for that bead
+3. Verifies implementation matches the spec
+4. If verified, agent proceeds to the next bead
+5. If issues found, sends feedback to the work-agent for correction
+
+**Why it matters:**
+- Catches spec drift early, before multiple beads compound the problem
+- Ensures each implementation step is correct before building on it
+- Reduces the amount of rework needed at the review stage
+
+**Triggering inspect-agent:**
+
+Inspect is triggered automatically by Cloister after each bead completion. It can also be configured per-project:
+
+```yaml
+# In ~/.panopticon/projects.yaml
+projects:
+  myproject:
+    specialists:
+      inspect_agent:
+        enabled: true
+```
+
+## UAT Agent
+
+The UAT (User Acceptance Testing) agent performs **browser-based requirement verification** using Playwright MCP. It runs after the test specialist passes, verifying that the implemented features actually work from a user's perspective.
+
+**What it does:**
+1. Reads the PRD and acceptance criteria
+2. Launches a browser via Playwright MCP
+3. Walks through user-facing requirements
+4. Verifies each acceptance criterion is met
+5. If all criteria pass, marks ready for human merge approval
+6. If criteria fail, sends detailed feedback with screenshots to the work-agent
+
+**UAT outcomes:**
+- **PASSED** - All acceptance criteria verified, ready for human to approve merge
+- **FAILED** - Criteria not met, sends feedback with evidence to work-agent
+- **SKIPPED** - UAT not applicable (e.g., backend-only changes)
+
+**Configuration:**
+
+```yaml
+# In ~/.panopticon/projects.yaml
+projects:
+  myproject:
+    specialists:
+      uat_agent:
+        enabled: true
+        dev_url: "https://myapp.localhost"  # URL to test against
 ```
 
 ## Merge Agent
@@ -137,6 +197,12 @@ Human clicks "Review"
 ┌───────────────────┐
 │    test-agent     │ Runs test suite, analyzes failures
 └─────────┬─────────┘
+          │ If PASSED: queues uat-agent (if enabled)
+          │ If FAILED: sends feedback to work-agent
+          ▼
+┌───────────────────┐
+│    uat-agent      │ Browser-based requirement verification
+└─────────┬─────────┘
           │ If PASSED: marks ready for merge
           │ If FAILED: sends feedback to work-agent
           ▼
@@ -150,11 +216,13 @@ Human clicks "Review"
 └───────────────────┘
 ```
 
+Additionally, **inspect-agent** runs during implementation (between beads), not as part of the post-implementation pipeline.
+
 **Key Points:**
 - **Human-initiated start** - A human must click "Review" to start the pipeline
-- **Automatic handoffs** - review-agent → test-agent happens automatically
+- **Automatic handoffs** - review-agent → test-agent → uat-agent happens automatically
 - **Human approval for merge** - Merge is NOT automatic; human clicks "Approve & Merge"
-- **Feedback loops** - Failed reviews/tests send feedback back to the work-agent
+- **Feedback loops** - Failed reviews/tests/UAT send feedback back to the work-agent
 
 ## Queue Processing
 
@@ -206,7 +274,7 @@ This prevents infinite loops where an agent repeatedly fails review.
 
 ## Specialist Auto-Initialization
 
-When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures the test-agent, review-agent, and merge-agent are ready to receive wake signals without manual setup.
+When Cloister starts, it automatically initializes specialists that don't exist yet. This ensures all five specialists (review-agent, test-agent, inspect-agent, uat-agent, merge-agent) are ready to receive wake signals without manual setup.
 
 **Manual initialization:**
 
@@ -239,14 +307,22 @@ Specialist configuration lives in `~/.panopticon/cloister/config.json`:
 ```json
 {
   "specialists": {
+    "review_agent": {
+      "enabled": true,
+      "auto_wake": false,
+      "model": "sonnet"
+    },
     "test_agent": {
       "enabled": true,
       "auto_wake": true,
       "model": "sonnet"
     },
-    "review_agent": {
+    "inspect_agent": {
       "enabled": true,
-      "auto_wake": false,
+      "model": "sonnet"
+    },
+    "uat_agent": {
+      "enabled": true,
       "model": "sonnet"
     },
     "merge_agent": {
