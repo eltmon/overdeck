@@ -113,7 +113,7 @@ export function SearchModal({
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-divider bg-gray-850 flex-wrap">
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-divider bg-surface/80 flex-wrap">
             <span className="text-xs text-content-subtle">Filters:</span>
 
             {/* Source toggles */}
@@ -121,10 +121,10 @@ export function SearchModal({
               <button
                 key={source}
                 onClick={() => toggleSource(source)}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
+                className={`px-2 py-1 text-xs rounded-full transition-colors border ${
                   filters.sources.size === 0 || filters.sources.has(source)
-                    ? 'bg-blue-600 text-content'
-                    : 'bg-surface-overlay text-content-subtle hover:text-content'
+                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/40'
+                    : 'bg-surface-overlay text-content-subtle border-transparent hover:text-content'
                 }`}
               >
                 {source === 'github' && <Github className="w-3 h-3 inline mr-1" />}
@@ -192,7 +192,7 @@ export function SearchModal({
 
           {/* Footer */}
           {resultCount > 0 && (
-            <div className="px-4 py-2 border-t border-divider bg-gray-850 text-xs text-content-subtle flex items-center justify-between">
+            <div className="px-4 py-2 border-t border-divider bg-surface/80 text-xs text-content-subtle flex items-center justify-between">
               <span>{resultCount} result{resultCount !== 1 ? 's' : ''}</span>
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
