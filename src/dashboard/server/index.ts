@@ -60,6 +60,7 @@ import type { Issue } from '../frontend/src/types.js';
 import { createBeadsFromVBrief, syncBeadStatusToVBrief } from '../../lib/vbrief/beads.js';
 import { findPlan, readPlan } from '../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../lib/cloister/task-readiness.js';
+import { criticalPath } from '../../lib/vbrief/dag.js';
 
 // Read package version once at startup — version never changes at runtime
 // In built output (dist/dashboard/server.js), import.meta.url resolves to dist/dashboard/,
@@ -5574,7 +5575,8 @@ app.get('/api/workspaces/:issueId/plan', (req, res) => {
 
   try {
     const doc = readPlan(planPath);
-    res.json(doc);
+    const cp = criticalPath(doc);
+    res.json({ ...doc, criticalPath: cp });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to read plan: ' + err.message });
   }
