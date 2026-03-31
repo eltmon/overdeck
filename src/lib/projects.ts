@@ -468,8 +468,8 @@ export function findProjectsByRallyProject(): Array<{ key: string; config: Proje
  */
 export function getSpecialistPromptOverride(
   projectKey: string,
-  specialistType: 'review-agent' | 'test-agent' | 'merge-agent'
+  specialistType: string
 ): string | null {
   const config = getSpecialistConfig(projectKey);
-  return config.prompts[specialistType] || null;
+  return (config.prompts as Record<string, string | undefined>)[specialistType] || null;
 }
