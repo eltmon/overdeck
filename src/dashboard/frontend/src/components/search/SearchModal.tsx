@@ -113,7 +113,7 @@ export function SearchModal({
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-divider bg-gray-850 flex-wrap">
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-divider bg-surface/80 flex-wrap">
             <span className="text-xs text-content-subtle">Filters:</span>
 
             {/* Source toggles */}
@@ -192,7 +192,7 @@ export function SearchModal({
 
           {/* Footer */}
           {resultCount > 0 && (
-            <div className="px-4 py-2 border-t border-divider bg-gray-850 text-xs text-content-subtle flex items-center justify-between">
+            <div className="px-4 py-2 border-t border-divider bg-surface/80 text-xs text-content-subtle flex items-center justify-between">
               <span>{resultCount} result{resultCount !== 1 ? 's' : ''}</span>
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
