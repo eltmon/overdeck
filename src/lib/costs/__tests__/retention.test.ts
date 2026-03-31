@@ -3,27 +3,30 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { tmpdir } from 'os';
 import { pruneOldEvents, needsPruning, getRetentionStatus, RetentionStats } from '../retention.js';
 import { appendCostEvent, readEvents, CostEvent, getEventsFilePath } from '../events.js';
 import { rebuildCache, loadCache } from '../aggregator.js';
 
-// Tests use the real .panopticon/costs directory since paths are fixed at module load time
-const COSTS_DIR = join(homedir(), '.panopticon', 'costs');
+// Redirect process.env.HOME to an isolated temp dir so the running dashboard
+// server (which writes to the real ~/.panopticon/costs) cannot pollute tests.
+let TEST_HOME: string;
+let COSTS_DIR: string;
+const REAL_HOME = process.env.HOME;
 
 beforeEach(() => {
-  // Clean up real directory before each test
-  if (existsSync(COSTS_DIR)) {
-    rmSync(COSTS_DIR, { recursive: true, force: true });
-  }
+  TEST_HOME = join(tmpdir(), `retention-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  COSTS_DIR = join(TEST_HOME, '.panopticon', 'costs');
+  mkdirSync(COSTS_DIR, { recursive: true });
+  process.env.HOME = TEST_HOME;
 });
 
 afterEach(() => {
-  // Clean up after each test
-  if (existsSync(COSTS_DIR)) {
-    rmSync(COSTS_DIR, { recursive: true, force: true });
+  process.env.HOME = REAL_HOME;
+  if (existsSync(TEST_HOME)) {
+    rmSync(TEST_HOME, { recursive: true, force: true });
   }
 });
 
