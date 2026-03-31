@@ -23,6 +23,10 @@ export function isTaskReady(itemId: string, workspacePath: string): boolean {
   const doc = readWorkspacePlan(workspacePath);
   if (!doc) return true; // No plan → all tasks ready
 
+  // If item doesn't exist in this plan, don't block it (e.g., legacy bead not in vBRIEF)
+  const itemExists = doc.plan.items.some(i => i.id === itemId);
+  if (!itemExists) return true;
+
   // Find all items that block this task (type: 'blocks', edge.to === itemId)
   const blockerIds = doc.plan.edges
     .filter(e => e.type === 'blocks' && e.to === itemId)

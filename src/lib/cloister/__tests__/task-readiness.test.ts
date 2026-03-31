@@ -120,6 +120,15 @@ describe('isTaskReady', () => {
     ));
     expect(isTaskReady('b', TEST_DIR)).toBe(true);
   });
+
+  it('returns true for item ID not present in the plan (phantom item)', () => {
+    writePlan(TEST_DIR, makeDoc(
+      [{ id: 'a', status: 'pending' }, { id: 'b', status: 'pending' }],
+      [{ from: 'a', to: 'b' }],
+    ));
+    // 'phantom' is not in the plan at all — should not be blocked
+    expect(isTaskReady('phantom', TEST_DIR)).toBe(true);
+  });
 });
 
 describe('getUnblockedItems', () => {
