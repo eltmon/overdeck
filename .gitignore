@@ -64,3 +64,4 @@ CLAUDE.md
 # Stitch temp files
 temp/
 .planning/plan.vbrief.json
+.planning/review-phase*.md
