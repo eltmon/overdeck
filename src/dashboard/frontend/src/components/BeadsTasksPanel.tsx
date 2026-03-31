@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2 } from 'lucide-react';
-import { PlanDAGViewer, type VBriefItem } from './PlanDAG.js';
+import { PlanDAGViewer, type VBriefItem, type VBriefDocument } from './PlanDAG.js';
 
 interface BeadTask {
   id: string;
@@ -47,15 +47,17 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
     refetchInterval: 10000,
   });
 
-  // Check if a vBRIEF plan exists for this workspace
-  const { data: planExists } = useQuery<boolean>({
-    queryKey: ['plan-exists', issueId],
+  // Fetch the vBRIEF plan (also used to check if plan exists)
+  const { data: planDoc } = useQuery<VBriefDocument | null>({
+    queryKey: ['plan', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/plan`);
-      return res.ok;
+      if (!res.ok) return null;
+      return res.json();
     },
     staleTime: 60_000,
   });
+  const planExists = planDoc != null;
 
   const openTasks = beadsData?.tasks?.filter(t => t.status === 'open') || [];
   const closedTasks = beadsData?.tasks?.filter(t => t.status === 'closed') || [];
@@ -129,27 +131,13 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
               className="rounded border border-divider overflow-hidden"
             />
           </div>
-          {selectedItem && (
-            <div className="p-2 rounded border border-divider bg-surface-raised/50 text-xs space-y-1">
-              <div className="font-medium text-content">{selectedItem.title}</div>
-              {selectedItem.narrative?.Action && (
-                <div className="text-content-muted leading-relaxed">{selectedItem.narrative.Action}</div>
-              )}
-              {(selectedItem.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion').length > 0 && (
-                <div className="space-y-0.5 mt-1">
-                  {(selectedItem.subItems ?? [])
-                    .filter(s => s.metadata?.kind === 'acceptance_criterion')
-                    .map(s => (
-                      <div key={s.id} className="flex items-start gap-1 text-[10px] text-content-subtle">
-                        {s.status === 'completed'
-                          ? <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0 mt-0.5" />
-                          : <Circle className="w-3 h-3 text-content-muted shrink-0 mt-0.5" />}
-                        {s.title}
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
+          {selectedItem && planDoc && (
+            <PlanItemDetail
+              item={selectedItem}
+              doc={planDoc}
+              beads={beadsData?.tasks ?? []}
+              issueId={issueId}
+            />
           )}
         </div>
       )}
@@ -224,6 +212,100 @@ function TaskItem({ task }: { task: BeadTask }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── PlanItemDetail — shows narrative, ACs, bead status, blockers/dependents ──
+
+interface PlanItemDetailProps {
+  item: VBriefItem;
+  doc: VBriefDocument;
+  beads: BeadTask[];
+  issueId: string;
+}
+
+function PlanItemDetail({ item, doc, beads, issueId }: PlanItemDetailProps) {
+  const titlePattern = `${issueId}: ${item.title}`.toLowerCase();
+  const matchedBead = beads.find(b => b.name.toLowerCase() === titlePattern);
+
+  const blockerIds = doc.plan.edges
+    .filter(e => e.type === 'blocks' && e.to === item.id)
+    .map(e => e.from);
+  const dependentIds = doc.plan.edges
+    .filter(e => e.type === 'blocks' && e.from === item.id)
+    .map(e => e.to);
+
+  const blockerItems = blockerIds.map(id => doc.plan.items.find(i => i.id === id)).filter(Boolean) as VBriefItem[];
+  const dependentItems = dependentIds.map(id => doc.plan.items.find(i => i.id === id)).filter(Boolean) as VBriefItem[];
+
+  const acs = (item.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion');
+
+  return (
+    <div className="p-2 rounded border border-divider bg-surface-raised/50 text-xs space-y-2">
+      {/* Title + meta row */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-medium text-content leading-snug">{item.title}</div>
+        <div className="flex items-center gap-1 shrink-0">
+          {item.metadata?.difficulty && (
+            <span className="bg-surface-overlay text-content-muted px-1 py-0.5 rounded text-[9px] uppercase">
+              {item.metadata.difficulty}
+            </span>
+          )}
+          {item.priority && (
+            <span className="bg-surface-overlay text-content-muted px-1 py-0.5 rounded text-[9px] uppercase">
+              {item.priority}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Bead status */}
+      {matchedBead && (
+        <div className="flex items-center gap-1 text-[10px]">
+          {matchedBead.status === 'closed'
+            ? <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
+            : <Circle className="w-3 h-3 text-blue-400 shrink-0" />}
+          <span className="text-content-subtle">
+            Bead: {matchedBead.status === 'closed' ? 'completed' : 'open'} ({matchedBead.id})
+          </span>
+        </div>
+      )}
+
+      {/* Narrative */}
+      {item.narrative?.Action && (
+        <div className="text-content-muted leading-relaxed">{item.narrative.Action}</div>
+      )}
+
+      {/* Acceptance criteria */}
+      {acs.length > 0 && (
+        <div className="space-y-0.5">
+          {acs.map(s => (
+            <div key={s.id} className="flex items-start gap-1 text-[10px] text-content-subtle">
+              {s.status === 'completed'
+                ? <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0 mt-0.5" />
+                : <Circle className="w-3 h-3 text-content-muted shrink-0 mt-0.5" />}
+              {s.title}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Blockers */}
+      {blockerItems.length > 0 && (
+        <div className="text-[10px] text-orange-400/80">
+          <span className="font-medium">Blocked by: </span>
+          {blockerItems.map(b => b.title).join(', ')}
+        </div>
+      )}
+
+      {/* Dependents */}
+      {dependentItems.length > 0 && (
+        <div className="text-[10px] text-content-subtle">
+          <span className="font-medium">Blocks: </span>
+          {dependentItems.map(d => d.title).join(', ')}
+        </div>
+      )}
     </div>
   );
 }
