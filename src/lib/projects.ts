@@ -300,8 +300,8 @@ export function resolveProjectFromIssue(
         linearTeam: projectConfig.linear_team,
       };
     }
-    // For GitHub-only projects without linear_team, derive prefix from project key
-    if (!projectConfig.linear_team && projectConfig.github_repo) {
+    // For projects without linear_team (GitHub-only or Rally-only), derive prefix from project key
+    if (!projectConfig.linear_team && (projectConfig.github_repo || projectConfig.rally_project)) {
       const derivedPrefix = key.toUpperCase().replace(/-/g, '');
       if (derivedPrefix === teamPrefix) {
         const resolvedPath = resolveProjectPath(projectConfig, labels);
