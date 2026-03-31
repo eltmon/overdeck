@@ -70,6 +70,17 @@ export function useSocketIssues(): void {
       queryClient.invalidateQueries({ queryKey: ['issues'], exact: false });
     });
 
+    // Planning agent lifecycle events
+    socket.on('planning:started', ({ issueId }: { issueId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['planningStatus', issueId] });
+    });
+
+    socket.on('planning:failed', ({ issueId }: { issueId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['planningStatus', issueId] });
+      // Invalidate agents so kanban badge picks up the failed state
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    });
+
     // Tab visibility: request snapshot on re-focus
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && socket.connected) {
