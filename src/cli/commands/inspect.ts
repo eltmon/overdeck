@@ -47,10 +47,11 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
   let workspacePath = options.workspace;
   if (!workspacePath) {
     // Auto-detect workspace from issue ID
-    const { findWorkspaceForIssue } = await import('../../lib/workspace-manager.js');
-    const workspace = findWorkspaceForIssue(normalizedIssueId);
-    if (workspace) {
-      workspacePath = workspace.path;
+    const { join } = await import('path');
+    const { existsSync } = await import('fs');
+    const candidatePath = join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
+    if (existsSync(candidatePath)) {
+      workspacePath = candidatePath;
     }
   }
 
@@ -61,7 +62,7 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
   }
 
   // Show what we're inspecting
-  const diffBase = getDiffBase(project.key, normalizedIssueId, workspacePath);
+  const diffBase = getDiffBase(project.projectKey, normalizedIssueId, workspacePath);
   const diffStats = getDiffStats(workspacePath, diffBase);
 
   console.log('');
@@ -77,8 +78,8 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
 
   // Spawn the inspect specialist
   const context: InspectContext = {
-    projectKey: project.key,
-    projectPath: project.path,
+    projectKey: project.projectKey,
+    projectPath: project.projectPath,
     issueId: normalizedIssueId,
     beadId: options.bead,
     workspace: workspacePath,

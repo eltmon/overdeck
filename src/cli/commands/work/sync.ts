@@ -52,30 +52,29 @@ async function syncToLinear(
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    // Find the issue
-    const me = await client.viewer;
-    const teams = await me.teams();
-    const team = teams.nodes[0];
-
-    if (!team) {
-      return { success: false, error: 'No Linear team found' };
-    }
-
-    const issues = await team.issues({ first: 100 });
-    const issue = issues.nodes.find(
+    // Deterministic lookup by identifier — no team iteration needed
+    // searchIssues returns IssueSearchResult which lacks .update(); re-fetch full Issue object
+    const searchResults = await client.searchIssues(issueId, { first: 1 });
+    const searchHit = searchResults.nodes.find(
       (i) => i.identifier.toUpperCase() === issueId.toUpperCase()
     );
 
-    if (!issue) {
+    if (!searchHit) {
       return { success: false, error: `Issue ${issueId} not found in Linear` };
     }
+    const issue = await client.issue(searchHit.id);
 
     // Get current state
     const currentState = await issue.state;
     const previousState = currentState?.type === 'completed' ? 'closed' :
                          currentState?.type === 'started' ? 'in_progress' : 'open';
 
-    // Find the target state
+    // Get the team from the issue itself, then find the target state
+    const team = await issue.team;
+    if (!team) {
+      return { success: false, error: 'Could not resolve team from issue' };
+    }
+
     const states = await team.states();
     let targetLinearState = null;
 

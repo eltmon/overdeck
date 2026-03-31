@@ -79,22 +79,20 @@ async function updateLinearStatus(apiKey: string, issueIdentifier: string): Prom
     const { LinearClient } = await import('@linear/sdk');
     const client = new LinearClient({ apiKey });
 
-    // Get the team and find the Done state
-    const me = await client.viewer;
-    const teams = await me.teams();
-    const team = teams.nodes[0];
-
-    if (!team) return false;
-
-    // Find the issue
-    const issues = await team.issues({ first: 100 });
-    const issue = issues.nodes.find(
+    // Deterministic lookup by identifier — no team iteration needed
+    // searchIssues returns IssueSearchResult which lacks .update(); re-fetch full Issue object
+    const searchResults = await client.searchIssues(issueIdentifier, { first: 1 });
+    const searchHit = searchResults.nodes.find(
       (i) => i.identifier.toUpperCase() === issueIdentifier.toUpperCase()
     );
 
-    if (!issue) return false;
+    if (!searchHit) return false;
+    const issue = await client.issue(searchHit.id);
 
-    // Find the Done state
+    // Get the team from the issue itself, then find the Done state
+    const team = await issue.team;
+    if (!team) return false;
+
     const states = await team.states();
     const doneState = states.nodes.find((s) => s.type === 'completed' && s.name === 'Done');
 

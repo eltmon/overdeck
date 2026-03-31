@@ -1832,11 +1832,12 @@ async function checkSpecialistQueues(): Promise<string[]> {
         const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
         const workspacePath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
 
+        // HookItem payload may carry specialist-specific fields when queued via SpecialistQueueItem
+        const queuePayload = item.payload as { issueId?: string; branch?: string; workspace?: string; [k: string]: unknown };
         await spawnEphemeralSpecialist(resolved.projectKey, specialistType, {
           issueId,
-          workspace: workspacePath || undefined,
-          branch: item.payload?.branch,
-          context: item.payload,
+          workspace: workspacePath || queuePayload.workspace || undefined,
+          branch: queuePayload.branch,
         });
 
         actions.push(`Dispatched queued ${specialistType} for ${issueId}`);
