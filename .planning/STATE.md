@@ -124,3 +124,5 @@ task-readiness ──blocks──> critical-path
 ## Specialist Feedback
 
 - **[2026-03-31T19:35Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-03-31T20:51Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+- **[2026-03-31T20:54Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
