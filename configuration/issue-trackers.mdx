@@ -1,6 +1,6 @@
 ---
 title: Issue Tracker Integration
-description: Connect GitHub, Linear, GitLab, Jira, and Rally
+description: Connect GitHub, Linear, GitLab, and Rally
 ---
 
 # Issue Tracker Integration
@@ -14,7 +14,6 @@ Panopticon integrates with popular issue tracking systems to provide unified pro
 | **GitHub Issues** | `GITHUB_TOKEN` or `gh auth login` |
 | **Linear** | `LINEAR_API_KEY` in `.panopticon.env` |
 | **GitLab Issues** | `GITLAB_TOKEN` or `glab auth login` |
-| **Jira** | `JIRA_API_KEY` in `.panopticon.env` |
 | **Rally** | `RALLY_API_KEY` in `.panopticon.env` |
 
 All trackers are equal — configure whichever your projects use. The dashboard displays issues from all configured trackers in a unified Kanban board.
@@ -27,13 +26,54 @@ Create `~/.panopticon.env`:
 GITHUB_TOKEN=ghp_xxxxx     # For GitHub-tracked projects
 LINEAR_API_KEY=lin_api_xxxxx  # For Linear-tracked projects
 GITLAB_TOKEN=glpat-xxxxx  # For GitLab-tracked projects
-JIRA_API_KEY=xxxxx         # For Jira-tracked projects
 RALLY_API_KEY=_xxxxx       # For Rally-tracked projects
+```
+
+## GitHub Issues
+
+GitHub Issues provides full integration with PRs, status updates, and automated merging.
+
+### Setup
+
+```bash
+# Authenticate with GitHub CLI (recommended)
+gh auth login
+
+# Or set a token in .panopticon.env
+GITHUB_TOKEN=ghp_xxxxx
+```
+
+### Issue Prefix
+
+GitHub Issues use an uppercase project key as prefix, derived from the project name in `projects.yaml`:
+
+```
+PAN-45       # GitHub issue #45 on the panopticon-cli project
+KRUX-3       # GitHub issue #3 on the krux project
+```
+
+The prefix is the project key uppercased. Configure via `projects.yaml`:
+
+```yaml
+projects:
+  panopticon-cli:
+    name: "Panopticon CLI"
+    path: /home/user/projects/panopticon-cli
+    github_repo: eltmon/panopticon-cli
+```
+
+### Creating Issues
+
+```bash
+# Via CLI
+gh issue create --title "New feature" --body "Description"
+
+# Or via dashboard - select GitHub project
 ```
 
 ## Linear Integration
 
-Linear is Panopticon's primary issue tracker. Most features are designed around Linear's workflow.
+Linear provides full integration with cycles, labels, and status updates.
 
 ### Setup
 
@@ -67,41 +107,9 @@ Panopticon tracks and updates Linear issue states:
 | **In Review** | Awaiting code review |
 | **Done** | Work completed |
 
-## GitHub Issues
-
-GitHub Issues work as a secondary tracker, syncing to the dashboard alongside Linear.
-
-### Setup
-
-```bash
-# Authenticate with GitHub CLI
-gh auth login
-
-# Or set a token in .panopticon.env
-GITHUB_TOKEN=ghp_xxxxx
-```
-
-### Issue Prefix
-
-GitHub Issues are prefixed with the repository name:
-
-```
-myn-123      # Linear issue (MIN team)
-panopticon#45  # GitHub issue (panopticon repo)
-```
-
-### Creating Issues
-
-```bash
-# Via CLI
-gh issue create --title "New feature" --body "Description"
-
-# Or via dashboard - select GitHub project
-```
-
 ## GitLab Issues
 
-GitLab Issues integrate similarly to GitHub Issues.
+GitLab Issues integrate similarly to GitHub Issues, with MR management support.
 
 ### Setup
 
@@ -193,32 +201,32 @@ The dashboard shows issues from all configured trackers:
 
 ## Multi-Tracker Workflows
 
-### Primary + Secondary Pattern
+### Mixed Tracker Pattern
 
-A common pattern is using Linear as primary with GitHub for open-source components:
+A common pattern is using different trackers for different projects:
 
 ```yaml
 projects:
   myapp:
     name: "My Application"
     linear_team: APP
-    # ... standard config
+    # Linear for this project
 
   myapp-oss:
     name: "My App OSS Components"
     github_repo: myorg/myapp-oss
-    # GitHub Issues as primary for this project
+    # GitHub Issues for this project
 ```
 
 ### Syncing Between Trackers
 
-Panopticon doesn't sync issues between trackers - each issue lives in its source system. However, agents can reference issues from multiple trackers:
+Panopticon doesn't sync issues between trackers — each issue lives in its source system. However, agents can reference issues from multiple trackers:
 
 ```markdown
 <!-- In an agent's STATE.md -->
 Related issues:
 - MIN-123 (Linear) - Parent feature
-- panopticon#45 (GitHub) - Dependency fix needed
+- PAN-45 (GitHub) - Dependency fix needed
 ```
 
 ## Related Guides
