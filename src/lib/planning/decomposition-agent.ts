@@ -289,15 +289,12 @@ You are a decomposition agent. Your job is to break down work into discrete task
    - Dependencies on other tasks
    - Estimated difficulty (trivial, simple, medium, complex, expert)
 
-4. Create Beads tasks using the 'bd create' command
+4. Update STATE.md with the task list including estimated difficulty for each task
 
-5. Ensure proper dependency links:
-   - Use '--deps "blocks:task-id"' for dependencies
-   - Tasks should be in logical execution order
+5. Provide a summary of tasks created
 
-6. Update STATE.md with the task list
-
-7. Provide a summary of tasks created
+Note: Do NOT run 'bd create' commands. Beads tasks are created automatically
+from plan.vbrief.json by Cloister after planning completes.
 
 Guidelines:
 - Tasks should be small enough to complete in one session (2-4 hours)

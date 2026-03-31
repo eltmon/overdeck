@@ -188,6 +188,7 @@ export function onInspectComplete(
     const commitSha = getCurrentHead(workspacePath);
     saveCheckpoint(projectKey, issueId, beadId, commitSha);
     console.log(`[inspect] Checkpoint saved for ${issueId} bead ${beadId} at ${commitSha.substring(0, 8)}`);
+
   } else {
     console.log(`[inspect] Bead ${beadId} blocked for ${issueId} — no checkpoint saved`);
   }
