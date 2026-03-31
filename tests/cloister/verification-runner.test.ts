@@ -175,7 +175,7 @@ describe('runVerificationForIssue', () => {
       await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
 
       expect(writeFeedbackFileMock).toHaveBeenCalledWith(
-        expect.objectContaining({ issueId, workspacePath, specialist: 'review-agent' })
+        expect.objectContaining({ issueId, workspacePath, specialist: 'verification-gate' })
       );
       expect(messageAgentMock).toHaveBeenCalledWith(
         `agent-${issueId.toLowerCase()}`,
