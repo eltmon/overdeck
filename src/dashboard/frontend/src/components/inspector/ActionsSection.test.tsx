@@ -78,6 +78,15 @@ const defaultProps = {
 };
 
 describe('ActionsSection', () => {
+  it('shows loading skeleton when reviewStatusLoading is true', () => {
+    const { container } = render(<ActionsSection {...defaultProps} reviewStatusLoading={true} />);
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+    const skeletons = container.querySelectorAll('.animate-pulse');
+    expect(skeletons.length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('review-test-btn')).not.toBeInTheDocument();
+    expect(screen.queryByText('Start Agent')).not.toBeInTheDocument();
+  });
+
   it('shows Start Agent button when no agent', () => {
     render(<ActionsSection {...defaultProps} />);
     expect(screen.getByText('Start Agent')).toBeInTheDocument();
