@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Circle, CheckCircle2, Clock, ListTodo, RefreshCw, Loader2 } from 'lucide-react';
+import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2 } from 'lucide-react';
+import { PlanDAGViewer, type VBriefItem } from './PlanDAG.js';
 
 interface BeadTask {
   id: string;
@@ -22,7 +24,19 @@ interface BeadsTasksPanelProps {
   issueId: string;
 }
 
+const VIEW_PREF_KEY = 'beads-panel-view';
+
 export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
+  const [view, setView] = useState<'list' | 'graph'>(() => {
+    try {
+      return (localStorage.getItem(VIEW_PREF_KEY) as 'list' | 'graph') ?? 'list';
+    } catch {
+      return 'list';
+    }
+  });
+
+  const [selectedItem, setSelectedItem] = useState<VBriefItem | null>(null);
+
   const { data: beadsData, isLoading, refetch, isRefetching } = useQuery<BeadsResponse>({
     queryKey: ['beads', issueId],
     queryFn: async () => {
@@ -33,8 +47,24 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
     refetchInterval: 10000,
   });
 
+  // Check if a vBRIEF plan exists for this workspace
+  const { data: planExists } = useQuery<boolean>({
+    queryKey: ['plan-exists', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/plan`);
+      return res.ok;
+    },
+    staleTime: 60_000,
+  });
+
   const openTasks = beadsData?.tasks?.filter(t => t.status === 'open') || [];
   const closedTasks = beadsData?.tasks?.filter(t => t.status === 'closed') || [];
+
+  function toggleView(next: 'list' | 'graph') {
+    setView(next);
+    setSelectedItem(null);
+    try { localStorage.setItem(VIEW_PREF_KEY, next); } catch { /* ignore */ }
+  }
 
   if (isLoading) {
     return (
@@ -47,7 +77,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
 
   return (
     <div className="space-y-2">
-      {/* Header with counts */}
+      {/* Header with counts and view toggle */}
       <div className="flex items-center justify-between text-xs text-content-subtle">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
@@ -59,33 +89,90 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
             {closedTasks.length} closed
           </span>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isRefetching}
-          className="p-1 hover:bg-surface-overlay rounded transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw className={`w-3 h-3 ${isRefetching ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-1">
+          {planExists && (
+            <div className="flex items-center rounded border border-divider overflow-hidden mr-1">
+              <button
+                onClick={() => toggleView('list')}
+                className={`p-1 transition-colors ${view === 'list' ? 'bg-surface-overlay text-content' : 'hover:bg-surface-overlay/50 text-content-muted'}`}
+                title="List view"
+              >
+                <List className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => toggleView('graph')}
+                className={`p-1 transition-colors ${view === 'graph' ? 'bg-surface-overlay text-content' : 'hover:bg-surface-overlay/50 text-content-muted'}`}
+                title="DAG graph view"
+              >
+                <GitFork className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            className="p-1 hover:bg-surface-overlay rounded transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-3 h-3 ${isRefetching ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
-      {/* Task List */}
-      {beadsData?.tasks && beadsData.tasks.length > 0 ? (
-        <div className="space-y-1.5 max-h-64 overflow-y-auto">
-          {/* Open tasks first */}
-          {openTasks.map((task) => (
-            <TaskItem key={task.id} task={task} />
-          ))}
-          {/* Then closed tasks */}
-          {closedTasks.map((task) => (
-            <TaskItem key={task.id} task={task} />
-          ))}
+      {/* Graph view */}
+      {view === 'graph' && planExists && (
+        <div className="space-y-2">
+          <div style={{ height: 320 }}>
+            <PlanDAGViewer
+              issueId={issueId}
+              onNodeClick={item => setSelectedItem(prev => prev?.id === item.id ? null : item)}
+              className="rounded border border-divider overflow-hidden"
+            />
+          </div>
+          {selectedItem && (
+            <div className="p-2 rounded border border-divider bg-surface-raised/50 text-xs space-y-1">
+              <div className="font-medium text-content">{selectedItem.title}</div>
+              {selectedItem.narrative?.Action && (
+                <div className="text-content-muted leading-relaxed">{selectedItem.narrative.Action}</div>
+              )}
+              {(selectedItem.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion').length > 0 && (
+                <div className="space-y-0.5 mt-1">
+                  {(selectedItem.subItems ?? [])
+                    .filter(s => s.metadata?.kind === 'acceptance_criterion')
+                    .map(s => (
+                      <div key={s.id} className="flex items-start gap-1 text-[10px] text-content-subtle">
+                        {s.status === 'completed'
+                          ? <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0 mt-0.5" />
+                          : <Circle className="w-3 h-3 text-content-muted shrink-0 mt-0.5" />}
+                        {s.title}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="text-center py-4 text-content-muted text-xs">
-          <ListTodo className="w-5 h-5 mx-auto mb-1 opacity-50" />
-          <p>No tasks yet</p>
-        </div>
+      )}
+
+      {/* List view */}
+      {view === 'list' && (
+        <>
+          {beadsData?.tasks && beadsData.tasks.length > 0 ? (
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {openTasks.map((task) => (
+                <TaskItem key={task.id} task={task} />
+              ))}
+              {closedTasks.map((task) => (
+                <TaskItem key={task.id} task={task} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-content-muted text-xs">
+              <ListTodo className="w-5 h-5 mx-auto mb-1 opacity-50" />
+              <p>No tasks yet</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -110,7 +197,6 @@ function TaskItem({ task }: { task: BeadTask }) {
           <div className="text-content break-words leading-tight">
             {task.name}
           </div>
-          {/* Labels */}
           {task.labels.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {task.labels.map((label) => (
@@ -130,7 +216,6 @@ function TaskItem({ task }: { task: BeadTask }) {
               ))}
             </div>
           )}
-          {/* Dependencies */}
           {task.blockedBy.length > 0 && (
             <div className="flex items-center gap-1 mt-1 text-[9px] text-orange-400">
               <Clock className="w-2.5 h-2.5" />
