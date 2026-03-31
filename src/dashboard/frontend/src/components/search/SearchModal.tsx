@@ -121,10 +121,10 @@ export function SearchModal({
               <button
                 key={source}
                 onClick={() => toggleSource(source)}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${
                   filters.sources.size === 0 || filters.sources.has(source)
-                    ? 'bg-blue-600 text-content'
-                    : 'bg-surface-overlay text-content-subtle hover:text-content'
+                    ? 'bg-blue-500/20 text-blue-400 ring-1 ring-inset ring-blue-500/30'
+                    : 'bg-surface-overlay text-content-subtle hover:text-content hover:bg-surface-emphasis'
                 }`}
               >
                 {source === 'github' && <Github className="w-3 h-3 inline mr-1" />}
