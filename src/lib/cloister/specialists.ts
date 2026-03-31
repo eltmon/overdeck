@@ -2325,6 +2325,23 @@ Then use send-feedback-to-agent skill to notify issue agent of NEW failures only
 
 **NEVER run test commands without redirecting to a file.** This is not optional.
 
+## Container Smoke Test (if Docker workspace)
+
+If the workspace has running Docker containers, verify the frontend is accessible:
+
+\`\`\`bash
+# Check if containers are running for this workspace
+docker ps --filter "name=${task.issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-')}" --format "{{.Names}} {{.Status}}" 2>/dev/null
+\`\`\`
+
+If containers are running:
+1. Find the frontend URL from Traefik labels or workspace config
+2. Use \`curl -sk\` to verify the frontend loads (returns HTML with \`<div id="root">\`)
+3. Use \`curl -sk\` to verify the API proxy works (e.g., \`/api/health\` through the frontend URL returns JSON)
+4. If the frontend returns HTML but API calls fail, that's a FAIL — the proxy configuration is broken
+
+This is especially important for UI changes — passing unit tests doesn't prove the app works in its container.
+
 IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
       break;
     }
