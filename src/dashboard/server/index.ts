@@ -1660,6 +1660,7 @@ app.get('/api/agents', async (_req, res) => {
     const agentsDir = join(homedir(), '.panopticon', 'agents');
     const remoteAgentIds: string[] = [];
     const startingAgentIds: string[] = [];
+    const failedAgentIds: string[] = [];
     if (existsSync(agentsDir)) {
       const dirs = readdirSync(agentsDir).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
       for (const dir of dirs) {
@@ -1676,7 +1677,7 @@ app.get('/api/agents', async (_req, res) => {
           } catch {}
         }
 
-        // Check for "starting" agents (containers starting, no tmux session yet)
+        // Check for "starting" or "failed" agents (no tmux session yet)
         if (!inLocalList && !remoteAgentIds.includes(dir)) {
           const localStateFile = join(agentsDir, dir, 'state.json');
           if (existsSync(localStateFile)) {
@@ -1684,6 +1685,8 @@ app.get('/api/agents', async (_req, res) => {
               const state = JSON.parse(readFileSync(localStateFile, 'utf-8'));
               if (state.status === 'starting') {
                 startingAgentIds.push(dir);
+              } else if (state.status === 'failed') {
+                failedAgentIds.push(dir);
               }
             } catch {}
           }
@@ -1927,8 +1930,37 @@ app.get('/api/agents', async (_req, res) => {
       } catch { return null; }
     }).filter(Boolean);
 
-    // Combine local, remote, starting, and recently-stopped agents
-    const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...startingAgents, ...stoppedAgents];
+    // Process failed agents (spawn failed — no tmux session, state.status === 'failed')
+    const failedAgents = failedAgentIds.map(dir => {
+      const stateFile = join(agentsDir, dir, 'state.json');
+      try {
+        const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+        const isPlanning = dir.startsWith('planning-');
+        const issueId = state.issueId?.toUpperCase() ||
+          (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
+        return {
+          id: dir,
+          issueId,
+          runtime: state.runtime || 'claude',
+          model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+          status: 'failed' as const,
+          startedAt: state.startedAt || new Date().toISOString(),
+          consecutiveFailures: 0,
+          killCount: 0,
+          workspace: state.workspace || null,
+          workspaceLocation: state.location || 'local',
+          git: null,
+          type: 'agent',
+          agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
+          hasPendingQuestion: false,
+          pendingQuestionCount: 0,
+          error: state.error || 'Unknown error',
+        };
+      } catch { return null; }
+    }).filter(Boolean);
+
+    // Combine local, remote, starting, failed, and recently-stopped agents
+    const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...startingAgents, ...failedAgents, ...stoppedAgents];
 
     // Cache the result
     agentsCache = { data: allAgents, timestamp: now };

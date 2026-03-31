@@ -45,6 +45,8 @@ const AGENT_STATUS_DOT: Record<Agent['status'], string> = {
   stuck: 'bg-orange-400',
   dead: 'bg-red-500',
   stopped: 'bg-surface-overlay',
+  starting: 'bg-purple-400',
+  failed: 'bg-red-600',
 };
 
 export function ContainerCard({ container, history, onClick }: ContainerCardProps) {
