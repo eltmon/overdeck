@@ -2325,22 +2325,28 @@ Then use send-feedback-to-agent skill to notify issue agent of NEW failures only
 
 **NEVER run test commands without redirecting to a file.** This is not optional.
 
-## Container Smoke Test (if Docker workspace)
+## REQUIRED: Container Smoke Test
 
-If the workspace has running Docker containers, verify the frontend is accessible:
+After unit tests pass, verify the Docker workspace frontend is accessible.
+This is NOT optional — UI changes that pass unit tests but break in containers must be caught.
 
 \`\`\`bash
 # Check if containers are running for this workspace
-docker ps --filter "name=${task.issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-')}" --format "{{.Names}} {{.Status}}" 2>/dev/null
+docker ps --filter "name=${featureName}" --format "{{.Names}} {{.Status}}" 2>/dev/null
 \`\`\`
 
-If containers are running:
-1. Find the frontend URL from Traefik labels or workspace config
-2. Use \`curl -sk\` to verify the frontend loads (returns HTML with \`<div id="root">\`)
-3. Use \`curl -sk\` to verify the API proxy works (e.g., \`/api/health\` through the frontend URL returns JSON)
-4. If the frontend returns HTML but API calls fail, that's a FAIL — the proxy configuration is broken
+If containers are running, test these URLs:
+- **Frontend**: \`curl -sk https://feature-${featureName}.${testProjectConfig?.workspace?.dns?.domain || 'pan.localhost'}/ | head -5\`
+- **API proxy**: \`curl -sk https://feature-${featureName}.${testProjectConfig?.workspace?.dns?.domain || 'pan.localhost'}/api/health\`
+- **API issues**: \`curl -sk https://feature-${featureName}.${testProjectConfig?.workspace?.dns?.domain || 'pan.localhost'}/api/issues | head -100\`
 
-This is especially important for UI changes — passing unit tests doesn't prove the app works in its container.
+**Pass criteria:**
+1. Frontend returns HTML containing \`<div id="root">\`
+2. \`/api/health\` returns JSON with \`"status":"ok"\`
+3. \`/api/issues\` returns JSON array (not an error)
+
+**If ANY of these fail, the test FAILS** — report via the API with details about which check failed.
+If containers are NOT running, note it but don't fail (containers may not be configured for this project).
 
 IMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready.`;
       break;
