@@ -9,14 +9,18 @@ description: 'Multi-agent orchestration for AI coding assistants'
 >
 > — Classic Doctor Who. The Panopticon was the great hall at the heart of the Time Lord Citadel, where all could be observed. We liked the metaphor.
 
-Spawn AI agents from a dashboard. Route tasks to the right model. Review, test, and merge automatically.
+Panopticon is an open-source control plane for multi-agent software development. It connects to your issue tracker — GitHub Issues, Linear, GitLab, or Rally — and manages the full agent lifecycle from planning through merge.
+
+Assign an issue to Panopticon and an Opus-class model reads the ticket and writes a detailed PRD, then hands off to a cost-effective implementation model (configurable per project — Kimi, Sonnet, GPT, Gemini, or others) that writes code in an isolated git worktree. Once the implementation agent signals completion, five specialist agents take over: an **inspect specialist** verifies each implementation step against the spec, a **review specialist** diffs the changes against the PRD, a **test specialist** runs your CI pipeline, a **UAT specialist** performs browser-based requirement verification, and a **merge specialist** opens the PR. The only human step is clicking **Merge**.
+
+Each stage runs as a separate agent process in its own tmux session with full terminal I/O — attach to any session mid-flight, read its scrollback, or send it commands directly. Coordinating all of this is **Cloister**, a lifecycle manager that routes tasks to models based on capability and cost, monitors agent health, detects and recovers stuck sessions, tracks per-issue token spend, and orchestrates the handoff sequence between specialists. Everything is observable through **Mission Control**, a 13-view real-time dashboard.
 
 ![Panopticon Kanban Board](/docs/screenshot-board.png)
 
 ## Why Panopticon?
 
 - **Stop babysitting agents.** Spawn them from a dashboard, monitor progress in real time, and let specialists handle code review, testing, and merging.
-- **Use the right model for the job.** Opus for planning, Sonnet for implementation, Haiku for quick commands — automatic routing based on task type and required capabilities.
+- **Use the right model for the job.** Opus for planning, Kimi for implementation, Haiku for quick commands — automatic routing based on task type and capabilities.
 - **Work survives across sessions.** PRDs, state files, beads, and skills persist context so agents don't start from zero every time.
 - **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI.
 
@@ -24,17 +28,17 @@ Spawn AI agents from a dashboard. Route tasks to the right model. Review, test, 
 
 ```mermaid
 flowchart LR
-    Issue["🎫 Issue\nGitHub · Linear\nGitLab · Jira · Rally"]
-    PRD["📋 PRD\nPlan with Opus"]
-    Agent["⚡ Agent\nWrite code in\nisolated worktree\n(Kimi/Sonnet — routed)"]
-    Review["🔍 Review\nCode review\nby specialist\n(Opus)"]
-    Test["🧪 Test\nRun tests\nby specialist\n(Sonnet)"]
-    Merge["✅ Merge\nPR merged\nby specialist\n(Sonnet)"]
+    Issue["Issue\nGitHub · Linear\nGitLab · Rally"]
+    PRD["PRD\nPlan with Opus"]
+    Agent["Agent\nWrite code in\nisolated worktree\n(Kimi/Sonnet — routed)"]
+    Review["Review\nCode review\nby specialist"]
+    Test["Test\nRun tests\nby specialist"]
+    Merge["Merge\nPR merged\nby specialist"]
 
     Issue --> PRD --> Agent --> Review --> Test --> Merge
 ```
 
-Create a workspace, and Panopticon handles the rest: planning with Opus, implementation with your configured model, automated code review, test execution, and merge — the only manual step is clicking **MERGE** when you're satisfied.
+Plus two specialists that run inline: **Inspect** verifies each implementation step against the spec during development, and **UAT** performs browser-based requirement verification after tests pass.
 
 ## Key Features
 
@@ -42,14 +46,14 @@ Create a workspace, and Panopticon handles the rest: planning with Opus, impleme
 |:--------|:------------|
 | **Multi-Agent Orchestration** | Spawn and manage AI agents in tmux sessions via dashboard or CLI |
 | **Cloister Lifecycle Manager** | Automatic model routing, stuck detection, cost tracking, and specialist handoffs |
-| **Mission Control** | 11-view dashboard — project tree, activity feed, kanban board, agent status, costs, metrics, and more |
+| **Mission Control** | 13-view dashboard — project tree, activity feed, kanban board, agent status, costs, metrics, and more |
 | **PRD-Driven Workflow** | Opus writes a PRD before implementation starts; agents are blocked without one |
-| **67+ Universal Skills** | Pre-built skills ship out of the box, synced via `pan sync` — one SKILL.md works across all AI tools |
-| **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Jira, Rally — all from one dashboard |
+| **70+ Universal Skills** | Pre-built skills ship out of the box, synced via `pan sync` — one SKILL.md works across all AI tools |
+| **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all from one dashboard |
 | **Multi-Model Routing** | Anthropic, OpenAI, Google, Kimi, Zhipu — route by task type, capability, and budget |
-| **Workspaces** | Git worktree-based feature branches with Docker isolation (local and remote via exe.dev) |
+| **Workspaces** | Git worktree-based feature branches with Docker isolation (local and remote via Fly.io) |
 | **Convoys** | Run parallel agents on related issues with automatic synthesis |
-| **Specialists** | Dedicated review, test, and merge agents — fully automated quality pipeline |
+| **5 Specialist Agents** | Review, test, inspect, UAT, and merge — fully automated quality pipeline |
 | **Beads** | Git-backed task tracking that survives context compaction and works offline |
 | **Cost Tracking** | Per-issue, per-stage token costs with dashboard analytics |
 | **Legacy Codebase Support** | AI self-monitoring skills that learn your codebase conventions over time |
@@ -66,13 +70,14 @@ Create a workspace, and Panopticon handles the rest: planning with Opus, impleme
 
 ## Dashboard Views
 
-The dashboard at `https://pan.localhost` provides 11 views:
+The dashboard at `https://pan.localhost` provides 13 views:
 
 | View | Purpose |
 |------|---------|
 | **Mission Control** | Project tree + activity timeline — see the full pipeline for any feature |
 | **Board** | Kanban board with cost badges, agent status, and workspace controls |
 | **Agents** | Cloister Deacon, specialist agents, and issue agents with token/cost tracking |
+| **Resources** | System resource monitoring and allocation |
 | **Convoys** | Parallel agent runs with synthesis status |
 | **Handoffs** | Specialist handoff queue and history |
 | **Activity** | Real-time agent command output log |
@@ -80,6 +85,7 @@ The dashboard at `https://pan.localhost` provides 11 views:
 | **Costs** | Per-issue, per-stage cost breakdown with daily totals |
 | **Skills** | All available skills with descriptions and sync status |
 | **Health** | System health checks and diagnostics |
+| **God View** | Aggregate cross-project view of all agent activity |
 | **Settings** | Model routing, tracker API keys, and project configuration |
 
 ![Mission Control](/docs/dashboard-overview.png)

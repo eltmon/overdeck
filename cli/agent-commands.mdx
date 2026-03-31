@@ -162,6 +162,52 @@ pan work recover --all
 
 Attempts to resume agents that crashed or were interrupted.
 
+## pan specialists
+
+Manage specialist agents (review, test, inspect, UAT, merge).
+
+```bash
+# Check status of all specialists
+pan specialists status
+
+# Wake a specialist for an issue
+pan specialists wake review-agent --issue MIN-123
+
+# View specialist queue
+pan specialists queue review-agent
+
+# Clear a specialist's queue
+pan specialists clear-queue review-agent
+
+# Reset a specialist's state
+pan specialists reset review-agent
+
+# View specialist logs
+pan specialists logs review-agent
+```
+
+See [Specialist Agents](/features/specialists) for detailed information on each specialist type.
+
+## pan remote
+
+Manage remote workspaces via Fly.io.
+
+```bash
+# Initialize Fly.io provider
+pan remote init
+
+# Configure remote environment
+pan remote setup
+
+# Check remote workspace status
+pan remote status
+
+# View resource allocation
+pan remote resources
+```
+
+See [Workspaces](/features/workspaces#remote-workspaces-flyio) for details on remote workspace execution.
+
 ## Next Steps
 
 - [Workspace Commands](/cli/workspace-commands) - Manage workspaces

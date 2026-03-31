@@ -15,8 +15,8 @@ Panopticon consists of three main components:
 ┌─────────────────────────────────────────────────────────────────┐
 │                         DASHBOARD                                │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │   React     │  │   Next.js   │  │   API       │            │
-│  │   Frontend  │──│   SSR       │──│   Server    │            │
+│  │   React     │  │   Vite      │  │   Express   │            │
+│  │   Frontend  │──│   Build     │──│   API       │            │
 │  └─────────────┘  └─────────────┘  └─────────────┘            │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -33,11 +33,14 @@ Panopticon consists of three main components:
 │                        CLOISTER                                  │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
 │  │  Heartbeat  │  │  Handoff    │  │ Specialists │            │
-│  │  Monitor    │  │  Manager    │  │  (review,   │            │
-│  └─────────────┘  └─────────────┘  │  test, merge)│            │
+│  │  Monitor    │  │  Manager    │  │ (review,    │            │
+│  └─────────────┘  └─────────────┘  │ test, inspect│           │
+│                                    │ uat, merge) │            │
 │                                    └─────────────┘            │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+The dashboard uses **React + Vite** for the frontend and **Express** for the API server. There is no SSR layer — the frontend is a standard SPA served by the Express API.
 
 ## Directory Structure
 
@@ -45,7 +48,7 @@ Panopticon stores all runtime state in `~/.panopticon/`:
 
 ```
 ~/.panopticon/
-  config.toml           # Main configuration
+  config.yaml           # Main configuration
   projects.yaml         # Multi-project registry with issue routing
   project-mappings.json # Linear project → local path mappings (legacy)
   session-map.json      # Claude sessions → issue linking
@@ -95,7 +98,7 @@ Each agent's state is tracked in `~/.panopticon/agents/{agent-id}/state.json`:
   "workspace": "/home/user/projects/myapp/workspaces/feature-min-123",
   "branch": "feature/min-123",
   "phase": "implementation",
-  "model": "sonnet",
+  "model": "kimi-k2.5",
   "complexity": "medium",
   "handoffCount": 0,
   "sessionId": "abc123",
@@ -107,12 +110,28 @@ Each agent's state is tracked in `~/.panopticon/agents/{agent-id}/state.json`:
 | Field | Description |
 |-------|-------------|
 | `phase` | Current work phase: `planning`, `implementation`, `testing`, `review`, `merging` |
-| `model` | Current model: `haiku`, `sonnet`, `opus` |
+| `model` | Current model: `haiku`, `sonnet`, `opus`, `kimi-k2.5`, or other provider models |
 | `complexity` | Detected complexity: `trivial`, `simple`, `medium`, `complex`, `expert` |
 | `handoffCount` | Number of times the agent has been handed off to a different model |
 | `sessionId` | Claude Code session ID (for resuming after handoff) |
 
 **State Cleanup:** When an agent is killed or aborted (`pan work kill`), Panopticon automatically cleans up its state files to prevent stale data from affecting future runs.
+
+## Remote Workspaces
+
+Panopticon supports remote workspace execution via Fly.io Machines. Remote workspaces provide:
+
+- **Cloud-hosted agent environments** — run agents on remote machines without local resource constraints
+- **On-demand provisioning** — Fly.io Machines spin up per workspace and shut down after merge
+- **Same workflow** — `pan remote` commands mirror local workspace operations
+
+Remote workspace management:
+```bash
+pan remote init        # Initialize Fly.io provider
+pan remote setup       # Configure remote environment
+pan remote status      # Check remote workspace status
+pan remote resources   # View resource allocation
+```
 
 ## Deep Wipe
 
@@ -129,10 +148,9 @@ pan work wipe MIN-123 -y -w     # Skip confirmation
 - Agent state directories (`~/.panopticon/agents/planning-*`, `agent-*`)
 - Legacy planning directories (`project/.planning/min-123/`)
 - Workspace (if `-w` flag is used)
-- Linear issue status (reset to Backlog)
-- Linear labels (removes "Review Ready", "Planning")
+- Issue tracker status (reset to Backlog/Open)
 
-**Dashboard UI:** When aborting planning, click "🔥 Deep Wipe" for a complete reset.
+**Dashboard UI:** When aborting planning, click "Deep Wipe" for a complete reset.
 
 ## Health Monitoring (Deacon Pattern)
 
@@ -169,8 +187,8 @@ Panopticon uses a **shared config, switchable CLI** approach:
 
 ```
 ~/.panopticon/           # Shared by both dev and prod
-├── config.toml          # Settings
-├── projects.json        # Registered projects
+├── config.yaml          # Settings
+├── projects.yaml        # Registered projects
 ├── project-mappings.json # Linear → local path mappings
 ├── agents/              # Agent state
 └── skills/              # Shared skills
@@ -182,16 +200,14 @@ Both dev and production versions read/write the same config, so you can switch b
 
 ```bash
 # Clone and setup
-git clone https://github.com/eltmon/panopticon.git
-cd panopticon
+git clone https://github.com/eltmon/panopticon-cli.git
+cd panopticon-cli
 npm install
 
 # Link dev version globally (makes 'pan' use your local code)
 npm link
 
 # Start the dashboard (with hot reload)
-cd src/dashboard
-npm run install:all
 npm run dev
 # → Frontend: http://localhost:3010
 # → API: http://localhost:3011
@@ -201,7 +217,7 @@ npm run dev
 
 ```bash
 # Use dev version (from your local repo)
-cd /path/to/panopticon && npm link
+cd /path/to/panopticon-cli && npm link
 
 # Switch back to stable release
 npm unlink panopticon-cli
@@ -212,10 +228,10 @@ npm install -g panopticon-cli
 
 | Mode | Command | Use Case |
 |------|---------|----------|
-| **Production** | `pan up` | Daily usage, containerized, HTTPS at https://pan.localhost |
-| **Dev** | `cd src/dashboard && npm run dev` | Only for active development on Panopticon itself |
+| **Production** | `pan up` | Daily usage, HTTPS at https://pan.localhost |
+| **Dev** | `npm run dev` | Only for active development on Panopticon itself |
 
-**Note:** Use `pan up` for normal usage - it runs in Docker and won't conflict with your project's ports. Only use dev mode when actively working on Panopticon's codebase.
+**Note:** Use `pan up` for normal usage. Only use dev mode when actively working on Panopticon's codebase.
 
 ### Working on Panopticon While Using It
 
