@@ -8,8 +8,10 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { readWorkspacePlan } from './io.js';
-import type { VBriefDocument, VBriefItem } from './types.js';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { readWorkspacePlan, updateItemStatus } from './io.js';
+import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 
 const execAsync = promisify(exec);
 
@@ -171,4 +173,68 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   }
 
   return { success: errors.length === 0, created, errors, beadIds };
+}
+
+/**
+ * Syncs a closed bead's status to the corresponding vBRIEF item.
+ *
+ * Reads the bead title from .beads/issues.jsonl, strips the issue prefix
+ * (e.g. "PAN-388: Wire createBeadsFromVBrief()" → "Wire createBeadsFromVBrief()"),
+ * finds the matching item in plan.vbrief.json, and calls updateItemStatus().
+ *
+ * No-ops gracefully when:
+ * - No plan.vbrief.json exists (legacy workspace)
+ * - Bead ID not found in issues.jsonl
+ * - No matching vBRIEF item found
+ */
+export function syncBeadStatusToVBrief(
+  beadId: string,
+  workspacePath: string,
+  status: VBriefItemStatus = 'completed'
+): void {
+  try {
+    const doc = readWorkspacePlan(workspacePath);
+    if (!doc) return;
+
+    // Read bead title from .beads/issues.jsonl
+    const beadsFile = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!existsSync(beadsFile)) return;
+
+    const lines = readFileSync(beadsFile, 'utf-8').split('\n').filter(Boolean);
+    let beadTitle: string | null = null;
+    for (const line of lines) {
+      try {
+        const bead = JSON.parse(line);
+        if (bead.id === beadId && bead.title) {
+          beadTitle = bead.title as string;
+          break;
+        }
+      } catch {
+        // skip malformed lines
+      }
+    }
+
+    if (!beadTitle) return;
+
+    // Strip issue prefix: "{PLAN_ID}: {item.title}" → "{item.title}"
+    const planId = doc.plan.id;
+    const prefix = `${planId}: `;
+    const itemTitle = beadTitle.startsWith(prefix)
+      ? beadTitle.slice(prefix.length)
+      : beadTitle;
+
+    // Find matching item (case-insensitive)
+    const itemTitleLower = itemTitle.toLowerCase();
+    const matchingItem = doc.plan.items.find(
+      i => i.title.toLowerCase() === itemTitleLower
+    );
+
+    if (!matchingItem) return;
+
+    updateItemStatus(workspacePath, matchingItem.id, status);
+    console.log(`[vbrief-sync] Updated item "${matchingItem.id}" to "${status}" from bead ${beadId}`);
+  } catch (err: any) {
+    // Non-fatal: log and continue
+    console.warn(`[vbrief-sync] Failed to sync bead ${beadId}: ${err.message}`);
+  }
 }
