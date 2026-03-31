@@ -1988,7 +1988,7 @@ PHASE 1 — SYNC & BASELINE (before merge):
    If rebase conflicts: abort and report failure.
 5. Run tests on main to establish a baseline. Record BASELINE_PASS and BASELINE_FAIL.
 
-PHASE 2 — MERGE:
+PHASE 2 — MERGE (dry run):
 6. git merge ${mergeBranch} --no-edit
 7. If conflicts: resolve them intelligently, then git add and git commit
 8. If clean merge: the merge commit is auto-created (or fast-forward)
@@ -1998,9 +1998,12 @@ PHASE 3 — VERIFY:
 
 PHASE 4 — DECIDE:
 10. Compare results:
-    - If MERGE_FAIL > BASELINE_FAIL (NEW test failures): ROLLBACK with git reset --hard ORIG_HEAD
-    - If MERGE_FAIL <= BASELINE_FAIL (no new failures): PUSH with git push origin main
+    - If MERGE_FAIL > BASELINE_FAIL (NEW test failures): ROLLBACK with git reset --hard ORIG_HEAD and report FAILED
+    - If MERGE_FAIL <= BASELINE_FAIL (no new failures): Report PASSED (merge is validated)
     - Pre-existing failures on main are NOT a reason to rollback
+
+CRITICAL: Do NOT push to main. Do NOT run git push origin main.
+The merge validation stays LOCAL. A human will click Merge in the dashboard to push.
 
 PHASE 5 — REPORT:
 11. Call the Panopticon API to report results:
@@ -2009,6 +2012,7 @@ PHASE 5 — REPORT:
       -d '{"specialist":"merge","issueId":"${task.issueId}","status":"passed|failed","notes":"<summary>"}'
 
 CRITICAL: You MUST call the /api/specialists/done endpoint whether you succeed or fail.
+CRITICAL: NEVER push to main — only humans merge. Your job is to VALIDATE the merge, not execute it.
 CRITICAL: NEVER use git push --force.
 CRITICAL: Do NOT delete the feature branch.`;
       break;
