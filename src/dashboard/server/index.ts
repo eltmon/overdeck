@@ -7236,12 +7236,10 @@ app.post('/api/workspaces/:issueId/review', async (req, res) => {
       return;
     }
 
-    // Set state to active IMMEDIATELY to prevent concurrent wakes (PAN-88)
-    saveAgentRuntimeState(reviewSession, {
-      state: 'active',
-      lastActivity: new Date().toISOString(),
-    });
-    console.log(`[review] Marked review-agent active, starting pipeline for ${issueId}${isRemoteWorkspace ? ' (remote)' : ''}...`);
+    // NOTE: Do NOT pre-set state to 'active' here. spawnEphemeralSpecialist checks
+    // runtime state for busy detection — pre-setting 'active' makes it think the
+    // specialist is already working. The spawn function sets state to active internally.
+    console.log(`[review] Starting review pipeline for ${issueId}${isRemoteWorkspace ? ' (remote)' : ''}...`);
 
     const reviewPrompt = `STRICT REVIEW for ${issueId}
 
