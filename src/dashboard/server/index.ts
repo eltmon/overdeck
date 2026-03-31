@@ -7282,9 +7282,8 @@ ${workspaceAccessInstructions}
 
 **IF CODE IS PERFECT:**
 - Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
-- Queue test-agent (DO NOT use pan specialists wake directly):
-
-curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","isRemote":${workspaceInfo.isRemote},"vmName":"${workspaceInfo.vmName || ''}","customPrompt":"TEST for ${issueId}:\\nWORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}\\nBRANCH: ${branchName}\\n\\n1. ${isRemoteWorkspace ? `fly ssh console -a ${flyAppName} then cd ${workspacePath}` : `cd ${workspacePath}`}\\n2. Run tests: npm test\\n3. Update status:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Just update status. Human will click Merge."}'`;
+- The test-agent will be automatically dispatched when you post reviewStatus:"passed". Do NOT manually queue the test-agent.
+- After posting the status, your work is DONE. Do not do anything else.`;
 
     // Use per-project ephemeral specialist when possible (PAN-300)
     let reviewResult: { success: boolean; message: string };
