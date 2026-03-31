@@ -128,8 +128,11 @@ function getLabelStyle(label: string): string {
   return 'bg-gray-800/60 text-gray-400 border border-gray-600/30';
 }
 
-function getCostColor(_cost: number): string {
-  return 'bg-surface-overlay text-content-subtle';
+function getCostColor(cost: number): string {
+  if (cost < 2) return 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30';
+  if (cost < 5) return 'bg-yellow-500/15 text-yellow-400 ring-1 ring-inset ring-yellow-500/30';
+  if (cost < 10) return 'bg-orange-500/15 text-orange-400 ring-1 ring-inset ring-orange-500/30';
+  return 'bg-red-500/15 text-red-400 ring-1 ring-inset ring-red-500/30';
 }
 
 async function fetchIssues(cycle: string = 'current', includeCompleted: boolean = false): Promise<Issue[]> {
