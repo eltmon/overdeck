@@ -10,7 +10,7 @@
  * In Phase 2, removeWorkspace() will delegate to this module for the common steps.
  */
 
-import { existsSync, rmSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, rmSync, unlinkSync } from 'fs';
 import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -28,6 +28,7 @@ const execAsync = promisify(exec);
  */
 async function killTmuxSessions(issueLower: string): Promise<StepResult> {
   const step = 'teardown:tmux-sessions';
+  // Legacy naming: agent-{issue}, review-{issue}, etc.
   const patterns = [
     `agent-${issueLower}`,
     `review-${issueLower}`,
@@ -46,6 +47,30 @@ async function killTmuxSessions(issueLower: string): Promise<StepResult> {
         // session may have died between check and kill
       }
     }
+  }
+
+  // PAN-300: per-project ephemeral specialists use "specialist-{project}-{type}" naming.
+  // Kill any specialist session whose currentIssue matches this issue.
+  try {
+    const { stdout } = await execAsync(`tmux list-sessions -F "#{session_name}" 2>/dev/null || true`, { encoding: 'utf-8' });
+    const sessions = stdout.trim().split('\n').filter(s => s.startsWith('specialist-'));
+    for (const session of sessions) {
+      try {
+        // Check if this specialist's runtime state has currentIssue matching our issue
+        const statePath = join(homedir(), '.panopticon', 'agents', session, 'state.json');
+        if (existsSync(statePath)) {
+          const state = JSON.parse(readFileSync(statePath, 'utf-8'));
+          if (state.currentIssue?.toLowerCase() === issueLower) {
+            await execAsync(`tmux kill-session -t "${session}"`);
+            killed++;
+          }
+        }
+      } catch {
+        // ignore individual session check failures
+      }
+    }
+  } catch {
+    // tmux not available or no sessions
   }
 
   if (killed > 0) {
