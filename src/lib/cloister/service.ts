@@ -465,6 +465,17 @@ export class CloisterService {
         // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
         const issueId = dir.name.replace('agent-', '').toUpperCase();
 
+        // Skip if review is already in progress or passed — `pan work done` already triggered it.
+        // This completion marker scan is only a fallback for when the HTTP call from `pan work done` fails.
+        const { getReviewStatus } = await import('../review-status.js');
+        const existingReview = getReviewStatus(issueId);
+        if (existingReview && ['reviewing', 'passed'].includes(existingReview.reviewStatus || '')) {
+          console.log(`🔔 Cloister: Completion marker for ${issueId} — review already ${existingReview.reviewStatus}, marking processed`);
+          try { renameSync(completedFile, processedFile); } catch {}
+          this.processedCompletions.set(dir.name, Infinity);
+          continue;
+        }
+
         console.log(`🔔 Cloister: Found completion marker for ${issueId}, triggering review...${retryCount > 0 ? ` (retry ${retryCount}/3)` : ''}`);
 
         try {
