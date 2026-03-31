@@ -7,7 +7,7 @@ cd "$SCRIPT_DIR"
 # Load and export all .env variables so Docker Compose can use them
 if [ -f .env ]; then set -a; source .env; set +a; fi
 
-FEATURE_FOLDER="feature-pan-354"
+FEATURE_FOLDER="feature-pan-402"
 
 # Use workspace-specific project name to avoid container conflicts
 export COMPOSE_PROJECT_NAME="panopticon-${FEATURE_FOLDER}"

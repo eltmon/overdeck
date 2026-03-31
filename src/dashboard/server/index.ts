@@ -10019,6 +10019,7 @@ set -s escape-time 0
         }, null, 2));
 
         console.log(`Started remote planning agent ${sessionName} on ${vmName}`);
+        socketIo.emit('planning:started', { issueId: issue.identifier, sessionName });
 
       } else {
         // ===== LOCAL PLANNING AGENT =====
@@ -10038,6 +10039,7 @@ set -s escape-time 0
             type: 'planning',
             location: 'local',
           }, null, 2));
+          socketIo.emit('planning:failed', { issueId: issue.identifier, error: `Workspace creation failed: ${workspaceError || 'unknown'}` });
           return; // Exit the background async block
         }
 
@@ -10094,6 +10096,7 @@ exec ${cmdWithArgs} "$prompt"
         }
 
         console.log(`Started local planning agent ${sessionName} with initial prompt`);
+        socketIo.emit('planning:started', { issueId: issue.identifier, sessionName });
       }
 
       console.log(`[start-planning] Background setup complete for ${issue.identifier}`);
@@ -10112,6 +10115,7 @@ exec ${cmdWithArgs} "$prompt"
           location: workspaceLocation,
         }, null, 2));
       } catch { /* ignore state write errors */ }
+      socketIo.emit('planning:failed', { issueId: issue.identifier, error: err.message });
     }
 
     } catch (bgErr: any) {

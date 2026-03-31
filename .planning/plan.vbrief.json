@@ -1,0 +1,72 @@
+{
+  "vBRIEFInfo": { "version": "0.5", "created": "2026-03-31T00:00:00Z" },
+  "plan": {
+    "id": "PAN-402",
+    "title": "Dashboard: planning agent spawn failures are invisible to the UI",
+    "status": "approved",
+    "author": "opus-plan",
+    "tags": ["dashboard", "planning", "error-handling", "socket.io", "ux"],
+    "narratives": {
+      "Problem": "When planning agent spawn fails in the background async task, the UI shows success because the HTTP response was already sent. The user has no way to know planning didn't actually start.",
+      "Proposal": "Emit Socket.io events (planning:started, planning:failed) from the background async task. Frontend listens for these events to show failures in PlanDialog (with retry/abort) and on kanban cards (failure badge).",
+      "Constraint": "Must not change the fire-and-forget pattern from PAN-302 (instant UI response). Must not break existing polling fallback. Must follow existing badge patterns in KanbanBoard.",
+      "Risk": "Socket event could be missed on reconnect — mitigated by agents query refetch (5s interval) picking up failed state for kanban badge, and PlanDialog re-checking status on open.",
+      "Alternative": "Polling-only approach rejected because it only works when Watch Planning is checked and has 2s latency. Combined socket+enhanced-polling rejected as unnecessary complexity."
+    },
+    "items": [
+      {
+        "id": "emit-socket-events",
+        "title": "Emit planning:started and planning:failed Socket.io events from backend",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-402"
+        },
+        "narrative": { "Action": "In the background async IIFE of POST /api/issues/:id/start-planning in server/index.ts, emit socketIo.emit('planning:started', { issueId, sessionName }) after writing status: 'running', and socketIo.emit('planning:failed', { issueId, error }) in the catch block after writing status: 'failed'." },
+        "subItems": []
+      },
+      {
+        "id": "socket-listeners",
+        "title": "Add planning socket event listeners in useSocketIssues hook",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-402"
+        },
+        "narrative": { "Action": "In useSocketIssues.ts, add listeners for planning:started and planning:failed events. On either event, invalidate the ['planningStatus', issueId] and ['agents'] React Query caches so both PlanDialog and KanbanBoard reflect the new state." },
+        "subItems": []
+      },
+      {
+        "id": "plandialog-error-state",
+        "title": "Add error step to PlanDialog with retry and abort controls",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-402"
+        },
+        "narrative": { "Action": "Add a new 'error' step to PlanDialog's state machine. When planning:failed is received (via invalidated planningStatus query showing error), transition to error step. Render: error message from status endpoint, Retry button (re-calls startPlanningMutation), Abort button (calls abort-planning endpoint). Handle transitions back to 'starting' on retry." },
+        "subItems": []
+      },
+      {
+        "id": "kanban-failure-badge",
+        "title": "Show 'Plan Failed' badge on kanban card when planning spawn fails",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-402"
+        },
+        "narrative": { "Action": "In KanbanBoard.tsx IssueCard, check if the planning agent for this issue has status: 'failed' (from the agents query data). If so, render a red 'Plan Failed' badge with XCircle icon, following the same pattern as the existing 'Stuck' badge (red-500, pulse animation)." },
+        "subItems": []
+      }
+    ],
+    "edges": [
+      { "from": "emit-socket-events", "to": "socket-listeners", "type": "blocks" },
+      { "from": "socket-listeners", "to": "plandialog-error-state", "type": "blocks" },
+      { "from": "socket-listeners", "to": "kanban-failure-badge", "type": "informs" }
+    ]
+  }
+}
