@@ -2060,8 +2060,19 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 <AgentBadge key={i} type={b.type} name={b.name} isConflict={hasConflict} />
               ));
             })()}
+            {/* Plan Failed badge - shown when planning agent spawn failed */}
+            {planningAgent?.status === 'failed' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onPlan(); }}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-red-900/50 text-red-300 animate-pulse hover:bg-red-800/60 transition-colors cursor-pointer"
+                title={planningAgent.error ? `Planning failed: ${planningAgent.error}` : 'Planning agent failed to start — click to retry'}
+              >
+                <XCircle className="w-3 h-3" />
+                Plan Failed
+              </button>
+            )}
             {/* Planning badge - clickable to watch the active planning session */}
-            {planningAgent && planningAgent.status !== 'stopped' && (
+            {planningAgent && planningAgent.status !== 'stopped' && planningAgent.status !== 'failed' && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPlan(); }}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-900/50 text-purple-300 animate-pulse hover:bg-purple-800/60 transition-colors cursor-pointer"
