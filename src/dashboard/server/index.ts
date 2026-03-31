@@ -58,7 +58,7 @@ import {
 } from '../../lib/paths.js';
 import type { Issue } from '../frontend/src/types.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
-import { findPlan } from '../../lib/vbrief/io.js';
+import { findPlan, readPlan } from '../../lib/vbrief/io.js';
 
 // Read package version once at startup — version never changes at runtime
 // In built output (dist/dashboard/server.js), import.meta.url resolves to dist/dashboard/,
@@ -5554,6 +5554,28 @@ app.post('/api/workspaces', (req, res) => {
   } catch (error: any) {
     console.error('Error creating workspace:', error);
     res.status(500).json({ error: 'Failed to create workspace: ' + error.message });
+  }
+});
+
+// Return the vBRIEF plan document for a workspace
+app.get('/api/workspaces/:issueId/plan', (req, res) => {
+  const { issueId } = req.params;
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspaceName = `feature-${issueLower}`;
+  const workspacePath = join(projectPath, 'workspaces', workspaceName);
+
+  const planPath = findPlan(workspacePath);
+  if (!planPath) {
+    return res.status(404).json({ error: 'No vBRIEF plan found for this workspace' });
+  }
+
+  try {
+    const doc = readPlan(planPath);
+    res.json(doc);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to read plan: ' + err.message });
   }
 });
 
