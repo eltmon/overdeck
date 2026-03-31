@@ -35,7 +35,11 @@ export function criticalPath(doc: VBriefDocument): string[] {
     }
   }
 
-  // Topological sort (Kahn's algorithm) for longest-path DP
+  // Topological sort (Kahn's algorithm) for longest-path DP.
+  // Assumption: the plan DAG is acyclic. Cycles are not detected; if present,
+  // nodes in the cycle will retain non-zero in-degree and be excluded from
+  // topoOrder, effectively treating the cycle as a disconnected subgraph
+  // (the longest path through non-cyclic nodes is still returned correctly).
   const inDegree = new Map<string, number>();
   for (const id of itemIds) {
     inDegree.set(id, incoming.get(id)!.length);

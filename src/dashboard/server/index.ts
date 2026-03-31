@@ -58,7 +58,7 @@ import {
 } from '../../lib/paths.js';
 import type { Issue } from '../frontend/src/types.js';
 import { createBeadsFromVBrief, syncBeadStatusToVBrief } from '../../lib/vbrief/beads.js';
-import { findPlan, readPlan } from '../../lib/vbrief/io.js';
+import { findPlan, readPlan, readWorkspacePlan } from '../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../lib/cloister/task-readiness.js';
 import { criticalPath } from '../../lib/vbrief/dag.js';
 
@@ -7006,7 +7006,7 @@ app.post('/api/specialists/done', async (req, res) => {
                 status: 'completed',
               });
 
-              // Auto-wake: check which tasks are now unblocked and emit notification
+              // Auto-wake: check which tasks are now unblocked and wake the work agent
               try {
                 const unblockedItems = getUnblockedItems(workspacePath, updatedItemId);
                 if (unblockedItems.length > 0) {
@@ -7015,6 +7015,17 @@ app.post('/api/specialists/done', async (req, res) => {
                     issueId: normalizedIssueId,
                     itemIds: unblockedItems,
                     triggeredBy: updatedItemId,
+                  });
+                  // Wake the work agent so it picks up the next unblocked task
+                  const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
+                  const doc = readWorkspacePlan(workspacePath);
+                  const unblockedTitles = unblockedItems.map(id => {
+                    const it = doc?.plan.items.find(i => i.id === id);
+                    return it ? `"${it.title}"` : `"${id}"`;
+                  }).join(', ');
+                  const wakeMsg = `DAG SCHEDULER: Task${unblockedItems.length > 1 ? 's' : ''} now unblocked after completing "${updatedItemId}": ${unblockedTitles}. Pick up the next available task.`;
+                  await messageAgent(workAgentId, wakeMsg).catch((err: any) => {
+                    console.log(`[auto-wake] Could not wake ${workAgentId} (may not be running): ${err.message}`);
                   });
                 }
               } catch (wakeErr: any) {
@@ -10400,7 +10411,7 @@ PANOPTICON_MSG_EOF`);
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, Beads tasks via \`bd create\`, implementation plan at \`docs/prds/active/{issue-id}-plan.md\`)
+- Generate planning artifacts (STATE.md, vBRIEF plan at \`.planning/plan.vbrief.json\`, implementation plan at \`docs/prds/active/{issue-id}-plan.md\`)
 - Present options and tradeoffs
 
 ---

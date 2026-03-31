@@ -226,7 +226,8 @@ interface PlanItemDetailProps {
 }
 
 function PlanItemDetail({ item, doc, beads, issueId }: PlanItemDetailProps) {
-  const titlePattern = `${issueId}: ${item.title}`.toLowerCase();
+  // Beads are created with title "{plan.id}: {item.title}" — match using plan.id, not issueId
+  const titlePattern = `${doc.plan.id}: ${item.title}`.toLowerCase();
   const matchedBead = beads.find(b => b.name.toLowerCase() === titlePattern);
 
   const blockerIds = doc.plan.edges
