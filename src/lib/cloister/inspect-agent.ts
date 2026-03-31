@@ -7,6 +7,7 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
+import { syncBeadStatusToVBrief } from '../vbrief/beads.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
@@ -188,6 +189,13 @@ export function onInspectComplete(
     const commitSha = getCurrentHead(workspacePath);
     saveCheckpoint(projectKey, issueId, beadId, commitSha);
     console.log(`[inspect] Checkpoint saved for ${issueId} bead ${beadId} at ${commitSha.substring(0, 8)}`);
+
+    // Sync bead completion to vBRIEF plan (no-op when no plan exists)
+    try {
+      syncBeadStatusToVBrief(beadId, workspacePath, 'completed');
+    } catch {
+      // Non-fatal: vBRIEF sync failure should not block inspection
+    }
   } else {
     console.log(`[inspect] Bead ${beadId} blocked for ${issueId} — no checkpoint saved`);
   }
