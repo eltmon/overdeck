@@ -2,13 +2,17 @@
  * PlanDAG — ReactFlow-based DAG visualization for vBRIEF plans
  *
  * Renders a dependency graph from a VBriefDocument with:
- * - Status-colored node borders
- * - Edge type styling (solid=blocks, dashed=informs)
- * - Automatic dagre layout (top-to-bottom)
+ * - Status-colored node borders (gray=pending, blue=in_progress, green=completed, red=blocked, yellow=cancelled)
+ * - Edge type styling (solid=blocks, dashed=informs, dotted=suggests)
+ * - Automatic dagre top-to-bottom layout
  * - Zoom, pan, minimap support
+ * - Critical path highlighting in orange
+ *
+ * PlanDAGViewer: data-fetching wrapper that loads from /api/workspaces/:issueId/plan
  */
 
 import { useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import ReactFlow, {
   type Node,
   type Edge,
@@ -246,5 +250,51 @@ export function PlanDAG({ doc, criticalPath = [], onNodeClick, className }: Plan
         />
       </ReactFlow>
     </div>
+  );
+}
+
+// ── PlanDAGViewer — fetches plan from API and renders PlanDAG ──
+
+interface PlanDAGViewerProps {
+  issueId: string;
+  criticalPath?: string[];
+  onNodeClick?: (item: VBriefItem) => void;
+  className?: string;
+}
+
+export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }: PlanDAGViewerProps) {
+  const { data: doc, isLoading, isError } = useQuery<VBriefDocument>({
+    queryKey: ['plan', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/plan`);
+      if (!res.ok) throw new Error('No plan available');
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className={className} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#6b7280', fontSize: 12 }}>
+        Loading plan…
+      </div>
+    );
+  }
+
+  if (isError || !doc) {
+    return (
+      <div className={className} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#6b7280', fontSize: 12 }}>
+        No plan available for this workspace.
+      </div>
+    );
+  }
+
+  return (
+    <PlanDAG
+      doc={doc}
+      criticalPath={criticalPath}
+      onNodeClick={onNodeClick}
+      className={className}
+    />
   );
 }
