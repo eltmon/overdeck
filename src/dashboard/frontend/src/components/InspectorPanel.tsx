@@ -149,7 +149,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
     refetchInterval: (workspaceCreating || containersStarting) ? 2000 : 5000,
   });
 
-  const { data: reviewStatus } = useQuery<ReviewStatus>({
+  const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
     queryKey: ['review-status', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/review-status`);
@@ -837,6 +837,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
         <ActionsSection
           agent={agent}
           reviewStatus={reviewStatus}
+          reviewStatusLoading={reviewStatusLoading}
           workspace={workspace}
           mergeMutation={mergeMutation}
           reviewMutation={reviewMutation}
