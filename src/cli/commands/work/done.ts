@@ -152,9 +152,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (workspacePath && existsSync(workspacePath)) {
       const failures: string[] = [];
 
-      // Check 1: Open beads
+      // Check 1: Open beads for THIS issue only (not all beads in shared database)
       try {
-        const { stdout } = await execAsync('bd list --status open --limit 0 --json', { cwd: workspacePath });
+        const { stdout } = await execAsync(
+          `bd list --status open -l "${issueId.toLowerCase()}" --limit 0 --json`,
+          { cwd: workspacePath }
+        );
         const beads = JSON.parse(stdout);
         if (Array.isArray(beads) && beads.length > 0) {
           failures.push(`  Open beads (${beads.length}):`);

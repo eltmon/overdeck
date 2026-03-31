@@ -846,9 +846,34 @@ export async function stopWorkspaceDocker(
       const fileFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
       const cwd = existsSync(devcontainerDir) ? devcontainerDir : workspacePath;
 
-      // Don't pass -p: let the compose file's `name:` field determine the project.
-      // This must match what was used at startup to target the correct containers.
-      await execAsync(`docker compose ${fileFlags} down -v --remove-orphans`, {
+      // Derive compose project name from the dev script (same logic as dashboard)
+      // or fall back to "{projectName}-feature-{featureName}" convention.
+      let composeProjectName = `${projectName}-feature-${featureName}`;
+      const devScriptPaths = [
+        join(workspacePath, '.devcontainer', 'dev'),
+        join(workspacePath, 'dev'),
+      ];
+      for (const devPath of devScriptPaths) {
+        try {
+          if (existsSync(devPath)) {
+            const content = readFileSync(devPath, 'utf-8');
+            const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+            if (match) {
+              composeProjectName = `${match[1]}feature-${featureName}`;
+              break;
+            }
+            const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
+            if (literalMatch) {
+              composeProjectName = literalMatch[1];
+              break;
+            }
+          }
+        } catch {
+          // Fall through to default
+        }
+      }
+
+      await execAsync(`docker compose ${fileFlags} -p "${composeProjectName}" down -v --remove-orphans`, {
         cwd,
         timeout: 60000,
       });
