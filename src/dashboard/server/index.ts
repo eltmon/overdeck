@@ -59,6 +59,7 @@ import {
 import type { Issue } from '../frontend/src/types.js';
 import { createBeadsFromVBrief, syncBeadStatusToVBrief } from '../../lib/vbrief/beads.js';
 import { findPlan, readPlan } from '../../lib/vbrief/io.js';
+import { getUnblockedItems } from '../../lib/cloister/task-readiness.js';
 
 // Read package version once at startup — version never changes at runtime
 // In built output (dist/dashboard/server.js), import.meta.url resolves to dist/dashboard/,
@@ -7002,6 +7003,21 @@ app.post('/api/specialists/done', async (req, res) => {
                 itemId: updatedItemId,
                 status: 'completed',
               });
+
+              // Auto-wake: check which tasks are now unblocked and emit notification
+              try {
+                const unblockedItems = getUnblockedItems(workspacePath, updatedItemId);
+                if (unblockedItems.length > 0) {
+                  console.log(`[auto-wake] ${normalizedIssueId}: items unblocked after "${updatedItemId}": ${unblockedItems.join(', ')}`);
+                  socketIo.emit('plan:items-unblocked', {
+                    issueId: normalizedIssueId,
+                    itemIds: unblockedItems,
+                    triggeredBy: updatedItemId,
+                  });
+                }
+              } catch (wakeErr: any) {
+                console.warn(`[auto-wake] Failed to check unblocked items: ${wakeErr.message}`);
+              }
             }
           } catch (syncErr: any) {
             console.warn(`[specialists/done] vBRIEF sync failed: ${syncErr.message}`);
