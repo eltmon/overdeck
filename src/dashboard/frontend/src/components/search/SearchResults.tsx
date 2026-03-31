@@ -51,7 +51,7 @@ export function SearchResults({ groupedResults, onSelect, onExternalLink }: Sear
                 key={issue.id}
                 value={issue.identifier}
                 onSelect={() => onSelect(issue.identifier)}
-                className="px-4 py-3 cursor-pointer hover:bg-surface-overlay transition-colors border-b border-gray-750 last:border-b-0 aria-selected:bg-surface-overlay"
+                className="px-4 py-3 cursor-pointer hover:bg-surface-overlay transition-colors border-b border-divider last:border-b-0 aria-selected:bg-surface-overlay"
               >
                 <div className="flex items-start gap-3">
                   {/* Project color indicator */}
