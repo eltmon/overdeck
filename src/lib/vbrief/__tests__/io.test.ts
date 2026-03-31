@@ -1,0 +1,141 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { findPlan, readPlan, readWorkspacePlan, updateItemStatus } from '../io.js';
+import type { VBriefDocument } from '../types.js';
+
+let TEST_DIR: string;
+
+function makePlanDoc(items: Array<{ id: string; status?: string }> = []): VBriefDocument {
+  return {
+    vBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
+    plan: {
+      id: 'TEST',
+      title: 'Test Plan',
+      status: 'active',
+      items: items.map(i => ({ id: i.id, title: i.id, status: (i.status ?? 'pending') as any })),
+      edges: [],
+    },
+  };
+}
+
+function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
+  const planDir = join(workspacePath, '.planning');
+  mkdirSync(planDir, { recursive: true });
+  const planPath = join(planDir, 'plan.vbrief.json');
+  writeFileSync(planPath, JSON.stringify(doc, null, 2));
+  return planPath;
+}
+
+beforeEach(() => {
+  TEST_DIR = join(tmpdir(), `vbrief-io-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(TEST_DIR, { recursive: true });
+});
+
+afterEach(() => {
+  rmSync(TEST_DIR, { recursive: true, force: true });
+});
+
+describe('findPlan', () => {
+  it('returns null when workspace has no .planning directory', () => {
+    expect(findPlan(TEST_DIR)).toBeNull();
+  });
+
+  it('returns null when .planning exists but plan.vbrief.json does not', () => {
+    mkdirSync(join(TEST_DIR, '.planning'), { recursive: true });
+    expect(findPlan(TEST_DIR)).toBeNull();
+  });
+
+  it('returns the plan path when plan.vbrief.json exists', () => {
+    writePlanDoc(TEST_DIR, makePlanDoc());
+    const result = findPlan(TEST_DIR);
+    expect(result).not.toBeNull();
+    expect(result).toContain('plan.vbrief.json');
+    expect(existsSync(result!)).toBe(true);
+  });
+});
+
+describe('readPlan', () => {
+  it('parses and returns VBriefDocument', () => {
+    const doc = makePlanDoc([{ id: 'item-1' }]);
+    const planPath = writePlanDoc(TEST_DIR, doc);
+    const result = readPlan(planPath);
+    expect(result.plan.id).toBe('TEST');
+    expect(result.plan.items).toHaveLength(1);
+    expect(result.plan.items[0].id).toBe('item-1');
+  });
+
+  it('throws for nonexistent file', () => {
+    expect(() => readPlan(join(TEST_DIR, 'nonexistent.json'))).toThrow();
+  });
+
+  it('throws for invalid JSON', () => {
+    const badPath = join(TEST_DIR, 'bad.json');
+    writeFileSync(badPath, 'not valid json!!!');
+    expect(() => readPlan(badPath)).toThrow();
+  });
+});
+
+describe('readWorkspacePlan', () => {
+  it('returns null when no plan exists', () => {
+    expect(readWorkspacePlan(TEST_DIR)).toBeNull();
+  });
+
+  it('returns VBriefDocument when plan exists', () => {
+    writePlanDoc(TEST_DIR, makePlanDoc([{ id: 'x' }]));
+    const result = readWorkspacePlan(TEST_DIR);
+    expect(result).not.toBeNull();
+    expect(result!.plan.items[0].id).toBe('x');
+  });
+});
+
+describe('updateItemStatus', () => {
+  it('no-ops when no plan exists', () => {
+    expect(() => updateItemStatus(TEST_DIR, 'item-1', 'completed')).not.toThrow();
+  });
+
+  it('updates the status of an existing item', () => {
+    const doc = makePlanDoc([{ id: 'item-1', status: 'pending' }]);
+    writePlanDoc(TEST_DIR, doc);
+
+    updateItemStatus(TEST_DIR, 'item-1', 'completed');
+
+    const updated = readWorkspacePlan(TEST_DIR)!;
+    const item = updated.plan.items.find(i => i.id === 'item-1');
+    expect(item?.status).toBe('completed');
+  });
+
+  it('no-ops when item ID does not exist in plan', () => {
+    writePlanDoc(TEST_DIR, makePlanDoc([{ id: 'item-1' }]));
+    expect(() => updateItemStatus(TEST_DIR, 'nonexistent', 'completed')).not.toThrow();
+
+    const after = readWorkspacePlan(TEST_DIR)!;
+    expect(after.plan.items[0].status).toBe('pending');
+  });
+
+  it('preserves other items when updating one', () => {
+    const doc = makePlanDoc([
+      { id: 'item-1', status: 'pending' },
+      { id: 'item-2', status: 'in_progress' },
+    ]);
+    writePlanDoc(TEST_DIR, doc);
+
+    updateItemStatus(TEST_DIR, 'item-1', 'completed');
+
+    const updated = readWorkspacePlan(TEST_DIR)!;
+    const item2 = updated.plan.items.find(i => i.id === 'item-2');
+    expect(item2?.status).toBe('in_progress');
+  });
+
+  it('writes valid JSON (no .tmp file left over)', () => {
+    writePlanDoc(TEST_DIR, makePlanDoc([{ id: 'item-1' }]));
+    updateItemStatus(TEST_DIR, 'item-1', 'completed');
+
+    const tmpPath = join(TEST_DIR, '.planning', 'plan.vbrief.json.tmp');
+    expect(existsSync(tmpPath)).toBe(false);
+
+    const planPath = join(TEST_DIR, '.planning', 'plan.vbrief.json');
+    expect(() => JSON.parse(readFileSync(planPath, 'utf-8'))).not.toThrow();
+  });
+});

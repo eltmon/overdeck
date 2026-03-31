@@ -38,7 +38,9 @@
     "@visx/group": "^3.3.0",
     "@visx/scale": "^3.5.0",
     "@fontsource/space-grotesk": "^5.0.0",
-    "@fontsource/jetbrains-mono": "^5.0.0"
+    "@fontsource/jetbrains-mono": "^5.0.0",
+    "reactflow": "^11.11.4",
+    "@dagrejs/dagre": "^3.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

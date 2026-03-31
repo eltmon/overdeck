@@ -57,6 +57,10 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../lib/paths.js';
 import type { Issue } from '../frontend/src/types.js';
+import { createBeadsFromVBrief, syncBeadStatusToVBrief } from '../../lib/vbrief/beads.js';
+import { findPlan, readPlan, readWorkspacePlan } from '../../lib/vbrief/io.js';
+import { getUnblockedItems } from '../../lib/cloister/task-readiness.js';
+import { criticalPath } from '../../lib/vbrief/dag.js';
 
 // Read package version once at startup — version never changes at runtime
 // In built output (dist/dashboard/server.js), import.meta.url resolves to dist/dashboard/,
@@ -5555,6 +5559,29 @@ app.post('/api/workspaces', (req, res) => {
   }
 });
 
+// Return the vBRIEF plan document for a workspace
+app.get('/api/workspaces/:issueId/plan', (req, res) => {
+  const { issueId } = req.params;
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspaceName = `feature-${issueLower}`;
+  const workspacePath = join(projectPath, 'workspaces', workspaceName);
+
+  const planPath = findPlan(workspacePath);
+  if (!planPath) {
+    return res.status(404).json({ error: 'No vBRIEF plan found for this workspace' });
+  }
+
+  try {
+    const doc = readPlan(planPath);
+    const cp = criticalPath(doc);
+    res.json({ ...doc, criticalPath: cp });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to read plan: ' + err.message });
+  }
+});
+
 // Preview what would be lost when cleaning a corrupted workspace
 // Includes diff analysis against main branch to identify actual changes
 app.get('/api/workspaces/:issueId/clean/preview', async (req, res) => {
@@ -6968,6 +6995,46 @@ app.post('/api/specialists/done', async (req, res) => {
         const workspacePath = join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
         if (existsSync(workspacePath)) {
           onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath);
+
+          // Sync bead completion to vBRIEF plan and emit live update event
+          try {
+            const updatedItemId = syncBeadStatusToVBrief(beadId, workspacePath, 'completed');
+            if (updatedItemId) {
+              socketIo.emit('plan:item-status-changed', {
+                issueId: normalizedIssueId,
+                itemId: updatedItemId,
+                status: 'completed',
+              });
+
+              // Auto-wake: check which tasks are now unblocked and wake the work agent
+              try {
+                const unblockedItems = getUnblockedItems(workspacePath, updatedItemId);
+                if (unblockedItems.length > 0) {
+                  console.log(`[auto-wake] ${normalizedIssueId}: items unblocked after "${updatedItemId}": ${unblockedItems.join(', ')}`);
+                  socketIo.emit('plan:items-unblocked', {
+                    issueId: normalizedIssueId,
+                    itemIds: unblockedItems,
+                    triggeredBy: updatedItemId,
+                  });
+                  // Wake the work agent so it picks up the next unblocked task
+                  const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
+                  const doc = readWorkspacePlan(workspacePath);
+                  const unblockedTitles = unblockedItems.map(id => {
+                    const it = doc?.plan.items.find(i => i.id === id);
+                    return it ? `"${it.title}"` : `"${id}"`;
+                  }).join(', ');
+                  const wakeMsg = `DAG SCHEDULER: Task${unblockedItems.length > 1 ? 's' : ''} now unblocked after completing "${updatedItemId}": ${unblockedTitles}. Pick up the next available task.`;
+                  await messageAgent(workAgentId, wakeMsg).catch((err: any) => {
+                    console.log(`[auto-wake] Could not wake ${workAgentId} (may not be running): ${err.message}`);
+                  });
+                }
+              } catch (wakeErr: any) {
+                console.warn(`[auto-wake] Failed to check unblocked items: ${wakeErr.message}`);
+              }
+            }
+          } catch (syncErr: any) {
+            console.warn(`[specialists/done] vBRIEF sync failed: ${syncErr.message}`);
+          }
         }
       }
     } catch (err) {
@@ -9754,23 +9821,19 @@ Consider these factors:
 - **Risk level**: Low (simple), Medium (medium), High (expert)
 - **Domain knowledge**: Standard (simple), Research needed (medium), Deep expertise (expert)
 
-When creating beads tasks, include difficulty labels:
-\`\`\`bash
-bd create "PAN-XX: Task name" --type task -l "PAN-XX,linear,difficulty:medium" -d "Description"
-\`\`\`
-
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
 1. Create STATE.md with decisions made
 2. Copy STATE.md to implementation plan at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
 3. Create a vBRIEF plan file at \`.planning/plan.vbrief.json\` (structured machine-readable plan — see format below)
-4. Create beads tasks with dependencies using \`bd create\` (include difficulty:LEVEL labels)
-5. Summarize the plan and STOP
+4. Summarize the plan and STOP
+
+**DO NOT run \`bd create\` commands.** Beads tasks are created automatically from \`plan.vbrief.json\` by Cloister when planning completes. Your job is to produce the vBRIEF plan — the system handles beads creation mechanically.
 
 ### vBRIEF Plan Format
 
 Create \`.planning/plan.vbrief.json\` — a structured plan with items and dependency edges.
-This file will be used to visualize the dependency graph and eventually to generate beads programmatically.
+Cloister converts this file into beads tasks with proper dependency links automatically.
 
 \`\`\`json
 {
@@ -10348,7 +10411,7 @@ PANOPTICON_MSG_EOF`);
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, Beads tasks via \`bd create\`, implementation plan at \`docs/prds/active/{issue-id}-plan.md\`)
+- Generate planning artifacts (STATE.md, vBRIEF plan at \`.planning/plan.vbrief.json\`, implementation plan at \`docs/prds/active/{issue-id}-plan.md\`)
 - Present options and tradeoffs
 
 ---
@@ -10911,6 +10974,24 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           const gitRoot = planningDir.includes('/workspaces/')
             ? join(projectPath, 'workspaces', `feature-${issueLower}`)
             : projectPath;
+
+          // If a vBRIEF plan exists, create beads programmatically from it.
+          // This replaces LLM-generated `bd create` calls with deterministic conversion.
+          if (findPlan(gitRoot)) {
+            try {
+              console.log(`[complete-planning] vBRIEF plan found — creating beads from plan`);
+              const beadsResult = await createBeadsFromVBrief(gitRoot);
+              if (beadsResult.created.length > 0) {
+                console.log(`[complete-planning] Created ${beadsResult.created.length} beads from vBRIEF plan`);
+              }
+              if (beadsResult.errors.length > 0) {
+                console.warn(`[complete-planning] Bead creation errors: ${beadsResult.errors.join('; ')}`);
+              }
+            } catch (vbriefErr: any) {
+              console.warn(`[complete-planning] createBeadsFromVBrief failed: ${vbriefErr.message}`);
+              // Non-fatal: fall through to existing beads if any were created by the agent
+            }
+          }
 
           // Run bd sync locally first to export beads to JSONL
           try {
