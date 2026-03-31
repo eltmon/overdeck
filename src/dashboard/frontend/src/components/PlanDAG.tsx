@@ -11,8 +11,9 @@
  * PlanDAGViewer: data-fetching wrapper that loads from /api/workspaces/:issueId/plan
  */
 
-import { useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { io } from 'socket.io-client';
 import ReactFlow, {
   type Node,
   type Edge,
@@ -215,8 +216,15 @@ export function PlanDAG({ doc, criticalPath = [], onNodeClick, className }: Plan
     [doc, criticalPath],
   );
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Sync when doc changes (e.g., real-time status updates via socket)
+  useEffect(() => {
+    const { nodes: updated, edges: updatedEdges } = vbriefToFlow(doc, criticalPath);
+    setNodes(updated);
+    setEdges(updatedEdges);
+  }, [doc, criticalPath, setNodes, setEdges]);
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (onNodeClick) {
@@ -263,6 +271,8 @@ interface PlanDAGViewerProps {
 }
 
 export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }: PlanDAGViewerProps) {
+  const queryClient = useQueryClient();
+
   const { data: doc, isLoading, isError } = useQuery<VBriefDocument>({
     queryKey: ['plan', issueId],
     queryFn: async () => {
@@ -272,6 +282,31 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }:
     },
     staleTime: 30_000,
   });
+
+  // Subscribe to live status updates via socket.io
+  useEffect(() => {
+    const socket = io({ path: '/socket.io', transports: ['websocket', 'polling'] });
+
+    socket.on('plan:item-status-changed', (event: { issueId: string; itemId: string; status: VBriefItemStatus }) => {
+      if (event.issueId.toLowerCase() !== issueId.toLowerCase()) return;
+
+      // Update the cached plan document immutably
+      queryClient.setQueryData<VBriefDocument>(['plan', issueId], (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          plan: {
+            ...prev.plan,
+            items: prev.plan.items.map(item =>
+              item.id === event.itemId ? { ...item, status: event.status } : item
+            ),
+          },
+        };
+      });
+    });
+
+    return () => { socket.disconnect(); };
+  }, [issueId, queryClient]);
 
   if (isLoading) {
     return (
