@@ -54,7 +54,8 @@ export interface Agent {
   issueId?: string;
   runtime: string;
   model: string;
-  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped';
+  status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped' | 'starting' | 'failed';
+  error?: string;
   pid?: number;
   startedAt: string;
   lastActivity?: string;

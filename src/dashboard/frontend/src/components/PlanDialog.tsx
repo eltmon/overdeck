@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List } from 'lucide-react';
+import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
+import { io } from 'socket.io-client';
 import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
 import { BeadsDialog } from './BeadsDialog';
@@ -302,6 +303,27 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     // Spawn the work agent - this also updates status to "In Progress"
     startAgentMutation.mutate();
   };
+
+  // Listen for planning:failed socket event while in starting/planning step
+  useEffect(() => {
+    if (!isOpen || (step !== 'starting' && step !== 'planning')) return;
+
+    const socket = io({
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+    });
+
+    socket.on('planning:failed', ({ issueId, error: errMsg }: { issueId: string; error: string }) => {
+      if (issueId === issue.identifier) {
+        setError(errMsg);
+        setStep('error');
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [isOpen, step, issue.identifier]);
 
   if (!isOpen) return null;
 
@@ -807,7 +829,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     <AlertCircle className="w-10 h-10 text-red-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-content mb-2">Planning Failed</h3>
-                  <p className="text-red-400 text-center max-w-md mb-6">{error}</p>
+                  <p className="text-red-400 text-center max-w-md mb-2">{error}</p>
+                  <p className="text-sm text-content-muted text-center max-w-md mb-6">
+                    The planning agent could not start. You can retry or abort to return the issue to Todo.
+                  </p>
 
                   <div className="flex gap-3">
                     <button
@@ -818,12 +843,25 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     </button>
                     <button
                       onClick={() => {
-                        setStep('ready');
-                        setError(null);
+                        abortPlanningMutation.mutate();
                       }}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-content rounded-lg transition-colors"
+                      disabled={abortPlanningMutation.isPending}
+                      className="flex items-center gap-2 px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded-lg transition-colors disabled:opacity-50"
                     >
-                      Try Again
+                      <X className="w-4 h-4" />
+                      {abortPlanningMutation.isPending ? 'Aborting...' : 'Abort'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setError(null);
+                        setStep('starting');
+                        startPlanningMutation.mutate();
+                      }}
+                      disabled={startPlanningMutation.isPending}
+                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-content rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      {startPlanningMutation.isPending ? 'Retrying...' : 'Retry'}
                     </button>
                   </div>
                 </div>
