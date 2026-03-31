@@ -21,6 +21,7 @@ import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
+import { isTaskReady } from './task-readiness.js';
 
 const execAsync = promisify(exec);
 
@@ -2396,6 +2397,26 @@ export async function wakeSpecialistOrQueue(
   error?: string;
 }> {
   const { priority = 'normal', source = 'handoff' } = options;
+
+  // DAG-aware readiness gate: if a vBRIEF item ID is provided in context,
+  // check that all its blocking dependencies are completed before scheduling.
+  // This prevents scheduling work whose dependencies aren't done yet.
+  const vbriefItemId = task.context?.vbriefItemId as string | undefined;
+  const workspacePath = task.workspace || (task.context?.workspace as string | undefined);
+  if (vbriefItemId && workspacePath) {
+    try {
+      if (!isTaskReady(vbriefItemId, workspacePath)) {
+        return {
+          success: false,
+          queued: false,
+          message: `Task "${vbriefItemId}" has incomplete blocking dependencies — not ready to schedule`,
+        };
+      }
+    } catch (readinessErr: any) {
+      // Non-fatal: proceed if readiness check fails
+      console.warn(`[specialist] Task readiness check failed for ${vbriefItemId}: ${readinessErr.message}`);
+    }
+  }
 
   // Check if specialist is running and get state (PAN-80)
   const running = await isRunning(name);
