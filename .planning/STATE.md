@@ -120,3 +120,7 @@ task-readiness ──blocks──> critical-path
 - Hierarchical planning / Rally features (PAN-397)
 - Headroom integration (PAN-398)
 - Migration of existing workspaces to vBRIEF format
+
+## Specialist Feedback
+
+- **[2026-03-31T19:35Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
