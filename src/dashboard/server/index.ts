@@ -43,7 +43,7 @@ import { calculateCost, getPricing, TokenUsage } from '../../lib/cost.js';
 import { normalizeModelName, getActiveSessionModel } from '../../lib/cost-parsers/jsonl-parser.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../lib/convoy.js';
 import { loadPanopticonEnv, getApiKeysFromEnv } from '../../lib/env-loader.js';
-import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../lib/tracker-utils.js';
+import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../lib/tracker-utils.js';
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents, reconcile } from '../../lib/costs/index.js';
 import { getCostsByIssueFromDb, getCostForIssueFromDb, getDailyTrends, getModelRollup, getAgentRollup } from '../../lib/database/cost-events-db.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
@@ -9141,7 +9141,8 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       console.log('[start-planning] Could not check existing agents:', tmuxError);
     }
 
-    // Check if this is a GitHub issue
+    // Determine tracker type for this issue
+    const trackerTypeForIssue = resolveTrackerType(id);
     const githubCheck = isGitHubIssue(id);
 
     let issue: {
@@ -9150,12 +9151,12 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       title: string;
       description: string;
       url: string;
-      source: 'linear' | 'github';
+      source: 'linear' | 'github' | 'rally';
       comments?: Array<{ author: string; body: string; createdAt: string }>;
     };
     let newStateName = 'In Planning';
 
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+    if (trackerTypeForIssue === 'github' && githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
       // Handle GitHub issue
       const ghIssue = await fetchGitHubIssue(githubCheck.owner, githubCheck.repo, githubCheck.number);
 
@@ -9205,6 +9206,43 @@ app.post('/api/issues/:id/start-planning', async (req, res) => {
       await addGitHubPlanningLabel(githubCheck.owner, githubCheck.repo, githubCheck.number);
       newStateName = 'In Planning';
       console.log(`[start-planning] GitHub issue setup complete`);
+
+    } else if (trackerTypeForIssue === 'rally') {
+      // Handle Rally issue
+      const rallyConfig = getRallyConfig();
+      if (!rallyConfig) {
+        return res.status(500).json({ error: 'RALLY_API_KEY not configured. Set it in ~/.panopticon.env' });
+      }
+
+      const { createTracker } = await import('../../lib/tracker/factory.js');
+      const { resolveProjectFromIssue, getProject } = await import('../../lib/projects.js');
+
+      const projectInfo = resolveProjectFromIssue(id);
+      const rallyProject = projectInfo
+        ? getProject(projectInfo.projectKey)?.rally_project
+        : undefined;
+
+      try {
+        const tracker = createTracker({
+          type: 'rally',
+          project: rallyProject || rallyConfig.project,
+          server: rallyConfig.server,
+          workspace: rallyConfig.workspace,
+        });
+        const rallyIssue = await tracker.getIssue(id);
+
+        issue = {
+          id: rallyIssue.id,
+          identifier: rallyIssue.ref,
+          title: rallyIssue.title,
+          description: rallyIssue.description || '',
+          url: rallyIssue.url,
+          source: 'rally',
+        };
+        console.log(`[start-planning] Fetched Rally issue: ${rallyIssue.ref}`);
+      } catch (err: any) {
+        return res.status(500).json({ error: `Rally error: ${err.message}` });
+      }
 
     } else {
       // Handle Linear issue
