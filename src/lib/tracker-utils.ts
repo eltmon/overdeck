@@ -107,3 +107,49 @@ export function resolveGitHubIssue(issueId: string): IssueResolution {
 export function isGitHubIssue(issueId: string): boolean {
   return resolveGitHubIssue(issueId).isGitHub;
 }
+
+export type TrackerTypeResolution = 'github' | 'rally' | 'linear';
+
+/**
+ * Resolve the tracker type for an issue ID by checking projects.yaml configuration.
+ *
+ * Resolution order:
+ * 1. GitHub — prefix matches a configured github_repo project
+ * 2. Rally — prefix matches a project with rally_project but no linear_team / github_repo
+ * 3. Linear — fallback (matches linear_team or unknown prefix)
+ */
+export function resolveTrackerType(issueId: string): TrackerTypeResolution {
+  // Check GitHub first (existing logic)
+  if (resolveGitHubIssue(issueId).isGitHub) {
+    return 'github';
+  }
+
+  // Check if the issue prefix matches a Rally-only project
+  const prefix = extractIssuePrefix(issueId);
+  try {
+    const { projects } = loadProjectsConfig();
+    for (const [key, project] of Object.entries(projects)) {
+      // Match by linear_team first (even Rally projects may have linear_team for routing)
+      if (project.linear_team?.toUpperCase() === prefix) {
+        // Project has linear_team matching this prefix — it's a Linear project
+        // (even if it also has rally_project for cross-tracking)
+        return 'linear';
+      }
+
+      // For projects without linear_team, derive prefix from project key
+      if (!project.linear_team) {
+        const derivedPrefix = key.toUpperCase().replace(/-/g, '');
+        if (derivedPrefix === prefix) {
+          // Prefix matches — determine tracker by what's configured
+          if (project.rally_project && !project.github_repo) {
+            return 'rally';
+          }
+          // github_repo projects are already caught by resolveGitHubIssue above
+        }
+      }
+    }
+  } catch { /* ignore config errors */ }
+
+  // Default to Linear for unknown prefixes
+  return 'linear';
+}
