@@ -1,128 +1,96 @@
-# PAN-388: vBRIEF Integration — Structured Plans, Programmatic Beads, DAG Visualization
+# PAN-402: Dashboard — Planning Agent Spawn Failures Are Invisible to the UI
 
-## Status: Planning Complete
+## Status: Planned
 
-## Decisions
+## Problem
 
-### Scope
-All remaining phases (2 tail + 3 + 4) delivered as a single issue:
-- **Phase 2 tail**: Wire `createBeadsFromVBrief()` into post-planning flow, remove LLM-generated `bd create`
-- **Phase 3**: Plan viewer + DAG visualization in dashboard
-- **Phase 4**: Cloister DAG-aware scheduling with hard gates + auto-wake
+When the dashboard "Plan" button triggers `POST /api/issues/:id/start-planning`, the endpoint returns `planningAgent.started: true` immediately, then spawns the agent in a background async task. If the background task fails (workspace creation error, tmux spawn failure, remote VM issues), the agent state file is updated to `status: failed` but the UI never learns about it. The user sees a success state while nothing is actually running.
 
-### Architecture Decisions
+## Decision: Socket.io Events
 
-**AD-1: ReactFlow for DAG visualization**
-- Use `reactflow` (not @xyflow/react v12 rebrand) — same library as vBRIEF Studio
-- ~150KB gzipped, handles layout, zoom, pan, click events out of the box
+**Chosen approach:** Emit `planning:started` and `planning:failed` Socket.io events from the background async task in the start-planning endpoint.
 
-**AD-2: Augment BeadsTasks panel with graph/list toggle**
-- No new tab or inspector section — add a toggle to the existing BeadsTasks panel
-- List view = current beads list; Graph view = ReactFlow DAG with status colors
-- Keeps workspace detail view cohesive
+**Why:** Consistent with how `agents:changed` works for work agents. Provides immediate notification without polling delay. The status polling endpoint already exists as a fallback.
 
-**AD-3: Post-planning conversion in Cloister (not in agent prompt)**
-- After planning agent writes `plan.vbrief.json` and signals completion, Cloister calls `createBeadsFromVBrief()` before waking work agent
-- Clean separation: agent produces structured plan, system handles mechanical conversion
-- Planning agent prompts updated to remove `bd create` instructions
+**Rejected alternatives:**
+- **Polling-only:** Only works when "Watch planning" is checked; misses failures when dialog is closed.
+- **Both socket + enhanced polling:** Unnecessary complexity; socket events are sufficient and polling already exists as a natural fallback via the status endpoint.
 
-**AD-4: Hard gate + auto-detect ready for Cloister scheduling**
-- `blocks` edges are hard gates — Cloister will NOT schedule a task whose blocking dependencies aren't complete
-- When a bead completes, Cloister checks if any downstream tasks are now unblocked and auto-wakes the appropriate specialist
-- `informs` edges are soft preferences — provide context ordering but don't block
+## Decision: Kanban Card Failure Indicator
 
-**AD-5: Bidirectional status sync included**
-- When agents close beads, update corresponding vBRIEF item status in `plan.vbrief.json`
-- DAG visualization reads from vBRIEF for status colors (single source of truth)
-- Sync triggered via bead completion hook or polling
+**Chosen approach:** Show a failure badge on the issue's kanban card when planning spawn fails, similar to the existing "Stuck" badge pattern.
 
-**AD-6: Critical path detection included**
-- Compute longest dependency chain in the DAG
-- Highlight critical path edges/nodes in the DAG visualization
-- Show in dashboard for bottleneck visibility
+**Why:** User sees the failure without needing to open the PlanDialog. Matches existing badge patterns (Ready, Stuck, Blocked, Input).
 
-## Task Breakdown
+## Decision: Full Recovery Controls
 
-### Phase 2 Tail: Wire Converter
+**Chosen approach:** When a planning spawn failure is detected, show:
+1. Error details from `state.json` error field
+2. Retry button (calls start-planning again)
+3. Abort button (calls abort-planning to revert issue state)
 
-| ID | Task | Difficulty | Deps |
-|----|------|-----------|------|
-| wire-converter | Wire `createBeadsFromVBrief()` into Cloister post-planning step | medium | — |
-| remove-bd-prompts | Remove `bd create` instructions from planning agent prompts | simple | wire-converter |
+**Why:** Covers all scenarios — transient failures (retry), persistent config issues (read error, fix, retry), and "I need to fix something else first" (abort).
 
-### Phase 3: Plan Viewer + DAG Visualization
+## Architecture
 
-| ID | Task | Difficulty | Deps |
-|----|------|-----------|------|
-| vbrief-api | API endpoint to serve vBRIEF plan data for a workspace | simple | — |
-| reactflow-setup | Add ReactFlow dependency + base DAG component | simple | — |
-| dag-graph | Build DAG graph with status colors, edge type styling, layout | complex | reactflow-setup, vbrief-api |
-| beads-toggle | Augment BeadsTasks panel with graph/list toggle | medium | dag-graph |
-| node-detail | Click-through from graph node to item/bead detail | medium | dag-graph |
-| status-sync | Bidirectional bead-to-vBRIEF status sync | medium | vbrief-api |
-| live-updates | Live DAG updates via socket.io as beads complete | medium | dag-graph, status-sync |
+### Backend Changes (`src/dashboard/server/index.ts`)
 
-### Phase 4: Cloister DAG Scheduling
+In the background async IIFE of `POST /api/issues/:id/start-planning` (~line 9432):
 
-| ID | Task | Difficulty | Deps |
-|----|------|-----------|------|
-| task-readiness | Dependency-aware task readiness check in Cloister | complex | wire-converter |
-| auto-wake | Auto-detect unblocked tasks + wake specialists | complex | task-readiness |
-| critical-path | Critical path algorithm + dashboard highlight | medium | task-readiness, dag-graph |
+1. On successful spawn (after writing `status: 'running'` to state.json):
+   ```
+   socketIo.emit('planning:started', { issueId: issue.identifier, sessionName })
+   ```
 
-## Dependency Graph (text)
+2. In the catch block (after writing `status: 'failed'` to state.json):
+   ```
+   socketIo.emit('planning:failed', { issueId: issue.identifier, error: err.message })
+   ```
+
+### Frontend Changes
+
+#### `useSocketIssues.ts` — Add planning event listeners
+- Listen for `planning:started` → invalidate planning status query
+- Listen for `planning:failed` → invalidate planning status query, store failure in React Query cache or Zustand
+
+#### `KanbanBoard.tsx` — Planning failure badge
+- Query planning agent state (from `/api/agents` data, which already includes planning agents)
+- When a planning agent has `status: 'failed'`, show a red "Plan Failed" badge on the card
+- Badge uses the same pattern as existing "Stuck" badge (red pulse, XCircle icon)
+
+#### `PlanDialog.tsx` — Error state with recovery
+- Listen for `planning:failed` socket event when `step === 'starting'` or `step === 'planning'`
+- Transition to new `step: 'error'` state
+- Error state shows: error message, Retry button, Abort button
+- Retry calls `startPlanningMutation` again
+- Abort calls existing `abort-planning` endpoint
+
+### Data Flow
 
 ```
-wire-converter ──blocks──> remove-bd-prompts
-wire-converter ──blocks──> task-readiness
-reactflow-setup ──blocks──> dag-graph
-vbrief-api ──blocks──> dag-graph
-vbrief-api ──blocks──> status-sync
-dag-graph ──blocks──> beads-toggle
-dag-graph ──blocks──> node-detail
-dag-graph ──blocks──> live-updates
-dag-graph ──blocks──> critical-path
-status-sync ──blocks──> live-updates
-task-readiness ──blocks──> auto-wake
-task-readiness ──blocks──> critical-path
+Background async task fails
+  → writes status: 'failed' + error to state.json
+  → emits socketIo.emit('planning:failed', { issueId, error })
+  → useSocketIssues receives event
+    → invalidates ['planningStatus', issueId] query
+    → invalidates ['agents'] query (for kanban badge)
+  → PlanDialog (if open): transitions to error step
+  → KanbanBoard: shows "Plan Failed" badge on card
 ```
 
-## Key Files to Modify
+## Files to Modify
 
-### Phase 2
-- `src/lib/cloister/specialists.ts` — Add post-planning vBRIEF→beads conversion step
-- `src/lib/planning/planning-agent.ts` — Remove `bd create` from agent prompt
-- `src/lib/planning/decomposition-agent.ts` — May be bypassed entirely by converter
+| File | Change | Difficulty |
+|------|--------|-----------|
+| `src/dashboard/server/index.ts` | Emit `planning:started` and `planning:failed` socket events | simple |
+| `src/dashboard/frontend/src/hooks/useSocketIssues.ts` | Add `planning:started` and `planning:failed` listeners | simple |
+| `src/dashboard/frontend/src/components/PlanDialog.tsx` | Add error step with retry/abort UI | medium |
+| `src/dashboard/frontend/src/components/KanbanBoard.tsx` | Add "Plan Failed" badge to IssueCard | simple |
 
-### Phase 3
-- `src/dashboard/server/index.ts` — New GET `/api/workspaces/:issueId/plan` endpoint
-- `src/dashboard/frontend/src/components/BeadsTasksPanel.tsx` — Add graph/list toggle
-- `src/dashboard/frontend/src/components/PlanDAG.tsx` — New ReactFlow DAG component
-- `src/dashboard/frontend/src/components/PlanItemDetail.tsx` — New node detail panel
-- `src/lib/vbrief/io.ts` — May need `updateItemStatus()` utility
-- `package.json` (frontend) — Add `reactflow` dependency
+## Edge Cases
 
-### Phase 4
-- `src/lib/cloister/specialists.ts` — Dependency check before scheduling
-- `src/lib/cloister/task-readiness.ts` — New module for DAG-aware readiness
-- `src/lib/cloister/service.ts` — Hook into bead completion for auto-wake
-- `src/lib/vbrief/dag.ts` — Critical path algorithm (or add to existing DAG utils)
-
-## Risks
-
-1. **ReactFlow bundle size**: ~150KB gzipped addition to frontend. Acceptable for the functionality gained; can lazy-load the component.
-2. **Status sync race conditions**: Multiple agents closing beads simultaneously could cause write conflicts on `plan.vbrief.json`. Mitigation: use atomic read-modify-write with file locking or debounced sync.
-3. **Cloister complexity**: Adding DAG scheduling to the already-complex specialist system. Mitigation: isolate in dedicated `task-readiness.ts` module, keep specialist scheduling code unchanged except for the readiness gate.
-4. **Plan file absence**: Not all workspaces will have `plan.vbrief.json` (legacy or non-vBRIEF flows). All code must gracefully degrade when no plan exists.
-
-## Out of Scope
-- TRON encoding (PAN-399)
-- Hierarchical planning / Rally features (PAN-397)
-- Headroom integration (PAN-398)
-- Migration of existing workspaces to vBRIEF format
-
-## Specialist Feedback
-
-- **[2026-03-31T19:35Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-03-31T20:51Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
-- **[2026-03-31T20:54Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+1. **Dialog closed when failure occurs:** Socket event still fires → agents query invalidated → kanban card shows badge. User sees failure on next glance at the board.
+2. **Multiple rapid retries:** Each start-planning call overwrites state.json. Socket events are idempotent — latest state wins.
+3. **Remote workspace failures:** Same socket events emitted regardless of local/remote. Error message from state.json contains the specific failure reason.
+4. **Socket reconnection:** If the client misses the socket event, the next agents query refetch (every 5s) will pick up the failed state for the kanban badge. PlanDialog re-checks status on open.
+5. **Status: 'starting' race:** The status endpoint already treats `status: 'starting'` as active. The `planning:failed` event only fires after the background task completes, so there's no race.
