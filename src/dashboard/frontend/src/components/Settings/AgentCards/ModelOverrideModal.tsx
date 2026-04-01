@@ -91,9 +91,6 @@ export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
   'subagent:plan': ['reasoning'],
   'subagent:bash': ['fast', 'code'],
   'subagent:general-purpose': ['reasoning', 'code'],
-  'prd-agent': ['reasoning'],
-  'decomposition-agent': ['reasoning'],
-  'triage-agent': ['fast', 'reasoning'],
   'cli:interactive': ['reasoning', 'code'],
   'cli:quick-command': ['fast'],
 };
@@ -116,9 +113,6 @@ export const WORK_TYPE_NAMES: Record<string, string> = {
   'subagent:plan': 'Plan Subagent',
   'subagent:bash': 'Bash Subagent',
   'subagent:general-purpose': 'General Purpose Subagent',
-  'prd-agent': 'PRD Agent',
-  'decomposition-agent': 'Decomposition Agent',
-  'triage-agent': 'Triage Agent',
   'cli:interactive': 'CLI Interactive',
   'cli:quick-command': 'CLI Quick Command',
 };

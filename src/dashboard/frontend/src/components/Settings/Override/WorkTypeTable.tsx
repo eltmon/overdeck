@@ -11,14 +11,13 @@ export interface WorkTypeTableProps {
 }
 
 export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, onRemoveOverride }: WorkTypeTableProps) {
-  const categories: WorkTypeCategory[] = ['issue-agent', 'specialist', 'convoy', 'subagent', 'pre-work', 'cli'];
+  const categories: WorkTypeCategory[] = ['issue-agent', 'specialist', 'convoy', 'subagent', 'cli'];
 
   const categoryLabels: Record<WorkTypeCategory, string> = {
     'issue-agent': 'Issue Agent Phases',
     'specialist': 'Specialist Agents',
     'convoy': 'Convoy Members',
     'subagent': 'Subagents',
-    'pre-work': 'Pre-Work Agents',
     'cli': 'CLI Contexts',
   };
 

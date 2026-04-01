@@ -24,10 +24,6 @@ export type WorkTypeId =
   | 'convoy:performance-reviewer'
   | 'convoy:correctness-reviewer'
   | 'convoy:synthesis-agent'
-  // Pre-work agents
-  | 'prd-agent'
-  | 'decomposition-agent'
-  | 'triage-agent'
   // CLI contexts
   | 'cli:interactive'
   | 'cli:quick-command';
@@ -95,7 +91,6 @@ export type WorkTypeCategory =
   | 'specialist'
   | 'convoy'
   | 'subagent'
-  | 'pre-work'
   | 'cli';
 
 export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
@@ -122,11 +117,6 @@ export const WORK_TYPE_CATEGORIES: Record<WorkTypeCategory, WorkTypeInfo[]> = {
     { id: 'subagent:plan', category: 'subagent', displayName: 'Plan' },
     { id: 'subagent:bash', category: 'subagent', displayName: 'Bash' },
     { id: 'subagent:general-purpose', category: 'subagent', displayName: 'General Purpose' },
-  ],
-  'pre-work': [
-    { id: 'prd-agent', category: 'pre-work', displayName: 'PRD Agent' },
-    { id: 'decomposition-agent', category: 'pre-work', displayName: 'Decomposition Agent' },
-    { id: 'triage-agent', category: 'pre-work', displayName: 'Triage Agent' },
   ],
   'cli': [
     { id: 'cli:interactive', category: 'cli', displayName: 'Interactive' },
