@@ -2380,6 +2380,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       {/* Done items - Reopen + Close Out + Deep Wipe */}
       {!isRunning && STATUS_LABELS[issue.status] === 'done' && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-green-600/30 flex-wrap">
+          <button
+            onClick={() => onViewBeads && onViewBeads(issue)}
+            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+            title="View tasks for this issue"
+          >
+            <List className="w-3.5 h-3.5" />
+            Tasks
+          </button>
           <ReopenSection issue={issue} inline />
           <CloseOutSection issue={issue} />
           <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
