@@ -3431,6 +3431,23 @@ app.get('/api/version', (_req, res) => {
   res.json({ version: panopticonVersion });
 });
 
+// GET /api/registered-projects - All projects from projects.yaml (for Kanban filter pills)
+app.get('/api/registered-projects', (_req, res) => {
+  try {
+    const projects = listProjects();
+    res.json(projects.map(p => ({
+      key: p.key,
+      name: p.config.name,
+      path: p.config.path,
+      linearTeam: p.config.linear_team || null,
+      githubRepo: p.config.github_repo || null,
+      linearProject: p.config.linear_project || null,
+    })));
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to list projects: ' + error.message });
+  }
+});
+
 // ============================================================================
 // Metrics API Endpoints (PAN-33 Phase 6)
 // ============================================================================
@@ -9996,7 +10013,12 @@ export PANOPTICON_SESSION_TYPE="planning"
 
 cd /workspace
 prompt=$(cat "${remotePromptFile}")
-exec claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
+claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
+# Keep session alive after Claude exits so user can review and click Done
+echo ""
+echo "Planning agent has exited. Session kept alive for review."
+echo "Click 'Done' in the dashboard when ready to hand off to implementation."
+while true; do sleep 60; done
 `;
         const launcherBase64 = Buffer.from(launcherContent).toString('base64');
         await fly.ssh(vmName, `echo '${launcherBase64}' | base64 -d > ${remoteLauncherScript}`);
@@ -10100,7 +10122,12 @@ export PANOPTICON_ISSUE_ID="${issue.identifier}"
 export PANOPTICON_SESSION_TYPE="planning"
 cd "${agentCwd}"
 prompt=$(cat "${promptFile}")
-exec ${cmdWithArgs} "$prompt"
+${cmdWithArgs} "$prompt"
+# Keep session alive after Claude exits so user can review and click Done
+echo ""
+echo "Planning agent has exited. Session kept alive for review."
+echo "Click 'Done' in the dashboard when ready to hand off to implementation."
+while true; do sleep 60; done
 `, { mode: 0o755 });
 
         // Ensure tmux is running before starting session
