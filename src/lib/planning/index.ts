@@ -13,19 +13,9 @@
  * model routing according to presets and user configuration.
  */
 
-// PRD Agent
-export {
-  generatePRD,
-  spawnPRDAgent,
-  type PRDSection,
-  type PRDDocument,
-  type PRDGenerationOptions,
-} from './prd-agent.js';
-
-// Triage Agent
+// Triage utilities
 export {
   analyzeIssue,
-  spawnTriageAgent,
   triageMultiple,
   sortByPriority,
   type TriageResult,
@@ -42,16 +32,6 @@ export {
   type ArchitectureDecision,
   type PlanningDocument,
 } from './planning-agent.js';
-
-// Decomposition Agent (Task breakdown)
-export {
-  decomposeWork,
-  spawnDecompositionAgent,
-  validateTaskDependencies,
-  type Task,
-  type DecompositionResult,
-  type DecompositionOptions,
-} from './decomposition-agent.js';
 
 // Plan Utilities (shared between CLI and dashboard)
 export {
