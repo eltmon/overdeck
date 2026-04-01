@@ -104,19 +104,6 @@ export const WORK_TYPES = {
     category: 'pre-work',
     description: 'Interactive planning and discovery agent',
   },
-  'prd-agent': {
-    category: 'pre-work',
-    description: 'Generates Product Requirement Documents',
-  },
-  'decomposition-agent': {
-    category: 'pre-work',
-    description: 'Breaks down work into tasks',
-  },
-  'triage-agent': {
-    category: 'pre-work',
-    description: 'Prioritizes and triages issues',
-  },
-
   // CLI contexts (2)
   'cli:interactive': {
     category: 'cli',

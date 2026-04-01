@@ -154,24 +154,6 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
     { skill: 'documentation', weight: 0.2 }, // Documenting decisions
   ],
 
-  'prd-agent': [
-    { skill: 'documentation', weight: 0.5 }, // Primary skill
-    { skill: 'planning', weight: 0.3 }, // Structure
-    { skill: 'synthesis', weight: 0.2 }, // Combining requirements
-  ],
-
-  'decomposition-agent': [
-    { skill: 'planning', weight: 0.5 }, // Primary skill
-    { skill: 'synthesis', weight: 0.3 }, // Breaking down
-    { skill: 'documentation', weight: 0.2 }, // Clear tasks
-  ],
-
-  'triage-agent': [
-    { skill: 'speed', weight: 0.4 }, // Quick decisions
-    { skill: 'synthesis', weight: 0.3 }, // Understanding scope
-    { skill: 'planning', weight: 0.3 }, // Prioritization
-  ],
-
   // ═══════════════════════════════════════════════════════════════════════════
   // CLI CONTEXTS
   // ═══════════════════════════════════════════════════════════════════════════
