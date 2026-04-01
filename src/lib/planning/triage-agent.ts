@@ -1,11 +1,7 @@
-import { spawnAgent } from '../agents.js';
-
 /**
- * Triage Agent - Issue prioritization and classification
+ * Triage utilities - Issue prioritization and classification
  *
- * Uses work type ID: 'triage-agent'
- *
- * This agent analyzes issues to determine:
+ * Rule-based heuristics for analyzing issues.
  * - Priority (P0-P4)
  * - Complexity (trivial, simple, medium, complex, expert)
  * - Required skills/specialists
@@ -36,8 +32,7 @@ export interface TriageOptions {
 /**
  * Perform automated triage analysis
  *
- * This is a rule-based triage system that can run without spawning an agent.
- * For complex triage decisions, use spawnTriageAgent() instead.
+ * This is a rule-based triage system that runs without spawning an agent.
  */
 export function analyzeIssue(options: TriageOptions): TriageResult {
   const { issueId, title, description = '', labels = [], currentPriority } = options;
@@ -187,48 +182,6 @@ export function analyzeIssue(options: TriageOptions): TriageResult {
     needsPlanning,
     recommendation,
   };
-}
-
-/**
- * Spawn triage agent for complex triage decisions
- *
- * Use this when automated triage is insufficient or when you need
- * AI-powered analysis of requirements, dependencies, and risks.
- */
-export async function spawnTriageAgent(issueId: string, workspace: string, prompt?: string) {
-  const agentPrompt = prompt || `
-You are a triage agent for software development issues. Your job is to:
-
-1. Analyze the issue description and context
-2. Determine:
-   - Priority (P0-P4)
-   - Complexity (trivial, simple, medium, complex, expert)
-   - Estimated effort in hours
-   - Required skills (frontend, backend, devops, testing, etc.)
-   - Dependencies on other issues
-   - Whether PRD is needed
-   - Whether planning phase is needed
-
-3. Provide a recommendation on next steps
-
-4. Update the issue with labels and priority if needed
-
-5. Create a triage report in .planning/TRIAGE.md
-
-Be thorough but decisive. Use your judgment based on:
-- Technical complexity
-- Business impact
-- User impact
-- Risk factors
-- Available information
-`.trim();
-
-  return spawnAgent({
-    issueId,
-    workspace,
-    workType: 'triage-agent',
-    prompt: agentPrompt,
-  });
 }
 
 /**
