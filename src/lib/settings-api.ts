@@ -50,11 +50,6 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'subagent:bash': 'claude-haiku-4-5',
     'subagent:general-purpose': 'claude-sonnet-4-6',
 
-    // Workflow agents - Opus for PRDs, Haiku for speed tasks
-    'prd-agent': 'claude-opus-4-6',
-    'decomposition-agent': 'claude-haiku-4-5',
-    'triage-agent': 'claude-haiku-4-5',
-
     // CLI modes - speed for quick, quality for interactive
     'cli:interactive': 'claude-sonnet-4-6',
     'cli:quick-command': 'claude-haiku-4-5',
