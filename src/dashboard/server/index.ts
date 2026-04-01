@@ -47,7 +47,7 @@ import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } fr
 import { getCostsByIssue, getCacheStatus, syncCache, migrateIfNeeded, needsMigration, rebuildCache, migrateAllSessions, getCostsForIssue, tailEvents, readEvents, deduplicateEvents, reconcile } from '../../lib/costs/index.js';
 import { getCostsByIssueFromDb, getCostForIssueFromDb, getDailyTrends, getModelRollup, getAgentRollup } from '../../lib/database/cost-events-db.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
-import { hasPRDDraft, promotePRDToWorkspace } from '../../lib/prd-draft.js';
+import { hasPRDDraft } from '../../lib/prd-draft.js';
 import { DockerStatsCollector } from '../../lib/docker-stats.js';
 import {
   PROJECT_DOCS_SUBDIR,
@@ -8597,16 +8597,6 @@ app.post('/api/agents', async (req, res) => {
       }
     }
 
-    // If PRD draft exists, promote it to workspace
-    if (hasDraftPrd && !hasPrd) {
-      const promoteResult = promotePRDToWorkspace(issueId, workspacePath);
-      if (promoteResult.success) {
-        console.log(`[start-agent] Promoted PRD draft to workspace for ${issueId}`);
-      } else {
-        console.warn(`[start-agent] Could not promote PRD draft: ${promoteResult.error}`);
-      }
-    }
-
     // Before starting agent, find and transfer planning artifacts to workspace
     const workspacePlanningDir = join(workspacePath, '.planning');
     const legacyPlanningDir = join(projectPath, '.planning', issueLower);
@@ -14243,11 +14233,9 @@ app.get('/api/mission-control/planning/:issueId', async (req, res) => {
     }
 
     // Read core planning docs
-    const prdPath = join(planningDir, 'PRD.md');
     const statePath = join(planningDir, 'STATE.md');
     const inferencePath = join(planningDir, 'INFERENCE.md');
 
-    if (existsSync(prdPath)) result.prd = readFileSync(prdPath, 'utf-8');
     if (existsSync(statePath)) result.state = readFileSync(statePath, 'utf-8');
     if (existsSync(inferencePath)) result.inference = readFileSync(inferencePath, 'utf-8');
 
@@ -14324,10 +14312,8 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
       return res.status(404).json({ error: 'No planning directory found' });
     }
 
-    // Gather context: PRD, STATE, git diff, file list
-    const prdPath = join(planningDir, 'PRD.md');
+    // Gather context: STATE, git diff, file list
     const statePath = join(planningDir, 'STATE.md');
-    const prd = existsSync(prdPath) ? readFileSync(prdPath, 'utf-8') : null;
     const state = existsSync(statePath) ? readFileSync(statePath, 'utf-8') : null;
 
     // Helper to read all files from a planning subdirectory
@@ -14370,7 +14356,7 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
       }
     } catch { /* skip if issue data unavailable */ }
 
-    const hasAnyContent = prd || state || discussionsContent || transcriptsContent || notesContent || issueContext;
+    const hasAnyContent = state || discussionsContent || transcriptsContent || notesContent || issueContext;
     if (!hasAnyContent) {
       return res.status(400).json({ error: 'No planning artifacts, discussions, transcripts, or issue data to review against' });
     }
@@ -14421,7 +14407,7 @@ app.post('/api/mission-control/planning/:issueId/status-review', async (req, res
 
     // Build a content fingerprint from all inputs to detect changes
     const { createHash } = await import('crypto');
-    const contentForHash = [prd, state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitDiffFull, gitLog, filesChanged, reviewStatus, testStatus].filter(Boolean).join('|');
+    const contentForHash = [state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitDiffFull, gitLog, filesChanged, reviewStatus, testStatus].filter(Boolean).join('|');
     const contentHash = createHash('md5').update(contentForHash).digest('hex');
 
     // Check if we already have a review for this exact content
@@ -14451,10 +14437,7 @@ ${issueContext ? `\n${issueContext}\n` : ''}
 - Review: ${reviewStatus}
 - Tests: ${testStatus}
 
-## PRD (Product Requirements Document)
-${prd ? prd.slice(0, 5000) : '(No PRD available)'}
-
-## STATE.md (Agent Progress Notes)
+## STATE.md (Planning Context and Progress Notes)
 ${state ? state.slice(0, 4000) : '(No STATE.md available)'}
 
 ## Files Changed
@@ -14928,7 +14911,7 @@ app.get('/api/mission-control/projects', async (_req, res) => {
 
           // Check for planning artifacts
           const hasPlanning = existsSync(planningDir);
-          const hasPrd = hasPlanning && (existsSync(join(planningDir, 'PRD.md')) || existsSync(join(planningDir, 'PLANNING_PROMPT.md')));
+          const hasPrd = hasPlanning && existsSync(join(planningDir, 'PLANNING_PROMPT.md'));
           const hasState = hasPlanning && existsSync(join(planningDir, 'STATE.md'));
           const isShadow = hasPlanning && existsSync(join(planningDir, 'INFERENCE.md'));
 
@@ -14963,14 +14946,12 @@ app.get('/api/mission-control/projects', async (_req, res) => {
           else if (hasPrd && !hasState) stateLabel = 'Planning';
           else if (hasState) stateLabel = 'Has Context';
 
-          // Look up title from cached issues, then PRD.md, then fall back to issueId
+          // Look up title from cached issues, then PLANNING_PROMPT.md, then fall back to issueId
           let title = issueTitleMap.get(issueId) || '';
           if (!title && hasPrd) {
             try {
-              const prdPath = existsSync(join(planningDir, 'PRD.md'))
-                ? join(planningDir, 'PRD.md')
-                : join(planningDir, 'PLANNING_PROMPT.md');
-              const prdContent = readFileSync(prdPath, 'utf-8');
+              const promptPath = join(planningDir, 'PLANNING_PROMPT.md');
+              const prdContent = readFileSync(promptPath, 'utf-8');
               // Extract title from first heading (# Title) or first non-empty line
               const firstLine = prdContent.split('\n').find(l => l.trim().length > 0) || '';
               title = firstLine.replace(/^#+\s*/, '').trim();
