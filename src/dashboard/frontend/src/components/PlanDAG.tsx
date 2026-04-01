@@ -19,7 +19,6 @@ import ReactFlow, {
   type Edge,
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   MarkerType,
@@ -251,13 +250,6 @@ export function PlanDAG({ doc, criticalPath = [], onNodeClick, className }: Plan
       >
         <Background color="#374151" gap={20} size={1} />
         <Controls style={{ background: '#1f2937', border: '1px solid #374151' }} />
-        <MiniMap
-          style={{ background: '#1f2937', border: '1px solid #374151' }}
-          nodeColor={node => {
-            const item = (node.data as PlanItemNodeData)?.item;
-            return item ? STATUS_COLORS[item.status]?.border ?? '#6b7280' : '#6b7280';
-          }}
-        />
       </ReactFlow>
     </div>
   );

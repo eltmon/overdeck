@@ -21,6 +21,7 @@ import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalStat
 import { getFriendlyModelName } from './inspector/utils';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban, XCircle, AlertCircle } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
+import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
@@ -993,17 +994,46 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     staleTime: 10000,
   });
 
-  // Extract unique projects from issues
+  // Fetch registered projects from projects.yaml
+  interface RegisteredProject {
+    key: string;
+    name: string;
+    linearTeam: string | null;
+    githubRepo: string | null;
+    linearProject: string | null;
+  }
+  const { data: registeredProjects = [] } = useQuery<RegisteredProject[]>({
+    queryKey: ['registered-projects'],
+    queryFn: async () => {
+      const res = await fetch('/api/registered-projects');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+
+  // Extract unique projects from issues, then merge registered projects that have no issues yet
   const projects = useMemo(() => {
-    if (!issues) return [];
     const projectMap = new Map<string, LinearProject>();
-    for (const issue of issues) {
+    for (const issue of (issues || [])) {
       if (issue.project && !projectMap.has(issue.project.id)) {
         projectMap.set(issue.project.id, issue.project);
       }
     }
+    // Add registered projects that aren't already represented by issues
+    const existingNames = new Set(Array.from(projectMap.values()).map(p => p.name.toLowerCase()));
+    for (const rp of registeredProjects) {
+      const displayName = rp.linearProject || rp.githubRepo || rp.name;
+      if (!existingNames.has(displayName.toLowerCase()) && !existingNames.has(rp.name.toLowerCase())) {
+        projectMap.set(`registered:${rp.key}`, {
+          id: `registered:${rp.key}`,
+          name: displayName,
+          color: '#6b7280', // neutral gray for projects with no issues yet
+        });
+      }
+    }
     return Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [issues]);
+  }, [issues, registeredProjects]);
 
   // Filter issues by selected projects
   const filteredIssues = useMemo(() => {
@@ -1729,19 +1759,10 @@ function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
 
 // Simple Beads Dialog component
 function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['beads', issue.identifier],
-    queryFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/beads`);
-      if (!res.ok) throw new Error('Failed to fetch tasks');
-      return res.json();
-    },
-  });
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] overflow-hidden flex flex-col">
+      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
           <div className="flex items-center gap-2">
@@ -1756,66 +1777,9 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {isLoading && (
-            <div className="flex items-center justify-center py-8 text-content-subtle">
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              Loading tasks...
-            </div>
-          )}
-
-          {error && (
-            <div className="text-red-400 text-center py-8">
-              Failed to load tasks
-            </div>
-          )}
-
-          {data && data.tasks?.length === 0 && (
-            <div className="text-content-muted text-center py-8">
-              No tasks created yet
-            </div>
-          )}
-
-          {data && data.tasks?.length > 0 && (
-            <div className="space-y-2">
-              {data.tasks.map((task: any) => (
-                <div
-                  key={task.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg ${
-                    task.status === 'closed' ? 'bg-green-900/20' :
-                    task.status === 'in_progress' ? 'bg-blue-900/20' :
-                    'bg-surface-overlay/50'
-                  }`}
-                >
-                  <div className={`mt-0.5 ${
-                    task.status === 'closed' ? 'text-green-400' :
-                    task.status === 'in_progress' ? 'text-blue-400' :
-                    'text-content-subtle'
-                  }`}>
-                    {task.status === 'closed' ? (
-                      <CheckCircle className="w-4 h-4" />
-                    ) : task.status === 'in_progress' ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <div className="w-4 h-4 border-2 border-current rounded-full" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-content">{task.title}</div>
-                    <div className="text-xs text-content-muted mt-1">
-                      {task.id} · {task.status}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-divider text-xs text-content-muted">
-          {data?.count || 0} task{data?.count !== 1 ? 's' : ''} · Beads
+        {/* BeadsTasksPanel with list/graph toggle */}
+        <div className="flex-1 overflow-hidden">
+          <BeadsTasksPanel issueId={issue.identifier} />
         </div>
       </div>
     </div>

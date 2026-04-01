@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2 } from 'lucide-react';
+import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2, Download } from 'lucide-react';
 import { PlanDAGViewer, type VBriefItem, type VBriefDocument } from './PlanDAG.js';
 
 interface BeadTask {
   id: string;
-  name: string;
+  name?: string;
+  title?: string;
   status: 'open' | 'closed';
   labels: string[];
   blockedBy: string[];
@@ -78,7 +79,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 p-4">
       {/* Header with counts and view toggle */}
       <div className="flex items-center justify-between text-xs text-content-subtle">
         <div className="flex items-center gap-3">
@@ -109,6 +110,27 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
                 <GitFork className="w-3 h-3" />
               </button>
             </div>
+          )}
+          {planExists && (
+            <button
+              onClick={() => {
+                fetch(`/api/workspaces/${issueId}/plan`)
+                  .then(res => res.json())
+                  .then(data => {
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${issueId.toLowerCase()}-plan.vbrief.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  });
+              }}
+              className="p-1 hover:bg-surface-overlay rounded transition-colors"
+              title="Download vBRIEF plan (for vBRIEF Studio)"
+            >
+              <Download className="w-3 h-3" />
+            </button>
           )}
           <button
             onClick={() => refetch()}
@@ -182,7 +204,7 @@ function TaskItem({ task }: { task: BeadTask }) {
         )}
         <div className="flex-1 min-w-0">
           <div className="text-content break-words leading-tight">
-            {task.name}
+            {task.title || task.name || task.id}
           </div>
           {task.labels.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
@@ -226,7 +248,7 @@ interface PlanItemDetailProps {
 function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
   // Beads are created with title "{plan.id}: {item.title}" — match using plan.id, not issueId
   const titlePattern = `${doc.plan.id}: ${item.title}`.toLowerCase();
-  const matchedBead = beads.find(b => b.name.toLowerCase() === titlePattern);
+  const matchedBead = beads.find(b => (b.title || b.name || '').toLowerCase() === titlePattern);
 
   const blockerIds = doc.plan.edges
     .filter(e => e.type === 'blocks' && e.to === item.id)
