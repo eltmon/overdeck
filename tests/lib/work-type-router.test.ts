@@ -134,7 +134,7 @@ describe('work-type-router', () => {
           'specialist-review-agent',
           'subagent:explore',
           'convoy:security-reviewer',
-          'prd-agent',
+          'planning-agent',
           'cli:interactive',
         ];
 
