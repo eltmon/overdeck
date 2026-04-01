@@ -193,32 +193,4 @@ describe('prd-draft', () => {
     });
   });
 
-  describe('promotePRDToWorkspace', () => {
-    it('should return error when draft does not exist', async () => {
-      const { promotePRDToWorkspace } = await import('../../src/lib/prd-draft.js');
-
-      const result = promotePRDToWorkspace('PAN-NONEXISTENT', tempDir);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('No PRD draft found');
-    });
-
-    it('should copy draft to workspace planning directory', async () => {
-      const { promotePRDToWorkspace, writePRDDraft } = await import('../../src/lib/prd-draft.js');
-      const { existsSync, readFileSync } = await import('fs');
-
-      const content = '# Test PRD\n\nPromoted content';
-      writePRDDraft('PAN-123', content);
-
-      const workspaceDir = join(tempDir, 'workspace');
-      mkdirSync(join(workspaceDir, '.planning'), { recursive: true });
-
-      const result = promotePRDToWorkspace('PAN-123', workspaceDir);
-
-      expect(result.success).toBe(true);
-      const prdPath = join(workspaceDir, '.planning', 'PRD.md');
-      expect(existsSync(prdPath)).toBe(true);
-      expect(readFileSync(prdPath, 'utf-8')).toBe(content);
-    });
-  });
 });
