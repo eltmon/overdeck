@@ -42,7 +42,6 @@ async function findRequirements(issueId: string, workspacePath: string): Promise
   // Search common locations for PRD/spec files
   const searchPaths = [
     // Workspace-level planning docs
-    join(workspacePath, '.planning', 'PRD.md'),
     join(workspacePath, '.planning', 'STATE.md'),
     // Docs directory
     join(workspacePath, 'docs'),
@@ -51,8 +50,8 @@ async function findRequirements(issueId: string, workspacePath: string): Promise
     join(workspacePath, 'api', 'docs'),
   ];
 
-  // Check .planning/PRD.md first (workspace-specific PRD)
-  for (const path of searchPaths.slice(0, 2)) {
+  // Check .planning/STATE.md first (workspace planning context)
+  for (const path of searchPaths.slice(0, 1)) {
     if (existsSync(path)) {
       try {
         const content = readFileSync(path, 'utf-8');
@@ -62,7 +61,7 @@ async function findRequirements(issueId: string, workspacePath: string): Promise
   }
 
   // Search docs directories for files matching the issue ID
-  for (const dir of searchPaths.slice(2)) {
+  for (const dir of searchPaths.slice(1)) {
     if (!existsSync(dir)) continue;
     try {
       const { stdout } = await execAsync(
