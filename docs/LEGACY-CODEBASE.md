@@ -125,3 +125,92 @@ skip: authentication                       # Security team owns this
 - **"Welcome naming fixes"** - Low risk, high value, always appreciated
 
 The AI adapts to your org structure, not the other way around.
+
+---
+
+## Shadow Mode
+
+Shadow mode lets you run Panopticon agents without updating your issue tracker. This is useful when:
+
+- You're evaluating Panopticon on a real issue without committing tracker changes to stakeholders
+- You want to test the pipeline on a legacy codebase before going live
+- You're running training or demos and don't want to pollute your issue tracker
+
+### How Shadow Mode Works
+
+When shadow mode is enabled, agents run normally — they plan, implement, review, and commit code — but all issue tracker updates (status changes, comments, assignments) are suppressed. The work proceeds, but it stays invisible to your tracker.
+
+Shadow state is persisted to `~/.panopticon/shadow/` so it survives restarts. Each issue has its own shadow state: once an issue enters shadow mode, it stays shadowed for all subsequent operations.
+
+When shadow mode ends, you can replay the suppressed updates or simply let the next non-shadow run update the tracker normally.
+
+### How to Enable Shadow Mode
+
+**Per-run (CLI flag):**
+```bash
+pan work issue MIN-123 --shadow
+```
+
+**Per-project (config file):**
+```yaml
+# In <project>/.panopticon.yaml
+shadow:
+  enabled: true
+```
+
+**Globally (config file):**
+```yaml
+# In ~/.panopticon/config.yaml
+shadow:
+  enabled: true
+```
+
+**Environment variable:**
+```bash
+SHADOW_MODE=true pan work issue MIN-123
+```
+
+**Per-tracker override:**
+```yaml
+# In .panopticon.yaml — only shadow Linear, not GitHub
+shadow:
+  enabled: false
+  trackers:
+    linear: true
+    github: false
+```
+
+### Priority Order
+
+Shadow mode respects a priority chain (highest to lowest):
+1. `--shadow` / `--no-shadow` CLI flag
+2. Existing shadow state for the issue (once shadowed, always shadowed)
+3. Per-project `.panopticon.yaml` `shadow.enabled`
+4. Global `~/.panopticon/config.yaml` `shadow.enabled`
+5. `SHADOW_MODE` environment variable
+6. Default: disabled
+
+### The INFERENCE.md Artifact
+
+When shadow mode is active and an agent runs planning or inference, it writes an `INFERENCE.md` file to the workspace `.planning/` directory. This file captures:
+
+- What the agent inferred about the codebase
+- Decisions made during shadow mode
+- Any corrections or assumptions that should be reviewed
+
+If you later move the issue out of shadow mode, `INFERENCE.md` provides a record of what happened during the shadow run.
+
+The presence of `INFERENCE.md` in a workspace is how the dashboard identifies shadow-mode workspaces (shown with the `isShadow` flag in the kanban view).
+
+### Implementation Reference
+
+Shadow mode is implemented in `src/lib/shadow-mode.ts`. Key functions:
+
+| Function | Purpose |
+|----------|---------|
+| `resolveShadowMode(options)` | Resolve the effective shadow mode setting |
+| `isShadowModeEnabled(options)` | Convenience boolean check |
+| `shouldSkipTrackerUpdate(issueId, cliFlag, trackerType)` | Main guard for tracker writes |
+| `getShadowModeStatus(options)` | Human-readable status string |
+
+Shadow state persistence is in `src/lib/shadow-state.ts`. Original implementation: PAN-28.
