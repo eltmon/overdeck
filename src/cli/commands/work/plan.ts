@@ -415,17 +415,6 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
 
     spinnerCreate.succeed('Context files created');
 
-    if (result.beads.created.length > 0) {
-      if (result.beads.success) {
-        console.log(chalk.green(`Created ${result.beads.created.length} Beads tasks`));
-      } else {
-        console.log(chalk.yellow(`Created ${result.beads.created.length} Beads tasks with errors`));
-        for (const error of result.beads.errors) {
-          console.log(chalk.red(`  - ${error}`));
-        }
-      }
-    }
-
     if (result.files.prd) {
       console.log(chalk.dim(`Plan copied to: ${result.files.prd.replace(process.cwd() + '/', '')}`));
     }
@@ -438,7 +427,6 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
         tasks,
         decisions,
         files: result.files,
-        beads: result.beads,
       }, null, 2));
       return;
     }

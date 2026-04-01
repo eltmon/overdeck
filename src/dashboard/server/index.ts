@@ -1411,11 +1411,9 @@ app.post('/api/issues/:id/plan', async (req, res) => {
       tasks,
       files: {
         state: result.files.state.replace(projectPath, '.'),
-        workspace: result.files.workspace.replace(projectPath, '.'),
         prd: result.files.prd ? result.files.prd.replace(projectPath, '.') : undefined,
       },
       prdCommitted: result.prdCommitted,
-      beads: result.beads,
     });
   } catch (error: any) {
     console.error('Error creating plan:', error);
@@ -5475,15 +5473,17 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     }
   }
 
-  // Check for WORKSPACE.md to get custom service URLs
+  // Check for service URLs in STATE.md (or legacy WORKSPACE.md for backward compat)
   let services: { name: string; url?: string }[] = [];
+  const stateMd = join(workspacePath, '.planning', 'STATE.md');
   const workspaceMd = join(workspacePath, 'WORKSPACE.md');
   const dockerCompose = join(workspacePath, 'docker-compose.yml');
 
-  // Try to extract service URLs from WORKSPACE.md if it exists
-  if (existsSync(workspaceMd)) {
+  // Try to extract service URLs from STATE.md first, fall back to WORKSPACE.md
+  const urlSourceFile = existsSync(stateMd) ? stateMd : existsSync(workspaceMd) ? workspaceMd : null;
+  if (urlSourceFile) {
     try {
-      const content = readFileSync(workspaceMd, 'utf-8');
+      const content = readFileSync(urlSourceFile, 'utf-8');
       // Look for URLs in the format: Frontend: http://... or Backend: http://...
       const urlMatches = content.matchAll(/(\w+):\s*(https?:\/\/[^\s\n]+)/gi);
       for (const match of urlMatches) {
@@ -5492,7 +5492,7 @@ app.get('/api/workspaces/:issueId', async (req, res) => {
     } catch {}
   }
 
-  // If no services from WORKSPACE.md, use constructed URLs
+  // If no services found, use constructed URLs
   if (services.length === 0) {
     services = [
       { name: 'Frontend', url: frontendUrl },
@@ -8708,12 +8708,9 @@ app.post('/api/agents', async (req, res) => {
         if (existsSync(join(gitRoot, '.beads'))) {
           await execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' });
         }
-        // Also add STATE.md and WORKSPACE.md if they exist
+        // Also add STATE.md if it exists at root (legacy location)
         if (existsSync(join(gitRoot, 'STATE.md'))) {
           await execAsync(`git add STATE.md`, { cwd: gitRoot, encoding: 'utf-8' });
-        }
-        if (existsSync(join(gitRoot, 'WORKSPACE.md'))) {
-          await execAsync(`git add WORKSPACE.md`, { cwd: gitRoot, encoding: 'utf-8' });
         }
 
         // Check if there are changes to commit
