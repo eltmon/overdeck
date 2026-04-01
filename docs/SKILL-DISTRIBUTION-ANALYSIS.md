@@ -789,7 +789,7 @@ Rules are a new content type Panopticon should distribute. Some content currentl
 
 | Skill | Description |
 |-------|-------------|
-| `opus-plan` | Opus-driven planning before implementation |
+| `plan` | Opus-driven planning before implementation |
 | `send-feedback-to-agent` | Send specialist feedback to issue agents |
 | `session-health` | Detect and clean up stuck sessions |
 | `work-complete` | Agent completion checklist |

@@ -266,7 +266,7 @@ Validation: 8/8 checks passed
 
 Next steps:
   1. Create issues on <tracker>
-  2. Run: pan opus-plan <PREFIX>-<N>  (plan with Opus)
+  2. Run: pan plan <PREFIX>-<N>  (plan with Opus)
   3. Run: pan work issue <PREFIX>-<N> (spawn implementation agent)
 ```
 

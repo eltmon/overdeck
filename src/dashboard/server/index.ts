@@ -9878,7 +9878,7 @@ Cloister converts this file into beads tasks with proper dependency links automa
     "id": "${issue.identifier}",
     "title": "<issue title>",
     "status": "approved",
-    "author": "opus-plan",
+    "author": "plan",
     "tags": ["<relevant tags>"],
     "narratives": {
       "Problem": "<what problem this solves>",
