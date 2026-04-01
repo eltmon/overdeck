@@ -440,10 +440,9 @@ export async function planCommand(id: string, options: PlanOptions = {}): Promis
 
     console.log(chalk.bold('Files created:'));
     console.log(`  ${chalk.cyan(result.files.state.replace(process.cwd() + '/', ''))}`);
-    console.log(`  ${chalk.cyan(result.files.workspace.replace(process.cwd() + '/', ''))}`);
     console.log('');
 
-    console.log(chalk.bold('Beads tasks:'));
+    console.log(chalk.bold('Tasks:'));
     for (const task of tasks) {
       console.log(`  ${chalk.dim('○')} ${issueData.identifier}: ${task.name}`);
     }
