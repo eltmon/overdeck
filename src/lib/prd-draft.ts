@@ -8,7 +8,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, renameSync, statSync } from 'fs';
 import { join, basename } from 'path';
-import { PRD_DRAFTS_DIR, PRD_PUBLISHED_DIR } from './paths.js';
+import { PRD_DRAFTS_DIR } from './paths.js';
 
 /**
  * Get the file path for a pre-workspace PRD draft
@@ -62,43 +62,6 @@ export function listPRDDrafts(): string[] {
   return readdirSync(PRD_DRAFTS_DIR)
     .filter((f) => f.endsWith('.md'))
     .map((f) => basename(f, '.md'));
-}
-
-/**
- * Promote a PRD draft to a workspace
- * Moves the PRD from ~/.panopticon/docs/prds/drafts/ to <workspace>/.planning/PRD.md
- */
-export function promotePRDToWorkspace(issueId: string, workspacePath: string): { success: boolean; error?: string } {
-  const draftPath = getPRDDraftPath(issueId);
-
-  if (!existsSync(draftPath)) {
-    return { success: false, error: `No PRD draft found for ${issueId}` };
-  }
-
-  // Create .planning directory in workspace
-  const planningDir = join(workspacePath, '.planning');
-  if (!existsSync(planningDir)) {
-    mkdirSync(planningDir, { recursive: true });
-  }
-
-  // Move PRD to workspace
-  const targetPath = join(planningDir, 'PRD.md');
-  try {
-    // Copy content rather than move, so draft persists as backup
-    const content = readFileSync(draftPath, 'utf-8');
-    writeFileSync(targetPath, content, 'utf-8');
-
-    // Move original to published folder
-    if (!existsSync(PRD_PUBLISHED_DIR)) {
-      mkdirSync(PRD_PUBLISHED_DIR, { recursive: true });
-    }
-    const publishedPath = join(PRD_PUBLISHED_DIR, `${issueId.toUpperCase()}.md`);
-    renameSync(draftPath, publishedPath);
-
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
 }
 
 /**

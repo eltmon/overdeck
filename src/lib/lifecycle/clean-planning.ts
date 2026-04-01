@@ -22,6 +22,7 @@ const execAsync = promisify(exec);
 const EPHEMERAL_PLANNING_FILES = [
   '.planning/STATE.md',
   '.planning/PRD.md',
+  '.planning/WORKSPACE.md',
   '.planning/PLANNING_PROMPT.md',
   '.planning/PLANNING_PROMPT.md.archived',
   '.planning/.planning-complete',

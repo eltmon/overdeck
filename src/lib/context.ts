@@ -25,15 +25,6 @@ export interface AgentStateContext {
   };
 }
 
-export interface WorkspaceMdContext {
-  projectName: string;
-  branch: string;
-  issueId: string;
-  description: string;
-  constraints: string[];
-  activeWork: string[];
-}
-
 export interface SummaryEntry {
   title: string;
   completedAt: string;
@@ -170,47 +161,6 @@ function parseStateMd(content: string): AgentStateContext {
   if (beadsMatch) state.contextRefs.beads = beadsMatch[1].trim();
 
   return state;
-}
-
-// ============== WORKSPACE.md ==============
-
-/**
- * Generate WORKSPACE.md for a workspace
- */
-export function generateWorkspaceMd(ctx: WorkspaceMdContext): string {
-  const lines: string[] = [
-    `# ${ctx.projectName}`,
-    '',
-    ctx.description,
-    '',
-    '## Core Value',
-    '',
-    `Working on ${ctx.issueId} to deliver requested functionality.`,
-    '',
-    '## Active Work',
-    '',
-  ];
-
-  for (const work of ctx.activeWork) {
-    lines.push(`- [ ] ${work}`);
-  }
-
-  lines.push('');
-  lines.push('## Constraints');
-  lines.push('');
-
-  for (const constraint of ctx.constraints) {
-    lines.push(`- ${constraint}`);
-  }
-
-  lines.push('');
-  lines.push('## Context');
-  lines.push('');
-  lines.push(`- Branch: \`${ctx.branch}\``);
-  lines.push(`- Issue: ${ctx.issueId}`);
-  lines.push('');
-
-  return lines.join('\n');
 }
 
 // ============== SUMMARY.md ==============
