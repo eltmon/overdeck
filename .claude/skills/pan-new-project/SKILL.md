@@ -3,7 +3,7 @@ name: pan-new-project
 description: >
   Complete setup for registering a new project with Panopticon. Handles
   project registration, issue prefix, workspace config, trust setup,
-  and validates against working project configurations.
+  beads init, tracker config, and validates against working projects.
 triggers:
   - new project
   - add new project
@@ -19,7 +19,7 @@ allowed-tools:
   - Glob
   - Grep
   - AskUserQuestion
-version: "1.0.0"
+version: "2.1.0"
 author: "Ed Becker"
 license: "MIT"
 ---
@@ -28,23 +28,26 @@ license: "MIT"
 
 **Trigger:** `/pan-new-project`
 
-Sets up a new project for Panopticon management. Ensures all required
-configuration is in place so workspaces, planning agents, and work agents
-function correctly from the start.
+Sets up a new project for Panopticon management. This is the ONLY correct
+way to add a new project. Do NOT just run `pan project add` alone — it
+creates a skeleton entry that breaks planning agents, workspace creation,
+issue routing, and beads.
 
 ---
 
 ## WHY THIS SKILL EXISTS
 
-Running `pan project add /path --name foo` only creates a minimal entry in
-`projects.yaml`. Without the full configuration, critical features break:
+Running `pan project add /path --name foo` alone causes these failures:
 
-- **No `linear_team`** → `resolveProjectFromIssue()` can't map issue prefixes
-  to the project → planning agents start in `$HOME` instead of the project root
-- **No trust entry** → Claude Code shows "Quick safety check" trust dialog,
-  blocking autonomous agents
-- **No workspace config** → `pan workspace create` may fail or use wrong defaults
-- **No test config** → specialist test agents can't run tests
+| Missing config | Symptom |
+|----------------|---------|
+| `linear_team` (issue prefix) | Planning agents start in `$HOME`, not the project root |
+| Trust entry in `~/.claude.json` | Claude Code shows trust dialog, blocking autonomous agents |
+| `GITHUB_REPOS` entry | Issues don't appear on the dashboard kanban board |
+| `beads.role` in git config | Every `bd` command prints "beads.role not configured" warnings |
+| `workspaces/` directory | Git worktree creation fails |
+| `.gitignore` entry | `workspaces/` gets committed accidentally |
+| Test config | Specialist test agents can't run tests |
 
 ---
 
@@ -52,24 +55,23 @@ Running `pan project add /path --name foo` only creates a minimal entry in
 
 ### Step 1: Gather Project Information
 
-Ask the user for (or detect from the filesystem):
+Ask the user for (or auto-detect from the filesystem):
 
 | Field | Required | Example | Notes |
 |-------|----------|---------|-------|
 | Path | Yes | `/home/eltmon/Projects/myapp` | Must exist, must have `.git/` |
-| Name | Yes | `myapp` | Short lowercase identifier |
+| Name | Yes | `myapp` | Short lowercase key for projects.yaml |
 | Issue prefix | Yes | `APP` | Maps `APP-123` → this project. Goes in `linear_team` field |
-| Tracker | Yes | `github` or `linear` or `gitlab` | Where issues live |
-| Repo | Yes | `owner/repo` | `github_repo` or `gitlab_repo` |
-| Workspace type | Yes | `standalone`, `monorepo`, or `polyrepo` | How git worktrees work |
-| Language/stack | Auto-detect | Go, TypeScript, Java, Python | Determines test commands |
+| Tracker | Yes | `github` / `linear` / `gitlab` | Where issues live |
+| Repo slug | Yes | `owner/repo` | `github_repo` or `gitlab_repo` |
+| Workspace type | Yes | `standalone` / `monorepo` / `polyrepo` | How git worktrees work |
 
-**Auto-detection hints:**
-- `go.mod` → Go project, `make test` or `go test ./...`
-- `package.json` → Node/TypeScript, `npm test` or `pnpm test`
-- `pom.xml` / `mvnw` → Java/Maven, `./mvnw test`
-- `Cargo.toml` → Rust, `cargo test`
-- `pyproject.toml` / `setup.py` → Python, `pytest`
+**Auto-detection:**
+- `go.mod` → Go, test: `make test` or `go test ./...`
+- `package.json` → Node/TS, test: `npm test` or `pnpm test`
+- `pom.xml` / `mvnw` → Java/Maven, test: `./mvnw test`
+- `Cargo.toml` → Rust, test: `cargo test`
+- `pyproject.toml` → Python, test: `pytest`
 
 ### Step 2: Register Project
 
@@ -77,11 +79,14 @@ Ask the user for (or detect from the filesystem):
 pan project add <path> --name <name>
 ```
 
+This creates a minimal entry AND pre-trusts the directory in `~/.claude.json`
+(the `projectAddCommand` calls `preTrustDirectory` automatically).
+
 ### Step 3: Configure projects.yaml
 
 Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
 
-**Minimum viable config** (compare against working projects):
+**Minimum viable config:**
 
 ```yaml
   <project-key>:
@@ -140,42 +145,56 @@ Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
         command: <cmd>
 ```
 
-### Step 4: Pre-trust Directory
+### Step 4: Add to Dashboard Tracker Config
 
-The project directory AND any workspace directories must be pre-trusted in
-Claude Code's `~/.claude.json` to avoid the trust dialog blocking agents.
+For **GitHub** projects, add to `GITHUB_REPOS` in `~/.panopticon.env`:
 
 ```bash
-# This is done automatically by `pan project add` (after our fix),
-# but verify it's there:
-node -e "
-const data = JSON.parse(require('fs').readFileSync(
-  require('path').join(require('os').homedir(), '.claude.json'), 'utf8'));
-const p = '<project-path>';
-console.log(p, '→', data.projects?.[p]?.hasTrustDialogAccepted ? 'TRUSTED' : 'NOT TRUSTED');
-"
+# Format: owner/repo:PREFIX (comma-separated)
+# Example: current value might be:
+#   GITHUB_REPOS=eltmon/panopticon-cli:PAN
+# Append the new project:
+#   GITHUB_REPOS=eltmon/panopticon-cli:PAN,owner/newrepo:APP
 ```
 
-If not trusted, add it:
+Read current value, append new repo, write back. The dashboard polls this
+to fetch issues from GitHub.
+
+For **Linear** projects, issues are fetched automatically by team — no
+extra config needed beyond `linear_team` in projects.yaml.
+
+For **GitLab** projects, TBD — not yet supported in dashboard polling.
+
+### Step 5: Initialize Beads
+
 ```bash
-node -e "
-const fs = require('fs'), path = require('path'), os = require('os');
-const f = path.join(os.homedir(), '.claude.json');
-const d = JSON.parse(fs.readFileSync(f, 'utf8'));
-if (!d.projects) d.projects = {};
-d.projects['<project-path>'] = {
-  allowedTools: [], mcpContextUris: [], mcpServers: {},
-  enabledMcpjsonServers: [], disabledMcpjsonServers: [],
-  hasTrustDialogAccepted: true, projectOnboardingSeenCount: 0,
-  hasClaudeMdExternalIncludesApproved: false,
-  hasClaudeMdExternalIncludesWarningShown: false,
-};
-fs.writeFileSync(f, JSON.stringify(d, null, 2), 'utf8');
-console.log('Trusted:', '<project-path>');
-"
+cd <project-path>
+bd init
 ```
 
-### Step 5: Create CLAUDE.md (if missing)
+This initializes the beads database, installs git hooks, creates `AGENTS.md`,
+and sets `beads.role` in git config (preventing the "beads.role not configured"
+warning). New worktrees inherit the beads config automatically since Panopticon
+sets it during workspace creation.
+
+If `bd init` has already been run, just verify `beads.role` is set:
+```bash
+cd <project-path> && git config beads.role
+```
+
+### Step 6: Create workspaces/ Directory
+
+```bash
+mkdir -p <project-path>/workspaces
+```
+
+Check `.gitignore` — add `workspaces/` if not already there:
+```bash
+grep -q '^workspaces/' <project-path>/.gitignore 2>/dev/null || \
+  echo 'workspaces/' >> <project-path>/.gitignore
+```
+
+### Step 7: Create CLAUDE.md (if missing)
 
 Check if the project has a `CLAUDE.md`. If not, create a minimal one:
 
@@ -195,35 +214,47 @@ Check if the project has a `CLAUDE.md`. If not, create a minimal one:
 <Test commands, coverage requirements>
 ```
 
-### Step 6: Create workspaces/ Directory
+### Step 8: Validate Configuration
+
+Run ALL of these checks and report pass/fail:
 
 ```bash
-mkdir -p <project-path>/workspaces
-echo "workspaces/" >> <project-path>/.gitignore  # if not already there
-```
-
-### Step 7: Validate Configuration
-
-Run these checks:
-
-```bash
-# 1. Project is registered
+# 1. Project registered
 pan project list | grep <name>
 
-# 2. Issue prefix resolves correctly
-# (Try creating a workspace — dry run)
-pan workspace create <PREFIX>-999 --dry-run 2>&1 || true
+# 2. Issue prefix resolves (won't crash)
+# Check projects.yaml has linear_team: <PREFIX>
 
-# 3. Trust is set
-node -e "const d=JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.claude.json','utf8')); console.log(d.projects?.['<path>']?.hasTrustDialogAccepted ? 'OK' : 'MISSING')"
+# 3. Trust is set in ~/.claude.json
+node -e "
+const d=JSON.parse(require('fs').readFileSync(
+  require('os').homedir()+'/.claude.json','utf8'));
+console.log(d.projects?.['<path>']?.hasTrustDialogAccepted
+  ? 'PASS: trusted' : 'FAIL: not trusted');
+"
 
-# 4. Git is clean
-cd <path> && git status --short
+# 4. Dashboard can see issues (GitHub only)
+grep 'GITHUB_REPOS' ~/.panopticon.env | grep -q '<PREFIX>' && \
+  echo "PASS: in GITHUB_REPOS" || echo "FAIL: not in GITHUB_REPOS"
+
+# 5. Beads configured
+cd <path> && git config beads.role && echo "PASS" || echo "FAIL: beads.role not set"
+
+# 6. workspaces/ exists
+test -d <path>/workspaces && echo "PASS" || echo "FAIL: no workspaces/"
+
+# 7. workspaces/ in .gitignore
+grep -q 'workspaces' <path>/.gitignore 2>/dev/null && \
+  echo "PASS" || echo "FAIL: workspaces/ not in .gitignore"
+
+# 8. CLAUDE.md exists
+test -f <path>/CLAUDE.md && echo "PASS" || echo "WARN: no CLAUDE.md"
+
+# 9. Git clean
+cd <path> && git status --short | head -5
 ```
 
-### Step 8: Summary
-
-Print a summary of what was configured:
+### Step 9: Summary
 
 ```
 ## New Project Setup Complete: <NAME>
@@ -234,6 +265,10 @@ Tracker:        GitHub (<owner/repo>)
 Workspace type: <type>
 Tests:          <command>
 Trusted:        Yes
+Beads:          Configured
+Dashboard:      Issues visible
+
+Validation: 8/8 checks passed
 
 Next steps:
   1. Create issues on <tracker>
@@ -245,23 +280,18 @@ Next steps:
 
 ## REFERENCE: Working Project Configs
 
-For comparison, here are the key fields from existing working projects:
-
 ### panopticon-cli (monorepo, GitHub)
-- `linear_team: PAN`
-- `github_repo: eltmon/panopticon-cli`
+- `linear_team: PAN`, `github_repo: eltmon/panopticon-cli`
 - `workspace.type: monorepo`
 - Has: dns, docker, agent, services, env, tests
 
-### mind-your-now (polyrepo, GitLab)
-- `linear_team: MIN`
-- `gitlab_repo: eltmon/mind-your-now`
+### mind-your-now (polyrepo, Linear/GitLab)
+- `linear_team: MIN`, `gitlab_repo: eltmon/mind-your-now`
 - `workspace.type: polyrepo` with 6 sub-repos
 - Has: dns, docker, database, agent, services, tunnel, hume, env, tests
 
 ### myn-cli (standalone, GitHub)
-- `linear_team: CLI`
-- `github_repo: mindyournow/myn-cli`
+- `linear_team: CLI`, `github_repo: mindyournow/myn-cli`
 - `workspace.type: standalone`
 - Has: tests
 
@@ -271,8 +301,10 @@ For comparison, here are the key fields from existing working projects:
 
 1. **Missing `linear_team`** — The #1 cause of "planning agent starts in $HOME."
    Despite the name, this field is the issue PREFIX for ALL trackers, not just Linear.
-2. **Not pre-trusting the directory** — Agent gets stuck on Claude Code trust dialog.
-3. **Wrong `workspace.type`** — `standalone` = single repo, `monorepo` = one repo with
+2. **Not in `GITHUB_REPOS`** — Issues don't appear on dashboard kanban board.
+3. **No `beads.role`** — Every `bd` command prints warning noise in agent output.
+4. **Not pre-trusting the directory** — Agent gets stuck on trust dialog.
+5. **Wrong `workspace.type`** — `standalone` = single repo, `monorepo` = one repo with
    worktrees, `polyrepo` = multiple repos under one parent dir.
-4. **Missing `workspaces/` directory** — Git worktree creation fails.
-5. **Missing `.gitignore` entry** — `workspaces/` gets committed accidentally.
+6. **Missing `workspaces/` directory** — Git worktree creation fails.
+7. **Missing `.gitignore` entry** — `workspaces/` gets committed accidentally.
