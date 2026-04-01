@@ -97,6 +97,67 @@ async function stopDocker(
 }
 
 /**
+ * Sync workspace beads to the project-root beads database before workspace deletion.
+ * Without this, beads created in the workspace's .beads/dolt/ are lost when the worktree is removed.
+ */
+async function syncWorkspaceBeads(
+  projectPath: string,
+  workspacePath: string,
+  issueLower: string,
+): Promise<StepResult> {
+  const step = 'teardown:sync-beads';
+  const workspaceBeadsDir = join(workspacePath, '.beads');
+
+  if (!existsSync(workspaceBeadsDir)) {
+    return stepSkipped(step, ['No .beads directory in workspace']);
+  }
+
+  try {
+    // Export workspace beads to JSONL
+    const { stdout: exportOutput } = await execAsync(
+      'bd export --output .beads/issues-export.jsonl 2>&1 || true',
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }
+    );
+
+    const exportPath = join(workspacePath, '.beads', 'issues-export.jsonl');
+    if (!existsSync(exportPath)) {
+      // Try syncing directly — bd sync exports to the standard JSONL
+      await execAsync('bd sync 2>&1 || true', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+    }
+
+    // Import workspace beads into project-root database
+    // Use bd import if available, otherwise copy JSONL entries
+    try {
+      await execAsync(
+        `bd import "${join(workspacePath, '.beads', 'issues.jsonl')}" 2>&1 || true`,
+        { cwd: projectPath, encoding: 'utf-8', timeout: 15000 }
+      );
+      return stepOk(step, [`Synced workspace beads to project root for ${issueLower}`]);
+    } catch {
+      // bd import may not exist — try manual JSONL merge
+      const { readFileSync, appendFileSync } = await import('fs');
+      const wsJsonl = join(workspacePath, '.beads', 'issues.jsonl');
+      const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
+
+      if (existsSync(wsJsonl) && existsSync(projJsonl)) {
+        const wsContent = readFileSync(wsJsonl, 'utf-8');
+        const issuePattern = issueLower.replace('-', '[-_]');
+        const relevantLines = wsContent.split('\n').filter(
+          line => line.trim() && new RegExp(issuePattern, 'i').test(line)
+        );
+        if (relevantLines.length > 0) {
+          appendFileSync(projJsonl, '\n' + relevantLines.join('\n'));
+          return stepOk(step, [`Appended ${relevantLines.length} beads entries for ${issueLower} to project JSONL`]);
+        }
+      }
+      return stepSkipped(step, ['No beads to sync or import not available']);
+    }
+  } catch (err) {
+    return stepFailed(step, `Failed to sync workspace beads: ${(err as Error).message}`);
+  }
+}
+
+/**
  * Remove git worktree for the workspace.
  */
 async function removeWorktree(
@@ -330,6 +391,12 @@ export async function teardownWorkspace(
 
     // 6. Clear planning marker (before workspace deletion, or when preserving workspace)
     results.push(await clearPlanningMarker(workspacePath));
+
+    // 6b. Sync workspace beads to project root before deletion (PAN-412)
+    // Workspace beads live in the worktree's .beads/dolt/ — they're lost when the worktree is deleted.
+    if (shouldDeleteWorkspace) {
+      results.push(await syncWorkspaceBeads(ctx.projectPath, workspacePath, issueLower));
+    }
 
     // 7-8: Project-specific cleanup (tunnel, Hume) — only when deleting workspace and config provided
     if (shouldDeleteWorkspace && (opts.workspaceConfig?.tunnel || opts.workspaceConfig?.hume)) {
