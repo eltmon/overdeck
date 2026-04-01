@@ -2,7 +2,7 @@
 name: opus-plan
 description: >
   Opus-driven planning for issues before Sonnet implementation. Creates workspace,
-  STATE.md, plan.vbrief.json with beads, and updates issue tracker. Ensures
+  PRD.md, STATE.md, beads with dependencies, and updates issue tracker. Ensures
   strategic decisions are made by Opus, not cheaper models.
 triggers:
   - opus plan
@@ -17,7 +17,7 @@ allowed-tools:
   - Grep
   - Glob
   - ToolSearch
-version: "2.0.0"
+version: "1.2.0"
 author: "Ed Becker"
 license: "MIT"
 ---
@@ -86,14 +86,80 @@ Read the FULL issue. Understand what's being asked.
    - Files to delete (cleanup)
    - Tests to write/update
 
-### Step 4: Write STATE.md
+### Step 4: Write PRD.md
 
-Create `.planning/STATE.md` with COMPLETE planning context:
+Create `.planning/PRD.md` with ALL sections filled in completely:
+
+```markdown
+# PRD: <Title>
+
+**Issue:** <issue-id>
+**Author:** Ed Becker (with Claude Opus 4.6)
+**Created:** <date>
+**Status:** Ready for Implementation
+
+## Executive Summary
+<2-3 sentences describing what we're building and why>
+
+## Problem Statement
+<Detailed description of the problem. Include:
+- Current behavior
+- Desired behavior
+- Impact of not fixing>
+
+## User Personas
+<At least 3 personas with specific needs>
+
+## User Stories
+<10+ user stories covering all use cases>
+
+## Functional Requirements
+
+### FR1: <Category>
+- FR1.1: <Specific, testable requirement>
+- FR1.2: <Specific, testable requirement>
+
+### FR2: <Category>
+...
+
+## Non-Functional Requirements
+<Performance, accessibility, security, etc.>
+
+## Technical Design
+
+### Architecture Overview
+<High-level description with diagram if helpful>
+
+### Data Flow
+<How data moves through the system>
+
+### API Changes
+<New endpoints, modified endpoints, with full signatures>
+
+### Component Structure
+<File tree of new/modified components>
+
+### Database Changes
+<Schema changes if any>
+
+## Acceptance Criteria
+<Numbered checkboxes - these become the final verification>
+
+## Dependencies
+<External dependencies, internal dependencies>
+
+## Risks and Mitigations
+<What could go wrong, prevention strategies>
+```
+
+### Step 5: Write STATE.md
+
+Create `.planning/STATE.md` with COMPLETE task breakdown:
 
 ```markdown
 # <issue-id>: <Title>
 
-**Status:** Plan Approved
+**Status:** Ready for Implementation
 **Planned by:** Claude Opus 4.6
 **Date:** <date>
 
@@ -104,93 +170,102 @@ Create `.planning/STATE.md` with COMPLETE planning context:
 
 ## Key Architectural Decisions
 
-### D1: <Topic>
-**Decision:** <What we're doing>
+### Decision 1: <Topic>
+**Choice:** <What we're doing>
 **Rationale:** <Why this choice, not alternatives>
+**Implications:** <What this means for implementation>
 
-### D2: ...
+### Decision 2: ...
 
-## Architecture
+## Implementation Plan
 
-### What's Being Changed
-<Table of components, files, and what changes>
+### Phase 1: <Name> (Priority: P1)
 
-### Key Touch Points
-<Specific file:line references for important changes>
+#### Task 1.1: <Specific task name>
+**File:** `src/path/to/file.ts`
+**Action:** Create new file / Modify existing
+**Details:**
+- Create function `functionName(param: Type): ReturnType`
+- Handle edge case X
+- Integrate with Y
+**Tests:** `tests/path/to/test.ts`
 
-## Service URLs (if applicable)
-<If this issue involves services with URLs, list them here:>
-Frontend: https://...
-API: https://...
+#### Task 1.2: ...
 
-## Remaining Work
-See plan.vbrief.json for the complete bead breakdown.
+### Phase 2: <Name> (Priority: P2)
+...
+
+## Task Dependencies
+
+```
+Task 1.1 ──┬── Task 2.1 ── Task 3.1
+           │
+Task 1.2 ──┴── Task 2.2 ── Task 3.2
 ```
 
-### Step 5: Produce plan.vbrief.json
+<Explicit list: "Task X blocks Task Y because...">
 
-Create `.planning/plan.vbrief.json` following the vBRIEF schema. This replaces the manual `bd create` loop — the Panopticon complete-planning pipeline reads this file and creates beads automatically.
+## Definition of Done
+- [ ] All beads completed
+- [ ] All tests passing
+- [ ] No TypeScript errors
+- [ ] Manual testing complete
+- [ ] PR created and reviewed
 
-```json
-{
-  "vBRIEFInfo": {
-    "version": "0.5",
-    "created": "<ISO timestamp>"
-  },
-  "plan": {
-    "id": "<ISSUE-ID>",
-    "title": "<Full issue title>",
-    "status": "approved",
-    "author": "opus-plan",
-    "tags": ["<relevant>", "<tags>"],
-    "narratives": {
-      "Problem": "<What problem this solves>",
-      "Proposal": "<How we solve it>",
-      "Constraint": "<Any constraints>",
-      "Risk": "<Key risks>",
-      "Alternative": "<What alternatives were considered>"
-    },
-    "items": [
-      {
-        "id": "<kebab-case-id>",
-        "title": "<ISSUE-ID>: <Specific task name>",
-        "status": "pending",
-        "priority": "high",
-        "metadata": {
-          "difficulty": "simple|medium|complex",
-          "issueLabel": "<issue-id-lowercase>"
-        },
-        "narrative": {
-          "Action": "<Exact what to do: file paths, function names, specific changes>"
-        },
-        "subItems": []
-      }
-    ],
-    "edges": [
-      {
-        "from": "<item-id>",
-        "to": "<item-id>",
-        "type": "blocks"
-      }
-    ]
-  }
-}
+## Notes for Implementation Agent
+- Start with Phase 1 tasks (they unblock everything)
+- Run tests after each task
+- Don't refactor code outside the scope
+- Ask for help if blocked
 ```
 
-**Bead sizing guidance:**
-- Each item should be completable in one focused session
-- Include exact file paths and function names in the Action field
-- Set `edges` to capture blocking relationships between items
-- `difficulty`: trivial (typo/config), simple (1 file), medium (2-3 files), complex (multi-system)
-- 10-40 items for a typical feature; more for large refactors
+### Step 6: CREATE ALL BEADS
 
-**After writing the JSON file:**
+**This is the critical step.** Create 30-60+ beads for a typical feature. Each bead must be:
+- Completable in 1 focused session
+- Specific enough that no decisions are needed
+- Include exact file paths and function names
+
+**For each task in STATE.md, create a bead:**
+
 ```bash
-# Mark planning complete so the pipeline picks it up
-touch workspaces/feature-<issue-id-lowercase>/.planning/.planning-complete
+bd create --title "<ISSUE-ID>: <exact task name>" \
+  --priority <1-4> \
+  --labels "<ISSUE-ID>,difficulty:<level>,phase-<n>,<optional-tags>" \
+  --description "<VERY detailed description:
+File: src/exact/path/file.ts
+
+What to do:
+1. Create/modify function X
+2. Add parameter Y
+3. Handle edge case Z
+
+Expected behavior:
+- When A happens, B should occur
+- If C fails, show error D
+
+Tests:
+- Add test in tests/path/test.ts
+- Cover cases: E, F, G>"
 ```
 
-### Step 6: Stitch Integration (UI Work)
+**Label format:**
+- `<ISSUE-ID>` - always include
+- `difficulty:trivial|simple|medium|complex`
+- `phase-1|phase-2|etc`
+- `api` - backend work
+- `frontend` - React components
+- `stitch` - design work
+- `test` - test-only tasks
+
+**After creating beads, set dependencies:**
+```bash
+bd dep add <blocked-id> <blocker-id>
+```
+
+**VERIFY:** `bd search "<ISSUE-ID>"` and count. Should be 30-60+ for a real feature.
+
+### Step 7: Stitch Integration (UI Work)
 
 If issue involves UI, YOU MUST use Stitch:
 
@@ -207,7 +282,7 @@ mcp__stitch__generate_screen_from_text ...
 
 Document all designs in `.planning/STITCH_DESIGNS.md`.
 
-### Step 7: Update Issue Tracker
+### Step 8: Update Issue Tracker
 
 **GitHub (PAN-*):**
 ```bash
@@ -221,21 +296,26 @@ gh issue comment <number> --body "## Planning Complete
 **Planned by:** Claude Opus 4.6
 **Workspace:** workspaces/feature-<issue-id>/
 
-### Beads: <N> items in plan.vbrief.json
+### Beads Created: <N> tasks
+### Ready Work: <list unblocked beads>
 ### Next: /work-issue <ISSUE-ID>"
 ```
 
-### Step 8: Output Summary
+### Step 9: Output Summary
 
 ```
 ## Opus Planning Complete for <ISSUE-ID>
 
 **Workspace:** <path>
-**STATE.md:** decisions log, architecture, key touch points
-**plan.vbrief.json:** <N> items, <M> edges
+**PRD:** <title> - <N> requirements
+**STATE.md:** <N> phases, <M> tasks
 
-**Unblocked Items:**
-1. <item-id>: <title> [P<n>]
+**Beads Created:** <total>
+- Ready (unblocked): <N>
+- Blocked: <M>
+
+**Ready Work:**
+1. <bead-id>: <title> [P<n>]
 ...
 
 **Next:** /work-issue <ISSUE-ID>
@@ -248,7 +328,8 @@ gh issue comment <number> --body "## Planning Complete
 ### For Backend API Work:
 
 ```
-Items:
+Phase: API Implementation
+Tasks:
 - Define types/interfaces in types.ts
 - Create endpoint handler function
 - Add route registration
@@ -256,42 +337,50 @@ Items:
 - Add error handling
 - Write unit tests for handler
 - Write integration tests for endpoint
+- Update API documentation
 ```
 
 ### For React Component Work:
 
 ```
-Items:
+Phase: Component Implementation
+Tasks:
 - Create component file with shell
 - Add props interface
 - Implement render logic
 - Add state management (if needed)
 - Add event handlers
 - Style with Tailwind/CSS
-- Add loading/error states
+- Add loading states
+- Add error states
 - Write unit tests
 - Wire into parent component
+- Add to Storybook (if applicable)
 ```
 
 ### For Bug Fixes:
 
 ```
-Items:
+Phase: Bug Fix
+Tasks:
 - Write failing test that reproduces bug
-- Identify root cause (document in Action field)
+- Identify root cause (document in bead)
 - Implement fix
 - Verify test passes
 - Add regression tests
+- Check for similar issues elsewhere
 ```
 
 ### For Refactoring:
 
 ```
-Items:
+Phase: Refactoring
+Tasks:
 - Write tests for current behavior (if missing)
 - Extract function/module
 - Update all call sites
 - Run tests, fix failures
+- Update documentation
 - Remove old code
 ```
 
@@ -301,10 +390,11 @@ Items:
 
 Before completing /opus-plan, verify:
 
-- [ ] STATE.md has complete discovery, decisions, and architecture
-- [ ] plan.vbrief.json is valid JSON with all required fields
-- [ ] Each item has exact file paths in Action field
-- [ ] Dependencies (edges) are set correctly
-- [ ] .planning-complete marker created
+- [ ] PRD.md has ALL sections filled
+- [ ] STATE.md has EVERY task detailed
+- [ ] Each bead has exact file paths
+- [ ] Each bead has expected behavior
+- [ ] Dependencies are set correctly
+- [ ] Ready tasks identified
 - [ ] Issue tracker updated
 - [ ] No decisions left for implementation agent
