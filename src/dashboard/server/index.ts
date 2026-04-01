@@ -12247,7 +12247,7 @@ app.get('/api/issues/:id/beads', async (req, res) => {
       try {
         // Search from workspace dir first (where .beads/ lives), fall back to project root
         const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-        const { stdout } = await execAsync(`bd search "${id}" --json`, {
+        const { stdout } = await execAsync(`bd search "${id}" --json --status all`, {
           cwd: bdSearchDir,
           encoding: 'utf-8',
           timeout: 10000,
