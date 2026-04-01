@@ -2,38 +2,35 @@
  * vBRIEF Plan Builder
  *
  * Fluent API for constructing vBRIEF documents programmatically.
- * Used by planning agents to produce structured plans.
+ * All date fields use RFC 3339 date-time format.
  */
 
 import type {
   VBriefDocument,
-  Plan,
-  PlanItem,
-  PlanItemMetadata,
-  Edge,
-  EdgeType,
-  PlanStatus,
-  Priority,
-  ItemKind,
+  VBriefPlan,
+  VBriefItem,
+  VBriefSubItem,
+  VBriefEdgeType,
+  VBriefItemStatus,
+  VBriefPriority,
+  VBriefDifficulty,
 } from './types.js';
 
 export class PlanBuilder {
-  private plan: Plan;
+  private plan: VBriefPlan;
 
-  constructor(title: string) {
+  constructor(id: string, title: string) {
     this.plan = {
+      id,
       title,
       status: 'draft',
       items: [],
       edges: [],
       narratives: {},
-      created: new Date().toISOString(),
     };
   }
 
-  // ── Plan-Level Methods ──
-
-  status(status: PlanStatus): this {
+  status(status: string): this {
     this.plan.status = status;
     return this;
   }
@@ -43,8 +40,9 @@ export class PlanBuilder {
     return this;
   }
 
-  agent(agent: string): this {
-    this.plan.agent = agent;
+  tag(...tags: string[]): this {
+    if (!this.plan.tags) this.plan.tags = [];
+    this.plan.tags.push(...tags);
     return this;
   }
 
@@ -54,123 +52,47 @@ export class PlanBuilder {
     return this;
   }
 
-  uri(key: string, value: string): this {
-    if (!this.plan.uris) this.plan.uris = {};
-    this.plan.uris[key] = value;
-    return this;
-  }
-
-  tag(...tags: string[]): this {
-    if (!this.plan.tags) this.plan.tags = [];
-    this.plan.tags.push(...tags);
-    return this;
-  }
-
-  // ── Item Methods ──
-
-  addItem(item: PlanItem): this {
+  addItem(item: VBriefItem): this {
     this.plan.items.push(item);
-    return this;
-  }
-
-  addRequirement(id: string, title: string, opts?: {
-    narrative?: string;
-    priority?: Priority;
-    acceptanceCriteria?: Array<{ id: string; title: string }>;
-  }): this {
-    const item: PlanItem = {
-      id,
-      title,
-      status: 'pending',
-      narrative: opts?.narrative,
-      priority: opts?.priority,
-      metadata: { kind: 'requirement' },
-      subItems: opts?.acceptanceCriteria?.map(ac => ({
-        id: ac.id,
-        title: ac.title,
-        status: 'pending' as PlanStatus,
-        metadata: { kind: 'acceptance_criterion' as ItemKind },
-      })),
-    };
-    this.plan.items.push(item);
-    return this;
-  }
-
-  addArchitecturalDecision(id: string, title: string, narrative: string): this {
-    this.plan.items.push({
-      id,
-      title,
-      status: 'approved',
-      narrative,
-      metadata: { kind: 'architectural_decision' },
-    });
-    return this;
-  }
-
-  addStory(id: string, title: string, opts?: {
-    narrative?: string;
-    rallyRef?: string;
-    planRef?: string;
-    priority?: Priority;
-  }): this {
-    this.plan.items.push({
-      id,
-      title,
-      status: 'pending',
-      narrative: opts?.narrative,
-      planRef: opts?.planRef,
-      priority: opts?.priority,
-      metadata: {
-        kind: 'story',
-        rally_ref: opts?.rallyRef,
-      },
-    });
     return this;
   }
 
   addTask(id: string, title: string, opts?: {
     narrative?: string;
-    difficulty?: PlanItemMetadata['difficulty'];
+    difficulty?: VBriefDifficulty;
     phase?: number;
-    priority?: Priority;
+    priority?: VBriefPriority;
+    subItems?: VBriefSubItem[];
   }): this {
     this.plan.items.push({
       id,
       title,
       status: 'pending',
-      narrative: opts?.narrative,
       priority: opts?.priority,
       metadata: {
-        kind: 'task',
         difficulty: opts?.difficulty,
         phase: opts?.phase,
       },
+      narrative: opts?.narrative ? { Action: opts.narrative } : undefined,
+      subItems: opts?.subItems,
     });
     return this;
   }
 
-  // ── Edge Methods ──
-
-  addEdge(from: string, to: string, type: EdgeType): this {
-    if (!this.plan.edges) this.plan.edges = [];
-    this.plan.edges.push({ from, to, type });
+  blocks(from: string, to: string): this {
+    this.plan.edges.push({ from, to, type: 'blocks' });
     return this;
   }
 
-  blocks(from: string, to: string): this {
-    return this.addEdge(from, to, 'blocks');
-  }
-
   informs(from: string, to: string): this {
-    return this.addEdge(from, to, 'informs');
+    this.plan.edges.push({ from, to, type: 'informs' });
+    return this;
   }
-
-  // ── Build ──
 
   build(): VBriefDocument {
-    this.plan.updated = new Date().toISOString();
+    const now = new Date().toISOString();
     return {
-      vBRIEFInfo: { version: '0.5', created: this.plan.created, updated: this.plan.updated },
+      vBRIEFInfo: { version: '0.5', created: now },
       plan: { ...this.plan },
     };
   }
@@ -178,19 +100,7 @@ export class PlanBuilder {
 
 /**
  * Create a new plan builder.
- *
- * @example
- * const doc = planBuilder('MIN-630: Redesign Daily Briefing')
- *   .status('approved')
- *   .narrative('Problem', 'Current briefing is a wall of text')
- *   .addRequirement('api.response', 'Restructure briefing API response', {
- *     acceptanceCriteria: [
- *       { id: 'api.response.ac1', title: 'Response includes urgency_zones array' },
- *     ]
- *   })
- *   .blocks('api.response', 'ui.cards')
- *   .build();
  */
-export function planBuilder(title: string): PlanBuilder {
-  return new PlanBuilder(title);
+export function planBuilder(id: string, title: string): PlanBuilder {
+  return new PlanBuilder(id, title);
 }
