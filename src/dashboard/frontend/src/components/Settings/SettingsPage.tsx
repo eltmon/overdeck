@@ -131,9 +131,6 @@ const AGENT_CATEGORIES: AgentCategory[] = [
     name: 'Workflow Agents',
     icon: 'route',
     agents: [
-      { id: 'prd-agent' as WorkTypeId, name: 'PRD Agent', icon: 'article', description: 'Product requirements' },
-      { id: 'decomposition-agent' as WorkTypeId, name: 'Decomposition', icon: 'account_tree', description: 'Break down epics' },
-      { id: 'triage-agent' as WorkTypeId, name: 'Triage', icon: 'filter_list', description: 'Prioritize issues' },
       { id: 'status-review' as WorkTypeId, name: 'Status Review', icon: 'assessment', description: 'AI status reviews (executive-facing)' },
     ],
   },

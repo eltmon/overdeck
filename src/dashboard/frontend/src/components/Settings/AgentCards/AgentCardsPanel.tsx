@@ -91,26 +91,6 @@ const AGENT_DEFINITIONS = {
     workType: 'subagent:general-purpose' as WorkTypeId,
   },
 
-  // Pre-work agents
-  prdAgent: {
-    name: 'PRD Agent',
-    icon: 'description',
-    description: 'Product requirement docs',
-    workType: 'prd-agent' as WorkTypeId,
-  },
-  decompositionAgent: {
-    name: 'Decomposition Agent',
-    icon: 'account_tree',
-    description: 'Breaks down work into tasks',
-    workType: 'decomposition-agent' as WorkTypeId,
-  },
-  triageAgent: {
-    name: 'Triage Agent',
-    icon: 'sort',
-    description: 'Prioritizes and triages issues',
-    workType: 'triage-agent' as WorkTypeId,
-  },
-
   // CLI contexts
   cliInteractive: {
     name: 'CLI Interactive',
@@ -306,35 +286,6 @@ export function AgentCardsPanel({
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {(['exploreSubagent', 'planSubagent', 'bashSubagent', 'generalSubagent'] as const).map((key) => {
-            const agent = AGENT_DEFINITIONS[key];
-            const { model, isOverride } = getModel(agent.workType);
-            return (
-              <div
-                key={key}
-                onClick={() => handleConfigureOverride(agent.workType)}
-                className="cursor-pointer"
-              >
-                <AgentCard
-                  name={agent.name}
-                  icon={agent.icon}
-                  description={agent.description}
-                  primaryModel={model}
-                  isOverride={isOverride}
-                  variant="compact"
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Pre-work Agents */}
-      <div>
-        <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-3">
-          Pre-work Agents
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {(['prdAgent', 'decompositionAgent', 'triageAgent'] as const).map((key) => {
             const agent = AGENT_DEFINITIONS[key];
             const { model, isOverride } = getModel(agent.workType);
             return (
