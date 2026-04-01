@@ -1,72 +1,115 @@
 {
-  "vBRIEFInfo": { "version": "0.5", "created": "2026-03-31T00:00:00Z" },
+  "vBRIEFInfo": { "version": "0.5", "created": "2026-03-31T12:00:00Z" },
   "plan": {
-    "id": "PAN-402",
-    "title": "Dashboard: planning agent spawn failures are invisible to the UI",
+    "id": "PAN-404",
+    "title": "Simplify planning pipeline: collapse agents, remove redundant artifacts",
     "status": "approved",
     "author": "opus-plan",
-    "tags": ["dashboard", "planning", "error-handling", "socket.io", "ux"],
+    "tags": ["refactor", "planning", "cleanup"],
     "narratives": {
-      "Problem": "When planning agent spawn fails in the background async task, the UI shows success because the HTTP response was already sent. The user has no way to know planning didn't actually start.",
-      "Proposal": "Emit Socket.io events (planning:started, planning:failed) from the background async task. Frontend listens for these events to show failures in PlanDialog (with retry/abort) and on kanban cards (failure badge).",
-      "Constraint": "Must not change the fire-and-forget pattern from PAN-302 (instant UI response). Must not break existing polling fallback. Must follow existing badge patterns in KanbanBoard.",
-      "Risk": "Socket event could be missed on reconnect — mitigated by agents query refetch (5s interval) picking up failed state for kanban badge, and PlanDialog re-checking status on open.",
-      "Alternative": "Polling-only approach rejected because it only works when Watch Planning is checked and has 2s latency. Combined socket+enhanced-polling rejected as unnecessary complexity."
+      "Problem": "The planning pipeline has accumulated redundant agents (PRD, triage, decomposition) and artifacts (PRD.md, WORKSPACE.md) that are superseded by vBRIEF adoption. This complexity slows development and confuses the planning flow.",
+      "Proposal": "Remove three agent types, two artifact types, and their associated registrations/UI. Consolidate to: one planning agent producing vBRIEF, STATE.md for operational state, and human-written PRDs in docs/prds/.",
+      "Constraint": "Must preserve analyzeIssue() heuristics from triage-agent as a utility function. Dashboard must gracefully handle workspaces that still have legacy PRD.md files. Service URL extraction must move to STATE.md before WORKSPACE.md removal.",
+      "Risk": "Large surface area across dashboard server, frontend settings UI, lifecycle modules, and skills. Dashboard server index.ts is a monolith — changes require careful line-level verification. Existing workspaces with PRD.md files need graceful degradation.",
+      "Alternative": "Could deprecate gradually with feature flags, but the agents are already unused (runPreWorkflow is dead code) and vBRIEF is the active path. Clean removal is simpler and safer than maintaining two parallel systems."
     },
     "items": [
       {
-        "id": "emit-socket-events",
-        "title": "Emit planning:started and planning:failed Socket.io events from backend",
+        "id": "remove-agent-files",
+        "title": "Remove prd-agent.ts, decomposition-agent.ts, and triage-agent spawn; keep analyzeIssue()",
         "status": "pending",
         "priority": "high",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-402"
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-404" },
+        "narrative": {
+          "Action": "Delete src/lib/planning/prd-agent.ts entirely. Delete src/lib/planning/decomposition-agent.ts entirely. In src/lib/planning/triage-agent.ts, remove the spawnTriageAgent() function and agent spawn logic but preserve the analyzeIssue() utility function (move to plan-utils.ts or keep file as triage-utils.ts). Delete .claude/agents/triage-agent.md agent definition."
         },
-        "narrative": { "Action": "In the background async IIFE of POST /api/issues/:id/start-planning in server/index.ts, emit socketIo.emit('planning:started', { issueId, sessionName }) after writing status: 'running', and socketIo.emit('planning:failed', { issueId, error }) in the catch block after writing status: 'failed'." },
         "subItems": []
       },
       {
-        "id": "socket-listeners",
-        "title": "Add planning socket event listeners in useSocketIssues hook",
+        "id": "clean-planning-module",
+        "title": "Clean up planning/index.ts exports and remove dead code from plan-utils.ts",
         "status": "pending",
         "priority": "high",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-402"
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-404" },
+        "narrative": {
+          "Action": "Remove runPreWorkflow() from index.ts (dead code, never called). Remove exports for deleted agents (generatePRD, decomposeWork, spawnPRDAgent, spawnTriageAgent, spawnDecompositionAgent). Remove createBeadsTasks() from plan-utils.ts (replaced by createBeadsFromVBrief). Remove generateWorkspaceContent() from plan-utils.ts. Remove WORKSPACE.md writing from writePlanFiles(). Update remaining exports."
         },
-        "narrative": { "Action": "In useSocketIssues.ts, add listeners for planning:started and planning:failed events. On either event, invalidate the ['planningStatus', issueId] and ['agents'] React Query caches so both PlanDialog and KanbanBoard reflect the new state." },
         "subItems": []
       },
       {
-        "id": "plandialog-error-state",
-        "title": "Add error step to PlanDialog with retry and abort controls",
+        "id": "remove-agent-registrations",
+        "title": "Remove prd/triage/decomposition agent registrations from work-types, settings, model selector",
         "status": "pending",
         "priority": "high",
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-402"
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-404" },
+        "narrative": {
+          "Action": "Remove prd-agent, triage-agent, decomposition-agent entries from: src/lib/work-types.ts (work type registry), src/lib/settings-api.ts (default model overrides), src/lib/smart-model-selector.ts (skill weight profiles)."
         },
-        "narrative": { "Action": "Add a new 'error' step to PlanDialog's state machine. When planning:failed is received (via invalidated planningStatus query showing error), transition to error step. Render: error message from status endpoint, Retry button (re-calls startPlanningMutation), Abort button (calls abort-planning endpoint). Handle transitions back to 'starting' on retry." },
         "subItems": []
       },
       {
-        "id": "kanban-failure-badge",
-        "title": "Show 'Plan Failed' badge on kanban card when planning spawn fails",
+        "id": "remove-dashboard-agent-cards",
+        "title": "Remove Settings UI cards for removed agents",
         "status": "pending",
         "priority": "medium",
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-402"
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-404" },
+        "narrative": {
+          "Action": "Remove prd-agent, triage-agent, decomposition-agent from: Settings/types.ts (WorkTypeId union + agent display list), SettingsPage.tsx (workflow agents section), AgentCardsPanel.tsx (card metadata), ModelOverrideModal.tsx (model capability tags + display names). Verify no other frontend components reference these agent types."
         },
-        "narrative": { "Action": "In KanbanBoard.tsx IssueCard, check if the planning agent for this issue has status: 'failed' (from the agents query data). If so, render a red 'Plan Failed' badge with XCircle icon, following the same pattern as the existing 'Stuck' badge (red-500, pulse animation)." },
+        "subItems": []
+      },
+      {
+        "id": "remove-prd-md-usage",
+        "title": "Remove .planning/PRD.md reads from dashboard server, UAT agent, and lifecycle",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-404" },
+        "narrative": {
+          "Action": "In dashboard server/index.ts: (1) Remove PRD.md read at ~line 14219 — result.prd field can be removed or populated from STATE.md. (2) Remove PRD.md read at ~line 14301 for AI context — use STATE.md only. (3) Update hasPrd logic at ~line 14904 to use PLANNING_PROMPT.md or STATE.md instead. (4) Update title extraction at ~line 14943 to not check PRD.md. (5) Remove promotePRDToWorkspace() call at ~line 8585. In uat-agent.ts: remove PRD.md from searchPaths array (STATE.md is already included). In clean-planning.ts: PRD.md is already in EPHEMERAL_PLANNING_FILES — leave it for backward compat with existing workspaces. In close-out.ts/archive-planning.ts: leave PRD.md archive logic (harmless no-op if file missing)."
+        },
+        "subItems": []
+      },
+      {
+        "id": "remove-workspace-md",
+        "title": "Remove WORKSPACE.md generation and update service URL extraction",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-404" },
+        "narrative": {
+          "Action": "Remove generateWorkspaceContent() and WORKSPACE.md writing from plan-utils.ts (may already be done in clean-planning-module task). Remove generateWorkspaceMd() from context.ts if unused elsewhere. Update dashboard server ~line 5463 to extract service URLs from STATE.md instead of WORKSPACE.md. Remove 'git add WORKSPACE.md' at ~line 8708. Add WORKSPACE.md to EPHEMERAL_PLANNING_FILES in clean-planning.ts. Remove promotePRDDraft() from prd-draft.ts and its import/call in dashboard server."
+        },
+        "subItems": []
+      },
+      {
+        "id": "update-opus-plan-skill",
+        "title": "Rewrite opus-plan skill to produce plan.vbrief.json instead of PRD.md + bd create",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-404" },
+        "narrative": {
+          "Action": "Rewrite skills/opus-plan/SKILL.md and .claude/skills/opus-plan/SKILL.md to: (1) Remove Step 4 (create PRD.md). (2) Keep STATE.md creation but add service URLs section template. (3) Replace Step 6 (manual bd create loop) with: produce plan.vbrief.json following the vBRIEF schema. (4) Remove references to WORKSPACE.md. (5) Update the skill description and workflow to match the simplified pipeline."
+        },
+        "subItems": []
+      },
+      {
+        "id": "document-shadow-mode",
+        "title": "Document shadow mode under legacy codebase support in docs",
+        "status": "pending",
+        "priority": "low",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-404" },
+        "narrative": {
+          "Action": "Add shadow mode documentation under the legacy/codebase support section in docs. Reference existing implementation in src/lib/shadow-mode.ts. Cover: what shadow mode is, how to enable (per-project config, env var, CLI flag), shadow state persistence, and the INFERENCE.md artifact. Reference PAN-28 as the original implementation."
+        },
         "subItems": []
       }
     ],
     "edges": [
-      { "from": "emit-socket-events", "to": "socket-listeners", "type": "blocks" },
-      { "from": "socket-listeners", "to": "plandialog-error-state", "type": "blocks" },
-      { "from": "socket-listeners", "to": "kanban-failure-badge", "type": "informs" }
+      { "from": "remove-agent-files", "to": "clean-planning-module", "type": "blocks" },
+      { "from": "remove-agent-files", "to": "remove-agent-registrations", "type": "blocks" },
+      { "from": "remove-agent-registrations", "to": "remove-dashboard-agent-cards", "type": "blocks" },
+      { "from": "clean-planning-module", "to": "remove-workspace-md", "type": "informs" },
+      { "from": "remove-prd-md-usage", "to": "remove-workspace-md", "type": "informs" },
+      { "from": "remove-agent-files", "to": "update-opus-plan-skill", "type": "informs" }
     ]
   }
 }
