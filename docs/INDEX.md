@@ -133,6 +133,8 @@
 - **"DNS"** / **"domains"** → DNS_SETUP.md
 - **"remote"** → PRD-REMOTE-WORKSPACES.md
 - **"git"** / **"worktree"** → README.md, CLAUDE.md
+- **"terminal"** / **"WebSocket"** / **"PTY"** / **"tmux attach"** → CLAUDE.md (Dashboard Terminal WebSocket Architecture)
+- **"capture-pane"** / **"send-keys"** → CLAUDE.md (Dashboard Terminal WebSocket Architecture, tmux Message Delivery)
 
 ### Monitoring & Cost
 - **"cost"** / **"billing"** / **"tracking"** → cost-tracking.md, CONFIGURATION.md

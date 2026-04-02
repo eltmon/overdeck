@@ -61,6 +61,24 @@ await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
 
 Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
 
+## Dashboard Terminal WebSocket Architecture
+
+The dashboard shows live terminal output via a WebSocket endpoint (`/ws/terminal?session=<name>`).
+
+**CRITICAL: The server does NOT use `tmux attach-session`.** It uses a non-attaching approach:
+
+- **Output**: `tmux capture-pane` polled at 4Hz (250ms interval)
+- **Input**: `tmux send-keys` for control characters, `load-buffer` + `paste-buffer` for text
+- **Resize**: `tmux resize-window`
+
+**Why not attach?** Previous implementation used `node-pty` to spawn `tmux attach-session`. When the WebSocket closed (browser navigation, dialog close), orphan `tmux attach` PTY processes accumulated. After 2-4 reconnect cycles, these orphans caused tmux to destroy the session — killing the planning agent and losing all output.
+
+The capture-pane approach has zero impact on session lifecycle. WebSocket connect/disconnect is completely decoupled from the tmux session. Tested: 30 consecutive connect/disconnect cycles with zero failures.
+
+**Trade-off**: 250ms polling latency vs real-time PTY streaming. Acceptable for monitoring; PAN-406 tracks future optimization with `tmux pipe-pane` for real-time output.
+
+**NEVER reintroduce `tmux attach-session` or `node-pty` for the terminal WebSocket.** This was a multi-hour debugging effort. The capture-pane approach is correct.
+
 ## Verification Gate (PAN-174)
 
 After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
