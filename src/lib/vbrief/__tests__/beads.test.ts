@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { syncBeadStatusToVBrief } from '../beads.js';
+import { syncBeadStatusToVBrief, getVBriefACStatus } from '../beads.js';
 import { readWorkspacePlan } from '../io.js';
 import type { VBriefDocument } from '../types.js';
 
@@ -115,5 +115,119 @@ describe('syncBeadStatusToVBrief', () => {
 
     const result = syncBeadStatusToVBrief('bead-1', TEST_DIR);
     expect(result).toBe('item-1');
+  });
+});
+
+describe('getVBriefACStatus', () => {
+  function makePlanWithAC(items: Array<{
+    id: string;
+    title: string;
+    subItems?: Array<{ id: string; title: string; status?: string; kind?: string }>;
+  }>): VBriefDocument {
+    return {
+      vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
+      plan: {
+        id: 'TEST',
+        title: 'Test Plan',
+        status: 'approved',
+        items: items.map(i => ({
+          id: i.id,
+          title: i.title,
+          status: 'pending' as const,
+          subItems: i.subItems?.map(s => ({
+            id: s.id,
+            title: s.title,
+            status: (s.status ?? 'pending') as any,
+            metadata: { kind: s.kind ?? 'acceptance_criterion' },
+          })),
+        })),
+        edges: [],
+      },
+    };
+  }
+
+  it('returns null when no plan exists', () => {
+    expect(getVBriefACStatus(TEST_DIR)).toBeNull();
+  });
+
+  it('returns null when plan has no AC subItems', () => {
+    writePlan(TEST_DIR, makePlanWithAC([{ id: 'item-1', title: 'Task' }]));
+    expect(getVBriefACStatus(TEST_DIR)).toBeNull();
+  });
+
+  it('returns structured status for items with AC', () => {
+    const doc = makePlanWithAC([{
+      id: 'item-1',
+      title: 'Build module',
+      subItems: [
+        { id: 'item-1.ac1', title: 'Function exists', status: 'completed' },
+        { id: 'item-1.ac2', title: 'Tests pass', status: 'pending' },
+      ],
+    }]);
+    writePlan(TEST_DIR, doc);
+
+    const result = getVBriefACStatus(TEST_DIR)!;
+    expect(result).not.toBeNull();
+    expect(result.allCompleted).toBe(false);
+    expect(result.totalCompleted).toBe(1);
+    expect(result.totalPending).toBe(1);
+    expect(result.totalCount).toBe(2);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].itemId).toBe('item-1');
+    expect(result.items[0].completed).toBe(1);
+    expect(result.items[0].pending).toBe(1);
+  });
+
+  it('returns allCompleted=true when all AC are completed', () => {
+    const doc = makePlanWithAC([{
+      id: 'item-1',
+      title: 'Task',
+      subItems: [
+        { id: 'item-1.ac1', title: 'Done', status: 'completed' },
+        { id: 'item-1.ac2', title: 'Also done', status: 'completed' },
+      ],
+    }]);
+    writePlan(TEST_DIR, doc);
+
+    const result = getVBriefACStatus(TEST_DIR)!;
+    expect(result.allCompleted).toBe(true);
+    expect(result.totalPending).toBe(0);
+  });
+
+  it('treats cancelled AC as completed', () => {
+    const doc = makePlanWithAC([{
+      id: 'item-1',
+      title: 'Task',
+      subItems: [
+        { id: 'item-1.ac1', title: 'Done', status: 'completed' },
+        { id: 'item-1.ac2', title: 'Cancelled', status: 'cancelled' },
+      ],
+    }]);
+    writePlan(TEST_DIR, doc);
+
+    const result = getVBriefACStatus(TEST_DIR)!;
+    expect(result.allCompleted).toBe(true);
+  });
+
+  it('aggregates across multiple items', () => {
+    const doc = makePlanWithAC([
+      {
+        id: 'item-1',
+        title: 'First',
+        subItems: [{ id: 'item-1.ac1', title: 'A', status: 'completed' }],
+      },
+      {
+        id: 'item-2',
+        title: 'Second',
+        subItems: [{ id: 'item-2.ac1', title: 'B', status: 'pending' }],
+      },
+    ]);
+    writePlan(TEST_DIR, doc);
+
+    const result = getVBriefACStatus(TEST_DIR)!;
+    expect(result.allCompleted).toBe(false);
+    expect(result.items).toHaveLength(2);
+    expect(result.totalCompleted).toBe(1);
+    expect(result.totalPending).toBe(1);
   });
 });

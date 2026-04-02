@@ -36,6 +36,10 @@ export {
   updateSubItemStatus,
 } from './io.js';
 
+// Beads integration
+export { createBeadsFromVBrief, syncBeadStatusToVBrief, getVBriefACStatus } from './beads.js';
+export type { CreateBeadsResult, VBriefACStatus, ItemACStatus } from './beads.js';
+
 // Acceptance Criteria
 export {
   extractAcceptanceCriteria,

@@ -11,6 +11,8 @@ import { promisify } from 'util';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { readWorkspacePlan, updateItemStatus } from './io.js';
+import { extractACFromDocument } from './acceptance-criteria.js';
+import type { AcceptanceCriterion } from './acceptance-criteria.js';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 
 const execAsync = promisify(exec);
@@ -257,4 +259,70 @@ export function syncBeadStatusToVBrief(
     console.warn(`[vbrief-sync] Failed to sync bead ${beadId}: ${err.message}`);
     return null;
   }
+}
+
+/** Per-item AC status summary. */
+export interface ItemACStatus {
+  itemId: string;
+  itemTitle: string;
+  completed: number;
+  pending: number;
+  total: number;
+  criteria: AcceptanceCriterion[];
+}
+
+/** Result of getVBriefACStatus(). null means no plan or no AC found. */
+export interface VBriefACStatus {
+  allCompleted: boolean;
+  items: ItemACStatus[];
+  totalCompleted: number;
+  totalPending: number;
+  totalCount: number;
+}
+
+/**
+ * Get structured AC status from a workspace's vBRIEF plan.
+ *
+ * Returns per-item AC counts (completed/pending/total) plus an overall
+ * allCompleted flag. Returns null if no plan exists or no AC are found
+ * (legacy workspace compatibility).
+ *
+ * Used by: verification gate, pan work done, merge agent, prompt injection.
+ */
+export function getVBriefACStatus(workspacePath: string): VBriefACStatus | null {
+  const doc = readWorkspacePlan(workspacePath);
+  if (!doc) return null;
+
+  const allCriteria = extractACFromDocument(doc);
+  if (allCriteria.length === 0) return null;
+
+  // Group by item
+  const itemMap = new Map<string, ItemACStatus>();
+  for (const ac of allCriteria) {
+    let item = itemMap.get(ac.itemId);
+    if (!item) {
+      item = { itemId: ac.itemId, itemTitle: ac.itemTitle, completed: 0, pending: 0, total: 0, criteria: [] };
+      itemMap.set(ac.itemId, item);
+    }
+    item.total++;
+    item.criteria.push(ac);
+    if (ac.status === 'completed' || ac.status === 'cancelled') {
+      item.completed++;
+    } else {
+      item.pending++;
+    }
+  }
+
+  const items = Array.from(itemMap.values());
+  const totalCompleted = items.reduce((sum, i) => sum + i.completed, 0);
+  const totalPending = items.reduce((sum, i) => sum + i.pending, 0);
+  const totalCount = totalCompleted + totalPending;
+
+  return {
+    allCompleted: totalPending === 0,
+    items,
+    totalCompleted,
+    totalPending,
+    totalCount,
+  };
 }
