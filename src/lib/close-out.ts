@@ -309,6 +309,17 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
       }
     }
 
+    // Delete local and remote feature branches (safe — we verified merge in step 2)
+    const branchName = `feature/${issueLower}`;
+    try {
+      await execAsync(`git branch -D "${branchName}"`, { cwd: ctx.projectPath });
+      cleaned = true;
+    } catch { /* Branch may not exist locally */ }
+    try {
+      await execAsync(`git push origin --delete "${branchName}"`, { cwd: ctx.projectPath });
+      cleaned = true;
+    } catch { /* Branch may not exist on remote */ }
+
     steps.push({
       name: 'Clean up workspace',
       status: cleaned ? 'passed' : 'skipped',
