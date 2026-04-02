@@ -58,7 +58,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
     },
     staleTime: 60_000,
   });
-  const planExists = planDoc != null;
+  const planHasItems = planDoc != null && (planDoc.plan?.items?.length ?? 0) > 0;
 
   const openTasks = beadsData?.tasks?.filter(t => t.status === 'open') || [];
   const closedTasks = beadsData?.tasks?.filter(t => t.status === 'closed') || [];
@@ -93,7 +93,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
           </span>
         </div>
         <div className="flex items-center gap-1">
-          {planExists && (
+          {planHasItems && (
             <div className="flex items-center rounded border border-divider overflow-hidden mr-1">
               <button
                 onClick={() => toggleView('list')}
@@ -111,7 +111,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
               </button>
             </div>
           )}
-          {planExists && (
+          {planHasItems && (
             <button
               onClick={() => {
                 fetch(`/api/workspaces/${issueId}/plan`)
@@ -144,7 +144,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
       </div>
 
       {/* Graph view */}
-      {view === 'graph' && planExists && (
+      {view === 'graph' && planHasItems && (
         <div className="space-y-2">
           <div style={{ height: 320 }}>
             <PlanDAGViewer
@@ -163,8 +163,8 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
         </div>
       )}
 
-      {/* List view */}
-      {view === 'list' && (
+      {/* List view — also shown when graph selected but no plan items */}
+      {(view === 'list' || !planHasItems) && (
         <>
           {beadsData?.tasks && beadsData.tasks.length > 0 ? (
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
