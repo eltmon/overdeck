@@ -210,10 +210,11 @@ export async function deepWipe(
   const allSteps: StepResult[] = [];
   const { deleteWorkspace = true, deleteBranches = true, resetIssue = true } = opts;
 
-  // 1. Teardown workspace (aggressive — delete branches, project-specific cleanup)
+  // 1. Teardown workspace (aggressive — delete branches, project-specific cleanup, clear beads)
   const teardownSteps = await teardownWorkspace(ctx, {
     deleteWorkspace,
     deleteBranches,
+    clearBeads: true,
     workspaceConfig: opts.workspaceConfig,
     projectName: opts.projectName,
   });
