@@ -10119,6 +10119,11 @@ set -s escape-time 0
           : `${agentCmd.command} --dangerously-skip-permissions`;
 
         writeFileSync(launcherScript, `#!/bin/bash
+# Set terminal environment for proper rendering (match remote launcher)
+export TERM=xterm-256color
+export COLORTERM=truecolor
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
 export PANOPTICON_AGENT_ID="${sessionName}"
 export PANOPTICON_ISSUE_ID="${issue.identifier}"
 export PANOPTICON_SESSION_TYPE="planning"
@@ -10139,7 +10144,7 @@ while true; do sleep 60; done
 
         // Ensure tmux is running before starting session
         await ensureTmuxRunning();
-        await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
+        await execAsync(`TERM=xterm-256color tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
         // Protect the session from being destroyed when clients disconnect.
         // When the dashboard's WebSocket terminal attaches and then detaches,
         // tmux can destroy the session if destroy-unattached is on. Setting
@@ -10160,12 +10165,11 @@ while true; do sleep 60; done
           location: 'local',
         }, null, 2));
 
-        // Resize the tmux window to be wide enough for Claude's TUI
-        try {
-          await execAsync(`tmux resize-window -t ${sessionName} -x 200 -y 50 2>/dev/null`, { encoding: 'utf-8' });
-        } catch {
-          // Ignore resize errors
-        }
+        // NOTE: No pre-resize of tmux window here. The WebSocket terminal handler
+        // defers PTY spawn until the client sends its actual dimensions, so the
+        // tmux window will be sized correctly from the start. Pre-resizing to
+        // 200×50 caused a dimension cascade (200→120→actual) that garbled output.
+        // See PAN-417 for the full forensic timeline.
 
         console.log(`Started local planning agent ${sessionName} with initial prompt`);
         socketIo.emit('planning:started', { issueId: issue.identifier, sessionName });
@@ -13525,38 +13529,86 @@ wss.on('connection', (ws: WebSocket, req) => {
 
     // Local sessions use node-pty with tmux attach-session.
     // This gives proper terminal emulation (ANSI escape sequences, cursor positioning).
+    //
+    // CRITICAL (PAN-417): Wait for the client's first resize message before spawning
+    // the PTY. This ensures the PTY starts at the correct dimensions, avoiding the
+    // dimension cascade (200×50 → 120×30 → actual) that garbled terminal output.
+    // This matches the remote path's startFly() pattern.
     activePtys.delete(sessionName);
 
-    let ptyProcess: pty.IPty;
-    ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
-      name: 'xterm-256color',
-      cols: 120,
-      rows: 30,
-      cwd: homedir(),
-      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
-    });
+    let ptyProcess: pty.IPty | null = null;
+    let ptyStarted = false;
+    let lastResizeCols = 0;
+    let lastResizeRows = 0;
+    const pendingInput: string[] = [];
 
-    activePtys.set(sessionName, ptyProcess);
+    const startLocalPty = (cols: number, rows: number) => {
+      if (ptyStarted) return;
+      ptyStarted = true;
+      lastResizeCols = cols;
+      lastResizeRows = rows;
 
-    // Forward PTY output to WebSocket
-    ptyProcess.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
+      console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${cols}x${rows}`);
+
+      // Spawn PTY at client's exact dimensions. The PTY attachment causes tmux
+      // to resize its window (window-size=latest), which sends SIGWINCH to Claude.
+      ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
+        name: 'xterm-256color',
+        cols,
+        rows,
+        cwd: homedir(),
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
+      });
+
+      activePtys.set(sessionName, ptyProcess);
+
+      // Suppress initial PTY output — the first data burst contains the tmux screen
+      // rendered at the OLD size (80×24 default). We drop it, wait for Claude to
+      // process SIGWINCH (from our PTY attachment resizing the window), then force
+      // a second SIGWINCH via dimension toggle to trigger a clean full repaint.
+      let forwarding = false;
+
+      ptyProcess.onData((data) => {
+        if (forwarding && ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
+
+      // After 200ms: start forwarding, then force full repaint via dimension toggle.
+      // The toggle (cols→cols-1→cols) guarantees two SIGWINCHs, the last at the
+      // correct size. Claude repaints its entire TUI and we forward the clean result.
+      setTimeout(() => {
+        forwarding = true;
+        if (ptyProcess && ws.readyState === WebSocket.OPEN) {
+          // Toggle dimensions to force SIGWINCH + full repaint
+          ptyProcess.resize(cols - 1, rows);
+          execAsync(`tmux resize-window -t ${sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
+            .then(() => new Promise(r => setTimeout(r, 50)))
+            .then(() => {
+              if (ptyProcess && ws.readyState === WebSocket.OPEN) {
+                ptyProcess.resize(cols, rows);
+                return execAsync(`tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
+              }
+            })
+            .catch(() => {});
+        }
+      }, 200);
+
+      // Handle PTY exit
+      ptyProcess.onExit(({ exitCode }) => {
+        console.log(`PTY for ${sessionName} exited with code ${exitCode}`);
+        activePtys.delete(sessionName);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close(1000, 'Session ended');
+        }
+      });
+
+      // Flush any input that arrived while PTY was starting
+      for (const input of pendingInput) {
+        ptyProcess.write(input);
       }
-    });
-
-    // Handle PTY exit
-    ptyProcess.onExit(({ exitCode }) => {
-      console.log(`PTY for ${sessionName} exited with code ${exitCode}`);
-      activePtys.delete(sessionName);
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close(1000, 'Session ended');
-      }
-    });
-
-    // Track last resize to debounce/dedupe
-    let lastResizeCols = 120;
-    let lastResizeRows = 30;
+      pendingInput.length = 0;
+    };
 
     // Set up message handler for local sessions (using the buffered message pattern)
     const handleLocalMessage = (message: string) => {
@@ -13565,14 +13617,22 @@ wss.on('connection', (ws: WebSocket, req) => {
         try {
           const parsed = JSON.parse(message);
           if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
+            if (!ptyStarted) {
+              // First resize message — start PTY with correct dimensions
+              startLocalPty(parsed.cols, parsed.rows);
+              return;
+            }
+            // Subsequent resize — update dimensions
             if (parsed.cols === lastResizeCols && parsed.rows === lastResizeRows) {
               return;
             }
             lastResizeCols = parsed.cols;
             lastResizeRows = parsed.rows;
-            ptyProcess.resize(parsed.cols, parsed.rows);
-            execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
-              .catch(() => {});
+            if (ptyProcess) {
+              ptyProcess.resize(parsed.cols, parsed.rows);
+              execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
+                .catch(() => {});
+            }
             return;
           }
         } catch {
@@ -13580,7 +13640,12 @@ wss.on('connection', (ws: WebSocket, req) => {
         }
       }
 
-      ptyProcess.write(message);
+      // Terminal input — buffer if PTY not ready yet
+      if (ptyProcess) {
+        ptyProcess.write(message);
+      } else {
+        pendingInput.push(message);
+      }
     };
 
     // Set the message handler and process any buffered early messages
