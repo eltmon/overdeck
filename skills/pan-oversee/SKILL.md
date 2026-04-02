@@ -1,6 +1,6 @@
 ---
 name: pan-oversee
-description: Actively supervise an agent through the full work lifecycle, fixing infrastructure issues as they arise
+description: Test the Panopticon framework by supervising an agent through the full lifecycle, identifying and filing every bug encountered
 triggers:
   - oversee issue
   - oversee agent
@@ -17,15 +17,35 @@ allowed-tools:
   - Task
 ---
 
-# Pan Oversee — Active Agent Supervision
+# Pan Oversee — Panopticon Framework Testing
 
 ## Purpose
 
-Actively supervise an agent working on an issue through the **entire lifecycle**:
+**This skill exists to test the Panopticon framework itself.** The issue being overseen is a test payload — the real goal is exercising the full agent lifecycle pipeline and identifying every bug, glitch, and rough edge along the way.
+
+Supervise an agent working on an issue through the **entire lifecycle**:
 `spawn/resume → work → completion → review → feedback loop → test → merge-ready`
 
-This is NOT passive monitoring — you actively watch for breakdowns at each stage
-and fix the underlying Panopticon infrastructure code when something fails.
+This is NOT passive monitoring. You are actively:
+- **Watching for bugs at every stage** — dashboard rendering, agent spawning, workspace creation, beads lifecycle, specialist handoffs, status transitions, terminal output, API responses
+- **Documenting everything** — no bug is too small. If something flickers, logs a warning, shows stale data, or doesn't match expected state, that's a finding
+- **Fixing infrastructure bugs** when they block progress, then continuing the test
+- **Filing or updating GitHub issues** (PAN-XXX) for every bug found
+
+## Bug Tracking During Oversight
+
+Maintain a running bug log throughout the session. For each finding:
+
+1. **Note it immediately** — don't wait until the end. Capture the symptom, what you expected, and what actually happened.
+2. **Check for existing issues** — `gh issue list --search "keyword"` before filing duplicates
+3. **File new issues or update existing ones** — include reproduction context from this oversight run
+4. **Categorize severity:**
+   - **Blocker** — stops the pipeline, had to fix inline to continue
+   - **Bug** — incorrect behavior but pipeline continued
+   - **Cosmetic** — dashboard display issue, misleading status, stale data
+   - **Observation** — not clearly a bug but worth investigating
+
+At the end of the oversight session, **report a summary** to the user of all findings: what was filed, what was updated, what was fixed inline, and what needs follow-up.
 
 ## Usage
 
@@ -306,12 +326,27 @@ pan work approve PAN-{ID}
 
 When you find a bug in the Panopticon infrastructure:
 
-1. **Stop the agent** (if it's actively hitting the bug)
-2. **Identify the root cause** in the source code
-3. **Fix the code** — edit the relevant file(s)
-4. **Rebuild if needed** — `npx tsup` or restart dashboard
-5. **Resume/restart the agent** to continue from where it left off
+1. **Log the finding** — add to your running bug list with symptom, expected behavior, and actual behavior
+2. **Check for existing issues** — `gh issue list --state open --search "keyword"` to avoid duplicates
+3. **File or update a GitHub issue** — include context from this oversight run
+4. **Assess: blocker or not?**
+   - **If blocker:** Stop the agent, fix the code, rebuild (`npx tsup` or restart dashboard), resume the agent, continue testing
+   - **If not blocker:** Log it, file the issue, keep going — don't derail the test run for non-blocking bugs
+5. **After fixing a blocker**, verify the fix actually works by continuing through the same pipeline stage
 6. **Continue monitoring** from the current phase
+
+### What Counts as a Bug
+
+Be thorough. All of these are findings worth logging:
+- Dashboard shows wrong status, stale data, or flickers
+- Agent state file says one thing, dashboard shows another
+- Beads not created, duplicated, or disappearing
+- Specialist doesn't wake up or takes too long
+- Terminal output garbled or missing
+- API returns unexpected response
+- Status transition skipped or out of order
+- Workspace in inconsistent state (e.g., directory exists but no git worktree)
+- Any error in server logs, even if the pipeline recovers
 
 ## Key API Endpoints
 
