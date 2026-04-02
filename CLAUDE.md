@@ -139,13 +139,13 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 2. **Agent state directories** — `~/.panopticon/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
    - `.planning/STATE.md` — planning progress and status
-   - `.planning/PRD.md` — the **workspace-specific implementation PRD** (generated during planning, distinct from the docs-level PRD)
+   - `.planning/plan.vbrief.json` — the **workspace-specific vBRIEF plan** with items, acceptance criteria, and dependencies (generated during planning)
    - `.planning/beads/` — all task tracking beads
    - Any implementation work in progress
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The docs-level PRD** (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) survives because it's committed to the docs repo, but it is NOT the same as the workspace implementation plan generated during planning.
+**The docs-level PRD** (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) survives because it's committed to the docs repo, but it is NOT the same as the workspace vBRIEF plan generated during planning. The two workspace planning artifacts are `plan.vbrief.json` (structured plan with acceptance criteria) and `STATE.md` (narrative context and current status).
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
