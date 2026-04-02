@@ -23,6 +23,7 @@
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |
 | [PRD-CLOISTER.md](./PRD-CLOISTER.md) | Cloister lifecycle manager requirements |
 | [PRD-REMOTE-WORKSPACES.md](./PRD-REMOTE-WORKSPACES.md) | Remote workspace requirements |
+| [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | vBRIEF planning, DAG scheduling, acceptance criteria pipeline |
 
 ---
 
@@ -114,6 +115,8 @@
 - **"session ID"** / **"session persistence"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"deterministic UUID"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
+- **"vBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
+- **"beads conversion"** / **"createBeadsFromVBrief"** → HIERARCHICAL-PLANNING.md
 - **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
 - **"deacon"** / **"health monitor"** → SPECIALIST_WORKFLOW.md (Deacon Health Monitor section)
 - **"rollback"** / **"revert"** / **"ORIG_HEAD"** → PRD-CLOISTER.md
