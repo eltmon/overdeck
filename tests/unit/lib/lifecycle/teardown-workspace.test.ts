@@ -214,4 +214,56 @@ describe('teardown-workspace', () => {
     const worktreeResult = results.find(r => r.step === 'teardown:worktree');
     expect(worktreeResult).toBeUndefined();
   });
+
+  it('should NOT clear beads by default (normal completion preserves beads)', async () => {
+    const wsPath = join(testDir, 'workspaces', 'pan-100');
+    const beadsDir = join(testDir, '.beads');
+    mkdirSync(wsPath, { recursive: true });
+    mkdirSync(beadsDir, { recursive: true });
+    writeFileSync(
+      join(beadsDir, 'issues.jsonl'),
+      JSON.stringify({ id: 'bead-1', title: 'PAN-100: Task one', status: 'closed' }) + '\n'
+    );
+
+    const results = await teardownWorkspace({
+      issueId: 'PAN-100',
+      projectPath: testDir,
+    });
+
+    // clear-beads step should NOT appear (beads preserved)
+    const clearResult = results.find(r => r.step === 'teardown:clear-beads');
+    expect(clearResult).toBeUndefined();
+
+    // Project JSONL should still contain the bead
+    const { readFileSync } = await import('fs');
+    const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
+    expect(content).toContain('PAN-100');
+  });
+
+  it('should clear beads when clearBeads is true (wipe scenario)', async () => {
+    const wsPath = join(testDir, 'workspaces', 'pan-100');
+    const beadsDir = join(testDir, '.beads');
+    mkdirSync(wsPath, { recursive: true });
+    mkdirSync(beadsDir, { recursive: true });
+    writeFileSync(
+      join(beadsDir, 'issues.jsonl'),
+      JSON.stringify({ id: 'bead-1', title: 'PAN-100: Task one', status: 'closed' }) + '\n' +
+      JSON.stringify({ id: 'bead-2', title: 'PAN-200: Other issue', status: 'open' }) + '\n'
+    );
+
+    const results = await teardownWorkspace(
+      { issueId: 'PAN-100', projectPath: testDir },
+      { clearBeads: true },
+    );
+
+    const clearResult = results.find(r => r.step === 'teardown:clear-beads');
+    expect(clearResult).toBeDefined();
+    expect(clearResult!.success).toBe(true);
+
+    // PAN-100 bead should be removed, PAN-200 preserved
+    const { readFileSync } = await import('fs');
+    const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
+    expect(content).not.toContain('PAN-100');
+    expect(content).toContain('PAN-200');
+  });
 });
