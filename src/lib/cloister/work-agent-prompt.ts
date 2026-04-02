@@ -417,10 +417,10 @@ export function readBeadsTasks(
           const task = JSON.parse(line);
           if (seenIds.has(task.id)) continue;
 
-          const tags = task.tags || [];
+          const labels = task.labels || task.tags || [];
           const isMatch =
             beadsIds.includes(task.id) ||
-            tags.some((t: string) => t.toLowerCase().includes(normalizedId)) ||
+            labels.some((t: string) => t.toLowerCase().includes(normalizedId)) ||
             task.title?.toLowerCase().includes(normalizedId);
 
           if (isMatch) {
