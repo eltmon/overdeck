@@ -207,6 +207,15 @@ Create `.planning/plan.vbrief.json` following the vBRIEF schema. This replaces t
 touch workspaces/feature-<issue-id-lowercase>/.planning/.planning-complete
 ```
 
+**Cloister hand-off:** When the `.planning-complete` marker is created, Cloister automatically:
+1. Reads `plan.vbrief.json` from the workspace
+2. Calls `createBeadsFromVBrief()` to convert vBRIEF items into beads tasks
+3. Preserves dependency relationships from `edges` (blocking order)
+4. Includes acceptance criteria in bead descriptions
+5. Starts the work agent with the beads ready for implementation
+
+You do NOT need to run `bd create` manually — Cloister handles the full conversion.
+
 ### Step 6: Stitch Integration (UI Work)
 
 If issue involves UI, YOU MUST use Stitch:
