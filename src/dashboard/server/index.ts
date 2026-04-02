@@ -8638,8 +8638,44 @@ app.post('/api/agents', async (req, res) => {
       }
     }
 
-    // SAFEGUARD: Require beads tasks before work begins (planning must create them)
-    // Query beads database directly (storage-backend agnostic — works with Dolt, SQLite, or JSONL)
+    // SAFEGUARD: Require completed vBRIEF plan before work begins (PAN-381)
+    // Planning must produce plan.vbrief.json with items AND touch .planning-complete marker.
+    // createBeadsFromVBrief then converts plan items to beads automatically.
+    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+    const planningComplete = join(workspacePath, '.planning', '.planning-complete');
+    const hasPlan = existsSync(planPath);
+    const isComplete = existsSync(planningComplete);
+
+    if (!hasPlan || !isComplete) {
+      const reason = !hasPlan
+        ? 'No plan.vbrief.json found — planning has not run for this issue.'
+        : 'Planning started but did not complete (.planning-complete marker missing).';
+      console.warn(`[start-agent] BLOCKED: ${reason} (${issueId})`);
+      return res.status(422).json({
+        error: reason,
+        hint: 'Run planning first (click Plan button or use /plan skill). The planning agent produces a vBRIEF plan which is then converted to beads automatically.',
+        issueId,
+      });
+    }
+
+    // Verify plan has items (not an empty shell)
+    try {
+      const planContent = JSON.parse(readFileSync(planPath, 'utf-8'));
+      const itemCount = planContent?.plan?.items?.length ?? 0;
+      if (itemCount === 0) {
+        console.warn(`[start-agent] BLOCKED: plan.vbrief.json exists but has 0 items (${issueId})`);
+        return res.status(422).json({
+          error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
+          hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
+          issueId,
+        });
+      }
+      console.log(`[start-agent] Plan verified: ${itemCount} items for ${issueId}`);
+    } catch (planErr) {
+      console.warn(`[start-agent] Could not read plan.vbrief.json: ${planErr}`);
+    }
+
+    // Verify beads exist (created by createBeadsFromVBrief during planning)
     let hasBeads = false;
     try {
       const { stdout: bdOutput } = await execAsync(
@@ -8649,7 +8685,6 @@ app.post('/api/agents', async (req, res) => {
       const bdTasks = JSON.parse(bdOutput.trim() || '[]');
       hasBeads = bdTasks.length > 0;
       if (hasBeads) {
-        // Get full count for logging
         const { stdout: countOutput } = await execAsync(
           `bd list --json -l ${issueId.toLowerCase()} --limit 0`,
           { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
@@ -8658,40 +8693,15 @@ app.post('/api/agents', async (req, res) => {
         console.log(`[start-agent] Found ${allTasks.length} beads tasks for ${issueId}`);
       }
     } catch (bdErr) {
-      // bd CLI unavailable — fall back to .beads directory existence
-      console.warn(`[start-agent] bd list failed, falling back to directory check: ${bdErr}`);
-      hasBeads = existsSync(join(workspaceBeadsDir, '.beads'));
+      console.warn(`[start-agent] bd list failed: ${bdErr}`);
     }
     if (!hasBeads) {
-      // If no planning was done (no .planning/ directory), this is a simple issue —
-      // auto-create a bead from the issue ID so the agent can start without full planning.
-      // This bridges the gap where Phase 0.5 (pan-oversee) correctly skips planning for
-      // simple issues but the beads gate blocks agent spawn.
-      const hasPlanningDir = existsSync(join(workspacePath, '.planning'));
-      if (!hasPlanningDir) {
-        console.log(`[start-agent] No beads and no planning for ${issueId} — auto-creating bead for simple issue`);
-        try {
-          const nodeDir = dirname(process.execPath);
-          await execAsync(
-            `bd create "${issueId}: Implement issue" --type task -l "${issueId.toLowerCase()},difficulty:simple"`,
-            { cwd: workspacePath, encoding: 'utf-8', timeout: 10000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
-          );
-          hasBeads = true;
-          console.log(`[start-agent] Auto-created bead for ${issueId}`);
-        } catch (bdCreateErr) {
-          console.warn(`[start-agent] Failed to auto-create bead: ${bdCreateErr}`);
-        }
-      }
-
-      if (!hasBeads) {
-        // Planning was done but no beads created — that's a planning bug, block agent start
-        console.warn(`[start-agent] BLOCKED: No beads tasks found for ${issueId}`);
-        return res.status(422).json({
-          error: `No beads tasks found for ${issueId}. Planning must create task breakdown before work begins.`,
-          hint: 'Run planning again and ensure it creates beads with "bd create". The planning prompt requires this.',
-          issueId,
-        });
-      }
+      console.warn(`[start-agent] BLOCKED: Plan exists but no beads found for ${issueId}`);
+      return res.status(422).json({
+        error: `Plan exists but no beads tasks found for ${issueId}. createBeadsFromVBrief may have failed during planning.`,
+        hint: 'Re-run planning or manually trigger beads creation from the plan.',
+        issueId,
+      });
     }
 
     if (planningDir) {
