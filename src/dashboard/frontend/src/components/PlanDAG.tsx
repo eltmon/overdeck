@@ -147,27 +147,11 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
         cursor: 'default',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-        {priorityColor && (
-          <span style={{
-            width: 6, height: 6, borderRadius: '50%',
-            background: priorityColor, flexShrink: 0, marginTop: 3,
-          }} />
-        )}
-        <span style={{ flex: 1, lineHeight: 1.3, wordBreak: 'break-word' }}>
-          {item.title}
-        </span>
-        {difficulty && (
-          <span style={{
-            fontSize: 9, background: '#374151', color: '#9ca3af',
-            borderRadius: 3, padding: '1px 3px', flexShrink: 0,
-          }}>
-            {DIFFICULTY_LABELS[difficulty] ?? difficulty[0].toUpperCase()}
-          </span>
-        )}
+      <div style={{ lineHeight: 1.3, wordBreak: 'break-word' }}>
+        {item.title}
       </div>
-      {/* Status badge */}
-      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* Badges row: status, priority, difficulty */}
+      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
         <span style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -188,6 +172,41 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
           }} />
           {STATUS_LABELS[item.status]}
         </span>
+        {priorityColor && (
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 3,
+            fontSize: 9,
+            fontWeight: 600,
+            color: priorityColor,
+            background: `${priorityColor}22`,
+            border: `1px solid ${priorityColor}55`,
+            borderRadius: 3,
+            padding: '1px 5px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}>
+            <span style={{
+              width: 5, height: 5, borderRadius: '50%',
+              background: priorityColor,
+            }} />
+            {item.priority}
+          </span>
+        )}
+        {difficulty && (
+          <span style={{
+            fontSize: 9,
+            fontWeight: 500,
+            color: '#9ca3af',
+            background: '#374151',
+            borderRadius: 3,
+            padding: '1px 5px',
+            textTransform: 'capitalize',
+          }}>
+            {difficulty}
+          </span>
+        )}
       </div>
     </div>
   );
