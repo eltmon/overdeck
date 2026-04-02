@@ -5,7 +5,7 @@ import { Rnd } from 'react-rnd';
 import { io } from 'socket.io-client';
 import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
-import { BeadsDialog } from './BeadsDialog';
+import { BeadsTasksPanel } from './BeadsTasksPanel';
 
 interface PlanDialogProps {
   issue: Issue;
@@ -71,7 +71,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
   const [shadowMode, setShadowMode] = useState(false);
   const [watchPlanning, setWatchPlanning] = useState(false);
-  const [showBeadsDialog, setShowBeadsDialog] = useState(false);
+  const [showTasksPanel, setShowTasksPanel] = useState(false);
 
   // Track if we've actually connected to a planning session in THIS dialog instance
   // This prevents stale cache from incorrectly triggering 'complete' state
@@ -661,36 +661,38 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               {/* Planning step - active session with web terminal */}
               {step === 'planning' && (
                 <>
-                  {/* Web terminal via xterm.js + websocket */}
+                  {/* Toggle between terminal and tasks panel */}
                   <div className="flex-1 bg-black relative overflow-hidden" style={{ minHeight: '400px' }}>
-                    {/* Use result.planningAgent.sessionName as primary source to avoid remounts during status refetch */}
-                    {result?.planningAgent.sessionName ? (
-                      <XTerminal
-                        sessionName={result.planningAgent.sessionName}
-                        onDisconnect={() => {
-                          // PTY/WebSocket disconnected — this often happens during Docker
-                          // network disruption (PAN-207), NOT because planning actually ended.
-                          // Don't eagerly transition to 'complete' here. Instead, just trigger
-                          // a status refetch and let the polling useEffect handle the transition
-                          // with proper guards (dataUpdatedAt, 10s minimum, etc.)
-                          statusQuery.refetch();
-                        }}
-                      />
-                    ) : statusQuery.data?.sessionName ? (
-                      <XTerminal
-                        sessionName={statusQuery.data.sessionName}
-                        onDisconnect={() => {
-                          // Same as above — don't eagerly transition, just refetch
-                          statusQuery.refetch();
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="flex items-center gap-2 text-content-muted">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Connecting to terminal...
-                        </div>
+                    {showTasksPanel ? (
+                      <div className="h-full overflow-auto bg-surface">
+                        <BeadsTasksPanel issueId={issue.identifier} />
                       </div>
+                    ) : (
+                      <>
+                        {/* Use result.planningAgent.sessionName as primary source to avoid remounts during status refetch */}
+                        {result?.planningAgent.sessionName ? (
+                          <XTerminal
+                            sessionName={result.planningAgent.sessionName}
+                            onDisconnect={() => {
+                              statusQuery.refetch();
+                            }}
+                          />
+                        ) : statusQuery.data?.sessionName ? (
+                          <XTerminal
+                            sessionName={statusQuery.data.sessionName}
+                            onDisconnect={() => {
+                              statusQuery.refetch();
+                            }}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full">
+                            <div className="flex items-center gap-2 text-content-muted">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Connecting to terminal...
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -702,12 +704,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setShowBeadsDialog(true)}
-                        className="flex items-center gap-1 px-3 py-1 bg-surface-overlay hover:bg-surface-emphasis text-content-body text-sm rounded transition-colors"
-                        title="View tasks created during planning"
+                        onClick={() => setShowTasksPanel(!showTasksPanel)}
+                        className={`flex items-center gap-1 px-3 py-1 text-sm rounded transition-colors ${
+                          showTasksPanel
+                            ? 'bg-purple-600/30 text-purple-300 hover:bg-purple-600/40'
+                            : 'bg-surface-overlay hover:bg-surface-emphasis text-content-body'
+                        }`}
+                        title={showTasksPanel ? 'Back to terminal' : 'View vBRIEF tasks and dependency graph'}
                       >
                         <List className="w-4 h-4" />
-                        Tasks
+                        {showTasksPanel ? 'Terminal' : 'Tasks'}
                       </button>
                       <button
                         onClick={handleAbortPlanning}
@@ -767,15 +773,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                     </div>
                   )}
 
-                  {/* Tasks Link */}
-                  <button
-                    onClick={() => setShowBeadsDialog(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors mb-6"
-                  >
-                    <List className="w-5 h-5" />
-                    View Tasks
-                    <span className="text-xs text-green-600">(beads created during planning)</span>
-                  </button>
+                  {/* Tasks Panel - inline vBRIEF view */}
+                  <div className="w-full max-w-2xl mb-6 max-h-80 overflow-auto rounded-lg border border-divider">
+                    <BeadsTasksPanel issueId={issue.identifier} />
+                  </div>
 
                   {result && (
                     <div className="bg-surface-overlay/50 rounded-lg p-4 mb-6 max-w-md w-full">
@@ -870,12 +871,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
           </div>
         </Rnd>
 
-      {/* Beads Tasks Dialog */}
-      <BeadsDialog
-        issueId={issue.identifier}
-        isOpen={showBeadsDialog}
-        onClose={() => setShowBeadsDialog(false)}
-      />
+      {/* BeadsDialog removed — Tasks panel is now inline (PAN-417) */}
     </div>
   );
 }
