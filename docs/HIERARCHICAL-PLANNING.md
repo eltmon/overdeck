@@ -303,6 +303,51 @@ Yes. LLMs are good at producing structured JSON when given a schema and examples
 
 ---
 
+## Automatic Beads Conversion
+
+When the planning agent finishes and touches `.planning/.planning-complete`, Cloister automatically converts the vBRIEF plan into beads:
+
+1. **Read** `plan.vbrief.json` from the workspace
+2. **Topological sort** items using Kahn's algorithm on `blocks` edges
+3. **Create beads** in dependency order via `bd create` with:
+   - Title: `"{plan.id}: {item.title}"`
+   - Labels: `issueLabel,difficulty:X,phase-N`
+   - Description: Narrative Action + acceptance criteria
+   - Dependencies: `--deps "blocks:beadId1,blocks:beadId2"`
+4. **Start work agent** with beads ready for implementation
+
+Implementation: `createBeadsFromVBrief()` in `src/lib/vbrief/beads.ts`.
+
+## DAG Visualization
+
+The dashboard visualizes the vBRIEF DAG using the dependency edges between items. The `criticalPath()` function in `src/lib/vbrief/dag.ts` computes the longest dependency chain using a longest-path algorithm over `blocks` edges. This highlights the critical path that determines the minimum time to complete all work.
+
+## DAG-Aware Task Scheduling
+
+Work agents use `bd ready -l <issue>` to find unblocked beads — tasks whose dependencies are all closed. This ensures work proceeds in dependency order without manual scheduling. The DAG structure from vBRIEF edges is preserved in beads dependencies during the automatic conversion.
+
+## AC-Driven Specialist Pipeline
+
+Acceptance criteria (`subItems` with `metadata.kind: "acceptance_criterion"`) flow through the entire specialist pipeline:
+
+| Stage | AC Usage |
+|-------|----------|
+| **Work agent** | Sees AC per bead as completion checklist |
+| **Inspect agent** | Verifies per-bead AC against the diff |
+| **Review agent** | Full AC list for implementation coverage verification |
+| **Test agent** | Maps test results to AC, flags untested criteria |
+| **Verification gate** | Hard-gates on all AC subItems completed |
+| **Merge agent** | Final AC validation before merge |
+| **pan work done** | Blocks completion on incomplete AC |
+
+The shared utilities in `src/lib/vbrief/acceptance-criteria.ts` provide:
+- `extractAcceptanceCriteria()` — reads plan and returns AC with parent context
+- `formatAcceptanceCriteria()` — renders AC as markdown checklist
+- `checkAllCriteriaCompleted()` — returns completion status
+- `getVBriefACStatus()` — per-item AC counts for gates and prompts
+
+---
+
 ## Related Documentation
 
 - [vBRIEF Specification](https://github.com/deftai/vBRIEF) — The format specification

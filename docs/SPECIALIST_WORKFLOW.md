@@ -187,7 +187,23 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 
 ### Beads Prerequisite
 
-Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. The planning agent must create beads via `bd create` before handing off to implementation.
+Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. Cloister automatically creates beads from the vBRIEF plan via `createBeadsFromVBrief()` when the planning agent touches the `.planning-complete` marker. Manual `bd create` is no longer needed.
+
+### DAG-Aware Task Scheduling
+
+The vBRIEF plan includes dependency edges (`blocks`, `informs`) between items. When Cloister converts items to beads, it preserves these dependencies. Work agents use `bd ready -l <issue>` to find unblocked beads, ensuring tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/vbrief/dag.ts` computes the longest dependency chain for visualization.
+
+### Acceptance Criteria Pipeline
+
+Each vBRIEF item can have `subItems` with `metadata.kind: "acceptance_criterion"`. These AC flow through the specialist pipeline:
+
+1. **Work agent**: sees AC per bead as an indented checklist
+2. **Inspect agent**: verifies per-bead AC against the diff (Spec Fidelity check)
+3. **Review agent**: receives full AC list to verify implementation coverage
+4. **Test agent**: maps test results to AC, flags untested criteria
+5. **Verification gate**: hard-gates on all AC subItems completed
+6. **Merge agent**: final AC validation before merge
+7. **pan work done**: blocks completion if AC are incomplete (skippable with `--force`)
 
 ### Handling Pre-Existing PRDs
 
