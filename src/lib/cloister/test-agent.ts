@@ -13,6 +13,8 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import { PANOPTICON_HOME } from '../paths.js';
+import { extractAcceptanceCriteria, formatAcceptanceCriteria } from '../vbrief/acceptance-criteria.js';
+import { processIfBlocks } from '../template.js';
 import {
   getSessionId,
   setSessionId,
@@ -175,13 +177,32 @@ function buildTestPrompt(context: TestContext): string {
 
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
 
-  // Replace template variables
-  const prompt = template
-    .replace(/\{\{apiUrl\}\}/g, apiUrl)
-    .replace(/\{\{projectPath\}\}/g, context.projectPath)
-    .replace(/\{\{issueId\}\}/g, context.issueId)
-    .replace(/\{\{branch\}\}/g, context.branch)
-    .replace(/\{\{testCommand\}\}/g, testCommand);
+  // Build acceptance criteria section from vBRIEF plan
+  let acSection = '';
+  if (context.workspace) {
+    const criteria = extractAcceptanceCriteria(context.workspace);
+    if (criteria.length > 0) {
+      acSection = formatAcceptanceCriteria(criteria);
+    }
+  }
+
+  // Build variables for template processing
+  const vars: Record<string, string | undefined> = {
+    apiUrl,
+    projectPath: context.projectPath,
+    issueId: context.issueId,
+    branch: context.branch,
+    testCommand,
+    acceptanceCriteria: acSection || undefined,
+  };
+
+  // Process {{#if}} blocks then substitute variables
+  let prompt = processIfBlocks(template, vars);
+  for (const [key, value] of Object.entries(vars)) {
+    if (value !== undefined) {
+      prompt = prompt.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    }
+  }
 
   // Wrap in orchestration markers for context delineation
   return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;
