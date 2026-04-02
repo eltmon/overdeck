@@ -9898,7 +9898,14 @@ Cloister converts this file into beads tasks with proper dependency links automa
           "issueLabel": "${issueLower}"
         },
         "narrative": { "Action": "<what needs to be done>" },
-        "subItems": []
+        "subItems": [
+          {
+            "id": "<short-kebab-id>.<ac-name>",
+            "title": "<specific testable acceptance criterion>",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
       }
     ],
     "edges": [
@@ -9913,6 +9920,13 @@ Cloister converts this file into beads tasks with proper dependency links automa
 - \`informs\` — target benefits from source context (soft dependency)
 - \`invalidates\` — source completion makes target unnecessary
 - \`suggests\` — weak recommendation, no dependency
+
+**CRITICAL vBRIEF Structure Rules:**
+1. **Acceptance criteria MUST be subItems, NEVER top-level items.** Nest them under their parent task. Top-level items with kind "acceptance_criterion" will fail vBRIEF Studio validation.
+2. **Hierarchical IDs required for subItems.** Use dot-notation: \`parent-id.ac-name\`. Example: \`work-prompt-ac.injects-per-bead\`.
+3. **Only actionable tasks at top level.** Tasks, requirements, and architectural decisions go in \`items[]\`. Acceptance criteria go in \`subItems[]\`.
+4. **Every task SHOULD have at least one acceptance criterion** in subItems.
+5. **SubItems are NOT converted to beads** — they are verification checklists for the work agent.
 
 **IMPORTANT:** Create the plan file BEFORE creating beads tasks.
 **NOTE:** \`*-spec.md\` files are human-written specs — do NOT overwrite them. Your output is \`*-plan.md\`.
