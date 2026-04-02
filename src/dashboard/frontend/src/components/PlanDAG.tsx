@@ -96,12 +96,12 @@ const STATUS_LABELS: Record<VBriefItemStatus, string> = {
 
 // ── Layout ──
 
-const NODE_WIDTH = 180;
-const NODE_HEIGHT = 60;
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 80;
 
 function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60 });
+  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80, marginx: 20, marginy: 20 });
   g.setDefaultEdgeLabel(() => ({}));
 
   for (const node of nodes) {
