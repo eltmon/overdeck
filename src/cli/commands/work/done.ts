@@ -7,6 +7,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { AGENTS_DIR } from '../../../lib/paths.js';
+import { getVBriefACStatus } from '../../../lib/vbrief/beads.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { updateShadowState } from '../../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../../core/state-mapping.js';
@@ -212,6 +213,25 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         } catch {
           // can't read workspace dir — skip
         }
+      }
+
+      // Check 3: vBRIEF acceptance criteria completion
+      try {
+        const acStatus = getVBriefACStatus(workspacePath);
+        if (acStatus && !acStatus.allCompleted) {
+          failures.push(`  Incomplete acceptance criteria (${acStatus.totalPending}/${acStatus.totalCount}):`);
+          for (const item of acStatus.items) {
+            if (item.pending > 0) {
+              for (const ac of item.criteria) {
+                if (ac.status !== 'completed' && ac.status !== 'cancelled') {
+                  failures.push(`    - [ ] ${ac.title} (${item.itemTitle})`);
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // vBRIEF not available — skip check
       }
 
       if (failures.length > 0) {
