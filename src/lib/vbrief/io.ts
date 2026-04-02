@@ -57,3 +57,31 @@ export function updateItemStatus(workspacePath: string, itemId: string, status: 
   writeFileSync(tempPath, JSON.stringify(doc, null, 2), 'utf-8');
   renameSync(tempPath, planPath);
 }
+
+/**
+ * Updates the status of a specific subItem within an item in plan.vbrief.json.
+ * Uses write-to-temp-then-rename pattern for atomicity.
+ * No-ops gracefully if the file, item, or subItem doesn't exist.
+ */
+export function updateSubItemStatus(
+  workspacePath: string,
+  itemId: string,
+  subItemId: string,
+  status: VBriefItemStatus,
+): void {
+  const planPath = findPlan(workspacePath);
+  if (!planPath) return;
+
+  const doc = readPlan(planPath);
+  const item = doc.plan.items.find(i => i.id === itemId);
+  if (!item?.subItems) return;
+
+  const subItem = item.subItems.find(s => s.id === subItemId);
+  if (!subItem) return;
+
+  subItem.status = status;
+
+  const tempPath = planPath + '.tmp';
+  writeFileSync(tempPath, JSON.stringify(doc, null, 2), 'utf-8');
+  renameSync(tempPath, planPath);
+}
