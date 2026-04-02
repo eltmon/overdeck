@@ -7,7 +7,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
 import { createBackup } from '../../lib/backup.js';
-import { planSync, executeSync, refreshCache, migrateFromPersonalSymlinks, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
+import { planSync, executeSync, refreshCache, migrateStalePersonalContent, planHooksSync, syncHooks, syncStatusline } from '../../lib/sync.js';
 import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
@@ -101,7 +101,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   // One-time migration: remove Panopticon symlinks from ~/.claude/ (devroot replaces this)
-  const migration = migrateFromPersonalSymlinks();
+  const migration = migrateStalePersonalContent();
   if (migration.removedSymlinks.length > 0) {
     console.log(chalk.cyan(`Migrated: removed ${migration.removedSymlinks.length} Panopticon symlink(s) from ~/.claude/`));
     if (migration.preservedUserContent.length > 0) {
