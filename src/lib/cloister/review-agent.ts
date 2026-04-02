@@ -8,6 +8,8 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { startConvoy, waitForConvoy, type ConvoyContext } from '../convoy.js';
+import { extractAcceptanceCriteria, formatAcceptanceCriteria } from '../vbrief/acceptance-criteria.js';
+import { processIfBlocks } from '../template.js';
 
 const execAsync = promisify(exec);
 
@@ -89,19 +91,35 @@ async function buildReviewPrompt(context: ReviewContext): Promise<string> {
 
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
 
-  // Replace template variables
-  const prompt = template
-    .replace(/\{\{apiUrl\}\}/g, apiUrl)
-    .replace(/\{\{projectPath\}\}/g, context.projectPath)
-    .replace(/\{\{prUrl\}\}/g, context.prUrl)
-    .replace(/\{\{issueId\}\}/g, context.issueId)
-    .replace(/\{\{branch\}\}/g, context.branch)
-    .replace(
-      /\{\{filesChanged\}\}/g,
-      filesChanged.length > 0
-        ? filesChanged.map((f) => `  - ${f}`).join('\n')
-        : '  (Use `gh pr diff` to see changes)'
-    );
+  // Build acceptance criteria section from vBRIEF plan
+  let acSection = '';
+  if (context.workspace) {
+    const criteria = extractAcceptanceCriteria(context.workspace);
+    if (criteria.length > 0) {
+      acSection = formatAcceptanceCriteria(criteria);
+    }
+  }
+
+  // Build variables for template processing
+  const vars: Record<string, string | undefined> = {
+    apiUrl,
+    projectPath: context.projectPath,
+    prUrl: context.prUrl,
+    issueId: context.issueId,
+    branch: context.branch,
+    filesChanged: filesChanged.length > 0
+      ? filesChanged.map((f) => `  - ${f}`).join('\n')
+      : '  (Use `gh pr diff` to see changes)',
+    acceptanceCriteria: acSection || undefined,
+  };
+
+  // Process {{#if}} blocks then substitute variables
+  let prompt = processIfBlocks(template, vars);
+  for (const [key, value] of Object.entries(vars)) {
+    if (value !== undefined) {
+      prompt = prompt.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    }
+  }
 
   // Wrap in orchestration markers for context delineation
   return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;

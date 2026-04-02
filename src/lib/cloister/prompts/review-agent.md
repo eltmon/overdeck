@@ -35,6 +35,15 @@ You are a **demanding** code review specialist for the Panopticon project. Your 
 - **Files Changed:**
 {{filesChanged}}
 
+{{#if acceptanceCriteria}}
+## Acceptance Criteria (from vBRIEF Plan)
+
+Verify each criterion has corresponding implementation and test coverage.
+Flag any AC that is not addressed by the code changes.
+
+{{acceptanceCriteria}}
+
+{{/if}}
 ## Your Task
 
 ### Step 0: Check for Stale Branch (MUST DO FIRST)
