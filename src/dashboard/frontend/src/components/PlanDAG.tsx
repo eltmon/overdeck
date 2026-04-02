@@ -229,32 +229,43 @@ export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = []): 
     data: { item, isCritical: criticalSet.has(item.id) } satisfies PlanItemNodeData,
   }));
 
+  // Edge type color palette — distinct colors per relationship type
+  const EDGE_TYPE_COLORS: Record<string, string> = {
+    blocks:      '#9ca3af',
+    informs:     '#60a5fa',
+    invalidates: '#f87171',
+    suggests:    '#a78bfa',
+  };
+
   const rawEdges: Edge[] = doc.plan.edges.map((edge, i) => {
     const isDashed = edge.type === 'informs' || edge.type === 'suggests';
     const isDotted = edge.type === 'suggests';
     const isCritical = criticalSet.has(edge.from) && criticalSet.has(edge.to);
+    const typeColor = EDGE_TYPE_COLORS[edge.type] ?? '#6b7280';
+    const edgeColor = isCritical ? '#f97316' : typeColor;
 
     return {
       id: `e-${i}-${edge.from}-${edge.to}`,
       source: edge.from,
       target: edge.to,
+      type: 'smoothstep',
       label: edge.type,
       labelStyle: {
         fontSize: 9,
         fontWeight: 500,
-        fill: isCritical ? '#f97316' : '#9ca3af',
+        fill: edgeColor,
         letterSpacing: '0.03em',
       },
       labelBgStyle: {
         fill: '#111827',
-        fillOpacity: 0.85,
+        fillOpacity: 0.9,
       },
       labelBgPadding: [4, 2] as [number, number],
       labelBgBorderRadius: 3,
-      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: isCritical ? '#f97316' : '#6b7280' },
+      markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color: edgeColor },
       style: {
-        stroke: isCritical ? '#f97316' : edge.type === 'blocks' ? '#9ca3af' : '#4b5563',
-        strokeWidth: isCritical ? 2 : 1,
+        stroke: edgeColor,
+        strokeWidth: isCritical ? 2.5 : 1.5,
         strokeDasharray: isDotted ? '3 4' : isDashed ? '6 4' : undefined,
       },
       animated: edge.type === 'blocks' && isCritical,
