@@ -135,6 +135,17 @@ Detect the project type and run the appropriate **production** build command:
 - Modify files outside the conflict resolution
 - Push to remote (the caller handles pushing)
 
+### 5. Pre-Merge AC Validation
+
+Before signaling completion, verify all vBRIEF acceptance criteria are met:
+
+1. Read `.planning/plan.vbrief.json` in the workspace (if it exists)
+2. Check all items' `subItems` where `metadata.kind === "acceptance_criterion"`
+3. If **any AC has status other than "completed" or "cancelled"**, REFUSE to merge and report what's missing
+4. If no plan or no AC exist, skip this check (legacy workspaces)
+
+This is the last line of defense — even if the verification gate was bypassed (circuit breaker), you catch incomplete AC here.
+
 ## Signal Completion (CRITICAL)
 
 When you're done, you MUST call the API to update status:
