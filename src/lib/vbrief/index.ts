@@ -33,4 +33,14 @@ export {
   readPlan,
   readWorkspacePlan,
   updateItemStatus,
+  updateSubItemStatus,
 } from './io.js';
+
+// Acceptance Criteria
+export {
+  extractAcceptanceCriteria,
+  extractACFromDocument,
+  formatAcceptanceCriteria,
+  checkAllCriteriaCompleted,
+} from './acceptance-criteria.js';
+export type { AcceptanceCriterion, ACCompletionResult } from './acceptance-criteria.js';

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { findPlan, readPlan, readWorkspacePlan, updateItemStatus } from '../io.js';
+import { findPlan, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
 import type { VBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -137,5 +137,72 @@ describe('updateItemStatus', () => {
 
     const planPath = join(TEST_DIR, '.planning', 'plan.vbrief.json');
     expect(() => JSON.parse(readFileSync(planPath, 'utf-8'))).not.toThrow();
+  });
+});
+
+describe('updateSubItemStatus', () => {
+  function makePlanWithSubItems(): VBriefDocument {
+    return {
+      vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
+      plan: {
+        id: 'TEST',
+        title: 'Test Plan',
+        status: 'active',
+        items: [{
+          id: 'item-1',
+          title: 'Task 1',
+          status: 'pending' as const,
+          subItems: [
+            { id: 'item-1.ac1', title: 'First AC', status: 'pending' as const, metadata: { kind: 'acceptance_criterion' } },
+            { id: 'item-1.ac2', title: 'Second AC', status: 'pending' as const, metadata: { kind: 'acceptance_criterion' } },
+          ],
+        }],
+        edges: [],
+      },
+    };
+  }
+
+  it('no-ops when no plan exists', () => {
+    expect(() => updateSubItemStatus(TEST_DIR, 'item-1', 'item-1.ac1', 'completed')).not.toThrow();
+  });
+
+  it('updates a specific subItem status', () => {
+    const doc = makePlanWithSubItems();
+    writePlanDoc(TEST_DIR, doc);
+
+    updateSubItemStatus(TEST_DIR, 'item-1', 'item-1.ac1', 'completed');
+
+    const updated = readWorkspacePlan(TEST_DIR)!;
+    const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
+    expect(sub?.status).toBe('completed');
+  });
+
+  it('preserves other subItems when updating one', () => {
+    const doc = makePlanWithSubItems();
+    writePlanDoc(TEST_DIR, doc);
+
+    updateSubItemStatus(TEST_DIR, 'item-1', 'item-1.ac1', 'completed');
+
+    const updated = readWorkspacePlan(TEST_DIR)!;
+    const other = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac2');
+    expect(other?.status).toBe('pending');
+  });
+
+  it('no-ops when item ID does not exist', () => {
+    const doc = makePlanWithSubItems();
+    writePlanDoc(TEST_DIR, doc);
+
+    expect(() => updateSubItemStatus(TEST_DIR, 'nonexistent', 'item-1.ac1', 'completed')).not.toThrow();
+    const updated = readWorkspacePlan(TEST_DIR)!;
+    expect(updated.plan.items[0].subItems![0].status).toBe('pending');
+  });
+
+  it('no-ops when subItem ID does not exist', () => {
+    const doc = makePlanWithSubItems();
+    writePlanDoc(TEST_DIR, doc);
+
+    expect(() => updateSubItemStatus(TEST_DIR, 'item-1', 'nonexistent', 'completed')).not.toThrow();
+    const updated = readWorkspacePlan(TEST_DIR)!;
+    expect(updated.plan.items[0].subItems![0].status).toBe('pending');
   });
 });
