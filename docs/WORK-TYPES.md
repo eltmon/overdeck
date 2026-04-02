@@ -65,14 +65,11 @@ Convoy agents run in parallel for comprehensive code review.
 
 ## 5. Pre-Work Agents
 
-Agents that run before code work begins (PRD generation, planning, triage).
+Planning now uses a single planning step that produces a vBRIEF plan (`plan.vbrief.json`). Cloister automatically converts the plan into beads via `createBeadsFromVBrief()`. The separate PRD, decomposition, and triage agents were removed in PAN-404.
 
 | Work Type ID | Agent | Description | Primary Model | Budget Alternative | Rationale |
 |--------------|-------|-------------|---------------|-------------------|-----------|
-| `prd-agent` | PRD Generation | Q&A-driven requirements gathering, PRD creation | `o3-deep-research` | `gemini-3-pro-preview` (thinking: high) | Good structured PRD generation without "research" premium |
-| `decomposition-agent` | Task Decomposition | PRD → Beads breakdown, story splitting, dependency mapping | `o3-deep-research` | `gemini-3-pro-preview` (thinking: high) | Task breakdown + dependency mapping works well on Pro high |
-| `triage-agent` | Triage Agent | Issue prioritization, complexity estimation | `gpt-4o` | `gemini-3-flash-preview` (thinking: medium) | Quick prioritization + estimation, Flash medium is enough |
-| `planning-agent` | Planning Agent | Initial feature planning, high-level architecture | `claude-opus-4-6` | `gemini-3-pro-preview` (thinking: high) | High-level planning substitute when Opus budget is red |
+| `planning-agent` | Planning Agent | Feature planning, architecture, vBRIEF plan generation | `claude-opus-4-6` | `gemini-3-pro-preview` (thinking: high) | High-level planning substitute when Opus budget is red |
 
 ---
 
@@ -184,23 +181,16 @@ See [PAN-78](https://github.com/eltmon/panopticon-cli/issues/78) for integration
 
 ---
 
-## Planning vs Task Decomposition
+## Planning and vBRIEF Conversion
 
-**Important architectural separation:**
+Planning is now a single step that produces a vBRIEF plan with structured acceptance criteria:
 
 | Phase | Responsibility | Agent | Model |
 |-------|---------------|-------|-------|
-| **Planning** | High-level architecture, approach selection, technical design | `planning-agent` or `issue-agent:planning` | claude-opus-4-6 (premium) or gemini-3-pro-preview (budget) |
-| **Decomposition** | Breaking PRD into beads, story splitting, dependency mapping | `decomposition-agent` | o3-deep-research (premium) or gemini-3-pro-preview (budget) |
+| **Planning** | Architecture, approach, acceptance criteria, vBRIEF plan | `planning-agent` | claude-opus-4-6 (premium) or gemini-3-pro-preview (budget) |
+| **Beads Conversion** | Automatic — vBRIEF items → beads with dependencies | Cloister (`createBeadsFromVBrief()`) | N/A (programmatic) |
 
-These are **decoupled phases**:
-- Planning happens first: "How should we build this?"
-- Decomposition happens after: "What are the specific tasks?"
-
-This separation allows:
-- Different models for strategic vs tactical thinking
-- Planning can be reused across multiple decomposition strategies
-- Decomposition can run independently when requirements are clear
+The planning agent produces `plan.vbrief.json` with items, acceptance criteria, and dependency edges. Cloister automatically converts this into beads tasks, preserving the DAG structure. No separate decomposition or triage agents are needed.
 
 ---
 

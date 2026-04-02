@@ -95,13 +95,10 @@ Optimal AI model assignments for each agent task based on research from January 
 **General Subagent** (`subagent:general-purpose`)
 - Versatile fallback for unknown task types
 
-**PRD Agent** (`prd-agent`)
-- Detailed requirements documentation
-- Comprehensive feature specification
-
 **Planning Agent** (`planning-agent`)
-- Sprint planning quality
-- Dependency analysis
+- vBRIEF plan generation with structured acceptance criteria
+- Sprint planning quality, dependency analysis
+- Note: Planning now uses a single step that produces vBRIEF plans. Beads are automatically converted by Cloister.
 
 **Interactive CLI** (`cli:interactive`)
 - Conversation quality for extended sessions
@@ -121,14 +118,6 @@ Optimal AI model assignments for each agent task based on research from January 
 **Bash Subagent** (`subagent:bash`)
 - Simple CLI generation
 - Lower-risk operations
-
-**Decomposition Agent** (`decomposition-agent`)
-- Fast epic breakdown
-- Initial work item generation
-
-**Triage Agent** (`triage-agent`)
-- SPEED CRITICAL for real-time prioritization
-- Frequent operations don't require deep analysis
 
 **Quick Command CLI** (`cli:quick-command`)
 - SPEED CRITICAL - users expect instant responses
@@ -174,7 +163,7 @@ Enable batch mode for 50% cost reduction on non-urgent operations:
 
 ### 2. Cascade Approach
 Run fast Haiku pass first, escalate to Sonnet/Opus only when complexity detected:
-- Decomposition: Haiku draft → Sonnet validation
+- Planning: Opus vBRIEF plan → Cloister programmatic beads conversion
 - Code review: Haiku scan → Opus deep analysis for flagged issues
 
 ### 3. Parallel Processing
