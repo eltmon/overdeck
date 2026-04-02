@@ -1,7 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Loader2, X } from 'lucide-react';
+import {
+  Loader2,
+  X,
+  Search,
+  Code,
+  Beaker,
+  FileText,
+  MessageSquare,
+  Eye,
+  GitMerge,
+  Shield,
+  Zap,
+  CheckCircle,
+  Merge,
+  Globe,
+  Calendar,
+  Terminal,
+  Brain,
+  SplitSquareVertical,
+  BookMarked,
+  BarChart3,
+  Route,
+  MessageCircle,
+  Lightbulb,
+  User,
+  AlertTriangle,
+  CheckSquare as VerifiedUser,
+  Eye as PageView,
+  ClipboardList,
+  Key,
+  GitBranch,
+  Flag,
+  Settings,
+} from 'lucide-react';
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
 import {
@@ -65,81 +98,90 @@ async function testApiKey(provider: string, apiKey: string, model?: string): Pro
 }
 
 // Provider definitions
-const PROVIDERS: { id: Provider; name: string; icon: string; placeholder: string }[] = [
-  { id: 'anthropic', name: 'Anthropic', icon: 'deployed_code', placeholder: 'sk-ant-...' },
-  { id: 'openai', name: 'OpenAI', icon: 'auto_awesome', placeholder: 'sk-...' },
-  { id: 'google', name: 'Google', icon: 'cloud', placeholder: 'AIza...' },
-  { id: 'kimi', name: 'Kimi (Moonshot)', icon: 'token', placeholder: 'sk-kimi-...' },
-  { id: 'zai', name: 'Zhipu (GLM)', icon: 'hub', placeholder: 'sk-zai-...' },
+const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[] = [
+  { id: 'anthropic', name: 'Anthropic', icon: Code, placeholder: 'sk-ant-...' },
+  { id: 'openai', name: 'OpenAI', icon: Lightbulb, placeholder: 'sk-...' },
+  { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
+  { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
+  { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
 ];
 
 // Tracker definitions
 type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
-const TRACKERS: { id: TrackerType; name: string; icon: string; envVar: string; placeholder: string }[] = [
-  { id: 'linear', name: 'Linear', icon: 'view_kanban', envVar: 'LINEAR_API_KEY', placeholder: 'lin_api_...' },
-  { id: 'github', name: 'GitHub', icon: 'code', envVar: 'GITHUB_TOKEN', placeholder: 'ghp_...' },
-  { id: 'gitlab', name: 'GitLab', icon: 'commit', envVar: 'GITLAB_TOKEN', placeholder: 'glpat-...' },
-  { id: 'rally', name: 'Rally', icon: 'flag', envVar: 'RALLY_API_KEY', placeholder: '_abc123...' },
+const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; placeholder: string }[] = [
+  { id: 'linear', name: 'Linear', icon: BarChart3, envVar: 'LINEAR_API_KEY', placeholder: 'lin_api_...' },
+  { id: 'github', name: 'GitHub', icon: Code, envVar: 'GITHUB_TOKEN', placeholder: 'ghp_...' },
+  { id: 'gitlab', name: 'GitLab', icon: GitBranch, envVar: 'GITLAB_TOKEN', placeholder: 'glpat-...' },
+  { id: 'rally', name: 'Rally', icon: Flag, envVar: 'RALLY_API_KEY', placeholder: '_abc123...' },
 ];
 
 // Agent definitions organized by category
-interface AgentDef { id: WorkTypeId; name: string; icon: string; description: string }
-interface AgentCategory { name: string; icon: string; agents: AgentDef[] }
+interface AgentDef { id: WorkTypeId; name: string; icon: any; description: string; implemented: boolean }
+interface AgentCategory { name: string; icon: any; agents: AgentDef[] }
 
 const AGENT_CATEGORIES: AgentCategory[] = [
   {
     name: 'Issue Agent Phases',
-    icon: 'list_alt',
+    icon: ClipboardList,
     agents: [
-      { id: 'issue-agent:exploration' as WorkTypeId, name: 'Exploration', icon: 'search', description: 'Codebase discovery' },
-      { id: 'issue-agent:implementation' as WorkTypeId, name: 'Implementation', icon: 'code', description: 'Write the code' },
-      { id: 'issue-agent:testing' as WorkTypeId, name: 'Testing', icon: 'science', description: 'Write & run tests' },
-      { id: 'issue-agent:documentation' as WorkTypeId, name: 'Documentation', icon: 'description', description: 'Update docs' },
-      { id: 'issue-agent:review-response' as WorkTypeId, name: 'Review Response', icon: 'reply', description: 'Address PR feedback' },
+      { id: 'issue-agent:exploration' as WorkTypeId, name: 'Exploration', icon: Search, description: 'Codebase discovery', implemented: true },
+      { id: 'issue-agent:implementation' as WorkTypeId, name: 'Implementation', icon: Code, description: 'Write the code', implemented: true },
+      { id: 'issue-agent:testing' as WorkTypeId, name: 'Testing', icon: Beaker, description: 'Write & run tests', implemented: true },
+      { id: 'issue-agent:documentation' as WorkTypeId, name: 'Documentation', icon: FileText, description: 'Update docs', implemented: true },
+      { id: 'issue-agent:review-response' as WorkTypeId, name: 'Review Response', icon: MessageSquare, description: 'Address PR feedback', implemented: false },
     ],
   },
   {
     name: 'Specialist Agents',
-    icon: 'psychology',
+    icon: Brain,
     agents: [
-      { id: 'specialist-review-agent' as WorkTypeId, name: 'Review Agent', icon: 'rate_review', description: 'Automated code reviews' },
-      { id: 'specialist-test-agent' as WorkTypeId, name: 'Test Agent', icon: 'science', description: 'Test generation' },
-      { id: 'specialist-merge-agent' as WorkTypeId, name: 'Merge Agent', icon: 'call_merge', description: 'Merge conflict resolution' },
+      { id: 'specialist-review-agent' as WorkTypeId, name: 'Review Agent', icon: Eye, description: 'Automated code reviews', implemented: true },
+      { id: 'specialist-test-agent' as WorkTypeId, name: 'Test Agent', icon: Beaker, description: 'Test generation', implemented: true },
+      { id: 'specialist-merge-agent' as WorkTypeId, name: 'Merge Agent', icon: GitMerge, description: 'Merge conflict resolution', implemented: true },
+      { id: 'specialist-inspect-agent' as WorkTypeId, name: 'Inspect Agent', icon: PageView, description: 'Per-bead diff inspection', implemented: true },
+      { id: 'specialist-uat-agent' as WorkTypeId, name: 'UAT Agent', icon: VerifiedUser, description: 'User acceptance testing', implemented: true },
     ],
   },
   {
     name: 'Convoy Reviewers',
-    icon: 'groups',
+    icon: SplitSquareVertical,
     agents: [
-      { id: 'convoy:security-reviewer' as WorkTypeId, name: 'Security', icon: 'shield', description: 'Security analysis' },
-      { id: 'convoy:performance-reviewer' as WorkTypeId, name: 'Performance', icon: 'speed', description: 'Performance review' },
-      { id: 'convoy:correctness-reviewer' as WorkTypeId, name: 'Correctness', icon: 'check_circle', description: 'Logic validation' },
-      { id: 'convoy:synthesis-agent' as WorkTypeId, name: 'Synthesis', icon: 'merge', description: 'Combine reviews' },
+      { id: 'convoy:security-reviewer' as WorkTypeId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
+      { id: 'convoy:performance-reviewer' as WorkTypeId, name: 'Performance', icon: Zap, description: 'Performance review', implemented: true },
+      { id: 'convoy:correctness-reviewer' as WorkTypeId, name: 'Correctness', icon: CheckCircle, description: 'Logic validation', implemented: true },
+      { id: 'convoy:synthesis-agent' as WorkTypeId, name: 'Synthesis', icon: Merge, description: 'Combine reviews', implemented: true },
     ],
   },
   {
     name: 'Subagents',
-    icon: 'account_tree',
+    icon: User,
     agents: [
-      { id: 'subagent:explore' as WorkTypeId, name: 'Explore', icon: 'explore', description: 'Codebase exploration' },
-      { id: 'subagent:plan' as WorkTypeId, name: 'Plan', icon: 'event_note', description: 'Task breakdown' },
-      { id: 'subagent:bash' as WorkTypeId, name: 'Bash', icon: 'terminal', description: 'CLI commands' },
-      { id: 'subagent:general-purpose' as WorkTypeId, name: 'General', icon: 'psychology', description: 'General tasks' },
+      { id: 'subagent:explore' as WorkTypeId, name: 'Explore', icon: Globe, description: 'Codebase exploration', implemented: true },
+      { id: 'subagent:plan' as WorkTypeId, name: 'Plan', icon: Calendar, description: 'Task breakdown', implemented: true },
+      { id: 'subagent:bash' as WorkTypeId, name: 'Bash', icon: Terminal, description: 'CLI commands', implemented: true },
+      { id: 'subagent:general-purpose' as WorkTypeId, name: 'General', icon: Lightbulb, description: 'General tasks', implemented: true },
     ],
   },
   {
     name: 'Workflow Agents',
-    icon: 'route',
+    icon: Route,
     agents: [
-      { id: 'status-review' as WorkTypeId, name: 'Status Review', icon: 'assessment', description: 'AI status reviews (executive-facing)' },
+      { id: 'status-review' as WorkTypeId, name: 'Status Review', icon: BarChart3, description: 'AI status reviews (executive-facing)', implemented: true },
+    ],
+  },
+  {
+    name: 'Planning',
+    icon: Brain,
+    agents: [
+      { id: 'planning-agent' as WorkTypeId, name: 'Planning Agent', icon: BookMarked, description: 'vBRIEF plan generation', implemented: true },
     ],
   },
   {
     name: 'CLI Modes',
-    icon: 'terminal',
+    icon: Terminal,
     agents: [
-      { id: 'cli:interactive' as WorkTypeId, name: 'Interactive', icon: 'chat', description: 'Conversation mode' },
-      { id: 'cli:quick-command' as WorkTypeId, name: 'Quick Command', icon: 'bolt', description: 'One-shot queries' },
+      { id: 'cli:interactive' as WorkTypeId, name: 'Interactive', icon: MessageCircle, description: 'Conversation mode', implemented: true },
+      { id: 'cli:quick-command' as WorkTypeId, name: 'Quick Command', icon: Zap, description: 'One-shot queries', implemented: true },
     ],
   },
 ];
@@ -360,7 +402,7 @@ export function SettingsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="material-symbols-outlined text-blue-400 text-2xl">settings</span>
+            <Settings className="w-8 h-8 text-blue-400" />
             <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
           </div>
           <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
@@ -371,7 +413,7 @@ export function SettingsPage() {
       {formData.deprecation_warnings && formData.deprecation_warnings.length > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-6">
           <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-amber-400 text-xl shrink-0 mt-0.5">warning</span>
+            <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-amber-400 font-semibold mb-2">
                 Deprecated Model IDs Detected
@@ -409,15 +451,15 @@ export function SettingsPage() {
               <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-xs">
                 <div className="flex items-center justify-between w-full">
                   <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
-                    <span className="material-symbols-outlined text-content-subtle">terminal</span>
+                    <Terminal className="w-5 h-5 text-content-subtle" />
                   </div>
                   <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-blue-500 to-divider-strong mx-2" />
                   <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
-                    <span className="material-symbols-outlined text-blue-400">account_tree</span>
+                    <User className="w-5 h-5 text-blue-400" />
                   </div>
                   <div className="flex-1 h-px bg-gradient-to-r from-divider via-blue-500 to-divider mx-2" />
                   <div className="size-12 rounded-lg bg-blue-500 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)]">
-                    <span className="material-symbols-outlined text-content">bolt</span>
+                    <Zap className="w-5 h-5 text-content" />
                   </div>
                 </div>
                 <div className="flex justify-between w-full px-2 text-[10px] uppercase tracking-widest font-bold text-content-muted">
@@ -438,14 +480,14 @@ export function SettingsPage() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-blue-400 text-sm mt-1">check_circle</span>
+                  <CheckCircle className="w-4 h-4 text-blue-400 mt-1" />
                   <div>
                     <p className="text-sm font-semibold text-content">Capability Matching</p>
                     <p className="text-xs text-content-muted">Best model for each task type</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-blue-400 text-sm mt-1">check_circle</span>
+                  <CheckCircle className="w-4 h-4 text-blue-400 mt-1" />
                   <div>
                     <p className="text-sm font-semibold text-content">Cost Optimization</p>
                     <p className="text-xs text-content-muted">Balance performance vs spend</p>
@@ -487,7 +529,7 @@ export function SettingsPage() {
                 )}
                 <div className="flex items-center gap-3 mb-5">
                   <div className="size-10 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
-                    <span className="material-symbols-outlined text-content-subtle">{provider.icon}</span>
+                    <provider.icon className="w-5 h-5 text-content-subtle" />
                   </div>
                   <span className="font-bold text-content">{provider.name}</span>
                   <div className="ml-auto">
@@ -513,7 +555,7 @@ export function SettingsPage() {
                     {apiKey.startsWith('$') ? (
                       <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2 text-amber-400 text-xs">
-                          <span className="material-symbols-outlined text-[14px]">info</span>
+                          <AlertTriangle className="w-4 h-4" />
                           <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
                         </div>
                         <p className="text-[10px] text-amber-400/70 mt-1">
@@ -551,9 +593,11 @@ export function SettingsPage() {
                             onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
                             className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
                           >
-                            <span className="material-symbols-outlined text-[16px]">
-                              {showApiKey[provider.id] ? 'visibility_off' : 'visibility'}
-                            </span>
+                            {showApiKey[provider.id] ? (
+                              <Eye className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4 opacity-50" />
+                            )}
                           </button>
                         )}
                       </div>
@@ -568,7 +612,7 @@ export function SettingsPage() {
                           onClick={() => setModelsModalProvider(provider.id)}
                           className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-xs text-blue-400 transition-colors w-full"
                         >
-                          <span className="material-symbols-outlined text-[14px]">view_list</span>
+                          <BarChart3 className="w-3.5 h-3.5" />
                           View Models
                         </button>
                       )}
@@ -583,15 +627,17 @@ export function SettingsPage() {
                             {testingProvider === provider.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
                             ) : (
-                              <span className="material-symbols-outlined text-[14px]">quiz</span>
+                              <Beaker className="w-3.5 h-3.5" />
                             )}
                             Test 2+3
                           </button>
                           {testResults[provider.id] && (
                             <div className={`flex items-center gap-1 text-xs ${testResults[provider.id]?.success ? 'text-green-400' : 'text-red-400'}`}>
-                              <span className="material-symbols-outlined text-[14px]">
-                                {testResults[provider.id]?.success ? 'check_circle' : 'error'}
-                              </span>
+                              {testResults[provider.id]?.success ? (
+                                <CheckCircle className="w-3.5 h-3.5" />
+                              ) : (
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                              )}
                               {testResults[provider.id]?.success
                                 ? `${testResults[provider.id]?.latencyMs}ms`
                                 : testResults[provider.id]?.error}
@@ -628,7 +674,7 @@ export function SettingsPage() {
               >
                 <div className="flex items-center gap-3 mb-5">
                   <div className="size-10 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
-                    <span className="material-symbols-outlined text-content-subtle">{tracker.icon}</span>
+                    <tracker.icon className="w-5 h-5 text-content-subtle" />
                   </div>
                   <div>
                     <span className="font-bold text-content">{tracker.name}</span>
@@ -641,7 +687,7 @@ export function SettingsPage() {
                     {trackerKey.startsWith('$') ? (
                       <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2 text-amber-400 text-xs">
-                          <span className="material-symbols-outlined text-[14px]">info</span>
+                          <AlertTriangle className="w-4 h-4" />
                           <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{trackerKey}</code></span>
                         </div>
                         <input
@@ -672,9 +718,11 @@ export function SettingsPage() {
                           onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
                         >
-                          <span className="material-symbols-outlined text-[16px]">
-                            {showTrackerKey[tracker.id] ? 'visibility_off' : 'visibility'}
-                          </span>
+                          {showTrackerKey[tracker.id] ? (
+                            <Eye className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4 opacity-50" />
+                          )}
                         </button>
                       </div>
                     )}
@@ -697,7 +745,7 @@ export function SettingsPage() {
           {AGENT_CATEGORIES.map((category) => (
             <div key={category.name}>
               <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-content-muted text-lg">{category.icon}</span>
+                <category.icon className="w-5 h-5 text-content-muted" />
                 <h3 className="text-content-body font-semibold text-sm uppercase tracking-wider">{category.name}</h3>
                 <div className="h-px flex-1 bg-divider" />
               </div>
@@ -721,6 +769,7 @@ export function SettingsPage() {
                   // Build hover text
                   const hoverText = [
                     `${agent.name}: ${agent.description}`,
+                    !agent.implemented ? '⚠️ NOT YET IMPLEMENTED' : '',
                     `Model: ${modelDisplay}`,
                     isDeprecated ? '⚠️ DEPRECATED: Click to update to current model' : '',
                     `Needs: ${requiredCaps.map(c => CAPABILITY_INFO[c].name).join(', ')}`,
@@ -731,16 +780,20 @@ export function SettingsPage() {
                   return (
                     <div
                       key={agent.id}
-                      onClick={() => setModalWorkType(agent.id)}
+                      onClick={() => agent.implemented && setModalWorkType(agent.id)}
                       title={hoverText}
-                      className={`p-3 border rounded-lg cursor-pointer transition-all group relative ${
-                        isDeprecated
-                          ? 'bg-amber-500/10 border-amber-500/50 hover:border-amber-500/70 hover:bg-amber-500/15'
-                          : isGoodFit
-                            ? 'bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10'
-                            : isOkFit
-                              ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10'
-                              : 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/10'
+                      className={`p-3 border rounded-lg transition-all group relative ${
+                        !agent.implemented
+                          ? 'opacity-50 bg-surface-emphasis border-divider cursor-not-allowed'
+                          : `cursor-pointer ${
+                            isDeprecated
+                              ? 'bg-amber-500/10 border-amber-500/50 hover:border-amber-500/70 hover:bg-amber-500/15'
+                              : isGoodFit
+                                ? 'bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10'
+                                : isOkFit
+                                  ? 'bg-amber-500/5 border-amber-500/30 hover:border-amber-500/50 hover:bg-amber-500/10'
+                                  : 'bg-rose-500/5 border-rose-500/30 hover:border-rose-500/50 hover:bg-rose-500/10'
+                            }`
                       }`}
                     >
                       {isDeprecated && (
@@ -750,20 +803,27 @@ export function SettingsPage() {
                           </span>
                         </div>
                       )}
+                      {!agent.implemented && (
+                        <div className="absolute top-1 right-1">
+                          <span className="bg-gray-500 text-content text-[8px] font-black px-1 py-0.5 rounded uppercase tracking-tighter">
+                            NOT YET IMPLEMENTED
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`material-symbols-outlined text-sm ${
+                        <agent.icon className={`w-4 h-4 ${
                           isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
-                        }`}>
-                          {agent.icon}
-                        </span>
-                        <span className={`text-[9px] font-bold ${
-                          isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
-                        }`}>
-                          {Math.round(score * 100)}%
-                        </span>
+                        }`} />
+                        {agent.implemented && (
+                          <span className={`text-[9px] font-bold ${
+                            isDeprecated ? 'text-amber-400' : isGoodFit ? 'text-emerald-400' : isOkFit ? 'text-amber-400' : 'text-rose-400'
+                          }`}>
+                            {Math.round(score * 100)}%
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs font-semibold text-content truncate">{agent.name}</p>
-                      <p className="text-[10px] text-content-muted truncate mb-2">{modelDisplay}</p>
+                      {agent.implemented && <p className="text-[10px] text-content-muted truncate mb-2">{modelDisplay}</p>}
 
                       {/* Capability indicators */}
                       <div className="flex gap-1 flex-wrap">
@@ -799,13 +859,13 @@ export function SettingsPage() {
           <div className="flex items-center gap-2 text-content-muted text-sm">
             {saveMutation.isSuccess && (
               <>
-                <span className="material-symbols-outlined text-green-400">check_circle</span>
+                <CheckCircle className="w-4 h-4 text-green-400" />
                 <span className="text-green-400">Settings saved!</span>
               </>
             )}
             {saveMutation.isError && (
               <>
-                <span className="material-symbols-outlined text-red-400">error</span>
+                <AlertTriangle className="w-4 h-4 text-red-400" />
                 <span className="text-red-400">Error saving settings</span>
               </>
             )}
@@ -816,7 +876,7 @@ export function SettingsPage() {
               className="px-6 py-2 text-amber-400 hover:text-amber-300 font-semibold text-sm transition-colors flex items-center gap-1.5"
               title="Set all model assignments to research-based optimal defaults"
             >
-              <span className="material-symbols-outlined text-[16px]">auto_fix_high</span>
+              <Zap className="w-4 h-4" />
               Optimal Defaults
             </button>
             <button
@@ -860,9 +920,10 @@ export function SettingsPage() {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-divider">
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-blue-400">
-                  {PROVIDERS.find(p => p.id === modelsModalProvider)?.icon}
-                </span>
+                {(() => {
+                  const Icon = PROVIDERS.find(p => p.id === modelsModalProvider)?.icon;
+                  return Icon ? <Icon className="w-5 h-5 text-blue-400" /> : null;
+                })()}
                 <h3 className="text-content text-lg font-bold">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
                 </h3>
@@ -884,7 +945,7 @@ export function SettingsPage() {
                 if (!providerApiKey) {
                   return (
                     <div className="text-center py-8">
-                      <span className="material-symbols-outlined text-4xl text-content-muted mb-2">key_off</span>
+                      <Key className="w-10 h-10 text-content-muted mb-2 mx-auto" />
                       <p className="text-content-muted">Enter an API key to test models</p>
                     </div>
                   );
@@ -893,7 +954,7 @@ export function SettingsPage() {
                 if (isEnvVarRef) {
                   return (
                     <div className="text-center py-8">
-                      <span className="material-symbols-outlined text-4xl text-amber-500 mb-2">warning</span>
+                      <AlertTriangle className="w-10 h-10 text-amber-500 mb-2 mx-auto" />
                       <p className="text-amber-400">API key configured via environment variable</p>
                       <p className="text-content-muted text-sm mt-1">
                         <code className="font-mono bg-surface-overlay px-1 rounded">{providerApiKey}</code> is not set
@@ -918,7 +979,10 @@ export function SettingsPage() {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="material-symbols-outlined text-content-muted text-sm">{model.icon}</span>
+                              {/* Model icons are strings (Material Symbols names) - render as text fallback */}
+                              <div className="w-4 h-4 flex items-center justify-center text-content-muted text-[10px]">
+                                {typeof model.icon === 'string' ? model.icon[0] : '◆'}
+                              </div>
                               <h4 className="text-content font-semibold">{model.name}</h4>
                               {model.tier && (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
@@ -953,15 +1017,17 @@ export function SettingsPage() {
                               {isTesting ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
                               ) : (
-                                <span className="material-symbols-outlined text-[14px]">play_arrow</span>
+                                <Zap className="w-3.5 h-3.5" />
                               )}
                               Test 2+3
                             </button>
                             {testResult && (
                               <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-green-400' : 'text-red-400'}`}>
-                                <span className="material-symbols-outlined text-[12px]">
-                                  {testResult.success ? 'check_circle' : 'error'}
-                                </span>
+                                {testResult.success ? (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                ) : (
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                )}
                                 {testResult.success
                                   ? `${testResult.latencyMs}ms`
                                   : (testResult.error?.slice(0, 30) || 'Failed')}
