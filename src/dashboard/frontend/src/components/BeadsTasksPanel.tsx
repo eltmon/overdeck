@@ -250,35 +250,66 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
   const titlePattern = `${doc.plan.id}: ${item.title}`.toLowerCase();
   const matchedBead = beads.find(b => (b.title || b.name || '').toLowerCase() === titlePattern);
 
-  const blockerIds = doc.plan.edges
-    .filter(e => e.type === 'blocks' && e.to === item.id)
-    .map(e => e.from);
-  const dependentIds = doc.plan.edges
-    .filter(e => e.type === 'blocks' && e.from === item.id)
-    .map(e => e.to);
+  // Gather all incoming edges (not just blocks) for richer dependency info
+  const incomingEdges = doc.plan.edges.filter(e => e.to === item.id);
+  const outgoingEdges = doc.plan.edges.filter(e => e.from === item.id);
 
-  const blockerItems = blockerIds.map(id => doc.plan.items.find(i => i.id === id)).filter(Boolean) as VBriefItem[];
-  const dependentItems = dependentIds.map(id => doc.plan.items.find(i => i.id === id)).filter(Boolean) as VBriefItem[];
+  const blockerItems = incomingEdges
+    .filter(e => e.type === 'blocks')
+    .map(e => doc.plan.items.find(i => i.id === e.from))
+    .filter(Boolean) as VBriefItem[];
+  const informerItems = incomingEdges
+    .filter(e => e.type === 'informs')
+    .map(e => doc.plan.items.find(i => i.id === e.from))
+    .filter(Boolean) as VBriefItem[];
+  const dependentItems = outgoingEdges
+    .filter(e => e.type === 'blocks')
+    .map(e => doc.plan.items.find(i => i.id === e.to))
+    .filter(Boolean) as VBriefItem[];
+  const informsItems = outgoingEdges
+    .filter(e => e.type === 'informs')
+    .map(e => doc.plan.items.find(i => i.id === e.to))
+    .filter(Boolean) as VBriefItem[];
 
   const acs = (item.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion');
+  const narrativeEntries = Object.entries(item.narrative ?? {}).filter(([, v]) => v);
+  const phase = item.metadata?.phase;
+
+  const STATUS_BADGE_COLORS: Record<string, string> = {
+    pending: 'text-gray-400',
+    in_progress: 'text-blue-400',
+    completed: 'text-green-400',
+    cancelled: 'text-yellow-400',
+    blocked: 'text-red-400',
+  };
 
   return (
-    <div className="p-2 rounded border border-divider bg-surface-raised/50 text-xs space-y-2">
-      {/* Title + meta row */}
+    <div className="p-2.5 rounded border border-divider bg-surface-raised/50 text-xs space-y-2.5">
+      {/* Title + status */}
       <div className="flex items-start justify-between gap-2">
         <div className="font-medium text-content leading-snug">{item.title}</div>
-        <div className="flex items-center gap-1 shrink-0">
-          {item.metadata?.difficulty && (
-            <span className="bg-surface-overlay text-content-muted px-1 py-0.5 rounded text-[9px] uppercase">
-              {item.metadata.difficulty}
-            </span>
-          )}
-          {item.priority && (
-            <span className="bg-surface-overlay text-content-muted px-1 py-0.5 rounded text-[9px] uppercase">
-              {item.priority}
-            </span>
-          )}
-        </div>
+        <span className={`shrink-0 text-[10px] font-semibold uppercase ${STATUS_BADGE_COLORS[item.status] ?? 'text-gray-400'}`}>
+          {item.status.replace('_', ' ')}
+        </span>
+      </div>
+
+      {/* Metadata badges row */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {item.metadata?.difficulty && (
+          <span className="bg-surface-overlay text-content-muted px-1.5 py-0.5 rounded text-[9px] uppercase font-medium">
+            {item.metadata.difficulty}
+          </span>
+        )}
+        {item.priority && (
+          <span className="bg-surface-overlay text-content-muted px-1.5 py-0.5 rounded text-[9px] uppercase font-medium">
+            {item.priority}
+          </span>
+        )}
+        {phase != null && (
+          <span className="bg-surface-overlay text-content-muted px-1.5 py-0.5 rounded text-[9px] font-medium">
+            Phase {phase}
+          </span>
+        )}
       </div>
 
       {/* Bead status */}
@@ -293,14 +324,24 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
         </div>
       )}
 
-      {/* Narrative */}
-      {item.narrative?.Action && (
-        <div className="text-content-muted leading-relaxed">{item.narrative.Action}</div>
+      {/* Narrative — show all fields, not just Action */}
+      {narrativeEntries.length > 0 && (
+        <div className="space-y-1">
+          {narrativeEntries.map(([key, value]) => (
+            <div key={key} className="text-content-muted leading-relaxed">
+              {narrativeEntries.length > 1 && (
+                <span className="font-medium text-content-subtle">{key}: </span>
+              )}
+              {value}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Acceptance criteria */}
       {acs.length > 0 && (
         <div className="space-y-0.5">
+          <div className="text-[10px] font-medium text-content-subtle mb-0.5">Acceptance Criteria</div>
           {acs.map(s => (
             <div key={s.id} className="flex items-start gap-1 text-[10px] text-content-subtle">
               {s.status === 'completed'
@@ -312,19 +353,33 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
         </div>
       )}
 
-      {/* Blockers */}
-      {blockerItems.length > 0 && (
-        <div className="text-[10px] text-orange-400/80">
-          <span className="font-medium">Blocked by: </span>
-          {blockerItems.map(b => b.title).join(', ')}
-        </div>
-      )}
-
-      {/* Dependents */}
-      {dependentItems.length > 0 && (
-        <div className="text-[10px] text-content-subtle">
-          <span className="font-medium">Blocks: </span>
-          {dependentItems.map(d => d.title).join(', ')}
+      {/* Dependencies section */}
+      {(blockerItems.length > 0 || informerItems.length > 0 || dependentItems.length > 0 || informsItems.length > 0) && (
+        <div className="space-y-1 border-t border-divider pt-2">
+          {blockerItems.length > 0 && (
+            <div className="text-[10px] text-orange-400/80">
+              <span className="font-medium">Blocked by: </span>
+              {blockerItems.map(b => b.title).join(', ')}
+            </div>
+          )}
+          {informerItems.length > 0 && (
+            <div className="text-[10px] text-blue-400/80">
+              <span className="font-medium">Informed by: </span>
+              {informerItems.map(b => b.title).join(', ')}
+            </div>
+          )}
+          {dependentItems.length > 0 && (
+            <div className="text-[10px] text-content-subtle">
+              <span className="font-medium">Blocks: </span>
+              {dependentItems.map(d => d.title).join(', ')}
+            </div>
+          )}
+          {informsItems.length > 0 && (
+            <div className="text-[10px] text-blue-300/60">
+              <span className="font-medium">Informs: </span>
+              {informsItems.map(d => d.title).join(', ')}
+            </div>
+          )}
         </div>
       )}
     </div>
