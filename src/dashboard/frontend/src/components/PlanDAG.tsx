@@ -188,6 +188,19 @@ export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = []): 
       id: `e-${i}-${edge.from}-${edge.to}`,
       source: edge.from,
       target: edge.to,
+      label: edge.type,
+      labelStyle: {
+        fontSize: 9,
+        fontWeight: 500,
+        fill: isCritical ? '#f97316' : '#9ca3af',
+        letterSpacing: '0.03em',
+      },
+      labelBgStyle: {
+        fill: '#111827',
+        fillOpacity: 0.85,
+      },
+      labelBgPadding: [4, 2] as [number, number],
+      labelBgBorderRadius: 3,
       markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: isCritical ? '#f97316' : '#6b7280' },
       style: {
         stroke: isCritical ? '#f97316' : edge.type === 'blocks' ? '#9ca3af' : '#4b5563',
