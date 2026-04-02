@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -225,6 +225,52 @@ describe('workflows', () => {
       expect(result.success).toBe(true);
       // Workspace should still exist
       expect(existsSync(wsPath)).toBe(true);
+    });
+  });
+
+  describe('beads lifecycle (PAN-412)', () => {
+    it('approve should NOT clear beads (preserves them for history)', async () => {
+      const beadsDir = join(testDir, '.beads');
+      mkdirSync(beadsDir, { recursive: true });
+      writeFileSync(
+        join(beadsDir, 'issues.jsonl'),
+        JSON.stringify({ id: 'b1', title: 'PAN-100: Task', status: 'closed' }) + '\n'
+      );
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await approve(ctx);
+
+      // clear-beads step should not appear
+      const clearStep = result.steps.find(s => s.step === 'teardown:clear-beads');
+      expect(clearStep).toBeUndefined();
+
+      // Beads JSONL should still contain the entry
+      const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
+      expect(content).toContain('PAN-100');
+    });
+
+    it('deepWipe should clear beads for the issue', async () => {
+      const beadsDir = join(testDir, '.beads');
+      const wsPath = join(testDir, 'workspaces', 'pan-100');
+      mkdirSync(beadsDir, { recursive: true });
+      mkdirSync(wsPath, { recursive: true });
+      writeFileSync(
+        join(beadsDir, 'issues.jsonl'),
+        JSON.stringify({ id: 'b1', title: 'PAN-100: Task', status: 'closed' }) + '\n' +
+        JSON.stringify({ id: 'b2', title: 'PAN-200: Other', status: 'open' }) + '\n'
+      );
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await deepWipe(ctx);
+
+      const clearStep = result.steps.find(s => s.step === 'teardown:clear-beads');
+      expect(clearStep).toBeDefined();
+      expect(clearStep!.success).toBe(true);
+
+      // PAN-100 should be gone, PAN-200 preserved
+      const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
+      expect(content).not.toContain('PAN-100');
+      expect(content).toContain('PAN-200');
     });
   });
 
