@@ -78,14 +78,6 @@ const PRIORITY_DOT: Record<string, string> = {
   low:      '#6b7280',
 };
 
-const DIFFICULTY_LABELS: Record<string, string> = {
-  trivial: 'T',
-  simple:  'S',
-  medium:  'M',
-  complex: 'C',
-  expert:  'E',
-};
-
 const STATUS_LABELS: Record<VBriefItemStatus, string> = {
   pending:     'pending',
   in_progress: 'in progress',

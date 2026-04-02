@@ -307,7 +307,7 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
         )}
         {phase != null && (
           <span className="bg-surface-overlay text-content-muted px-1.5 py-0.5 rounded text-[9px] font-medium">
-            Phase {phase}
+            Phase {String(phase)}
           </span>
         )}
       </div>
