@@ -24,8 +24,6 @@ export interface UseSearchOptions {
 
 export function useSearch(query: string, filters: SearchFilters, options: UseSearchOptions = {}) {
   const {
-    cycleFilter = 'current',
-    includeCompletedFilter = false,
     minQueryLength = 2,
     maxResults = 20,
     debounceMs = 150,
@@ -43,8 +41,23 @@ export function useSearch(query: string, filters: SearchFilters, options: UseSea
     return () => clearTimeout(timer);
   }, [query, debounceMs]);
 
-  // Get issues from React Query cache
-  const cachedIssues = queryClient.getQueryData<Issue[]>(['issues', cycleFilter, includeCompletedFilter]);
+  // Get issues from React Query cache — search across all cached issue sets
+  // so completed issues are findable even if the kanban isn't showing them
+  const cachedIssues = useMemo(() => {
+    const seen = new Set<string>();
+    const all: Issue[] = [];
+    const cache = queryClient.getQueriesData<Issue[]>({ queryKey: ['issues'] });
+    for (const [, issues] of cache) {
+      if (!issues) continue;
+      for (const issue of issues) {
+        if (!seen.has(issue.identifier)) {
+          seen.add(issue.identifier);
+          all.push(issue);
+        }
+      }
+    }
+    return all;
+  }, [queryClient, debouncedQuery]);
 
   // Search and score results
   const results = useMemo(() => {
@@ -67,10 +80,8 @@ export function useSearch(query: string, filters: SearchFilters, options: UseSea
         continue;
       }
 
-      // Apply completed filter
-      if (!filters.includeCompleted && (issue.status === 'Done' || issue.status === 'Completed' || issue.status === 'Closed')) {
-        continue;
-      }
+      // Always search completed issues — if they're visible on the board,
+      // they should be findable via search
 
       let score = 0;
       let matchType: 'identifier' | 'title' | 'description' | null = null;

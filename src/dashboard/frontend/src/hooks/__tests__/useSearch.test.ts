@@ -83,7 +83,7 @@ describe('useSearch', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockQueryClient = {
-      getQueryData: vi.fn().mockReturnValue(mockIssues),
+      getQueriesData: vi.fn().mockReturnValue([[['issues', 'current', false], mockIssues]]),
     };
     vi.mocked(useQueryClient).mockReturnValue(mockQueryClient);
   });
@@ -318,7 +318,7 @@ describe('useSearch', () => {
       expect(sources.size).toBeGreaterThan(1); // Multiple sources
     });
 
-    it('should exclude completed issues by default', async () => {
+    it('should always include completed issues in search results', async () => {
       const { result } = renderHook(() => useSearch('PAN', defaultFilters));
 
       await act(async () => {
@@ -328,22 +328,6 @@ describe('useSearch', () => {
       const hasCompleted = result.current.results.some(r =>
         r.issue.status === 'Done' || r.issue.status === 'Completed' || r.issue.status === 'Closed'
       );
-      expect(hasCompleted).toBe(false);
-    });
-
-    it('should include completed issues when includeCompleted is true', async () => {
-      const filters: SearchFilters = {
-        ...defaultFilters,
-        includeCompleted: true,
-      };
-
-      const { result } = renderHook(() => useSearch('PAN', filters));
-
-      await act(async () => {
-        vi.advanceTimersByTime(150);
-      });
-
-      const hasCompleted = result.current.results.some(r => r.issue.status === 'Done');
       expect(hasCompleted).toBe(true);
     });
   });
@@ -432,7 +416,7 @@ describe('useSearch', () => {
         identifier: `PAN-${i}`,
       }));
 
-      mockQueryClient.getQueryData.mockReturnValue(manyIssues);
+      mockQueryClient.getQueriesData.mockReturnValue([[['issues'], manyIssues]]);
 
       const { result } = renderHook(() => useSearch('PAN', defaultFilters));
 
@@ -450,7 +434,7 @@ describe('useSearch', () => {
         identifier: `PAN-${i}`,
       }));
 
-      mockQueryClient.getQueryData.mockReturnValue(manyIssues);
+      mockQueryClient.getQueriesData.mockReturnValue([[['issues'], manyIssues]]);
 
       const { result } = renderHook(() =>
         useSearch('PAN', defaultFilters, { maxResults: 5 })
@@ -466,7 +450,7 @@ describe('useSearch', () => {
 
   describe('Edge cases', () => {
     it('should handle no cached issues gracefully', async () => {
-      mockQueryClient.getQueryData.mockReturnValue(undefined);
+      mockQueryClient.getQueriesData.mockReturnValue([]);
 
       const { result } = renderHook(() => useSearch('PAN', defaultFilters));
 
@@ -479,7 +463,7 @@ describe('useSearch', () => {
     });
 
     it('should handle empty cached issues array', async () => {
-      mockQueryClient.getQueryData.mockReturnValue([]);
+      mockQueryClient.getQueriesData.mockReturnValue([[['issues'], []]]);
 
       const { result } = renderHook(() => useSearch('PAN', defaultFilters));
 
@@ -496,7 +480,7 @@ describe('useSearch', () => {
         description: undefined,
       }));
 
-      mockQueryClient.getQueryData.mockReturnValue(issuesWithoutDesc);
+      mockQueryClient.getQueriesData.mockReturnValue([[['issues'], issuesWithoutDesc]]);
 
       const filters: SearchFilters = {
         ...defaultFilters,
