@@ -112,7 +112,7 @@ If you batch multiple beads, the inspector cannot verify them individually and y
 will be rejected.
 
 **Workflow for EVERY bead:**
-1. `bd ready` — find the next unblocked bead
+1. `bd ready -l {{ISSUE_ID_LOWER}}` — find the next unblocked bead for THIS issue
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
@@ -120,6 +120,10 @@ will be rejected.
 6. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
 7. `INSPECTION PASSED` → proceed to step 1
 8. `INSPECTION BLOCKED` → fix, commit, `bd close` again
+
+**IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
+to this issue's beads. The shared database contains beads from ALL issues — without the
+label filter you will see irrelevant beads from other workspaces.
 
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
 a separate commit with a separate `bd close`. The inspection fires automatically on
@@ -192,7 +196,7 @@ If you batch multiple beads into one commit, the inspector cannot verify them in
 and your work will be rejected.
 
 **Workflow for EVERY bead:**
-1. `bd ready` — find the next unblocked bead
+1. `bd ready -l {{ISSUE_ID_LOWER}}` — find the next unblocked bead for THIS issue
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
@@ -200,6 +204,10 @@ and your work will be rejected.
 6. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
 7. `INSPECTION PASSED` → proceed to step 1
 8. `INSPECTION BLOCKED` → fix, commit, `bd close` again
+
+**IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
+to this issue's beads. The shared database contains beads from ALL issues — without the
+label filter you will see irrelevant beads from other workspaces.
 
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
 a separate commit with a separate `bd close`. The inspection fires automatically on
