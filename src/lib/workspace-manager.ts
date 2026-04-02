@@ -4,7 +4,7 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, statSync } from 'fs';
 import { join, dirname, basename, extname, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -681,7 +681,11 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   if (startDocker) {
     // Check for Traefik
     if (workspaceConfig.docker?.traefik) {
-      const traefikPath = join(projectConfig.path, workspaceConfig.docker.traefik);
+      let traefikPath = join(projectConfig.path, workspaceConfig.docker.traefik);
+      // If traefik config points to a directory, look for docker-compose.yml inside it
+      if (existsSync(traefikPath) && statSync(traefikPath).isDirectory()) {
+        traefikPath = join(traefikPath, 'docker-compose.yml');
+      }
       if (existsSync(traefikPath)) {
         try {
           await execAsync(`docker compose -f "${traefikPath}" up -d`, { cwd: projectConfig.path });
