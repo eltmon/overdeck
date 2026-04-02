@@ -65,19 +65,31 @@ Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Ente
 
 The dashboard shows live terminal output via a WebSocket endpoint (`/ws/terminal?session=<name>`).
 
-**CRITICAL: The server does NOT use `tmux attach-session`.** It uses a non-attaching approach:
+The server uses `node-pty` to spawn `tmux attach-session` for real-time terminal emulation
+(ANSI escape sequences, cursor positioning, alternate screen buffer).
 
-- **Output**: `tmux capture-pane` polled at 4Hz (250ms interval)
-- **Input**: `tmux send-keys` for control characters, `load-buffer` + `paste-buffer` for text
-- **Resize**: `tmux resize-window`
+**CRITICAL: Defer PTY spawn + suppress stale data (PAN-417).**
 
-**Why not attach?** Previous implementation used `node-pty` to spawn `tmux attach-session`. When the WebSocket closed (browser navigation, dialog close), orphan `tmux attach` PTY processes accumulated. After 2-4 reconnect cycles, these orphans caused tmux to destroy the session — killing the planning agent and losing all output.
+Both local and remote handlers MUST wait for the first `resize` message from the client
+before spawning the PTY/SSH session. This ensures the PTY starts at the correct dimensions.
 
-The capture-pane approach has zero impact on session lifecycle. WebSocket connect/disconnect is completely decoupled from the tmux session. Tested: 30 consecutive connect/disconnect cycles with zero failures.
+- **Local**: `startLocalPty(cols, rows)` — spawns PTY only on first resize message
+- **Remote**: `startFly(cols, rows)` — spawns SSH only on first resize message
+- **Client** (`XTerminal.tsx`): Sends dimensions immediately on WebSocket open
 
-**Trade-off**: 250ms polling latency vs real-time PTY streaming. Acceptable for monitoring; PAN-406 tracks future optimization with `tmux pipe-pane` for real-time output.
+**Stale data suppression (local path):** When the PTY attaches, tmux sends the screen
+content rendered at the OLD size (80×24 default). This stale burst must be **suppressed**
+for ~200ms. After the delay, forwarding starts and a dimension toggle (`cols→cols-1→cols`)
+forces two SIGWINCHs, guaranteeing Claude fully repaints its TUI at the correct size.
+Without this, the stale 80×24 content appears garbled in the wider xterm.js terminal.
 
-**NEVER reintroduce `tmux attach-session` or `node-pty` for the terminal WebSocket.** This was a multi-hour debugging effort. The capture-pane approach is correct.
+**Session lifecycle rules:**
+- On WebSocket close, do NOT kill the PTY — just remove from tracking. The PTY exits
+  naturally when pipes close. The tmux session survives independently.
+- Do NOT pre-resize tmux windows to arbitrary large sizes (e.g., 200×50). Let the PTY
+  spawn handle sizing via the client's actual dimensions.
+- The local planning launcher script MUST export TERM/COLORTERM/LANG (matching the
+  remote launcher) for proper Claude Code rendering.
 
 ## Verification Gate (PAN-174)
 
