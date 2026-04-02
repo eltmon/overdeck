@@ -10124,7 +10124,13 @@ export PANOPTICON_ISSUE_ID="${issue.identifier}"
 export PANOPTICON_SESSION_TYPE="planning"
 cd "${agentCwd}"
 prompt=$(cat "${promptFile}")
-exec ${cmdWithArgs} "$prompt"
+trap '' HUP
+${cmdWithArgs} "$prompt"
+# Keep session alive after Claude exits so user can review and click Done
+echo ""
+echo "Planning agent has exited. Session kept alive for review."
+echo "Click 'Done' in the dashboard when ready to hand off to implementation."
+while true; do sleep 60; done
 `, { mode: 0o755 });
 
         // Ensure tmux is running before starting session
