@@ -681,14 +681,14 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   if (startDocker) {
     // Check for Traefik
     if (workspaceConfig.docker?.traefik) {
-      let traefikPath = join(projectConfig.path, workspaceConfig.docker.traefik);
-      // If traefik config points to a directory, look for docker-compose.yml inside it
-      if (existsSync(traefikPath) && statSync(traefikPath).isDirectory()) {
-        traefikPath = join(traefikPath, 'docker-compose.yml');
-      }
+      // Always use the installed Traefik location (~/.panopticon/traefik/), not the
+      // template source in projects.yaml. The template is copied to ~/.panopticon/traefik/
+      // during `pan install`, and the installed copy has the correct volume mounts
+      // (dynamic configs, certs) relative to ~/.panopticon/traefik/.
+      const traefikPath = join(homedir(), '.panopticon', 'traefik', 'docker-compose.yml');
       if (existsSync(traefikPath)) {
         try {
-          await execAsync(`docker compose -f "${traefikPath}" up -d`, { cwd: projectConfig.path });
+          await execAsync(`docker compose -f "${traefikPath}" up -d`, { cwd: join(homedir(), '.panopticon', 'traefik') });
           result.steps.push('Started Traefik');
         } catch (error: any) {
           const msg = error?.message || String(error);
