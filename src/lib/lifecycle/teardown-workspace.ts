@@ -158,6 +158,50 @@ async function syncWorkspaceBeads(
 }
 
 /**
+ * Clear beads for this issue from the project-root .beads/issues.jsonl.
+ * On wipe, beads should be removed so the user starts fresh.
+ */
+async function clearProjectBeads(
+  projectPath: string,
+  issueLower: string,
+): Promise<StepResult> {
+  const step = 'teardown:clear-beads';
+  const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
+
+  if (!existsSync(projJsonl)) {
+    return stepSkipped(step, ['No .beads/issues.jsonl in project root']);
+  }
+
+  try {
+    const { readFileSync, writeFileSync } = await import('fs');
+    const content = readFileSync(projJsonl, 'utf-8');
+    const lines = content.split('\n');
+    const issueUpper = issueLower.toUpperCase();
+    const before = lines.length;
+    // Remove lines that reference this issue (by ID in the title or issue field)
+    const filtered = lines.filter(line => {
+      if (!line.trim()) return true; // keep blank lines
+      try {
+        const entry = JSON.parse(line);
+        const title = (entry.title || '').toUpperCase();
+        const issue = (entry.issue || '').toUpperCase();
+        return !title.includes(issueUpper) && issue !== issueUpper;
+      } catch {
+        return true; // keep unparseable lines
+      }
+    });
+    const removed = before - filtered.length;
+    if (removed > 0) {
+      writeFileSync(projJsonl, filtered.join('\n'));
+      return stepOk(step, [`Removed ${removed} beads entries for ${issueLower} from project JSONL`]);
+    }
+    return stepSkipped(step, [`No beads entries found for ${issueLower}`]);
+  } catch (err) {
+    return stepFailed(step, `Failed to clear beads: ${(err as Error).message}`);
+  }
+}
+
+/**
  * Remove git worktree for the workspace.
  */
 async function removeWorktree(
@@ -392,10 +436,12 @@ export async function teardownWorkspace(
     // 6. Clear planning marker (before workspace deletion, or when preserving workspace)
     results.push(await clearPlanningMarker(workspacePath));
 
-    // 6b. Sync workspace beads to project root before deletion (PAN-412)
-    // Workspace beads live in the worktree's .beads/dolt/ — they're lost when the worktree is deleted.
+    // 6b. Clear beads for this issue from project root (PAN-417)
+    // On wipe, beads should be cleared — the workspace is being destroyed and the user
+    // intends to start fresh. Previously we synced beads to preserve them, but that left
+    // stale beads after wipe.
     if (shouldDeleteWorkspace) {
-      results.push(await syncWorkspaceBeads(ctx.projectPath, workspacePath, issueLower));
+      results.push(await clearProjectBeads(ctx.projectPath, issueLower));
     }
 
     // 7-8: Project-specific cleanup (tunnel, Hume) — only when deleting workspace and config provided
