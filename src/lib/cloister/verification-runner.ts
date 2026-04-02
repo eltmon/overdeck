@@ -15,6 +15,7 @@ import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { messageAgent } from '../agents.js';
 import { findProjectByPath } from '../projects.js';
+import { getVBriefACStatus } from '../vbrief/beads.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
 export const VERIFICATION_MAX_CYCLES = 3;
@@ -127,6 +128,56 @@ export async function runVerificationForIssue(
         }
       } catch (feedbackErr: any) {
         console.error(`[${logPrefix}] Failed to write verification feedback for ${issueId}:`, feedbackErr);
+      }
+
+      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+    }
+
+    // vBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
+    const acStatus = getVBriefACStatus(workspacePath);
+    if (acStatus && !acStatus.allCompleted) {
+      const newCycleCount = currentCycles + 1;
+      const failedCheck = 'vbrief-ac';
+      const incompleteList = acStatus.items
+        .filter(i => i.pending > 0)
+        .map(i => {
+          const pendingAC = i.criteria
+            .filter(ac => ac.status !== 'completed' && ac.status !== 'cancelled')
+            .map(ac => `  - [ ] ${ac.title}`)
+            .join('\n');
+          return `### ${i.itemTitle} (${i.pending}/${i.total} incomplete)\n${pendingAC}`;
+        })
+        .join('\n\n');
+      const summary = `Acceptance criteria check FAILED — ${acStatus.totalPending}/${acStatus.totalCount} AC incomplete:\n\n${incompleteList}`;
+
+      setReviewStatus(issueId, {
+        reviewStatus: 'pending',
+        verificationStatus: 'failed',
+        verificationNotes: summary,
+        verificationCycleCount: newCycleCount,
+        verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+      });
+
+      const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Update plan.vbrief.json subItem statuses to 'completed'\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT resubmit until all AC are completed.`;
+
+      try {
+        const fileResult = await writeFeedbackFile({
+          issueId,
+          workspacePath,
+          specialist: 'verification-gate',
+          outcome: 'failed',
+          summary: `AC check FAILED — ${acStatus.totalPending}/${acStatus.totalCount} incomplete (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+          markdownBody: feedbackBody,
+        });
+        if (fileResult.success) {
+          const agentId = `agent-${issueId.toLowerCase()}`;
+          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete\nRead and address: ${fileResult.relativePath}`;
+          await messageAgent(agentId, msg);
+          console.log(`[${logPrefix}] AC verification failed for ${issueId} — sent feedback to ${agentId}`);
+        }
+      } catch (feedbackErr: any) {
+        console.error(`[${logPrefix}] Failed to write AC verification feedback for ${issueId}:`, feedbackErr);
       }
 
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
