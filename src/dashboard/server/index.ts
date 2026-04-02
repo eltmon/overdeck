@@ -10000,6 +10000,7 @@ export PANOPTICON_SESSION_TYPE="planning"
 
 cd /workspace
 prompt=$(cat "${remotePromptFile}")
+trap '' HUP
 claude --dangerously-skip-permissions --model ${planningModel} "$prompt"
 # Keep session alive after Claude exits so user can review and click Done
 echo ""
@@ -10109,17 +10110,18 @@ export PANOPTICON_ISSUE_ID="${issue.identifier}"
 export PANOPTICON_SESSION_TYPE="planning"
 cd "${agentCwd}"
 prompt=$(cat "${promptFile}")
-${cmdWithArgs} "$prompt"
-# Keep session alive after Claude exits so user can review and click Done
-echo ""
-echo "Planning agent has exited. Session kept alive for review."
-echo "Click 'Done' in the dashboard when ready to hand off to implementation."
-while true; do sleep 60; done
+exec ${cmdWithArgs} "$prompt"
 `, { mode: 0o755 });
 
         // Ensure tmux is running before starting session
         await ensureTmuxRunning();
         await execAsync(`tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
+        // Protect the session from being destroyed when clients disconnect.
+        // When the dashboard's WebSocket terminal attaches and then detaches,
+        // tmux can destroy the session if destroy-unattached is on. Setting
+        // remain-on-exit keeps the pane alive even if the process dies.
+        await execAsync(`tmux set-option -t ${sessionName} destroy-unattached off 2>/dev/null || true`, { encoding: 'utf-8' });
+        await execAsync(`tmux set-option -t ${sessionName} remain-on-exit on 2>/dev/null || true`, { encoding: 'utf-8' });
 
         // Write agent state file so QuestionDialog can find the JSONL path
         writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
@@ -13490,6 +13492,13 @@ wss.on('connection', (ws: WebSocket, req) => {
     }
 
     // Local sessions use node-pty directly
+    // Kill any existing PTY for this session first to prevent multiple tmux attach
+    // processes. Multiple clients cause Ctrl-b d to detach ALL clients, and
+    // If there's an existing PTY for this session, just remove from tracking.
+    // Do NOT kill it — killing sends SIGHUP which can destroy the tmux session.
+    // The old PTY will exit naturally when its pipes close.
+    activePtys.delete(sessionName);
+
     let ptyProcess: pty.IPty;
     ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
       name: 'xterm-256color',
@@ -13553,35 +13562,22 @@ wss.on('connection', (ws: WebSocket, req) => {
     }
     earlyMessages.length = 0;
 
-    // Clean up on WebSocket close — detach from tmux but DON'T kill the session.
-    // The tmux session must survive so the user can reconnect and review output.
-    // Previously ptyProcess.kill() was called which killed the bash process inside
-    // the tmux pane, destroying the keep-alive loop and all session output.
+    // Clean up on WebSocket close.
+    // CRITICAL: Do NOT call ptyProcess.kill() — node-pty sends SIGHUP which tmux
+    // propagates to all processes in the session, killing the planning agent.
+    // Instead, just remove from tracking. The PTY (tmux attach) process will exit
+    // on its own when the WebSocket pipe closes and stdin/stdout become unreadable.
+    // The pre-attach cleanup above ensures we never accumulate stale PTYs.
     ws.on('close', () => {
       console.log(`WebSocket closed for session: ${sessionName}`);
-      try {
-        ptyProcess.write('\x02d'); // Ctrl-b d (detach from tmux)
-      } catch {
-        // PTY may already be dead
-      }
-      setTimeout(() => {
-        try {
-          ptyProcess.kill(); // Kill the PTY adapter process (tmux attach), NOT the tmux session itself
-        } catch {
-          // Already dead
-        }
-        activePtys.delete(sessionName);
-      }, 200);
+      activePtys.delete(sessionName);
+      // PTY will exit naturally — do NOT call ptyProcess.kill()
     });
 
     ws.on('error', (err) => {
       console.error(`WebSocket error for ${sessionName}:`, err);
-      try {
-        ptyProcess.kill();
-      } catch {
-        // Already dead
-      }
       activePtys.delete(sessionName);
+      // PTY will exit naturally — do NOT call ptyProcess.kill()
     });
   })();
 });
