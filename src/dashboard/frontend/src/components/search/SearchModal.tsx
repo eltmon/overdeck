@@ -1,9 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Command } from 'cmdk';
 import { X, Search, Github } from 'lucide-react';
-import { IssueSource } from '../../types';
+import { useQueryClient } from '@tanstack/react-query';
+import { Issue, IssueSource } from '../../types';
 import { useSearch, SearchFilters } from '../../hooks/useSearch';
 import { SearchResults } from './SearchResults';
+
+async function fetchIssues(cycle: string, includeCompleted: boolean): Promise<Issue[]> {
+  const params = new URLSearchParams();
+  params.set('cycle', cycle);
+  if (includeCompleted) params.set('includeCompleted', 'true');
+  const res = await fetch(`/api/issues?${params}`);
+  if (!res.ok) throw new Error('Failed to fetch issues');
+  return res.json();
+}
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -20,6 +30,7 @@ export function SearchModal({
   cycleFilter = 'current',
   includeCompletedFilter = false,
 }: SearchModalProps) {
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<SearchFilters>({
     sources: new Set<IssueSource>(),
@@ -32,6 +43,17 @@ export function SearchModal({
     filters,
     { cycleFilter, includeCompletedFilter }
   );
+
+  // When search opens, ensure completed issues are in the cache so they're searchable
+  useEffect(() => {
+    if (isOpen) {
+      queryClient.prefetchQuery({
+        queryKey: ['issues', cycleFilter, true],
+        queryFn: () => fetchIssues(cycleFilter, true),
+        staleTime: 30_000,
+      });
+    }
+  }, [isOpen, cycleFilter, queryClient]);
 
   // Reset state when modal closes
   useEffect(() => {
