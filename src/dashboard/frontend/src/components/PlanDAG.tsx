@@ -86,6 +86,14 @@ const DIFFICULTY_LABELS: Record<string, string> = {
   expert:  'E',
 };
 
+const STATUS_LABELS: Record<VBriefItemStatus, string> = {
+  pending:     'pending',
+  in_progress: 'in progress',
+  completed:   'completed',
+  cancelled:   'cancelled',
+  blocked:     'blocked',
+};
+
 // ── Layout ──
 
 const NODE_WIDTH = 180;
@@ -157,6 +165,29 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
             {DIFFICULTY_LABELS[difficulty] ?? difficulty[0].toUpperCase()}
           </span>
         )}
+      </div>
+      {/* Status badge */}
+      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 3,
+          fontSize: 9,
+          fontWeight: 600,
+          color: colors.text,
+          background: `${colors.border}33`,
+          border: `1px solid ${colors.border}66`,
+          borderRadius: 3,
+          padding: '1px 5px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}>
+          <span style={{
+            width: 5, height: 5, borderRadius: '50%',
+            background: colors.border,
+          }} />
+          {STATUS_LABELS[item.status]}
+        </span>
       </div>
     </div>
   );
