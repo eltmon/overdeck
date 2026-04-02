@@ -548,7 +548,6 @@ models:
     # High thinking for critical tasks
     issue-agent:planning: high
     convoy:security-reviewer: high
-    decomposition-agent: high
 
     # Medium thinking for balanced tasks
     issue-agent:implementation: medium
