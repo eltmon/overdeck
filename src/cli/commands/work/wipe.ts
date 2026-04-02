@@ -157,7 +157,66 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 5. Delete workspace if requested
+  // 5. Clear beads for this issue (before workspace deletion removes .beads/)
+  if (projectPath) {
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const workspaceBeadsDir = join(workspacePath, '.beads');
+
+    // Clear workspace-local beads via bd CLI (needs .beads/ to still exist)
+    if (existsSync(workspaceBeadsDir)) {
+      try {
+        const { stdout: listOutput } = await execAsync(
+          `bd list --json -l "${issueLower}" --limit 0`,
+          { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
+        );
+        const beads = JSON.parse(listOutput || '[]');
+        if (Array.isArray(beads) && beads.length > 0) {
+          const ids = beads.map((b: any) => b.id).filter(Boolean);
+          for (const id of ids) {
+            try {
+              await execAsync(`bd delete ${id} --force`, { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 });
+            } catch { /* individual delete failure non-fatal */ }
+          }
+          cleanupLog.push(`Deleted ${ids.length} beads for ${issueLower}`);
+          console.log(chalk.green(`  ✓ Deleted ${ids.length} beads for ${issueLower}`));
+        }
+      } catch {
+        // bd CLI may not be available or no beads exist — non-fatal
+      }
+    }
+
+    // Also clear from project-root JSONL (defense-in-depth)
+    const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
+    if (existsSync(projJsonl)) {
+      try {
+        const content = readFileSync(projJsonl, 'utf-8');
+        const lines = content.split('\n');
+        const issueUpper = issueLower.toUpperCase();
+        const filtered = lines.filter(line => {
+          if (!line.trim()) return true;
+          try {
+            const entry = JSON.parse(line);
+            const title = (entry.title || '').toUpperCase();
+            const issue = (entry.issue || '').toUpperCase();
+            return !title.includes(issueUpper) && issue !== issueUpper;
+          } catch {
+            return true;
+          }
+        });
+        const removed = lines.length - filtered.length;
+        if (removed > 0) {
+          const { writeFileSync } = await import('fs');
+          writeFileSync(projJsonl, filtered.join('\n'));
+          cleanupLog.push(`Removed ${removed} beads entries from project JSONL`);
+          console.log(chalk.green(`  ✓ Removed ${removed} beads entries from project JSONL`));
+        }
+      } catch {
+        // JSONL cleanup failure non-fatal
+      }
+    }
+  }
+
+  // 6. Delete workspace if requested
   if (options.workspace && projectPath) {
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (existsSync(workspacePath)) {
@@ -181,7 +240,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     }
   }
 
-  // 6. Reset Linear issue (if LINEAR_API_KEY is available)
+  // 7. Reset Linear issue (if LINEAR_API_KEY is available)
   const linearKey = process.env.LINEAR_API_KEY;
   if (linearKey) {
     try {
