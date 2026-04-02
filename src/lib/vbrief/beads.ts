@@ -49,6 +49,30 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 
   const { plan } = doc;
 
+  // Idempotency: clear any existing beads for this issue before creating new ones.
+  // Re-planning means "the old plan was invalid" — start fresh.
+  const issueLabel = plan.id.toLowerCase();
+  try {
+    const { stdout: existingJson } = await execAsync(
+      `bd list --json -l "${issueLabel}" --limit 0`,
+      { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
+    );
+    const existingBeads = JSON.parse(existingJson || '[]');
+    if (Array.isArray(existingBeads) && existingBeads.length > 0) {
+      const ids = existingBeads.map((b: any) => b.id).filter(Boolean);
+      for (const id of ids) {
+        try {
+          await execAsync(`bd delete ${id} --force`, { encoding: 'utf-8', cwd: workspacePath, timeout: 10000 });
+        } catch {
+          // Individual delete failure is non-fatal
+        }
+      }
+      console.log(`[beads] Cleared ${ids.length} existing beads for ${issueLabel} before re-creating`);
+    }
+  } catch {
+    // If listing fails (no beads exist, bd not initialized), proceed with creation
+  }
+
   // Build blocking-edge map: item.id → set of item IDs that block it
   // (i.e., blockers[B] = { A } means A blocks B, so B depends on A)
   const blockers = new Map<string, Set<string>>();
