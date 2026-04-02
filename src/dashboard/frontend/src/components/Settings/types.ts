@@ -14,6 +14,8 @@ export type WorkTypeId =
   | 'specialist-review-agent'
   | 'specialist-test-agent'
   | 'specialist-merge-agent'
+  | 'specialist-inspect-agent'
+  | 'specialist-uat-agent'
   // Subagents
   | 'subagent:explore'
   | 'subagent:plan'
@@ -24,6 +26,10 @@ export type WorkTypeId =
   | 'convoy:performance-reviewer'
   | 'convoy:correctness-reviewer'
   | 'convoy:synthesis-agent'
+  // Planning
+  | 'planning-agent'
+  // Workflow
+  | 'status-review'
   // CLI contexts
   | 'cli:interactive'
   | 'cli:quick-command';
