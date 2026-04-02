@@ -48,20 +48,24 @@ src/dashboard/restart.sh
 # Workspace-specific generated files
 CLAUDE.md
 
-# Ephemeral planning artifacts — ignored so they don't re-leak to main after cleanup.
-# Feature branches MUST use `git add -f` to track these files intentionally.
+# Ephemeral planning artifacts — entire directory is workspace-specific.
 # postMergeLifecycle removes them from main programmatically (PAN-337).
-.planning/STATE.md
-.planning/PRD.md
-.planning/PLANNING_PROMPT.md
-.planning/PLANNING_PROMPT.md.archived
-.planning/.planning-complete
-.planning/feedback/
+.planning/
+
+# Test caches (regenerated on each run)
+.cache/
+
+# Devcontainer files (generated from .template files per-workspace)
+.devcontainer/
+dev
+devcontainer.json
+docker-compose.devcontainer.yml
+
+# Pan sync manifest (tracks what pan sync installed — workspace-specific)
+.claude/.panopticon-manifest.json
 
 # Beads daemon files
 .beads/
 
 # Stitch temp files
 temp/
-.planning/plan.vbrief.json
-.planning/review-phase*.md
