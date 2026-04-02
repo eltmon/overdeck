@@ -163,15 +163,6 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     }
   }
 
-  // Flush beads to persist
-  if (created.length > 0) {
-    try {
-      await execAsync('bd flush', { encoding: 'utf-8', cwd: workspacePath });
-    } catch {
-      // Flush failure is non-fatal
-    }
-  }
-
   return { success: errors.length === 0, created, errors, beadIds };
 }
 
