@@ -436,12 +436,13 @@ export async function teardownWorkspace(
     // 6. Clear planning marker (before workspace deletion, or when preserving workspace)
     results.push(await clearPlanningMarker(workspacePath));
 
-    // 6b. Clear beads for this issue from project root (PAN-417)
-    // On wipe, beads should be cleared — the workspace is being destroyed and the user
-    // intends to start fresh. Previously we synced beads to preserve them, but that left
-    // stale beads after wipe.
-    if (shouldDeleteWorkspace) {
+    // 6b. Beads lifecycle: sync or clear depending on context (PAN-412)
+    // Normal completion (approve/closeOut): sync beads to project root to preserve history.
+    // Destructive wipe: clear beads so the user starts fresh.
+    if (opts.clearBeads) {
       results.push(await clearProjectBeads(ctx.projectPath, issueLower));
+    } else if (shouldDeleteWorkspace) {
+      results.push(await syncWorkspaceBeads(ctx.projectPath, workspacePath, issueLower));
     }
 
     // 7-8: Project-specific cleanup (tunnel, Hume) — only when deleting workspace and config provided
