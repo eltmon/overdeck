@@ -13553,19 +13553,34 @@ wss.on('connection', (ws: WebSocket, req) => {
     }
     earlyMessages.length = 0;
 
-    // Clean up on WebSocket close
+    // Clean up on WebSocket close — detach from tmux but DON'T kill the session.
+    // The tmux session must survive so the user can reconnect and review output.
+    // Previously ptyProcess.kill() was called which killed the bash process inside
+    // the tmux pane, destroying the keep-alive loop and all session output.
     ws.on('close', () => {
       console.log(`WebSocket closed for session: ${sessionName}`);
-      ptyProcess.write('\x02d'); // Ctrl-b d
+      try {
+        ptyProcess.write('\x02d'); // Ctrl-b d (detach from tmux)
+      } catch {
+        // PTY may already be dead
+      }
       setTimeout(() => {
-        ptyProcess.kill();
+        try {
+          ptyProcess.kill(); // Kill the PTY adapter process (tmux attach), NOT the tmux session itself
+        } catch {
+          // Already dead
+        }
         activePtys.delete(sessionName);
-      }, 100);
+      }, 200);
     });
 
     ws.on('error', (err) => {
       console.error(`WebSocket error for ${sessionName}:`, err);
-      ptyProcess.kill();
+      try {
+        ptyProcess.kill();
+      } catch {
+        // Already dead
+      }
       activePtys.delete(sessionName);
     });
   })();
