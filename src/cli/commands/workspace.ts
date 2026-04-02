@@ -85,13 +85,14 @@ async function initializeWorkspaceBeads(workspacePath: string, issueId: string):
     const beadsVersion = await getBeadsVersion();
 
     if (beadsVersion >= 4701) {
-      // v0.47.1+ - Use shared database with workspace label
+      // v0.47.1+ - Use shared database with issue label for scoping
       // The worktree inherits .beads/redirect from main repo, which points to shared database
-      const workspaceLabel = `workspace:${issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
+      // Use bare issueId label (e.g. "pan-419") matching createBeadsFromVBrief and all query sites
+      const issueLabel = issueId.toLowerCase();
       const title = `${issueId.toUpperCase()}: Implementation`;
 
       const { stdout } = await execAsync(
-        `bd create --title "${title}" --priority 1 --type task --labels "${workspaceLabel}" 2>&1`,
+        `bd create --title "${title}" --priority 1 --type task --labels "${issueLabel}" 2>&1`,
         { cwd: workspacePath, encoding: 'utf-8' }
       );
 
