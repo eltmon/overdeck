@@ -3,6 +3,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { processEnvBlocks, processIfBlocks, substituteVariables } from '../template.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
+import { readWorkspacePlan } from '../vbrief/io.js';
+import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
 import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
@@ -398,6 +400,9 @@ export function readBeadsTasks(
   const stateContent = readPlanningContext(workspacePath);
   const beadsIds = stateContent ? extractBeadsIdsFromState(stateContent) : [];
 
+  // Load vBRIEF AC indexed by item title (lowercase) for per-bead injection
+  const acByTitle = buildACLookupByTitle(workspacePath);
+
   const beadsPaths = [
     join(workspacePath, '.beads', 'issues.jsonl'),
     join(projectRoot, '.beads', 'issues.jsonl'),
@@ -426,6 +431,13 @@ export function readBeadsTasks(
           if (isMatch) {
             seenIds.add(task.id);
             tasks.push(`- [${task.status || 'open'}] ${task.title} (${task.id})`);
+
+            // Inject per-bead AC from vBRIEF plan
+            const beadAC = matchBeadToAC(task.title, acByTitle);
+            for (const ac of beadAC) {
+              const check = ac.status === 'completed' ? 'x' : ' ';
+              tasks.push(`  - [${check}] AC: ${ac.title}`);
+            }
           }
         } catch {
           // Skip malformed lines
@@ -437,6 +449,44 @@ export function readBeadsTasks(
   }
 
   return tasks;
+}
+
+/**
+ * Build a lookup map from item title (lowercase) → AC sub-items.
+ * Used to match beads to their vBRIEF acceptance criteria.
+ */
+function buildACLookupByTitle(workspacePath: string): Map<string, Array<{ title: string; status: string }>> {
+  const lookup = new Map<string, Array<{ title: string; status: string }>>();
+  const doc = readWorkspacePlan(workspacePath);
+  if (!doc) return lookup;
+
+  const criteria = extractACFromDocument(doc);
+  for (const ac of criteria) {
+    const key = ac.itemTitle.toLowerCase();
+    let list = lookup.get(key);
+    if (!list) {
+      list = [];
+      lookup.set(key, list);
+    }
+    list.push({ title: ac.title, status: ac.status });
+  }
+
+  return lookup;
+}
+
+/**
+ * Match a bead title to its AC. Bead titles may have a plan ID prefix
+ * (e.g., "PAN-408: Create module") — strip it before matching.
+ */
+function matchBeadToAC(
+  beadTitle: string,
+  acByTitle: Map<string, Array<{ title: string; status: string }>>
+): Array<{ title: string; status: string }> {
+  if (acByTitle.size === 0 || !beadTitle) return [];
+
+  // Strip "PAN-XXX: " prefix if present
+  const stripped = beadTitle.replace(/^[A-Z]+-\d+:\s*/, '');
+  return acByTitle.get(stripped.toLowerCase()) || [];
 }
 
 /**
