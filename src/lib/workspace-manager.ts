@@ -256,6 +256,11 @@ function processTemplates(
         const content = readFileSync(sourcePath, 'utf-8');
         const processed = replacePlaceholders(content, placeholders);
         writeFileSync(targetPath, processed);
+        // Shell scripts need execute permission
+        const targetName = file.replace('.template', '');
+        if (targetName === 'dev' || targetName.endsWith('.sh')) {
+          chmodSync(targetPath, 0o755);
+        }
         steps.push(`Processed template: ${file}`);
       }
     }
