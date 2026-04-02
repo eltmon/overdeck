@@ -10125,11 +10125,15 @@ export PANOPTICON_SESSION_TYPE="planning"
 cd "${agentCwd}"
 prompt=$(cat "${promptFile}")
 trap '' HUP
+echo "[launcher] Claude starting at $(date)" >> /tmp/pan-launcher-debug.log
 ${cmdWithArgs} "$prompt"
+CLAUDE_EXIT=$?
+echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> /tmp/pan-launcher-debug.log
 # Keep session alive after Claude exits so user can review and click Done
 echo ""
 echo "Planning agent has exited. Session kept alive for review."
 echo "Click 'Done' in the dashboard when ready to hand off to implementation."
+echo "[launcher] Keep-alive loop starting at $(date)" >> /tmp/pan-launcher-debug.log
 while true; do sleep 60; done
 `, { mode: 0o755 });
 
@@ -10556,6 +10560,8 @@ app.delete('/api/planning/:issueId', async (req, res) => {
   const { issueId } = req.params;
   const sessionName = `planning-${issueId.toLowerCase()}`;
 
+  console.log(`[stop-planning] DELETE called for ${issueId} — killing session ${sessionName}`);
+
   try {
     // Kill tmux session
     await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
@@ -10914,6 +10920,12 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
   const { id } = req.params;
   const sessionName = `planning-${id.toLowerCase()}`;
   const issueLower = id.toLowerCase();
+
+  // DEBUG: trace who called complete-planning
+  console.log(`[complete-planning] CALLED for ${id}`);
+  console.log(`[complete-planning] Referer: ${req.headers.referer || 'NONE'}`);
+  console.log(`[complete-planning] User-Agent: ${(req.headers['user-agent'] || 'NONE').slice(0, 80)}`);
+  console.log(`[complete-planning] Origin: ${req.headers.origin || 'NONE'}`);
 
   try {
     // Check if this was a remote planning session
@@ -13511,49 +13523,54 @@ wss.on('connection', (ws: WebSocket, req) => {
       return;
     }
 
-    // Local sessions: use tmux capture-pane for output and send-keys for input.
-    // This avoids attaching a client to the tmux session, preventing the
-    // session-destruction bug where orphaned tmux-attach PTY processes accumulate
-    // and eventually kill the session on WebSocket disconnect/reconnect cycles.
+    // Local sessions use node-pty with tmux attach-session.
+    // This gives proper terminal emulation (ANSI escape sequences, cursor positioning).
+    activePtys.delete(sessionName);
 
-    let pollInterval: NodeJS.Timeout | null = null;
-    let lastCaptureHash = '';
-    let closed = false;
+    let ptyProcess: pty.IPty;
+    ptyProcess = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
+      name: 'xterm-256color',
+      cols: 120,
+      rows: 30,
+      cwd: homedir(),
+      env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
+    });
 
-    // Poll tmux capture-pane for output changes
-    const pollOutput = async () => {
-      if (closed) return;
-      try {
-        const { stdout } = await execAsync(
-          `tmux capture-pane -t "${sessionName}" -p -S -500 2>/dev/null || echo ""`,
-          { encoding: 'utf-8', timeout: 5000 }
-        );
+    activePtys.set(sessionName, ptyProcess);
 
-        // Only send if content changed
-        const hash = Buffer.from(stdout).toString('base64').slice(-100);
-        if (hash !== lastCaptureHash) {
-          lastCaptureHash = hash;
-          if (ws.readyState === WebSocket.OPEN) {
-            // Clear screen and redraw (ANSI escape: clear + home)
-            ws.send('\x1b[2J\x1b[H' + stdout);
-          }
-        }
-      } catch {
-        // Session may not exist yet or capture failed
+    // Forward PTY output to WebSocket
+    ptyProcess.onData((data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
       }
-    };
+    });
 
-    // Start polling at ~4 Hz for responsive feel
-    pollInterval = setInterval(pollOutput, 250);
-    // Initial capture
-    pollOutput();
+    // Handle PTY exit
+    ptyProcess.onExit(({ exitCode }) => {
+      console.log(`PTY for ${sessionName} exited with code ${exitCode}`);
+      activePtys.delete(sessionName);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1000, 'Session ended');
+      }
+    });
 
-    // Handle resize
+    // Track last resize to debounce/dedupe
+    let lastResizeCols = 120;
+    let lastResizeRows = 30;
+
+    // Set up message handler for local sessions (using the buffered message pattern)
     const handleLocalMessage = (message: string) => {
+      // Handle resize messages
       if (message.startsWith('{')) {
         try {
           const parsed = JSON.parse(message);
           if (parsed.type === 'resize' && parsed.cols && parsed.rows) {
+            if (parsed.cols === lastResizeCols && parsed.rows === lastResizeRows) {
+              return;
+            }
+            lastResizeCols = parsed.cols;
+            lastResizeRows = parsed.rows;
+            ptyProcess.resize(parsed.cols, parsed.rows);
             execAsync(`tmux resize-window -t ${sessionName} -x ${parsed.cols} -y ${parsed.rows} 2>/dev/null || true`)
               .catch(() => {});
             return;
@@ -13563,72 +13580,26 @@ wss.on('connection', (ws: WebSocket, req) => {
         }
       }
 
-      // Send input to tmux via send-keys (no client attachment needed)
-      // Use load-buffer + paste-buffer for text, send-keys for control sequences
-      if (message.length === 1 && message.charCodeAt(0) < 32) {
-        // Control character — send directly
-        const keyName = message === '\r' ? 'Enter'
-          : message === '\x1b' ? 'Escape'
-          : message === '\x7f' ? 'BSpace'
-          : message === '\x03' ? 'C-c'
-          : message === '\x04' ? 'C-d'
-          : message === '\x09' ? 'Tab'
-          : null;
-        if (keyName) {
-          execAsync(`tmux send-keys -t "${sessionName}" ${keyName} 2>/dev/null || true`)
-            .catch(() => {});
-        } else {
-          // Other control chars
-          execAsync(`tmux send-keys -t "${sessionName}" -l "${message.replace(/"/g, '\\"')}" 2>/dev/null || true`)
-            .catch(() => {});
-        }
-      } else if (message.startsWith('\x1b[')) {
-        // ANSI escape sequence (arrow keys, etc.)
-        const keyMap: Record<string, string> = {
-          '\x1b[A': 'Up', '\x1b[B': 'Down', '\x1b[C': 'Right', '\x1b[D': 'Left',
-          '\x1b[H': 'Home', '\x1b[F': 'End',
-          '\x1b[5~': 'PageUp', '\x1b[6~': 'PageDown',
-          '\x1b[3~': 'DC', // Delete
-        };
-        const key = keyMap[message];
-        if (key) {
-          execAsync(`tmux send-keys -t "${sessionName}" ${key} 2>/dev/null || true`)
-            .catch(() => {});
-        }
-      } else {
-        // Regular text — use load-buffer + paste-buffer for reliability
-        const tmpFile = `/tmp/tmux-input-${sessionName}-${Date.now()}`;
-        const { writeFileSync, unlinkSync } = require('fs');
-        try {
-          writeFileSync(tmpFile, message);
-          execAsync(`tmux load-buffer "${tmpFile}" && tmux paste-buffer -t "${sessionName}" && rm -f "${tmpFile}" 2>/dev/null || rm -f "${tmpFile}"`)
-            .catch(() => { try { unlinkSync(tmpFile); } catch {} });
-        } catch {
-          // Fall back to send-keys -l
-          execAsync(`tmux send-keys -t "${sessionName}" -l "${message.replace(/"/g, '\\"')}" 2>/dev/null || true`)
-            .catch(() => {});
-        }
-      }
+      ptyProcess.write(message);
     };
 
-    // Set the message handler and process buffered messages
+    // Set the message handler and process any buffered early messages
     messageHandler = handleLocalMessage;
     for (const msg of earlyMessages) {
       handleLocalMessage(msg);
     }
     earlyMessages.length = 0;
 
-    // Clean up on WebSocket close — just stop polling. No tmux client to kill.
+    // Clean up on WebSocket close — do NOT kill the PTY, just remove from tracking.
+    // The PTY (tmux attach) will exit naturally when pipes close.
     ws.on('close', () => {
       console.log(`WebSocket closed for session: ${sessionName}`);
-      closed = true;
-      if (pollInterval) clearInterval(pollInterval);
+      activePtys.delete(sessionName);
     });
 
     ws.on('error', (err) => {
       console.error(`WebSocket error for ${sessionName}:`, err);
-      closed = true;
-      if (pollInterval) clearInterval(pollInterval);
+      activePtys.delete(sessionName);
     });
   })();
 });
