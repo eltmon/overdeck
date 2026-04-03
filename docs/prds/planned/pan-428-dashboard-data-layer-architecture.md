@@ -579,8 +579,7 @@ Each bead creates ONE route file. **See full pattern, instructions, and assignme
 - `package.json` scripts — Update `build:dashboard:server` for tsdown
 
 **Creates:**
-- `src/dashboard/server/services/` — Effect service wrappers needed by multiple route modules
-- Background fiber layers: IssuePoller, Deacon, DockerStats, Cloister
+- Background fiber layers: IssuePoller, Deacon, DockerStats, Cloister (long-running Effect fibers that poll external systems and emit events to the store)
 
 **Does:**
 - Wire all B6–B17 route layers into server.ts
@@ -724,7 +723,7 @@ export const {category}Routes = Layer.mergeAll(list, /* ... */);
 
 | Express | Effect |
 |---------|--------|
-| `req.params.id` | `HttpServerRequest.params(request).id` |
+| `req.params.id` | `HttpServerRequest.params(request).id` (if params API unavailable, parse URL: `url.pathname.split('/')[3]`) |
 | `req.query.foo` | `HttpServerRequest.toURL(request)` → `url.searchParams.get('foo')` |
 | `req.body` | `yield* HttpServerRequest.bodyJson(request)` |
 | `res.json(data)` | `HttpServerResponse.json(data)` |
@@ -825,26 +824,56 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 
 ## RPC Methods
 
-### Streaming
+### Streaming (server → client)
 | Method | Input | Output | Description |
 |--------|-------|--------|-------------|
 | `pan.subscribeDomainEvents` | `{}` | `Stream<DomainEvent>` | All events, sequence-ordered with replay |
-| `pan.subscribeTerminal` | `{ sessionName, cols, rows }` | `Stream<TerminalChunk>` | Live PTY output |
-| `pan.subscribeAgentOutput` | `{ agentId }` | `Stream<OutputLine>` | Agent log tail |
+| `pan.subscribeTerminal` | `{ sessionName, cols, rows, location? }` | `Stream<TerminalChunk>` | Live PTY output (initial cols/rows replace the current "first resize" trigger) |
+| `pan.subscribeAgentOutput` | `{ agentId }` | `Stream<OutputLine>` | Agent log tail (passive, no input) |
 
-### Unary
+### Unary (request → response)
 | Method | Input | Output | Description |
 |--------|-------|--------|-------------|
-| `pan.getSnapshot` | `{}` | `DashboardSnapshot` | Full state for cold start |
+| `pan.getSnapshot` | `{}` | `DashboardSnapshot` | Full state for cold start (see type below) |
 | `pan.replayEvents` | `{ fromSequence }` | `DomainEvent[]` | Missed events for recovery |
-| `pan.getWorkspaceDetail` | `{ issueId }` | `WorkspaceDetail` | Batched detail panel data |
+| `pan.getWorkspaceDetail` | `{ issueId }` | `WorkspaceDetail` | Batched detail panel data (see type below) |
+| `pan.sendTerminalInput` | `{ sessionName, data }` | `void` | Send keystrokes to PTY (client → server input channel) |
+| `pan.resizeTerminal` | `{ sessionName, cols, rows }` | `void` | Resize PTY + tmux window |
 
-### Commands
+### Commands (mutations)
 | Method | Input | Output | Description |
 |--------|-------|--------|-------------|
 | `pan.startPlanning` | `{ issueId, location, shadow? }` | `{ sessionName }` | Launch planning |
 | `pan.startAgent` | `{ issueId }` | `{ agentId }` | Launch implementation |
 | `pan.deepWipe` | `{ issueId, deleteWorkspace? }` | `{ cleanupLog }` | Wipe workspace |
+
+### Key Type Definitions
+
+**`DashboardSnapshot`** — returned by `getSnapshot`, contains the full read model:
+```typescript
+{
+  issues: Issue[],           // All issues from all trackers
+  agents: Agent[],           // All agent states (running, stopped, etc.)
+  specialists: Specialist[], // Current specialist pool
+  cloisterStatus: CloisterStatus, // Pause state, config, active count
+  costs: Record<string, IssueCost>, // Cost by issue identifier
+  containers: ContainerStats[], // Current Docker container states
+  snapshotSequence: number,  // Latest event sequence included in this snapshot
+}
+```
+
+**`WorkspaceDetail`** — batched replacement for the 5 separate detail-panel queries:
+```typescript
+{
+  workspace: WorkspaceInfo,        // path, branch, type, containers
+  reviewStatus: ReviewStatus,       // review/test/merge pipeline state
+  planning: PlanningInfo | null,    // STATE.md, PRD link, plan status
+  costs: IssueCostData,            // cost breakdown by stage/model
+  agentOutput: string[],           // last 200 lines of agent output
+}
+```
+
+**Why `sendTerminalInput` and `resizeTerminal` are separate unary RPCs:** Effect RPC streaming is server→client only. The current raw WebSocket handles terminal bidirectionally (keystrokes go client→server on the same connection). In the new model, `subscribeTerminal` streams PTY output server→client, while `sendTerminalInput` sends keystrokes client→server as unary RPC calls over the same multiplexed WebSocket. This is the same connection — no extra HTTP, no extra sockets. The overhead is negligible (keystrokes arrive in batches, not individual bytes).
 
 ---
 
