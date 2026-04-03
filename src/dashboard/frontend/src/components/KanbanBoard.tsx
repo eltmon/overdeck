@@ -562,7 +562,7 @@ export function ListIssueRow({
   onSelectIssue: (id: string | null) => void;
   onPlan: (issue: Issue) => void;
 }) {
-  const isSelected = selectedIssue === issue.id;
+  const isSelected = selectedIssue === issue.identifier;
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -601,7 +601,7 @@ export function ListIssueRow({
   return (
     <div
       ref={rowRef}
-      onClick={() => onSelectIssue(isSelected ? null : issue.id)}
+      onClick={() => onSelectIssue(isSelected ? null : issue.identifier)}
       className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-overlay/50 transition-colors cursor-pointer ${
         isSelected ? 'bg-surface-overlay' : ''
       }`}
@@ -686,7 +686,7 @@ export function ListIssueRow({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onSelectIssue(issue.id);
+            onSelectIssue(issue.identifier);
           }}
           className="p-1 text-content-subtle hover:text-content transition-colors"
           title="View details"

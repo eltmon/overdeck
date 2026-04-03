@@ -201,6 +201,7 @@ export default function App() {
     ? issues.find((i) => i.identifier.toLowerCase() === selectedIssue.toLowerCase())
     : null;
 
+
   const handleConfirm = useCallback(async () => {
     if (!currentConfirmation) return;
     try {
