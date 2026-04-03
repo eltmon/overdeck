@@ -121,8 +121,8 @@ export async function buildInspectPrompt(context: InspectContext): Promise<strin
   const beadDescription = await getBeadDescription(context.beadId, context.workspace);
 
   // Get diff scope
-  const diffBase = getDiffBase(context.projectKey, context.issueId, context.workspace);
-  const diffStats = getDiffStats(context.workspace, diffBase);
+  const diffBase = await getDiffBase(context.projectKey, context.issueId, context.workspace);
+  const diffStats = await getDiffStats(context.workspace, diffBase);
   const compileCommand = detectCompileCommand(context.workspace);
 
   const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
@@ -177,15 +177,15 @@ export async function spawnInspectAgent(context: InspectContext): Promise<{
  * Handle inspect completion — called when the inspect specialist signals done.
  * Saves checkpoint on PASS.
  */
-export function onInspectComplete(
+export async function onInspectComplete(
   projectKey: string,
   issueId: string,
   beadId: string,
   status: 'passed' | 'failed',
   workspacePath: string
-): void {
+): Promise<void> {
   if (status === 'passed') {
-    const commitSha = getCurrentHead(workspacePath);
+    const commitSha = await getCurrentHead(workspacePath);
     saveCheckpoint(projectKey, issueId, beadId, commitSha);
     console.log(`[inspect] Checkpoint saved for ${issueId} bead ${beadId} at ${commitSha.substring(0, 8)}`);
 

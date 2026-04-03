@@ -10,7 +10,10 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const PANOPTICON_HOME = join(homedir(), '.panopticon');
 
@@ -101,7 +104,7 @@ export function saveCheckpoint(
  *
  * Returns the commit SHA or ref to diff from.
  */
-export function getDiffBase(projectKey: string, issueId: string, workspacePath: string): string {
+export async function getDiffBase(projectKey: string, issueId: string, workspacePath: string): Promise<string> {
   const lastCheckpoint = getLastCheckpoint(projectKey, issueId);
 
   if (lastCheckpoint) {
@@ -110,11 +113,11 @@ export function getDiffBase(projectKey: string, issueId: string, workspacePath: 
 
   // No checkpoint — use the merge-base with main
   try {
-    const mergeBase = execSync('git merge-base main HEAD', {
+    const { stdout } = await execAsync('git merge-base main HEAD', {
       cwd: workspacePath,
       encoding: 'utf-8',
-    }).trim();
-    return mergeBase;
+    });
+    return stdout.trim();
   } catch {
     // Fallback to 'main' if merge-base fails
     return 'main';
@@ -124,13 +127,13 @@ export function getDiffBase(projectKey: string, issueId: string, workspacePath: 
 /**
  * Get the diff stats (files changed, insertions, deletions) for the inspection scope.
  */
-export function getDiffStats(workspacePath: string, diffBase: string): string {
+export async function getDiffStats(workspacePath: string, diffBase: string): Promise<string> {
   try {
-    const stats = execSync(`git diff --stat ${diffBase}...HEAD`, {
+    const { stdout } = await execAsync(`git diff --stat ${diffBase}...HEAD`, {
       cwd: workspacePath,
       encoding: 'utf-8',
-    }).trim();
-    return stats || 'No changes detected';
+    });
+    return stdout.trim() || 'No changes detected';
   } catch {
     return 'Unable to compute diff stats';
   }
@@ -139,12 +142,13 @@ export function getDiffStats(workspacePath: string, diffBase: string): string {
 /**
  * Get the current HEAD commit SHA.
  */
-export function getCurrentHead(workspacePath: string): string {
+export async function getCurrentHead(workspacePath: string): Promise<string> {
   try {
-    return execSync('git rev-parse HEAD', {
+    const { stdout } = await execAsync('git rev-parse HEAD', {
       cwd: workspacePath,
       encoding: 'utf-8',
-    }).trim();
+    });
+    return stdout.trim();
   } catch {
     return 'unknown';
   }

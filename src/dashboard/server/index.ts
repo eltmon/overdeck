@@ -15652,10 +15652,10 @@ server.listen(PORT, '0.0.0.0', async () => {
   // the server was running a stale build without them.
   try {
     const { statSync } = await import('fs');
-    const { execSync } = await import('child_process');
     const serverJsPath = join(__dirname, 'server.js');
     const serverJsStat = statSync(serverJsPath);
-    const latestCommitTime = execSync('git log -1 --format=%ct', { cwd: join(__dirname, '..', '..'), encoding: 'utf-8' }).trim();
+    const { stdout: latestCommitRaw } = await execAsync('git log -1 --format=%ct', { cwd: join(__dirname, '..', '..'), encoding: 'utf-8' });
+    const latestCommitTime = latestCommitRaw.trim();
     const commitDate = new Date(parseInt(latestCommitTime, 10) * 1000);
     if (serverJsStat.mtime < commitDate) {
       const staleSecs = Math.round((commitDate.getTime() - serverJsStat.mtime.getTime()) / 1000);
