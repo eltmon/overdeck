@@ -671,7 +671,10 @@ Preserves deferred-spawn (PAN-417), stale-data suppression (200ms), dimension-to
 - [ ] `npm run dev` script — update to `bun run` with new entry point
 - [ ] `npm link` / `pan` CLI — verify `dist/` output is correct for npm consumers
 
+**Version bump:** `0.5.x` → `0.6.0` — this is a major architectural milestone (Express → Effect.js), not a patch.
+
 **Modifies:**
+- `package.json` — version to `0.6.0`
 - `CLAUDE.md` — Update architecture section for Effect.js + Bun
 - `docs/INDEX.md` — Update references
 
