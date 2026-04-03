@@ -250,17 +250,18 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
   const titlePattern = `${doc.plan.id}: ${item.title}`.toLowerCase();
   const matchedBead = beads.find(b => (b.title || b.name || '').toLowerCase() === titlePattern);
 
-  const blockerIds = doc.plan.edges
-    .filter(e => e.type === 'blocks' && e.to === item.id)
-    .map(e => e.from);
-  const dependentIds = doc.plan.edges
-    .filter(e => e.type === 'blocks' && e.from === item.id)
-    .map(e => e.to);
+  // All incoming edges (this item is the target)
+  const incomingEdges = doc.plan.edges.filter(e => e.to === item.id);
+  // All outgoing edges (this item is the source)
+  const outgoingEdges = doc.plan.edges.filter(e => e.from === item.id);
 
-  const blockerItems = blockerIds.map(id => doc.plan.items.find(i => i.id === id)).filter(Boolean) as VBriefItem[];
-  const dependentItems = dependentIds.map(id => doc.plan.items.find(i => i.id === id)).filter(Boolean) as VBriefItem[];
+  const itemById = (id: string) => doc.plan.items.find(i => i.id === id);
 
   const acs = (item.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion');
+  const completedAcs = acs.filter(s => s.status === 'completed').length;
+
+  // All narrative fields (not just Action)
+  const narrativeEntries = item.narrative ? Object.entries(item.narrative) : [];
 
   return (
     <div className="p-2 rounded border border-divider bg-surface-raised/50 text-xs space-y-2">
@@ -293,14 +294,20 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
         </div>
       )}
 
-      {/* Narrative */}
-      {item.narrative?.Action && (
-        <div className="text-content-muted leading-relaxed">{item.narrative.Action}</div>
-      )}
+      {/* Narrative fields */}
+      {narrativeEntries.map(([key, value]) => value ? (
+        <div key={key} className="space-y-0.5">
+          <div className="text-[9px] font-medium uppercase tracking-wide text-content-subtle">{key}</div>
+          <div className="text-content-muted leading-relaxed">{value}</div>
+        </div>
+      ) : null)}
 
-      {/* Acceptance criteria */}
+      {/* Acceptance criteria with progress counter */}
       {acs.length > 0 && (
         <div className="space-y-0.5">
+          <div className="text-[9px] font-medium uppercase tracking-wide text-content-subtle">
+            Criteria ({completedAcs}/{acs.length} met)
+          </div>
           {acs.map(s => (
             <div key={s.id} className="flex items-start gap-1 text-[10px] text-content-subtle">
               {s.status === 'completed'
@@ -312,19 +319,28 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
         </div>
       )}
 
-      {/* Blockers */}
-      {blockerItems.length > 0 && (
-        <div className="text-[10px] text-orange-400/80">
-          <span className="font-medium">Blocked by: </span>
-          {blockerItems.map(b => b.title).join(', ')}
-        </div>
-      )}
-
-      {/* Dependents */}
-      {dependentItems.length > 0 && (
-        <div className="text-[10px] text-content-subtle">
-          <span className="font-medium">Blocks: </span>
-          {dependentItems.map(d => d.title).join(', ')}
+      {/* Edge context — all incoming/outgoing edges */}
+      {(incomingEdges.length > 0 || outgoingEdges.length > 0) && (
+        <div className="space-y-0.5">
+          <div className="text-[9px] font-medium uppercase tracking-wide text-content-subtle">Dependencies</div>
+          {incomingEdges.map((e, i) => {
+            const source = itemById(e.from);
+            return source ? (
+              <div key={`in-${i}`} className="text-[10px] text-content-subtle">
+                <span className="text-blue-400/80">← {e.type}</span>
+                {' '}{source.title}
+              </div>
+            ) : null;
+          })}
+          {outgoingEdges.map((e, i) => {
+            const target = itemById(e.to);
+            return target ? (
+              <div key={`out-${i}`} className="text-[10px] text-content-subtle">
+                <span className="text-orange-400/80">→ {e.type}</span>
+                {' '}{target.title}
+              </div>
+            ) : null;
+          })}
         </div>
       )}
     </div>
