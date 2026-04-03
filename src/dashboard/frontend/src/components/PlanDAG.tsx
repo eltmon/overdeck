@@ -203,6 +203,16 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
             {DIFFICULTY_LABELS[difficulty] ?? difficulty}
           </span>
         )}
+        {/* AC progress badge — always visible when node has ACs */}
+        {acs.length > 0 && (
+          <span style={{
+            fontSize: 9, background: '#1e3a5f', color: '#93c5fd',
+            borderRadius: 3, padding: '1px 4px', fontWeight: 600,
+            border: '1px solid #3b82f6',
+          }}>
+            {acs.filter(s => s.status === 'completed').length}/{acs.length} AC
+          </span>
+        )}
       </div>
       {/* Inline AC checklist (shown when showAC toggle is on) */}
       {showAC && acs.length > 0 && (
