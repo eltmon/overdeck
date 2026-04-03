@@ -1,0 +1,350 @@
+{
+  "vBRIEFInfo": { "version": "0.5", "created": "2026-04-03T12:00:00Z" },
+  "plan": {
+    "id": "PAN-428",
+    "title": "Dashboard data layer: consolidate polling, push-first architecture",
+    "status": "approved",
+    "author": "plan",
+    "tags": ["architecture", "effect-js", "performance", "dashboard", "migration"],
+    "narratives": {
+      "Problem": "Dashboard takes 5-20+ seconds to open workspace detail panels due to 80+ HTTP requests/minute from aggressive, duplicated polling. Three independent /api/issues fetches (1.3MB each) with different React Query keys saturate the browser's 6-connection HTTP/1.1 limit. The 15,793-line monolithic Express server compounds the problem with three uncoordinated transport paradigms.",
+      "Proposal": "Full Effect.js migration: replace Express + socket.io with Effect HTTP server + WebSocket RPC. Bun as package manager + dev runtime, shared contracts package, SQLite event store with PubSub, Zustand store on frontend with pure event reducers. 12 route modules replacing the monolith, parallelized across 12 agents.",
+      "Constraint": "API response shapes must be preserved exactly (same URLs, JSON, status codes). src/lib/* modules stay as-is — only wrapped in Effect services. Effect 4.0.0-beta.43 pinned exactly. Node 22 remains production runtime. No new features — pure architectural migration.",
+      "Risk": "Effect 4.x is beta (mitigated by T3Code canary + exact version pin). 185 routes is large scope (mitigated by 12 parallel agents with isolated files). node-pty incompatible with Bun (mitigated by dual-runtime PTY). Frontend regression risk (mitigated by preserved API shapes + Playwright E2E).",
+      "Alternative": "Incremental approach (fix polling without framework migration) was rejected — the monolithic Express file and three transport paradigms are the structural root cause. Partial migration (keep Express, add Effect for new routes) was rejected — two frameworks in one server doubles complexity."
+    },
+    "items": [
+      {
+        "id": "b0-toolchain",
+        "title": "B0: Toolchain Setup — Bun, workspaces, contracts scaffold",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Switch package manager to Bun, create packages/contracts/ workspace package scaffold, configure bunfig.toml, update root package.json with Bun workspaces and Effect version catalog. Verify bun install, bun run build, and bun test all pass with zero regressions." },
+        "subItems": [
+          { "id": "b0-toolchain.bun-install", "title": "bun install succeeds and generates bun.lock", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b0-toolchain.build-works", "title": "bun run build produces working CLI and dashboard", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b0-toolchain.tests-pass", "title": "bun test passes all existing tests", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b0-toolchain.contracts-resolvable", "title": "packages/contracts/ exists and is resolvable as @panopticon/contracts", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b1-contracts",
+        "title": "B1: Contracts Package — event schemas, RPC definitions, shared types",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create packages/contracts/src/ with events.ts (25 domain event Schema definitions), rpc.ts (RPC method + group definitions for streaming, unary, and command methods), types.ts (Issue, Agent, Specialist, Workspace, Cost schemas), and index.ts re-exports. Follow T3Code packages/contracts/src/rpc.ts patterns." },
+        "subItems": [
+          { "id": "b1-contracts.typecheck", "title": "bun run --filter @panopticon/contracts typecheck passes", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b1-contracts.event-coverage", "title": "Event schemas cover all 13 current socket.io events mapped to ~25 domain events", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b1-contracts.rpc-group", "title": "RPC group includes all 9 methods from PRD spec", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b1-contracts.importable", "title": "Server and frontend can both import from @panopticon/contracts", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b2-event-store",
+        "title": "B2: Event Store — SQLite-backed append-only store with PubSub",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/event-store.ts with SQLite-backed event persistence (events table in existing panopticon.db), in-memory PubSub for live streaming, monotonic sequence counter, dual-runtime SQLite (Bun native / better-sqlite3), 7-day retention with startup compaction, and schema migrations." },
+        "subItems": [
+          { "id": "b2-event-store.persistence", "title": "Events persist across server restarts", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b2-event-store.read-from", "title": "readFrom(N) returns only events with sequence > N", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b2-event-store.live-stream", "title": "liveStream delivers events in real-time via PubSub", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b2-event-store.monotonic", "title": "Sequence numbers are gap-free and monotonic", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b2-event-store.dual-runtime", "title": "Works on both Bun and Node runtimes", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b2-event-store.unit-tests", "title": "Unit tests for append, read, stream, restart recovery", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b3-config",
+        "title": "B3: ServerConfig Service — Effect service wrapping env vars and config",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/config.ts wrapping env vars (~/.panopticon.env), projects.yaml, and CLI flags as an Effect service. Replace inline env loading from current index.ts." },
+        "subItems": [
+          { "id": "b3-config.env-access", "title": "All env vars currently used by index.ts accessible via yield* ServerConfig", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b3-config.typed-errors", "title": "Missing required vars produce typed errors, not runtime crashes", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b4-frontend-transport",
+        "title": "B4: Frontend Transport + Zustand Store + Recovery Coordinator",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create frontend transport layer (WsTransport with auto-reconnect, RpcClient), Zustand DashboardState store with pure event reducers, selectors, recovery coordinator for sequence gaps, and EventRouter root subscriber component. Follow T3Code apps/web/src/wsTransport.ts, store.ts, orchestrationRecovery.ts patterns." },
+        "subItems": [
+          { "id": "b4-frontend-transport.ws-connect", "title": "WsTransport connects to /ws/rpc and auto-reconnects with exponential backoff", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b4-frontend-transport.snapshot", "title": "Store receives snapshot on connect, applies events incrementally", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b4-frontend-transport.recovery", "title": "Recovery coordinator detects sequence gaps and triggers replay", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b4-frontend-transport.coalescing", "title": "Event coalescing batches rapid events via queueMicrotask", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b4-frontend-transport.selectors", "title": "Selectors return correct filtered views", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b4-frontend-transport.unit-tests", "title": "Unit tests for every event reducer and selector", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b5-server-skeleton",
+        "title": "B5: Server Skeleton + RPC + Shared Services",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "expert", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create Effect.js server entry (main.ts, server.ts with dual-runtime HTTP), WebSocket RPC handlers (ws-rpc.ts with subscribeDomainEvents, getSnapshot, replayEvents), static file serving, health route, CORS/JSON middleware, and all shared Effect service wrappers (AgentManager, WorkspaceManager, SpecialistService, CostService, DockerStatsService). Follow T3Code apps/server/src/server.ts and ws.ts patterns." },
+        "subItems": [
+          { "id": "b5-server-skeleton.bun-starts", "title": "bun run src/dashboard/server/main.ts starts and listens on port 3011", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b5-server-skeleton.node-starts", "title": "node dist/server/index.mjs also starts (dual-runtime)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b5-server-skeleton.health", "title": "curl http://localhost:3011/api/health returns { status: ok }", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b5-server-skeleton.static", "title": "Frontend static files served at /", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b5-server-skeleton.ws-rpc", "title": "WebSocket connects at /ws/rpc and subscribeDomainEvents streams events", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b5-server-skeleton.cors", "title": "CORS headers present on API responses", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b5-server-skeleton.services-compile", "title": "All service wrappers compile and export valid Effect services", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b6-issues-routes",
+        "title": "B6: Route Module — issues.ts (17 routes)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/issues.ts converting all 17 /api/issues routes from Express to Effect HttpRouter.add(). Wrap existing lib calls in Effect.tryPromise(), replace socketIo.emit with eventStore.append(), export issuesRoutes Layer." },
+        "subItems": [
+          { "id": "b6-issues-routes.all-routes", "title": "All 17 /api/issues routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b6-issues-routes.events", "title": "Socket.io emits replaced with eventStore.append() per mapping table", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b6-issues-routes.no-execsync", "title": "No execSync in any handler", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b7-agents-routes",
+        "title": "B7: Route Module — agents.ts (20 routes)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/agents.ts converting all 20 /api/agents routes. Includes start/stop/deep-wipe/messaging/output/health endpoints. Wrap lib/agents.ts calls in Effect, emit agent lifecycle events." },
+        "subItems": [
+          { "id": "b7-agents-routes.all-routes", "title": "All 20 /api/agents routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b7-agents-routes.events", "title": "Agent lifecycle events emitted to event store", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b7-agents-routes.no-execsync", "title": "No execSync in any handler", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b8-workspaces-routes",
+        "title": "B8: Route Module — workspaces.ts (19 routes)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/workspaces.ts converting all 19 /api/workspaces routes. Includes workspace creation, containerization, detail fetching. Emit workspace lifecycle events." },
+        "subItems": [
+          { "id": "b8-workspaces-routes.all-routes", "title": "All 19 /api/workspaces routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b8-workspaces-routes.events", "title": "Workspace lifecycle events emitted to event store", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b9-specialists-routes",
+        "title": "B9: Route Module — specialists.ts (33 routes)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/specialists.ts converting all 33 /api/specialists routes. Largest route module — covers specialist lifecycle, handoffs, pipeline status, review/test/merge flow. Critical idempotency guards (PAN-328) must be preserved." },
+        "subItems": [
+          { "id": "b9-specialists-routes.all-routes", "title": "All 33 /api/specialists routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b9-specialists-routes.idempotency", "title": "postMergeLifecycle idempotency guards preserved (PAN-328)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b9-specialists-routes.events", "title": "Pipeline and specialist events emitted to event store", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b10-costs-routes",
+        "title": "B10: Route Module — costs.ts (11 routes)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/costs.ts converting all 11 /api/costs routes. Includes cost streaming, reconciliation, WAL sync, trends." },
+        "subItems": [
+          { "id": "b10-costs-routes.all-routes", "title": "All 11 /api/costs routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b10-costs-routes.events", "title": "Cost events emitted to event store", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b11-cloister-routes",
+        "title": "B11: Route Module — cloister.ts (9 routes)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/cloister.ts converting all 9 /api/cloister routes. Includes start/stop/config/status for the Cloister service." },
+        "subItems": [
+          { "id": "b11-cloister-routes.all-routes", "title": "All 9 /api/cloister routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b12-resources-routes",
+        "title": "B12: Route Module — resources.ts (8 routes)",
+        "status": "pending",
+        "priority": "low",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/resources.ts converting all 8 /api/resources routes. Docker container/volume/network management." },
+        "subItems": [
+          { "id": "b12-resources-routes.all-routes", "title": "All 8 /api/resources routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b13-mission-control-routes",
+        "title": "B13: Route Module — mission-control.ts (7 routes)",
+        "status": "pending",
+        "priority": "low",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/mission-control.ts converting all 7 /api/mission-control routes. Planning and activity tracking." },
+        "subItems": [
+          { "id": "b13-mission-control-routes.all-routes", "title": "All 7 /api/mission-control routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b14-remote-routes",
+        "title": "B14: Route Module — remote.ts (9 routes)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "medium", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/remote.ts converting all 9 /api/remote routes. Remote workspace management via Fly.io SSH." },
+        "subItems": [
+          { "id": "b14-remote-routes.all-routes", "title": "All 9 /api/remote routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b15-settings-routes",
+        "title": "B15: Route Module — settings.ts (6 routes)",
+        "status": "pending",
+        "priority": "low",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/settings.ts converting all 6 /api/settings routes. Configuration, model availability, API key validation." },
+        "subItems": [
+          { "id": "b15-settings-routes.all-routes", "title": "All 6 /api/settings routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b16-metrics-convoys-routes",
+        "title": "B16: Route Module — metrics.ts + convoys.ts (11 routes)",
+        "status": "pending",
+        "priority": "low",
+        "metadata": { "difficulty": "simple", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/metrics.ts and routes/convoys.ts converting all 11 /api/metrics and /api/convoys routes. Runtime comparisons, task analytics, convoy orchestration." },
+        "subItems": [
+          { "id": "b16-metrics-convoys-routes.all-routes", "title": "All 11 /api/metrics and /api/convoys routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b17-misc-routes",
+        "title": "B17: Route Module — misc.ts (35 routes)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create src/dashboard/server/routes/misc.ts converting all 35 remaining routes: activity, confirmations, tracker-status, handoffs, shadow, planning, deacon, skills, version, godview, rally, project-mappings, services, registered-projects, cache-status." },
+        "subItems": [
+          { "id": "b17-misc-routes.all-routes", "title": "All 35 misc routes respond with same shapes as Express version", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b17-misc-routes.events", "title": "Planning and pipeline events emitted to event store where applicable", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b18-integration",
+        "title": "B18: Integration — wire routes, build, full test suite",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "expert", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Wire all 12+ route layers into server.ts makeRoutesLayer. Create background fiber layers (IssuePoller, Deacon, DockerStats, Cloister). Update build config for tsdown entry point. Run full test suite — all 223 tests must pass. Smoke test all 185 routes." },
+        "subItems": [
+          { "id": "b18-integration.build", "title": "bun run build succeeds", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b18-integration.tests-pass", "title": "All existing tests pass (223/223)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b18-integration.routes-respond", "title": "Server starts and all 185 routes respond correctly", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b18-integration.ws-rpc", "title": "WebSocket RPC streams events to connected clients", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b18-integration.fibers", "title": "Background processes (issue polling, deacon) run as Effect fibers", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b19-frontend-migration",
+        "title": "B19: Frontend Component Migration — React Query → Zustand store",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Migrate App.tsx, KanbanBoard, InspectorPanel, SearchModal, AgentList, CloisterStatusBar, MetricsSummaryRow from React Query polling to Zustand store selectors. Delete useSocketIssues.ts, IssueDetailPanel.tsx (dead code), WorkspacePanel.tsx (dead code)." },
+        "subItems": [
+          { "id": "b19-frontend-migration.kanban-store", "title": "KanbanBoard renders from store selectors, zero /api/issues HTTP polling", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b19-frontend-migration.detail-panel-speed", "title": "Detail panel opens in <1 second (Playwright)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b19-frontend-migration.http-reduction", "title": "HTTP requests from kanban board: <5/minute", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b19-frontend-migration.fe-tests", "title": "All frontend tests pass", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b20-terminal-rpc",
+        "title": "B20: Terminal Streaming RPC — dual-runtime PTY",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "expert", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Create terminal-service.ts with dual-runtime PTY (Bun.spawn on Linux, node-pty on Node). Add subscribeTerminal and subscribeAgentOutput RPCs to ws-rpc.ts. Migrate XTerminal.tsx from raw WebSocket to rpcClient.subscribeTerminal(), TerminalPanel.tsx from HTTP polling to rpcClient.subscribeAgentOutput(). Preserve deferred-spawn (PAN-417), stale-data suppression, remote terminal (Fly.io) support." },
+        "subItems": [
+          { "id": "b20-terminal-rpc.interactive", "title": "Interactive terminal (XTerminal) works via RPC stream — input, resize, deferred spawn", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b20-terminal-rpc.passive", "title": "Passive log viewer (TerminalPanel) works via RPC stream — no HTTP polling", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b20-terminal-rpc.dual-runtime", "title": "Works on both Bun (dev) and Node (production) runtimes", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b20-terminal-rpc.remote", "title": "Remote terminal (Fly.io) works via same stream interface", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b20-terminal-rpc.multiplexed", "title": "Multiple terminals open simultaneously on one WebSocket", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b20-terminal-rpc.cleanup", "title": "PTY cleanup on disconnect, deferred spawn + stale data suppression preserved", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      },
+      {
+        "id": "b21-cleanup",
+        "title": "B21: Cleanup + Playwright Verification + Version Bump",
+        "status": "pending",
+        "priority": "high",
+        "metadata": { "difficulty": "complex", "issueLabel": "pan-428" },
+        "narrative": { "Action": "Delete src/dashboard/server/index.ts (15,793 lines), package-lock.json. Remove express, cors, socket.io, ws, socket.io-client from dependencies. Update dist path references in CLI, build configs, dev scripts. Update CLAUDE.md and docs. Version bump to 0.6.0. Run full Playwright E2E verification suite." },
+        "subItems": [
+          { "id": "b21-cleanup.index-deleted", "title": "src/dashboard/server/index.ts deleted (15,793 lines removed)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b21-cleanup.deps-removed", "title": "express, cors, socket.io, ws removed from dependencies", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b21-cleanup.dashboard-loads", "title": "Dashboard loads in <3 seconds (Playwright)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b21-cleanup.detail-panel", "title": "Click kanban card → detail panel in <1 second (Playwright)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b21-cleanup.terminal", "title": "Terminal tab shows live output (Playwright)", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b21-cleanup.http-requests", "title": "HTTP requests/minute from idle board: <5", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b21-cleanup.single-ws", "title": "WebSocket connections: exactly 1", "status": "pending", "metadata": { "kind": "acceptance_criterion" } },
+          { "id": "b21-cleanup.version", "title": "Version bumped to 0.6.0", "status": "pending", "metadata": { "kind": "acceptance_criterion" } }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "b0-toolchain", "to": "b1-contracts", "type": "blocks" },
+      { "from": "b1-contracts", "to": "b2-event-store", "type": "blocks" },
+      { "from": "b1-contracts", "to": "b3-config", "type": "blocks" },
+      { "from": "b1-contracts", "to": "b4-frontend-transport", "type": "blocks" },
+      { "from": "b1-contracts", "to": "b5-server-skeleton", "type": "blocks" },
+      { "from": "b2-event-store", "to": "b5-server-skeleton", "type": "blocks" },
+      { "from": "b3-config", "to": "b5-server-skeleton", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b6-issues-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b7-agents-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b8-workspaces-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b9-specialists-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b10-costs-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b11-cloister-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b12-resources-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b13-mission-control-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b14-remote-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b15-settings-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b16-metrics-convoys-routes", "type": "blocks" },
+      { "from": "b5-server-skeleton", "to": "b17-misc-routes", "type": "blocks" },
+      { "from": "b6-issues-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b7-agents-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b8-workspaces-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b9-specialists-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b10-costs-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b11-cloister-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b12-resources-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b13-mission-control-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b14-remote-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b15-settings-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b16-metrics-convoys-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b17-misc-routes", "to": "b18-integration", "type": "blocks" },
+      { "from": "b4-frontend-transport", "to": "b18-integration", "type": "blocks" },
+      { "from": "b18-integration", "to": "b19-frontend-migration", "type": "blocks" },
+      { "from": "b18-integration", "to": "b20-terminal-rpc", "type": "blocks" },
+      { "from": "b19-frontend-migration", "to": "b21-cleanup", "type": "blocks" },
+      { "from": "b20-terminal-rpc", "to": "b21-cleanup", "type": "blocks" }
+    ]
+  }
+}
