@@ -56,7 +56,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   const issueLabel = plan.id.toLowerCase();
   try {
     const { stdout: existingJson } = await execAsync(
-      `bd list --json -l "${issueLabel}" --limit 0`,
+      `bd list --json -l "${issueLabel}" --status all --limit 0`,
       { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
     );
     const existingBeads = JSON.parse(existingJson || '[]');
