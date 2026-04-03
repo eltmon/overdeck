@@ -291,8 +291,10 @@ export function mapGitHubStateToCanonical(state: string, labels: string[]): Cano
   const labelNames = labels.map(l => l.toLowerCase());
 
   // Most progressed states first
-  // needs-close-out = merged work reopened for close-out ceremony → done column
-  if (labelNames.some(l => l === 'needs-close-out')) {
+  // merged = postMergeLifecycle applied label; issue may still be open if auto-close failed
+  // needs-close-out = merged work reopened for close-out ceremony
+  // Both belong in the done column — awaiting close-out ceremony
+  if (labelNames.some(l => l === 'merged' || l === 'needs-close-out')) {
     return 'done';
   }
   // "done" label on OPEN issues = work complete, pending merge/closure → in_review

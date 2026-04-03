@@ -10331,7 +10331,9 @@ app.post('/api/planning/:issueId/message', async (req, res) => {
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    } else {
+    }
+    // Fall through to projects.yaml resolution if GitHub local paths didn't resolve
+    if (!projectPath) {
       const teamPrefix = extractTeamPrefix(issueId);
       const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
       projectPath = projectConfig?.path || '';
@@ -10814,40 +10816,14 @@ app.post('/api/issues/:id/abort-planning', async (req, res) => {
         if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
           const localPaths = getGitHubLocalPaths();
           projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`];
-        } else if (issueIdentifier) {
-          // For Linear issues, use the identifier to find the project path
-          // Check project mappings
-          const mappingsPath = join(homedir(), '.panopticon', 'project-mappings.json');
-          if (existsSync(mappingsPath)) {
-            const mappings = JSON.parse(readFileSync(mappingsPath, 'utf-8'));
-            // Try to match by issue prefix (e.g., MIN-123 -> MIN)
-            const prefix = issueIdentifier.split('-')[0];
-            const mapping = mappings.find((m: any) => m.linearPrefix?.toUpperCase() === prefix.toUpperCase());
-            if (mapping) {
-              projectPath = mapping.localPath;
-            }
-          }
+        }
 
-          // Also check projects.yaml
-          if (!projectPath) {
-            const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
-            if (existsSync(projectsYamlPath)) {
-              try {
-                const yaml = await import('js-yaml');
-                const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
-                const prefix = issueIdentifier.split('-')[0].toUpperCase();
-
-                for (const [, config] of Object.entries(projectsConfig.projects || {})) {
-                  const projConfig = config as any;
-                  if (projConfig.linear_team?.toUpperCase() === prefix) {
-                    projectPath = projConfig.path;
-                    break;
-                  }
-                }
-              } catch {
-                // Ignore YAML errors
-              }
-            }
+        // Fall through to projects.yaml resolution if GitHub local paths didn't resolve
+        if (!projectPath && issueIdentifier) {
+          const prefix = issueIdentifier.split('-')[0].toUpperCase();
+          const projConfig = findProjectByTeam(prefix);
+          if (projConfig) {
+            projectPath = projConfig.path;
           }
         }
 
@@ -10934,9 +10910,14 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
   const { id } = req.params;
   const sessionName = `planning-${id.toLowerCase()}`;
   const issueLower = id.toLowerCase();
+  // skipKill: when called from the stop-hook (agent just exited naturally),
+  // don't kill the tmux session — the keep-alive loop is showing the user
+  // "Planning complete, click Done" and the terminal view should stay visible.
+  // Only kill the session when the user explicitly clicks Done in the dashboard.
+  const skipKill = req.body?.skipKill === true;
 
   // DEBUG: trace who called complete-planning
-  console.log(`[complete-planning] CALLED for ${id}`);
+  console.log(`[complete-planning] CALLED for ${id} (skipKill=${skipKill})`);
   console.log(`[complete-planning] Referer: ${req.headers.referer || 'NONE'}`);
   console.log(`[complete-planning] User-Agent: ${(req.headers['user-agent'] || 'NONE').slice(0, 80)}`);
   console.log(`[complete-planning] Origin: ${req.headers.origin || 'NONE'}`);
@@ -10977,22 +10958,30 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
       console.log(`[complete-planning] Could not detect remote session: ${err}`);
     }
 
-    // Kill any running planning session (local)
-    try {
-      await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
-    } catch (e) {
-      // Session might not exist
-    }
-
-    // Also kill remote session if applicable
-    if (isRemotePlanning && remoteVmName) {
+    // Kill the planning tmux session — but only when the user explicitly clicks Done.
+    // When called from the stop-hook (skipKill=true), the agent just exited naturally
+    // and the keep-alive loop is running. Killing the session would destroy the terminal
+    // view before the user can review the planning output.
+    if (!skipKill) {
+      // Kill any running planning session (local)
       try {
-        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
-        await fly.ssh(remoteVmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
-        console.log(`[complete-planning] Killed remote tmux session on ${remoteVmName}`);
-      } catch (err) {
-        console.log(`[complete-planning] Could not kill remote session: ${err}`);
+        await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
+      } catch (e) {
+        // Session might not exist
       }
+
+      // Also kill remote session if applicable
+      if (isRemotePlanning && remoteVmName) {
+        try {
+          const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+          await fly.ssh(remoteVmName, `tmux kill-session -t ${sessionName} 2>/dev/null || true`);
+          console.log(`[complete-planning] Killed remote tmux session on ${remoteVmName}`);
+        } catch (err) {
+          console.log(`[complete-planning] Could not kill remote session: ${err}`);
+        }
+      }
+    } else {
+      console.log(`[complete-planning] skipKill=true — preserving tmux session for user review`);
     }
 
     // Find planning directory and commit/push
@@ -11004,10 +10993,18 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    } else {
+    }
+    // Fall through to projects.yaml resolution if GitHub local paths didn't resolve
+    if (!projectPath) {
       const teamPrefix = extractTeamPrefix(id);
       const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
       projectPath = projectConfig?.path || '';
+    }
+
+    if (!projectPath) {
+      console.error(`[complete-planning] CRITICAL: could not resolve project path for ${id} — beads will NOT be created`);
+    } else {
+      console.log(`[complete-planning] Resolved project path: ${projectPath}`);
     }
 
     // For remote planning, sync beads from remote VM first
@@ -11104,6 +11101,16 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           console.log(`[complete-planning] Wrote .planning-complete marker`);
 
           // Git add planning and beads directories.
+          // For polyrepo workspaces, bd init (called by createBeadsFromVBrief) creates
+          // a standalone git repo at the workspace root. For monorepo, the workspace IS
+          // a git worktree. Either way, check before running git commands.
+          const isGitRepo = existsSync(join(gitRoot, '.git'));
+          if (!isGitRepo) {
+            // Polyrepo workspace without beads init (edge case) — init git so we can track planning artifacts
+            await execAsync(`git init`, { cwd: gitRoot, encoding: 'utf-8' });
+            console.log(`[complete-planning] Initialized git repo at workspace root (polyrepo)`);
+          }
+
           // .planning/ files are gitignored (PAN-337) so -f is required to track them on feature branches.
           await execAsync(`git add -f .planning/`, { cwd: gitRoot, encoding: 'utf-8' });
           // Also add .beads/ if it exists (planning may create beads tasks)
@@ -11121,11 +11128,21 @@ app.post('/api/issues/:id/complete-planning', async (req, res) => {
           }
 
           // Push to remote (non-blocking to avoid freezing dashboard)
-          // Spawn in background - don't await
-          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-          pushChild.unref();
-          gitPushed = true;
-          console.log(`[complete-planning] Git push started in background for ${id}`);
+          // Only push if the repo has a remote (polyrepo workspace roots may not)
+          try {
+            const { stdout: remotes } = await execAsync(`git remote`, { cwd: gitRoot, encoding: 'utf-8' });
+            if (remotes.trim()) {
+              const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
+              pushChild.unref();
+              gitPushed = true;
+              console.log(`[complete-planning] Git push started in background for ${id}`);
+            } else {
+              console.log(`[complete-planning] No git remote — skipping push (polyrepo workspace root)`);
+              gitPushed = true; // Don't trigger the "no push" warning
+            }
+          } catch {
+            // Non-fatal
+          }
         } catch (gitErr) {
           console.error('Git commit/push failed:', gitErr);
           // Continue even if git fails
@@ -12011,7 +12028,12 @@ app.post('/api/issues/:id/cleanup-workspace', async (req, res) => {
       const repoKey = `${githubCheck.owner}/${githubCheck.repo}`;
       projectRoot = localPaths[repoKey] || null;
     }
-    // TODO: Add Linear project path resolution
+    // Fall through to projects.yaml resolution if GitHub local paths didn't resolve
+    if (!projectRoot) {
+      const teamPrefix = extractTeamPrefix(id);
+      const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+      projectRoot = projectConfig?.path || null;
+    }
 
     if (projectRoot) {
       const workspacePath = join(projectRoot, 'workspaces', `feature-${issueLower}`);
@@ -12081,7 +12103,9 @@ app.post('/api/issues/:id/deep-wipe', async (req, res) => {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
       projectName = githubCheck.repo || '';
-    } else {
+    }
+    // Fall through to projects.yaml resolution if GitHub local paths didn't resolve
+    if (!projectPath) {
       const prefix = id.split('-')[0].toUpperCase();
       projectConfig = findProjectByTeam(prefix);
       if (projectConfig) {
@@ -12138,7 +12162,10 @@ app.post('/api/issues/:id/close-out', async (req, res) => {
     if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
       const localPaths = getGitHubLocalPaths();
       projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    } else {
+    }
+
+    // Fall through to projects.yaml resolution if GitHub local paths didn't resolve
+    if (!projectPath) {
       const issuePrefix = id.split('-')[0].toUpperCase();
       projectPath = getProjectPath(undefined, issuePrefix);
     }

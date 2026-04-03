@@ -43,6 +43,17 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     return { success: false, created: [], errors: ['bd (beads) CLI not found in PATH'], beadIds };
   }
 
+  // Ensure beads database is initialized — planning agents create the vBRIEF plan
+  // but don't run `bd init`, so the workspace may not have a .beads/ directory yet.
+  if (!existsSync(join(workspacePath, '.beads'))) {
+    try {
+      await execAsync('bd init', { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
+      console.log(`[beads] Initialized beads database in ${workspacePath}`);
+    } catch (initErr: any) {
+      return { success: false, created: [], errors: [`Failed to initialize beads: ${initErr.message}`], beadIds };
+    }
+  }
+
   // Read the vBRIEF plan
   const doc = readWorkspacePlan(workspacePath);
   if (!doc) {
