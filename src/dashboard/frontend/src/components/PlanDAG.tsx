@@ -11,7 +11,7 @@
  * PlanDAGViewer: data-fetching wrapper that loads from /api/workspaces/:issueId/plan
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import ReactFlow, {
@@ -98,6 +98,11 @@ const STATUS_BADGE_LABELS: Record<VBriefItemStatus, string> = {
 
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 80;
+const AC_ROW_HEIGHT = 16;
+
+function nodeHeight(acCount: number, showAC: boolean): number {
+  return showAC && acCount > 0 ? NODE_HEIGHT + acCount * AC_ROW_HEIGHT + 6 : NODE_HEIGHT;
+}
 
 function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
@@ -105,7 +110,8 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   g.setDefaultEdgeLabel(() => ({}));
 
   for (const node of nodes) {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    const h = (node.data as PlanItemNodeData).nodeHeight ?? NODE_HEIGHT;
+    g.setNode(node.id, { width: NODE_WIDTH, height: h });
   }
   for (const edge of edges) {
     g.setEdge(edge.source, edge.target);
@@ -115,23 +121,36 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
 
   return nodes.map(node => {
     const { x, y } = g.node(node.id);
-    return { ...node, position: { x: x - NODE_WIDTH / 2, y: y - NODE_HEIGHT / 2 } };
+    const h = (node.data as PlanItemNodeData).nodeHeight ?? NODE_HEIGHT;
+    return { ...node, position: { x: x - NODE_WIDTH / 2, y: y - h / 2 } };
   });
 }
 
 // ── Custom node ──
 
+// AC status rendering
+const AC_STATUS_COLORS: Record<string, string> = {
+  completed:   '#22c55e',
+  in_progress: '#eab308',
+  pending:     '#6b7280',
+  blocked:     '#6b7280',
+  cancelled:   '#6b7280',
+};
+
 interface PlanItemNodeData {
   item: VBriefItem;
   isCritical?: boolean;
+  showAC?: boolean;
+  nodeHeight?: number;
 }
 
 function PlanItemNode({ data }: { data: PlanItemNodeData }) {
-  const { item, isCritical } = data;
+  const { item, isCritical, showAC } = data;
   const colors = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
   const difficulty = item.metadata?.difficulty;
   const priority = item.priority;
   const priorityColor = priority ? PRIORITY_DOT[priority] : undefined;
+  const acs = (item.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion');
 
   return (
     <div
@@ -185,6 +204,31 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
           </span>
         )}
       </div>
+      {/* Inline AC checklist (shown when showAC toggle is on) */}
+      {showAC && acs.length > 0 && (
+        <div style={{
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          paddingTop: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}>
+          {acs.map(ac => {
+            const dotColor = AC_STATUS_COLORS[ac.status] ?? AC_STATUS_COLORS.pending;
+            return (
+              <div key={ac.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: dotColor, flexShrink: 0, marginTop: 2,
+                }} />
+                <span style={{ fontSize: 9, color: '#d1d5db', lineHeight: 1.3, wordBreak: 'break-word' }}>
+                  {ac.title}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -193,18 +237,22 @@ const NODE_TYPES = { planItem: PlanItemNode };
 
 // ── Conversion: VBriefDocument → ReactFlow nodes/edges ──
 
-export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = []): {
+export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = [], showAC = false): {
   nodes: Node[];
   edges: Edge[];
 } {
   const criticalSet = new Set(criticalPath);
 
-  const rawNodes: Node[] = doc.plan.items.map(item => ({
-    id: item.id,
-    type: 'planItem',
-    position: { x: 0, y: 0 }, // overwritten by dagre
-    data: { item, isCritical: criticalSet.has(item.id) } satisfies PlanItemNodeData,
-  }));
+  const rawNodes: Node[] = doc.plan.items.map(item => {
+    const acCount = (item.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion').length;
+    const h = nodeHeight(acCount, showAC);
+    return {
+      id: item.id,
+      type: 'planItem',
+      position: { x: 0, y: 0 }, // overwritten by dagre
+      data: { item, isCritical: criticalSet.has(item.id), showAC, nodeHeight: h } satisfies PlanItemNodeData,
+    };
+  });
 
   const EDGE_TYPE_COLORS: Record<string, string> = {
     blocks:      '#ef4444',
@@ -249,23 +297,24 @@ interface PlanDAGProps {
   criticalPath?: string[];
   onNodeClick?: (item: VBriefItem) => void;
   className?: string;
+  showAC?: boolean;
 }
 
-export function PlanDAG({ doc, criticalPath = [], onNodeClick, className }: PlanDAGProps) {
+export function PlanDAG({ doc, criticalPath = [], onNodeClick, className, showAC = false }: PlanDAGProps) {
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => vbriefToFlow(doc, criticalPath),
-    [doc, criticalPath],
+    () => vbriefToFlow(doc, criticalPath, showAC),
+    [doc, criticalPath, showAC],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync when doc changes (e.g., real-time status updates via socket)
+  // Sync when doc or showAC changes (e.g., real-time status updates or toggle)
   useEffect(() => {
-    const { nodes: updated, edges: updatedEdges } = vbriefToFlow(doc, criticalPath);
+    const { nodes: updated, edges: updatedEdges } = vbriefToFlow(doc, criticalPath, showAC);
     setNodes(updated);
     setEdges(updatedEdges);
-  }, [doc, criticalPath, setNodes, setEdges]);
+  }, [doc, criticalPath, showAC, setNodes, setEdges]);
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (onNodeClick) {
@@ -287,6 +336,7 @@ export function PlanDAG({ doc, criticalPath = [], onNodeClick, className }: Plan
         minZoom={0.2}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
+        key={showAC ? 'ac-on' : 'ac-off'}
       >
         <Background color="#374151" gap={20} size={1} />
         <Controls style={{ background: '#1f2937', border: '1px solid #374151' }} />
@@ -306,6 +356,7 @@ interface PlanDAGViewerProps {
 
 export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }: PlanDAGViewerProps) {
   const queryClient = useQueryClient();
+  const [showAC, setShowAC] = useState(false);
 
   const { data: doc, isLoading, isError } = useQuery<VBriefDocument>({
     queryKey: ['plan', issueId],
@@ -344,6 +395,30 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }:
       });
     });
 
+    socket.on('plan:subitem-status-changed', (event: { issueId: string; itemId: string; subItemId: string; status: VBriefItemStatus }) => {
+      if (event.issueId.toLowerCase() !== issueIdRef.current.toLowerCase()) return;
+
+      queryClientRef.current.setQueryData<VBriefDocument>(['plan', issueIdRef.current], (prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          plan: {
+            ...prev.plan,
+            items: prev.plan.items.map(item =>
+              item.id === event.itemId
+                ? {
+                    ...item,
+                    subItems: (item.subItems ?? []).map(s =>
+                      s.id === event.subItemId ? { ...s, status: event.status } : s
+                    ),
+                  }
+                : item
+            ),
+          },
+        };
+      });
+    });
+
     return () => { socket.disconnect(); };
   }, []); // empty deps: socket created once, refs keep values current
 
@@ -371,18 +446,30 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }:
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {cpLength > 1 && (
-        <div style={{ padding: '4px 8px', fontSize: 10, color: '#f97316', background: '#1f2937', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontWeight: 600 }}>Critical path:</span>
-          {cpLength} steps
-        </div>
-      )}
+      <div style={{ padding: '4px 8px', fontSize: 10, background: '#1f2937', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ color: '#f97316', fontWeight: 600 }}>
+          {cpLength > 1 ? `Critical path: ${cpLength} steps` : ''}
+        </span>
+        <button
+          onClick={() => setShowAC(prev => !prev)}
+          style={{
+            fontSize: 9, padding: '2px 6px', borderRadius: 3, cursor: 'pointer',
+            background: showAC ? '#22c55e' : '#374151',
+            color: showAC ? '#111827' : '#9ca3af',
+            border: 'none', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em',
+          }}
+          title="Toggle acceptance criteria on DAG nodes"
+        >
+          Show AC
+        </button>
+      </div>
       <div style={{ flex: 1 }}>
         <PlanDAG
           doc={doc}
           criticalPath={effectiveCriticalPath}
           onNodeClick={onNodeClick}
           className={className}
+          showAC={showAC}
         />
       </div>
     </div>
