@@ -137,6 +137,14 @@ const AC_STATUS_COLORS: Record<string, string> = {
   cancelled:   '#6b7280',
 };
 
+const AC_STATUS_SYMBOL: Record<string, string> = {
+  completed:   '✓',
+  in_progress: '●',
+  pending:     '○',
+  blocked:     '○',
+  cancelled:   '○',
+};
+
 interface PlanItemNodeData {
   item: VBriefItem;
   isCritical?: boolean;
@@ -224,13 +232,13 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
           gap: 2,
         }}>
           {acs.map(ac => {
-            const dotColor = AC_STATUS_COLORS[ac.status] ?? AC_STATUS_COLORS.pending;
+            const color = AC_STATUS_COLORS[ac.status] ?? AC_STATUS_COLORS.pending;
+            const symbol = AC_STATUS_SYMBOL[ac.status] ?? AC_STATUS_SYMBOL.pending;
             return (
               <div key={ac.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-                <span style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: dotColor, flexShrink: 0, marginTop: 2,
-                }} />
+                <span style={{ color, fontSize: 8, flexShrink: 0, marginTop: 1, fontWeight: 700 }}>
+                  {symbol}
+                </span>
                 <span style={{ fontSize: 9, color: '#d1d5db', lineHeight: 1.3, wordBreak: 'break-word' }}>
                   {ac.title}
                 </span>

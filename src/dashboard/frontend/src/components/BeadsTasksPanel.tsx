@@ -188,7 +188,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
 }
 
 const AC_STATUS_ICONS: Record<string, { color: string; symbol: string }> = {
-  completed:   { color: '#22c55e', symbol: '●' },
+  completed:   { color: '#22c55e', symbol: '✓' },
   in_progress: { color: '#eab308', symbol: '●' },
   pending:     { color: '#6b7280', symbol: '○' },
   blocked:     { color: '#6b7280', symbol: '○' },
