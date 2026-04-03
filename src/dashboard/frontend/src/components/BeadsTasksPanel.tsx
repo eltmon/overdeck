@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2, Download } from 'lucide-react';
+import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { PlanDAGViewer, type VBriefItem, type VBriefDocument } from './PlanDAG.js';
 
 interface BeadTask {
@@ -169,10 +169,10 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
           {beadsData?.tasks && beadsData.tasks.length > 0 ? (
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {openTasks.map((task) => (
-                <TaskItem key={task.id} task={task} />
+                <TaskItem key={task.id} task={task} planDoc={planDoc ?? null} />
               ))}
               {closedTasks.map((task) => (
-                <TaskItem key={task.id} task={task} />
+                <TaskItem key={task.id} task={task} planDoc={planDoc ?? null} />
               ))}
             </div>
           ) : (
@@ -187,16 +187,36 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
   );
 }
 
-function TaskItem({ task }: { task: BeadTask }) {
+const AC_STATUS_ICONS: Record<string, { color: string; symbol: string }> = {
+  completed:   { color: '#22c55e', symbol: '●' },
+  in_progress: { color: '#eab308', symbol: '●' },
+  pending:     { color: '#6b7280', symbol: '○' },
+  blocked:     { color: '#6b7280', symbol: '○' },
+  cancelled:   { color: '#6b7280', symbol: '○' },
+};
+
+function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument | null }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Match bead to plan item using the same pattern as PlanItemDetail
+  const planItem: VBriefItem | undefined = planDoc
+    ? planDoc.plan.items.find(item =>
+        `${planDoc.plan.id}: ${item.title}`.toLowerCase() === (task.title || task.name || '').toLowerCase()
+      )
+    : undefined;
+  const acs = (planItem?.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion');
+  const completedAcs = acs.filter(s => s.status === 'completed').length;
+  const hasACs = acs.length > 0;
+
   return (
     <div
-      className={`p-2 rounded border text-xs ${
+      className={`rounded border text-xs ${
         task.status === 'open'
           ? 'border-divider bg-surface-raised/50'
           : 'border-divider bg-surface/50 opacity-60'
       }`}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2 p-2">
         {task.status === 'open' ? (
           <Circle className="w-3.5 h-3.5 text-blue-400 mt-0.5 shrink-0" />
         ) : (
@@ -206,25 +226,29 @@ function TaskItem({ task }: { task: BeadTask }) {
           <div className="text-content break-words leading-tight">
             {task.title || task.name || task.id}
           </div>
-          {task.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {task.labels.map((label) => (
-                <span
-                  key={label}
-                  className={`text-[9px] px-1 py-0.5 rounded ${
-                    label.startsWith('difficulty:')
-                      ? label.includes('easy') ? 'bg-green-900/50 text-green-400' :
-                        label.includes('medium') ? 'bg-yellow-900/50 text-yellow-400' :
-                        label.includes('hard') ? 'bg-red-900/50 text-red-400' :
-                        'bg-surface-overlay text-content-body'
-                      : 'bg-surface-overlay text-content-body'
-                  }`}
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            {task.labels.map((label) => (
+              <span
+                key={label}
+                className={`text-[9px] px-1 py-0.5 rounded ${
+                  label.startsWith('difficulty:')
+                    ? label.includes('easy') ? 'bg-green-900/50 text-green-400' :
+                      label.includes('medium') ? 'bg-yellow-900/50 text-yellow-400' :
+                      label.includes('hard') ? 'bg-red-900/50 text-red-400' :
+                      'bg-surface-overlay text-content-body'
+                    : 'bg-surface-overlay text-content-body'
+                }`}
+              >
+                {label}
+              </span>
+            ))}
+            {/* AC count badge */}
+            {hasACs && (
+              <span className="text-[9px] px-1 py-0.5 rounded border border-blue-800 bg-blue-950/50 text-blue-400 font-semibold">
+                {completedAcs}/{acs.length} AC
+              </span>
+            )}
+          </div>
           {task.blockedBy.length > 0 && (
             <div className="flex items-center gap-1 mt-1 text-[9px] text-orange-400">
               <Clock className="w-2.5 h-2.5" />
@@ -232,7 +256,33 @@ function TaskItem({ task }: { task: BeadTask }) {
             </div>
           )}
         </div>
+        {/* Expand/collapse chevron */}
+        {hasACs && (
+          <button
+            onClick={() => setExpanded(prev => !prev)}
+            className="shrink-0 text-content-muted hover:text-content transition-colors mt-0.5"
+            title={expanded ? 'Collapse acceptance criteria' : 'Expand acceptance criteria'}
+          >
+            {expanded
+              ? <ChevronDown className="w-3 h-3" />
+              : <ChevronRight className="w-3 h-3" />}
+          </button>
+        )}
       </div>
+      {/* Expandable AC section */}
+      {hasACs && expanded && (
+        <div className="px-2 pb-2 space-y-1 border-t border-divider/50 pt-1.5">
+          {acs.map(ac => {
+            const icon = AC_STATUS_ICONS[ac.status] ?? AC_STATUS_ICONS.pending;
+            return (
+              <div key={ac.id} className="flex items-start gap-1.5 text-[10px] text-content-subtle">
+                <span style={{ color: icon.color, fontSize: 7, marginTop: 2, flexShrink: 0 }}>{icon.symbol}</span>
+                <span className="leading-tight break-words">{ac.title}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
