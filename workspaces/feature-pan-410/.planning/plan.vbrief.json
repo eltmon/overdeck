@@ -1,0 +1,140 @@
+{
+  "vBRIEFInfo": { "version": "0.5", "created": "2026-04-02T12:00:00Z" },
+  "plan": {
+    "id": "PAN-410",
+    "title": "DAG visualization: match vBRIEF Studio quality — edge labels, status badges, item metadata",
+    "status": "approved",
+    "author": "plan",
+    "tags": ["dashboard", "visualization", "reactflow", "ux"],
+    "narratives": {
+      "Problem": "The dashboard DAG visualization is functional but visually basic compared to vBRIEF Studio. Edges have no labels, nodes lack status text badges, difficulty/priority indicators are cryptic single letters, edge styling is uniform gray, layout is tight, and the metadata panel is sparse.",
+      "Proposal": "Implement all 6 improvements in a single deliverable across PlanDAG.tsx (nodes, edges, layout) and BeadsTasksPanel.tsx (metadata panel). Use existing ReactFlow APIs — edge labels, styled node badges, distinct edge colors per type, increased dagre spacing, and enriched detail panel.",
+      "Constraint": "Must use existing ReactFlow v11.11.4 and dagre — no new dependencies. Dark theme only. Must preserve real-time socket.io status updates and critical path highlighting. Node click handler and detail panel must continue to work.",
+      "Risk": "Node size increase may affect fit-view zoom level (mitigated by ReactFlow fitView auto-adjustment). Edge labels may overlap on dense graphs (mitigated by small font with background, single-word labels).",
+      "Alternative": "Tooltip-only edge labels (rejected — Studio shows labels always, hover not discoverable). Separate tasks per improvement (rejected — all changes in 2 files, interdependent)."
+    },
+    "items": [
+      {
+        "id": "node-enhancements",
+        "title": "Add status text badges and expand difficulty/priority badges on DAG nodes",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-410"
+        },
+        "narrative": {
+          "Action": "In PlanDAG.tsx PlanItemNode component: (1) Add a colored pill badge showing status text ('pending', 'in progress', 'completed', 'blocked') using existing statusColors palette. (2) Expand single-letter difficulty badge to full word in a styled pill. (3) Replace 6px priority dot with a labeled badge. (4) Increase node dimensions from 180x60 to ~220x80 to accommodate badges. Update NODE_WIDTH/NODE_HEIGHT constants and dagre node size registration."
+        },
+        "subItems": [
+          {
+            "id": "node-enhancements.status-badge-visible",
+            "title": "Each node displays a colored status text badge (e.g., 'pending', 'completed') — not just a colored border",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "node-enhancements.difficulty-full-word",
+            "title": "Difficulty badge shows full word ('medium', 'complex') instead of single letter",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "node-enhancements.priority-labeled",
+            "title": "Priority indicator is a labeled badge ('high', 'low') instead of an unlabeled colored dot",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "node-enhancements.node-size-increased",
+            "title": "Node dimensions increased to accommodate badges without text crowding or overflow",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "edge-enhancements",
+        "title": "Add edge type labels, distinct colors per type, and larger arrows",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-410"
+        },
+        "narrative": {
+          "Action": "In PlanDAG.tsx edge conversion: (1) Add 'label' property to each ReactFlow edge with the edge type name ('blocks', 'informs', 'suggests', 'invalidates'). Style labels with ~10px font and semi-transparent dark background. (2) Assign distinct stroke colors per edge type: blocks=#ef4444 (red), informs=#3b82f6 (blue), suggests=#8b5cf6 (purple), invalidates=#f59e0b (amber). (3) Increase markerEnd arrow size and ensure arrowhead color matches stroke. (4) Preserve existing critical path orange animation override."
+        },
+        "subItems": [
+          {
+            "id": "edge-enhancements.labels-visible",
+            "title": "Every edge displays its type as a text label ('blocks', 'informs', etc.) on the connection line",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "edge-enhancements.distinct-colors",
+            "title": "Each edge type has a visually distinct color (red for blocks, blue for informs, purple for suggests, amber for invalidates)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "edge-enhancements.arrows-visible",
+            "title": "Arrowheads are larger and color-matched to their edge stroke",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "edge-enhancements.critical-path-preserved",
+            "title": "Critical path edges still render with orange animated styling, overriding per-type colors",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "layout-and-metadata",
+        "title": "Improve dagre layout spacing and enrich the item detail metadata panel",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-410"
+        },
+        "narrative": {
+          "Action": "Two parts: (1) In PlanDAG.tsx dagre config, increase nodesep from 40 to 60 and ranksep from 60 to 100 to reduce visual crowding with larger nodes. (2) In BeadsTasksPanel.tsx PlanItemDetail component, enrich the panel: show difficulty and priority as styled badges matching node badges; display all narrative fields (Problem, Constraint, etc.) not just Action; show sub-item completion progress ('2/5 acceptance criteria met'); list incoming/outgoing edges with types and connected item titles."
+        },
+        "subItems": [
+          {
+            "id": "layout-and-metadata.spacing-improved",
+            "title": "Dagre nodesep >= 60 and ranksep >= 100 — nodes no longer overlap or cluster awkwardly",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "layout-and-metadata.all-narratives",
+            "title": "Detail panel shows all available narrative fields (Problem, Constraint, Action, etc.), not just Action",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "layout-and-metadata.completion-progress",
+            "title": "Detail panel shows sub-item completion progress (e.g., '2/5 acceptance criteria met')",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "layout-and-metadata.edge-context",
+            "title": "Detail panel lists incoming and outgoing edges with their type and connected item title",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "node-enhancements", "to": "layout-and-metadata", "type": "blocks" },
+      { "from": "edge-enhancements", "to": "layout-and-metadata", "type": "informs" }
+    ]
+  }
+}
