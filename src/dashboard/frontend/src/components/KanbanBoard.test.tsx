@@ -286,7 +286,7 @@ describe('ListIssueRow', () => {
     );
 
     fireEvent.click(container.firstChild!);
-    expect(onSelectIssue).toHaveBeenCalledWith('issue-1');
+    expect(onSelectIssue).toHaveBeenCalledWith('TEST-123');
   });
 
   it('should deselect when clicking already selected issue', () => {
@@ -298,7 +298,7 @@ describe('ListIssueRow', () => {
         agents={[]}
         specialists={[]}
         issueCosts={{}}
-        selectedIssue="issue-1"
+        selectedIssue="TEST-123"
         onSelectIssue={onSelectIssue}
         onPlan={vi.fn()}
       />
