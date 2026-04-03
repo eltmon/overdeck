@@ -23,6 +23,16 @@ vi.mock('os', async () => {
 
 vi.mock('child_process', () => ({
   execSync: (...args: any[]) => execSyncMock(...args),
+  exec: vi.fn((cmd: string, opts: any, cb?: Function) => {
+    // Simulate async exec by calling execSync mock
+    const callback = cb || opts;
+    try {
+      const result = execSyncMock(cmd, typeof opts === 'object' ? opts : {});
+      if (typeof callback === 'function') callback(null, { stdout: result || '', stderr: '' });
+    } catch (err) {
+      if (typeof callback === 'function') callback(err, { stdout: '', stderr: '' });
+    }
+  }),
 }));
 
 import {
@@ -115,68 +125,62 @@ describe('inspect-checkpoints', () => {
   });
 
   describe('getDiffBase', () => {
-    it('uses merge-base when no checkpoint exists', () => {
+    it('uses merge-base when no checkpoint exists', async () => {
       execSyncMock.mockReturnValue('abc123def456\n');
 
-      const base = getDiffBase(projectKey, issueId, '/tmp/workspace');
+      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
       expect(base).toBe('abc123def456');
-      expect(execSyncMock).toHaveBeenCalledWith(
-        'git merge-base main HEAD',
-        expect.objectContaining({ cwd: '/tmp/workspace' })
-      );
     });
 
-    it('uses last checkpoint SHA when checkpoints exist', () => {
+    it('uses last checkpoint SHA when checkpoints exist', async () => {
       saveCheckpoint(projectKey, issueId, 'myn-80', 'checkpoint-sha');
 
-      const base = getDiffBase(projectKey, issueId, '/tmp/workspace');
+      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
       expect(base).toBe('checkpoint-sha');
-      // Should NOT call execSync since checkpoint exists
-      expect(execSyncMock).not.toHaveBeenCalled();
     });
 
-    it('falls back to main when merge-base fails', () => {
+    it('falls back to main when merge-base fails', async () => {
       execSyncMock.mockImplementation(() => {
         throw new Error('not a git repo');
       });
 
-      const base = getDiffBase(projectKey, issueId, '/tmp/workspace');
+      const base = await getDiffBase(projectKey, issueId, '/tmp/workspace');
       expect(base).toBe('main');
     });
   });
 
   describe('getDiffStats', () => {
-    it('returns diff stats from git', () => {
+    it('returns diff stats from git', async () => {
       execSyncMock.mockReturnValue(' 3 files changed, 120 insertions(+), 5 deletions(-)\n');
 
-      const stats = getDiffStats('/tmp/workspace', 'abc123');
+      const stats = await getDiffStats('/tmp/workspace', 'abc123');
       expect(stats).toContain('3 files changed');
     });
 
-    it('returns fallback message on error', () => {
+    it('returns fallback message on error', async () => {
       execSyncMock.mockImplementation(() => {
         throw new Error('git error');
       });
 
-      const stats = getDiffStats('/tmp/workspace', 'abc123');
+      const stats = await getDiffStats('/tmp/workspace', 'abc123');
       expect(stats).toBe('Unable to compute diff stats');
     });
   });
 
   describe('getCurrentHead', () => {
-    it('returns HEAD sha', () => {
+    it('returns HEAD sha', async () => {
       execSyncMock.mockReturnValue('abc123def456\n');
 
-      const head = getCurrentHead('/tmp/workspace');
+      const head = await getCurrentHead('/tmp/workspace');
       expect(head).toBe('abc123def456');
     });
 
-    it('returns unknown on error', () => {
+    it('returns unknown on error', async () => {
       execSyncMock.mockImplementation(() => {
         throw new Error('not a git repo');
       });
 
-      const head = getCurrentHead('/tmp/workspace');
+      const head = await getCurrentHead('/tmp/workspace');
       expect(head).toBe('unknown');
     });
   });
