@@ -101,7 +101,7 @@ const NODE_HEIGHT = 80;
 
 function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60 });
+  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 100 });
   g.setDefaultEdgeLabel(() => ({}));
 
   for (const node of nodes) {
