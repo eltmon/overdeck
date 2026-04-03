@@ -115,13 +115,15 @@ async function createWorktree(
     // Prune stale worktree entries (e.g., from deleted workspaces)
     await execAsync('git worktree prune', { cwd: repoPath });
 
-    // Check if branch exists locally or remotely
+    // Check if branch exists locally or remotely (exact match, not substring)
     const { stdout: localBranches } = await execAsync('git branch --list', { cwd: repoPath });
     const { stdout: remoteBranches } = await execAsync('git branch -r --list', { cwd: repoPath });
 
+    const localList = localBranches.split('\n').map(b => b.replace(/^[*+\s]+/, '').trim()).filter(Boolean);
+    const remoteList = remoteBranches.split('\n').map(b => b.trim()).filter(Boolean);
     const branchExists =
-      localBranches.includes(branchName) ||
-      remoteBranches.includes(`origin/${branchName}`);
+      localList.includes(branchName) ||
+      remoteList.includes(`origin/${branchName}`);
 
     if (branchExists) {
       await execAsync(`git worktree add "${targetPath}" "${branchName}"`, { cwd: repoPath });
