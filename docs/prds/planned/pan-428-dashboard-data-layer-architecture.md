@@ -4,7 +4,9 @@
 
 The Panopticon dashboard takes 5-20+ seconds to open a workspace detail panel. Root cause: **80+ HTTP requests/minute** from aggressive, duplicated polling saturates the browser's 6-connection HTTP/1.1 limit through Traefik.
 
-Additionally, the server is a single 15,777-line Express file (`src/dashboard/server/index.ts`) with 185 routes, making it unmaintainable. Two paradigms (Express + socket.io) coexist poorly. The `execSync` class of bugs (PAN-70/72/205/425) keeps recurring because the Express model doesn't prevent blocking calls.
+The server has a partial data layer already — `IssueDataService` handles background tracker polling, GitHub ETag caching, and socket.io snapshot/update push. The core problem is **inconsistency**: issues are partially centralized through `IssueDataService`, but agents, specialists, workspaces, costs, and resources each have their own independent React Query polling loops. The frontend has 3 independent `/api/issues` queries with different cache keys, plus 42+ other polls at 2-5 second intervals. Live updates are split across socket.io, raw WebSocket (terminal), and HTTP polling — three transport paradigms that don't coordinate.
+
+The server is a single 15,777-line Express file (`src/dashboard/server/index.ts`) with 185 routes. The `execSync` class of bugs (PAN-70/72/205/425) keeps recurring because the Express model doesn't prevent blocking calls.
 
 ## Decision
 
@@ -305,6 +307,8 @@ const result = yield* Effect.tryPromise({
 
 The only lib files modified are those that need to emit events (they gain an `eventStore.append()` call).
 
+**Caveat on sync code:** `Effect.tryPromise()` only works on async functions. If the underlying lib function uses `execSync` or `readFileSync`, the call still blocks the event loop even though it's wrapped in Effect. The known sync hot paths in server-reachable lib code (`src/lib/tmux.ts` sendKeys/listSessions) have already been converted to async (`sendKeysAsync`, `execAsync`) by PAN-70/205. If route agents encounter remaining sync calls in hot paths, they should convert them to async as part of the route migration — don't leave a sync call wrapped in `Effect.tryPromise()`.
+
 ### 2. Do NOT modify `server.ts` from route modules
 
 Each route module exports a `Layer`. The integration bead (B18) wires them together. Route agents create their file and ONLY their file.
@@ -315,21 +319,22 @@ Every route must return the SAME response shape as the current Express route. Th
 
 ### 4. Socket.io → EventStore mapping
 
-| Old socket.io event | New domain event type |
-|---------------------|----------------------|
-| `agents:changed` | `agent.started` / `agent.stopped` |
-| `pipeline:status` | `pipeline.review-completed` / `pipeline.test-completed` |
-| `planning:started` | `planning.started` |
-| `planning:failed` | `planning.failed` |
-| `merge:ready` | `pipeline.merge-ready` |
-| `resources:updated` | `workspace.containers-ready` |
-| `plan:item-status-changed` | `bead.status-changed` |
-| `plan:items-unblocked` | `bead.status-changed` (items that became unblocked) |
-| `godview:agent-output` | delivered via `subscribeAgentOutput` RPC stream |
-| `godview:status-change` | `agent.started` / `agent.stopped` (same events) |
-| `godview:activity` | `agent.started` / `pipeline.*` / `specialist.*` (derived) |
-| `shadow:inference-update` | `issue.shadow-updated` |
-| `planning:sync` | `planning.completed` (artifact sync is part of completion) |
+| Old socket.io event | New domain event type | Notes |
+|---------------------|----------------------|-------|
+| `agents:changed` | `agent.started` / `agent.stopped` | Split into specific lifecycle events |
+| `pipeline:status` | `pipeline.review-completed` / `pipeline.test-completed` | Split by stage |
+| `planning:started` | `planning.started` | Direct mapping |
+| `planning:failed` | `planning.failed` | Direct mapping |
+| `planning:sync` | `planning.artifact-synced` | NOT the same as completed — fired when artifacts upload/sync during planning |
+| `merge:ready` | `pipeline.merge-ready` | Direct mapping |
+| `resources:updated` | `resources.stats-updated` | Carries container stats, not just readiness |
+| `plan:item-status-changed` | `bead.status-changed` | Direct mapping |
+| `plan:items-unblocked` | `bead.unblocked` | Items whose blockers cleared |
+| `plan:subitem-status-changed` | `bead.ac-status-changed` | AC (acceptance criteria) sub-item status |
+| `godview:agent-output` | Delivered via `subscribeAgentOutput` RPC stream | Not a domain event — live data stream |
+| `godview:status-change` | `agent.started` / `agent.stopped` | Derived from agent lifecycle events |
+| `godview:activity` | Derived from all domain events | Client-side projection, not a separate event |
+| `shadow:inference-update` | `issue.shadow-updated` | Direct mapping |
 
 ### 5. Background processes become Effect fibers
 
@@ -427,6 +432,8 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 - [ ] RPC group includes all methods from the RPC Methods section
 - [ ] Server and frontend can both `import { DomainEvent } from "@panopticon/contracts"`
 
+**Note on npm distribution:** The contracts package exports raw `.ts` files (`"exports": { ".": "./src/index.ts" }`). This works for local dev (Bun/Vite resolve TS natively) and for production builds (tsdown/Vite bundle the contracts into the output). The contracts package itself is NOT published to npm — it's build-time only, always bundled into the server and frontend artifacts that ship.
+
 ---
 
 ### B2: Event Store
@@ -440,7 +447,9 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 - Monotonic sequence counter (loaded from DB max on startup)
 - Methods: `append()`, `readFrom(sequence)`, `liveStream`, `getLatestSequence()`
 - DB schema: `events (sequence INTEGER PRIMARY KEY, type TEXT, timestamp TEXT, payload JSON)`
-- DB location: `~/.panopticon/dashboard-events.db`
+- DB location: `~/.panopticon/panopticon.db` (existing app DB — add `events` table, NOT a third database). The repo already has `cache.db` and `panopticon.db`; do not create a third SQLite file.
+- **Retention**: Events older than 7 days are compacted on startup. The snapshot RPC provides the full current state, so old events are only needed for short-term replay/recovery. A daily cleanup fiber truncates events where `sequence < latestSequence - 10000`.
+- **Schema migrations**: Version table (`event_store_version`) with ordered migration array, applied on startup. Following the same pattern as `src/lib/database/index.ts`.
 
 **Blocks:** B5
 
@@ -506,7 +515,7 @@ selectIsBootstrapped(state)
 
 ---
 
-### B5: Server Skeleton + RPC
+### B5: Server Skeleton + RPC + Shared Services
 
 **Creates:**
 - `src/dashboard/server/main.ts` — Entry: Layer composition + `NodeRuntime.runMain`
@@ -516,6 +525,27 @@ selectIsBootstrapped(state)
 - `src/dashboard/server/routes/health.ts` — `/api/health`, `/api/version`
 - `src/dashboard/server/middleware/cors.ts` — CORS middleware
 - `src/dashboard/server/middleware/json-body.ts` — JSON body parsing
+- `src/dashboard/server/services/agent-manager.ts` — Effect service wrapping `src/lib/agents.ts`
+- `src/dashboard/server/services/workspace-manager-service.ts` — Effect service wrapping workspace ops
+- `src/dashboard/server/services/specialist-service.ts` — Effect service wrapping specialist/cloister ops
+- `src/dashboard/server/services/cost-service.ts` — Effect service wrapping cost tracking
+- `src/dashboard/server/services/docker-stats-service.ts` — Effect service wrapping Docker stats
+
+**Why services are here (not B18):** Route modules (B6-B17) run in parallel and all need to `yield*` from shared services. If services aren't created until B18 (integration), the parallel beads can't compile. Creating all service wrappers in B5 eliminates merge conflicts — route agents import from `../services/` and never create their own service definitions.
+
+**Service wrapper pattern:**
+```typescript
+export class AgentManager extends Context.Tag("AgentManager")<AgentManager, {
+  readonly startAgent: (issueId: string, opts: StartAgentOpts) => Effect.Effect<void, AgentError>;
+  readonly stopAgent: (agentId: string) => Effect.Effect<void, AgentError>;
+  // ... all methods route modules will need
+}>() {}
+
+export const AgentManagerLive = Layer.succeed(AgentManager, {
+  startAgent: (issueId, opts) => Effect.tryPromise(() => agentsLib.startAgent(issueId, opts)),
+  // ...
+});
+```
 
 **Design for `server.ts`:** Follows T3Code `apps/server/src/server.ts` — dual-runtime HTTP detection, Layer composition, `HttpRouter.serve(makeRoutesLayer)`.
 
@@ -531,6 +561,7 @@ selectIsBootstrapped(state)
 - [ ] WebSocket connects at `/ws/rpc`
 - [ ] `subscribeDomainEvents` streams test events to connected clients
 - [ ] CORS headers present on API responses
+- [ ] All service wrappers compile and export valid Effect services
 
 ---
 
@@ -572,7 +603,10 @@ Each bead creates ONE route file. **See full pattern, instructions, and assignme
 
 **Modifies:** App.tsx, KanbanBoard.tsx, InspectorPanel.tsx, SearchModal.tsx, AgentList.tsx, CloisterStatusBar.tsx, MetricsSummaryRow.tsx
 
-**Deletes:** `frontend/src/hooks/useSocketIssues.ts`
+**Deletes:**
+- `frontend/src/hooks/useSocketIssues.ts` — replaced by EventRouter
+- `frontend/src/components/IssueDetailPanel.tsx` — dead code, superseded by InspectorPanel
+- `frontend/src/components/WorkspacePanel.tsx` — dead code, superseded by InspectorPanel
 
 **Acceptance criteria:**
 - [ ] KanbanBoard renders from store selectors, zero `/api/issues` HTTP polling
@@ -584,6 +618,14 @@ Each bead creates ONE route file. **See full pattern, instructions, and assignme
 
 ### B20: Terminal Streaming RPC (Dual-Runtime)
 
+The codebase has TWO terminal surfaces:
+- **`XTerminal.tsx`** — Interactive PTY via raw WebSocket at `/ws/terminal`. Used by `PlanDialog.tsx` and workspace detail. Full input, resize, deferred spawn (PAN-417), stale-data suppression.
+- **`TerminalPanel.tsx`** — Passive log viewer polling `/api/agents/{id}/output?lines=200`. Shows text output, no PTY.
+
+Both migrate to Effect RPC streams over the single WebSocket:
+- `subscribeTerminal` replaces `XTerminal.tsx`'s raw WebSocket (interactive PTY with input/resize)
+- `subscribeAgentOutput` replaces `TerminalPanel.tsx`'s HTTP polling (lightweight text stream)
+
 **Creates:**
 - `src/dashboard/server/services/terminal-service.ts` — Dual-runtime PTY management
 
@@ -591,21 +633,24 @@ Each bead creates ONE route file. **See full pattern, instructions, and assignme
 - **Bun**: `Bun.spawn(command, { terminal: { cols, rows } })` — native, no addon
 - **Node**: `@homebridge/node-pty-prebuilt-multiarch` — prebuilt native addon
 
-Preserves the deferred-spawn pattern (PAN-417): wait for first resize message before spawning PTY. Preserves stale-data suppression (200ms) and dimension-toggle repaint.
+Preserves deferred-spawn (PAN-417), stale-data suppression (200ms), dimension-toggle repaint.
+
+**Remote terminals (Fly.io):** Preserved as `subscribeTerminal({ location: 'remote', vmName })`. Same stream interface, spawns `fly ssh console` instead of local `tmux attach`.
 
 **Modifies:**
-- `src/dashboard/server/ws-rpc.ts` — Add `subscribeTerminal` streaming RPC
-- `src/dashboard/frontend/src/components/TerminalPanel.tsx` — Subscribe via RPC stream
+- `src/dashboard/server/ws-rpc.ts` — Add `subscribeTerminal` + `subscribeAgentOutput` RPCs
+- `src/dashboard/frontend/src/components/XTerminal.tsx` — Replace raw WS with `rpcClient.subscribeTerminal()`
+- `src/dashboard/frontend/src/components/TerminalPanel.tsx` — Replace HTTP poll with `rpcClient.subscribeAgentOutput()`
 
-**Reference:** T3Code `apps/server/src/terminal/Layers/BunPTY.ts` for Bun PTY pattern. Current Panopticon `index.ts` lines 13064-13720 for full terminal logic including remote/Fly.io path.
+**Note on "1 WebSocket connection":** The acceptance criterion means 1 multiplexed RPC connection. Multiple concurrent streams (2 terminals + domain events) run over the same socket. Effect RPC handles this natively.
 
 **Acceptance criteria:**
-- [ ] Terminal panel shows live agent output via WebSocket RPC
+- [ ] Interactive terminal (XTerminal) works via RPC stream — input, resize, deferred spawn
+- [ ] Passive log viewer (TerminalPanel) works via RPC stream — no HTTP polling
 - [ ] Works on both Bun (dev) and Node (production) runtimes
-- [ ] Resize works correctly
-- [ ] Deferred spawn + stale data suppression preserved
-- [ ] Multiple terminals can be open simultaneously
-- [ ] PTY cleanup on disconnect (no leaked processes)
+- [ ] Remote terminal (Fly.io) works via same stream interface
+- [ ] Multiple terminals open simultaneously on one WebSocket
+- [ ] PTY cleanup on disconnect, deferred spawn + stale data suppression preserved
 
 ---
 
@@ -618,6 +663,14 @@ Preserves the deferred-spawn pattern (PAN-417): wait for first resize message be
 **Removes from dependencies:**
 - `express`, `cors`, `socket.io`, `ws` (raw WebSocket server)
 - `socket.io-client` (if in frontend)
+
+**Dist path migration checklist** (these all reference the old paths):
+- [ ] `src/cli/index.ts` — looks for bundled server at `dist/dashboard/server.js`, update to new path
+- [ ] `src/dashboard/server/index.ts` — build-freshness check hard-coded to `server.js`, remove
+- [ ] Static file serving — currently looks for `dist/dashboard/public`, update to new Vite output path
+- [ ] `esbuild.config.mjs` — replace with tsdown config or remove
+- [ ] `npm run dev` script — update to `bun run` with new entry point
+- [ ] `npm link` / `pan` CLI — verify `dist/` output is correct for npm consumers
 
 **Modifies:**
 - `CLAUDE.md` — Update architecture section for Effect.js + Bun
@@ -737,6 +790,7 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 | `planning.started` | Planning agent launched | `{ issueId, sessionName, location }` |
 | `planning.completed` | stop-hook fires complete-planning | `{ issueId, beadCount }` |
 | `planning.failed` | Planning fails | `{ issueId, error }` |
+| `planning.artifact-synced` | Planning artifact uploaded/synced | `{ issueId, artifactType, filename }` |
 
 ### Specialist Events
 | Event Type | Emitted When | Payload |
@@ -752,11 +806,20 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 | `workspace.containers-ready` | Docker containers healthy | `{ issueId, containers[] }` |
 | `workspace.deleted` | Deep-wipe | `{ issueId }` |
 
+### Resource Events
+| Event Type | Emitted When | Payload |
+|------------|-------------|---------|
+| `resources.stats-updated` | DockerStatsCollector polls (5s) | `{ containers: { name, cpu, mem, status }[] }` |
+
+**Note:** Resource stats are ephemeral telemetry — they are NOT persisted to the event store. They flow through PubSub only (live subscribers get them, replay does not include them). The snapshot includes current container state.
+
 ### Cost / Bead Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
 | `cost.recorded` | Cost event ingested | `{ issueId, agentId, amount, model }` |
 | `bead.status-changed` | Bead transitions | `{ issueId, beadId, from, to }` |
+| `bead.unblocked` | Blocker completed, item ready | `{ issueId, beadId }` |
+| `bead.ac-status-changed` | AC sub-item status change | `{ issueId, beadId, subItemId, status }` |
 
 ---
 
@@ -792,7 +855,8 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 3. **Route modules (B6–B17):** Call Effect handler with mock request, verify response matches Express behavior. Use Vitest + `Effect.runPromise`.
 4. **Recovery coordinator (B4):** State machine: bootstrap → streaming → gap → replay → streaming
 5. **Zustand reducers (B4):** Each event type → correct state transition
-6. **Integration (B21):** Playwright E2E — board load → card click → terminal view
+6. **Integration (B18):** Start actual Effect server, connect WebSocket RPC client, verify events flow end-to-end. Test: dispatch command → event emitted → client receives → store updated.
+7. **E2E (B21):** Playwright — board load → card click → detail panel <1s → terminal view → all action buttons work
 
 ---
 
