@@ -8838,7 +8838,7 @@ app.post('/api/agents', async (req, res) => {
       const activityId = spawnPanCommand(
         ['work', 'issue', issueId, '--phase', phase],
         `Start agent for ${issueId}`,
-        projectPath
+        workspacePath
       );
       console.log(`[start-agent] Agent spawned for ${issueId} (containers ready: ${containersOk})`);
       socketIo.emit('agents:changed', { event: 'started', issueId });

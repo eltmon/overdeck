@@ -575,18 +575,42 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }).trim();
 
       if (branch === 'main' || branch === 'master') {
-        spinner.fail(`Workspace is on ${branch} branch`);
-        console.log('');
-        console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
-        console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
-        console.log('');
-        console.log(chalk.bold('To fix:'));
-        console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
-        console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
-        process.exit(1);
-      }
+        // For polyrepo workspaces, the workspace root may be on main/master
+        // but sub-repos are on feature branches. Check sub-directories.
+        const { readdirSync, statSync } = await import('fs');
+        let hasFeatureBranch = false;
+        try {
+          const entries = readdirSync(workspace);
+          for (const entry of entries) {
+            const subPath = join(workspace, entry);
+            if (statSync(subPath).isDirectory() && existsSync(join(subPath, '.git'))) {
+              const subBranch = execSync('git branch --show-current', {
+                cwd: subPath,
+                encoding: 'utf8'
+              }).trim();
+              if (subBranch !== 'main' && subBranch !== 'master' && subBranch.length > 0) {
+                hasFeatureBranch = true;
+                spinner.text = `Found polyrepo workspace — sub-repo ${entry} on branch: ${subBranch}`;
+                break;
+              }
+            }
+          }
+        } catch { /* ignore sub-repo check errors */ }
 
-      spinner.text = `Found workspace on branch: ${branch}`;
+        if (!hasFeatureBranch) {
+          spinner.fail(`Workspace is on ${branch} branch`);
+          console.log('');
+          console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
+          console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
+          console.log('');
+          console.log(chalk.bold('To fix:'));
+          console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
+          console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
+          process.exit(1);
+        }
+      } else {
+        spinner.text = `Found workspace on branch: ${branch}`;
+      }
     } catch (e) {
       // If git check fails, continue but warn
       spinner.warn('Could not verify branch - ensure you are NOT on main');
