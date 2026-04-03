@@ -24,11 +24,23 @@
     "url": "https://github.com/eltmon/panopticon-cli/issues"
   },
   "type": "module",
-  "workspaces": [
-    "packages/shared",
-    "src/dashboard/server",
-    "src/dashboard/frontend"
-  ],
+  "workspaces": {
+    "packages": [
+      "packages/contracts",
+      "src/dashboard/server",
+      "src/dashboard/frontend"
+    ],
+    "catalog": {
+      "effect": "4.0.0-beta.43",
+      "@effect/platform-bun": "4.0.0-beta.43",
+      "@effect/platform-node": "4.0.0-beta.43",
+      "@effect/sql-sqlite-bun": "4.0.0-beta.43",
+      "@effect/vitest": "4.0.0-beta.43",
+      "@effect/language-service": "0.84.2",
+      "@types/bun": "^1.2.0",
+      "typescript": "^5.7.3"
+    }
+  },
   "bin": {
     "pan": "./dist/cli/index.js",
     "panopticon": "./dist/cli/index.js"
@@ -82,6 +94,7 @@
     "yaml": "^2.8.2"
   },
   "devDependencies": {
+    "@panopticon/contracts": "workspace:*",
     "@types/better-sqlite3": "^7.6.13",
     "@types/inquirer": "^9.0.9",
     "@types/js-yaml": "^4.0.9",
