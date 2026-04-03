@@ -4,13 +4,15 @@
 
 The Panopticon dashboard takes 5-20+ seconds to open a workspace detail panel. Root cause: **80+ HTTP requests/minute** from aggressive, duplicated polling saturates the browser's 6-connection HTTP/1.1 limit through Traefik.
 
-Additionally, the server is a single 15,777-line Express file (`src/dashboard/server/index.ts`) with 185 routes, making it unmaintainable. Two paradigms (Express + socket.io) coexist poorly.
+Additionally, the server is a single 15,777-line Express file (`src/dashboard/server/index.ts`) with 185 routes, making it unmaintainable. Two paradigms (Express + socket.io) coexist poorly. The `execSync` class of bugs (PAN-70/72/205/425) keeps recurring because the Express model doesn't prevent blocking calls.
 
 ## Decision
 
 **Go full Effect.js.** Replace Express and socket.io entirely with Effect's HTTP server + WebSocket RPC. Single paradigm, single error model. Modeled on T3Code's production architecture (`/home/eltmon/Projects/t3code`).
 
-This work will be parallelized across multiple Panopticon agents overnight.
+This work will be parallelized across multiple Panopticon agents.
+
+---
 
 ## Reference Implementation
 
@@ -26,10 +28,10 @@ T3Code source: `/home/eltmon/Projects/t3code`
 | `apps/web/src/routes/__root.tsx` | Recovery coordinator, event coalescing | Reconnection |
 | `packages/contracts/src/rpc.ts` | `Rpc.make()` with Schema validation | Shared contracts |
 
-**Key Effect imports used by T3Code (from `effect/unstable/http`):**
+**Effect imports (from T3Code — pin to same version `4.0.0-beta.43`):**
 ```typescript
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
-import { Effect, Layer, Stream, PubSub, Queue, Ref, Schema, Scope } from "effect";
+import { Effect, Layer, Stream, PubSub, Queue, Ref, Schema, Scope, Context } from "effect";
 import * as Rpc from "effect/Rpc";
 import * as RpcGroup from "effect/RpcGroup";
 import * as RpcClient from "effect/RpcClient";
@@ -41,184 +43,557 @@ import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeHttp from "node:http";
 ```
 
-## Current Server Inventory
+---
 
-### Route Categories (185 total)
-
-| Category | Count | Key Endpoints |
-|----------|-------|---------------|
-| specialists | 33 | CRUD, logs, status, handoffs |
-| agents | 20 | start, stop, heartbeat, output, deep-wipe |
-| workspaces | 19 | create, delete, containers, services, merge |
-| issues | 17 | CRUD, status, planning, costs, close/reopen |
-| costs | 11 | by-issue, by-agent, reconciliation, archive |
-| remote | 9 | Fly.io workspace management |
-| cloister | 9 | config, status, pause, specialist pool |
-| resources | 8 | Docker stats, container management |
-| mission-control | 7 | planning status, feature metadata |
-| settings | 6 | config read/write |
-| metrics | 6 | summary, daily, performance |
-| convoys | 5 | CRUD, status |
-| misc | 35 | health, activity, confirmations, skills, etc. |
-
-### Server Dependencies
+## Work Decomposition — Dependency DAG
 
 ```
-src/dashboard/server/index.ts (15,777 lines)
-├── services/issue-data-service.ts (Linear/GitHub polling + cache)
-├── services/cache-service.ts
-├── services/tracker-config.ts
-├── review-status.ts
-├── utils/vtt-parser.ts
-├── ../../lib/agents.ts
-├── ../../lib/cloister/*.ts (8 modules)
-├── ../../lib/costs/*.ts (3 modules)
-├── ../../lib/convoy.ts
-├── ../../lib/docker-stats.ts
-├── ../../lib/projects.ts
-├── ../../lib/remote/*.ts
-├── ../../lib/config.ts
-└── ../../lib/paths.ts
+                    ┌─────────────┐
+                    │   B1: Deps  │  npm install effect, @effect/platform-node, zustand
+                    │  + Contracts│  Create src/shared/contracts/{events,rpc,types}.ts
+                    └──────┬──────┘
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+      ┌──────────┐  ┌───────────┐  ┌───────────────┐
+      │B2: Event │  │B3: Config │  │B4: Frontend   │
+      │  Store   │  │  Service  │  │  Transport +  │
+      │          │  │           │  │  Store + Rcvry │
+      └────┬─────┘  └─────┬─────┘  └───────┬───────┘
+           │              │                 │
+           ▼              ▼                 │ (can start after B1)
+      ┌────────────────────────┐            │
+      │ B5: Server Skeleton    │            │
+      │ main.ts, server.ts,   │            │
+      │ ws-rpc.ts, static.ts, │            │
+      │ middleware, health     │            │
+      └────────────┬───────────┘            │
+                   │                        │
+    ┌──────────────┼──────────────┐         │
+    ▼              ▼              ▼         │
+┌────────┐  ┌──────────┐  ┌──────────┐    │
+│B6-B17: │  │B6-B17:   │  │B6-B17:   │    │
+│Route   │  │Route     │  │Route     │    │
+│Module 1│  │Module 2  │  │Module N  │    │
+│(issues)│  │(agents)  │  │(misc)    │    │
+└───┬────┘  └────┬─────┘  └────┬─────┘    │
+    │            │              │           │
+    ▼            ▼              ▼           ▼
+┌──────────────────────────────────────────────┐
+│ B18: Integration — wire all route layers     │
+│ into server.ts, update esbuild, smoke test   │
+└──────────────────────┬───────────────────────┘
+                       │
+              ┌────────┼────────┐
+              ▼                 ▼
+    ┌──────────────┐  ┌──────────────────┐
+    │B19: Frontend │  │B20: Terminal     │
+    │ Component    │  │ Streaming RPC    │
+    │ Migration    │  │ (node-pty)       │
+    └──────┬───────┘  └────────┬─────────┘
+           │                   │
+           ▼                   ▼
+    ┌──────────────────────────────────┐
+    │ B21: Cleanup — delete index.ts,  │
+    │ remove Express/socket.io deps,   │
+    │ Playwright verification          │
+    └──────────────────────────────────┘
 ```
 
-### Socket.io Events Emitted (13)
+**Parallelism opportunities:**
+- B2, B3, B4 can all run in parallel (after B1)
+- B6–B17 (12 route modules) can ALL run in parallel (after B5)
+- B4 (frontend transport/store) can run in parallel with B5–B17 (only needs contracts from B1)
+- B19 and B20 can run in parallel (after B18)
 
-```
-agents:changed, godview:activity, godview:agent-output,
-godview:status-change, merge:ready, pipeline:status,
-plan:item-status-changed, plan:items-unblocked, planning:failed,
-planning:started, planning:sync, resources:updated,
-shadow:inference-update
-```
+---
 
-### WebSocket Terminal
+## Critical Rules for Agents
 
-Raw WebSocket at `/ws/terminal` using `node-pty` to spawn `tmux attach-session`. This streams terminal output for live agent monitoring. Must be preserved as a streaming RPC method.
+### 1. Do NOT rewrite `src/lib/*` modules
 
-## Target Architecture
+The existing library code (`src/lib/agents.ts`, `src/lib/cloister/*.ts`, `src/lib/costs/*.ts`, etc.) stays as-is. These are plain TypeScript modules with async functions. Route handlers wrap calls to them:
 
-### Server Module Structure
+```typescript
+// CORRECT — wrap existing async code in Effect
+const result = yield* Effect.tryPromise({
+  try: () => deepWipeAgent(issueId, { deleteWorkspace: true }),
+  catch: (err) => new DeepWipeError({ message: String(err) }),
+});
 
-```
-src/dashboard/server/
-├── main.ts                          # Entry point: Layer composition + NodeRuntime.runMain
-├── server.ts                        # makeServerLayer, makeRoutesLayer assembly
-├── config.ts                        # ServerConfig Effect service (reads env, yaml)
-├── event-store.ts                   # SQLite append-only event store with PubSub
-├── ws-rpc.ts                        # WsRpcGroup.toLayer() — streaming subscriptions
-│
-├── routes/                          # HTTP routes (one file per domain)
-│   ├── issues.ts                    # 17 routes → HttpRouter.Tag("IssueRoutes")
-│   ├── agents.ts                    # 20 routes → HttpRouter.Tag("AgentRoutes")
-│   ├── workspaces.ts                # 19 routes → HttpRouter.Tag("WorkspaceRoutes")
-│   ├── specialists.ts               # 33 routes → HttpRouter.Tag("SpecialistRoutes")
-│   ├── costs.ts                     # 11 routes → HttpRouter.Tag("CostRoutes")
-│   ├── cloister.ts                  # 9 routes → HttpRouter.Tag("CloisterRoutes")
-│   ├── resources.ts                 # 8 routes → HttpRouter.Tag("ResourceRoutes")
-│   ├── mission-control.ts           # 7 routes → HttpRouter.Tag("MissionControlRoutes")
-│   ├── remote.ts                    # 9 routes → HttpRouter.Tag("RemoteRoutes")
-│   ├── settings.ts                  # 6 routes → HttpRouter.Tag("SettingsRoutes")
-│   ├── metrics.ts                   # 6 routes → HttpRouter.Tag("MetricsRoutes")
-│   ├── convoys.ts                   # 5 routes → HttpRouter.Tag("ConvoyRoutes")
-│   ├── health.ts                    # 3 routes → HttpRouter.Tag("HealthRoutes")
-│   ├── misc.ts                      # Remaining routes
-│   └── static.ts                    # Static file serving (frontend assets)
-│
-├── services/                        # Effect service layers
-│   ├── issue-data-service.ts        # Existing, wrapped as Effect service
-│   ├── agent-manager.ts             # Agent lifecycle, extracted from index.ts
-│   ├── workspace-manager-service.ts # Workspace ops, extracted from index.ts
-│   ├── specialist-service.ts        # Specialist management
-│   ├── cost-service.ts              # Cost tracking
-│   ├── docker-stats-service.ts      # Container monitoring
-│   └── terminal-service.ts          # node-pty terminal management
-│
-└── middleware/
-    ├── cors.ts                      # CORS middleware
-    └── json-body.ts                 # JSON body parsing
+// WRONG — don't rewrite the library function itself
 ```
 
-### Shared Contracts
+The only lib files that get modified are the ones that need to emit events (they gain an `eventStore.append()` call).
 
-```
-src/shared/contracts/
-├── events.ts           # All domain event schemas (Schema.Struct)
-├── rpc.ts              # RPC method definitions (Rpc.make)
-├── types.ts            # Shared types: Issue, Agent, Specialist, etc.
-└── index.ts            # Re-exports
+### 2. Do NOT modify `server.ts` from route modules
+
+Each route module exports a `Layer`. The integration bead (B18) wires them together. Route agents create their file and ONLY their file:
+
+```typescript
+// routes/issues.ts — Agent creates this file
+export const issueRoutes = Layer.mergeAll(getIssues, createIssue, deepWipe, /* ... */);
+
+// server.ts — Only B18 (integration bead) modifies this
+export const makeRoutesLayer = Layer.mergeAll(
+  issueRoutes, agentRoutes, workspaceRoutes, /* ... all route layers */
+);
 ```
 
-### Frontend Structure (new files)
+### 3. Preserve exact API contracts
 
+Every route must return the SAME response shape as the current Express route. The frontend depends on these shapes. Don't rename fields, don't change status codes, don't change URL patterns. The frontend migration (B19) handles changing how the frontend consumes data.
+
+### 4. Socket.io → EventStore mapping
+
+Where current code does `socketIo.emit('event-name', data)`, the new code does `yield* eventStore.append({ type: 'event.name', payload: data })`. The event store's PubSub delivers to the WebSocket RPC stream subscribers. Map:
+
+| Old socket.io event | New domain event type |
+|---------------------|----------------------|
+| `agents:changed` | `agent.started` / `agent.stopped` |
+| `pipeline:status` | `pipeline.review-completed` / `pipeline.test-completed` |
+| `planning:started` | `planning.started` |
+| `planning:failed` | `planning.failed` |
+| `merge:ready` | `pipeline.merge-ready` |
+| `resources:updated` | `workspace.containers-ready` |
+| `plan:item-status-changed` | `bead.status-changed` |
+| `godview:agent-output` | delivered via `subscribeAgentOutput` RPC stream |
+| `godview:status-change` | `agent.started` / `agent.stopped` (same events) |
+| `shadow:inference-update` | `issue.shadow-updated` |
+
+### 5. Background processes become Effect fibers
+
+The current server has background processes started in `startServer()`:
+- `IssueDataService` — polls Linear/GitHub every 5-60s
+- `DockerStatsCollector` — polls Docker every 5s
+- `Deacon` — patrol cycle every 60s
+- `Cloister` — specialist watchdog
+
+In the Effect model, these become long-running fibers started as `Layer.effectDiscard`:
+
+```typescript
+const IssuePollerLive = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const issueService = yield* IssueDataService;
+    const eventStore = yield* EventStore;
+    // Poll loop as Effect fiber
+    yield* Effect.forever(
+      Effect.gen(function* () {
+        const changes = yield* issueService.poll();
+        for (const change of changes) {
+          yield* eventStore.append(change);
+        }
+        yield* Effect.sleep("30 seconds");
+      })
+    ).pipe(Effect.fork); // Fork as background fiber
+  })
+);
 ```
-src/dashboard/frontend/src/
-├── transport/
-│   ├── wsTransport.ts        # Effect.js WebSocket RPC client
-│   ├── rpcClient.ts          # Typed API wrapper (like T3Code's wsRpcClient.ts)
-│   └── protocol.ts           # createWsRpcProtocolLayer
-│
-├── store/
-│   ├── store.ts              # Zustand store: DashboardState + applyDomainEvent
-│   ├── selectors.ts          # All derived views (by cycle, by identifier, etc.)
-│   ├── eventReducers.ts      # Pure functions: event → state transition
-│   └── recovery.ts           # Sequence-based recovery coordinator
-│
-├── components/
-│   └── EventRouter.tsx       # Root component: subscribes to events, manages recovery
-│
-└── hooks/
-    └── useStore.ts           # Typed Zustand hooks with selectors
+
+### 6. Effect service pattern for injecting existing modules
+
+Existing modules become Effect services via `Context.Tag`:
+
+```typescript
+// services/agent-manager.ts
+import * as agentsLib from '../../lib/agents.js';
+
+export class AgentManager extends Context.Tag("AgentManager")<
+  AgentManager,
+  {
+    readonly startAgent: (issueId: string, opts: StartAgentOpts) => Effect.Effect<void, AgentError>;
+    readonly stopAgent: (agentId: string) => Effect.Effect<void, AgentError>;
+    readonly deepWipe: (issueId: string, opts: WipeOpts) => Effect.Effect<CleanupLog, AgentError>;
+    readonly listAgents: () => Effect.Effect<Agent[], never>;
+  }
+>() {}
+
+export const AgentManagerLive = Layer.succeed(AgentManager, {
+  startAgent: (issueId, opts) => Effect.tryPromise(() => agentsLib.startAgent(issueId, opts)),
+  stopAgent: (agentId) => Effect.tryPromise(() => agentsLib.stopAgent(agentId)),
+  deepWipe: (issueId, opts) => Effect.tryPromise(() => agentsLib.deepWipe(issueId, opts)),
+  listAgents: () => Effect.tryPromise(() => agentsLib.listAgents()),
+});
 ```
+
+---
+
+## Bead Specifications
+
+### B1: Dependencies + Shared Contracts
+
+**Creates:**
+- `src/shared/contracts/events.ts` — All domain event Schema definitions (~25 event types)
+- `src/shared/contracts/rpc.ts` — RPC method + group definitions (6 streaming + 3 unary + 3 command)
+- `src/shared/contracts/types.ts` — Issue, Agent, Specialist, Workspace, Cost schemas
+- `src/shared/contracts/index.ts` — Re-exports
+
+**Modifies:**
+- `package.json` — Add `effect@4.0.0-beta.43`, `@effect/platform-node@4.0.0-beta.43`
+- `src/dashboard/frontend/package.json` — Add `effect@4.0.0-beta.43`, `zustand@^5`
+- `tsconfig.json` — Ensure `src/shared/` is included in compilation
+
+**Blocks:** B2, B3, B4, B5
+
+**Reference:** T3Code `packages/contracts/src/rpc.ts`, `packages/contracts/src/orchestration.ts`
+
+**Acceptance criteria:**
+- [ ] `npm install` succeeds
+- [ ] `tsc --noEmit` on contracts compiles
+- [ ] Event schemas cover all 13 current socket.io events
+- [ ] RPC group includes all methods from the RPC Methods section below
+
+---
+
+### B2: Event Store
+
+**Creates:**
+- `src/dashboard/server/event-store.ts`
+
+**Design:**
+- SQLite-backed append-only event store (use `better-sqlite3`, already a transitive dep)
+- In-memory `PubSub<DomainEvent>` for live streaming
+- Monotonic sequence counter (loaded from DB max on startup)
+- Methods: `append()`, `readFrom(sequence)`, `liveStream`, `getLatestSequence()`
+- DB schema: single table `events (sequence INTEGER PRIMARY KEY, type TEXT, timestamp TEXT, payload JSON)`
+- DB location: `~/.panopticon/dashboard-events.db`
+
+**Blocks:** B5
+
+**Reference:** T3Code `apps/server/src/orchestration/Layers/OrchestrationEngine.ts` (PubSub pattern)
+
+**Acceptance criteria:**
+- [ ] Events persist across server restarts
+- [ ] `readFrom(N)` returns only events with sequence > N
+- [ ] `liveStream` delivers events in real-time
+- [ ] Sequence numbers are gap-free and monotonic
+- [ ] Unit tests for append, read, stream, restart recovery
+
+---
+
+### B3: ServerConfig Service
+
+**Creates:**
+- `src/dashboard/server/config.ts`
+
+**Design:**
+- Effect service that loads env vars (from `~/.panopticon.env`), projects.yaml, and CLI flags
+- Provides: port, staticDir, Linear API key, GitHub token, GitHub repos, project configs
+- Replaces the inline env loading at the top of current `index.ts`
+
+**Blocks:** B5
+
+**Acceptance criteria:**
+- [ ] All env vars currently used by index.ts are accessible via `yield* ServerConfig`
+- [ ] Missing required vars produce typed errors
+
+---
+
+### B4: Frontend Transport + Store + Recovery
+
+**Creates:**
+- `src/dashboard/frontend/src/transport/protocol.ts` — `createWsRpcProtocolLayer(url)`
+- `src/dashboard/frontend/src/transport/wsTransport.ts` — `WsTransport` class with `request()`, `requestStream()`, `subscribe()`
+- `src/dashboard/frontend/src/transport/rpcClient.ts` — Typed `PanRpcClient` wrapping transport
+- `src/dashboard/frontend/src/store/store.ts` — Zustand `DashboardState` + `applyDomainEvent`
+- `src/dashboard/frontend/src/store/selectors.ts` — All selectors (see list below)
+- `src/dashboard/frontend/src/store/eventReducers.ts` — Pure `switch` reducer per event type
+- `src/dashboard/frontend/src/store/recovery.ts` — Sequence-based recovery coordinator
+- `src/dashboard/frontend/src/components/EventRouter.tsx` — Root subscriber component
+
+**Selectors needed:**
+```typescript
+selectAllIssues(state)                              // full list
+selectIssuesByCycle(cycle, includeCompleted)(state)  // kanban filter
+selectIssueByIdentifier(id)(state)                   // detail panel
+selectAgents(state)                                  // all agents
+selectAgentForIssue(issueId)(state)                  // detail panel
+selectSpecialists(state)                             // cloister bar
+selectCostForIssue(issueId)(state)                   // cost badge
+selectIsBootstrapped(state)                          // loading state
+```
+
+**Can run in parallel with:** B2, B3, B5, B6–B17 (only depends on B1 contracts)
+
+**Reference files (copy and adapt):**
+- `WsTransport`: T3Code `apps/web/src/wsTransport.ts` (131 lines)
+- `store.ts`: T3Code `apps/web/src/store.ts` (state shape + reducers)
+- `recovery.ts`: T3Code `apps/web/src/orchestrationRecovery.ts` (137 lines)
+- `EventRouter.tsx`: T3Code `apps/web/src/routes/__root.tsx` lines 194-524
+
+**Acceptance criteria:**
+- [ ] WsTransport connects to `/ws/rpc` and auto-reconnects
+- [ ] Store receives snapshot on connect, applies events incrementally
+- [ ] Recovery coordinator detects sequence gaps and replays
+- [ ] Event coalescing batches rapid events via `queueMicrotask`
+- [ ] Selectors return correct filtered views
+- [ ] Unit tests for every event reducer and selector
+
+---
+
+### B5: Server Skeleton
+
+**Creates:**
+- `src/dashboard/server/main.ts` — Entry: Layer composition + `NodeRuntime.runMain`
+- `src/dashboard/server/server.ts` — `makeServerLayer`, `makeRoutesLayer` assembly
+- `src/dashboard/server/ws-rpc.ts` — RPC handlers: `getSnapshot`, `subscribeDomainEvents`, `replayEvents`
+- `src/dashboard/server/routes/static.ts` — Static file serving (Vite build output)
+- `src/dashboard/server/routes/health.ts` — `/api/health`, `/api/version`
+- `src/dashboard/server/middleware/cors.ts` — CORS middleware
+- `src/dashboard/server/middleware/json-body.ts` — JSON body parsing middleware
+
+**Design for `server.ts`:**
+```typescript
+// Follows T3Code apps/server/src/server.ts pattern
+export const makeRoutesLayer = Layer.mergeAll(
+  healthRoutes,
+  staticRoutes,
+  // Route modules added by B18 integration bead
+);
+
+export const makeServerLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const config = yield* ServerConfig;
+    const httpListeningLayer = Layer.effectDiscard(
+      Effect.log(`Panopticon API server running on http://0.0.0.0:${config.port}`)
+    );
+    return Layer.mergeAll(
+      HttpRouter.serve(makeRoutesLayer),
+      httpListeningLayer,
+    ).pipe(
+      Layer.provideMerge(rpcLayer),      // WebSocket RPC
+      Layer.provideMerge(EventStoreLive),
+      Layer.provideMerge(ServerConfigLive),
+      Layer.provideMerge(NodeHttpServer.layer(NodeHttp.createServer, { port: config.port })),
+    );
+  })
+);
+```
+
+**Design for `ws-rpc.ts`:**
+Implements `subscribeDomainEvents` with T3Code's sequence-ordered deduplication pattern (see ws.ts lines 134-190). Also implements `getSnapshot` (returns current issue/agent/specialist state) and `replayEvents` (reads from event store).
+
+**Blocks:** B6–B17 (route modules need the server skeleton to exist)
+
+**Acceptance criteria:**
+- [ ] `node dist/dashboard/server.js` starts and listens on port 3011
+- [ ] `curl http://localhost:3011/api/health` returns `{ status: "ok" }`
+- [ ] Frontend static files served at `/`
+- [ ] WebSocket connects at `/ws/rpc`
+- [ ] `subscribeDomainEvents` streams events to connected clients
+- [ ] `getSnapshot` returns current state
+- [ ] CORS headers present on API responses
+
+---
+
+### B6–B17: Route Modules (12 beads, ALL parallel)
+
+Each bead creates ONE route file. Pattern:
+
+```typescript
+// src/dashboard/server/routes/{category}.ts
+import { Effect, Layer } from "effect";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+
+// GET /api/{category}
+const list = HttpRouter.add("GET", "/api/{category}",
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    // ... existing logic wrapped in Effect.tryPromise
+    return HttpServerResponse.json(result);
+  }).pipe(Effect.catchAll(/* error handling */))
+);
+
+// POST /api/{category}/:id/action
+const action = HttpRouter.add("POST", "/api/{category}/:id/action",
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const params = HttpServerRequest.params(request);
+    const body = yield* HttpServerRequest.bodyJson(request);
+    // ... existing logic
+    return HttpServerResponse.json(result);
+  }).pipe(Effect.catchAll(/* error handling */))
+);
+
+export const {category}Routes = Layer.mergeAll(list, action, /* ... */);
+```
+
+**Each agent MUST:**
+1. Read ALL Express routes for their category from `src/dashboard/server/index.ts` using `grep '/api/{category}` to find every route
+2. Create the new route file at `src/dashboard/server/routes/{category}.ts`
+3. Convert each Express route to an `HttpRouter.add()` call
+4. Wrap existing async logic in `Effect.tryPromise()` — do NOT rewrite business logic
+5. Replace `socketIo.emit(...)` calls with `yield* eventStore.append(...)` using the mapping table above
+6. Replace `execSync` calls with `yield* Effect.tryPromise(() => execAsync(...))` 
+7. Export a single `{category}Routes` Layer that merges all routes
+8. **Do NOT import or modify `server.ts`** — that's B18's job
+9. For routes that need services, use `yield* ServiceTag` pattern (services defined in B5 or created inline)
+
+**Bead assignments:**
+
+| Bead | File | Routes | How to find them |
+|------|------|--------|------------------|
+| B6 | `routes/issues.ts` | 17 | `grep "app\.\(get\|post\|put\|delete\)('/api/issues" src/dashboard/server/index.ts` |
+| B7 | `routes/agents.ts` | 20 | `grep "app\.\(get\|post\|put\|delete\)('/api/agents" src/dashboard/server/index.ts` |
+| B8 | `routes/workspaces.ts` | 19 | `grep "app\.\(get\|post\|put\|delete\)('/api/workspaces" src/dashboard/server/index.ts` |
+| B9 | `routes/specialists.ts` | 33 | `grep "app\.\(get\|post\|put\|delete\)('/api/specialists" src/dashboard/server/index.ts` |
+| B10 | `routes/costs.ts` | 11 | `grep "app\.\(get\|post\|put\|delete\)('/api/costs" src/dashboard/server/index.ts` |
+| B11 | `routes/cloister.ts` | 9 | `grep "app\.\(get\|post\|put\|delete\)('/api/cloister" src/dashboard/server/index.ts` |
+| B12 | `routes/resources.ts` | 8 | `grep "app\.\(get\|post\|put\|delete\)('/api/resources" src/dashboard/server/index.ts` |
+| B13 | `routes/mission-control.ts` | 7 | `grep "app\.\(get\|post\|put\|delete\)('/api/mission-control" src/dashboard/server/index.ts` |
+| B14 | `routes/remote.ts` | 9 | `grep "app\.\(get\|post\|put\|delete\)('/api/remote" src/dashboard/server/index.ts` |
+| B15 | `routes/settings.ts` | 6 | `grep "app\.\(get\|post\|put\|delete\)('/api/settings" src/dashboard/server/index.ts` |
+| B16 | `routes/metrics.ts` + `routes/convoys.ts` | 11 | `grep "app\.\(get\|post\|put\|delete\)('/api/\(metrics\|convoys\)" src/dashboard/server/index.ts` |
+| B17 | `routes/misc.ts` | 35 | All remaining routes not covered by B6–B16 (activity, confirmations, tracker-status, handoffs, shadow, planning, deacon, skills, version, godview, rally, project-mappings, services, registered-projects, cache-status) |
+
+---
+
+### B18: Integration + Build
+
+**Modifies:**
+- `src/dashboard/server/server.ts` — Add all 12+ route layers to `makeRoutesLayer`
+- `esbuild.config.mjs` — Entry point to `src/dashboard/server/main.ts`
+- `package.json` scripts — `build:dashboard:server` targets new entry
+
+**Creates:**
+- `src/dashboard/server/services/` — Any Effect service wrappers needed by multiple route modules (AgentManager, WorkspaceManager, etc.)
+
+**Does:**
+- Wire all `B6–B17` route layers into `server.ts` `makeRoutesLayer`
+- Wire background fibers (IssuePoller, Deacon, DockerStats, Cloister)
+- Run full test suite — all existing tests must pass
+- Smoke test: start server, verify all endpoints return same responses as before
+
+**Blocks:** B19, B20
+
+**Acceptance criteria:**
+- [ ] `npm run build` succeeds
+- [ ] `npm test -- --run` all pass
+- [ ] Server starts and all 185 routes respond correctly
+- [ ] WebSocket RPC streams events
+- [ ] Old `index.ts` is no longer the entry point
+
+---
+
+### B19: Frontend Component Migration
+
+**Modifies:**
+- `frontend/src/App.tsx` — Remove React Query issues/agents polling, add EventRouter
+- `frontend/src/components/KanbanBoard.tsx` — Replace `useQuery(['issues', ...])` with `useStore(selectIssuesByCycle(cycle))`
+- `frontend/src/components/InspectorPanel.tsx` — Replace 5 polling queries with store selectors + single `getWorkspaceDetail` RPC
+- `frontend/src/components/search/SearchModal.tsx` — Replace independent issue fetch with store selector
+- `frontend/src/components/AgentList.tsx` — Replace 3-5s agent polling with store selector
+- `frontend/src/components/CloisterStatusBar.tsx` — Replace specialist/cloister polling with store selector
+- `frontend/src/components/MetricsSummaryRow.tsx` — Derive metrics from store
+
+**Deletes:**
+- `frontend/src/hooks/useSocketIssues.ts` — Replaced by EventRouter
+
+**Acceptance criteria:**
+- [ ] KanbanBoard renders from store, zero `/api/issues` HTTP polling
+- [ ] Detail panel opens in <1 second (Playwright verified)
+- [ ] Total HTTP requests from kanban board: <5/minute
+- [ ] Search works from store data
+- [ ] All existing frontend tests pass
+
+---
+
+### B20: Terminal Streaming RPC
+
+**Modifies:**
+- `src/dashboard/server/ws-rpc.ts` — Add `subscribeTerminal` streaming RPC
+- `src/dashboard/frontend/src/components/TerminalPanel.tsx` — Subscribe via RPC stream
+
+**Creates:**
+- `src/dashboard/server/services/terminal-service.ts` — Extract node-pty/tmux management from index.ts
+
+**Design:** `subscribeTerminal` takes `{ sessionName, cols, rows }`, spawns `tmux attach-session` via node-pty, streams `TerminalChunk { data: string }` to client. Handles resize messages from client. On WebSocket close, kills PTY (not tmux session).
+
+**Reference:** Current WebSocket terminal code at index.ts lines ~13064-13200
+
+**Acceptance criteria:**
+- [ ] Terminal panel shows live agent output via WebSocket RPC
+- [ ] Resize works
+- [ ] Multiple terminals can be open simultaneously
+- [ ] PTY cleanup on disconnect (no leaked processes)
+
+---
+
+### B21: Cleanup + Verification
+
+**Deletes:**
+- `src/dashboard/server/index.ts` (the 15,777-line Express file)
+
+**Removes from `package.json`:**
+- `express`, `cors`, `socket.io`, `socket.io-client`
+
+**Removes from frontend `package.json`:**
+- `socket.io-client` (if present)
+
+**Modifies:**
+- `CLAUDE.md` — Update architecture section for Effect.js
+- `docs/INDEX.md` — Update references
+
+**Verification (Playwright):**
+- [ ] Dashboard loads in <3 seconds
+- [ ] Click kanban card → detail panel appears in <1 second
+- [ ] Terminal tab shows live output
+- [ ] Plan button → planning dialog → agent starts
+- [ ] All buttons (Watch, Tasks, Tell, Kill, Wipe, etc.) work
+- [ ] HTTP requests/minute from idle board: <5
+- [ ] WebSocket connections: exactly 1
+
+---
 
 ## Domain Events Catalog
 
-Every event has: `{ type, sequence, timestamp, payload }`.
+Every event: `{ type: string, sequence: number, timestamp: string, payload: {...} }`
 
 ### Issue Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
-| `issue.updated` | IssueDataService detects change from tracker poll | `{ identifier, changedFields }` |
+| `issue.updated` | IssueDataService detects change from tracker poll | `{ identifier, changedFields: Record<string, unknown> }` |
 | `issue.status-changed` | Status transition (todo→in_progress, etc.) | `{ identifier, from, to }` |
-| `issue.labels-changed` | Labels added/removed | `{ identifier, added[], removed[] }` |
-| `issue.shadow-updated` | Shadow state inference changes | `{ identifier, shadowStatus }` |
+| `issue.labels-changed` | Labels added/removed | `{ identifier, added: string[], removed: string[] }` |
+| `issue.shadow-updated` | Shadow state inference changes | `{ identifier, shadowStatus, shadowTrackerStatus }` |
 
 ### Agent Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
-| `agent.started` | Agent tmux session created | `{ agentId, issueId, model, phase }` |
-| `agent.stopped` | Agent exited or killed | `{ agentId, issueId, exitCode }` |
-| `agent.heartbeat` | Stop-hook fires (idle detection) | `{ agentId, state, contextPercent }` |
-| `agent.stuck` | Deacon detects stuck agent | `{ agentId, issueId, duration }` |
+| `agent.started` | Agent tmux session created | `{ agentId, issueId, model, phase, runtime }` |
+| `agent.stopped` | Agent exited or killed | `{ agentId, issueId, exitCode? }` |
+| `agent.heartbeat` | Stop-hook fires (idle detection) | `{ agentId, state, contextPercent?, lastActivity }` |
+| `agent.stuck` | Deacon detects stuck agent | `{ agentId, issueId, stuckDuration }` |
 
 ### Pipeline Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
-| `pipeline.review-started` | Review specialist spawned | `{ issueId, specialistId }` |
+| `pipeline.review-started` | Review specialist spawned | `{ issueId, specialistId, project }` |
 | `pipeline.review-completed` | Review passes/fails | `{ issueId, result, feedback? }` |
-| `pipeline.test-started` | Test specialist spawned | `{ issueId, specialistId }` |
-| `pipeline.test-completed` | Tests pass/fail | `{ issueId, result }` |
+| `pipeline.test-started` | Test specialist spawned | `{ issueId, specialistId, project }` |
+| `pipeline.test-completed` | Tests pass/fail | `{ issueId, result, output? }` |
 | `pipeline.merge-ready` | All gates passed, waiting for human | `{ issueId }` |
-| `pipeline.merged` | Human clicked merge | `{ issueId, branch }` |
+| `pipeline.merged` | Human clicked merge | `{ issueId, branch, project }` |
 
 ### Planning Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
-| `planning.started` | Planning agent launched | `{ issueId, sessionName }` |
+| `planning.started` | Planning agent launched | `{ issueId, sessionName, location }` |
 | `planning.completed` | stop-hook fires complete-planning | `{ issueId, beadCount }` |
-| `planning.failed` | Workspace creation fails | `{ issueId, error }` |
+| `planning.failed` | Workspace creation or planning fails | `{ issueId, error }` |
 
 ### Specialist Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
 | `specialist.spawned` | Specialist session created | `{ id, type, issueId, project }` |
 | `specialist.completed` | Specialist finishes | `{ id, type, issueId, result }` |
-| `specialist.handoff` | One specialist hands off to next | `{ fromId, toId, issueId }` |
+| `specialist.handoff` | One specialist hands off to next | `{ fromId, toType, issueId }` |
 
 ### Workspace Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
 | `workspace.created` | `pan workspace create` completes | `{ issueId, path, type }` |
-| `workspace.containers-ready` | Docker containers healthy | `{ issueId, containers[] }` |
+| `workspace.containers-ready` | Docker containers healthy | `{ issueId, containers: string[] }` |
 | `workspace.deleted` | Deep-wipe or worktree remove | `{ issueId }` |
 
 ### Cost Events
@@ -226,285 +601,103 @@ Every event has: `{ type, sequence, timestamp, payload }`.
 |------------|-------------|---------|
 | `cost.recorded` | Cost event ingested | `{ issueId, agentId, amount, model }` |
 
+### Bead Events
+| Event Type | Emitted When | Payload |
+|------------|-------------|---------|
+| `bead.status-changed` | Bead transitions state | `{ issueId, beadId, from, to }` |
+
+---
+
 ## RPC Methods
 
-### Streaming (real-time)
-| Method | Contract | Description |
-|--------|----------|-------------|
-| `pan.subscribeDomainEvents` | `() → Stream<DomainEvent>` | All domain events, sequence-ordered |
-| `pan.subscribeTerminal` | `(sessionName) → Stream<TerminalChunk>` | Live terminal output via node-pty |
-| `pan.subscribeAgentOutput` | `(agentId) → Stream<OutputLine>` | Agent log tail |
+### Streaming
+| Method | Input | Output | Description |
+|--------|-------|--------|-------------|
+| `pan.subscribeDomainEvents` | `{}` | `Stream<DomainEvent>` | All events, sequence-ordered, with replay |
+| `pan.subscribeTerminal` | `{ sessionName, cols, rows }` | `Stream<TerminalChunk>` | Live PTY output |
+| `pan.subscribeAgentOutput` | `{ agentId }` | `Stream<OutputLine>` | Agent log tail |
 
-### Unary (request-response)
-| Method | Contract | Description |
-|--------|----------|-------------|
-| `pan.getSnapshot` | `() → DashboardSnapshot` | Full state for cold start |
-| `pan.replayEvents` | `(fromSequence) → DomainEvent[]` | Missed events for recovery |
-| `pan.getWorkspaceDetail` | `(issueId) → WorkspaceDetail` | Single-call detail panel data |
+### Unary
+| Method | Input | Output | Description |
+|--------|-------|--------|-------------|
+| `pan.getSnapshot` | `{}` | `DashboardSnapshot` | Full state for cold start |
+| `pan.replayEvents` | `{ fromSequence }` | `DomainEvent[]` | Missed events for recovery |
+| `pan.getWorkspaceDetail` | `{ issueId }` | `WorkspaceDetail` | Batched detail panel data |
 
-### Commands (mutations via RPC)
-| Method | Contract | Description |
-|--------|----------|-------------|
-| `pan.startPlanning` | `(issueId, opts) → void` | Launch planning agent |
-| `pan.startAgent` | `(issueId) → void` | Launch implementation agent |
-| `pan.deepWipe` | `(issueId, opts) → CleanupLog` | Wipe workspace + state |
+### Commands
+| Method | Input | Output | Description |
+|--------|-------|--------|-------------|
+| `pan.startPlanning` | `{ issueId, location, shadow? }` | `{ sessionName }` | Launch planning |
+| `pan.startAgent` | `{ issueId }` | `{ agentId }` | Launch implementation |
+| `pan.deepWipe` | `{ issueId, deleteWorkspace? }` | `{ cleanupLog }` | Wipe workspace |
 
-**Note:** Most mutations (185 Express routes) stay as HTTP routes initially. Only the highest-value ones become RPC methods in Phase 1. Remaining routes migrate to Effect HTTP routes (`HttpRouter.add`) but remain request-response.
-
-## Implementation Phases
-
-### Phase 1: Foundation — Effect Server + Event Store
-
-**Goal:** Effect.js server running alongside (then replacing) Express. Event store operational.
-
-**Files to create:**
-
-| File | What | Lines (est.) | Depends On |
-|------|------|-------------|------------|
-| `src/shared/contracts/events.ts` | All event Schema definitions | ~200 | nothing |
-| `src/shared/contracts/rpc.ts` | RPC method + group definitions | ~100 | events.ts |
-| `src/shared/contracts/types.ts` | Issue, Agent, Specialist schemas | ~150 | nothing |
-| `src/dashboard/server/event-store.ts` | SQLite event store + PubSub | ~150 | events.ts |
-| `src/dashboard/server/config.ts` | ServerConfig Effect service | ~80 | nothing |
-| `src/dashboard/server/ws-rpc.ts` | RPC server: getSnapshot, subscribe, replay | ~200 | event-store, rpc.ts |
-| `src/dashboard/server/server.ts` | Layer assembly: HTTP + WS + services | ~100 | all above |
-| `src/dashboard/server/main.ts` | Entry: `NodeRuntime.runMain` | ~20 | server.ts |
-| `src/dashboard/server/middleware/cors.ts` | CORS as Effect middleware | ~20 | nothing |
-| `src/dashboard/server/middleware/json-body.ts` | JSON body parser | ~30 | nothing |
-| `src/dashboard/server/routes/static.ts` | Static file serving | ~50 | T3Code http.ts |
-| `src/dashboard/server/routes/health.ts` | `/api/health`, `/api/version` | ~30 | nothing |
-
-**Files to modify:**
-
-| File | Change |
-|------|--------|
-| `package.json` | Add `effect`, `@effect/platform-node` |
-| `src/dashboard/server/services/issue-data-service.ts` | Emit events to EventStore on change |
-| `esbuild.config.mjs` | Update entry point to `main.ts` |
-
-**Validation:** Server starts, WebSocket connects, events flow to a test client.
-
-### Phase 2: Route Migration (Parallelizable — 12 agents)
-
-**Goal:** All 185 Express routes converted to Effect `HttpRouter.add()` handlers.
-
-Each route module is independent and can be worked on by a separate agent. The pattern for each:
-
-```typescript
-// src/dashboard/server/routes/issues.ts
-import { Effect, Layer } from "effect";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
-import { IssueDataService } from "../services/issue-data-service.js";
-import { EventStore } from "../event-store.js";
-
-// GET /api/issues
-const getIssues = HttpRouter.add("GET", "/api/issues",
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = HttpServerRequest.toURL(request);
-    // ... parse query params from url
-    const issueDataService = yield* IssueDataService;
-    const issues = yield* issueDataService.getIssues({ cycle, includeCompleted });
-    return HttpServerResponse.json(issues);
-  })
-);
-
-// POST /api/issues/:id/deep-wipe
-const deepWipe = HttpRouter.add("POST", "/api/issues/:id/deep-wipe",
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const body = yield* HttpServerRequest.bodyJson(request);
-    // ... validation via Schema.decode
-    // ... existing deep-wipe logic
-    const eventStore = yield* EventStore;
-    yield* eventStore.append({ type: "workspace.deleted", payload: { issueId } });
-    return HttpServerResponse.json({ success: true, message: "..." });
-  })
-);
-
-export const issueRoutesLayer = Layer.mergeAll(getIssues, deepWipe, /* ... */);
-```
-
-**Agent work assignments (one agent per file):**
-
-| Agent | File | Routes | Source Lines (in index.ts) |
-|-------|------|--------|---------------------------|
-| Agent 1 | `routes/issues.ts` | 17 | grep `'/api/issues` |
-| Agent 2 | `routes/agents.ts` | 20 | grep `'/api/agents` |
-| Agent 3 | `routes/workspaces.ts` | 19 | grep `'/api/workspaces` |
-| Agent 4 | `routes/specialists.ts` | 33 | grep `'/api/specialists` |
-| Agent 5 | `routes/costs.ts` | 11 | grep `'/api/costs` |
-| Agent 6 | `routes/cloister.ts` | 9 | grep `'/api/cloister` |
-| Agent 7 | `routes/resources.ts` | 8 | grep `'/api/resources` |
-| Agent 8 | `routes/mission-control.ts` | 7 | grep `'/api/mission-control` |
-| Agent 9 | `routes/remote.ts` | 9 | grep `'/api/remote` |
-| Agent 10 | `routes/settings.ts` | 6 | grep `'/api/settings` |
-| Agent 11 | `routes/metrics.ts` + `convoys.ts` | 11 | grep `'/api/metrics\|/api/convoys` |
-| Agent 12 | `routes/misc.ts` | 35 | everything else |
-
-**Each agent's instructions:**
-1. Read the relevant Express routes from `src/dashboard/server/index.ts`
-2. Create the new route file using Effect `HttpRouter.add()` pattern
-3. Preserve exact API contract (same URLs, same request/response shapes)
-4. Inject services via `yield*` (not global imports)
-5. Emit domain events to EventStore where appropriate
-6. Export a `Layer` that combines all routes
-7. Add the layer to `server.ts` `makeRoutesLayer`
-
-### Phase 3: Frontend — Zustand Store + WsTransport
-
-**Goal:** KanbanBoard + detail panel read from Zustand store. Zero HTTP polling for issues/agents.
-
-**Files to create:**
-
-| File | What | Lines (est.) |
-|------|------|-------------|
-| `frontend/src/transport/protocol.ts` | `createWsRpcProtocolLayer` | ~30 |
-| `frontend/src/transport/wsTransport.ts` | `WsTransport` class (from T3Code) | ~130 |
-| `frontend/src/transport/rpcClient.ts` | Typed API wrapper | ~100 |
-| `frontend/src/store/store.ts` | Zustand store + `applyDomainEvent` | ~300 |
-| `frontend/src/store/selectors.ts` | `selectIssuesByCycle`, `selectAgentForIssue`, etc. | ~100 |
-| `frontend/src/store/eventReducers.ts` | Pure event→state reducers (one per event type) | ~400 |
-| `frontend/src/store/recovery.ts` | Recovery coordinator (from T3Code) | ~140 |
-| `frontend/src/components/EventRouter.tsx` | Root: subscribe, coalesce, apply, recover | ~200 |
-
-**Files to modify:**
-
-| File | Change |
-|------|--------|
-| `package.json` (frontend) | Add `effect`, `zustand` |
-| `frontend/src/App.tsx` | Remove React Query issues/agents polling, wrap with EventRouter |
-| `frontend/src/components/KanbanBoard.tsx` | Replace `useQuery` with `useStore(selectIssuesByCycle)` |
-| `frontend/src/components/InspectorPanel.tsx` | Use store selectors + single `getWorkspaceDetail` RPC |
-| `frontend/src/hooks/useSocketIssues.ts` | Remove (replaced by EventRouter) |
-
-### Phase 4: Terminal Streaming
-
-**Goal:** Terminal output streams over WebSocket RPC instead of HTTP polling.
-
-| File | Change |
-|------|--------|
-| `server/ws-rpc.ts` | Add `subscribeTerminal` RPC using `Stream.callback` + node-pty |
-| `server/services/terminal-service.ts` | Extract terminal management from index.ts |
-| `frontend/src/components/TerminalPanel.tsx` | Subscribe via RPC stream instead of polling |
-
-### Phase 5: Cleanup + Verification
-
-- [ ] Delete `src/dashboard/server/index.ts` (the 15K-line Express file)
-- [ ] Remove Express, socket.io, cors dependencies
-- [ ] Remove React Query polling for application state
-- [ ] Remove `useSocketIssues.ts`
-- [ ] Update `esbuild.config.mjs` for new entry point
-- [ ] Playwright verification: detail panel <1s, <5 HTTP req/min
-- [ ] Update CLAUDE.md with new architecture notes
+---
 
 ## Effect.js Setup Notes (for agents)
 
-### Dependencies
+### Dependencies (pin exact versions — match T3Code)
 ```bash
-npm install effect @effect/platform-node
-# Frontend
-cd src/dashboard/frontend && npm install effect zustand
+npm install effect@4.0.0-beta.43 @effect/platform-node@4.0.0-beta.43
+cd src/dashboard/frontend && npm install effect@4.0.0-beta.43 zustand@^5
 ```
 
 ### Node.js Compatibility
-- T3Code uses `@effect/platform-node` for Node.js (not Bun-only)
-- Effect 4.x HTTP is at `effect/unstable/http` (will stabilize)
-- Our Node 22 is fully supported
-- esbuild bundles Effect fine (it's standard ESM)
+- We use Node 22, not Bun — use `@effect/platform-node`, not `@effect/platform-bun`
+- Effect 4.x HTTP is at `effect/unstable/http` (will stabilize in a future release)
+- esbuild bundles Effect fine (standard ESM)
+- Our Vitest config needs `maxForks: 4` (CLAUDE.md rule — prevents OOM)
 
-### Route Conversion Pattern
+### Route Conversion Cheat Sheet
 
-**Express (before):**
-```typescript
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+**Express → Effect mapping:**
 
-app.post('/api/agents/:id/deep-wipe', async (req, res) => {
-  const { id } = req.params;
-  const { deleteWorkspace } = req.body;
-  try {
-    const result = await deepWipeAgent(id, deleteWorkspace);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-```
+| Express | Effect |
+|---------|--------|
+| `req.params.id` | `HttpServerRequest.params(request).id` |
+| `req.query.foo` | `HttpServerRequest.toURL(request)` → `url.searchParams.get('foo')` |
+| `req.body` | `yield* HttpServerRequest.bodyJson(request)` |
+| `res.json(data)` | `HttpServerResponse.json(data)` |
+| `res.status(404).json(...)` | `HttpServerResponse.json(data, { status: 404 })` |
+| `res.sendFile(path)` | `yield* HttpServerResponse.file(path)` |
+| `try/catch` | `Effect.catchAll()` or `Effect.tryPromise({ try, catch })` |
+| `async (req, res) => { }` | `Effect.gen(function* () { })` |
+| Global variable access | `yield* ServiceTag` (dependency injection) |
 
-**Effect (after):**
-```typescript
-const healthRoute = HttpRouter.add("GET", "/api/health",
-  Effect.succeed(HttpServerResponse.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-  }))
-);
-
-const deepWipeRoute = HttpRouter.add("POST", "/api/agents/:id/deep-wipe",
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const params = HttpServerRequest.params(request);
-    const body = yield* HttpServerRequest.bodyJson(request);
-    const { deleteWorkspace } = yield* Schema.decode(DeepWipeInput)(body);
-    const agentService = yield* AgentService;
-    const result = yield* agentService.deepWipe(params.id, deleteWorkspace);
-    return HttpServerResponse.json(result);
-  }).pipe(
-    Effect.catchAll((error) =>
-      Effect.succeed(HttpServerResponse.json({ error: String(error) }, { status: 500 }))
-    )
-  )
-);
-```
-
-### Streaming RPC Pattern (for terminal)
-```typescript
-// Server
-subscribeTerminal: (input) =>
-  Stream.callback<TerminalChunk>((queue) =>
-    Effect.gen(function* () {
-      const pty = spawn("tmux", ["attach-session", "-t", input.sessionName], {
-        cols: input.cols, rows: input.rows,
-      });
-      pty.onData((data) => Queue.offer(queue, { data }));
-      pty.onExit(() => Queue.end(queue));
-    })
-  ),
-
-// Client
-const unsub = rpcClient.subscribeTerminal(
-  { sessionName: "agent-min-824", cols: 120, rows: 40 },
-  (chunk) => xterm.write(chunk.data),
-);
-```
+---
 
 ## Testing Strategy
 
-1. **Each route module**: Unit test that the Effect handler returns the same response as the Express route for the same input
-2. **Event store**: Test append, readFrom, liveStream, sequence ordering
-3. **Recovery coordinator**: Test bootstrap, sequence gap, replay, snapshot fallback
-4. **Zustand store**: Test each event reducer produces correct state transitions
-5. **Integration**: Playwright E2E — load board, click card, verify detail panel in <1s
+1. **Contracts (B1):** Schema encode/decode round-trip for every event and RPC type
+2. **Event store (B2):** append, readFrom, liveStream, sequence gaps, restart recovery
+3. **Route modules (B6–B17):** For each route, call the Effect handler with mock request and verify response matches current Express behavior. Use `@effect/vitest` or plain Vitest with `Effect.runPromise`.
+4. **Recovery coordinator (B4):** Unit test state machine: bootstrap → streaming → gap → replay → streaming
+5. **Zustand reducers (B4):** Unit test each event type produces correct state transition
+6. **Integration (B21):** Playwright E2E — full flow from board load through card click to terminal view
+
+---
 
 ## Acceptance Criteria
 
-| Phase | Metric | Target |
-|-------|--------|--------|
-| 1 | Effect server running, events flowing | Functional |
-| 2 | All 185 routes migrated, Express removed | Zero Express |
-| 3 | KanbanBoard from Zustand, zero issue/agent polling | <5 req/min |
-| 3 | Detail panel open time | <1 second |
-| 4 | Terminal streaming via RPC | Zero HTTP polling |
-| 5 | Single 15K-line index.ts | Deleted |
-| 5 | Dependencies removed | Express, socket.io, cors |
+| Bead | Metric | Target |
+|------|--------|--------|
+| B5 | Effect server running, health endpoint | Functional |
+| B18 | All 185 routes return correct responses | Zero regressions |
+| B18 | All existing tests pass | 223/223 |
+| B19 | Detail panel open time | <1 second |
+| B19 | HTTP requests/min (kanban board) | <5 (from 80+) |
+| B20 | Terminal streams live via RPC | Zero HTTP polling |
+| B21 | Express/socket.io removed | Zero deps |
+| B21 | `index.ts` deleted | 15,777 lines gone |
+
+---
 
 ## Risk
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Effect 4.x is beta | API changes | Pin exact version, T3Code as reference |
-| 185 routes to convert | Large scope | Parallelize across 12 agents |
-| node-pty + Effect WebSocket | Compatibility unknown | Prototype in Phase 1 |
-| Build system (esbuild) | Bundle size/compatibility | Test early, Effect is standard ESM |
+| Effect 4.x is beta | API may change | Pin `4.0.0-beta.43` (same as T3Code production) |
+| 185 routes to convert | Large scope | 12 parallel agents, each isolated to one file |
+| node-pty + Effect WS | Compatibility unknown | Prototype in B20 early, fallback to raw WS |
+| Build system (esbuild) | Bundle issues | Test in B5 before parallelizing |
+| Merge conflicts | Parallel agents touch same files | Each agent creates ONE file, B18 integrates |
+| Frontend React Query removal | State timing | Keep React Query for external data (git), only remove for app state |
