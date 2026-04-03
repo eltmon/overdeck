@@ -79,17 +79,25 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 const DIFFICULTY_LABELS: Record<string, string> = {
-  trivial: 'T',
-  simple:  'S',
-  medium:  'M',
-  complex: 'C',
-  expert:  'E',
+  trivial: 'trivial',
+  simple:  'simple',
+  medium:  'medium',
+  complex: 'complex',
+  expert:  'expert',
+};
+
+const STATUS_BADGE_LABELS: Record<VBriefItemStatus, string> = {
+  pending:     'pending',
+  in_progress: 'in progress',
+  completed:   'completed',
+  cancelled:   'cancelled',
+  blocked:     'blocked',
 };
 
 // ── Layout ──
 
-const NODE_WIDTH = 180;
-const NODE_HEIGHT = 60;
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 80;
 
 function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
@@ -122,7 +130,8 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
   const { item, isCritical } = data;
   const colors = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
   const difficulty = item.metadata?.difficulty;
-  const priorityColor = item.priority ? PRIORITY_DOT[item.priority] : undefined;
+  const priority = item.priority;
+  const priorityColor = priority ? PRIORITY_DOT[priority] : undefined;
 
   return (
     <div
@@ -137,24 +146,42 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
         color: colors.text,
         boxShadow: isCritical ? `0 0 8px #f97316aa` : undefined,
         cursor: 'default',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-        {priorityColor && (
-          <span style={{
-            width: 6, height: 6, borderRadius: '50%',
-            background: priorityColor, flexShrink: 0, marginTop: 3,
-          }} />
-        )}
-        <span style={{ flex: 1, lineHeight: 1.3, wordBreak: 'break-word' }}>
-          {item.title}
+      {/* Title row */}
+      <span style={{ lineHeight: 1.3, wordBreak: 'break-word' }}>
+        {item.title}
+      </span>
+      {/* Badge row */}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {/* Status badge */}
+        <span style={{
+          fontSize: 9, background: colors.border, color: colors.bg,
+          borderRadius: 3, padding: '1px 4px', fontWeight: 600,
+          textTransform: 'uppercase', letterSpacing: '0.02em',
+        }}>
+          {STATUS_BADGE_LABELS[item.status] ?? item.status}
         </span>
+        {/* Priority badge */}
+        {priorityColor && priority && (
+          <span style={{
+            fontSize: 9, background: priorityColor, color: '#111827',
+            borderRadius: 3, padding: '1px 4px', fontWeight: 600,
+            textTransform: 'uppercase', letterSpacing: '0.02em',
+          }}>
+            {priority}
+          </span>
+        )}
+        {/* Difficulty badge */}
         {difficulty && (
           <span style={{
             fontSize: 9, background: '#374151', color: '#9ca3af',
-            borderRadius: 3, padding: '1px 3px', flexShrink: 0,
+            borderRadius: 3, padding: '1px 4px',
           }}>
-            {DIFFICULTY_LABELS[difficulty] ?? difficulty[0].toUpperCase()}
+            {DIFFICULTY_LABELS[difficulty] ?? difficulty}
           </span>
         )}
       </div>
