@@ -10,7 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { readWorkspacePlan, updateItemStatus } from './io.js';
+import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
@@ -252,6 +252,16 @@ export function syncBeadStatusToVBrief(
     if (!matchingItem) return null;
 
     updateItemStatus(workspacePath, matchingItem.id, status);
+
+    // Also mark all AC subItems as completed when the parent item is completed
+    if (status === 'completed' && matchingItem.subItems) {
+      for (const sub of matchingItem.subItems) {
+        if (sub.metadata?.kind === 'acceptance_criterion' && sub.status !== 'completed') {
+          updateSubItemStatus(workspacePath, matchingItem.id, sub.id, 'completed');
+        }
+      }
+    }
+
     console.log(`[vbrief-sync] Updated item "${matchingItem.id}" to "${status}" from bead ${beadId}`);
     return matchingItem.id;
   } catch (err: any) {
