@@ -8,9 +8,104 @@ Additionally, the server is a single 15,777-line Express file (`src/dashboard/se
 
 ## Decision
 
-**Go full Effect.js.** Replace Express and socket.io entirely with Effect's HTTP server + WebSocket RPC. Single paradigm, single error model. Modeled on T3Code's production architecture (`/home/eltmon/Projects/t3code`).
+**Go full Effect.js.** Replace Express and socket.io entirely with Effect's HTTP server + WebSocket RPC. Single paradigm, single error model, async-by-default. Modeled on T3Code's production architecture (`/home/eltmon/Projects/t3code`).
+
+**Switch to Bun** as package manager and dev runtime (Node remains the production runtime for npm distribution). Add shared contracts as a proper workspace package.
 
 This work will be parallelized across multiple Panopticon agents.
+
+---
+
+## Toolchain Changes
+
+### Package Manager: npm → Bun
+
+T3Code uses Bun for package management, workspace resolution, and dev execution. We adopt the same:
+
+| What | Current | Target |
+|------|---------|--------|
+| Package manager | npm | Bun 1.3+ |
+| Lockfile | `package-lock.json` | `bun.lock` |
+| Workspace protocol | npm workspaces | Bun workspaces |
+| Dev execution | `tsx watch` / `node dist/...` | `bun run src/...` (native TS) |
+| Production runtime | Node 22 | Node 22 (unchanged — npm published CLI must work with Node) |
+
+**Why Bun**: Native TS execution (no build step in dev), faster installs, workspace `catalog:` versioning for Effect packages, and Bun.spawn() provides native PTY without the node-pty native addon.
+
+### Build System: esbuild → tsdown + Vite
+
+| Component | Current | Target |
+|-----------|---------|--------|
+| Server | esbuild → `dist/dashboard/server.js` | tsdown → `dist/server/index.mjs` |
+| Frontend | Vite → `dist/dashboard/public/` | Vite → `dist/web/` (unchanged tooling) |
+| CLI | tsup → `dist/cli/index.js` | tsup → `dist/cli/index.js` (unchanged for now) |
+
+**tsdown** is what T3Code uses for server compilation. It's TypeScript-native and simpler than esbuild for Effect code. In dev mode, Bun executes TS directly — no build step at all.
+
+### Runtime: Dual-Mode (Bun + Node)
+
+Following T3Code's exact pattern (`apps/server/src/server.ts:48-91`):
+
+```typescript
+// Auto-detect runtime for HTTP server
+if (typeof Bun !== "undefined") {
+  const BunHttpServer = await import("@effect/platform-bun/BunHttpServer");
+  return BunHttpServer.layer({ port });
+} else {
+  const NodeHttpServer = await import("@effect/platform-node/NodeHttpServer");
+  const NodeHttp = await import("node:http");
+  return NodeHttpServer.layer(NodeHttp.createServer, { port });
+}
+```
+
+**Dev**: `bun run src/dashboard/server/main.ts` — instant startup, native TS
+**Production**: `node dist/server/index.mjs` — compiled JS, works everywhere
+
+### PTY: Dual-Runtime Terminal
+
+**Investigation finding**: `@homebridge/node-pty-prebuilt-multiarch` is a native C++ addon (Node N-API) that does **NOT** work with Bun. T3Code solved this with runtime detection:
+
+```typescript
+// T3Code pattern: apps/server/src/terminal/Layers/BunPTY.ts
+if (typeof Bun !== "undefined" && process.platform !== "win32") {
+  // Bun: native PTY via Bun.spawn() — no native addon needed
+  const subprocess = Bun.spawn(command, {
+    cwd, env,
+    terminal: { cols, rows, data: (terminal, data) => onData(data) }
+  });
+} else {
+  // Node: use node-pty (prebuilt native addon)
+  const pty = require("@homebridge/node-pty-prebuilt-multiarch");
+  const process = pty.spawn(command, args, { cols, rows, cwd, env });
+}
+```
+
+We run on Linux (Ubuntu), so Bun.spawn() PTY works. We keep node-pty as a fallback for Node production runtime. The existing deferred-spawn + stale-data-suppression logic (PAN-417) is preserved in both paths.
+
+### SQLite: Dual-Runtime
+
+Following T3Code's pattern (`persistence/Layers/Sqlite.ts`):
+
+| Runtime | SQLite Provider |
+|---------|----------------|
+| Bun | `@effect/sql-sqlite-bun` (Bun's native sqlite) |
+| Node | `node:sqlite` (Node 22.16+ built-in) or `better-sqlite3` fallback |
+
+Both are fast, both avoid native compilation headaches.
+
+### Effect Version: `4.0.0-beta.43` (pinned)
+
+**Investigation finding**: Effect 4.x is beta. The maintainers explicitly recommend v3 for production. However:
+- T3Code (by Theo, who has a relationship with the Effect team) runs this version in production
+- The APIs we need (`unstable/http`, `unstable/rpc`) only exist in v4
+- We pin the EXACT version `4.0.0-beta.43` — no auto-updates
+- T3Code serves as our canary: if an update breaks them, we'll know before we update
+
+**Risk mitigation:**
+1. Pin exact version in root `package.json` catalog (not `^` or `~`)
+2. Never auto-update Effect — manual, tested version bumps only
+3. Track T3Code's version bumps via their git history
+4. All Effect imports from `unstable/*` modules are concentrated in contracts + transport layers, making future API changes a localized fix
 
 ---
 
@@ -20,15 +115,17 @@ T3Code source: `/home/eltmon/Projects/t3code`
 
 | T3Code File | Pattern | We Adapt For |
 |-------------|---------|--------------|
-| `apps/server/src/server.ts` | Layer composition, `HttpRouter.serve()` | Server assembly |
-| `apps/server/src/ws.ts` | `WsRpcGroup.toLayer()`, streaming subscriptions | Real-time data |
+| `apps/server/src/server.ts` | Layer composition, dual-runtime HTTP, `HttpRouter.serve()` | Server assembly |
+| `apps/server/src/ws.ts` | `WsRpcGroup.toLayer()`, sequence-ordered streaming | Real-time data |
 | `apps/server/src/http.ts` | `HttpRouter.add()` route handlers | REST-like routes |
+| `apps/server/src/terminal/Layers/BunPTY.ts` | Bun.spawn() native PTY | Terminal streaming |
 | `apps/web/src/wsTransport.ts` | `ManagedRuntime`, auto-reconnect subscriptions | Client transport |
 | `apps/web/src/store.ts` | Zustand + `applyDomainEvent()` pure reducers | Client state |
 | `apps/web/src/routes/__root.tsx` | Recovery coordinator, event coalescing | Reconnection |
 | `packages/contracts/src/rpc.ts` | `Rpc.make()` with Schema validation | Shared contracts |
+| `persistence/Layers/Sqlite.ts` | Dual-runtime SQLite detection | Event store |
 
-**Effect imports (from T3Code — pin to same version `4.0.0-beta.43`):**
+**Key Effect imports:**
 ```typescript
 import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { Effect, Layer, Stream, PubSub, Queue, Ref, Schema, Scope, Context } from "effect";
@@ -40,71 +137,153 @@ import * as RpcSerialization from "effect/RpcSerialization";
 import * as Socket from "effect/Socket";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import * as NodeHttp from "node:http";
 ```
+
+---
+
+## Monorepo Structure
+
+### Current Layout
+```
+panopticon-cli/
+├── src/
+│   ├── cli/                    # CLI (tsup → npm published)
+│   ├── dashboard/
+│   │   ├── server/             # Express server (15K line index.ts)
+│   │   └── frontend/           # React frontend (Vite)
+│   └── lib/                    # Shared library code
+├── package.json                # workspaces: ["src/dashboard/frontend"]
+└── package-lock.json
+```
+
+### Target Layout
+```
+panopticon-cli/
+├── packages/
+│   └── contracts/              # @panopticon/contracts (NEW)
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── src/
+│           ├── events.ts       # Domain event schemas
+│           ├── rpc.ts          # RPC method definitions
+│           ├── types.ts        # Shared types (Issue, Agent, etc.)
+│           └── index.ts        # Re-exports
+├── src/
+│   ├── cli/                    # CLI (unchanged for now)
+│   ├── dashboard/
+│   │   ├── server/             # Effect.js server (REWRITTEN)
+│   │   │   ├── main.ts         # Entry: NodeRuntime.runMain
+│   │   │   ├── server.ts       # Layer assembly
+│   │   │   ├── config.ts       # ServerConfig service
+│   │   │   ├── event-store.ts  # SQLite event store + PubSub
+│   │   │   ├── ws-rpc.ts       # WebSocket RPC handlers
+│   │   │   ├── routes/         # 12+ route modules
+│   │   │   ├── services/       # Effect service wrappers
+│   │   │   └── middleware/     # CORS, body parsing
+│   │   └── frontend/           # React frontend (MODIFIED)
+│   │       └── src/
+│   │           ├── transport/  # Effect WsTransport (NEW)
+│   │           ├── store/      # Zustand store (NEW)
+│   │           └── components/ # Modified to use store
+│   └── lib/                    # Shared library code (UNCHANGED)
+├── package.json                # workspaces: ["packages/*", "src/dashboard/frontend"]
+├── bunfig.toml                 # Bun configuration
+├── bun.lock                    # Bun lockfile
+└── turbo.json                  # Build task orchestration (optional)
+```
+
+**Key decision**: We do NOT restructure `src/` into `apps/`. The CLI, server, and frontend stay where they are. Only the NEW contracts package goes in `packages/`. This minimizes file moves and keeps import paths stable for the massive route migration.
+
+### Workspace Configuration
+
+**Root `package.json`:**
+```json
+{
+  "workspaces": ["packages/*", "src/dashboard/frontend"],
+  "catalog": {
+    "effect": "4.0.0-beta.43",
+    "@effect/platform-node": "4.0.0-beta.43",
+    "@effect/platform-bun": "4.0.0-beta.43",
+    "@effect/sql-sqlite-bun": "4.0.0-beta.43"
+  }
+}
+```
+
+**`packages/contracts/package.json`:**
+```json
+{
+  "name": "@panopticon/contracts",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "effect": "catalog:" }
+}
+```
+
+Server and frontend import: `import { DomainEvent, PanRpcGroup } from "@panopticon/contracts"`
 
 ---
 
 ## Work Decomposition — Dependency DAG
 
 ```
-                    ┌─────────────┐
-                    │   B1: Deps  │  npm install effect, @effect/platform-node, zustand
-                    │  + Contracts│  Create src/shared/contracts/{events,rpc,types}.ts
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-      ┌──────────┐  ┌───────────┐  ┌───────────────┐
-      │B2: Event │  │B3: Config │  │B4: Frontend   │
-      │  Store   │  │  Service  │  │  Transport +  │
-      │          │  │           │  │  Store + Rcvry │
-      └────┬─────┘  └─────┬─────┘  └───────┬───────┘
-           │              │                 │
-           ▼              ▼                 │ (can start after B1)
-      ┌────────────────────────┐            │
-      │ B5: Server Skeleton    │            │
-      │ main.ts, server.ts,   │            │
-      │ ws-rpc.ts, static.ts, │            │
-      │ middleware, health     │            │
-      └────────────┬───────────┘            │
-                   │                        │
-    ┌──────────────┼──────────────┐         │
-    ▼              ▼              ▼         │
-┌────────┐  ┌──────────┐  ┌──────────┐    │
-│B6-B17: │  │B6-B17:   │  │B6-B17:   │    │
-│Route   │  │Route     │  │Route     │    │
-│Module 1│  │Module 2  │  │Module N  │    │
-│(issues)│  │(agents)  │  │(misc)    │    │
-└───┬────┘  └────┬─────┘  └────┬─────┘    │
-    │            │              │           │
-    ▼            ▼              ▼           ▼
-┌──────────────────────────────────────────────┐
-│ B18: Integration — wire all route layers     │
-│ into server.ts, update esbuild, smoke test   │
-└──────────────────────┬───────────────────────┘
-                       │
-              ┌────────┼────────┐
-              ▼                 ▼
-    ┌──────────────┐  ┌──────────────────┐
-    │B19: Frontend │  │B20: Terminal     │
-    │ Component    │  │ Streaming RPC    │
-    │ Migration    │  │ (node-pty)       │
-    └──────┬───────┘  └────────┬─────────┘
-           │                   │
-           ▼                   ▼
-    ┌──────────────────────────────────┐
-    │ B21: Cleanup — delete index.ts,  │
-    │ remove Express/socket.io deps,   │
-    │ Playwright verification          │
-    └──────────────────────────────────┘
+┌──────────────────┐
+│  B0: Toolchain   │  Switch to Bun, create packages/contracts/,
+│  Setup           │  bunfig.toml, workspace config, tsdown setup
+└────────┬─────────┘
+         │
+┌────────┴─────────┐
+│  B1: Contracts   │  Event schemas, RPC definitions, shared types
+│  Package         │  in packages/contracts/src/
+└────────┬─────────┘
+         │
+    ┌────┼──────────────┐
+    ▼    ▼              ▼
+┌──────┐ ┌──────┐ ┌───────────────┐
+│  B2  │ │  B3  │ │  B4: Frontend │
+│Event │ │Config│ │  Transport +  │
+│Store │ │ Svc  │ │  Store + Rcvry│
+└──┬───┘ └──┬───┘ └──────┬────────┘
+   │        │             │
+   ▼        ▼             │ (parallel with B2-B17)
+┌──────────────────┐      │
+│ B5: Server       │      │
+│ Skeleton + RPC   │      │
+└────────┬─────────┘      │
+         │                │
+  ┌──────┼──────────┐    │
+  ▼      ▼          ▼    │
+┌────┐ ┌────┐ ┌────────┐ │
+│B6  │ │B7  │ │  B17   │ │
+│iss │ │agt │ │  misc  │ │
+│ues │ │nts │ │        │ │
+└─┬──┘ └─┬──┘ └───┬────┘ │
+  │       │        │      │
+  ▼       ▼        ▼      ▼
+┌────────────────────────────┐
+│ B18: Integration           │
+│ Wire routes + build + test │
+└─────────────┬──────────────┘
+              │
+     ┌────────┼────────┐
+     ▼                 ▼
+┌──────────┐  ┌───────────────┐
+│B19: FE   │  │B20: Terminal  │
+│Component │  │Streaming RPC  │
+│Migration │  │(dual-runtime) │
+└────┬─────┘  └──────┬────────┘
+     │               │
+     ▼               ▼
+┌────────────────────────────┐
+│ B21: Cleanup + Playwright  │
+└────────────────────────────┘
 ```
 
-**Parallelism opportunities:**
-- B2, B3, B4 can all run in parallel (after B1)
-- B6–B17 (12 route modules) can ALL run in parallel (after B5)
-- B4 (frontend transport/store) can run in parallel with B5–B17 (only needs contracts from B1)
-- B19 and B20 can run in parallel (after B18)
+**Parallelism:**
+- B2, B3, B4 all parallel (after B1)
+- B6–B17 (12 route modules) ALL parallel (after B5)
+- B4 runs in parallel with B2–B17 (only needs B1 contracts)
+- B19, B20 parallel (after B18)
 
 ---
 
@@ -112,7 +291,7 @@ import * as NodeHttp from "node:http";
 
 ### 1. Do NOT rewrite `src/lib/*` modules
 
-The existing library code (`src/lib/agents.ts`, `src/lib/cloister/*.ts`, `src/lib/costs/*.ts`, etc.) stays as-is. These are plain TypeScript modules with async functions. Route handlers wrap calls to them:
+The existing library code (`src/lib/agents.ts`, `src/lib/cloister/*.ts`, `src/lib/costs/*.ts`, etc.) stays as-is. Route handlers wrap calls to them:
 
 ```typescript
 // CORRECT — wrap existing async code in Effect
@@ -121,32 +300,20 @@ const result = yield* Effect.tryPromise({
   catch: (err) => new DeepWipeError({ message: String(err) }),
 });
 
-// WRONG — don't rewrite the library function itself
+// WRONG — don't rewrite the library function
 ```
 
-The only lib files that get modified are the ones that need to emit events (they gain an `eventStore.append()` call).
+The only lib files modified are those that need to emit events (they gain an `eventStore.append()` call).
 
 ### 2. Do NOT modify `server.ts` from route modules
 
-Each route module exports a `Layer`. The integration bead (B18) wires them together. Route agents create their file and ONLY their file:
-
-```typescript
-// routes/issues.ts — Agent creates this file
-export const issueRoutes = Layer.mergeAll(getIssues, createIssue, deepWipe, /* ... */);
-
-// server.ts — Only B18 (integration bead) modifies this
-export const makeRoutesLayer = Layer.mergeAll(
-  issueRoutes, agentRoutes, workspaceRoutes, /* ... all route layers */
-);
-```
+Each route module exports a `Layer`. The integration bead (B18) wires them together. Route agents create their file and ONLY their file.
 
 ### 3. Preserve exact API contracts
 
-Every route must return the SAME response shape as the current Express route. The frontend depends on these shapes. Don't rename fields, don't change status codes, don't change URL patterns. The frontend migration (B19) handles changing how the frontend consumes data.
+Every route must return the SAME response shape as the current Express route. The frontend depends on these shapes. Don't rename fields, don't change status codes, don't change URL patterns.
 
 ### 4. Socket.io → EventStore mapping
-
-Where current code does `socketIo.emit('event-name', data)`, the new code does `yield* eventStore.append({ type: 'event.name', payload: data })`. The event store's PubSub delivers to the WebSocket RPC stream subscribers. Map:
 
 | Old socket.io event | New domain event type |
 |---------------------|----------------------|
@@ -157,26 +324,20 @@ Where current code does `socketIo.emit('event-name', data)`, the new code does `
 | `merge:ready` | `pipeline.merge-ready` |
 | `resources:updated` | `workspace.containers-ready` |
 | `plan:item-status-changed` | `bead.status-changed` |
+| `plan:items-unblocked` | `bead.status-changed` (items that became unblocked) |
 | `godview:agent-output` | delivered via `subscribeAgentOutput` RPC stream |
 | `godview:status-change` | `agent.started` / `agent.stopped` (same events) |
+| `godview:activity` | `agent.started` / `pipeline.*` / `specialist.*` (derived) |
 | `shadow:inference-update` | `issue.shadow-updated` |
+| `planning:sync` | `planning.completed` (artifact sync is part of completion) |
 
 ### 5. Background processes become Effect fibers
-
-The current server has background processes started in `startServer()`:
-- `IssueDataService` — polls Linear/GitHub every 5-60s
-- `DockerStatsCollector` — polls Docker every 5s
-- `Deacon` — patrol cycle every 60s
-- `Cloister` — specialist watchdog
-
-In the Effect model, these become long-running fibers started as `Layer.effectDiscard`:
 
 ```typescript
 const IssuePollerLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const issueService = yield* IssueDataService;
     const eventStore = yield* EventStore;
-    // Poll loop as Effect fiber
     yield* Effect.forever(
       Effect.gen(function* () {
         const changes = yield* issueService.poll();
@@ -185,14 +346,12 @@ const IssuePollerLive = Layer.effectDiscard(
         }
         yield* Effect.sleep("30 seconds");
       })
-    ).pipe(Effect.fork); // Fork as background fiber
+    ).pipe(Effect.fork);
   })
 );
 ```
 
-### 6. Effect service pattern for injecting existing modules
-
-Existing modules become Effect services via `Context.Tag`:
+### 6. Effect service pattern for existing modules
 
 ```typescript
 // services/agent-manager.ts
@@ -220,72 +379,92 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 
 ## Bead Specifications
 
-### B1: Dependencies + Shared Contracts
+### B0: Toolchain Setup
+
+**Goal:** Switch package manager to Bun, create workspace structure, configure builds.
 
 **Creates:**
-- `src/shared/contracts/events.ts` — All domain event Schema definitions (~25 event types)
-- `src/shared/contracts/rpc.ts` — RPC method + group definitions (6 streaming + 3 unary + 3 command)
-- `src/shared/contracts/types.ts` — Issue, Agent, Specialist, Workspace, Cost schemas
-- `src/shared/contracts/index.ts` — Re-exports
+- `bunfig.toml` — Bun configuration
+- `packages/contracts/package.json` — `@panopticon/contracts` workspace package
+- `packages/contracts/tsconfig.json` — TypeScript config for contracts
+- `packages/contracts/src/index.ts` — Placeholder re-export
 
 **Modifies:**
-- `package.json` — Add `effect@4.0.0-beta.43`, `@effect/platform-node@4.0.0-beta.43`
-- `src/dashboard/frontend/package.json` — Add `effect@4.0.0-beta.43`, `zustand@^5`
-- `tsconfig.json` — Ensure `src/shared/` is included in compilation
+- `package.json` — Switch to Bun workspaces, add `catalog` for Effect versions, add `@effect/platform-node`, `@effect/platform-bun`, `@effect/sql-sqlite-bun` to catalog
+- `.gitignore` — Add `bun.lock` exclusions if needed
+- Remove `package-lock.json` (replaced by `bun.lock`)
 
-**Blocks:** B2, B3, B4, B5
+**Does:**
+- Run `bun install` to generate `bun.lock`
+- Verify `bun run build` still works (existing builds must not break)
+- Verify `bun test` runs existing tests
+
+**Blocks:** B1
+
+**Acceptance criteria:**
+- [ ] `bun install` succeeds
+- [ ] `bun run build` produces working CLI and dashboard
+- [ ] `bun test` passes all 223 existing tests
+- [ ] `packages/contracts/` exists and is resolvable as `@panopticon/contracts`
+
+---
+
+### B1: Contracts Package
+
+**Creates (in `packages/contracts/src/`):**
+- `events.ts` — All domain event Schema definitions (~25 event types from catalog below)
+- `rpc.ts` — RPC method + group definitions (streaming + unary + commands)
+- `types.ts` — Issue, Agent, Specialist, Workspace, Cost schemas
+- `index.ts` — Re-exports everything
 
 **Reference:** T3Code `packages/contracts/src/rpc.ts`, `packages/contracts/src/orchestration.ts`
 
+**Blocks:** B2, B3, B4, B5
+
 **Acceptance criteria:**
-- [ ] `npm install` succeeds
-- [ ] `tsc --noEmit` on contracts compiles
-- [ ] Event schemas cover all 13 current socket.io events
-- [ ] RPC group includes all methods from the RPC Methods section below
+- [ ] `bun run --filter @panopticon/contracts typecheck` passes
+- [ ] Event schemas cover all 13 current socket.io events (mapped to ~25 domain events)
+- [ ] RPC group includes all methods from the RPC Methods section
+- [ ] Server and frontend can both `import { DomainEvent } from "@panopticon/contracts"`
 
 ---
 
 ### B2: Event Store
 
-**Creates:**
-- `src/dashboard/server/event-store.ts`
+**Creates:** `src/dashboard/server/event-store.ts`
 
 **Design:**
-- SQLite-backed append-only event store (use `better-sqlite3`, already a transitive dep)
+- SQLite-backed append-only event store
+- Dual-runtime SQLite: Bun native sqlite or `better-sqlite3`/`node:sqlite` (detect at startup, following T3Code `persistence/Layers/Sqlite.ts`)
 - In-memory `PubSub<DomainEvent>` for live streaming
 - Monotonic sequence counter (loaded from DB max on startup)
 - Methods: `append()`, `readFrom(sequence)`, `liveStream`, `getLatestSequence()`
-- DB schema: single table `events (sequence INTEGER PRIMARY KEY, type TEXT, timestamp TEXT, payload JSON)`
+- DB schema: `events (sequence INTEGER PRIMARY KEY, type TEXT, timestamp TEXT, payload JSON)`
 - DB location: `~/.panopticon/dashboard-events.db`
 
 **Blocks:** B5
 
-**Reference:** T3Code `apps/server/src/orchestration/Layers/OrchestrationEngine.ts` (PubSub pattern)
-
 **Acceptance criteria:**
 - [ ] Events persist across server restarts
 - [ ] `readFrom(N)` returns only events with sequence > N
-- [ ] `liveStream` delivers events in real-time
+- [ ] `liveStream` delivers events in real-time via PubSub
 - [ ] Sequence numbers are gap-free and monotonic
+- [ ] Works on both Bun and Node runtimes
 - [ ] Unit tests for append, read, stream, restart recovery
 
 ---
 
 ### B3: ServerConfig Service
 
-**Creates:**
-- `src/dashboard/server/config.ts`
+**Creates:** `src/dashboard/server/config.ts`
 
-**Design:**
-- Effect service that loads env vars (from `~/.panopticon.env`), projects.yaml, and CLI flags
-- Provides: port, staticDir, Linear API key, GitHub token, GitHub repos, project configs
-- Replaces the inline env loading at the top of current `index.ts`
+Wraps env vars (`~/.panopticon.env`), projects.yaml, CLI flags as an Effect service. Replaces the inline env loading in current `index.ts`.
 
 **Blocks:** B5
 
 **Acceptance criteria:**
-- [ ] All env vars currently used by index.ts are accessible via `yield* ServerConfig`
-- [ ] Missing required vars produce typed errors
+- [ ] All env vars currently used by index.ts accessible via `yield* ServerConfig`
+- [ ] Missing required vars produce typed errors (not runtime crashes)
 
 ---
 
@@ -293,227 +472,138 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 
 **Creates:**
 - `src/dashboard/frontend/src/transport/protocol.ts` — `createWsRpcProtocolLayer(url)`
-- `src/dashboard/frontend/src/transport/wsTransport.ts` — `WsTransport` class with `request()`, `requestStream()`, `subscribe()`
-- `src/dashboard/frontend/src/transport/rpcClient.ts` — Typed `PanRpcClient` wrapping transport
-- `src/dashboard/frontend/src/store/store.ts` — Zustand `DashboardState` + `applyDomainEvent`
-- `src/dashboard/frontend/src/store/selectors.ts` — All selectors (see list below)
-- `src/dashboard/frontend/src/store/eventReducers.ts` — Pure `switch` reducer per event type
-- `src/dashboard/frontend/src/store/recovery.ts` — Sequence-based recovery coordinator
-- `src/dashboard/frontend/src/components/EventRouter.tsx` — Root subscriber component
+- `src/dashboard/frontend/src/transport/wsTransport.ts` — `WsTransport` class
+- `src/dashboard/frontend/src/transport/rpcClient.ts` — Typed `PanRpcClient`
+- `src/dashboard/frontend/src/store/store.ts` — Zustand `DashboardState`
+- `src/dashboard/frontend/src/store/selectors.ts` — All selectors
+- `src/dashboard/frontend/src/store/eventReducers.ts` — Pure event reducers
+- `src/dashboard/frontend/src/store/recovery.ts` — Recovery coordinator
+- `src/dashboard/frontend/src/components/EventRouter.tsx` — Root subscriber
 
-**Selectors needed:**
+**Selectors:**
 ```typescript
-selectAllIssues(state)                              // full list
-selectIssuesByCycle(cycle, includeCompleted)(state)  // kanban filter
-selectIssueByIdentifier(id)(state)                   // detail panel
-selectAgents(state)                                  // all agents
-selectAgentForIssue(issueId)(state)                  // detail panel
-selectSpecialists(state)                             // cloister bar
-selectCostForIssue(issueId)(state)                   // cost badge
-selectIsBootstrapped(state)                          // loading state
+selectAllIssues(state)
+selectIssuesByCycle(cycle, includeCompleted)(state)
+selectIssueByIdentifier(id)(state)
+selectAgents(state)
+selectAgentForIssue(issueId)(state)
+selectSpecialists(state)
+selectCostForIssue(issueId)(state)
+selectIsBootstrapped(state)
 ```
 
-**Can run in parallel with:** B2, B3, B5, B6–B17 (only depends on B1 contracts)
+**Can run in parallel with:** B2, B3, B5, B6–B17 (only depends on B1)
 
-**Reference files (copy and adapt):**
-- `WsTransport`: T3Code `apps/web/src/wsTransport.ts` (131 lines)
-- `store.ts`: T3Code `apps/web/src/store.ts` (state shape + reducers)
-- `recovery.ts`: T3Code `apps/web/src/orchestrationRecovery.ts` (137 lines)
-- `EventRouter.tsx`: T3Code `apps/web/src/routes/__root.tsx` lines 194-524
+**Reference:** T3Code `apps/web/src/wsTransport.ts` (131 lines), `apps/web/src/store.ts`, `apps/web/src/orchestrationRecovery.ts` (137 lines), `apps/web/src/routes/__root.tsx` lines 194-524
 
 **Acceptance criteria:**
-- [ ] WsTransport connects to `/ws/rpc` and auto-reconnects
+- [ ] WsTransport connects to `/ws/rpc` and auto-reconnects with exponential backoff
 - [ ] Store receives snapshot on connect, applies events incrementally
-- [ ] Recovery coordinator detects sequence gaps and replays
+- [ ] Recovery coordinator detects sequence gaps and triggers replay
 - [ ] Event coalescing batches rapid events via `queueMicrotask`
 - [ ] Selectors return correct filtered views
 - [ ] Unit tests for every event reducer and selector
 
 ---
 
-### B5: Server Skeleton
+### B5: Server Skeleton + RPC
 
 **Creates:**
 - `src/dashboard/server/main.ts` — Entry: Layer composition + `NodeRuntime.runMain`
-- `src/dashboard/server/server.ts` — `makeServerLayer`, `makeRoutesLayer` assembly
+- `src/dashboard/server/server.ts` — `makeServerLayer`, `makeRoutesLayer`, dual-runtime HTTP
 - `src/dashboard/server/ws-rpc.ts` — RPC handlers: `getSnapshot`, `subscribeDomainEvents`, `replayEvents`
-- `src/dashboard/server/routes/static.ts` — Static file serving (Vite build output)
+- `src/dashboard/server/routes/static.ts` — Static file serving (adapted from T3Code `http.ts`)
 - `src/dashboard/server/routes/health.ts` — `/api/health`, `/api/version`
 - `src/dashboard/server/middleware/cors.ts` — CORS middleware
-- `src/dashboard/server/middleware/json-body.ts` — JSON body parsing middleware
+- `src/dashboard/server/middleware/json-body.ts` — JSON body parsing
 
-**Design for `server.ts`:**
-```typescript
-// Follows T3Code apps/server/src/server.ts pattern
-export const makeRoutesLayer = Layer.mergeAll(
-  healthRoutes,
-  staticRoutes,
-  // Route modules added by B18 integration bead
-);
+**Design for `server.ts`:** Follows T3Code `apps/server/src/server.ts` — dual-runtime HTTP detection, Layer composition, `HttpRouter.serve(makeRoutesLayer)`.
 
-export const makeServerLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    const config = yield* ServerConfig;
-    const httpListeningLayer = Layer.effectDiscard(
-      Effect.log(`Panopticon API server running on http://0.0.0.0:${config.port}`)
-    );
-    return Layer.mergeAll(
-      HttpRouter.serve(makeRoutesLayer),
-      httpListeningLayer,
-    ).pipe(
-      Layer.provideMerge(rpcLayer),      // WebSocket RPC
-      Layer.provideMerge(EventStoreLive),
-      Layer.provideMerge(ServerConfigLive),
-      Layer.provideMerge(NodeHttpServer.layer(NodeHttp.createServer, { port: config.port })),
-    );
-  })
-);
-```
+**Design for `ws-rpc.ts`:** Implements `subscribeDomainEvents` with T3Code's sequence-ordered deduplication pattern (ws.ts lines 134-190). `getSnapshot` returns current state. `replayEvents` reads from event store.
 
-**Design for `ws-rpc.ts`:**
-Implements `subscribeDomainEvents` with T3Code's sequence-ordered deduplication pattern (see ws.ts lines 134-190). Also implements `getSnapshot` (returns current issue/agent/specialist state) and `replayEvents` (reads from event store).
-
-**Blocks:** B6–B17 (route modules need the server skeleton to exist)
+**Blocks:** B6–B17
 
 **Acceptance criteria:**
-- [ ] `node dist/dashboard/server.js` starts and listens on port 3011
+- [ ] `bun run src/dashboard/server/main.ts` starts and listens on port 3011
+- [ ] `node dist/server/index.mjs` also starts (dual-runtime)
 - [ ] `curl http://localhost:3011/api/health` returns `{ status: "ok" }`
 - [ ] Frontend static files served at `/`
 - [ ] WebSocket connects at `/ws/rpc`
-- [ ] `subscribeDomainEvents` streams events to connected clients
-- [ ] `getSnapshot` returns current state
+- [ ] `subscribeDomainEvents` streams test events to connected clients
 - [ ] CORS headers present on API responses
 
 ---
 
 ### B6–B17: Route Modules (12 beads, ALL parallel)
 
-Each bead creates ONE route file. Pattern:
-
-```typescript
-// src/dashboard/server/routes/{category}.ts
-import { Effect, Layer } from "effect";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
-
-// GET /api/{category}
-const list = HttpRouter.add("GET", "/api/{category}",
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    // ... existing logic wrapped in Effect.tryPromise
-    return HttpServerResponse.json(result);
-  }).pipe(Effect.catchAll(/* error handling */))
-);
-
-// POST /api/{category}/:id/action
-const action = HttpRouter.add("POST", "/api/{category}/:id/action",
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const params = HttpServerRequest.params(request);
-    const body = yield* HttpServerRequest.bodyJson(request);
-    // ... existing logic
-    return HttpServerResponse.json(result);
-  }).pipe(Effect.catchAll(/* error handling */))
-);
-
-export const {category}Routes = Layer.mergeAll(list, action, /* ... */);
-```
-
-**Each agent MUST:**
-1. Read ALL Express routes for their category from `src/dashboard/server/index.ts` using `grep '/api/{category}` to find every route
-2. Create the new route file at `src/dashboard/server/routes/{category}.ts`
-3. Convert each Express route to an `HttpRouter.add()` call
-4. Wrap existing async logic in `Effect.tryPromise()` — do NOT rewrite business logic
-5. Replace `socketIo.emit(...)` calls with `yield* eventStore.append(...)` using the mapping table above
-6. Replace `execSync` calls with `yield* Effect.tryPromise(() => execAsync(...))` 
-7. Export a single `{category}Routes` Layer that merges all routes
-8. **Do NOT import or modify `server.ts`** — that's B18's job
-9. For routes that need services, use `yield* ServiceTag` pattern (services defined in B5 or created inline)
-
-**Bead assignments:**
-
-| Bead | File | Routes | How to find them |
-|------|------|--------|------------------|
-| B6 | `routes/issues.ts` | 17 | `grep "app\.\(get\|post\|put\|delete\)('/api/issues" src/dashboard/server/index.ts` |
-| B7 | `routes/agents.ts` | 20 | `grep "app\.\(get\|post\|put\|delete\)('/api/agents" src/dashboard/server/index.ts` |
-| B8 | `routes/workspaces.ts` | 19 | `grep "app\.\(get\|post\|put\|delete\)('/api/workspaces" src/dashboard/server/index.ts` |
-| B9 | `routes/specialists.ts` | 33 | `grep "app\.\(get\|post\|put\|delete\)('/api/specialists" src/dashboard/server/index.ts` |
-| B10 | `routes/costs.ts` | 11 | `grep "app\.\(get\|post\|put\|delete\)('/api/costs" src/dashboard/server/index.ts` |
-| B11 | `routes/cloister.ts` | 9 | `grep "app\.\(get\|post\|put\|delete\)('/api/cloister" src/dashboard/server/index.ts` |
-| B12 | `routes/resources.ts` | 8 | `grep "app\.\(get\|post\|put\|delete\)('/api/resources" src/dashboard/server/index.ts` |
-| B13 | `routes/mission-control.ts` | 7 | `grep "app\.\(get\|post\|put\|delete\)('/api/mission-control" src/dashboard/server/index.ts` |
-| B14 | `routes/remote.ts` | 9 | `grep "app\.\(get\|post\|put\|delete\)('/api/remote" src/dashboard/server/index.ts` |
-| B15 | `routes/settings.ts` | 6 | `grep "app\.\(get\|post\|put\|delete\)('/api/settings" src/dashboard/server/index.ts` |
-| B16 | `routes/metrics.ts` + `routes/convoys.ts` | 11 | `grep "app\.\(get\|post\|put\|delete\)('/api/\(metrics\|convoys\)" src/dashboard/server/index.ts` |
-| B17 | `routes/misc.ts` | 35 | All remaining routes not covered by B6–B16 (activity, confirmations, tracker-status, handoffs, shadow, planning, deacon, skills, version, godview, rally, project-mappings, services, registered-projects, cache-status) |
+Each bead creates ONE route file. **See full pattern, instructions, and assignment table in the "Route Migration" section below.**
 
 ---
 
 ### B18: Integration + Build
 
 **Modifies:**
-- `src/dashboard/server/server.ts` — Add all 12+ route layers to `makeRoutesLayer`
-- `esbuild.config.mjs` — Entry point to `src/dashboard/server/main.ts`
-- `package.json` scripts — `build:dashboard:server` targets new entry
+- `src/dashboard/server/server.ts` — Wire all 12+ route layers into `makeRoutesLayer`
+- Build config — Entry point to `src/dashboard/server/main.ts`
+- `package.json` scripts — Update `build:dashboard:server` for tsdown
 
 **Creates:**
-- `src/dashboard/server/services/` — Any Effect service wrappers needed by multiple route modules (AgentManager, WorkspaceManager, etc.)
+- `src/dashboard/server/services/` — Effect service wrappers needed by multiple route modules
+- Background fiber layers: IssuePoller, Deacon, DockerStats, Cloister
 
 **Does:**
-- Wire all `B6–B17` route layers into `server.ts` `makeRoutesLayer`
-- Wire background fibers (IssuePoller, Deacon, DockerStats, Cloister)
+- Wire all B6–B17 route layers into server.ts
+- Wire background fibers into server layer
 - Run full test suite — all existing tests must pass
-- Smoke test: start server, verify all endpoints return same responses as before
+- Smoke test: start server, verify all endpoints return same responses
 
 **Blocks:** B19, B20
 
 **Acceptance criteria:**
-- [ ] `npm run build` succeeds
-- [ ] `npm test -- --run` all pass
+- [ ] `bun run build` succeeds
+- [ ] All existing tests pass (223/223)
 - [ ] Server starts and all 185 routes respond correctly
 - [ ] WebSocket RPC streams events
-- [ ] Old `index.ts` is no longer the entry point
+- [ ] Background processes (issue polling, deacon patrols) run as Effect fibers
 
 ---
 
 ### B19: Frontend Component Migration
 
-**Modifies:**
-- `frontend/src/App.tsx` — Remove React Query issues/agents polling, add EventRouter
-- `frontend/src/components/KanbanBoard.tsx` — Replace `useQuery(['issues', ...])` with `useStore(selectIssuesByCycle(cycle))`
-- `frontend/src/components/InspectorPanel.tsx` — Replace 5 polling queries with store selectors + single `getWorkspaceDetail` RPC
-- `frontend/src/components/search/SearchModal.tsx` — Replace independent issue fetch with store selector
-- `frontend/src/components/AgentList.tsx` — Replace 3-5s agent polling with store selector
-- `frontend/src/components/CloisterStatusBar.tsx` — Replace specialist/cloister polling with store selector
-- `frontend/src/components/MetricsSummaryRow.tsx` — Derive metrics from store
+**Modifies:** App.tsx, KanbanBoard.tsx, InspectorPanel.tsx, SearchModal.tsx, AgentList.tsx, CloisterStatusBar.tsx, MetricsSummaryRow.tsx
 
-**Deletes:**
-- `frontend/src/hooks/useSocketIssues.ts` — Replaced by EventRouter
+**Deletes:** `frontend/src/hooks/useSocketIssues.ts`
 
 **Acceptance criteria:**
-- [ ] KanbanBoard renders from store, zero `/api/issues` HTTP polling
-- [ ] Detail panel opens in <1 second (Playwright verified)
-- [ ] Total HTTP requests from kanban board: <5/minute
-- [ ] Search works from store data
-- [ ] All existing frontend tests pass
+- [ ] KanbanBoard renders from store selectors, zero `/api/issues` HTTP polling
+- [ ] Detail panel opens in <1 second (Playwright)
+- [ ] HTTP requests from kanban board: <5/minute
+- [ ] All frontend tests pass
 
 ---
 
-### B20: Terminal Streaming RPC
+### B20: Terminal Streaming RPC (Dual-Runtime)
+
+**Creates:**
+- `src/dashboard/server/services/terminal-service.ts` — Dual-runtime PTY management
+
+**Design:** Runtime detection for PTY:
+- **Bun**: `Bun.spawn(command, { terminal: { cols, rows } })` — native, no addon
+- **Node**: `@homebridge/node-pty-prebuilt-multiarch` — prebuilt native addon
+
+Preserves the deferred-spawn pattern (PAN-417): wait for first resize message before spawning PTY. Preserves stale-data suppression (200ms) and dimension-toggle repaint.
 
 **Modifies:**
 - `src/dashboard/server/ws-rpc.ts` — Add `subscribeTerminal` streaming RPC
 - `src/dashboard/frontend/src/components/TerminalPanel.tsx` — Subscribe via RPC stream
 
-**Creates:**
-- `src/dashboard/server/services/terminal-service.ts` — Extract node-pty/tmux management from index.ts
-
-**Design:** `subscribeTerminal` takes `{ sessionName, cols, rows }`, spawns `tmux attach-session` via node-pty, streams `TerminalChunk { data: string }` to client. Handles resize messages from client. On WebSocket close, kills PTY (not tmux session).
-
-**Reference:** Current WebSocket terminal code at index.ts lines ~13064-13200
+**Reference:** T3Code `apps/server/src/terminal/Layers/BunPTY.ts` for Bun PTY pattern. Current Panopticon `index.ts` lines 13064-13720 for full terminal logic including remote/Fly.io path.
 
 **Acceptance criteria:**
 - [ ] Terminal panel shows live agent output via WebSocket RPC
-- [ ] Resize works
+- [ ] Works on both Bun (dev) and Node (production) runtimes
+- [ ] Resize works correctly
+- [ ] Deferred spawn + stale data suppression preserved
 - [ ] Multiple terminals can be open simultaneously
 - [ ] PTY cleanup on disconnect (no leaked processes)
 
@@ -522,26 +612,92 @@ export const {category}Routes = Layer.mergeAll(list, action, /* ... */);
 ### B21: Cleanup + Verification
 
 **Deletes:**
-- `src/dashboard/server/index.ts` (the 15,777-line Express file)
+- `src/dashboard/server/index.ts` (15,777 lines)
+- `package-lock.json` (replaced by `bun.lock`)
 
-**Removes from `package.json`:**
-- `express`, `cors`, `socket.io`, `socket.io-client`
-
-**Removes from frontend `package.json`:**
-- `socket.io-client` (if present)
+**Removes from dependencies:**
+- `express`, `cors`, `socket.io`, `ws` (raw WebSocket server)
+- `socket.io-client` (if in frontend)
 
 **Modifies:**
-- `CLAUDE.md` — Update architecture section for Effect.js
+- `CLAUDE.md` — Update architecture section for Effect.js + Bun
 - `docs/INDEX.md` — Update references
 
-**Verification (Playwright):**
+**Playwright verification:**
 - [ ] Dashboard loads in <3 seconds
-- [ ] Click kanban card → detail panel appears in <1 second
+- [ ] Click kanban card → detail panel in <1 second
 - [ ] Terminal tab shows live output
-- [ ] Plan button → planning dialog → agent starts
-- [ ] All buttons (Watch, Tasks, Tell, Kill, Wipe, etc.) work
+- [ ] Plan → planning dialog → agent starts (full flow)
+- [ ] All action buttons work (Watch, Tasks, Tell, Kill, Wipe, etc.)
 - [ ] HTTP requests/minute from idle board: <5
 - [ ] WebSocket connections: exactly 1
+
+---
+
+## Route Migration Details (B6–B17)
+
+### Pattern
+
+```typescript
+// src/dashboard/server/routes/{category}.ts
+import { Effect, Layer } from "effect";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+
+const list = HttpRouter.add("GET", "/api/{category}",
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    // Parse query: HttpServerRequest.toURL(request) → url.searchParams
+    // Wrap existing logic: yield* Effect.tryPromise(() => existingAsyncFn())
+    return HttpServerResponse.json(result);
+  }).pipe(Effect.catchAll((error) =>
+    Effect.succeed(HttpServerResponse.json({ error: String(error) }, { status: 500 }))
+  ))
+);
+
+export const {category}Routes = Layer.mergeAll(list, /* ... */);
+```
+
+### Agent Instructions
+
+1. `grep "app\.\(get\|post\|put\|delete\)('/api/{category}" src/dashboard/server/index.ts` to find ALL routes
+2. Create `src/dashboard/server/routes/{category}.ts`
+3. Convert each Express route to `HttpRouter.add()` — wrap business logic in `Effect.tryPromise()`
+4. Replace `socketIo.emit(...)` with `yield* eventStore.append(...)` per mapping table
+5. Replace `execSync` with `yield* Effect.tryPromise(() => execAsync(...))`
+6. Export single `{category}Routes` Layer
+7. Do NOT import or modify `server.ts`
+
+### Route Conversion Cheat Sheet
+
+| Express | Effect |
+|---------|--------|
+| `req.params.id` | `HttpServerRequest.params(request).id` |
+| `req.query.foo` | `HttpServerRequest.toURL(request)` → `url.searchParams.get('foo')` |
+| `req.body` | `yield* HttpServerRequest.bodyJson(request)` |
+| `res.json(data)` | `HttpServerResponse.json(data)` |
+| `res.status(404).json(...)` | `HttpServerResponse.json(data, { status: 404 })` |
+| `res.sendFile(path)` | `yield* HttpServerResponse.file(path)` |
+| `try { } catch { }` | `Effect.tryPromise({ try, catch })` |
+| `async (req, res) => {}` | `Effect.gen(function* () {})` |
+| Global variable | `yield* ServiceTag` (DI) |
+| `socketIo.emit(...)` | `yield* eventStore.append(...)` |
+
+### Bead Assignments
+
+| Bead | File | Routes | Grep Pattern |
+|------|------|--------|--------------|
+| B6 | `routes/issues.ts` | 17 | `'/api/issues` |
+| B7 | `routes/agents.ts` | 20 | `'/api/agents` |
+| B8 | `routes/workspaces.ts` | 19 | `'/api/workspaces` |
+| B9 | `routes/specialists.ts` | 33 | `'/api/specialists` |
+| B10 | `routes/costs.ts` | 11 | `'/api/costs` |
+| B11 | `routes/cloister.ts` | 9 | `'/api/cloister` |
+| B12 | `routes/resources.ts` | 8 | `'/api/resources` |
+| B13 | `routes/mission-control.ts` | 7 | `'/api/mission-control` |
+| B14 | `routes/remote.ts` | 9 | `'/api/remote` |
+| B15 | `routes/settings.ts` | 6 | `'/api/settings` |
+| B16 | `routes/metrics.ts` + `routes/convoys.ts` | 11 | `'/api/metrics\|/api/convoys` |
+| B17 | `routes/misc.ts` | 35 | Everything else (activity, confirmations, tracker-status, handoffs, shadow, planning, deacon, skills, version, godview, rally, project-mappings, services, registered-projects, cache-status) |
 
 ---
 
@@ -552,18 +708,18 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 ### Issue Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
-| `issue.updated` | IssueDataService detects change from tracker poll | `{ identifier, changedFields: Record<string, unknown> }` |
-| `issue.status-changed` | Status transition (todo→in_progress, etc.) | `{ identifier, from, to }` |
-| `issue.labels-changed` | Labels added/removed | `{ identifier, added: string[], removed: string[] }` |
-| `issue.shadow-updated` | Shadow state inference changes | `{ identifier, shadowStatus, shadowTrackerStatus }` |
+| `issue.updated` | IssueDataService detects change | `{ identifier, changedFields }` |
+| `issue.status-changed` | Status transition | `{ identifier, from, to }` |
+| `issue.labels-changed` | Labels added/removed | `{ identifier, added[], removed[] }` |
+| `issue.shadow-updated` | Shadow state inference | `{ identifier, shadowStatus }` |
 
 ### Agent Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
-| `agent.started` | Agent tmux session created | `{ agentId, issueId, model, phase, runtime }` |
-| `agent.stopped` | Agent exited or killed | `{ agentId, issueId, exitCode? }` |
-| `agent.heartbeat` | Stop-hook fires (idle detection) | `{ agentId, state, contextPercent?, lastActivity }` |
-| `agent.stuck` | Deacon detects stuck agent | `{ agentId, issueId, stuckDuration }` |
+| `agent.started` | tmux session created | `{ agentId, issueId, model, phase, runtime }` |
+| `agent.stopped` | Agent exited/killed | `{ agentId, issueId, exitCode? }` |
+| `agent.heartbeat` | Stop-hook fires | `{ agentId, state, contextPercent?, lastActivity }` |
+| `agent.stuck` | Deacon detects stuck | `{ agentId, issueId, stuckDuration }` |
 
 ### Pipeline Events
 | Event Type | Emitted When | Payload |
@@ -572,7 +728,7 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 | `pipeline.review-completed` | Review passes/fails | `{ issueId, result, feedback? }` |
 | `pipeline.test-started` | Test specialist spawned | `{ issueId, specialistId, project }` |
 | `pipeline.test-completed` | Tests pass/fail | `{ issueId, result, output? }` |
-| `pipeline.merge-ready` | All gates passed, waiting for human | `{ issueId }` |
+| `pipeline.merge-ready` | Gates passed, waiting for human | `{ issueId }` |
 | `pipeline.merged` | Human clicked merge | `{ issueId, branch, project }` |
 
 ### Planning Events
@@ -580,31 +736,27 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 |------------|-------------|---------|
 | `planning.started` | Planning agent launched | `{ issueId, sessionName, location }` |
 | `planning.completed` | stop-hook fires complete-planning | `{ issueId, beadCount }` |
-| `planning.failed` | Workspace creation or planning fails | `{ issueId, error }` |
+| `planning.failed` | Planning fails | `{ issueId, error }` |
 
 ### Specialist Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
-| `specialist.spawned` | Specialist session created | `{ id, type, issueId, project }` |
+| `specialist.spawned` | Session created | `{ id, type, issueId, project }` |
 | `specialist.completed` | Specialist finishes | `{ id, type, issueId, result }` |
-| `specialist.handoff` | One specialist hands off to next | `{ fromId, toType, issueId }` |
+| `specialist.handoff` | Hands off to next | `{ fromId, toType, issueId }` |
 
 ### Workspace Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
-| `workspace.created` | `pan workspace create` completes | `{ issueId, path, type }` |
-| `workspace.containers-ready` | Docker containers healthy | `{ issueId, containers: string[] }` |
-| `workspace.deleted` | Deep-wipe or worktree remove | `{ issueId }` |
+| `workspace.created` | Workspace creation completes | `{ issueId, path, type }` |
+| `workspace.containers-ready` | Docker containers healthy | `{ issueId, containers[] }` |
+| `workspace.deleted` | Deep-wipe | `{ issueId }` |
 
-### Cost Events
+### Cost / Bead Events
 | Event Type | Emitted When | Payload |
 |------------|-------------|---------|
 | `cost.recorded` | Cost event ingested | `{ issueId, agentId, amount, model }` |
-
-### Bead Events
-| Event Type | Emitted When | Payload |
-|------------|-------------|---------|
-| `bead.status-changed` | Bead transitions state | `{ issueId, beadId, from, to }` |
+| `bead.status-changed` | Bead transitions | `{ issueId, beadId, from, to }` |
 
 ---
 
@@ -613,7 +765,7 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 ### Streaming
 | Method | Input | Output | Description |
 |--------|-------|--------|-------------|
-| `pan.subscribeDomainEvents` | `{}` | `Stream<DomainEvent>` | All events, sequence-ordered, with replay |
+| `pan.subscribeDomainEvents` | `{}` | `Stream<DomainEvent>` | All events, sequence-ordered with replay |
 | `pan.subscribeTerminal` | `{ sessionName, cols, rows }` | `Stream<TerminalChunk>` | Live PTY output |
 | `pan.subscribeAgentOutput` | `{ agentId }` | `Stream<OutputLine>` | Agent log tail |
 
@@ -633,46 +785,14 @@ Every event: `{ type: string, sequence: number, timestamp: string, payload: {...
 
 ---
 
-## Effect.js Setup Notes (for agents)
-
-### Dependencies (pin exact versions — match T3Code)
-```bash
-npm install effect@4.0.0-beta.43 @effect/platform-node@4.0.0-beta.43
-cd src/dashboard/frontend && npm install effect@4.0.0-beta.43 zustand@^5
-```
-
-### Node.js Compatibility
-- We use Node 22, not Bun — use `@effect/platform-node`, not `@effect/platform-bun`
-- Effect 4.x HTTP is at `effect/unstable/http` (will stabilize in a future release)
-- esbuild bundles Effect fine (standard ESM)
-- Our Vitest config needs `maxForks: 4` (CLAUDE.md rule — prevents OOM)
-
-### Route Conversion Cheat Sheet
-
-**Express → Effect mapping:**
-
-| Express | Effect |
-|---------|--------|
-| `req.params.id` | `HttpServerRequest.params(request).id` |
-| `req.query.foo` | `HttpServerRequest.toURL(request)` → `url.searchParams.get('foo')` |
-| `req.body` | `yield* HttpServerRequest.bodyJson(request)` |
-| `res.json(data)` | `HttpServerResponse.json(data)` |
-| `res.status(404).json(...)` | `HttpServerResponse.json(data, { status: 404 })` |
-| `res.sendFile(path)` | `yield* HttpServerResponse.file(path)` |
-| `try/catch` | `Effect.catchAll()` or `Effect.tryPromise({ try, catch })` |
-| `async (req, res) => { }` | `Effect.gen(function* () { })` |
-| Global variable access | `yield* ServiceTag` (dependency injection) |
-
----
-
 ## Testing Strategy
 
 1. **Contracts (B1):** Schema encode/decode round-trip for every event and RPC type
-2. **Event store (B2):** append, readFrom, liveStream, sequence gaps, restart recovery
-3. **Route modules (B6–B17):** For each route, call the Effect handler with mock request and verify response matches current Express behavior. Use `@effect/vitest` or plain Vitest with `Effect.runPromise`.
-4. **Recovery coordinator (B4):** Unit test state machine: bootstrap → streaming → gap → replay → streaming
-5. **Zustand reducers (B4):** Unit test each event type produces correct state transition
-6. **Integration (B21):** Playwright E2E — full flow from board load through card click to terminal view
+2. **Event store (B2):** append, readFrom, liveStream, sequence ordering, restart recovery
+3. **Route modules (B6–B17):** Call Effect handler with mock request, verify response matches Express behavior. Use Vitest + `Effect.runPromise`.
+4. **Recovery coordinator (B4):** State machine: bootstrap → streaming → gap → replay → streaming
+5. **Zustand reducers (B4):** Each event type → correct state transition
+6. **Integration (B21):** Playwright E2E — board load → card click → terminal view
 
 ---
 
@@ -680,24 +800,26 @@ cd src/dashboard/frontend && npm install effect@4.0.0-beta.43 zustand@^5
 
 | Bead | Metric | Target |
 |------|--------|--------|
-| B5 | Effect server running, health endpoint | Functional |
-| B18 | All 185 routes return correct responses | Zero regressions |
+| B0 | Bun install + existing tests pass | No regressions |
+| B5 | Effect server running, health + RPC | Functional |
+| B18 | All 185 routes correct responses | Zero regressions |
 | B18 | All existing tests pass | 223/223 |
 | B19 | Detail panel open time | <1 second |
-| B19 | HTTP requests/min (kanban board) | <5 (from 80+) |
-| B20 | Terminal streams live via RPC | Zero HTTP polling |
+| B19 | HTTP req/min (kanban board) | <5 (from 80+) |
+| B20 | Terminal streams via RPC, both runtimes | Zero HTTP polling |
 | B21 | Express/socket.io removed | Zero deps |
 | B21 | `index.ts` deleted | 15,777 lines gone |
 
 ---
 
-## Risk
+## Risk Assessment (Post-Investigation)
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Effect 4.x is beta | API may change | Pin `4.0.0-beta.43` (same as T3Code production) |
-| 185 routes to convert | Large scope | 12 parallel agents, each isolated to one file |
-| node-pty + Effect WS | Compatibility unknown | Prototype in B20 early, fallback to raw WS |
-| Build system (esbuild) | Bundle issues | Test in B5 before parallelizing |
-| Merge conflicts | Parallel agents touch same files | Each agent creates ONE file, B18 integrates |
-| Frontend React Query removal | State timing | Keep React Query for external data (git), only remove for app state |
+| Risk | Level | Finding | Mitigation |
+|------|-------|---------|------------|
+| Effect 4.x beta | 🟡 Medium | Effect recommends v3 for prod. T3Code runs beta.43 in prod. | Pin exact `4.0.0-beta.43`. T3Code is canary. |
+| node-pty + Bun | ✅ Resolved | Native addon won't work in Bun. T3Code uses `Bun.spawn()` native PTY. | Dual-runtime PTY: Bun.spawn() on Linux, node-pty on Node. |
+| Build system | ✅ Resolved | T3Code uses tsdown + Vite. Bun executes TS natively in dev. | Replace esbuild with tsdown. `bun run` for dev. |
+| 185 routes | 🟡 Medium | Large scope. | 12 parallel agents, each isolated to one file. |
+| Merge conflicts | ✅ Resolved | Each agent creates ONE file, B18 integrates. | No shared file modifications during parallel work. |
+| Frontend state timing | 🟢 Low | React Query → Zustand is well-understood migration. | Keep React Query for external data (git status). |
+| SQLite runtime | ✅ Resolved | T3Code has dual-runtime SQLite with auto-detection. | Copy pattern: Bun native sqlite / node:sqlite. |
