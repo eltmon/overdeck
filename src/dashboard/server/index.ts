@@ -7055,6 +7055,22 @@ app.post('/api/specialists/done', async (req, res) => {
                 status: 'completed',
               });
 
+              // Emit subitem status events for all ACs that were marked completed
+              const updatedDoc = readWorkspacePlan(workspacePath);
+              const updatedItem = updatedDoc?.plan.items.find(i => i.id === updatedItemId);
+              if (updatedItem?.subItems) {
+                for (const sub of updatedItem.subItems) {
+                  if (sub.metadata?.kind === 'acceptance_criterion' && sub.status === 'completed') {
+                    socketIo.emit('plan:subitem-status-changed', {
+                      issueId: normalizedIssueId,
+                      itemId: updatedItemId,
+                      subItemId: sub.id,
+                      status: 'completed',
+                    });
+                  }
+                }
+              }
+
               // Auto-wake: check which tasks are now unblocked and wake the work agent
               try {
                 const unblockedItems = getUnblockedItems(workspacePath, updatedItemId);
