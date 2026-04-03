@@ -62,8 +62,8 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
   }
 
   // Show what we're inspecting
-  const diffBase = getDiffBase(project.projectKey, normalizedIssueId, workspacePath);
-  const diffStats = getDiffStats(workspacePath, diffBase);
+  const diffBase = await getDiffBase(project.projectKey, normalizedIssueId, workspacePath);
+  const diffStats = await getDiffStats(workspacePath, diffBase);
 
   console.log('');
   console.log(chalk.bold('Requesting inspection'));
