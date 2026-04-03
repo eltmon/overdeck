@@ -1902,8 +1902,16 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         body: JSON.stringify({ issueId: issue.identifier }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to start agent');
+        // Handle non-JSON responses (e.g., Traefik 502 "Bad Gateway")
+        const text = await res.text();
+        let message = `Failed to start agent (${res.status})`;
+        try {
+          const data = JSON.parse(text);
+          message = data.error || message;
+        } catch {
+          message = text.length < 200 ? text : message;
+        }
+        throw new Error(message);
       }
       return res.json();
     },

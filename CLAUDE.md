@@ -10,6 +10,19 @@ This means:
 - If a component is generating bad data, fix the component — don't add defensive code downstream to tolerate bad data.
 - If an agent is misbehaving, fix the agent's constraints — don't add monitoring to catch the misbehavior after the fact.
 
+## CRITICAL: Never Work Around Broken Things — Fix Them
+
+**When something is broken, FIX IT. Never manually do what the code should do, never dismiss errors as "transient", never bypass a broken tool by using an alternative.**
+
+This means:
+- If a test should verify behavior, don't manually verify it — fix the test and run it.
+- If an API endpoint should create beads, don't run `bd init` manually — fix the endpoint.
+- If Playwright MCP crashes, don't fall back to `curl` — investigate why it crashed and fix it.
+- If a label should be removed by the merge flow, don't run `gh issue edit` — fix the merge flow.
+- If the dashboard should show the right status, don't tell the user to refresh — fix the data pipeline.
+
+**Every workaround is a bug you chose not to fix.** The user has stated this hundreds of times: always pick up the trash, never walk over it, zero intentional technical debt. This applies to EVERYTHING — tools, tests, data, UI, infrastructure. No exceptions.
+
 ## CRITICAL: Deliver Complete Features — No Partial Implementations
 
 **Unless explicitly asked to break work into phases, deliver the entire feature in a single issue.** A feature is idempotent — partial delivery provides zero value to the end user.
