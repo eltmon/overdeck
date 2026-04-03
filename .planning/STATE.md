@@ -50,3 +50,7 @@ The `plan.vbrief.json` is already fetched by both `BeadsTasksPanel` (via `useQue
 
 - IN: Tasks panel AC expand/collapse, DAG inline checklist toggle, AC badge on nodes, socket.io subitem events
 - OUT: No API changes, no new endpoints, no changes to AC extraction logic
+
+## Specialist Feedback
+
+- **[2026-04-03T19:44Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
