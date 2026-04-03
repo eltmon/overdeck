@@ -17,7 +17,7 @@
       {
         "id": "list-ac-expand",
         "title": "Add expand/collapse AC sections to list view TaskItem",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "metadata": {
           "difficulty": "medium",
@@ -30,25 +30,25 @@
           {
             "id": "list-ac-expand.badge-visible",
             "title": "Each bead row shows AC count badge (e.g., '2/4 AC') when the bead has AC subtasks",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "list-ac-expand.chevron-toggle",
             "title": "Clicking chevron expands/collapses AC checklist under the bead row, collapsed by default",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "list-ac-expand.three-states",
             "title": "AC items render with three visual states: green check (completed), yellow dot (in_progress), gray circle (pending/blocked)",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "list-ac-expand.bead-matching",
             "title": "Beads are correctly matched to plan items using the '{planId}: {itemTitle}' title convention",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -56,7 +56,7 @@
       {
         "id": "dag-ac-badge",
         "title": "Add always-visible AC progress badge to DAG nodes",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "metadata": {
           "difficulty": "simple",
@@ -69,13 +69,13 @@
           {
             "id": "dag-ac-badge.shows-count",
             "title": "DAG nodes with AC subtasks display a compact progress badge (e.g., '2/4 AC') in the badge row",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "dag-ac-badge.always-visible",
             "title": "AC badge is visible even when the Show AC toggle is off",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -83,7 +83,7 @@
       {
         "id": "dag-ac-toggle",
         "title": "Add Show AC toggle with inline checklist in DAG nodes",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "metadata": {
           "difficulty": "medium",
@@ -96,25 +96,25 @@
           {
             "id": "dag-ac-toggle.button-present",
             "title": "A 'Show AC' / 'Hide AC' toggle button is visible in the DAG header or controls area",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "dag-ac-toggle.nodes-expand",
             "title": "When toggled on, nodes with AC subtasks expand to show inline checklist with status indicators",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "dag-ac-toggle.dynamic-height",
             "title": "Node height adjusts dynamically based on number of AC items; dagre layout re-runs correctly",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "dag-ac-toggle.off-by-default",
             "title": "Toggle is off by default — current compact node behavior preserved",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -122,7 +122,7 @@
       {
         "id": "socket-subitem",
         "title": "Wire up socket.io event for real-time AC subitem status changes",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "metadata": {
           "difficulty": "medium",
@@ -135,19 +135,19 @@
           {
             "id": "socket-subitem.server-emits",
             "title": "Server emits 'plan:subitem-status-changed' event with {issueId, itemId, subItemId, status} when AC status changes",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "socket-subitem.frontend-listens",
             "title": "PlanDAGViewer listens for the event and updates React Query cache in-place for the matching subItem",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "socket-subitem.both-views-update",
             "title": "Both list view and DAG view reflect subitem status changes in real-time without page refresh",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
