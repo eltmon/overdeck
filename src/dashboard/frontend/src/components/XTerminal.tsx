@@ -362,18 +362,35 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     console.log('XTerminal: Starting RPC subscription with dimensions:', initialCols, 'x', initialRows);
 
     // Subscribe to terminal output stream via Effect RPC
-    // The transport handles reconnection automatically
+    // Use longer retry delay (2s) to give planning agents time to create tmux sessions
     connectedRef.current = true;
     term.clear();
+    term.writeln('\x1b[33m● Connecting to session...\x1b[0m');
+    let hasReceivedData = false;
 
     const unsubscribe = getTransport().subscribe(
-      (client) => client[WS_METHODS.subscribeTerminal]({
-        sessionName,
-        cols: initialCols,
-        rows: initialRows,
-      }),
+      (client) => {
+        // Show reconnecting message on retry (not first connect)
+        if (hasReceivedData) {
+          term.writeln('\r\n\x1b[33m● Connection lost. Reconnecting...\x1b[0m');
+        } else if (!hasReceivedData) {
+          // Still waiting for first data — update status
+          term.write('\r\x1b[2K\x1b[33m● Waiting for session to start...\x1b[0m');
+        }
+        return client[WS_METHODS.subscribeTerminal]({
+          sessionName,
+          cols: initialCols,
+          rows: initialRows,
+        });
+      },
       (output) => {
         const dataStr = output.data;
+
+        // Clear the "Connecting" message on first real data
+        if (!hasReceivedData) {
+          hasReceivedData = true;
+          term.clear();
+        }
 
         // DEBUG: Log incoming data
         if (DEBUG_TERMINAL) {
@@ -389,6 +406,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         writeQueue.push(dataStr);
         processWriteQueue();
       },
+      { retryDelay: 2000 },
     );
 
     unsubscribeRef.current = unsubscribe;
