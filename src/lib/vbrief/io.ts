@@ -38,7 +38,7 @@ export function readPlan(planPath: string): VBriefDocument {
     ...item,
     status: item.status || 'pending',
     narrative: item.narrative || (item.description ? { Action: item.description } : undefined),
-    metadata: item.metadata || (item.difficulty ? { difficulty: item.difficulty, issueLabel: (parsed.issue || parsed.id || '').toLowerCase() } : undefined),
+    metadata: item.metadata || (item.difficulty ? { difficulty: item.difficulty, issueLabel: (parsed.issue || parsed.issueId || parsed.id || '').toLowerCase() } : undefined),
     subItems: item.subItems || (Array.isArray(item.acceptance) ? item.acceptance.map((a: string, i: number) => ({
       id: `${item.id}.ac${i + 1}`,
       title: a,
@@ -53,7 +53,7 @@ export function readPlan(planPath: string): VBriefDocument {
       created: new Date().toISOString(),
     },
     plan: {
-      id: parsed.issue || parsed.id || '',
+      id: parsed.issue || parsed.issueId || parsed.id || '',
       title: parsed.title || '',
       status: parsed.status || 'approved',
       items,
