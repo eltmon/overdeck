@@ -22,7 +22,8 @@ Run `/pan-restart` to restart both the frontend (port 3010) and API server (port
 
 ```bash
 # Kill existing processes
-pkill -f "tsx.*server/index" 2>/dev/null
+pkill -f "node.*server\.js" 2>/dev/null
+pkill -f "bun.*server/main" 2>/dev/null
 pkill -f "vite.*dashboard" 2>/dev/null
 sleep 1
 

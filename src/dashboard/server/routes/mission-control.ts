@@ -46,28 +46,14 @@ import { getAgentCommand } from '../../../lib/settings.js';
 import { getReviewStatus } from '../review-status.js';
 import { getLinearApiKey, getGitHubConfig } from '../services/tracker-config.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import { CacheService } from '../services/cache-service.js';
 
 const execAsync = promisify(exec);
 
-// ─── Shared IssueDataService singleton ───────────────────────────────────────
-
-const noopIo = {
-  emit: () => {},
-  on: () => {},
-} as any;
-
-let _issueDataService: IssueDataService | null = null;
+// ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
 function getIssueDataService(): IssueDataService {
-  if (!_issueDataService) {
-    const cache = new CacheService();
-    _issueDataService = new IssueDataService(noopIo, cache);
-    _issueDataService.start().catch((err: unknown) => {
-      console.error('[mission-control-route] IssueDataService.start() failed:', err);
-    });
-  }
-  return _issueDataService;
+  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
+  return getSharedIssueService();
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────

@@ -12,7 +12,6 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import type { Server as SocketIOServer } from 'socket.io';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
@@ -94,7 +93,6 @@ function mapRallyStateToCanonical(issueState: string): string {
 
 export class IssueDataService {
   private cache: CacheService;
-  private io: SocketIOServer;
   private trackers: Record<string, TrackerState> = {};
   private linearLastFullRefresh = 0;
   private started = false;
@@ -106,8 +104,7 @@ export class IssueDataService {
     this._onIssuesChanged = fn;
   }
 
-  constructor(io: SocketIOServer, cache: CacheService) {
-    this.io = io;
+  constructor(cache: CacheService) {
     this.cache = cache;
 
     for (const tracker of ['github', 'linear', 'rally'] as const) {
@@ -149,16 +146,6 @@ export class IssueDataService {
     this.scheduleNext('linear');
     this.scheduleNext('rally');
 
-    // On new client connection, send cached snapshot immediately
-    this.io.on('connection', (socket) => {
-      const issues = this.getIssues();
-      socket.emit('issues:snapshot', issues);
-
-      // Client can request a fresh snapshot (e.g., on tab re-focus)
-      socket.on('issues:request-snapshot', () => {
-        socket.emit('issues:snapshot', this.getIssues());
-      });
-    });
   }
 
   /**
@@ -421,22 +408,15 @@ export class IssueDataService {
   }
 
   private pushSnapshot(): void {
-    const issues = this.getIssues();
-    this.io.emit('issues:snapshot', issues);
-    this._onIssuesChanged?.(issues);
+    this._onIssuesChanged?.(this.getIssues());
   }
 
   private pushUpdated(): void {
-    const issues = this.getIssues();
-    this.io.emit('issues:updated', issues);
-    this._onIssuesChanged?.(issues);
+    this._onIssuesChanged?.(this.getIssues());
   }
 
-  /**
-   * Push rate limit/meta info to connected clients.
-   */
   private pushMeta(): void {
-    this.io.emit('issues:meta', this.getDiagnostics());
+    // Diagnostics are served via GET /api/issues/diagnostics — no push needed
   }
 
   // ---------------------------------------------------------------

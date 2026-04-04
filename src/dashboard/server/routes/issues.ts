@@ -49,11 +49,6 @@ const execAsync = promisify(exec);
 // The service is started lazily on first use so background polling begins
 // at server startup without blocking route registration.
 
-const noopIo = {
-  emit: () => {},
-  on: () => {},
-} as any;
-
 function getIssueDataService(): IssueDataService {
   // Use the shared singleton — started by server.ts on boot
   const { getSharedIssueService } = require('../services/issue-service-singleton.js');
