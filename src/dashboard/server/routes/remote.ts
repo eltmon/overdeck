@@ -31,6 +31,7 @@ import {
   sendToRemoteAgent,
 } from '../../../lib/remote/index.js';
 import { loadConfig as loadPanConfig } from '../../../lib/config.js';
+import { EventStoreService } from '../services/domain-services.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -242,6 +243,7 @@ const startRemoteWorkspaceRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -259,6 +261,7 @@ const startRemoteWorkspaceRoute = HttpRouter.add(
         // Start containers
         await fly.ssh(metadata.vmName, 'cd /workspace && docker compose up -d 2>/dev/null || true');
 
+        Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
         return HttpServerResponse.json({ success: true, message: `Workspace ${issueId} started` });
       },
       catch: (error: unknown) => {
@@ -277,6 +280,7 @@ const stopRemoteWorkspaceRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -295,6 +299,7 @@ const stopRemoteWorkspaceRoute = HttpRouter.add(
         // Stop VM
         await fly.stopVm(metadata.vmName);
 
+        Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
         return HttpServerResponse.json({ success: true, message: `Workspace ${issueId} stopped` });
       },
       catch: (error: unknown) => {
@@ -314,6 +319,7 @@ const startRemoteAgentRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -335,6 +341,7 @@ const startRemoteAgentRoute = HttpRouter.add(
           model,
         });
 
+        Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
         return HttpServerResponse.json(state);
       },
       catch: (error: unknown) => {
@@ -353,6 +360,7 @@ const stopRemoteAgentRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -365,6 +373,7 @@ const stopRemoteAgentRoute = HttpRouter.add(
         const agentId = `agent-${issueId.toLowerCase()}`;
         await killRemoteAgent(agentId, metadata.vmName);
 
+        Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
         return HttpServerResponse.json({ success: true, message: `Agent ${agentId} stopped` });
       },
       catch: (error: unknown) => {

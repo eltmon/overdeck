@@ -132,7 +132,7 @@ export default function App() {
   const { data: confirmations = [] } = useQuery({
     queryKey: ['confirmations'],
     queryFn: fetchConfirmations,
-    refetchInterval: 2000,
+    refetchInterval: 10000,
   });
 
   // Show the most recent confirmation request
