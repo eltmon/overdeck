@@ -77,6 +77,13 @@ import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
 
+// ─── Shared IssueDataService singleton ───────────────────────────────────────
+
+function getIssueDataService(): import('../services/issue-data-service.js').IssueDataService {
+  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
+  return getSharedIssueService();
+}
+
 // ─── Cache ────────────────────────────────────────────────────────────────────
 
 const AGENTS_CACHE_TTL_MS = 5000;
@@ -1566,6 +1573,7 @@ const postAgentsRoute = HttpRouter.add(
             timestamp: new Date().toISOString(),
             payload: { agentId: issueId, issueId },
           }));
+          try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
           return jsonResponse({
             success: true,
             message: `Starting remote agent for ${issueId}`,
@@ -1749,6 +1757,7 @@ const postAgentsRoute = HttpRouter.add(
                 }
               })();
 
+              try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
               return jsonResponse({
                 success: true,
                 message: `Starting containers and agent for ${issueId} (this may take a few minutes)`,
@@ -1770,6 +1779,7 @@ const postAgentsRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { agentId: issueId, issueId },
         }));
+        try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
         return jsonResponse({
           success: true,
           message: `Starting agent for ${issueId}`,
