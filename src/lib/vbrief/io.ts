@@ -20,11 +20,46 @@ export function findPlan(workspacePath: string): string | null {
 
 /**
  * Reads and parses plan.vbrief.json from the given path.
+ * Handles both standard format ({ vBRIEFInfo, plan: {...} }) and flat format
+ * ({ issue, title, items, edges? }) produced by some planning prompts.
  * Throws if the file does not exist or is invalid JSON.
  */
 export function readPlan(planPath: string): VBriefDocument {
   const raw = readFileSync(planPath, 'utf-8');
-  return JSON.parse(raw) as VBriefDocument;
+  const parsed = JSON.parse(raw);
+
+  // Standard format — has vBRIEFInfo and plan
+  if (parsed.vBRIEFInfo && parsed.plan) {
+    return parsed as VBriefDocument;
+  }
+
+  // Flat format — normalize to standard
+  const items = (parsed.items || []).map((item: any) => ({
+    ...item,
+    status: item.status || 'pending',
+    narrative: item.narrative || (item.description ? { Action: item.description } : undefined),
+    metadata: item.metadata || (item.difficulty ? { difficulty: item.difficulty, issueLabel: (parsed.issue || parsed.id || '').toLowerCase() } : undefined),
+    subItems: item.subItems || (Array.isArray(item.acceptance) ? item.acceptance.map((a: string, i: number) => ({
+      id: `${item.id}.ac${i + 1}`,
+      title: a,
+      status: 'pending',
+      metadata: { kind: 'acceptance_criterion' },
+    })) : []),
+  }));
+
+  return {
+    vBRIEFInfo: {
+      version: '0.5',
+      created: new Date().toISOString(),
+    },
+    plan: {
+      id: parsed.issue || parsed.id || '',
+      title: parsed.title || '',
+      status: parsed.status || 'approved',
+      items,
+      edges: parsed.edges || [],
+    },
+  } as VBriefDocument;
 }
 
 /**
