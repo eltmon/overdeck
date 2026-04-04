@@ -16,7 +16,3 @@ Increase the inline confirmation timeout on the "Start Agent" / "Resume Agent" b
 - **Out of scope:** Changing the confirmation UX pattern (stays as auto-reset timeout)
 
 ## Difficulty: trivial
-
-## Specialist Feedback
-
-- **[2026-04-04T22:35Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
