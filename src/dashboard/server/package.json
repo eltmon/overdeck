@@ -9,6 +9,7 @@
     "build": "node esbuild.config.mjs"
   },
   "dependencies": {
+    "@panopticon/contracts": "workspace:*",
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "@linear/sdk": "^29.0.0",
     "@types/ws": "^8.18.1",

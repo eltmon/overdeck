@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * Initialize the complete database schema.
@@ -139,6 +139,20 @@ export function initSchema(db: Database.Database): void {
       window_start TEXT NOT NULL,
       limit_per_window INTEGER NOT NULL DEFAULT 1000
     );
+
+    -- ===== Domain Events (PAN-428: push-first architecture) =====
+    CREATE TABLE IF NOT EXISTS events (
+      sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
+      type      TEXT    NOT NULL,
+      timestamp TEXT    NOT NULL,
+      payload   TEXT    NOT NULL  -- JSON
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_events_type
+      ON events(type);
+
+    CREATE INDEX IF NOT EXISTS idx_events_timestamp
+      ON events(timestamp);
   `);
 
   // Record schema version
@@ -205,6 +219,24 @@ export function runMigrations(db: Database.Database): void {
     try {
       db.exec(`ALTER TABLE processed_sessions ADD COLUMN byte_offset INTEGER NOT NULL DEFAULT 0`);
     } catch { /* already exists */ }
+  }
+
+  // v3 → v4: add events table for push-first architecture (PAN-428)
+  if (currentVersion < 4) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS events (
+        sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
+        type      TEXT    NOT NULL,
+        timestamp TEXT    NOT NULL,
+        payload   TEXT    NOT NULL  -- JSON
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_events_type
+        ON events(type);
+
+      CREATE INDEX IF NOT EXISTS idx_events_timestamp
+        ON events(timestamp);
+    `);
   }
 
   // After all migrations, set the version
