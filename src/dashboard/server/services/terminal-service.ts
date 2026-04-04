@@ -110,7 +110,25 @@ class NodePtyProcess implements PtyProcess {
 
 // ─── PTY spawn ────────────────────────────────────────────────────────────────
 
+async function waitForTmuxSession(sessionName: string, timeoutMs = 60000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      await execAsync(`tmux has-session -t ${sessionName} 2>/dev/null`);
+      return; // Session exists
+    } catch {
+      // Not ready yet — wait and retry
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  throw new Error(`Timed out waiting for tmux session ${sessionName} (${timeoutMs}ms)`);
+}
+
 async function spawnPty(sessionName: string, cols: number, rows: number): Promise<PtyProcess> {
+  // Wait for the tmux session to exist before attaching.
+  // The planning agent spawn runs in the background — the session may not exist yet.
+  await waitForTmuxSession(sessionName);
+
   const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as Record<string, string>;
   const cwd = homedir();
 
