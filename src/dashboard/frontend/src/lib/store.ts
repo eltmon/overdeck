@@ -89,7 +89,7 @@ function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): Dashb
     agentsById,
     specialistsByName,
     reviewStatusByIssueId,
-    resources: snapshot.resources ?? null,
+    resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
   }
 }
