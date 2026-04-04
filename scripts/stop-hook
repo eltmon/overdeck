@@ -77,7 +77,7 @@ if [[ "$AGENT_ID" == planning-* ]]; then
     # Fire and forget — don't block the stop hook
     curl -s -X POST "http://localhost:3011/api/issues/$ISSUE_ID/complete-planning" \
       -H "Content-Type: application/json" \
-      -d '{}' > /dev/null 2>&1 &
+      -d '{"skipKill":true}' > /dev/null 2>&1 &
   fi
 fi
 
