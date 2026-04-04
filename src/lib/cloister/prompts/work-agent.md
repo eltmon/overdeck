@@ -128,6 +128,15 @@ label filter you will see irrelevant beads from other workspaces.
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
 a separate commit with a separate `bd close`. The inspection fires automatically on
 `bd close` — you do not need to call `pan inspect` manually.
+
+**CRITICAL: Update vBRIEF AC statuses as you complete each bead.** The verification gate
+checks `.planning/plan.vbrief.json` subItem statuses. If you close a bead but leave its
+acceptance criteria as `pending` in the plan, verification will FAIL. After closing each
+bead, update the corresponding item and subItem statuses to `completed`:
+```bash
+node -e "const fs=require('fs'); const p='.planning/plan.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; const item=items.find(i=>i.id==='ITEM_ID'); if(item){item.status='completed';(item.subItems||[]).forEach(s=>s.status='completed')}; fs.writeFileSync(p,JSON.stringify(d,null,2))}"
+```
+Replace `ITEM_ID` with the plan item ID that corresponds to the bead you just closed.
 {{/if}}
 
 {{#if STITCH_DESIGNS}}
@@ -287,6 +296,8 @@ pan work done {{ISSUE_ID}} -c "Brief summary"      # Signal completion
 When ALL tasks are complete, commit and push everything:
 ```bash
 npm test
+# Mark all vBRIEF acceptance criteria as completed (verification gate checks these)
+node -e "const fs=require('fs'); const p='.planning/plan.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; items.forEach(i=>{i.status='completed';(i.subItems||[]).forEach(s=>s.status='completed')}); fs.writeFileSync(p,JSON.stringify(d,null,2))}"
 git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)
 git status
