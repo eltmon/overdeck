@@ -149,6 +149,7 @@ const postTestApiKeyRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         let success = false;
         let error: string | null = null;
         let response: string | null = null;
@@ -305,12 +306,13 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         return HttpServerResponse.json({ success, error, response, latencyMs, model: model || 'default' });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error testing API key:', error);
+          return HttpServerResponse.json({ error: 'Failed to test API key: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error testing API key:', error);
-        return HttpServerResponse.json({ error: 'Failed to test API key: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -340,6 +342,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         let valid = false;
         let error: string | null = null;
         let models: string[] = [];
@@ -427,12 +430,13 @@ const postValidateApiKeyRoute = HttpRouter.add(
           models: valid ? models : undefined,
           error: error || undefined,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error validating API key:', error);
+          return HttpServerResponse.json({ error: 'Failed to validate API key: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error validating API key:', error);
-        return HttpServerResponse.json({ error: 'Failed to validate API key: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );

@@ -84,46 +84,48 @@ const getCostsByIssueRoute = HttpRouter.add(
   Effect.gen(function* () {
     return yield* Effect.tryPromise({
       try: async () => {
-        const dbIssues = getCostsByIssueFromDb();
+        try {
+          const dbIssues = getCostsByIssueFromDb();
 
-        const issues = Object.entries(dbIssues).map(([issueId, data]: [string, any]) => ({
-          issueId,
-          totalCost: data.totalCost,
-          tokenCount: data.inputTokens + data.outputTokens + data.cacheReadTokens + data.cacheWriteTokens,
-          inputTokens: data.inputTokens,
-          outputTokens: data.outputTokens,
-          cacheReadTokens: data.cacheReadTokens,
-          cacheWriteTokens: data.cacheWriteTokens,
-          models: data.models,
-          byModel: Object.fromEntries(
-            Object.entries(data.models).map(([model, stats]: [string, any]) => [
-              model,
-              { cost: stats.cost, tokens: stats.tokens },
-            ])
-          ),
-          byStage: Object.fromEntries(
-            Object.entries(data.stages || {}).map(([stage, stats]: [string, any]) => [
-              stage,
-              { cost: stats.cost, tokens: stats.tokens },
-            ])
-          ),
-          budgetWarning: data.budgetWarning,
-          lastUpdated: data.lastUpdated,
-        }));
+          const issues = Object.entries(dbIssues).map(([issueId, data]: [string, any]) => ({
+            issueId,
+            totalCost: data.totalCost,
+            tokenCount: data.inputTokens + data.outputTokens + data.cacheReadTokens + data.cacheWriteTokens,
+            inputTokens: data.inputTokens,
+            outputTokens: data.outputTokens,
+            cacheReadTokens: data.cacheReadTokens,
+            cacheWriteTokens: data.cacheWriteTokens,
+            models: data.models,
+            byModel: Object.fromEntries(
+              Object.entries(data.models).map(([model, stats]: [string, any]) => [
+                model,
+                { cost: stats.cost, tokens: stats.tokens },
+              ])
+            ),
+            byStage: Object.fromEntries(
+              Object.entries(data.stages || {}).map(([stage, stats]: [string, any]) => [
+                stage,
+                { cost: stats.cost, tokens: stats.tokens },
+              ])
+            ),
+            budgetWarning: data.budgetWarning,
+            lastUpdated: data.lastUpdated,
+          }));
 
-        issues.sort((a, b) => b.totalCost - a.totalCost);
+          issues.sort((a, b) => b.totalCost - a.totalCost);
 
-        return HttpServerResponse.json({
-          status: 'live',
-          eventCount: issues.length,
-          issues,
-        });
+          return HttpServerResponse.json({
+            status: 'live',
+            eventCount: issues.length,
+            issues,
+          });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error getting costs by issue:', error);
+          return HttpServerResponse.json({ error: 'Failed to get costs by issue: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting costs by issue:', error);
-        return HttpServerResponse.json({ error: 'Failed to get costs by issue: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -136,32 +138,34 @@ const postCostsRebuildRoute = HttpRouter.add(
   Effect.gen(function* () {
     return yield* Effect.tryPromise({
       try: async () => {
-        console.log('Manual cost cache rebuild requested...');
+        try {
+          console.log('Manual cost cache rebuild requested...');
 
-        const migrationStats = migrateAllSessions();
-        const cache = rebuildCache();
+          const migrationStats = migrateAllSessions();
+          const cache = rebuildCache();
 
-        return HttpServerResponse.json({
-          success: true,
-          message: 'Cost cache rebuilt successfully',
-          migration: {
-            eventsCreated: migrationStats.eventsCreated,
-            totalCost: migrationStats.totalCost,
-            errors: migrationStats.errors.length,
-            warnings: migrationStats.warnings.length,
-          },
-          cache: {
-            issueCount: Object.keys(cache.issues).length,
-            eventCount: cache.lastEventLine,
-            lastEventTs: cache.lastEventTs,
-          },
-        });
+          return HttpServerResponse.json({
+            success: true,
+            message: 'Cost cache rebuilt successfully',
+            migration: {
+              eventsCreated: migrationStats.eventsCreated,
+              totalCost: migrationStats.totalCost,
+              errors: migrationStats.errors.length,
+              warnings: migrationStats.warnings.length,
+            },
+            cache: {
+              issueCount: Object.keys(cache.issues).length,
+              eventCount: cache.lastEventLine,
+              lastEventTs: cache.lastEventTs,
+            },
+          });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error rebuilding cost cache:', error);
+          return HttpServerResponse.json({ error: 'Failed to rebuild cost cache: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error rebuilding cost cache:', error);
-        return HttpServerResponse.json({ error: 'Failed to rebuild cost cache: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -361,14 +365,16 @@ const postCostsSyncWalRoute = HttpRouter.add(
   Effect.gen(function* () {
     return yield* Effect.tryPromise({
       try: async () => {
-        const result = await syncWalFromAllProjects();
-        return HttpServerResponse.json({ success: true, ...result });
+        try {
+          const result = await syncWalFromAllProjects();
+          return HttpServerResponse.json({ success: true, ...result });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error syncing WAL:', error);
+          return HttpServerResponse.json({ error: 'Failed to sync WAL: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error syncing WAL:', error);
-        return HttpServerResponse.json({ error: 'Failed to sync WAL: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -381,17 +387,19 @@ const postCostsReconcileRoute = HttpRouter.add(
   Effect.gen(function* () {
     return yield* Effect.tryPromise({
       try: async () => {
-        const result = await reconcile();
-        console.log(
-          `[reconciler] Sweep complete: ${result.eventsImported} imported, ${result.duplicatesSkipped} dupes, ${result.sessionsScanned} sessions scanned`
-        );
-        return HttpServerResponse.json({ success: true, ...result });
+        try {
+          const result = await reconcile();
+          console.log(
+            `[reconciler] Sweep complete: ${result.eventsImported} imported, ${result.duplicatesSkipped} dupes, ${result.sessionsScanned} sessions scanned`
+          );
+          return HttpServerResponse.json({ success: true, ...result });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error running reconciler:', error);
+          return HttpServerResponse.json({ error: 'Failed to run reconciler: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error running reconciler:', error);
-        return HttpServerResponse.json({ error: 'Failed to run reconciler: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );

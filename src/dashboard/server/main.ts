@@ -8,8 +8,14 @@
 import { Effect } from 'effect';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
+import { startSharedIssueService } from './services/issue-service-singleton.js';
 
 declare const Bun: unknown;
+
+// Start the shared IssueDataService before the server
+// This ensures issue data is available when routes start handling requests
+await startSharedIssueService();
+console.log('[panopticon] IssueDataService started');
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 

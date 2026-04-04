@@ -69,3 +69,4 @@ docker-compose.devcontainer.yml
 
 # Stitch temp files
 temp/
+.panopticon.env

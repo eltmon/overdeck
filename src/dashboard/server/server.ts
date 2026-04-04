@@ -47,7 +47,7 @@ const HttpServerLive = Layer.unwrap(
       const BunHttpServer = yield* Effect.promise(
         () => import('@effect/platform-bun/BunHttpServer'),
       );
-      return BunHttpServer.layer({ port: config.port, hostname: config.host });
+      return BunHttpServer.layer({ port: config.port, hostname: config.host, idleTimeout: 120 });
     } else {
       const [NodeHttpServer, NodeHttp] = yield* Effect.all([
         Effect.promise(() => import('@effect/platform-node/NodeHttpServer')),

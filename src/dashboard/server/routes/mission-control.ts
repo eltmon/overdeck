@@ -120,6 +120,7 @@ const getMissionControlActivityRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
 
@@ -354,12 +355,13 @@ const getMissionControlActivityRoute = HttpRouter.add(
         } catch { /* cost data optional */ }
 
         return HttpServerResponse.json({ issueId, sections, costByStage, totalCost });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error fetching mission control activity:', error);
+          return HttpServerResponse.json({ error: 'Failed to fetch activity: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error fetching mission control activity:', error);
-        return HttpServerResponse.json({ error: 'Failed to fetch activity: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -375,6 +377,7 @@ const getMissionControlPlanningRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
 
@@ -458,12 +461,13 @@ const getMissionControlPlanningRoute = HttpRouter.add(
         result.notes = readArtifactDir('notes', 'uploadedAt') as any;
 
         return HttpServerResponse.json(result);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error fetching planning artifacts:', error);
+          return HttpServerResponse.json({ error: 'Failed to fetch planning artifacts: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error fetching planning artifacts:', error);
-        return HttpServerResponse.json({ error: 'Failed to fetch planning artifacts: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -480,6 +484,7 @@ const postMissionControlStatusReviewRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
 
@@ -712,12 +717,13 @@ ${issueContext ? `## Issue Tracker Data\n${issueContext}\n` : ''}---
 
         Effect.runSync(eventStore.append({ type: 'planning.sync', timestamp: new Date().toISOString(), payload: { issueId, status: 'reviewing' } }));
         return HttpServerResponse.json({ success: true, statusReview: review, reviewedAt: now });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error generating status review:', error);
+          return HttpServerResponse.json({ error: 'Failed to generate status review: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error generating status review:', error);
-        return HttpServerResponse.json({ error: 'Failed to generate status review: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -734,6 +740,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { type, filename, content } = body;
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
@@ -767,12 +774,13 @@ const postMissionControlUploadRoute = HttpRouter.add(
         writeFileSync(filePath, processedContent, 'utf-8');
 
         return HttpServerResponse.json({ success: true, path: filePath });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error uploading artifact:', error);
+          return HttpServerResponse.json({ error: 'Failed to upload artifact: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error uploading artifact:', error);
-        return HttpServerResponse.json({ error: 'Failed to upload artifact: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -789,6 +797,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { tracker } = body;
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
@@ -932,12 +941,13 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
         }
 
         return HttpServerResponse.json({ synced: syncedFiles.length, files: syncedFiles });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error syncing discussions:', error);
+          return HttpServerResponse.json({ error: 'Failed to sync discussions: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error syncing discussions:', error);
-        return HttpServerResponse.json({ error: 'Failed to sync discussions: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -955,6 +965,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { shadow } = body;
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
@@ -977,12 +988,13 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
         const sessionName = `planning-${issueLower}`;
         Effect.runSync(eventStore.append({ type: 'planning.started', timestamp: new Date().toISOString(), payload: { issueId, sessionName } }));
         return HttpServerResponse.json({ success: true, path: planningDir });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error initializing planning directory:', error);
+          return HttpServerResponse.json({ error: 'Failed to initialize planning directory: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error initializing planning directory:', error);
-        return HttpServerResponse.json({ error: 'Failed to initialize planning directory: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -995,6 +1007,7 @@ const getMissionControlProjectsRoute = HttpRouter.add(
   Effect.gen(function* () {
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const projects = listProjects();
 
         const issueTitleMap = new Map<string, string>();
@@ -1198,12 +1211,13 @@ const getMissionControlProjectsRoute = HttpRouter.add(
         }
 
         return HttpServerResponse.json(projectTree);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error fetching project tree:', error);
+          return HttpServerResponse.json({ error: 'Failed to fetch project tree: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error fetching project tree:', error);
-        return HttpServerResponse.json({ error: 'Failed to fetch project tree: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );

@@ -271,6 +271,7 @@ const getAgentsRoute = HttpRouter.add(
   Effect.gen(function* () {
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const now = Date.now();
 
         if (agentsCache.data && (now - agentsCache.timestamp) < AGENTS_CACHE_TTL_MS) {
@@ -539,11 +540,12 @@ const getAgentsRoute = HttpRouter.add(
         const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...startingAgents, ...failedAgents, ...stoppedAgents];
         agentsCache = { data: allAgents, timestamp: now };
         return HttpServerResponse.json(allAgents);
+        } catch (error: unknown) {
+          console.error('Error listing agents:', error);
+          return HttpServerResponse.json([]);
+        }
       },
-      catch: (error: unknown) => {
-        console.error('Error listing agents:', error);
-        return HttpServerResponse.json([]);
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -562,64 +564,66 @@ const getAgentOutputRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
-        const remoteStateFile = join(agentStateDir, 'remote-state.json');
-        let isRemote = false;
-        let vmName = '';
-
-        if (existsSync(remoteStateFile)) {
-          try {
-            const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
-            if (state.location === 'remote' && state.vmName) {
-              isRemote = true;
-              vmName = state.vmName;
-            }
-          } catch {}
-        }
-
-        let stdout: string;
-        if (isRemote && vmName) {
-          const result = await execAsync(
-            flyExecCmd(vmName, `tmux capture-pane -t '${id}' -p -S -${lines} 2>/dev/null || echo 'Session not found'`),
-            { maxBuffer: 10 * 1024 * 1024, timeout: 15000 }
-          );
-          stdout = result.stdout;
-        } else {
-          const result = await execAsync(
-            `tmux capture-pane -t "${id}" -p -S -${lines} 2>/dev/null || echo "Session not found"`,
-            { maxBuffer: 10 * 1024 * 1024 }
-          );
-          stdout = result.stdout;
-        }
-
-        if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
-          const savedLog = join(agentStateDir, 'output.log');
-          if (existsSync(savedLog)) {
-            const logContent = readFileSync(savedLog, 'utf-8');
-            const logLines = logContent.split('\n');
-            const numLines = parseInt(String(lines), 10) || 100;
-            stdout = logLines.slice(-numLines).join('\n');
-          }
-        }
-
-        if (stdout?.trim() === 'Session not found') {
-          stdout = '';
-        }
-
-        return HttpServerResponse.json({ output: stdout });
-      },
-      catch: async (error: unknown) => {
-        // Try saved log on error
         try {
           const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
-          const savedLog = join(agentStateDir, 'output.log');
-          if (existsSync(savedLog)) {
-            const logContent = readFileSync(savedLog, 'utf-8');
-            return HttpServerResponse.json({ output: logContent });
+          const remoteStateFile = join(agentStateDir, 'remote-state.json');
+          let isRemote = false;
+          let vmName = '';
+
+          if (existsSync(remoteStateFile)) {
+            try {
+              const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+              if (state.location === 'remote' && state.vmName) {
+                isRemote = true;
+                vmName = state.vmName;
+              }
+            } catch {}
           }
-        } catch {}
-        return HttpServerResponse.json({ output: '' });
+
+          let stdout: string;
+          if (isRemote && vmName) {
+            const result = await execAsync(
+              flyExecCmd(vmName, `tmux capture-pane -t '${id}' -p -S -${lines} 2>/dev/null || echo 'Session not found'`),
+              { maxBuffer: 10 * 1024 * 1024, timeout: 15000 }
+            );
+            stdout = result.stdout;
+          } else {
+            const result = await execAsync(
+              `tmux capture-pane -t "${id}" -p -S -${lines} 2>/dev/null || echo "Session not found"`,
+              { maxBuffer: 10 * 1024 * 1024 }
+            );
+            stdout = result.stdout;
+          }
+
+          if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
+            const savedLog = join(agentStateDir, 'output.log');
+            if (existsSync(savedLog)) {
+              const logContent = readFileSync(savedLog, 'utf-8');
+              const logLines = logContent.split('\n');
+              const numLines = parseInt(String(lines), 10) || 100;
+              stdout = logLines.slice(-numLines).join('\n');
+            }
+          }
+
+          if (stdout?.trim() === 'Session not found') {
+            stdout = '';
+          }
+
+          return HttpServerResponse.json({ output: stdout });
+        } catch (error: unknown) {
+          // Try saved log on error
+          try {
+            const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+            const savedLog = join(agentStateDir, 'output.log');
+            if (existsSync(savedLog)) {
+              const logContent = readFileSync(savedLog, 'utf-8');
+              return HttpServerResponse.json({ output: logContent });
+            }
+          } catch {}
+          return HttpServerResponse.json({ output: '' });
+        }
       },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -636,42 +640,44 @@ const postAgentMessageRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { message } = body as any;
-        if (!message) {
-          return HttpServerResponse.json({ error: 'Message required' }, { status: 400 });
-        }
+        try {
+          const { message } = body as any;
+          if (!message) {
+            return HttpServerResponse.json({ error: 'Message required' }, { status: 400 });
+          }
 
-        const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
-        const remoteStateFile = join(agentStateDir, 'remote-state.json');
-        let isRemote = false;
-        let vmName = '';
+          const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+          const remoteStateFile = join(agentStateDir, 'remote-state.json');
+          let isRemote = false;
+          let vmName = '';
 
-        if (existsSync(remoteStateFile)) {
-          try {
-            const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
-            if (state.location === 'remote' && state.vmName) {
-              isRemote = true;
-              vmName = state.vmName;
-            }
-          } catch {}
-        }
+          if (existsSync(remoteStateFile)) {
+            try {
+              const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+              if (state.location === 'remote' && state.vmName) {
+                isRemote = true;
+                vmName = state.vmName;
+              }
+            } catch {}
+          }
 
-        if (isRemote && vmName) {
-          const escapedMessage = message.replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/"/g, '\\"');
-          await execAsync(
-            flyExecCmd(vmName, `tmux send-keys -t '${id}' -l '${escapedMessage}' && tmux send-keys -t '${id}' Enter`),
-            { timeout: 15000 }
-          );
-          return HttpServerResponse.json({ success: true, remote: true });
-        } else {
-          await messageAgent(id, message);
-          return HttpServerResponse.json({ success: true });
+          if (isRemote && vmName) {
+            const escapedMessage = message.replace(/\\/g, '\\\\').replace(/'/g, "'\\''").replace(/"/g, '\\"');
+            await execAsync(
+              flyExecCmd(vmName, `tmux send-keys -t '${id}' -l '${escapedMessage}' && tmux send-keys -t '${id}' Enter`),
+              { timeout: 15000 }
+            );
+            return HttpServerResponse.json({ success: true, remote: true });
+          } else {
+            await messageAgent(id, message);
+            return HttpServerResponse.json({ success: true });
+          }
+        } catch (error: unknown) {
+          console.error('Error sending message:', error);
+          return HttpServerResponse.json({ error: 'Failed to send message' }, { status: 500 });
         }
       },
-      catch: (error: unknown) => {
-        console.error('Error sending message:', error);
-        return HttpServerResponse.json({ error: 'Failed to send message' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -688,18 +694,20 @@ const deleteAgentRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        stopAgent(id);
-        Effect.runSync(eventStore.append({
-          type: 'agent.stopped',
-          timestamp: new Date().toISOString(),
-          payload: { agentId: id },
-        }));
-        return HttpServerResponse.json({ success: true });
+        try {
+          stopAgent(id);
+          Effect.runSync(eventStore.append({
+            type: 'agent.stopped',
+            timestamp: new Date().toISOString(),
+            payload: { agentId: id },
+          }));
+          return HttpServerResponse.json({ success: true });
+        } catch (error: unknown) {
+          console.error('Error stopping agent:', error);
+          return HttpServerResponse.json({ error: 'Failed to stop agent' }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        console.error('Error stopping agent:', error);
-        return HttpServerResponse.json({ error: 'Failed to stop agent' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -718,21 +726,23 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { getHealthHistory } = await import('../../../lib/database/health-events-db.js');
-        const endTime = new Date();
-        const startTime = new Date(endTime.getTime() - parseInt(hours) * 60 * 60 * 1000);
-        const events = getHealthHistory(id, startTime.toISOString(), endTime.toISOString());
-        return HttpServerResponse.json({
-          agentId: id,
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          events,
-        });
+        try {
+          const { getHealthHistory } = await import('../../../lib/database/health-events-db.js');
+          const endTime = new Date();
+          const startTime = new Date(endTime.getTime() - parseInt(hours) * 60 * 60 * 1000);
+          const events = getHealthHistory(id, startTime.toISOString(), endTime.toISOString());
+          return HttpServerResponse.json({
+            agentId: id,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            events,
+          });
+        } catch (error: unknown) {
+          console.error('Error fetching health history:', error);
+          return HttpServerResponse.json({ error: 'Failed to fetch health history' }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        console.error('Error fetching health history:', error);
-        return HttpServerResponse.json({ error: 'Failed to fetch health history' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -749,21 +759,23 @@ const postAgentPokeRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { message } = body as any;
-        const defaultPokeMessage =
-          "You seem to have been inactive for a while. If you're stuck:\n" +
-          '1. Check your current task in STATE.md\n' +
-          '2. Try an alternative approach if blocked\n' +
-          '3. Ask for help if needed\n\n' +
-          "What's your current status?";
-        const pokeMsg = message || defaultPokeMessage;
-        await messageAgent(id, pokeMsg);
-        return HttpServerResponse.json({ success: true, message: 'Agent poked successfully' });
+        try {
+          const { message } = body as any;
+          const defaultPokeMessage =
+            "You seem to have been inactive for a while. If you're stuck:\n" +
+            '1. Check your current task in STATE.md\n' +
+            '2. Try an alternative approach if blocked\n' +
+            '3. Ask for help if needed\n\n' +
+            "What's your current status?";
+          const pokeMsg = message || defaultPokeMessage;
+          await messageAgent(id, pokeMsg);
+          return HttpServerResponse.json({ success: true, message: 'Agent poked successfully' });
+        } catch (error: unknown) {
+          console.error('Error poking agent:', error);
+          return HttpServerResponse.json({ error: 'Failed to poke agent' }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        console.error('Error poking agent:', error);
-        return HttpServerResponse.json({ error: 'Failed to poke agent' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -779,13 +791,15 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const questions = await getAgentPendingQuestions(id);
-        return HttpServerResponse.json({ pending: questions.length > 0, questions });
+        try {
+          const questions = await getAgentPendingQuestions(id);
+          return HttpServerResponse.json({ pending: questions.length > 0, questions });
+        } catch (error: unknown) {
+          console.error('Error checking pending questions:', error);
+          return HttpServerResponse.json({ pending: false, questions: [] });
+        }
       },
-      catch: (error: unknown) => {
-        console.error('Error checking pending questions:', error);
-        return HttpServerResponse.json({ pending: false, questions: [] });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -802,48 +816,50 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { answers } = body as any;
-        if (!answers || !Array.isArray(answers) || answers.length === 0) {
-          return HttpServerResponse.json({ error: 'answers array required' }, { status: 400 });
-        }
-
-        const pendingQuestions = await getAgentPendingQuestions(id);
-        if (pendingQuestions.length === 0) {
-          return HttpServerResponse.json({ error: 'No pending questions found' }, { status: 400 });
-        }
-
-        const questionSet = pendingQuestions[0];
-        const questions = questionSet.questions;
-        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-        for (let i = 0; i < answers.length && i < questions.length; i++) {
-          const answer = answers[i];
-          const question = questions[i];
-          const optionIndex = question.options.findIndex(
-            (opt: { label: string }) => opt.label === answer
-          );
-
-          if (optionIndex === -1) {
-            await execAsync(`tmux send-keys -t "${id}" "4"`);
-            const escapedAnswer = answer.replace(/'/g, "'\\''");
-            await execAsync(`tmux send-keys -t "${id}" '${escapedAnswer}'`);
-            await execAsync(`tmux send-keys -t "${id}" C-m`);
-          } else {
-            const keyNumber = optionIndex + 1;
-            await execAsync(`tmux send-keys -t "${id}" "${keyNumber}"`);
+        try {
+          const { answers } = body as any;
+          if (!answers || !Array.isArray(answers) || answers.length === 0) {
+            return HttpServerResponse.json({ error: 'answers array required' }, { status: 400 });
           }
 
-          await execAsync(`tmux send-keys -t "${id}" Tab`);
-          await delay(100);
-        }
+          const pendingQuestions = await getAgentPendingQuestions(id);
+          if (pendingQuestions.length === 0) {
+            return HttpServerResponse.json({ error: 'No pending questions found' }, { status: 400 });
+          }
 
-        await execAsync(`tmux send-keys -t "${id}" C-m`);
-        return HttpServerResponse.json({ success: true });
+          const questionSet = pendingQuestions[0];
+          const questions = questionSet.questions;
+          const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+          for (let i = 0; i < answers.length && i < questions.length; i++) {
+            const answer = answers[i];
+            const question = questions[i];
+            const optionIndex = question.options.findIndex(
+              (opt: { label: string }) => opt.label === answer
+            );
+
+            if (optionIndex === -1) {
+              await execAsync(`tmux send-keys -t "${id}" "4"`);
+              const escapedAnswer = answer.replace(/'/g, "'\\''");
+              await execAsync(`tmux send-keys -t "${id}" '${escapedAnswer}'`);
+              await execAsync(`tmux send-keys -t "${id}" C-m`);
+            } else {
+              const keyNumber = optionIndex + 1;
+              await execAsync(`tmux send-keys -t "${id}" "${keyNumber}"`);
+            }
+
+            await execAsync(`tmux send-keys -t "${id}" Tab`);
+            await delay(100);
+          }
+
+          await execAsync(`tmux send-keys -t "${id}" C-m`);
+          return HttpServerResponse.json({ success: true });
+        } catch (error: unknown) {
+          console.error('Error sending answer:', error);
+          return HttpServerResponse.json({ error: 'Failed to send answer' }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        console.error('Error sending answer:', error);
-        return HttpServerResponse.json({ error: 'Failed to send answer' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -860,18 +876,20 @@ const postAgentHeartbeatRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { state, tool, timestamp } = body as any;
-        saveAgentRuntimeState(id, {
-          state,
-          lastActivity: timestamp || new Date().toISOString(),
-          currentTool: tool,
-        });
-        return HttpServerResponse.json({ success: true });
+        try {
+          const { state, tool, timestamp } = body as any;
+          saveAgentRuntimeState(id, {
+            state,
+            lastActivity: timestamp || new Date().toISOString(),
+            currentTool: tool,
+          });
+          return HttpServerResponse.json({ success: true });
+        } catch (error: unknown) {
+          console.error('Error saving heartbeat:', error);
+          return HttpServerResponse.json({ error: 'Failed to save heartbeat' }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        console.error('Error saving heartbeat:', error);
-        return HttpServerResponse.json({ error: 'Failed to save heartbeat' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -891,13 +909,15 @@ const getAgentActivityRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const activity = getActivity(id, limit);
-        return HttpServerResponse.json({ activity });
+        try {
+          const activity = getActivity(id, limit);
+          return HttpServerResponse.json({ activity });
+        } catch (error: unknown) {
+          console.error('Error reading activity:', error);
+          return HttpServerResponse.json({ error: 'Failed to read activity' }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        console.error('Error reading activity:', error);
-        return HttpServerResponse.json({ error: 'Failed to read activity' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -913,35 +933,37 @@ const getAgentFilesRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const agentState = getAgentState(id);
-        if (!agentState?.workspace) {
+        try {
+          const agentState = getAgentState(id);
+          if (!agentState?.workspace) {
+            return HttpServerResponse.json({ files: [] });
+          }
+          const workspacePath = agentState.workspace;
+          if (!existsSync(workspacePath)) {
+            return HttpServerResponse.json({ files: [] });
+          }
+          const { stdout } = await execAsync(
+            'git diff --name-status HEAD 2>/dev/null || git status --porcelain 2>/dev/null || echo ""',
+            { cwd: workspacePath, encoding: 'utf-8' }
+          );
+          const files = stdout
+            .split('\n')
+            .filter(l => l.trim())
+            .map(l => {
+              const parts = l.trim().split(/\s+/);
+              if (parts.length >= 2) {
+                return { status: parts[0], path: parts[parts.length - 1] };
+              }
+              return { status: '?', path: l.trim() };
+            })
+            .filter(f => f.path);
+          return HttpServerResponse.json({ files });
+        } catch (error: unknown) {
+          console.error('[god-view] files error:', error);
           return HttpServerResponse.json({ files: [] });
         }
-        const workspacePath = agentState.workspace;
-        if (!existsSync(workspacePath)) {
-          return HttpServerResponse.json({ files: [] });
-        }
-        const { stdout } = await execAsync(
-          'git diff --name-status HEAD 2>/dev/null || git status --porcelain 2>/dev/null || echo ""',
-          { cwd: workspacePath, encoding: 'utf-8' }
-        );
-        const files = stdout
-          .split('\n')
-          .filter(l => l.trim())
-          .map(l => {
-            const parts = l.trim().split(/\s+/);
-            if (parts.length >= 2) {
-              return { status: parts[0], path: parts[parts.length - 1] };
-            }
-            return { status: '?', path: l.trim() };
-          })
-          .filter(f => f.path);
-        return HttpServerResponse.json({ files });
       },
-      catch: (error: unknown) => {
-        console.error('[god-view] files error:', error);
-        return HttpServerResponse.json({ files: [] });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -961,23 +983,25 @@ const getAgentTimelineRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const activity = getActivity(id, limit);
-        const agentState = getAgentState(id);
-        const events = activity.map((a: any) => ({
-          timestamp: a.timestamp || new Date().toISOString(),
-          type: a.type || 'activity',
-          message: a.message || a.content || '',
-        }));
-        if (agentState?.startedAt) {
-          events.unshift({ timestamp: agentState.startedAt, type: 'started', message: 'Agent started' });
+        try {
+          const activity = getActivity(id, limit);
+          const agentState = getAgentState(id);
+          const events = activity.map((a: any) => ({
+            timestamp: a.timestamp || new Date().toISOString(),
+            type: a.type || 'activity',
+            message: a.message || a.content || '',
+          }));
+          if (agentState?.startedAt) {
+            events.unshift({ timestamp: agentState.startedAt, type: 'started', message: 'Agent started' });
+          }
+          events.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          return HttpServerResponse.json({ timeline: events.slice(0, limit) });
+        } catch (error: unknown) {
+          console.error('[god-view] timeline error:', error);
+          return HttpServerResponse.json({ timeline: [] });
         }
-        events.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        return HttpServerResponse.json({ timeline: events.slice(0, limit) });
       },
-      catch: (error: unknown) => {
-        console.error('[god-view] timeline error:', error);
-        return HttpServerResponse.json({ timeline: [] });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -995,32 +1019,34 @@ const postAgentSuspendRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { sessionId } = body as any;
-        const effectiveSessionId = sessionId || getSessionId(id);
+        try {
+          const { sessionId } = body as any;
+          const effectiveSessionId = sessionId || getSessionId(id);
 
-        if (!effectiveSessionId) {
-          return HttpServerResponse.json({ error: 'Session ID required for suspend' }, { status: 400 });
+          if (!effectiveSessionId) {
+            return HttpServerResponse.json({ error: 'Session ID required for suspend' }, { status: 400 });
+          }
+
+          saveSessionId(id, effectiveSessionId);
+          await execAsync(`tmux kill-session -t "${id}" 2>/dev/null || true`);
+          saveAgentRuntimeState(id, {
+            state: 'suspended',
+            suspendedAt: new Date().toISOString(),
+            sessionId: effectiveSessionId,
+          });
+          Effect.runSync(eventStore.append({
+            type: 'agent.stopped',
+            timestamp: new Date().toISOString(),
+            payload: { agentId: id },
+          }));
+
+          return HttpServerResponse.json({ success: true });
+        } catch (error: unknown) {
+          console.error('Error suspending agent:', error);
+          return HttpServerResponse.json({ error: 'Failed to suspend agent' }, { status: 500 });
         }
-
-        saveSessionId(id, effectiveSessionId);
-        await execAsync(`tmux kill-session -t "${id}" 2>/dev/null || true`);
-        saveAgentRuntimeState(id, {
-          state: 'suspended',
-          suspendedAt: new Date().toISOString(),
-          sessionId: effectiveSessionId,
-        });
-        Effect.runSync(eventStore.append({
-          type: 'agent.stopped',
-          timestamp: new Date().toISOString(),
-          payload: { agentId: id },
-        }));
-
-        return HttpServerResponse.json({ success: true });
       },
-      catch: (error: unknown) => {
-        console.error('Error suspending agent:', error);
-        return HttpServerResponse.json({ error: 'Failed to suspend agent' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1037,18 +1063,20 @@ const postAgentResumeRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { message } = body as any;
-        const result = await resumeAgent(id, message);
-        if (result.success) {
-          return HttpServerResponse.json({ success: true });
-        } else {
-          return HttpServerResponse.json({ error: result.error }, { status: 400 });
+        try {
+          const { message } = body as any;
+          const result = await resumeAgent(id, message);
+          if (result.success) {
+            return HttpServerResponse.json({ success: true });
+          } else {
+            return HttpServerResponse.json({ error: result.error }, { status: 400 });
+          }
+        } catch (error: unknown) {
+          console.error('Error resuming agent:', error);
+          return HttpServerResponse.json({ error: 'Failed to resume agent' }, { status: 500 });
         }
       },
-      catch: (error: unknown) => {
-        console.error('Error resuming agent:', error);
-        return HttpServerResponse.json({ error: 'Failed to resume agent' }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1064,18 +1092,20 @@ const getAgentCloisterHealthRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const service = getCloisterService();
-        const health = service.getAgentHealth(id);
-        if (!health) {
-          return HttpServerResponse.json({ error: 'Agent not found or runtime not available' }, { status: 404 });
+        try {
+          const service = getCloisterService();
+          const health = service.getAgentHealth(id);
+          if (!health) {
+            return HttpServerResponse.json({ error: 'Agent not found or runtime not available' }, { status: 404 });
+          }
+          return HttpServerResponse.json(health);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error getting agent health:', error);
+          return HttpServerResponse.json({ error: 'Failed to get agent health: ' + msg }, { status: 500 });
         }
-        return HttpServerResponse.json(health);
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting agent health:', error);
-        return HttpServerResponse.json({ error: 'Failed to get agent health: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1091,50 +1121,52 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const agentState = getAgentState(id);
-        if (!agentState) {
-          return HttpServerResponse.json({ error: 'Agent not found' }, { status: 404 });
-        }
+        try {
+          const agentState = getAgentState(id);
+          if (!agentState) {
+            return HttpServerResponse.json({ error: 'Agent not found' }, { status: 404 });
+          }
 
-        const runtime = getRuntimeForAgent(id);
-        if (!runtime) {
-          return HttpServerResponse.json({ error: 'Runtime not found for agent' }, { status: 404 });
-        }
+          const runtime = getRuntimeForAgent(id);
+          if (!runtime) {
+            return HttpServerResponse.json({ error: 'Runtime not found for agent' }, { status: 404 });
+          }
 
-        const health = getAgentHealth(id, runtime);
-        const triggers = await checkAllTriggers(
-          id,
-          agentState.workspace,
-          agentState.issueId,
-          agentState.model,
-          health,
-          loadCloisterConfig()
-        );
+          const health = getAgentHealth(id, runtime);
+          const triggers = await checkAllTriggers(
+            id,
+            agentState.workspace,
+            agentState.issueId,
+            agentState.model,
+            health,
+            loadCloisterConfig()
+          );
 
-        if (triggers.length > 0) {
-          const trigger = triggers[0];
+          if (triggers.length > 0) {
+            const trigger = triggers[0];
+            return HttpServerResponse.json({
+              suggested: true,
+              trigger: trigger.type,
+              currentModel: agentState.model,
+              suggestedModel: trigger.suggestedModel,
+              reason: trigger.reason,
+            });
+          }
+
           return HttpServerResponse.json({
-            suggested: true,
-            trigger: trigger.type,
+            suggested: false,
+            trigger: null,
             currentModel: agentState.model,
-            suggestedModel: trigger.suggestedModel,
-            reason: trigger.reason,
+            suggestedModel: null,
+            reason: 'No handoff triggers detected',
           });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error getting handoff suggestion:', error);
+          return HttpServerResponse.json({ error: 'Failed to get handoff suggestion: ' + msg }, { status: 500 });
         }
-
-        return HttpServerResponse.json({
-          suggested: false,
-          trigger: null,
-          currentModel: agentState.model,
-          suggestedModel: null,
-          reason: 'No handoff triggers detected',
-        });
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting handoff suggestion:', error);
-        return HttpServerResponse.json({ error: 'Failed to get handoff suggestion: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1151,31 +1183,33 @@ const postAgentHandoffRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const { toModel, reason } = body as any;
-        if (!toModel) {
-          return HttpServerResponse.json({ error: 'toModel is required' }, { status: 400 });
-        }
+        try {
+          const { toModel, reason } = body as any;
+          if (!toModel) {
+            return HttpServerResponse.json({ error: 'toModel is required' }, { status: 400 });
+          }
 
-        const result = await performHandoff(id, {
-          targetModel: toModel,
-          reason: reason || 'Manual handoff from dashboard',
-        });
-
-        if (result.success) {
-          return HttpServerResponse.json({
-            success: true,
-            newAgentId: result.newAgentId,
-            newSessionId: result.newSessionId,
+          const result = await performHandoff(id, {
+            targetModel: toModel,
+            reason: reason || 'Manual handoff from dashboard',
           });
-        } else {
-          return HttpServerResponse.json({ success: false, error: result.error }, { status: 500 });
+
+          if (result.success) {
+            return HttpServerResponse.json({
+              success: true,
+              newAgentId: result.newAgentId,
+              newSessionId: result.newSessionId,
+            });
+          } else {
+            return HttpServerResponse.json({ success: false, error: result.error }, { status: 500 });
+          }
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error executing handoff:', error);
+          return HttpServerResponse.json({ error: 'Failed to execute handoff: ' + msg }, { status: 500 });
         }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error executing handoff:', error);
-        return HttpServerResponse.json({ error: 'Failed to execute handoff: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1191,14 +1225,16 @@ const getAgentHandoffsRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const handoffs = readAgentHandoffEvents(id);
-        return HttpServerResponse.json({ handoffs });
+        try {
+          const handoffs = readAgentHandoffEvents(id);
+          return HttpServerResponse.json({ handoffs });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error getting agent handoffs:', error);
+          return HttpServerResponse.json({ error: 'Failed to get agent handoffs: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting agent handoffs:', error);
-        return HttpServerResponse.json({ error: 'Failed to get agent handoffs: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1214,100 +1250,102 @@ const getAgentCostRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const agentState = getAgentState(id);
-        if (!agentState) {
-          return HttpServerResponse.json({ error: 'Agent not found' }, { status: 404 });
-        }
+        try {
+          const agentState = getAgentState(id);
+          if (!agentState) {
+            return HttpServerResponse.json({ error: 'Agent not found' }, { status: 404 });
+          }
 
-        let cost = 0;
-        let inputTokens = 0;
-        let outputTokens = 0;
-        let cacheReadTokens = 0;
-        let cacheWriteTokens = 0;
-        let detectedModel = agentState.model || '';
+          let cost = 0;
+          let inputTokens = 0;
+          let outputTokens = 0;
+          let cacheReadTokens = 0;
+          let cacheWriteTokens = 0;
+          let detectedModel = agentState.model || '';
 
-        const homeDir = process.env.HOME || homedir();
-        const claudeProjectsDir = join(homeDir, '.claude', 'projects');
-        const workspacePath = agentState.workspace;
+          const homeDir = process.env.HOME || homedir();
+          const claudeProjectsDir = join(homeDir, '.claude', 'projects');
+          const workspacePath = agentState.workspace;
 
-        if (workspacePath) {
-          const projectDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
-          const projectDir = join(claudeProjectsDir, projectDirName);
-          const sessionsIndexPath = join(projectDir, 'sessions-index.json');
+          if (workspacePath) {
+            const projectDirName = `-${workspacePath.replace(/^\//, '').replace(/\//g, '-')}`;
+            const projectDir = join(claudeProjectsDir, projectDirName);
+            const sessionsIndexPath = join(projectDir, 'sessions-index.json');
 
-          const parseJsonlCost = (filePath: string) => {
-            const jsonlContent = readFileSync(filePath, 'utf-8');
-            const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
-            for (const line of lines) {
+            const parseJsonlCost = (filePath: string) => {
+              const jsonlContent = readFileSync(filePath, 'utf-8');
+              const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
+              for (const line of lines) {
+                try {
+                  const entry = JSON.parse(line);
+                  const usage = entry.message?.usage || entry.usage;
+                  const model = entry.message?.model || entry.model;
+                  if (usage) {
+                    inputTokens += usage.input_tokens || 0;
+                    outputTokens += usage.output_tokens || 0;
+                    cacheReadTokens += usage.cache_read_input_tokens || 0;
+                    cacheWriteTokens += usage.cache_creation_input_tokens || 0;
+                  }
+                  if (model && !detectedModel) {
+                    detectedModel = model;
+                  }
+                } catch {}
+              }
+            };
+
+            if (existsSync(sessionsIndexPath)) {
               try {
-                const entry = JSON.parse(line);
-                const usage = entry.message?.usage || entry.usage;
-                const model = entry.message?.model || entry.model;
-                if (usage) {
-                  inputTokens += usage.input_tokens || 0;
-                  outputTokens += usage.output_tokens || 0;
-                  cacheReadTokens += usage.cache_read_input_tokens || 0;
-                  cacheWriteTokens += usage.cache_creation_input_tokens || 0;
-                }
-                if (model && !detectedModel) {
-                  detectedModel = model;
+                const indexContent = JSON.parse(readFileSync(sessionsIndexPath, 'utf-8'));
+                for (const sessionEntry of (indexContent.entries || [])) {
+                  if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
+                    parseJsonlCost(sessionEntry.fullPath);
+                  }
                 }
               } catch {}
             }
-          };
 
-          if (existsSync(sessionsIndexPath)) {
-            try {
-              const indexContent = JSON.parse(readFileSync(sessionsIndexPath, 'utf-8'));
-              for (const sessionEntry of (indexContent.entries || [])) {
-                if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
-                  parseJsonlCost(sessionEntry.fullPath);
+            if (inputTokens === 0 && existsSync(projectDir)) {
+              try {
+                const files = readdirSync(projectDir).filter(f => f.endsWith('.jsonl'));
+                for (const file of files) {
+                  parseJsonlCost(join(projectDir, file));
                 }
-              }
-            } catch {}
+              } catch {}
+            }
           }
 
-          if (inputTokens === 0 && existsSync(projectDir)) {
-            try {
-              const files = readdirSync(projectDir).filter(f => f.endsWith('.jsonl'));
-              for (const file of files) {
-                parseJsonlCost(join(projectDir, file));
-              }
-            } catch {}
+          if (inputTokens > 0 || outputTokens > 0) {
+            const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
+            const pricing = getPricing(modelInfo.provider, modelInfo.model);
+            if (pricing) {
+              const usage: TokenUsage = {
+                inputTokens,
+                outputTokens,
+                cacheReadTokens,
+                cacheWriteTokens,
+              };
+              cost = calculateCost(usage, pricing);
+            }
           }
+
+          return HttpServerResponse.json({
+            agentId: id,
+            model: detectedModel || agentState.model,
+            tokens: {
+              input: inputTokens,
+              output: outputTokens,
+              cacheRead: cacheReadTokens,
+              cacheWrite: cacheWriteTokens,
+            },
+            cost,
+          });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error getting agent cost:', error);
+          return HttpServerResponse.json({ error: 'Failed to get agent cost: ' + msg }, { status: 500 });
         }
-
-        if (inputTokens > 0 || outputTokens > 0) {
-          const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
-          const pricing = getPricing(modelInfo.provider, modelInfo.model);
-          if (pricing) {
-            const usage: TokenUsage = {
-              inputTokens,
-              outputTokens,
-              cacheReadTokens,
-              cacheWriteTokens,
-            };
-            cost = calculateCost(usage, pricing);
-          }
-        }
-
-        return HttpServerResponse.json({
-          agentId: id,
-          model: detectedModel || agentState.model,
-          tokens: {
-            input: inputTokens,
-            output: outputTokens,
-            cacheRead: cacheReadTokens,
-            cacheWrite: cacheWriteTokens,
-          },
-          cost,
-        });
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting agent cost:', error);
-        return HttpServerResponse.json({ error: 'Failed to get agent cost: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1323,6 +1361,7 @@ const postAgentsRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { issueId, projectId } = body as any;
 
         if (!issueId) {
@@ -1735,12 +1774,13 @@ const postAgentsRoute = HttpRouter.add(
           activityId,
           projectPath,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error starting agent:', error);
+          return HttpServerResponse.json({ error: 'Failed to start agent: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error starting agent:', error);
-        return HttpServerResponse.json({ error: 'Failed to start agent: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
