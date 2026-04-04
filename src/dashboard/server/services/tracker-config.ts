@@ -33,7 +33,7 @@ export function getLinearApiKey(): string | null {
   // 1. Check config.yaml (Settings page)
   try {
     const yamlConfig = loadYamlConfig();
-    if (yamlConfig.trackerKeys.linear) return yamlConfig.trackerKeys.linear;
+    if (yamlConfig.config.trackerKeys.linear) return yamlConfig.config.trackerKeys.linear;
   } catch { /* ignore */ }
 
   // 2. Check ~/.panopticon.env
@@ -61,7 +61,7 @@ export function getRallyConfig(): RallyConfig | null {
   // 1. Check config.yaml (Settings page)
   try {
     const yamlConfig = loadYamlConfig();
-    if (yamlConfig.trackerKeys.rally) apiKey = yamlConfig.trackerKeys.rally;
+    if (yamlConfig.config.trackerKeys.rally) apiKey = yamlConfig.config.trackerKeys.rally;
   } catch { /* ignore */ }
 
   // 2. Check ~/.panopticon.env (also get server/workspace/project from here)
@@ -125,7 +125,7 @@ export function getGitHubConfig(): GitHubConfig | null {
   // 1. Check config.yaml (Settings page)
   try {
     const yamlConfig = loadYamlConfig();
-    if (yamlConfig.trackerKeys.github) token = yamlConfig.trackerKeys.github;
+    if (yamlConfig.config.trackerKeys.github) token = yamlConfig.config.trackerKeys.github;
   } catch { /* ignore */ }
 
   // 2. Check ~/.panopticon.env (also get repos from here)
