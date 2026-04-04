@@ -1458,8 +1458,9 @@ const postAgentsRoute = HttpRouter.add(
         }
 
         try {
-          const planContent = JSON.parse(readFileSync(planPath, 'utf-8'));
-          const itemCount = planContent?.plan?.items?.length ?? 0;
+          const { readPlan } = await import('../../../lib/vbrief/io.js');
+          const planDoc = readPlan(planPath);
+          const itemCount = planDoc?.plan?.items?.length ?? 0;
           if (itemCount === 0) {
             return jsonResponse({
               error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
