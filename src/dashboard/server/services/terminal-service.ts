@@ -124,11 +124,15 @@ async function waitForTmuxSession(sessionName: string, timeoutMs = 60000): Promi
   throw new Error(`Timed out waiting for tmux session ${sessionName} (${timeoutMs}ms)`);
 }
 
-async function spawnPty(sessionName: string, cols: number, rows: number): Promise<PtyProcess> {
-  // Wait for the tmux session to exist before attaching.
-  // The planning agent spawn runs in the background — the session may not exist yet.
-  await waitForTmuxSession(sessionName);
+// Cache the node-pty module so spawn + onData registration have no async gap
+let _nodePtyModule: typeof import('@homebridge/node-pty-prebuilt-multiarch') | null = null;
+async function getNodePty() {
+  if (!_nodePtyModule) _nodePtyModule = await import('@homebridge/node-pty-prebuilt-multiarch');
+  return _nodePtyModule;
+}
 
+/** Spawn PTY immediately — caller must ensure tmux session exists. */
+function spawnPtyImmediate(sessionName: string, cols: number, rows: number): PtyProcess {
   const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as Record<string, string>;
   const cwd = homedir();
 
@@ -150,8 +154,8 @@ async function spawnPty(sessionName: string, cols: number, rows: number): Promis
     processHandle = new BunPtyProcess(subprocess);
     return processHandle;
   } else {
-    const pty = await import('@homebridge/node-pty-prebuilt-multiarch');
-    const proc = pty.spawn('tmux', ['attach-session', '-t', sessionName], {
+    if (!_nodePtyModule) throw new Error('node-pty not loaded — call getNodePty() first');
+    const proc = _nodePtyModule.spawn('tmux', ['attach-session', '-t', sessionName], {
       name: 'xterm-256color',
       cols,
       rows,
@@ -205,14 +209,21 @@ export const TerminalServiceLive = Layer.effect(
 
       console.log(`[terminal-service] Spawning PTY for ${state.sessionName} at ${cols}x${rows}`);
 
-      spawnPty(state.sessionName, cols, rows).then((proc) => {
+      // Wait for tmux session + preload node-pty, then spawn PTY and register
+      // callbacks with ZERO async gap. This ensures onData is registered before
+      // any data can be emitted from the initial tmux screen paint.
+      Promise.all([waitForTmuxSession(state.sessionName), getNodePty()]).then(() => {
+        // spawnPtyImmediate is now SYNCHRONOUS (node-pty cached) — no microtask gap
+        const proc = spawnPtyImmediate(state.sessionName, cols, rows);
         state.ptyProcess = proc;
 
-        // Forward ALL data immediately — no suppression.
-        // The dimension toggle below forces a full repaint at the correct size,
-        // which overwrites any initial stale-dimension content. A brief flash
-        // of wrong-sized content is acceptable; a permanently blank terminal is not.
+        // Register data handler SYNCHRONOUSLY with spawn — no async gap.
+        let chunkCount = 0;
         proc.onData((data) => {
+          chunkCount++;
+          if (chunkCount <= 5) {
+            console.log(`[terminal-service] ${state.sessionName} chunk#${chunkCount} len=${data.length} queueOk=${!!(state.queue && state.queue.state._tag !== "Done")}`);
+          }
           if (state.queue && state.queue.state._tag !== "Done") {
             Queue.offerUnsafe(Queue.asEnqueue(state.queue), { sessionName: state.sessionName, data });
           }

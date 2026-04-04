@@ -86,6 +86,7 @@
     "@iarna/toml": "^2.2.5",
     "@linear/sdk": "^70.0.0",
     "@octokit/rest": "^22.0.1",
+    "@types/ws": "^8.18.1",
     "better-sqlite3": "^12.6.2",
     "chalk": "^5.6.2",
     "commander": "^12.1.0",
@@ -94,6 +95,7 @@
     "inquirer": "^9.3.8",
     "js-yaml": "^4.1.1",
     "ora": "^8.2.0",
+    "ws": "^8.20.0",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
@@ -104,7 +106,6 @@
     "@types/node": "^20.10.0",
     "@vitest/coverage-v8": "^1.0.4",
     "effect": "catalog:",
-
     "eslint": "^8.55.0",
     "tsdown": "^0.21.7",
     "tsx": "^4.6.2",
