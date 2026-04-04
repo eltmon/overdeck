@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService } from './services/issue-service-singleton.js';
+import { startAgentEnrichmentService } from './services/agent-enrichment-service.js';
 
 declare const Bun: unknown;
 
@@ -16,6 +17,11 @@ declare const Bun: unknown;
 // This ensures issue data is available when the read model bootstraps
 await startSharedIssueService();
 console.log('[panopticon] IssueDataService started');
+
+// Start background enrichment poller — emits agent.enrichment_changed events
+// for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
+startAgentEnrichmentService();
+console.log('[panopticon] AgentEnrichmentService started');
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 

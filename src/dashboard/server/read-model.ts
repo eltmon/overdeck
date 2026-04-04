@@ -16,12 +16,13 @@ import {
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
 } from '@panopticon/contracts';
-import type { AgentSnapshot, AgentStatus, AgentPhase, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue } from '@panopticon/contracts';
+import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue } from '@panopticon/contracts';
 
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_AGENT_PHASES = new Set<AgentPhase>(["exploration", "implementation", "testing", "documentation", "pre_push", "post_push"]);
+const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push"]);
+const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear"]);
 const VALID_SPECIALIST_TYPES = new Set<SpecialistType>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
 const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", "uninitialized"]);
 const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked"]);
@@ -33,6 +34,9 @@ export function toAgentStatus(v: unknown): AgentStatus {
 }
 export function toAgentPhase(v: unknown): AgentPhase | undefined {
   return v && VALID_AGENT_PHASES.has(v as AgentPhase) ? v as AgentPhase : undefined;
+}
+export function toAgentResolution(v: unknown): AgentResolution | undefined {
+  return v && VALID_RESOLUTIONS.has(v as AgentResolution) ? v as AgentResolution : undefined;
 }
 export function toSpecialistType(v: unknown): SpecialistType | undefined {
   return VALID_SPECIALIST_TYPES.has(v as SpecialistType) ? v as SpecialistType : undefined;
@@ -92,10 +96,12 @@ export const ReadModelServiceLive = Layer.effect(
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
       // Lazy imports to avoid circular dependency issues
-      const [{ listRunningAgents }, { getAllSpecialists, getSpecialistState }, { loadReviewStatuses }] =
+      const [{ listRunningAgents }, { getAllSpecialists, getSpecialistState }, { loadReviewStatuses }, { computeAgentEnrichment }, { getReviewStatus }] =
         yield* Effect.all([
           Effect.promise(() => import('../../lib/agents.js')),
           Effect.promise(() => import('../../lib/cloister/specialists.js')),
+          Effect.promise(() => import('../../lib/review-status.js')),
+          Effect.promise(() => import('../../lib/agent-enrichment.js')),
           Effect.promise(() => import('../../lib/review-status.js')),
         ]);
 
@@ -107,7 +113,27 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Agents ──────────────────────────────────────────────────────────────
       const running = listRunningAgents();
       const agentsById: Record<string, AgentSnapshot> = {};
-      for (const a of running) {
+
+      // Compute enrichment for all agents in parallel during bootstrap
+      // so the initial snapshot already has badges/buttons data (no 3s gap).
+      const enrichmentResults = await Promise.all(
+        running.map(async (a) => {
+          const reviewStatus = getReviewStatus(a.issueId)
+          const hasActiveSpecialist =
+            reviewStatus?.reviewStatus === 'reviewing' ||
+            reviewStatus?.testStatus === 'testing' ||
+            reviewStatus?.mergeStatus === 'merging'
+          try {
+            return await computeAgentEnrichment(a.id, a.startedAt, hasActiveSpecialist)
+          } catch {
+            return undefined
+          }
+        })
+      )
+
+      for (let i = 0; i < running.length; i++) {
+        const a = running[i]
+        const enrichment = enrichmentResults[i]
         agentsById[a.id] = {
           id: a.id,
           issueId: a.issueId,
@@ -121,6 +147,12 @@ export const ReadModelServiceLive = Layer.effect(
           costSoFar: a.costSoFar,
           sessionId: a.sessionId || undefined,
           phase: toAgentPhase(a.phase),
+          // Enrichment fields (PAN-440)
+          agentPhase: enrichment ? toAgentPhase(enrichment.agentPhase) : undefined,
+          hasPendingQuestion: enrichment?.hasPendingQuestion,
+          pendingQuestionCount: enrichment?.pendingQuestionCount,
+          resolution: enrichment ? toAgentResolution(enrichment.resolution) : undefined,
+          resolutionCount: enrichment?.resolutionCount,
         };
       }
 
