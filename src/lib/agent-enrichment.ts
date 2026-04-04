@@ -1,0 +1,215 @@
+/**
+ * Agent enrichment utilities (PAN-440)
+ *
+ * Shared functions for computing enrichment fields:
+ *   agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
+ *
+ * Used by both the legacy REST /api/agents endpoint and the new
+ * AgentEnrichmentService background poller.
+ */
+
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
+import { readFile } from 'fs/promises'
+import { homedir } from 'os'
+import { join } from 'path'
+import { promisify } from 'util'
+import { exec } from 'child_process'
+import { getAgentRuntimeState, getAgentDir } from './agents.js'
+import { resolveProjectFromIssue } from './projects.js'
+import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
+
+const execAsync = promisify(exec)
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface QuestionOption { label: string; description: string }
+export interface Question { question: string; header: string; options: QuestionOption[]; multiSelect: boolean }
+export interface PendingQuestion { toolId: string; timestamp: string; questions: Question[] }
+
+export interface AgentEnrichment {
+  agentPhase: 'planning' | 'exploration' | 'implementation' | 'testing' | 'documentation' | 'pre_push' | 'post_push'
+  hasPendingQuestion: boolean
+  pendingQuestionCount: number
+  resolution: string
+  resolutionCount: number
+}
+
+// ─── JSONL path helpers ───────────────────────────────────────────────────────
+
+export function getClaudeProjectDir(workspacePath: string): string {
+  const dirName = workspacePath.replace(/^\//, '').replace(/\//g, '-')
+  return join(homedir(), '.claude', 'projects', `-${dirName}`)
+}
+
+export function getActiveSessionPath(projectDir: string): string | null {
+  if (!existsSync(projectDir)) return null
+  try {
+    const files = readdirSync(projectDir)
+      .filter(f => f.endsWith('.jsonl'))
+      .map(f => ({
+        name: f,
+        path: join(projectDir, f),
+        mtime: statSync(join(projectDir, f)).mtime.getTime(),
+      }))
+      .sort((a, b) => b.mtime - a.mtime)
+    return files.length > 0 ? files[0].path : null
+  } catch {
+    return null
+  }
+}
+
+function getProjectPathByPrefix(issuePrefix: string): string {
+  const issueId = `${issuePrefix}-1`
+  const resolved = resolveProjectFromIssue(issueId)
+  if (resolved) return resolved.projectPath
+  const config = getGitHubConfig()
+  if (config) {
+    for (const { owner, repo, prefix } of config.repos) {
+      const repoPrefix = prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '')
+      if (repoPrefix.toUpperCase() === issuePrefix.toUpperCase()) {
+        const possiblePaths = [
+          join(homedir(), 'Projects', repo),
+          join(homedir(), 'Projects', repo.replace(/-cli$/, '')),
+          join(homedir(), 'Projects', owner, repo),
+        ]
+        for (const path of possiblePaths) {
+          if (existsSync(path)) return path
+        }
+      }
+    }
+  }
+  return join(homedir(), 'Projects')
+}
+
+export async function getAgentWorkspace(agentId: string): Promise<string | null> {
+  const stateFile = join(getAgentDir(agentId), 'state.json')
+  if (existsSync(stateFile)) {
+    try {
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8'))
+      if (state.workspace) return state.workspace
+    } catch {}
+  }
+  try {
+    const { stdout: paneCwd } = await execAsync(
+      `tmux display-message -t ${agentId} -p '#{pane_current_path}' 2>/dev/null`,
+      { encoding: 'utf-8' }
+    )
+    const trimmed = paneCwd.trim()
+    if (trimmed && existsSync(trimmed)) return trimmed
+  } catch {}
+  const issueId = agentId.replace(/^(agent-|planning-)/, '').toUpperCase()
+  const prefix = issueId.split('-')[0]
+  try {
+    const projectPath = getProjectPathByPrefix(prefix)
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
+    if (existsSync(workspacePath)) return workspacePath
+    return projectPath
+  } catch {
+    return null
+  }
+}
+
+export async function getAgentJsonlPath(agentId: string): Promise<string | null> {
+  const workspace = await getAgentWorkspace(agentId)
+  if (!workspace) return null
+  const projectDir = getClaudeProjectDir(workspace)
+  return getActiveSessionPath(projectDir)
+}
+
+// ─── JSONL scanning ───────────────────────────────────────────────────────────
+
+export async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
+  if (!existsSync(jsonlPath)) return []
+  try {
+    const content = await readFile(jsonlPath, 'utf-8')
+    const lines = content.split('\n').filter(line => line.trim())
+    const toolCalls = new Map<string, PendingQuestion>()
+    const answeredIds = new Set<string>()
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line)
+        const messageContent = entry.message?.content
+        if (!Array.isArray(messageContent)) continue
+        for (const item of messageContent) {
+          if (item.type === 'tool_use' && item.name === 'AskUserQuestion') {
+            toolCalls.set(item.id, {
+              toolId: item.id,
+              timestamp: entry.timestamp || new Date().toISOString(),
+              questions: item.input?.questions || [],
+            })
+          }
+          if (item.type === 'tool_result' && item.tool_use_id) {
+            answeredIds.add(item.tool_use_id)
+          }
+        }
+      } catch {}
+    }
+    return Array.from(toolCalls.entries())
+      .filter(([id]) => !answeredIds.has(id))
+      .map(([, question]) => question)
+  } catch {
+    return []
+  }
+}
+
+export async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
+  const jsonlPath = await getAgentJsonlPath(agentId)
+  if (!jsonlPath) return []
+  return getPendingQuestions(jsonlPath)
+}
+
+// ─── Enrichment computation ───────────────────────────────────────────────────
+
+/**
+ * Compute the full enrichment snapshot for a single agent.
+ *
+ * @param agentId - Agent session name (e.g. 'agent-pan-440', 'planning-pan-440')
+ * @param startedAt - ISO timestamp when the agent started (filters stale questions)
+ * @param hasActiveSpecialist - Whether the agent's issue has an active specialist running
+ */
+export async function computeAgentEnrichment(
+  agentId: string,
+  startedAt?: string,
+  hasActiveSpecialist?: boolean,
+): Promise<AgentEnrichment> {
+  const isPlanning = agentId.startsWith('planning-')
+
+  // Read state.json for current phase
+  const stateFile = join(getAgentDir(agentId), 'state.json')
+  let statePhase: string | undefined
+  if (existsSync(stateFile)) {
+    try {
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8'))
+      statePhase = state.phase
+    } catch {}
+  }
+
+  const agentPhase = (isPlanning ? 'planning' : (statePhase || 'implementation')) as AgentEnrichment['agentPhase']
+
+  // Get runtime state for resolution + idle detection
+  const runtimeState = getAgentRuntimeState(agentId)
+  const isIdle = runtimeState?.state === 'idle' ||
+    (runtimeState?.currentTool === 'AskUserQuestion')
+
+  // Get pending questions, filtered by agent start time
+  let pendingQuestions = await getAgentPendingQuestions(agentId)
+  if (pendingQuestions.length > 0 && startedAt) {
+    const agentStartTime = new Date(startedAt).getTime()
+    pendingQuestions = pendingQuestions.filter(q => {
+      const qTime = new Date(q.timestamp).getTime()
+      return !isNaN(qTime) && qTime >= agentStartTime
+    })
+  }
+
+  const hasPendingQuestion =
+    !hasActiveSpecialist &&
+    (pendingQuestions.length > 0 || isIdle || runtimeState?.resolution === 'needs_input')
+
+  return {
+    agentPhase,
+    hasPendingQuestion,
+    pendingQuestionCount: pendingQuestions.length,
+    resolution: runtimeState?.resolution || 'working',
+    resolutionCount: runtimeState?.resolutionCount || 0,
+  }
+}
