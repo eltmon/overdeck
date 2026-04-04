@@ -974,3 +974,238 @@
   font-family: var(--mc-font-mono);
   letter-spacing: 0.03em;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Conversations Section (PAN-416)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.conversationSection {
+  border-bottom: 1px solid var(--mc-border);
+  flex-shrink: 0;
+}
+
+.conversationHeader {
+  display: flex;
+  align-items: center;
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) 0;
+}
+
+.conversationToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+  flex: 1;
+  padding: var(--mc-space-2) var(--mc-space-2) var(--mc-space-2) var(--mc-space-4);
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--mc-text-primary);
+  font-size: var(--mc-font-size-sm);
+  font-weight: 600;
+  transition: background 0.1s;
+  border-radius: var(--mc-radius-sm);
+}
+
+.conversationToggle:hover {
+  background: var(--mc-bg-hover);
+}
+
+.conversationTitle {
+  flex: 1;
+}
+
+.conversationAddBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  margin-right: var(--mc-space-2);
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+
+.conversationAddBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-accent);
+}
+
+.conversationList {
+  padding: var(--mc-space-1) 0;
+}
+
+.conversationAddForm {
+  padding: var(--mc-space-1) var(--mc-space-3);
+}
+
+.conversationInput {
+  width: 100%;
+  padding: var(--mc-space-1) var(--mc-space-2);
+  border: 1px solid var(--mc-border-strong);
+  border-radius: var(--mc-radius-sm);
+  font-size: var(--mc-font-size-sm);
+  font-family: var(--mc-font-family);
+  color: var(--mc-text-primary);
+  background: var(--mc-bg-main);
+  box-sizing: border-box;
+  outline: none;
+}
+
+.conversationInput:focus {
+  border-color: var(--mc-accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.conversationError {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-error);
+  margin-top: var(--mc-space-1);
+}
+
+.conversationEmpty {
+  padding: var(--mc-space-2) var(--mc-space-4) var(--mc-space-2) var(--mc-space-8);
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+}
+
+.conversationItem {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+  padding: var(--mc-space-2) var(--mc-space-2) var(--mc-space-2) var(--mc-space-8);
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: var(--mc-font-size-sm);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  color: var(--mc-text-primary);
+}
+
+.conversationItem:hover {
+  background: var(--mc-bg-hover);
+}
+
+.conversationItem:hover .conversationDeleteBtn {
+  opacity: 1;
+}
+
+.conversationItemSelected {
+  background: var(--mc-bg-selected);
+}
+
+.conversationDot {
+  flex-shrink: 0;
+}
+
+.conversationName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-font-size-xs);
+}
+
+.conversationDeleteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--mc-text-muted);
+  border-radius: var(--mc-radius-sm);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s, color 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.conversationDeleteBtn:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-error);
+}
+
+/* Conversation Terminal Panel */
+.conversationTerminal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.conversationTerminalHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-3);
+  padding: var(--mc-space-3) var(--mc-space-4);
+  border-bottom: 1px solid var(--mc-border);
+  flex-shrink: 0;
+  background: var(--mc-bg-sidebar);
+}
+
+.conversationTerminalTitle {
+  font-size: var(--mc-font-size-sm);
+  font-weight: 600;
+  font-family: var(--mc-font-mono);
+  color: var(--mc-text-primary);
+  flex: 1;
+}
+
+.conversationTerminalStatus {
+  font-size: var(--mc-font-size-xs);
+  color: var(--mc-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-1);
+}
+
+.conversationTerminalBody {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.conversationResumeOverlay {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mc-space-4);
+  color: var(--mc-text-secondary);
+}
+
+.conversationResumeBtn {
+  padding: var(--mc-space-2) var(--mc-space-4);
+  background: var(--mc-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--mc-radius);
+  font-size: var(--mc-font-size-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.conversationResumeBtn:hover {
+  background: var(--mc-accent-hover);
+}
+
+.conversationResumeBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
