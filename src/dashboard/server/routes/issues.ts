@@ -756,6 +756,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           console.error(`[start-planning] Background spawn failed:`, err);
         });
 
+        try { getIssueDataService().patchIssue(issue.identifier, { status: newStateName, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+
         return jsonResponse(responseBody);
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
@@ -909,6 +911,8 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
             workspaceError = err.message;
           }
         }
+
+        try { getIssueDataService().patchIssue(issueIdentifier || id, { status: revertedState, canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
 
         return jsonResponse({
           success: true,
@@ -1154,6 +1158,8 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           payload: { issueId: id, status: 'completed' },
         }));
 
+        try { getIssueDataService().patchIssue(id, { status: newState, canonicalStatus: newState === 'Skipped (already in progress)' ? 'in_progress' : 'todo' }); } catch { /* non-fatal */ }
+
         return jsonResponse({
           success: true,
           issueId: id,
@@ -1319,6 +1325,8 @@ const postIssueResetRoute = HttpRouter.add(
         issueDataService.invalidateTracker('linear').catch(() => {});
         issueDataService.invalidateTracker('rally').catch(() => {});
 
+        try { issueDataService.patchIssue(id, { status: 'Todo', canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
+
         return jsonResponse({ success: true, cleanupLog });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
@@ -1469,6 +1477,8 @@ const postIssueCancelRoute = HttpRouter.add(
         issueDataService.invalidateTracker('github').catch(() => {});
         issueDataService.invalidateTracker('linear').catch(() => {});
 
+        try { issueDataService.patchIssue(id, { status: 'Canceled', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
+
         return jsonResponse({ success: true, cleanupLog });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
@@ -1601,6 +1611,8 @@ const postIssueReopenRoute = HttpRouter.add(
           resetPostMergeState(id);
           resetPostMergeState(id.toUpperCase());
         } catch { /* non-fatal */ }
+
+        try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
 
         return jsonResponse({
           success: true,
@@ -1754,6 +1766,8 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { issueId: id },
         }));
+
+        try { issueDataService.patchIssue(id, { status: canonicalToDisplay[targetStatus] || targetStatus, canonicalStatus: targetStatus }); } catch { /* non-fatal */ }
 
         return jsonResponse({
           success: true,
@@ -1977,6 +1991,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
         if (result.success) {
           issueDataService.invalidateTracker('github').catch(() => {});
           issueDataService.invalidateTracker('linear').catch(() => {});
+          try { issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
         }
 
         return jsonResponse({
