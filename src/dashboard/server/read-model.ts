@@ -96,13 +96,12 @@ export const ReadModelServiceLive = Layer.effect(
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
       // Lazy imports to avoid circular dependency issues
-      const [{ listRunningAgents }, { getAllSpecialists, getSpecialistState }, { loadReviewStatuses }, { computeAgentEnrichment }, { getReviewStatus }] =
+      const [{ listRunningAgents }, { getAllSpecialists, getSpecialistState }, { loadReviewStatuses, getReviewStatus }, { computeAgentEnrichment }] =
         yield* Effect.all([
           Effect.promise(() => import('../../lib/agents.js')),
           Effect.promise(() => import('../../lib/cloister/specialists.js')),
           Effect.promise(() => import('../../lib/review-status.js')),
           Effect.promise(() => import('../../lib/agent-enrichment.js')),
-          Effect.promise(() => import('../../lib/review-status.js')),
         ]);
 
       // Import IssueDataService singleton for issue data
