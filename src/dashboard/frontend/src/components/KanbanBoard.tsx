@@ -1882,6 +1882,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   return (
     <div
       ref={cardRef}
+      data-testid={`issue-card-${issue.identifier}`}
       onClick={onSelect}
       className={`rounded-lg p-3 border border-pan-border border-l-4 cursor-pointer transition-all ${priorityColors[issue.priority] || 'border-l-gray-500'} ${
         isSelected
@@ -2183,6 +2184,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
           {isPlanningActive ? (
             <button
+              data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
               className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
             >
@@ -2191,6 +2193,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             </button>
           ) : (
             <button
+              data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
               className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-purple-400 hover:text-purple-300'}`}
             >
@@ -2231,6 +2234,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong flex-wrap">
           {isPlanningActive ? (
             <button
+              data-testid={`action-watch-planning-${issue.identifier}`}
               onClick={handlePlan}
               className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors animate-pulse"
             >
@@ -2239,6 +2243,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             </button>
           ) : (
             <button
+              data-testid={`action-plan-${issue.identifier}`}
               onClick={handlePlan}
               className={`flex items-center gap-1 text-xs transition-colors ${issue.labels?.some(l => l.toLowerCase() === 'planned') ? 'text-content-muted hover:text-content-subtle' : 'text-purple-400 hover:text-purple-300'}`}
             >
