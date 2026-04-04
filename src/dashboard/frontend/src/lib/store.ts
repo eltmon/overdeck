@@ -29,6 +29,8 @@ import { saveSnapshotToCache } from './snapshotCache'
 export interface DashboardState extends ReadModelState {
   /** Whether the initial snapshot has been loaded */
   bootstrapComplete: boolean
+  /** ISO timestamp of the last received snapshot (used for freshness indicator) */
+  snapshotTimestamp: string | null
 }
 
 export interface DashboardStore extends DashboardState {
@@ -42,12 +44,13 @@ export interface DashboardStore extends DashboardState {
 const initialState: DashboardState = {
   ...INITIAL_READ_MODEL_STATE,
   bootstrapComplete: false,
+  snapshotTimestamp: null,
 }
 
 // ─── Thin wrappers over shared reducers (add bootstrapComplete flag) ─────────
 
 function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): DashboardState {
-  return { ...syncSnapshotShared(state, snapshot), bootstrapComplete: true }
+  return { ...syncSnapshotShared(state, snapshot), bootstrapComplete: true, snapshotTimestamp: snapshot.timestamp }
 }
 
 function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
