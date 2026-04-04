@@ -753,32 +753,10 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const selectedIssue = externalSelectedIssue !== undefined ? externalSelectedIssue : internalSelectedIssue;
   const onSelectIssue = externalOnSelectIssue || setInternalSelectedIssue;
 
-  // Try Zustand store first (event-sourced via WebSocket RPC)
-  // Fall back to React Query polling if store hasn't bootstrapped (e.g. Express server without /ws/rpc)
-  const storeBootstrapped = useDashboardStore((s) => s.bootstrapComplete);
-  const storeIssues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
-  const storeAgents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const storeSpecialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
-
-  // React Query fallback — only fetches if store hasn't bootstrapped
-  const { data: polledIssues, isLoading: polledLoading, error: polledError } = useQuery({
-    queryKey: ['issues', cycleFilter, includeCompleted],
-    queryFn: () => fetchIssues(cycleFilter, includeCompleted),
-    refetchInterval: storeBootstrapped ? false : 5000,
-    enabled: !storeBootstrapped,
-  });
-  const { data: polledAgents = [] } = useQuery({
-    queryKey: ['agents'],
-    queryFn: async () => { const r = await fetch('/api/agents'); return r.json(); },
-    refetchInterval: storeBootstrapped ? false : 5000,
-    enabled: !storeBootstrapped,
-  });
-
-  const issues = storeBootstrapped ? storeIssues : (polledIssues ?? []);
-  const issuesLoading = storeBootstrapped ? false : polledLoading;
-  const issuesError = storeBootstrapped ? null : (polledError ?? null);
-  const agents = storeBootstrapped ? storeAgents : polledAgents;
-  const specialists = storeBootstrapped ? storeSpecialists : [];
+  // Event-sourced state from Zustand store (PAN-433 read model)
+  const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
+  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
 
   // DnD sensors
   const sensors = useSensors(
@@ -1047,60 +1025,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     });
   };
 
-  if (issuesLoading) {
-    return (
-      <div className="space-y-4">
-        {/* Skeleton filter bar */}
-        <div className="flex items-center gap-2 animate-pulse">
-          <div className="w-4 h-4 bg-surface-overlay rounded" />
-          <div className="w-16 h-4 bg-surface-overlay rounded" />
-          <div className="w-24 h-6 bg-surface-overlay rounded" />
-          <div className="w-20 h-6 bg-surface-overlay rounded" />
-          <div className="w-28 h-6 bg-surface-overlay rounded" />
-        </div>
-
-        {/* Skeleton columns */}
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => (
-            <div key={status} className="flex-shrink-0 w-80">
-              <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg`}>
-                <div className="px-4 py-3 border-b border-divider">
-                  <div className="flex items-center justify-between">
-                    <div className="h-5 bg-surface-overlay rounded w-24 animate-pulse" />
-                    <div className="h-4 bg-surface-overlay rounded w-6 animate-pulse" />
-                  </div>
-                </div>
-                <div className="p-2 space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-surface-overlay rounded-lg p-3 border-l-4 border-l-divider-strong animate-pulse">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 bg-surface-emphasis rounded-full" />
-                        <div className="h-4 bg-surface-emphasis rounded w-16" />
-                      </div>
-                      <div className="h-4 bg-surface-emphasis rounded w-full mb-1" />
-                      <div className="h-4 bg-surface-emphasis rounded w-3/4" />
-                      <div className="flex gap-2 mt-3">
-                        <div className="h-5 bg-surface-emphasis rounded w-16" />
-                        <div className="h-5 bg-surface-emphasis rounded w-12" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (issuesError) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-red-400">Error loading issues: {(issuesError as Error).message}</div>
-      </div>
-    );
-  }
 
   const grouped = groupByStatus(filteredIssues, includeCompleted);
 
