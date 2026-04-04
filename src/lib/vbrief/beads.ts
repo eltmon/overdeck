@@ -77,7 +77,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     try {
       const raw = JSON.parse(readFileSync(planPath, 'utf-8'));
       plan = {
-        id: raw.issue || raw.issueId || raw.id || raw.plan?.id || '',
+        id: raw.issue || raw.issueId || raw.issue_id || raw.id || raw.plan?.id || '',
         items: raw.items || raw.plan?.items || [],
         edges: raw.edges || raw.plan?.edges || [],
       };
