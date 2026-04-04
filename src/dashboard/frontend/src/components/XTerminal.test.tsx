@@ -33,13 +33,26 @@ vi.mock('@xterm/addon-fit', () => ({
 
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
-// Mock wsTransport — XTerminal uses getTransport() for RPC calls
-vi.mock('../lib/wsTransport', () => ({
-  getTransport: () => ({
-    subscribe: () => () => {},
-    request: () => Promise.resolve(),
-  }),
-}));
+// Mock WebSocket — XTerminal uses raw WebSocket to /ws/terminal
+class MockWebSocket {
+  static OPEN = 1;
+  static CONNECTING = 0;
+  static CLOSING = 2;
+  static CLOSED = 3;
+  readyState = 1;
+  binaryType = 'blob';
+  onopen: (() => void) | null = null;
+  onclose: (() => void) | null = null;
+  onmessage: ((event: unknown) => void) | null = null;
+  onerror: (() => void) | null = null;
+  send = vi.fn();
+  close = vi.fn();
+  constructor() {
+    // Simulate async open
+    setTimeout(() => this.onopen?.(), 0);
+  }
+}
+vi.stubGlobal('WebSocket', MockWebSocket);
 
 // Mock localStorage
 const localStorageMock: Storage = {

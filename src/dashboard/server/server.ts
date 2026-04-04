@@ -9,6 +9,7 @@ import { jsonResponse } from "./http-helpers.js";
  * Routes:
  *   GET  /api/health  → { status: "ok" }
  *   GET  /ws/rpc      → WebSocket RPC (PanRpcGroup)
+ *   GET  /ws/terminal  → Raw WebSocket terminal (bypasses Effect RPC)
  *   GET  *            → static files from PANOPTICON_FRONTEND_DIR
  */
 
@@ -18,6 +19,7 @@ import { ServerConfig } from './config.js';
 import { EventStoreServiceLive } from './services/domain-services.js';
 import { ReadModelServiceLive } from './read-model.js';
 import { TerminalServiceLive } from './services/terminal-service.js';
+import { setupTerminalWebSocket } from './ws-terminal.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { agentsRouteLayer } from './routes/agents.js'
@@ -55,7 +57,11 @@ const HttpServerLive = Layer.unwrap(
         Effect.promise(() => import('@effect/platform-node/NodeHttpServer')),
         Effect.promise(() => import('node:http')),
       ]);
-      return NodeHttpServer.layer(NodeHttp.createServer, {
+      // Create the HTTP server externally so we can attach the raw WebSocket
+      // terminal handler BEFORE Effect takes over upgrade events.
+      const nodeServer = NodeHttp.createServer();
+      setupTerminalWebSocket(nodeServer);
+      return NodeHttpServer.layer(() => nodeServer, {
         host: config.host,
         port: config.port,
       });
