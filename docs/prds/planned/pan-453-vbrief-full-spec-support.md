@@ -176,6 +176,51 @@ In `buildPlanningPrompt()`, provide the agent with discoverable references:
 
 Add the new fields to the documentation with examples.
 
+### Step 7: Harden complete-planning — auto-copy artifacts to docs/prds/active/
+
+The `complete-planning` endpoint (`src/dashboard/server/routes/issues.ts`) should automatically copy planning artifacts to `docs/prds/active/` so they're committed to the repo. Currently agents are told to do this manually but many skip it.
+
+**On complete-planning, Panopticon itself should copy:**
+
+1. `.planning/STATE.md` → `docs/prds/active/<ISSUE-ID>-plan.md`
+2. `.planning/plan.vbrief.json` → `docs/prds/active/<ISSUE-ID>-plan.vbrief.json`
+
+**On start-planning, if a PRD already exists, copy it INTO the workspace:**
+
+3. `docs/prds/planned/<issue-id>*.md` → `.planning/prd.md` (so the planning agent has it locally)
+
+This ensures:
+- PRDs written before planning are available to the planning agent in the workspace
+- Planning artifacts (STATE.md + vBRIEF) are always preserved in git after completion
+- No reliance on agents remembering to copy files
+
+### Step 8: Planning agent should discover and reference existing PRDs
+
+In `buildPlanningPrompt()`, scan for existing PRDs before generating the prompt:
+
+```typescript
+// Scan for PRDs matching this issue
+const prdDirs = [
+  join(projectPath, 'docs', 'prds', 'planned'),
+  join(projectPath, 'docs', 'prds', 'active'),
+];
+const prdFiles: string[] = [];
+for (const dir of prdDirs) {
+  if (existsSync(dir)) {
+    for (const file of readdirSync(dir)) {
+      if (file.toLowerCase().includes(issueLower) && file.endsWith('.md')) {
+        prdFiles.push(join(dir, file));
+      }
+    }
+  }
+}
+```
+
+If PRDs are found:
+- Copy them to `.planning/` in the workspace
+- Include their paths in the planning prompt so the agent reads them
+- Tell the agent to add them to `plan.references`
+
 ## Files Changed
 
 | File | Action |
@@ -183,7 +228,9 @@ Add the new fields to the documentation with examples.
 | `src/lib/vbrief/types.ts` | Add `uid`, `author`, `sequence`, `references`, `created`, `updated`, `completed`, `priority` |
 | `src/lib/vbrief/io.ts` | Update `updateItemStatus`/`updateSubItemStatus` to set timestamps + sequence |
 | `src/lib/vbrief/beads.ts` | Update `syncBeadStatusToVBrief` to set `completed` timestamp + sequence |
-| `src/lib/planning/spawn-planning-session.ts` | Update prompt template with all new fields |
+| `src/lib/planning/spawn-planning-session.ts` | Update prompt template with all new fields + PRD discovery |
+| `src/dashboard/server/routes/issues.ts` | `complete-planning`: auto-copy STATE.md + vbrief to docs/prds/active/ |
+| `src/dashboard/server/routes/issues.ts` | `start-planning`: copy existing PRDs into workspace .planning/ |
 | `docs/VBRIEF.md` | Document new fields |
 
 ## Testing
@@ -200,6 +247,19 @@ tests/vbrief/full-spec.test.ts
   - Planning prompt includes uid, author, references template
   - References include PRD when found in docs/prds/
   - References include issue URL
+
+tests/integration/complete-planning.test.ts
+  - complete-planning copies STATE.md to docs/prds/active/<ISSUE>-plan.md
+  - complete-planning copies plan.vbrief.json to docs/prds/active/<ISSUE>-plan.vbrief.json
+  - complete-planning does not overwrite existing plan in docs/prds/active/
+  - complete-planning handles missing STATE.md gracefully
+  - complete-planning handles missing plan.vbrief.json gracefully
+
+tests/integration/start-planning.test.ts
+  - start-planning copies PRD from docs/prds/planned/ to workspace .planning/
+  - start-planning copies PRD from docs/prds/active/ to workspace .planning/
+  - start-planning prompt includes PRD path when found
+  - start-planning works when no PRD exists
 ```
 
 ## Notes
@@ -209,3 +269,5 @@ tests/vbrief/full-spec.test.ts
 - `vBRIEFInfo.author` is the tool (`"panopticon-cli/0.6.0"`), `plan.author` is the agent (`"agent:claude-opus-4-6"`)
 - `items[].completed` is set when status transitions to `completed` — not cleared if status reverts
 - `references` is populated by the planning agent, not Panopticon itself (agent has context about what it referenced)
+- Artifact copying in complete-planning is idempotent — won't overwrite if files already exist in docs/prds/active/
+- PRD discovery in start-planning searches both `planned/` and `active/` directories
