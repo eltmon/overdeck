@@ -7,7 +7,7 @@
  */
 
 import { readWorkspacePlan } from './io.js';
-import type { VBriefDocument, VBriefItem, VBriefSubItem } from './types.js';
+import type { VBriefDocument, VBriefItem, VBriefItemStatus, VBriefSubItem } from './types.js';
 
 /** A single acceptance criterion with its parent task context. */
 export interface AcceptanceCriterion {
@@ -20,7 +20,7 @@ export interface AcceptanceCriterion {
   /** AC description */
   title: string;
   /** Current status */
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'blocked';
+  status: VBriefItemStatus;
 }
 
 /** Result of checking whether all AC are completed. */

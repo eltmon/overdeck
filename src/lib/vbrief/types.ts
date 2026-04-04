@@ -1,13 +1,20 @@
 /**
  * vBRIEF Type Definitions
  *
+ * Conforms to vBRIEF v0.5 specification (https://github.com/deftai/vBRIEF).
  * Structured plan format produced by the planning agent and consumed by
  * Cloister for programmatic beads creation and DAG visualization.
+ *
+ * Panopticon extensions (via metadata fields):
+ *   - metadata.difficulty: trivial | simple | medium | complex | expert
+ *   - metadata.issueLabel: issue ID for beads label filtering
+ *   - metadata.kind: "acceptance_criterion" on subItems
  */
 
 export type VBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';
 
-export type VBriefItemStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'blocked';
+// vBRIEF v0.5 spec status enum
+export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled';
 
 export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 

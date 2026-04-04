@@ -36,7 +36,7 @@ export function readPlan(planPath: string): VBriefDocument {
   // Flat format — normalize to standard
   const items = (parsed.items || []).map((item: any) => ({
     ...item,
-    status: item.status || 'pending',
+    status: item.status === 'in_progress' ? 'running' : (item.status || 'pending'),
     narrative: item.narrative || (item.description ? { Action: item.description } : undefined),
     metadata: item.metadata || (item.difficulty ? { difficulty: item.difficulty, issueLabel: (parsed.issue || parsed.issueId || parsed.issue_id || parsed.id || '').toLowerCase() } : undefined),
     subItems: item.subItems || (Array.isArray(item.acceptance) ? item.acceptance.map((a: string, i: number) => ({
