@@ -1,6 +1,8 @@
 import { Schema } from "effect"
 import {
   AgentId,
+  AgentPhase,
+  AgentResolution,
   AgentSnapshot,
   AgentStatus,
   IssueId,
@@ -52,6 +54,22 @@ export const AgentOutputReceivedEvent = Schema.Struct({
   payload: Schema.Struct({ agentId: AgentId, lines: Schema.Array(Schema.String) }),
 })
 export type AgentOutputReceivedEvent = typeof AgentOutputReceivedEvent.Type
+
+/** New — agent enrichment fields updated (PAN-440) */
+export const AgentEnrichmentChangedEvent = Schema.Struct({
+  type: Schema.Literal("agent.enrichment_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    agentPhase: Schema.optional(AgentPhase),
+    hasPendingQuestion: Schema.Boolean,
+    pendingQuestionCount: Schema.Number,
+    resolution: Schema.optional(AgentResolution),
+    resolutionCount: Schema.optional(Schema.Number),
+  }),
+})
+export type AgentEnrichmentChangedEvent = typeof AgentEnrichmentChangedEvent.Type
 
 /** New — agent created in database */
 export const AgentCreatedEvent = Schema.Struct({
@@ -301,6 +319,7 @@ export type CostEventRecordedEvent = typeof CostEventRecordedEvent.Type
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
 export const DomainEvent = Schema.Union([
   AgentCreatedEvent,
+  AgentEnrichmentChangedEvent,
   AgentStartedEvent,
   AgentStoppedEvent,
   AgentStatusChangedEvent,

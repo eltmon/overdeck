@@ -93,6 +93,26 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         },
       }
 
+    case 'agent.enrichment_changed': {
+      const agent = state.agentsById[event.payload.agentId]
+      if (!agent) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentsById: {
+          ...state.agentsById,
+          [event.payload.agentId]: {
+            ...agent,
+            agentPhase: event.payload.agentPhase,
+            hasPendingQuestion: event.payload.hasPendingQuestion,
+            pendingQuestionCount: event.payload.pendingQuestionCount,
+            resolution: event.payload.resolution,
+            resolutionCount: event.payload.resolutionCount,
+          },
+        },
+      }
+    }
+
     case 'agent.stopped': {
       const { [event.payload.agentId]: _removed, ...rest } = state.agentsById
       return {
