@@ -9,7 +9,6 @@ The dashboard server build uses a raw `esbuild.config.mjs` script (imperative JS
 **In scope:** Replace `esbuild.config.mjs` with `tsdown.config.ts` for the dashboard server build only.
 
 **Not in scope:**
-- CLI build (stays on tsup — `tsup.config.ts`)
 - Frontend build (stays on Vite — `vite.config.ts`)
 - Cost script build (`scripts/build-cost-script.mjs` — separate esbuild invocation)
 - Dev workflow (`bun run src/dashboard/server/main.ts` — unchanged)
@@ -143,8 +142,9 @@ All of these must pass:
 8. **Terminal works:** Open a terminal tab in the dashboard, verify PTY output streams
 9. **Native bindings work:** SQLite queries succeed (better-sqlite3), terminal spawns work (node-pty)
 10. **Full test suite:** `npm test` passes (all 2000+ tests)
-11. **CLI build unaffected:** `npm run build:cli` still works via tsup
-12. **Frontend build unaffected:** `npm run build:dashboard:frontend` still works via Vite
+11. **CLI build works:** `npm run build:cli` succeeds via tsdown, `node dist/cli/index.js --version` works
+12. **CLI types generated:** `dist/cli/index.d.ts` and `dist/index.d.ts` exist
+13. **Frontend build unaffected:** `npm run build:dashboard:frontend` still works via Vite
 13. **Prompts copied:** `dist/dashboard/prompts/` contains the cloister prompt markdown files
 
 ## Risks
@@ -156,11 +156,94 @@ All originally identified risks have been resolved by tsdown's built-in features
 - ~~**External resolution with deep paths**~~ — **RESOLVED.** `deps.neverBundle` accepts regex patterns. `/^@effect\/platform-bun/` catches all deep paths. Docs confirm regex support.
 - **Dual-runtime dynamic imports:** The `main.ts` file uses `await import('@effect/platform-bun/BunRuntime')` inside a conditional. The `deps.neverBundle` regex excludes these from bundling, so they remain as runtime dynamic imports. Verify the bundler doesn't error on unresolvable dynamic imports for external packages — tsdown should skip them since they're marked external.
 
-## Part 2: Build contracts package with tsdown
+## Part 2: Migrate CLI build from tsup to tsdown
+
+The CLI currently uses tsup (`tsup.config.ts` at repo root). tsdown has the same config shape — it's a near-drop-in replacement.
+
+### Current tsup config
+
+```typescript
+import { defineConfig } from 'tsup';
+
+export default defineConfig({
+  entry: {
+    'cli/index': 'src/cli/index.ts',
+    'index': 'src/index.ts',
+  },
+  format: ['esm'],
+  dts: true,
+  clean: true,
+  sourcemap: true,
+  target: 'node18',
+  shims: true,
+  noExternal: ['@panopticon/shared'],
+  tsconfig: './tsconfig.json',
+});
+```
+
+### Step 7: Create `tsdown.config.ts` at repo root
+
+```typescript
+import { defineConfig } from 'tsdown';
+
+export default defineConfig({
+  entry: {
+    'cli/index': 'src/cli/index.ts',
+    'index': 'src/index.ts',
+  },
+  format: 'esm',
+  dts: true,
+  clean: true,
+  sourcemap: true,
+  target: 'node18',
+  shims: true,
+  noExternal: (id) => id.startsWith('@panopticon/'),
+  outDir: 'dist',
+});
+```
+
+**Key differences from tsup:**
+- `format` is a string not array (tsdown accepts both, but string is simpler for single format)
+- `noExternal` uses a function pattern (matching T3Code) to catch all `@panopticon/*` workspace packages
+- `tsconfig` option may not be needed — tsdown resolves `tsconfig.json` automatically
+
+### Step 8: Update root `package.json`
+
+Change `build:cli` script:
+```json
+"build:cli": "tsdown"
+```
+
+### Step 9: Swap dependencies
+
+In root `package.json`:
+- Remove `tsup` from devDependencies
+- Add `tsdown` (use catalog version if available, otherwise `^0.20.3`)
+- Remove the old `tsup.config.ts` file
+
+### Step 10: Verify CLI build
+
+```bash
+npm run build:cli
+```
+
+Must produce:
+- `dist/cli/index.js` — executable CLI entry (shebang `#!/usr/bin/env node`)
+- `dist/index.js` — library entry
+- `dist/cli/index.d.ts` and `dist/index.d.ts` — type declarations
+- Source maps
+
+Verify `pan` command still works:
+```bash
+node dist/cli/index.js --version
+node dist/cli/index.js status
+```
+
+## Part 3: Build contracts package with tsdown
 
 Currently `@panopticon/contracts` is consumed as raw TypeScript — `"main": "./src/index.ts"`. This works but diverges from T3Code's pattern where contracts are precompiled. Adding a tsdown build step produces proper `.mjs` + `.cjs` + `.d.ts` outputs, making the package a proper publishable unit.
 
-### Step 7: Add tsdown to contracts
+### Step 11: Add tsdown to contracts
 
 In `packages/contracts/`:
 
@@ -168,7 +251,7 @@ In `packages/contracts/`:
 bun add --dev tsdown --cwd packages/contracts
 ```
 
-### Step 8: Add build scripts to `packages/contracts/package.json`
+### Step 12: Add build scripts to `packages/contracts/package.json`
 
 Update to match T3Code's pattern:
 
@@ -195,7 +278,7 @@ Update to match T3Code's pattern:
 
 Note: `types` and the `import` export still point at raw `.ts` source — this gives TypeScript consumers (the server bundler, Vite frontend) direct access to the source types without needing a separate `tsc --build` step. Only the CJS `require` path uses the compiled output.
 
-### Step 9: Wire contracts build into the top-level build
+### Step 13: Wire contracts build into the top-level build
 
 In root `package.json`, update the build order so contracts builds before the server:
 
@@ -204,7 +287,7 @@ In root `package.json`, update the build order so contracts builds before the se
 "build:dashboard:server": "npm run build:contracts && cd src/dashboard/server && npm run build && mkdir -p ../../../dist/dashboard/prompts && cp ../../lib/cloister/prompts/*.md ../../../dist/dashboard/prompts/"
 ```
 
-### Step 10: Verify contracts build
+### Step 14: Verify contracts build
 
 ```bash
 cd packages/contracts && npx tsdown src/index.ts --format esm,cjs --dts --clean
@@ -227,12 +310,18 @@ Should produce:
 
 | File | Action |
 |------|--------|
+| **Part 1: Server** | |
 | `src/dashboard/server/tsdown.config.ts` | CREATE |
 | `src/dashboard/server/package.json` | MODIFY — swap esbuild for tsdown, update build script |
 | `src/dashboard/server/esbuild.config.mjs` | DELETE |
 | `src/dashboard/server/esbuild.config.mjs.old` | DELETE (if exists) |
+| **Part 2: CLI** | |
+| `tsdown.config.ts` (root) | CREATE |
+| `tsup.config.ts` (root) | DELETE |
+| `package.json` (root) | MODIFY — swap tsup for tsdown, update `build:cli`, add `build:contracts` |
+| **Part 3: Contracts** | |
 | `packages/contracts/package.json` | MODIFY — add tsdown build, update exports |
-| `package.json` (root) | MODIFY — add `build:contracts` script, wire into build order |
+| **Lockfile** | |
 | `bun.lock` | AUTO-UPDATE |
 
-No changes to source code. No changes to CLI or frontend build.
+No changes to source code. No changes to frontend build.
