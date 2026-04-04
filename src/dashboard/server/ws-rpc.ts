@@ -1,0 +1,139 @@
+/**
+ * WebSocket RPC handlers — implements PanRpcGroup using Effect (PAN-428 B5)
+ *
+ * Connects the PanRpcGroup contract to the server-side service layer.
+ * Terminal RPC methods (subscribeTerminal, terminalOpen/Write/Resize/Close)
+ * are stubbed here; B20 replaces the stubs with dual-runtime PTY logic.
+ */
+
+import { Effect, Layer, Queue, Stream } from 'effect';
+import { HttpRouter, HttpServerResponse } from 'effect/unstable/http';
+import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
+import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panopticon/contracts';
+import { EventStoreService, SnapshotService } from './services/domain-services.js';
+import type { DomainEvent } from '@panopticon/contracts';
+import type { StoredEvent } from './event-store.js';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function storedToDomainEvent(stored: StoredEvent): DomainEvent {
+  return {
+    type: stored.type,
+    sequence: stored.sequence,
+    timestamp: stored.timestamp,
+    payload: stored.payload,
+  } as DomainEvent;
+}
+
+// ─── RPC handler layer ────────────────────────────────────────────────────────
+
+const PanRpcLayer = PanRpcGroup.toLayer(
+  Effect.gen(function* () {
+    const eventStore = yield* EventStoreService;
+    const snapshotService = yield* SnapshotService;
+
+    return PanRpcGroup.of({
+      // ── subscribeDomainEvents ────────────────────────────────────────────────
+      [WS_METHODS.subscribeDomainEvents]: (_input) =>
+        eventStore.streamEvents.pipe(
+          Stream.map(storedToDomainEvent),
+        ),
+
+      // ── subscribeTerminal — stub (B20) ───────────────────────────────────────
+      [WS_METHODS.subscribeTerminal]: (_input) =>
+        Stream.fail(
+          new PanRpcError({ message: 'Terminal streaming not yet implemented (B20)', code: 'NOT_IMPLEMENTED' }),
+        ),
+
+      // ── subscribeAgentOutput — live agent stdout lines ───────────────────────
+      // Filtered view of the domain event stream for a specific agent
+      [WS_METHODS.subscribeAgentOutput]: (input) =>
+        eventStore.streamEvents.pipe(
+          Stream.filter(
+            (e) => e.type === 'agent.output_received' &&
+              (e.payload as Record<string, unknown>)['agentId'] === input.agentId,
+          ),
+          Stream.flatMap((e) => {
+            const payload = e.payload as { agentId: string; lines: string[] };
+            return Stream.fromIterable(
+              payload.lines.map((line) => ({ agentId: payload.agentId, line })),
+            );
+          }),
+        ),
+
+      // ── getSnapshot ──────────────────────────────────────────────────────────
+      [WS_METHODS.getSnapshot]: (_input) =>
+        snapshotService.getSnapshot.pipe(
+          Effect.mapError(
+            (cause) =>
+              new PanRpcError({
+                message: `Failed to build dashboard snapshot: ${String(cause)}`,
+                code: 'SNAPSHOT_FAILED',
+              }),
+          ),
+        ),
+
+      // ── replayEvents ─────────────────────────────────────────────────────────
+      [WS_METHODS.replayEvents]: (input) =>
+        eventStore.readFrom(input.fromSequence).pipe(
+          Effect.map((stored) => stored.map(storedToDomainEvent)),
+          Effect.mapError(
+            (cause) =>
+              new PanRpcError({
+                message: `Failed to replay events: ${String(cause)}`,
+                code: 'REPLAY_FAILED',
+              }),
+          ),
+        ),
+
+      // ── terminalOpen — stub (B20) ────────────────────────────────────────────
+      [WS_METHODS.terminalOpen]: (_input) =>
+        Effect.fail(
+          new PanRpcError({
+            message: 'Terminal not yet implemented (B20)',
+            code: 'NOT_IMPLEMENTED',
+          }),
+        ) as Effect.Effect<{ sessionName: string }, PanRpcError>,
+
+      // ── terminalWrite — stub (B20) ───────────────────────────────────────────
+      [WS_METHODS.terminalWrite]: (_input) =>
+        Effect.fail(
+          new PanRpcError({ message: 'Terminal not yet implemented (B20)', code: 'NOT_IMPLEMENTED' }),
+        ),
+
+      // ── terminalResize — stub (B20) ──────────────────────────────────────────
+      [WS_METHODS.terminalResize]: (_input) =>
+        Effect.fail(
+          new PanRpcError({ message: 'Terminal not yet implemented (B20)', code: 'NOT_IMPLEMENTED' }),
+        ),
+
+      // ── terminalClose — stub (B20) ───────────────────────────────────────────
+      [WS_METHODS.terminalClose]: (_input) =>
+        Effect.fail(
+          new PanRpcError({ message: 'Terminal not yet implemented (B20)', code: 'NOT_IMPLEMENTED' }),
+        ),
+    });
+  }),
+);
+
+// ─── WebSocket route layer ────────────────────────────────────────────────────
+
+/**
+ * Layer that registers GET /ws/rpc as the WebSocket RPC endpoint.
+ * The transport layer (WsRpcLayer + RpcSerialization.layerJson) is
+ * provided inline so only ServerConfig leaks into the outer composition.
+ */
+export const websocketRpcRouteLayer = Layer.unwrap(
+  Effect.gen(function* () {
+    const rpcWebSocketHttpEffect = yield* RpcServer.toHttpEffectWebsocket(PanRpcGroup).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          PanRpcLayer,
+          RpcSerialization.layerJson,
+        ),
+      ),
+    );
+
+    return HttpRouter.add('GET', '/ws/rpc', rpcWebSocketHttpEffect);
+  }),
+);
