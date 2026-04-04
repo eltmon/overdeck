@@ -1,6 +1,6 @@
 # PAN-428: Dashboard Data Layer — Consolidate Polling, Push-First Architecture
 
-## Status: Planning Complete
+## Status: Implementation Complete
 
 ## Problem
 
@@ -94,7 +94,22 @@ Full PRD scope: 22 beads (B0–B21) as specified in `docs/prds/planned/pan-428-d
 | B18 | expert | opus | Wire all routes + fibers, full integration test |
 | B19 | complex | sonnet | Migrate 7+ components from React Query to Zustand store |
 | B20 | expert | opus | Dual-runtime PTY, terminal RPC, deferred spawn, stale suppression |
-| B21 | complex | sonnet | Delete 15K lines, remove deps, Playwright verification, version bump |
+| B21 | complex | sonnet | Delete 15K lines, remove deps, Playwright verification, version bump | ✅ |
+
+## Implementation Complete
+
+All 22 beads (B0–B21) delivered. The Effect.js server is fully implemented:
+
+- New Effect HTTP server (`src/dashboard/server/main.ts`, `server.ts`, `ws-rpc.ts`)
+- Shared contracts package (`packages/contracts/`) with RPC definitions and event schemas
+- SQLite event store with PubSub streaming
+- 12 route modules covering all 185 original routes
+- Dual-runtime PTY terminal streaming (Bun + node-pty)
+- Frontend migrated from React Query polling to Zustand push-first store
+- All tests passing: 7 backend unit tests + 257 frontend unit tests (264 total)
+- Version bumped to 0.6.0
+
+The old `src/dashboard/server/index.ts` is retained until the new server is proven in production.
 
 ## Reference
 
