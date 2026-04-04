@@ -1,0 +1,211 @@
+# PAN-453: Full vBRIEF v0.5 Spec Support
+
+## Problem
+
+We use a subset of the vBRIEF v0.5 spec. Several standard fields are unsupported, and we want to demonstrate complete spec compliance to the Deft team. We also need to implement our metadata extensions properly and ensure the agent lifecycle updates the plan throughout.
+
+## vBRIEF Spec Reference
+
+- Spec repo: https://github.com/deftai/vBRIEF
+- Schema: `vbrief-core.schema.json`
+- Our fork (if needed): https://github.com/eltmon/vBRIEF
+- Our extension proposal: https://github.com/deftai/vBRIEF/issues/1
+
+## Fields to Implement
+
+### vBRIEFInfo (envelope metadata)
+
+| Field | Type | Currently | Action |
+|-------|------|-----------|--------|
+| `version` | `"0.5"` | ✅ Used | None |
+| `created` | ISO datetime | ✅ Used | None |
+| `author` | string | ❌ Not set | Set to `"panopticon-cli/<version>"` — who created the FILE |
+| `description` | string | ❌ Not set | Set to `"Plan for <issue.identifier>: <issue.title>"` |
+| `updated` | ISO datetime | ❌ Not set | Update on every write (item status change, AC update) |
+| `metadata` | object | ❌ Not set | Optional — skip for now |
+
+### Plan (top-level payload)
+
+| Field | Type | Currently | Action |
+|-------|------|-----------|--------|
+| `id` | string | ✅ `issueLower` | None |
+| `title` | string | ✅ Issue title | None |
+| `status` | Status enum | ✅ `"approved"` | None |
+| `items` | PlanItem[] | ✅ Used | None |
+| `edges` | Edge[] | ✅ Used | None |
+| `tags` | string[] | ✅ Used | None |
+| `narratives` | object | ✅ Problem/Proposal | None |
+| `uid` | string | ❌ Not set | Generate UUID v4 on creation |
+| `author` | string | ❌ Not set | Set to `"agent:<model-id>"` — who created the PLAN (e.g., `"agent:claude-opus-4-6"`) |
+| `sequence` | integer | ❌ Not set | Increment on every update (starts at 1) |
+| `references` | VBriefReference[] | ❌ Not set | Planning agent populates from PRDs, specs, and issue URLs |
+| `created` | ISO datetime | ❌ Not set | Set on plan creation |
+| `updated` | ISO datetime | ❌ Not set | Update on every write |
+
+### PlanItem (task items)
+
+| Field | Type | Currently | Action |
+|-------|------|-----------|--------|
+| `id` | string | ✅ Used | None |
+| `title` | string | ✅ Used | None |
+| `status` | Status enum | ✅ Used | None |
+| `narrative` | object | ✅ `Action` key | None |
+| `subItems` | PlanItem[] | ✅ Used for AC | None |
+| `metadata` | object | ✅ difficulty, issueLabel, kind | None |
+| `priority` | enum | ❌ Not set | Planning agent can set: `low`, `medium`, `high`, `critical` |
+| `created` | ISO datetime | ❌ Not set | Set when item is created |
+| `completed` | ISO datetime | ❌ Not set | Set when status transitions to `completed` |
+
+### VBriefReference (external references)
+
+```typescript
+interface VBriefReference {
+  uri: string;     // e.g., "docs/prds/planned/pan-451.md", "https://github.com/eltmon/panopticon-cli/issues/451"
+  label?: string;  // e.g., "PRD", "GitHub Issue", "Spec"
+  type?: string;   // e.g., "prd", "issue", "spec"
+}
+```
+
+Planning agent should populate `references` with:
+- The PRD file if one exists in `docs/prds/` for this issue
+- The GitHub/Linear issue URL
+- Any spec files referenced during planning (from `docs/prds/active/*-spec.md`)
+
+## Implementation
+
+### Step 1: Update types.ts
+
+Add missing fields to `VBriefDocument`, `VBriefPlan`, `VBriefItem`:
+
+```typescript
+export interface VBriefInfo {
+  version: string;  // "0.5"
+  author?: string;  // "panopticon-cli/0.6.0"
+  description?: string;
+  created?: string;  // ISO datetime
+  updated?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface VBriefPlan {
+  // existing...
+  uid?: string;      // UUID v4
+  author?: string;   // "agent:claude-opus-4-6"
+  sequence?: number;  // increment on every update
+  references?: VBriefReference[];
+  created?: string;
+  updated?: string;
+}
+
+export interface VBriefItem {
+  // existing...
+  priority?: VBriefPriority;  // already defined but not used
+  created?: string;
+  completed?: string;  // ISO datetime when marked completed
+}
+
+export interface VBriefReference {
+  uri: string;
+  label?: string;
+  type?: string;
+}
+```
+
+### Step 2: Update planning prompt (spawn-planning-session.ts)
+
+Update the JSON template in `buildPlanningPrompt()` to include all new fields:
+
+```json
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "author": "panopticon-cli/0.6.0",
+    "description": "Plan for PAN-451: Conversation view",
+    "created": "<ISO timestamp>"
+  },
+  "plan": {
+    "id": "pan-451",
+    "uid": "<UUID v4>",
+    "title": "Conversation view — T3Code-style message rendering",
+    "status": "approved",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "<ISO timestamp>",
+    "references": [
+      { "uri": "docs/prds/planned/pan-451-conversation-view.md", "label": "PRD", "type": "prd" },
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/451", "label": "GitHub Issue", "type": "issue" }
+    ],
+    "narratives": { "Problem": "...", "Proposal": "..." },
+    "items": [...],
+    "edges": [...]
+  }
+}
+```
+
+Tell the planning agent:
+- Generate a UUID v4 for `plan.uid` (use `crypto.randomUUID()` or a simple generator)
+- Set `plan.author` to the model being used
+- Look for PRDs in `docs/prds/` matching the issue ID and add to `references`
+- Add the issue URL to `references`
+- Set `plan.created` to current ISO timestamp
+- Set `items[].priority` based on difficulty/urgency assessment
+- Set `items[].created` to current ISO timestamp
+
+### Step 3: Update io.ts — updateItemStatus / updateSubItemStatus
+
+When updating item status:
+- Set `updated` on `vBRIEFInfo` and `plan`
+- Increment `plan.sequence`
+- If new status is `completed`, set `items[].completed` to current ISO timestamp
+
+### Step 4: Update syncBeadStatusToVBrief (beads.ts)
+
+When a bead closes and syncs to vBRIEF:
+- Set `items[].completed` timestamp
+- Increment `plan.sequence`
+- Update `plan.updated` and `vBRIEFInfo.updated`
+
+### Step 5: Planning agent populates references
+
+In `buildPlanningPrompt()`, provide the agent with discoverable references:
+- Scan `docs/prds/` for files matching the issue ID
+- Include the issue URL from the `PlanningIssue` object
+- Tell the agent to include these in `plan.references`
+
+### Step 6: Update docs/VBRIEF.md
+
+Add the new fields to the documentation with examples.
+
+## Files Changed
+
+| File | Action |
+|------|--------|
+| `src/lib/vbrief/types.ts` | Add `uid`, `author`, `sequence`, `references`, `created`, `updated`, `completed`, `priority` |
+| `src/lib/vbrief/io.ts` | Update `updateItemStatus`/`updateSubItemStatus` to set timestamps + sequence |
+| `src/lib/vbrief/beads.ts` | Update `syncBeadStatusToVBrief` to set `completed` timestamp + sequence |
+| `src/lib/planning/spawn-planning-session.ts` | Update prompt template with all new fields |
+| `docs/VBRIEF.md` | Document new fields |
+
+## Testing
+
+```
+tests/vbrief/full-spec.test.ts
+  - readPlan validates vBRIEFInfo.version is "0.5"
+  - readPlan preserves uid, author, sequence, references
+  - updateItemStatus increments sequence
+  - updateItemStatus sets plan.updated and vBRIEFInfo.updated
+  - updateItemStatus sets completed timestamp when status → completed
+  - updateSubItemStatus sets completed timestamp on AC
+  - syncBeadStatusToVBrief increments sequence
+  - Planning prompt includes uid, author, references template
+  - References include PRD when found in docs/prds/
+  - References include issue URL
+```
+
+## Notes
+
+- `plan.uid` is a UUID v4 generated once at creation — never changes
+- `plan.sequence` starts at 1 and increments on every write — useful for conflict detection
+- `vBRIEFInfo.author` is the tool (`"panopticon-cli/0.6.0"`), `plan.author` is the agent (`"agent:claude-opus-4-6"`)
+- `items[].completed` is set when status transitions to `completed` — not cleared if status reverts
+- `references` is populated by the planning agent, not Panopticon itself (agent has context about what it referenced)
