@@ -159,6 +159,42 @@ export const ReviewStatusChangedEvent = Schema.Struct({
 })
 export type ReviewStatusChangedEvent = typeof ReviewStatusChangedEvent.Type
 
+/** New — review specialist dispatched */
+export const PipelineReviewStartedEvent = Schema.Struct({
+  type: Schema.Literal("pipeline.review-started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type PipelineReviewStartedEvent = typeof PipelineReviewStartedEvent.Type
+
+/** New — review specialist finished (passed or failed) */
+export const PipelineReviewCompletedEvent = Schema.Struct({
+  type: Schema.Literal("pipeline.review-completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, passed: Schema.Boolean }),
+})
+export type PipelineReviewCompletedEvent = typeof PipelineReviewCompletedEvent.Type
+
+/** New — test specialist dispatched */
+export const PipelineTestStartedEvent = Schema.Struct({
+  type: Schema.Literal("pipeline.test-started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type PipelineTestStartedEvent = typeof PipelineTestStartedEvent.Type
+
+/** New — test specialist finished (passed or failed) */
+export const PipelineTestCompletedEvent = Schema.Struct({
+  type: Schema.Literal("pipeline.test-completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, passed: Schema.Boolean }),
+})
+export type PipelineTestCompletedEvent = typeof PipelineTestCompletedEvent.Type
+
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
 /** New — specialist became active */
@@ -278,6 +314,10 @@ export const DomainEvent = Schema.Union([
   PipelineStatusChangedEvent,
   MergeReadyEvent,
   ReviewStatusChangedEvent,
+  PipelineReviewStartedEvent,
+  PipelineReviewCompletedEvent,
+  PipelineTestStartedEvent,
+  PipelineTestCompletedEvent,
   SpecialistStartedEvent,
   SpecialistCompletedEvent,
   SpecialistFailedEvent,

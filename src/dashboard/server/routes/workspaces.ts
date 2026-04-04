@@ -1996,6 +1996,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
     const { reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes } = body as {
       reviewStatus?: string;
       testStatus?: string;
@@ -2071,6 +2072,11 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           }
 
           if (reviewStatus === 'passed') {
+            Effect.runSync(eventStore.append({
+              type: 'pipeline.review-completed',
+              timestamp: new Date().toISOString(),
+              payload: { issueId, passed: true },
+            }));
             const issueLower = issueId.toLowerCase();
             const issuePrefix = issueId.split('-')[0];
             const projectPath = getProjectPath(undefined, issuePrefix);
@@ -2083,12 +2089,23 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
             );
             try {
               await autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent);
+              Effect.runSync(eventStore.append({
+                type: 'pipeline.test-started',
+                timestamp: new Date().toISOString(),
+                payload: { issueId },
+              }));
             } catch (err) {
               console.error(
                 `[review-status] Unhandled error in autoQueueTestAgentAndNotify for ${issueId}:`,
                 err
               );
             }
+          } else if (['blocked', 'failed'].includes(reviewStatus)) {
+            Effect.runSync(eventStore.append({
+              type: 'pipeline.review-completed',
+              timestamp: new Date().toISOString(),
+              payload: { issueId, passed: false },
+            }));
           }
         }
 
@@ -2106,6 +2123,14 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
               completeSpecialistTask('test-agent', item.id);
               console.log(`[review-status] Cleared ${issueId} from test-agent queue`);
             }
+          }
+
+          if (testStatus === 'failed') {
+            Effect.runSync(eventStore.append({
+              type: 'pipeline.test-completed',
+              timestamp: new Date().toISOString(),
+              payload: { issueId, passed: false },
+            }));
           }
 
           if (testStatus === 'failed' && testNotes) {
@@ -2144,6 +2169,11 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           }
 
           if (testStatus === 'passed') {
+            Effect.runSync(eventStore.append({
+              type: 'pipeline.test-completed',
+              timestamp: new Date().toISOString(),
+              payload: { issueId, passed: true },
+            }));
             try {
               const agentId = `agent-${issueId.toLowerCase()}`;
               await messageAgent(
@@ -2697,9 +2727,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           if (result.success) {
             console.log(`[request-review] Spawned review specialist for ${issueId}`);
             Effect.runSync(eventStore.append({
-              type: 'pipeline.review-completed',
+              type: 'pipeline.review-started',
               timestamp: new Date().toISOString(),
-              payload: { issueId, status: 'reviewing' },
+              payload: { issueId },
             }));
             return HttpServerResponse.json({
               success: true,
@@ -3273,9 +3303,9 @@ const postWorkspaceMergeRoute = HttpRouter.add(
         const result = await triggerMerge(issueId);
         if (result.success) {
           Effect.runSync(eventStore.append({
-            type: 'pipeline.merge-ready',
+            type: 'merge.ready',
             timestamp: new Date().toISOString(),
-            payload: { issueId, mergeStatus: result.mergeStatus ?? 'merged' },
+            payload: { issueId },
           }));
         }
         const { statusCode, ...body } = result;

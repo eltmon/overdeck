@@ -18,6 +18,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig, saveCloisterConfig } from '../../../lib/cloister/config.js';
+import { EventStoreService } from '../services/domain-services.js';
 
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
@@ -90,20 +91,31 @@ const postCloisterStopRoute = HttpRouter.add(
 const postCloisterEmergencyStopRoute = HttpRouter.add(
   'POST',
   '/api/cloister/emergency-stop',
-  Effect.sync(() => {
-    try {
-      const service = getCloisterService();
-      const killedAgents = service.emergencyStop();
-      return HttpServerResponse.json({
-        success: true,
-        message: 'Emergency stop executed',
-        killedAgents,
-      });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error executing emergency stop:', error);
-      return HttpServerResponse.json({ error: 'Failed to execute emergency stop: ' + msg }, { status: 500 });
-    }
+  Effect.gen(function* () {
+    const eventStore = yield* EventStoreService;
+    return yield* Effect.sync(() => {
+      try {
+        const service = getCloisterService();
+        const killedAgents = service.emergencyStop();
+        const ts = new Date().toISOString();
+        for (const agentId of killedAgents) {
+          Effect.runSync(eventStore.append({
+            type: 'agent.stopped',
+            timestamp: ts,
+            payload: { agentId, issueId: agentId.replace(/^agent-/, '').toUpperCase() },
+          }));
+        }
+        return HttpServerResponse.json({
+          success: true,
+          message: 'Emergency stop executed',
+          killedAgents,
+        });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error executing emergency stop:', error);
+        return HttpServerResponse.json({ error: 'Failed to execute emergency stop: ' + msg }, { status: 500 });
+      }
+    });
   }),
 );
 
