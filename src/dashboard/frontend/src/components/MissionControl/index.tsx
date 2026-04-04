@@ -6,8 +6,16 @@ import { ActivityView } from './ActivityView';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { DeaconStatus } from './DeaconStatus';
 import { BeadsDialog } from '../BeadsDialog';
+import { ConversationList, type Conversation } from './ConversationList';
+import { ConversationTerminal } from './ConversationTerminal';
 import type { Issue } from '../../types';
 import styles from './styles/mission-control.module.css';
+
+async function fetchConversations(): Promise<Conversation[]> {
+  const res = await fetch('/api/conversations');
+  if (!res.ok) throw new Error('Failed to fetch conversations');
+  return res.json();
+}
 
 interface ProjectData {
   name: string;
@@ -44,6 +52,7 @@ interface MissionControlProps {
 
 export function MissionControl({ issues = [] }: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [showBeads, setShowBeads] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('mc-sidebar-width');
@@ -88,8 +97,22 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
     issueCosts[entry.issueId.toLowerCase()] = entry.totalCost;
   }
 
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations,
+    refetchInterval: 10000,
+  });
+
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
+    setSelectedConversation(null); // clear conversation selection
+  }, []);
+
+  const handleSelectConversation = useCallback((name: string | null) => {
+    setSelectedConversation(name);
+    if (name !== null) {
+      setSelectedFeature(null); // clear feature selection
+    }
   }, []);
 
   // Resizable sidebar drag handlers
@@ -147,6 +170,12 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
             <p className={styles.sidebarSubtitle}>Active features across projects</p>
           </div>
 
+          {/* Conversations section — above project tree */}
+          <ConversationList
+            selectedConversation={selectedConversation}
+            onSelectConversation={handleSelectConversation}
+          />
+
           <div className={styles.projectTree}>
             {isLoading && projects.length === 0 ? (
               <div className={styles.emptyProject}>Loading projects...</div>
@@ -183,7 +212,20 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
 
         {/* Content Area */}
         <div className={styles.content}>
-          {selectedFeature ? (
+          {selectedConversation ? (
+            (() => {
+              const conv = conversations.find(c => c.name === selectedConversation);
+              return conv ? (
+                <ConversationTerminal conversation={conv} />
+              ) : (
+                <div className={styles.contentEmpty}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p>Loading session…</p>
+                  </div>
+                </div>
+              );
+            })()
+          ) : selectedFeature ? (
             <>
               {/* Feature Header */}
               <div className={styles.featureHeader}>
