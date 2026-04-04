@@ -33,6 +33,7 @@ import { remoteRouteLayer } from './routes/remote.js'
 import { settingsRouteLayer } from './routes/settings.js'
 import { metricsRouteLayer } from './routes/metrics.js'
 import { miscRouteLayer } from './routes/misc.js';
+import { conversationsRouteLayer } from './routes/conversations.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
 
@@ -190,6 +191,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   settingsRouteLayer,
   metricsRouteLayer,
   miscRouteLayer,
+  conversationsRouteLayer,
   staticRouteLayer,
 );
 

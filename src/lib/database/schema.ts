@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /**
  * Initialize the complete database schema.
@@ -161,6 +161,25 @@ export function initSchema(db: Database.Database): void {
       sequence   INTEGER NOT NULL,  -- Last event sequence applied
       updated_at TEXT NOT NULL      -- ISO timestamp
     );
+
+    -- ===== Conversations (PAN-416: Mission Control conversation launcher) =====
+    CREATE TABLE IF NOT EXISTS conversations (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      name             TEXT    NOT NULL UNIQUE,
+      tmux_session     TEXT    NOT NULL,
+      status           TEXT    NOT NULL DEFAULT 'active',  -- 'active', 'ended'
+      cwd              TEXT    NOT NULL,
+      issue_id         TEXT,                               -- optional cost attribution
+      created_at       TEXT    NOT NULL,
+      ended_at         TEXT,
+      last_attached_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_conversations_status
+      ON conversations(status);
+
+    CREATE INDEX IF NOT EXISTS idx_conversations_created_at
+      ON conversations(created_at);
   `);
 
   // Record schema version
@@ -256,6 +275,29 @@ export function runMigrations(db: Database.Database): void {
         sequence   INTEGER NOT NULL,
         updated_at TEXT NOT NULL
       );
+    `);
+  }
+
+  // v5 → v6: add conversations table (PAN-416)
+  if (currentVersion < 6) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        name             TEXT    NOT NULL UNIQUE,
+        tmux_session     TEXT    NOT NULL,
+        status           TEXT    NOT NULL DEFAULT 'active',
+        cwd              TEXT    NOT NULL,
+        issue_id         TEXT,
+        created_at       TEXT    NOT NULL,
+        ended_at         TEXT,
+        last_attached_at TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_conversations_status
+        ON conversations(status);
+
+      CREATE INDEX IF NOT EXISTS idx_conversations_created_at
+        ON conversations(created_at);
     `);
   }
 
