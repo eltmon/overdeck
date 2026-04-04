@@ -1,73 +1,170 @@
 {
-  "issueId": "PAN-436",
-  "title": "Dashboard shows zero stats on load — missing skeleton/loading states",
-  "difficulty": "medium",
-  "items": [
-    {
-      "id": "bootstrap-gate",
-      "title": "Create BootstrapGate wrapper component",
-      "description": "Create src/dashboard/frontend/src/components/BootstrapGate.tsx — a wrapper component that checks selectIsBootstrapped from the Zustand store and renders either children (when bootstrapped) or a fallback skeleton. Simple pattern: `const ready = useDashboardStore(selectIsBootstrapped); return ready ? children : fallback;`",
-      "difficulty": "simple",
-      "files": [
-        "src/dashboard/frontend/src/components/BootstrapGate.tsx"
-      ],
-      "acceptance": [
-        "Component accepts children and fallback ReactNode props",
-        "Reads selectIsBootstrapped from useDashboardStore",
-        "Renders fallback when bootstrapComplete is false, children when true"
-      ],
-      "dependencies": []
-    },
-    {
-      "id": "skeleton-components",
-      "title": "Create shimmer skeleton components for each view",
-      "description": "Create skeleton placeholder components with animate-pulse shimmer for: (1) KanbanSkeleton — 4-5 column layout with card-shaped placeholders, (2) AgentListSkeleton — list of row-shaped placeholders, (3) GodViewSkeleton — grid of card placeholders, (4) HeaderSkeleton — placeholder for sidebar count badges. Use Tailwind animate-pulse bg-surface-2 rounded classes. Match the approximate layout shape of each real component.",
-      "difficulty": "medium",
-      "files": [
-        "src/dashboard/frontend/src/components/skeletons/KanbanSkeleton.tsx",
-        "src/dashboard/frontend/src/components/skeletons/AgentListSkeleton.tsx",
-        "src/dashboard/frontend/src/components/skeletons/GodViewSkeleton.tsx",
-        "src/dashboard/frontend/src/components/skeletons/HeaderSkeleton.tsx"
-      ],
-      "acceptance": [
-        "Each skeleton visually approximates the layout of its corresponding real component",
-        "All use animate-pulse for shimmer effect",
-        "Use existing Tailwind theme tokens (bg-surface-2, rounded, etc.)",
-        "No external dependencies — pure Tailwind CSS"
-      ],
-      "dependencies": []
-    },
-    {
-      "id": "wire-bootstrap-gates",
-      "title": "Wire BootstrapGate into App.tsx and Header",
-      "description": "In App.tsx, wrap store-consuming tab views (kanban, agents, god-view) with <BootstrapGate fallback={<XxxSkeleton />}>. Also gate the Header's agent/issue count badges so they don't flash '0' before bootstrap. The MetricsSummaryRow on the kanban tab should also be inside the gate since it sits above the KanbanBoard.",
-      "difficulty": "simple",
-      "files": [
-        "src/dashboard/frontend/src/App.tsx",
-        "src/dashboard/frontend/src/components/Header.tsx"
-      ],
-      "acceptance": [
-        "Kanban tab shows KanbanSkeleton until bootstrapComplete",
-        "Agents tab shows AgentListSkeleton until bootstrapComplete",
-        "GodView shows GodViewSkeleton until bootstrapComplete",
-        "Header count badges don't show 0 during bootstrap",
-        "React Query views (MissionControl, HandoffsPage, etc.) are NOT wrapped — they have their own loading states"
-      ],
-      "dependencies": ["bootstrap-gate", "skeleton-components"]
-    },
-    {
-      "id": "verify-build-test",
-      "title": "Verify build and visual test",
-      "description": "Run npm run build to ensure no type errors or build failures. Visually verify in the browser that: (1) skeletons appear on fresh page load, (2) skeletons transition smoothly to real content when snapshot arrives, (3) no flash of zeros/empty state, (4) React Query views still work independently with their own loading states.",
-      "difficulty": "simple",
-      "files": [],
-      "acceptance": [
-        "npm run build succeeds with no errors",
-        "No flash of zero/empty state on page load",
-        "Skeleton → real content transition is smooth",
-        "Existing React Query loading states unchanged"
-      ],
-      "dependencies": ["wire-bootstrap-gates"]
-    }
-  ]
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-04T00:00:00.000Z"
+  },
+  "plan": {
+    "id": "PAN-436",
+    "title": "Dashboard shows zero stats on load — missing skeleton/loading states",
+    "status": "approved",
+    "items": [
+      {
+        "id": "bootstrap-gate",
+        "title": "Create BootstrapGate wrapper component",
+        "status": "completed",
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/BootstrapGate.tsx — a wrapper component that checks selectIsBootstrapped from the Zustand store and renders either children (when bootstrapped) or a fallback skeleton."
+        },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-436"
+        },
+        "subItems": [
+          {
+            "id": "bootstrap-gate.ac1",
+            "title": "Component accepts children and fallback ReactNode props",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "bootstrap-gate.ac2",
+            "title": "Reads selectIsBootstrapped from useDashboardStore",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "bootstrap-gate.ac3",
+            "title": "Renders fallback when bootstrapComplete is false, children when true",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "skeleton-components",
+        "title": "Create shimmer skeleton components for each view",
+        "status": "completed",
+        "narrative": {
+          "Action": "Create skeleton placeholder components with animate-pulse shimmer for KanbanSkeleton, AgentListSkeleton, GodViewSkeleton, and HeaderSkeleton."
+        },
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-436"
+        },
+        "subItems": [
+          {
+            "id": "skeleton-components.ac1",
+            "title": "Each skeleton visually approximates the layout of its corresponding real component",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "skeleton-components.ac2",
+            "title": "All use animate-pulse for shimmer effect",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "skeleton-components.ac3",
+            "title": "Use existing Tailwind theme tokens (bg-surface-2, rounded, etc.)",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "skeleton-components.ac4",
+            "title": "No external dependencies — pure Tailwind CSS",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "wire-bootstrap-gates",
+        "title": "Wire BootstrapGate into App.tsx and Header",
+        "status": "completed",
+        "narrative": {
+          "Action": "Wrap store-consuming tab views (kanban, agents, god-view) with BootstrapGate in App.tsx. Header has no store-dependent count badges in the current implementation."
+        },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-436"
+        },
+        "subItems": [
+          {
+            "id": "wire-bootstrap-gates.ac1",
+            "title": "Kanban tab shows KanbanSkeleton until bootstrapComplete",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "wire-bootstrap-gates.ac2",
+            "title": "Agents tab shows AgentListSkeleton until bootstrapComplete",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "wire-bootstrap-gates.ac3",
+            "title": "GodView shows GodViewSkeleton until bootstrapComplete",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "wire-bootstrap-gates.ac4",
+            "title": "Header count badges don't show 0 during bootstrap",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "wire-bootstrap-gates.ac5",
+            "title": "React Query views (MissionControl, HandoffsPage, etc.) are NOT wrapped — they have their own loading states",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "verify-build-test",
+        "title": "Verify build and visual test",
+        "status": "completed",
+        "narrative": {
+          "Action": "Run npm run build to ensure no type errors or build failures. Verify skeletons transition smoothly to real content."
+        },
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-436"
+        },
+        "subItems": [
+          {
+            "id": "verify-build-test.ac1",
+            "title": "npm run build succeeds with no errors",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "verify-build-test.ac2",
+            "title": "No flash of zero/empty state on page load",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "verify-build-test.ac3",
+            "title": "Skeleton → real content transition is smooth",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "verify-build-test.ac4",
+            "title": "Existing React Query loading states unchanged",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "bootstrap-gate", "to": "wire-bootstrap-gates", "type": "blocks" },
+      { "from": "skeleton-components", "to": "wire-bootstrap-gates", "type": "blocks" },
+      { "from": "wire-bootstrap-gates", "to": "verify-build-test", "type": "blocks" }
+    ]
+  }
 }
