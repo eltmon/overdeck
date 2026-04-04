@@ -192,7 +192,21 @@ See [docs/VBRIEF.md](docs/VBRIEF.md) for the full spec reference.
 
 **docs/INDEX.md** — Already has VBRIEF.md reference (added today).
 
-**README.md** — Add vBRIEF to the "Built With" or "Standards" section if one exists. Reference the upstream deftai/vBRIEF repo as the canonical spec. Note that Panopticon is a reference implementation of vBRIEF for multi-agent orchestration.
+**README.md** — Update the "Key Features" table to add a "Standards & Integrations" section. Add these rows to the feature table:
+
+```markdown
+| **vBRIEF Plan Format** | Machine-readable work plans using the [vBRIEF v0.5](https://github.com/deftai/vBRIEF) spec — DAG visualization, acceptance criteria, difficulty routing |
+| **TLDR Code Analysis** | Token-efficient codebase summaries (500-1200 tokens/file vs 10-25K) via MCP — structure, call graphs, semantic search ([details](docs/TLDR.md)) |
+| **Effect.js Server** | Dashboard server built on Effect.js — typed services, WebSocket RPC, domain event sourcing, dual-runtime (Bun dev / Node prod) |
+| **Beads Task Tracking** | Git-backed task tracking with dependency DAGs, auto-created from vBRIEF plans, survives context compaction |
+```
+
+Note: "Beads" already exists in the table but should be updated to mention vBRIEF integration. The other three are new.
+
+Also ensure the README references:
+- vBRIEF spec: `https://github.com/deftai/vBRIEF` (canonical, by Deft.co)
+- Our extensions proposal: `https://github.com/deftai/vBRIEF/issues/1`
+- Our fork: `https://github.com/eltmon/vBRIEF` (only as fallback for extensions ahead of upstream)
 
 **Key principle:** Always reference `deftai/vBRIEF` as the canonical spec. Our fork at `eltmon/vBRIEF` is only mentioned as a fallback for extensions that haven't been accepted upstream yet. We aim to stay compatible with the upstream spec — fork only if we must break compatibility for functionality.
 
