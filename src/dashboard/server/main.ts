@@ -11,6 +11,7 @@ import { runServer } from './server.js';
 import { startSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
+import { processPendingLifecycle } from './pending-lifecycle.js';
 
 declare const Bun: unknown;
 
@@ -40,6 +41,9 @@ process.once('SIGINT', () => {
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
 });
+
+// Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
+await processPendingLifecycle();
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 
