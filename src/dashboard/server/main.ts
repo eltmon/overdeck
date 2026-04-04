@@ -13,10 +13,13 @@ import { startAgentEnrichmentService, stopAgentEnrichmentService } from './servi
 
 declare const Bun: unknown;
 
-// Start the shared IssueDataService before the server
-// This ensures issue data is available when the read model bootstraps
-await startSharedIssueService();
-console.log('[panopticon] IssueDataService started');
+// Start the shared IssueDataService — fire and forget.
+// It loads SQLite-cached data instantly and pushes an initial snapshot,
+// then fetches fresh data from APIs in the background.
+void startSharedIssueService().then(() => {
+  console.log('[panopticon] IssueDataService background fetch complete');
+});
+console.log('[panopticon] IssueDataService started (non-blocking)');
 
 // Start background enrichment poller — emits agent.enrichment_changed events
 // for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
