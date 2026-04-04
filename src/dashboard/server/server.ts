@@ -159,6 +159,7 @@ const staticRouteLayer = HttpRouter.add(
 // ─── Route composition ────────────────────────────────────────────────────────
 
 export const makeRoutesLayer = Layer.mergeAll(
+  HttpRouter.cors(),
   healthRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,
