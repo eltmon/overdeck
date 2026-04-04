@@ -224,10 +224,63 @@ For each sub-task, estimate difficulty using this rubric:
 When discovery is complete:
 1. Create STATE.md with decisions made
 2. Copy STATE.md to implementation plan at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
-3. Create a vBRIEF plan file at \`.planning/plan.vbrief.json\` (structured machine-readable plan)
+3. Create a vBRIEF plan file at \`.planning/plan.vbrief.json\` — **MUST follow the exact format below**
 4. Summarize the plan and STOP
 
 **DO NOT run \`bd create\` commands.** Beads tasks are created automatically from \`plan.vbrief.json\` by Cloister when planning completes.
+
+### vBRIEF Plan Format (REQUIRED)
+
+The plan file MUST conform to vBRIEF v0.5 spec (https://github.com/visionik/vBRIEF).
+It MUST have exactly two top-level keys: \`vBRIEFInfo\` and \`plan\`.
+
+\`\`\`json
+{
+  "vBRIEFInfo": { "version": "0.5", "created": "<ISO 8601 timestamp>" },
+  "plan": {
+    "id": "${issueLower}",
+    "title": "<issue title>",
+    "status": "approved",
+    "tags": ["<relevant tags>"],
+    "narratives": {
+      "Problem": "<what problem this solves>",
+      "Proposal": "<the approach chosen>"
+    },
+    "items": [
+      {
+        "id": "<short-kebab-id>",
+        "title": "<task title>",
+        "status": "pending",
+        "metadata": {
+          "difficulty": "trivial|simple|medium|complex|expert",
+          "issueLabel": "${issueLower}"
+        },
+        "narrative": { "Action": "<what needs to be done>" },
+        "subItems": [
+          {
+            "id": "<parent-id>.ac1",
+            "title": "<specific testable acceptance criterion>",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "<source-item-id>", "to": "<target-item-id>", "type": "blocks" }
+    ]
+  }
+}
+\`\`\`
+
+**CRITICAL vBRIEF rules:**
+- The file MUST have \`vBRIEFInfo\` and \`plan\` as the ONLY top-level keys
+- \`plan.id\` MUST be the issue ID in lowercase (e.g., "${issueLower}")
+- Do NOT use \`issue\`, \`issueId\`, or \`issue_id\` — use \`plan.id\`
+- \`items[].status\` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled
+- Acceptance criteria MUST be \`subItems\` with \`metadata.kind: "acceptance_criterion"\`
+- \`metadata.difficulty\` and \`metadata.issueLabel\` are Panopticon extensions to the vBRIEF spec
+- Edge types: \`blocks\` (hard dependency), \`informs\` (soft), \`invalidates\`, \`suggests\`
 
 **IMPORTANT:** Create the plan file BEFORE creating beads tasks.
 **NOTE:** \`*-spec.md\` files are human-written specs — do NOT overwrite them. Your output is \`*-plan.md\`.
