@@ -30,22 +30,66 @@ export function readPlan(planPath: string): VBriefDocument {
 
   // Standard format — has vBRIEFInfo and plan
   if (parsed.vBRIEFInfo && parsed.plan) {
+    // Normalize any legacy status values in the standard format too
+    if (parsed.plan.items) {
+      for (const item of parsed.plan.items) {
+        if (item.status === 'in_progress') {
+          console.warn(`[vBRIEF] DEPRECATION: status 'in_progress' is not vBRIEF v0.5 spec — use 'running'. File: ${planPath}`);
+          item.status = 'running';
+        }
+        for (const sub of item.subItems || []) {
+          if (sub.status === 'in_progress') sub.status = 'running';
+        }
+      }
+    }
     return parsed as VBriefDocument;
   }
 
-  // Flat format — normalize to standard
-  const items = (parsed.items || []).map((item: any) => ({
-    ...item,
-    status: item.status === 'in_progress' ? 'running' : (item.status || 'pending'),
-    narrative: item.narrative || (item.description ? { Action: item.description } : undefined),
-    metadata: item.metadata || (item.difficulty ? { difficulty: item.difficulty, issueLabel: (parsed.issue || parsed.issueId || parsed.issue_id || parsed.id || '').toLowerCase() } : undefined),
-    subItems: item.subItems || (Array.isArray(item.acceptance) ? item.acceptance.map((a: string, i: number) => ({
-      id: `${item.id}.ac${i + 1}`,
-      title: a,
-      status: 'pending',
-      metadata: { kind: 'acceptance_criterion' },
-    })) : []),
-  }));
+  // ─── DEPRECATED: Flat format normalization ──────────────────────────────
+  // The flat format (no vBRIEFInfo/plan wrapper) is non-spec and deprecated.
+  // Planning prompts have been updated to produce the canonical format.
+  // This normalizer will be removed in a future release.
+  console.warn(
+    `[vBRIEF] DEPRECATION: ${planPath} uses flat format (no vBRIEFInfo/plan wrapper). ` +
+    `This is not vBRIEF v0.5 spec compliant and will stop being supported. ` +
+    `See docs/VBRIEF.md for the correct format.`
+  );
+
+  // Detect which non-standard field name was used for the issue ID
+  const planId = parsed.issue || parsed.issueId || parsed.issue_id || parsed.id || '';
+  if (parsed.issue_id) {
+    console.warn(`[vBRIEF] DEPRECATION: field 'issue_id' → use 'plan.id' in nested format`);
+  } else if (parsed.issueId) {
+    console.warn(`[vBRIEF] DEPRECATION: field 'issueId' → use 'plan.id' in nested format`);
+  } else if (parsed.issue) {
+    console.warn(`[vBRIEF] DEPRECATION: field 'issue' → use 'plan.id' in nested format`);
+  }
+
+  const items = (parsed.items || []).map((item: any) => {
+    // Normalize deprecated fields
+    if (item.description && !item.narrative) {
+      console.warn(`[vBRIEF] DEPRECATION: item '${item.id}' uses 'description' → use 'narrative.Action'`);
+    }
+    if (item.acceptance && !item.subItems) {
+      console.warn(`[vBRIEF] DEPRECATION: item '${item.id}' uses 'acceptance[]' strings → use 'subItems[]' with metadata.kind`);
+    }
+    if (item.status === 'in_progress') {
+      console.warn(`[vBRIEF] DEPRECATION: item '${item.id}' uses status 'in_progress' → use 'running'`);
+    }
+
+    return {
+      ...item,
+      status: item.status === 'in_progress' ? 'running' : (item.status || 'pending'),
+      narrative: item.narrative || (item.description ? { Action: item.description } : undefined),
+      metadata: item.metadata || (item.difficulty ? { difficulty: item.difficulty, issueLabel: planId.toLowerCase() } : undefined),
+      subItems: item.subItems || (Array.isArray(item.acceptance) ? item.acceptance.map((a: string, i: number) => ({
+        id: `${item.id}.ac${i + 1}`,
+        title: a,
+        status: 'pending' as const,
+        metadata: { kind: 'acceptance_criterion' },
+      })) : []),
+    };
+  });
 
   return {
     vBRIEFInfo: {
@@ -53,9 +97,9 @@ export function readPlan(planPath: string): VBriefDocument {
       created: new Date().toISOString(),
     },
     plan: {
-      id: parsed.issue || parsed.issueId || parsed.issue_id || parsed.id || '',
+      id: planId,
       title: parsed.title || '',
-      status: parsed.status || 'approved',
+      status: parsed.status === 'in_progress' ? 'running' : (parsed.status || 'approved'),
       items,
       edges: parsed.edges || [],
     },
