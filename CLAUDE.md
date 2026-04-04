@@ -33,24 +33,18 @@ This means:
 - If a feature genuinely cannot be completed in one session (e.g., token limits), the agent should document exactly what remains and NOT signal completion. The issue stays open until ALL work is done.
 - PRD phases are implementation guidance, not separate deliverables.
 
-## CRITICAL: No execSync in Dashboard Server Code
+## CRITICAL: No Blocking Calls in Dashboard Server Code
 
-**NEVER use `execSync` in any code reachable from the dashboard server** (Express routes, Socket.io handlers, Cloister specialists, deacon, or any module imported by `src/dashboard/server/index.ts`).
+**NEVER use `execSync`, `readFileSync`, `writeFileSync`, `readdirSync`, or `statSync` in any code reachable from the dashboard server** (Effect route handlers in `src/dashboard/server/routes/`, services in `src/dashboard/server/services/`, or any module imported by them).
 
-`execSync` blocks the Node.js event loop, freezing all HTTP requests, WebSocket connections, and polling. This was a major issue tracked in PAN-70 (15 commits to fix).
+These block the Node.js event loop, freezing all HTTP requests, WebSocket connections, and terminal streaming. This was a major issue tracked in PAN-70 (15 commits to fix execSync) and PAN-446 (139 sync FS calls still in routes).
 
 **Rules:**
-- Dashboard server code: use `execAsync` (promisified `exec`) or `spawn` with async handling
+- Dashboard server code: use `execAsync` (promisified `exec`), `fs/promises`, or Effect `FileSystem` service
+- `existsSync` is acceptable (fast stat check, no data read)
 - tmux message delivery: use `sendKeysAsync()` from `src/lib/tmux.ts`
-- CLI commands only: `execSync` and sync `sendKeys()` are acceptable since they run in their own process
+- CLI commands only: sync calls are acceptable since they run in their own process
 - `sleep` via `execSync('sleep 0.3')` is NEVER acceptable in server code — use `await new Promise(r => setTimeout(r, 300))`
-
-**Files that import from tmux.ts in server context MUST use `sendKeysAsync`, not `sendKeys`:**
-- `src/dashboard/server/index.ts`
-- `src/lib/agents.ts`
-- `src/lib/cloister/merge-agent.ts`
-- `src/lib/cloister/specialists.ts`
-- `src/lib/runtimes/claude-code.ts`
 
 ## Project Structure
 
@@ -59,6 +53,24 @@ This means:
 - **Dev**: `npm run dev` (tsx watch)
 - **Dashboard**: Must use Node 22 — `node dist/dashboard/server.js` from repo root
 - **Issue tracking**: GitHub Issues (PAN-XXX prefix), NOT Linear
+- **Package manager**: Bun (bun.lock, `bun install`, `bun add`)
+- **Workspaces**: Bun workspaces — `packages/contracts`, `src/dashboard/server`, `src/dashboard/frontend`
+- **Build configs**: tsdown.config.ts (root for CLI, src/dashboard/server/ for server, packages/contracts/ for contracts, scripts/ for cost script)
+
+## Workspace Setup for Agents
+
+Workspaces are git worktrees at `workspaces/feature-<issue-id>/`. They share `node_modules`
+with the main repo but may have stale or missing dependencies.
+
+**Before running builds or tests in a workspace:**
+1. Run `bun install` from the workspace root
+2. If frontend node_modules are empty, symlink from main: `ln -sf /home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/node_modules src/dashboard/frontend/node_modules`
+3. Build commands use the root `node_modules/.bin/` — run from workspace root, not subdirectories
+
+**Quality gates** (must pass before `pan work done`):
+- `npm run typecheck` — TypeScript strict mode
+- `npm run lint` — ESLint
+- `npm test` — Vitest (root + frontend)
 
 ## tmux Message Delivery
 
@@ -74,34 +86,46 @@ await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
 
 Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
 
-## Dashboard Terminal Architecture (Effect RPC)
+## Dashboard Server Architecture (Effect + Raw WebSocket)
 
-The dashboard shows live terminal output via Effect RPC over a single WebSocket at `/ws/rpc`.
+The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus a
+**raw WebSocket** endpoint for terminal streaming.
 
-All terminal methods are part of `PanRpcGroup` (defined in `@panopticon/contracts`):
-- `subscribeTerminal(sessionName, cols, rows)` → `Stream<TerminalOutput>` — live PTY data
-- `terminalWrite(sessionName, data)` — send keyboard input
-- `terminalResize(sessionName, cols, rows)` — resize the PTY
-- `terminalClose(sessionName)` — close the session
+**Server structure** (split from old 15K-line monolith in PAN-428):
+- `src/dashboard/server/main.ts` — entry point, dual-runtime (Bun dev, Node prod)
+- `src/dashboard/server/server.ts` — Effect HTTP server, route composition, layers
+- `src/dashboard/server/ws-rpc.ts` — Effect RPC over WebSocket at `/ws/rpc`
+- `src/dashboard/server/ws-terminal.ts` — raw WebSocket terminal at `/ws/terminal`
+- `src/dashboard/server/routes/*.ts` — 12 route modules (issues, agents, workspaces, etc.)
+- `src/dashboard/server/services/*.ts` — domain services (event store, read model, cache, enrichment, etc.)
+- `src/dashboard/server/read-model.ts` — in-memory read model, bootstrapped from lib modules
 
-**Server side**: `TerminalService` (`src/dashboard/server/services/terminal-service.ts`)
-manages PTY lifecycle. Uses `node-pty` on Node, `Bun.spawn()` on Bun. Implements deferred
-PTY spawn — the PTY is not started until `subscribeTerminal` provides initial dimensions.
+**Two WebSocket endpoints:**
+- `/ws/rpc` — Effect RPC (PanRpcGroup): domain events, snapshots, replay. Uses typed Schema.
+- `/ws/terminal?session=<name>` — Raw WebSocket: live PTY terminal streaming via `ws` library.
+  Terminal data bypasses Effect RPC because the RPC serialization layer can't handle
+  high-throughput binary-like terminal data reliably.
 
-**Client side**: `XTerminal.tsx` uses `WsTransport.subscribe()` for the data stream and
-`WsTransport.request()` for write/resize/close. Auto-reconnection is built into the
-transport layer — no manual WebSocket management needed.
+**Terminal architecture** (`ws-terminal.ts` + `XTerminal.tsx`):
+- Server: raw `WebSocketServer` with `noServer: true`, deferred PTY spawn (waits for
+  client resize dimensions), `node-pty` spawns `tmux attach-session`
+- Client: raw `WebSocket` API with exponential backoff reconnection
+- PTY waits for tmux session to exist (`waitForTmuxSession`) before spawning
+- Data flows immediately on attach — no stale data suppression
+- Dimension toggle at 200ms forces correct-size repaint
 
-**Stale data suppression**: When the PTY attaches, tmux sends content rendered at the
-OLD size (80×24 default). This burst is suppressed for ~200ms, then a dimension toggle
-forces SIGWINCHs to guarantee a full repaint at the correct size.
+**Frontend data flow:**
+- `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
+  subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
+- `WsTransport.ts` — Effect-based RPC client with auto-reconnection
+- Store: Zustand with shared reducers from `@panopticon/contracts`
 
 **Session lifecycle rules:**
-- On subscription end, do NOT kill the PTY — the tmux session survives independently.
-- Do NOT pre-resize tmux windows to arbitrary large sizes. Let the PTY spawn handle
-  sizing via the client's actual dimensions from `subscribeTerminal`.
-- The local planning launcher script MUST export TERM/COLORTERM/LANG for proper
-  Claude Code rendering.
+- On WebSocket close, do NOT kill the PTY — the tmux session survives independently.
+- Do NOT pre-resize tmux windows. Let the PTY spawn handle sizing via client dimensions.
+- The planning launcher script MUST export TERM/COLORTERM/LANG for Claude Code rendering.
+- Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
+  survives after the agent exits, until the user clicks Done.
 
 ## Verification Gate (PAN-174)
 
