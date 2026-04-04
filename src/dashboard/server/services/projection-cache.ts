@@ -31,7 +31,7 @@ export interface ProjectionCache {
 
 const CACHE_KEY = 'dashboard';
 
-function createProjectionCache(db: DbAdapter): ProjectionCache {
+export function createProjectionCache(db: DbAdapter): ProjectionCache {
   const loadStmt = db.prepare<CacheRow>(
     `SELECT key, data, sequence, updated_at FROM projection_cache WHERE key = :key`,
   );
