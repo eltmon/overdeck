@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Costs route module — Effect HttpRouter.Layer (PAN-428 B10)
  *
@@ -61,7 +62,7 @@ const getCostsSummaryRoute = HttpRouter.add(
           }, {} as Record<string, number>),
         });
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           today: summarize(todayEntries),
           week: summarize(weekEntries),
           month: summarize(monthEntries),
@@ -70,7 +71,7 @@ const getCostsSummaryRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting cost summary:', error);
-        return HttpServerResponse.json({ error: 'Failed to get cost summary: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get cost summary: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -114,7 +115,7 @@ const getCostsByIssueRoute = HttpRouter.add(
 
           issues.sort((a, b) => b.totalCost - a.totalCost);
 
-          return HttpServerResponse.json({
+          return jsonResponse({
             status: 'live',
             eventCount: issues.length,
             issues,
@@ -122,7 +123,7 @@ const getCostsByIssueRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error getting costs by issue:', error);
-          return HttpServerResponse.json({ error: 'Failed to get costs by issue: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to get costs by issue: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -144,7 +145,7 @@ const postCostsRebuildRoute = HttpRouter.add(
           const migrationStats = migrateAllSessions();
           const cache = rebuildCache();
 
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: true,
             message: 'Cost cache rebuilt successfully',
             migration: {
@@ -162,7 +163,7 @@ const postCostsRebuildRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error rebuilding cost cache:', error);
-          return HttpServerResponse.json({ error: 'Failed to rebuild cost cache: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to rebuild cost cache: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -179,7 +180,7 @@ const postCostsDeduplicateRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const removed = deduplicateEvents();
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Deduplication complete: ${removed} duplicate event${removed !== 1 ? 's' : ''} removed`,
           removed,
@@ -188,7 +189,7 @@ const postCostsDeduplicateRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error deduplicating cost events:', error);
-        return HttpServerResponse.json({ error: 'Failed to deduplicate cost events: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to deduplicate cost events: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -203,7 +204,7 @@ const getCostsStreamRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const urlOpt = HttpServerRequest.toURL(request);
     if (Option.isNone(urlOpt)) {
-      return HttpServerResponse.json({ error: 'Bad Request' }, { status: 400 });
+      return jsonResponse({ error: 'Bad Request' }, { status: 400 });
     }
     const searchParams = urlOpt.value.searchParams;
     const since = searchParams.get('since');
@@ -233,7 +234,7 @@ const getCostsStreamRoute = HttpRouter.add(
           });
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           events: events.slice(0, 50),
           byIssue,
           count: events.length,
@@ -242,7 +243,7 @@ const getCostsStreamRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error streaming cost events:', error);
-        return HttpServerResponse.json({ error: 'Failed to stream cost events: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to stream cost events: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -257,7 +258,7 @@ const getCostsTrendsRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const urlOpt = HttpServerRequest.toURL(request);
     if (Option.isNone(urlOpt)) {
-      return HttpServerResponse.json({ error: 'Bad Request' }, { status: 400 });
+      return jsonResponse({ error: 'Bad Request' }, { status: 400 });
     }
     const searchParams = urlOpt.value.searchParams;
     const days = parseInt(searchParams.get('days') ?? '30', 10);
@@ -266,12 +267,12 @@ const getCostsTrendsRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const trends = getDailyTrends({ days, issueId });
-        return HttpServerResponse.json({ trends, days, issueId: issueId ?? null });
+        return jsonResponse({ trends, days, issueId: issueId ?? null });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting cost trends:', error);
-        return HttpServerResponse.json({ error: 'Failed to get cost trends: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get cost trends: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -286,19 +287,19 @@ const getCostsByModelRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const urlOpt = HttpServerRequest.toURL(request);
     if (Option.isNone(urlOpt)) {
-      return HttpServerResponse.json({ error: 'Bad Request' }, { status: 400 });
+      return jsonResponse({ error: 'Bad Request' }, { status: 400 });
     }
     const issueId = urlOpt.value.searchParams.get('issueId') ?? undefined;
 
     return yield* Effect.try({
       try: () => {
         const models = getModelRollup(issueId);
-        return HttpServerResponse.json({ models, issueId: issueId ?? null });
+        return jsonResponse({ models, issueId: issueId ?? null });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting model costs:', error);
-        return HttpServerResponse.json({ error: 'Failed to get model costs: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get model costs: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -317,14 +318,14 @@ const getCostsIssueRoute = HttpRouter.add(
       try: () => {
         const data = getCostForIssueFromDb(id);
         if (!data) {
-          return HttpServerResponse.json({ issueId: id.toUpperCase(), totalCost: 0, models: {}, stages: {} });
+          return jsonResponse({ issueId: id.toUpperCase(), totalCost: 0, models: {}, stages: {} });
         }
-        return HttpServerResponse.json(data);
+        return jsonResponse(data);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting issue cost detail:', error);
-        return HttpServerResponse.json({ error: 'Failed to get issue cost detail: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get issue cost detail: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -339,19 +340,19 @@ const getCostsByAgentRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const urlOpt = HttpServerRequest.toURL(request);
     if (Option.isNone(urlOpt)) {
-      return HttpServerResponse.json({ error: 'Bad Request' }, { status: 400 });
+      return jsonResponse({ error: 'Bad Request' }, { status: 400 });
     }
     const issueId = urlOpt.value.searchParams.get('issueId') ?? undefined;
 
     return yield* Effect.try({
       try: () => {
         const agents = getAgentRollup(issueId);
-        return HttpServerResponse.json({ agents, issueId: issueId ?? null });
+        return jsonResponse({ agents, issueId: issueId ?? null });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting agent costs:', error);
-        return HttpServerResponse.json({ error: 'Failed to get agent costs: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get agent costs: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -367,11 +368,11 @@ const postCostsSyncWalRoute = HttpRouter.add(
       try: async () => {
         try {
           const result = await syncWalFromAllProjects();
-          return HttpServerResponse.json({ success: true, ...result });
+          return jsonResponse({ success: true, ...result });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error syncing WAL:', error);
-          return HttpServerResponse.json({ error: 'Failed to sync WAL: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to sync WAL: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -392,11 +393,11 @@ const postCostsReconcileRoute = HttpRouter.add(
           console.log(
             `[reconciler] Sweep complete: ${result.eventsImported} imported, ${result.duplicatesSkipped} dupes, ${result.sessionsScanned} sessions scanned`
           );
-          return HttpServerResponse.json({ success: true, ...result });
+          return jsonResponse({ success: true, ...result });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error running reconciler:', error);
-          return HttpServerResponse.json({ error: 'Failed to run reconciler: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to run reconciler: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),

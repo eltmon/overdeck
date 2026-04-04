@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Specialists route module — Effect HttpRouter.Layer (PAN-428 B9)
  *
@@ -156,7 +157,7 @@ const getSpecialistsRoute = HttpRouter.add(
       const legacySpecialists = await getAllSpecialistStatus();
       const projectSpecialists = await getAllProjectSpecialistStatuses();
 
-      return HttpServerResponse.json({
+      return jsonResponse({
         specialists: legacySpecialists,
         projects: projectSpecialists,
       });
@@ -164,7 +165,7 @@ const getSpecialistsRoute = HttpRouter.add(
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting specialists:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to get specialists: ' + msg },
         { status: 500 },
       );
@@ -228,7 +229,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
         console.error('Failed to reset review statuses:', e);
       }
 
-      return HttpServerResponse.json({
+      return jsonResponse({
         success: true,
         message: `Reset ${results.length} specialists, cleared queues, reset ${reviewStatusesReset} review statuses`,
         results,
@@ -238,7 +239,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error resetting all specialists:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to reset specialists: ' + msg },
         { status: 500 },
       );
@@ -266,7 +267,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // Validate specialist type
     const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat'];
     if (!validSpecialists.includes(specialist)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Invalid specialist: ${specialist}. Valid: ${validSpecialists.join(', ')}` },
         { status: 400 },
       );
@@ -274,7 +275,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     // Validate status
     if (!status || !['passed', 'failed'].includes(status)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Invalid status: ${status}. Must be 'passed' or 'failed'` },
         { status: 400 },
       );
@@ -282,7 +283,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     // Validate issueId
     if (!issueId) {
-      return HttpServerResponse.json({ error: 'issueId is required' }, { status: 400 });
+      return jsonResponse({ error: 'issueId is required' }, { status: 400 });
     }
 
     const normalizedIssueId = issueId.toUpperCase();
@@ -292,7 +293,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // the merge lifecycle. Acknowledge the agent's call but do NOT trigger onMergeComplete.
     if (specialist === 'merge' && _serverManagedMerges.has(normalizedIssueId)) {
       console.log(`[specialists/done] ${normalizedIssueId} is server-managed merge — acknowledging without triggering lifecycle`);
-      return HttpServerResponse.json({
+      return jsonResponse({
         success: true,
         specialist,
         issueId: normalizedIssueId,
@@ -499,7 +500,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }));
     }
 
-    return HttpServerResponse.json({
+    return jsonResponse({
       success: true,
       specialist,
       issueId: normalizedIssueId,
@@ -521,7 +522,7 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
       const { cleanupAllLogs } = await import('../../../lib/cloister/specialist-logs.js');
       const results = cleanupAllLogs();
 
-      return HttpServerResponse.json({
+      return jsonResponse({
         success: true,
         totalDeleted: results.totalDeleted,
         byProject: results.byProject,
@@ -531,7 +532,7 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error cleaning up all logs:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to clean up logs: ' + msg },
         { status: 500 },
       );
@@ -564,12 +565,12 @@ const getSpecialistQueuesRoute = HttpRouter.add(
         }),
       );
 
-      return HttpServerResponse.json({ queues });
+      return jsonResponse({ queues });
     },
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting specialist queues:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to get specialist queues: ' + msg },
         { status: 500 },
       );
@@ -588,12 +589,12 @@ const getSpecialistsProjectsRoute = HttpRouter.add(
       const { getAllProjectSpecialistStatuses } =
         await import('../../../lib/cloister/specialists.js');
       const specialists = await getAllProjectSpecialistStatuses();
-      return HttpServerResponse.json(specialists);
+      return jsonResponse(specialists);
     },
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting project specialists:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to get project specialists: ' + msg },
         { status: 500 },
       );
@@ -623,7 +624,7 @@ const postSpecialistWakeRoute = HttpRouter.add(
         } = await import('../../../lib/cloister/specialists.js');
 
         if (await isRunning(name as SpecialistType)) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `Specialist ${name} is already running` },
             { status: 400 },
           );
@@ -633,7 +634,7 @@ const postSpecialistWakeRoute = HttpRouter.add(
         const tmuxSession = getTmuxSessionName(name as SpecialistType);
 
         if (!existingSessionId && !sessionId) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             {
               error: 'No session ID found. Specialist must be initialized first or provide sessionId in request.',
             },
@@ -674,7 +675,7 @@ const postSpecialistWakeRoute = HttpRouter.add(
           },
         }));
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Specialist ${name} woken up`,
           tmuxSession,
@@ -684,7 +685,7 @@ const postSpecialistWakeRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error waking specialist:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to wake specialist: ' + msg },
           { status: 500 },
         );
@@ -714,7 +715,7 @@ const postSpecialistResetRoute = HttpRouter.add(
 
         if (await isRunning(name as SpecialistType)) {
           const tmuxSession = getTmuxSessionName(name as SpecialistType);
-          return HttpServerResponse.json(
+          return jsonResponse(
             {
               error: `Specialist ${name} is currently running. Stop it first (tmux kill-session -t ${tmuxSession})`,
             },
@@ -729,7 +730,7 @@ const postSpecialistResetRoute = HttpRouter.add(
           // For now, just clearing is sufficient
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Specialist ${name} reset`,
           sessionCleared: wasDeleted,
@@ -738,7 +739,7 @@ const postSpecialistResetRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error resetting specialist:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to reset specialist: ' + msg },
           { status: 500 },
         );
@@ -762,10 +763,10 @@ const postSpecialistInitRoute = HttpRouter.add(
         const result = await initializeSpecialist(name as SpecialistType);
 
         if (!result.success) {
-          return HttpServerResponse.json({ error: result.message }, { status: 400 });
+          return jsonResponse({ error: result.message }, { status: 400 });
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: result.message,
           tmuxSession: result.tmuxSession,
@@ -775,7 +776,7 @@ const postSpecialistInitRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error initializing specialist:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to initialize specialist: ' + msg },
           { status: 500 },
         );
@@ -801,14 +802,14 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
     };
 
     if (!issueId || !status) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'issueId and status required' },
         { status: 400 },
       );
     }
 
     if (!['passed', 'blocked', 'failed', 'in-progress'].includes(status)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'status must be: passed, blocked, failed, or in-progress' },
         { status: 400 },
       );
@@ -858,12 +859,12 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
           }));
         }
 
-        return HttpServerResponse.json({ success: true });
+        return jsonResponse({ success: true });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error saving specialist status:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to save status: ' + msg },
           { status: 500 },
         );
@@ -887,7 +888,7 @@ const getSpecialistCostRoute = HttpRouter.add(
         const sessionId = getSessionId(name as SpecialistType);
 
         if (!sessionId) {
-          return HttpServerResponse.json({ cost: 0, inputTokens: 0, outputTokens: 0 });
+          return jsonResponse({ cost: 0, inputTokens: 0, outputTokens: 0 });
         }
 
         // Find the JSONL session file
@@ -951,7 +952,7 @@ const getSpecialistCostRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           cost,
           inputTokens,
           outputTokens,
@@ -962,7 +963,7 @@ const getSpecialistCostRoute = HttpRouter.add(
       },
       catch: (error: unknown) => {
         console.error('Error getting specialist cost:', error);
-        return HttpServerResponse.json({ cost: 0, inputTokens: 0, outputTokens: 0 });
+        return jsonResponse({ cost: 0, inputTokens: 0, outputTokens: 0 });
       },
     });
   }),
@@ -978,7 +979,7 @@ const getSpecialistQueueRoute = HttpRouter.add(
     const name = params['name'] as string;
 
     if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Invalid specialist name: ${name}` },
         { status: 400 },
       );
@@ -989,7 +990,7 @@ const getSpecialistQueueRoute = HttpRouter.add(
         const { checkSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
         const queue = checkSpecialistQueue(name as SpecialistType);
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           specialistName: name,
           hasWork: queue.hasWork,
           urgentCount: queue.urgentCount,
@@ -1000,7 +1001,7 @@ const getSpecialistQueueRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error getting queue for ${name}:`, error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: `Failed to get queue for ${name}: ${msg}` },
           { status: 500 },
         );
@@ -1033,14 +1034,14 @@ const postSpecialistQueueRoute = HttpRouter.add(
     };
 
     if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Invalid specialist name: ${name}` },
         { status: 400 },
       );
     }
 
     if (!issueId) {
-      return HttpServerResponse.json({ error: 'issueId is required' }, { status: 400 });
+      return jsonResponse({ error: 'issueId is required' }, { status: 400 });
     }
 
     return yield* Effect.tryPromise({
@@ -1050,7 +1051,7 @@ const postSpecialistQueueRoute = HttpRouter.add(
 
         const resolved = resolveProjectFromIssue(issueId);
         if (!resolved) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `No project configured for ${issueId}. Add it to projects.yaml.` },
             { status: 400 },
           );
@@ -1071,14 +1072,14 @@ const postSpecialistQueueRoute = HttpRouter.add(
             workspace,
             branch,
           });
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: true,
             queued: true,
             message: `${name} busy, task queued for ${issueId}`,
           });
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: result.success,
           queued: false,
           ...result,
@@ -1087,7 +1088,7 @@ const postSpecialistQueueRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error queuing work to ${name}:`, error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: `Failed to queue work to ${name}: ${msg}` },
           { status: 500 },
         );
@@ -1107,7 +1108,7 @@ const deleteSpecialistQueueItemRoute = HttpRouter.add(
     const itemId = params['itemId'] as string;
 
     if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Invalid specialist name: ${name}` },
         { status: 400 },
       );
@@ -1119,13 +1120,13 @@ const deleteSpecialistQueueItemRoute = HttpRouter.add(
         const success = completeSpecialistTask(name as SpecialistType, itemId);
 
         if (!success) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `Item ${itemId} not found in queue for ${name}` },
             { status: 404 },
           );
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Removed item ${itemId} from ${name}'s queue`,
         });
@@ -1133,7 +1134,7 @@ const deleteSpecialistQueueItemRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error removing item from ${name}'s queue:`, error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: `Failed to remove item: ${msg}` },
           { status: 500 },
         );
@@ -1154,14 +1155,14 @@ const putSpecialistQueueReorderRoute = HttpRouter.add(
     const { itemIds } = body as { itemIds?: unknown };
 
     if (!Array.isArray(itemIds)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'itemIds must be an array' },
         { status: 400 },
       );
     }
 
     if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Invalid specialist name: ${name}` },
         { status: 400 },
       );
@@ -1173,13 +1174,13 @@ const putSpecialistQueueReorderRoute = HttpRouter.add(
         const success = reorderHookItems(name, itemIds as string[]);
 
         if (!success) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'Failed to reorder queue. Check that all item IDs are valid.' },
             { status: 400 },
           );
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Reordered queue for ${name}`,
         });
@@ -1187,7 +1188,7 @@ const putSpecialistQueueReorderRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error reordering queue for ${name}:`, error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: `Failed to reorder queue: ${msg}` },
           { status: 500 },
         );
@@ -1209,7 +1210,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
     const { issueId, status } = body as { issueId?: string; status?: string };
 
     if (!issueId || !status) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'issueId and status required' },
         { status: 400 },
       );
@@ -1218,7 +1219,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
     console.log(`[specialists] Auto-detected completion for ${name}: ${issueId} -> ${status}`);
 
     if (!VALID_SPECIALIST_NAMES.includes(name)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Invalid specialist name: ${name}` },
         { status: 400 },
       );
@@ -1375,7 +1376,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
           payload: { name: name as SpecialistType, issueId },
         }));
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           status,
           issueId,
@@ -1385,7 +1386,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error processing auto-complete for ${name}:`, error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -1402,7 +1403,7 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1412,12 +1413,12 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
       try: async () => {
         const { getSpecialistStatus } = await import('../../../lib/cloister/specialists.js');
         const status = await getSpecialistStatus(type, project);
-        return HttpServerResponse.json(status);
+        return jsonResponse(status);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting per-project specialist status:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to get specialist status: ' + msg },
           { status: 500 },
         );
@@ -1437,7 +1438,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1453,7 +1454,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
           state: 'idle',
           lastActivity: new Date().toISOString(),
         });
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Killed ${type} (${project})`,
         });
@@ -1461,7 +1462,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error killing per-project specialist:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to kill specialist: ' + msg },
           { status: 500 },
         );
@@ -1480,7 +1481,7 @@ const getProjectSpecialistQueueRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1490,12 +1491,12 @@ const getProjectSpecialistQueueRoute = HttpRouter.add(
       try: async () => {
         const { checkSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
         const queue = checkSpecialistQueue(type);
-        return HttpServerResponse.json(queue);
+        return jsonResponse(queue);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting per-project specialist queue:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to get queue: ' + msg },
           { status: 500 },
         );
@@ -1523,11 +1524,11 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
     };
 
     if (!issueId) {
-      return HttpServerResponse.json({ error: 'issueId is required' }, { status: 400 });
+      return jsonResponse({ error: 'issueId is required' }, { status: 400 });
     }
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1545,15 +1546,15 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
         });
 
         if (result.success) {
-          return HttpServerResponse.json(result);
+          return jsonResponse(result);
         } else {
-          return HttpServerResponse.json({ error: result.message }, { status: 500 });
+          return jsonResponse({ error: result.message }, { status: 500 });
         }
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error spawning specialist:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to spawn specialist: ' + msg },
           { status: 500 },
         );
@@ -1589,12 +1590,12 @@ const getProjectSpecialistRunsRoute = HttpRouter.add(
       try: async () => {
         const { listRunLogs } = await import('../../../lib/cloister/specialist-logs.js');
         const runs = listRunLogs(project, type, { limit, offset });
-        return HttpServerResponse.json(runs);
+        return jsonResponse(runs);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error listing run logs:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to list run logs: ' + msg },
           { status: 500 },
         );
@@ -1623,7 +1624,7 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
         const logPath = getRunLogPath(project, type, runId);
 
         if (!existsSync(logPath)) {
-          return HttpServerResponse.json({ error: 'Run log not found' }, { status: 404 });
+          return jsonResponse({ error: 'Run log not found' }, { status: 404 });
         }
 
         // Build an SSE stream using Effect Stream + Node ReadableStream
@@ -1700,7 +1701,7 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error streaming run log:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to stream run log: ' + msg },
           { status: 500 },
         );
@@ -1727,16 +1728,16 @@ const getProjectSpecialistRunRoute = HttpRouter.add(
         const content = getRunLog(project, type, runId);
 
         if (!content) {
-          return HttpServerResponse.json({ error: 'Run log not found' }, { status: 404 });
+          return jsonResponse({ error: 'Run log not found' }, { status: 404 });
         }
 
         const metadata = parseLogMetadata(content);
-        return HttpServerResponse.json({ runId, content, metadata });
+        return jsonResponse({ runId, content, metadata });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting run log:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to get run log: ' + msg },
           { status: 500 },
         );
@@ -1756,7 +1757,7 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1766,12 +1767,12 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
       try: async () => {
         const { terminateSpecialist } = await import('../../../lib/cloister/specialists.js');
         await terminateSpecialist(project, type);
-        return HttpServerResponse.json({ success: true, message: 'Specialist terminated' });
+        return jsonResponse({ success: true, message: 'Specialist terminated' });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error terminating specialist:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to terminate specialist: ' + msg },
           { status: 500 },
         );
@@ -1791,7 +1792,7 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1803,9 +1804,9 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
         const success = pauseGracePeriod(project, type);
 
         if (success) {
-          return HttpServerResponse.json({ success: true, message: 'Grace period paused' });
+          return jsonResponse({ success: true, message: 'Grace period paused' });
         } else {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'No active grace period to pause' },
             { status: 400 },
           );
@@ -1814,7 +1815,7 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error pausing grace period:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to pause grace period: ' + msg },
           { status: 500 },
         );
@@ -1834,7 +1835,7 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1846,9 +1847,9 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
         const success = resumeGracePeriod(project, type);
 
         if (success) {
-          return HttpServerResponse.json({ success: true, message: 'Grace period resumed' });
+          return jsonResponse({ success: true, message: 'Grace period resumed' });
         } else {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'No paused grace period to resume' },
             { status: 400 },
           );
@@ -1857,7 +1858,7 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error resuming grace period:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to resume grace period: ' + msg },
           { status: 500 },
         );
@@ -1877,7 +1878,7 @@ const postProjectSpecialistGraceExitRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1887,7 +1888,7 @@ const postProjectSpecialistGraceExitRoute = HttpRouter.add(
       try: async () => {
         const { exitGracePeriod } = await import('../../../lib/cloister/specialists.js');
         exitGracePeriod(project, type);
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: 'Specialist terminated immediately',
         });
@@ -1895,7 +1896,7 @@ const postProjectSpecialistGraceExitRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error exiting grace period:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to exit grace period: ' + msg },
           { status: 500 },
         );
@@ -1915,7 +1916,7 @@ const getProjectSpecialistGraceRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -1927,15 +1928,15 @@ const getProjectSpecialistGraceRoute = HttpRouter.add(
         const state = getGracePeriodState(project, type);
 
         if (state) {
-          return HttpServerResponse.json(state);
+          return jsonResponse(state);
         } else {
-          return HttpServerResponse.json({ error: 'No active grace period' }, { status: 404 });
+          return jsonResponse({ error: 'No active grace period' }, { status: 404 });
         }
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting grace period state:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to get grace period state: ' + msg },
           { status: 500 },
         );
@@ -1961,15 +1962,15 @@ const getProjectSpecialistContextRoute = HttpRouter.add(
         const digest = loadContextDigest(project, type);
 
         if (digest) {
-          return HttpServerResponse.json({ digest });
+          return jsonResponse({ digest });
         } else {
-          return HttpServerResponse.json({ error: 'No context digest found' }, { status: 404 });
+          return jsonResponse({ error: 'No context digest found' }, { status: 404 });
         }
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting context digest:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to get context digest: ' + msg },
           { status: 500 },
         );
@@ -1995,9 +1996,9 @@ const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
         const digest = await regenerateContextDigest(project, type);
 
         if (digest) {
-          return HttpServerResponse.json({ digest, message: 'Context digest regenerated' });
+          return jsonResponse({ digest, message: 'Context digest regenerated' });
         } else {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'Failed to generate context digest' },
             { status: 500 },
           );
@@ -2006,7 +2007,7 @@ const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error regenerating context digest:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to regenerate context digest: ' + msg },
           { status: 500 },
         );
@@ -2028,14 +2029,14 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
     const { status, notes } = body as { status?: string; notes?: string };
 
     if (!status || !['passed', 'failed', 'blocked'].includes(status)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Valid status (passed/failed/blocked) is required' },
         { status: 400 },
       );
     }
 
     if (!validateSpecialistType(type)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
       );
@@ -2046,7 +2047,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
         const { signalSpecialistCompletion } =
           await import('../../../lib/cloister/specialists.js');
         signalSpecialistCompletion(project, type, { status, notes });
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: 'Specialist completion signaled, grace period started',
         });
@@ -2054,7 +2055,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error signaling completion:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to signal completion: ' + msg },
           { status: 500 },
         );
@@ -2077,7 +2078,7 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
       try: () => {
         const runsDir = join(homedir(), '.panopticon', 'specialists', project, type, 'runs');
         if (!existsSync(runsDir)) {
-          return HttpServerResponse.json({ log: null, message: 'No runs found' });
+          return jsonResponse({ log: null, message: 'No runs found' });
         }
 
         const files = readdirSync(runsDir)
@@ -2086,11 +2087,11 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
           .reverse();
 
         if (files.length === 0) {
-          return HttpServerResponse.json({ log: null, message: 'No run logs found' });
+          return jsonResponse({ log: null, message: 'No run logs found' });
         }
 
         const latestLog = readFileSync(join(runsDir, files[0]), 'utf-8');
-        return HttpServerResponse.json({
+        return jsonResponse({
           log: latestLog,
           file: files[0],
           totalRuns: files.length,
@@ -2098,7 +2099,7 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -2122,7 +2123,7 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
         const retention = getSpecialistRetention(project);
         const deleted = cleanupOldLogs(project, type, retention);
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           deleted,
           message: `Cleaned up ${deleted} old logs`,
@@ -2131,7 +2132,7 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error cleaning up logs:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to clean up logs: ' + msg },
           { status: 500 },
         );

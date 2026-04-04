@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
  *
@@ -585,7 +586,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const workspaceInfo = getWorkspaceInfoForIssue(issueId);
 
         if (workspaceInfo.isRemote && workspaceInfo.vmName) {
-          return HttpServerResponse.json({
+          return jsonResponse({
             exists: true,
             issueId,
             isRemote: true,
@@ -602,7 +603,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
         if (!existsSync(workspacePath)) {
-          return HttpServerResponse.json({ exists: false, issueId });
+          return jsonResponse({ exists: false, issueId });
         }
 
         const gitFile = join(workspacePath, '.git');
@@ -622,7 +623,7 @@ const getWorkspaceRoute = HttpRouter.add(
 
         if (!hasValidStructure) {
           const location = getWorkspaceLocation(issueId);
-          return HttpServerResponse.json({
+          return jsonResponse({
             exists: true,
             corrupted: true,
             issueId,
@@ -726,7 +727,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const pendingOperation = getPendingOperation(issueId);
         const location = getWorkspaceLocation(issueId);
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           exists: true,
           issueId,
           path: workspacePath,
@@ -750,7 +751,7 @@ const getWorkspaceRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting workspace info:', error);
-        return HttpServerResponse.json({ error: 'Failed to get workspace info: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get workspace info: ' + msg }, { status: 500 });
       },
     });
   })
@@ -766,7 +767,7 @@ const postWorkspacesRoute = HttpRouter.add(
     const { issueId, projectId } = body as { issueId?: string; projectId?: string };
 
     if (!issueId) {
-      return HttpServerResponse.json({ error: 'issueId required' }, { status: 400 });
+      return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
     return yield* Effect.tryPromise({
@@ -778,7 +779,7 @@ const postWorkspacesRoute = HttpRouter.add(
           `Create workspace for ${issueId}`,
           projectPath
         );
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Creating workspace for ${issueId}`,
           activityId,
@@ -788,7 +789,7 @@ const postWorkspacesRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error creating workspace:', error);
-        return HttpServerResponse.json({ error: 'Failed to create workspace: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to create workspace: ' + msg }, { status: 500 });
       },
     });
   })
@@ -810,7 +811,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
 
     const planPath = findPlan(workspacePath);
     if (!planPath) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'No vBRIEF plan found for this workspace' },
         { status: 404 }
       );
@@ -820,11 +821,11 @@ const getWorkspacePlanRoute = HttpRouter.add(
       try: async () => {
         const doc = readPlan(planPath);
         const cp = criticalPath(doc);
-        return HttpServerResponse.json({ ...doc, criticalPath: cp });
+        return jsonResponse({ ...doc, criticalPath: cp });
       },
       catch: (err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
-        return HttpServerResponse.json({ error: 'Failed to read plan: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to read plan: ' + msg }, { status: 500 });
       },
     });
   })
@@ -845,7 +846,7 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
     const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
     if (!existsSync(workspacePath)) {
-      return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 404 });
+      return jsonResponse({ error: 'Workspace does not exist' }, { status: 404 });
     }
 
     return yield* Effect.tryPromise({
@@ -984,7 +985,7 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
           diffAnalysis.error = `Diff analysis failed: ${diffError.message}`;
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           workspacePath,
           totalSize,
           fileCount: files.length,
@@ -1003,7 +1004,7 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error previewing workspace:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to preview workspace: ' + msg },
           { status: 500 }
         );
@@ -1030,7 +1031,7 @@ const postWorkspaceCleanRoute = HttpRouter.add(
     const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
     if (!existsSync(workspacePath)) {
-      return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 404 });
+      return jsonResponse({ error: 'Workspace does not exist' }, { status: 404 });
     }
 
     return yield* Effect.tryPromise({
@@ -1071,7 +1072,7 @@ const postWorkspaceCleanRoute = HttpRouter.add(
           projectPath
         );
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: createBackup
             ? `Backed up to ${backupPath} and recreating workspace for ${issueId}`
@@ -1084,7 +1085,7 @@ const postWorkspaceCleanRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error cleaning workspace:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to clean workspace: ' + msg },
           { status: 500 }
         );
@@ -1107,7 +1108,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
 
     const newFeatureScript = join(projectPath, 'infra', 'new-feature');
     if (!existsSync(newFeatureScript)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Project does not support containerization (no infra/new-feature script)' },
         { status: 400 }
       );
@@ -1116,7 +1117,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
     const workspaceName = `feature-${issueLower}`;
     const workspacePath = join(projectPath, 'workspaces', workspaceName);
     if (existsSync(join(workspacePath, '.devcontainer'))) {
-      return HttpServerResponse.json({ error: 'Workspace is already containerized' }, { status: 400 });
+      return jsonResponse({ error: 'Workspace is already containerized' }, { status: 400 });
     }
 
     return yield* Effect.tryPromise({
@@ -1124,7 +1125,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
         try {
           await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
         } catch {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'Docker is not running. Start Docker Desktop first.' },
             { status: 400 }
           );
@@ -1220,7 +1221,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
           updateActivity(activityId, { status: 'failed' });
         });
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Containerizing workspace for ${issueId}`,
           activityId,
@@ -1230,7 +1231,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error containerizing workspace:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to containerize workspace: ' + msg },
           { status: 500 }
         );
@@ -1253,7 +1254,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
     if (!existsSync(workspacePath)) {
-      return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 400 });
+      return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
     }
 
     return yield* Effect.tryPromise({
@@ -1306,7 +1307,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
               chmodSync(devScriptInContainer, 0o755);
               console.log(`[workspace/start] Repaired: created ./dev symlink for ${issueId}`);
             } catch (repairErr) {
-              return HttpServerResponse.json(
+              return jsonResponse(
                 {
                   error: `Workspace has no ./dev script and repair failed: ${repairErr}`,
                 },
@@ -1314,7 +1315,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
               );
             }
           } else {
-            return HttpServerResponse.json(
+            return jsonResponse(
               { error: 'Workspace has no ./dev script (checked root and .devcontainer/)' },
               { status: 400 }
             );
@@ -1400,7 +1401,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
         try {
           await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
         } catch {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'Docker is not running. Start Docker Desktop first.' },
             { status: 400 }
           );
@@ -1566,7 +1567,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
           updateActivity(activityId, { status: 'failed' });
         });
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Starting containers for ${issueId}`,
           activityId,
@@ -1575,7 +1576,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error starting containers:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to start containers: ' + msg },
           { status: 500 }
         );
@@ -1596,7 +1597,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
     const action = params['action'] ?? '';
 
     if (!['start', 'stop', 'restart'].includes(action)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Invalid action. Must be start, stop, or restart.' },
         { status: 400 }
       );
@@ -1640,14 +1641,14 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
         }
 
         if (!workspacePath) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `Workspace not found for ${issueId}` },
             { status: 404 }
           );
         }
 
         if (!composeFile) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `No docker-compose file found in workspace` },
             { status: 404 }
           );
@@ -1656,7 +1657,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
         try {
           await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
         } catch {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'Docker is not running. Start Docker Desktop first.' },
             { status: 400 }
           );
@@ -1673,7 +1674,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
 
         const serviceNames = serviceMap[containerName.toLowerCase()];
         if (!serviceNames) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             {
               error: `Unknown container: ${containerName}. Valid: ${Object.keys(serviceMap).join(', ')}`,
             },
@@ -1737,12 +1738,12 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
         }
 
         if (success) {
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: true,
             message: `Container ${containerName} ${action}ed successfully`,
           });
         } else {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `Failed to ${action} ${containerName}: ${lastError}` },
             { status: 500 }
           );
@@ -1751,7 +1752,7 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error performing container action:`, error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: `Failed to ${action} container: ${msg}` },
           { status: 500 }
         );
@@ -1773,7 +1774,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
     const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
 
     if (!projectConfig) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `No project found for issue prefix: ${issueId}` },
         { status: 404 }
       );
@@ -1781,7 +1782,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
 
     const dbConfig = projectConfig.workspace?.database;
     if (!dbConfig?.seed_file) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'No seed_file configured in projects.yaml database config' },
         { status: 400 }
       );
@@ -1789,7 +1790,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
 
     const seedFile = join(projectConfig.path, dbConfig.seed_file);
     if (!existsSync(seedFile)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Seed file not found: ${seedFile}` },
         { status: 400 }
       );
@@ -1797,7 +1798,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
 
     const flywayFile = join(dirname(seedFile), 'zzz-flyway-workspace-baseline.sql');
     if (!existsSync(flywayFile)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Flyway baseline not found: ${flywayFile}` },
         { status: 400 }
       );
@@ -1811,7 +1812,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
         const workspacePath = join(projectConfig.path, workspacesDir, featureFolder);
 
         if (!existsSync(workspacePath)) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `Workspace not found: ${featureFolder}` },
             { status: 404 }
           );
@@ -1828,7 +1829,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
         }
 
         if (!composeFile) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'No docker-compose file found in workspace' },
             { status: 404 }
           );
@@ -1841,7 +1842,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
         const projectName = projectNameOut.trim();
 
         if (!projectName) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'Could not determine docker compose project name' },
             { status: 500 }
           );
@@ -1906,7 +1907,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
           `[refresh-db] DB refresh complete for ${issueId}: ${customerCount} customers`
         );
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Database refreshed successfully`,
           customerCount,
@@ -1915,7 +1916,7 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[refresh-db] Error refreshing DB for ${issueId}:`, error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: `Failed to refresh database: ${msg}` },
           { status: 500 }
         );
@@ -1973,12 +1974,12 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json({ ...base, queuePosition, activeSpecialist });
+        return jsonResponse({ ...base, queuePosition, activeSpecialist });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting review status:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to get review status: ' + msg },
           { status: 500 }
         );
@@ -2189,12 +2190,12 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json(status);
+        return jsonResponse(status);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error updating review status:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to update review status: ' + msg },
           { status: 500 }
         );
@@ -2248,7 +2249,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
           );
 
           if (!isInfraFailure && !forceReview) {
-            return HttpServerResponse.json({
+            return jsonResponse({
               success: false,
               alreadyReviewed: true,
               message: `Review already completed with status: ${existingStatus.reviewStatus}`,
@@ -2264,7 +2265,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
         if (existingStatus?.reviewStatus === 'passed' && !forceReview) {
           console.log(`[review] Skipping ${issueId}: already passed review`);
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: false,
             alreadyReviewed: true,
             message: `Review already passed for ${issueId}`,
@@ -2274,7 +2275,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
         if (existingStatus?.mergeStatus === 'merged') {
           console.log(`[review] Skipping ${issueId}: already merged`);
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: false,
             alreadyMerged: true,
             message: `${issueId} is already merged`,
@@ -2282,7 +2283,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
         }
 
         if (!workspaceInfo.exists) {
-          return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 400 });
+          return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
         }
 
         // Reset review status
@@ -2500,7 +2501,7 @@ ${workspaceAccessInstructions}
           }
         })();
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Review pipeline starting for ${issueId}`,
           pipeline: 'verification → review → test',
@@ -2510,7 +2511,7 @@ ${workspaceAccessInstructions}
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error starting review:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to start review: ' + msg },
           { status: 500 }
         );
@@ -2537,7 +2538,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
         if (existingStatus?.mergeStatus === 'merged') {
           console.log(`[request-review] Rejecting ${issueId}: already merged`);
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: false,
             alreadyMerged: true,
             message: `${issueId} is already merged. Use Reopen or Reset Reviews first.`,
@@ -2592,7 +2593,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
                 `[request-review] Failed to queue test specialist for ${issueId}: ${err.message}`
               );
             }
-            return HttpServerResponse.json({
+            return jsonResponse({
               success: true,
               requeued: true,
               message: `Tests re-queued for ${issueId} (review already passed)`,
@@ -2601,7 +2602,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           console.log(
             `[request-review] ${issueId}: review already passed — returning success no-op`
           );
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: true,
             alreadyPassed: true,
             message: `Review already passed for ${issueId}`,
@@ -2614,7 +2615,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           console.log(
             `[request-review] Circuit breaker: ${issueId} exceeded max auto-requeues (${currentCount}/${MAX_AUTO_REQUEUE})`
           );
-          return HttpServerResponse.json(
+          return jsonResponse(
             {
               success: false,
               error: 'Circuit breaker triggered',
@@ -2637,7 +2638,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
 
         if (!workspaceInfo.exists) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { success: false, error: 'Workspace does not exist' },
             { status: 400 }
           );
@@ -2669,7 +2670,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           'request-review'
         );
         if (reqVerifyOutcome.outcome === 'failed') {
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: false,
             verificationFailed: true,
             failedCheck: reqVerifyOutcome.failedCheck,
@@ -2679,7 +2680,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           });
         }
         if (reqVerifyOutcome.outcome === 'error') {
-          return HttpServerResponse.json(
+          return jsonResponse(
             {
               success: false,
               error: `Verification infrastructure error: ${reqVerifyOutcome.message}`,
@@ -2708,7 +2709,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           const resolved = resolveProjectFromIssue(issueId);
 
           if (!resolved) {
-            return HttpServerResponse.json(
+            return jsonResponse(
               {
                 success: false,
                 error: `No project configured for ${issueId}. Add it to projects.yaml.`,
@@ -2731,7 +2732,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               timestamp: new Date().toISOString(),
               payload: { issueId },
             }));
-            return HttpServerResponse.json({
+            return jsonResponse({
               success: true,
               queued: false,
               message: `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
@@ -2743,7 +2744,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               `[request-review] Review specialist busy for ${issueId}, reverting to pending`
             );
             setReviewStatus(issueId, { reviewStatus: 'pending' });
-            return HttpServerResponse.json(
+            return jsonResponse(
               {
                 success: false,
                 error: 'Review specialist busy, will retry',
@@ -2760,7 +2761,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               reviewStatus: 'dispatch_failed',
               reviewNotes: `Dispatch failed: ${result.error || result.message}`,
             });
-            return HttpServerResponse.json(
+            return jsonResponse(
               {
                 success: false,
                 error: result.error || 'Failed to spawn review specialist',
@@ -2775,7 +2776,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             reviewStatus: 'dispatch_failed',
             reviewNotes: `Dispatch error: ${error.message}`,
           });
-          return HttpServerResponse.json(
+          return jsonResponse(
             { success: false, error: error.message, autoRequeueCount: newCount },
             { status: 500 }
           );
@@ -2784,7 +2785,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error in request-review:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to request review: ' + msg },
           { status: 500 }
         );
@@ -2807,7 +2808,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
       try: async () => {
         const workspaceInfo = getWorkspaceInfoForIssue(issueId);
         if (!workspaceInfo.exists) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { success: false, error: 'Workspace does not exist' },
             { status: 400 }
           );
@@ -2901,7 +2902,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: rerun
             ? `Pipeline reset and review re-dispatched for ${issueId}.`
@@ -2912,7 +2913,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[reset-review] Error:`, error);
-        return HttpServerResponse.json({ success: false, error: msg }, { status: 500 });
+        return jsonResponse({ success: false, error: msg }, { status: 500 });
       },
     });
   })
@@ -2935,7 +2936,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
 
         const workspaceInfo = getWorkspaceInfoForIssue(issueId);
         if (workspaceInfo.isRemote) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             {
               success: false,
               error: 'Sync with Main is not supported for remote workspaces',
@@ -2949,7 +2950,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
           join(projectPath, 'workspaces', `feature-${issueLower}`);
 
         if (!existsSync(workspacePath)) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { success: false, error: 'Workspace does not exist' },
             { status: 400 }
           );
@@ -2961,13 +2962,13 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
 
         if (result.success) {
           if (result.alreadyUpToDate) {
-            return HttpServerResponse.json({
+            return jsonResponse({
               success: true,
               alreadyUpToDate: true,
               message: 'Already up to date with main',
             });
           }
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: true,
             commitCount: result.commitCount || 0,
             changedFiles: result.changedFiles || [],
@@ -2975,7 +2976,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
           });
         } else {
           const status = result.reason?.includes('uncommitted') ? 400 : 500;
-          return HttpServerResponse.json(
+          return jsonResponse(
             {
               success: false,
               error: result.reason || 'Sync failed',
@@ -2988,7 +2989,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[sync-main] Unexpected error for ${issueId}:`, error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { success: false, error: msg || 'Unexpected error during sync' },
           { status: 500 }
         );
@@ -3309,12 +3310,12 @@ const postWorkspaceMergeRoute = HttpRouter.add(
           }));
         }
         const { statusCode, ...body } = result;
-        return HttpServerResponse.json(body, { status: statusCode });
+        return jsonResponse(body, { status: statusCode });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error in merge endpoint:', error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   })
@@ -3347,9 +3348,9 @@ const postWorkspaceApproveRoute = HttpRouter.add(
               { method: 'POST', headers: { 'Content-Type': 'application/json' } }
             );
             const mergeData = (await mergeRes.json()) as any;
-            return HttpServerResponse.json(mergeData, { status: mergeRes.status });
+            return jsonResponse(mergeData, { status: mergeRes.status });
           } catch (err: any) {
-            return HttpServerResponse.json(
+            return jsonResponse(
               { error: `Failed to forward to merge: ${err.message}` },
               { status: 500 }
             );
@@ -3366,7 +3367,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
 
         if (!existsSync(workspacePath)) {
           completePendingOperation(issueId, 'Workspace does not exist');
-          return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 400 });
+          return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
         }
 
         try {
@@ -3376,7 +3377,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           });
         } catch {
           completePendingOperation(issueId, `Branch ${branchName} does not exist`);
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `Branch ${branchName} does not exist` },
             { status: 400 }
           );
@@ -3390,7 +3391,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           if (status.trim()) {
             const error = `Workspace has uncommitted changes. Please commit or stash them first:\ncd ${workspacePath}\ngit status`;
             completePendingOperation(issueId, error);
-            return HttpServerResponse.json({ error }, { status: 400 });
+            return jsonResponse({ error }, { status: 400 });
           }
         } catch {}
 
@@ -3412,7 +3413,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         } catch (checkoutErr: any) {
           const error = `Failed to checkout/update main branch: ${checkoutErr.message}`;
           completePendingOperation(issueId, error);
-          return HttpServerResponse.json({ error }, { status: 400 });
+          return jsonResponse({ error }, { status: 400 });
         }
 
         const { wakeSpecialist, spawnEphemeralSpecialist: spawnApproveEphemeral } =
@@ -3495,7 +3496,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
             `[approve] Pipeline started - review-agent will queue test-agent when done`
           );
           completePendingOperation(issueId, null);
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: true,
             message: `Approval pipeline started for ${issueId}. Specialists: review → test`,
             pipeline: 'running',
@@ -3530,7 +3531,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
             } catch {}
             const error = `merge-agent completed merge but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`;
             completePendingOperation(issueId, error);
-            return HttpServerResponse.json({ error }, { status: 400 });
+            return jsonResponse({ error }, { status: 400 });
           } else {
             try {
               await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
@@ -3540,7 +3541,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
             } catch {}
             const error = `merge-agent could not complete merge.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
             completePendingOperation(issueId, error);
-            return HttpServerResponse.json({ error }, { status: 400 });
+            return jsonResponse({ error }, { status: 400 });
           }
         } catch (agentError: any) {
           try {
@@ -3551,7 +3552,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
           } catch {}
           const error = `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
           completePendingOperation(issueId, error);
-          return HttpServerResponse.json({ error }, { status: 400 });
+          return jsonResponse({ error }, { status: 400 });
         }
 
         // Push merged main
@@ -3560,7 +3561,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
         } catch (pushErr: any) {
           const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
           completePendingOperation(issueId, error);
-          return HttpServerResponse.json({ error }, { status: 400 });
+          return jsonResponse({ error }, { status: 400 });
         }
 
         // Post-merge lifecycle
@@ -3599,7 +3600,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 
         completePendingOperation(issueId);
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Approved ${issueId}: ${lifecycleResult.steps
             .filter((s: any) => s.success && !s.skipped)
@@ -3611,7 +3612,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error approving workspace:', error);
         completePendingOperation(issueId, msg);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to approve: ' + msg },
           { status: 500 }
         );
@@ -3629,7 +3630,7 @@ const deleteWorkspacePendingRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     clearPendingOperation(issueId);
-    return HttpServerResponse.json({ success: true });
+    return jsonResponse({ success: true });
   })
 );
 
@@ -3649,11 +3650,11 @@ const getWorkspaceTldrRoute = HttpRouter.add(
         const venvPath = join(workspacePath, '.venv');
 
         if (!existsSync(workspacePath)) {
-          return HttpServerResponse.json({ error: 'Workspace not found' }, { status: 404 });
+          return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
         }
 
         if (!existsSync(venvPath)) {
-          return HttpServerResponse.json({
+          return jsonResponse({
             available: false,
             reason: 'No .venv found in workspace',
           });
@@ -3663,7 +3664,7 @@ const getWorkspaceTldrRoute = HttpRouter.add(
         const status = await service.getStatus();
         const { fileCount, indexAge, edgeCount } = getIndexStats(workspacePath);
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           available: true,
           running: status.running,
           pid: status.pid,
@@ -3677,7 +3678,7 @@ const getWorkspaceTldrRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting workspace TLDR status:', error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   })

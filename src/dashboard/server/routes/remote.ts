@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Remote route module — Effect HttpRouter.Layer (PAN-428 B14)
  *
@@ -104,7 +105,7 @@ const getRemoteStatusRoute = HttpRouter.add(
         const enabled = remoteConfig?.enabled ?? false;
 
         if (!enabled) {
-          return HttpServerResponse.json({
+          return jsonResponse({
             enabled: false,
             available: false,
             reason: 'Remote workspaces not enabled. Run: pan remote setup',
@@ -114,7 +115,7 @@ const getRemoteStatusRoute = HttpRouter.add(
         const availability = await isRemoteAvailable();
 
         if (!availability.available) {
-          return HttpServerResponse.json({
+          return jsonResponse({
             enabled: true,
             available: false,
             reason: availability.reason,
@@ -124,7 +125,7 @@ const getRemoteStatusRoute = HttpRouter.add(
         const fly = createFlyProviderFromConfig(remoteConfig);
         const vms = await fly.listVms();
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           enabled: true,
           available: true,
           provider: remoteConfig?.provider || 'fly',
@@ -136,7 +137,7 @@ const getRemoteStatusRoute = HttpRouter.add(
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -170,11 +171,11 @@ const listRemoteWorkspacesRoute = HttpRouter.add(
           };
         });
 
-        return HttpServerResponse.json(enriched);
+        return jsonResponse(enriched);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -194,7 +195,7 @@ const getRemoteWorkspaceRoute = HttpRouter.add(
         const metadata = loadRemoteWorkspaceMetadata(issueId);
 
         if (!metadata) {
-          return HttpServerResponse.json({ error: 'Remote workspace not found' }, { status: 404 });
+          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
         }
 
         const config = loadPanConfig();
@@ -221,7 +222,7 @@ const getRemoteWorkspaceRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           ...metadata,
           vmStatus,
           agent: agentStatus,
@@ -229,7 +230,7 @@ const getRemoteWorkspaceRoute = HttpRouter.add(
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -250,7 +251,7 @@ const startRemoteWorkspaceRoute = HttpRouter.add(
         const metadata = loadRemoteWorkspaceMetadata(issueId);
 
         if (!metadata) {
-          return HttpServerResponse.json({ error: 'Remote workspace not found' }, { status: 404 });
+          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
         }
 
         const config = loadPanConfig();
@@ -262,11 +263,11 @@ const startRemoteWorkspaceRoute = HttpRouter.add(
         await fly.ssh(metadata.vmName, 'cd /workspace && docker compose up -d 2>/dev/null || true');
 
         Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
-        return HttpServerResponse.json({ success: true, message: `Workspace ${issueId} started` });
+        return jsonResponse({ success: true, message: `Workspace ${issueId} started` });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -287,7 +288,7 @@ const stopRemoteWorkspaceRoute = HttpRouter.add(
         const metadata = loadRemoteWorkspaceMetadata(issueId);
 
         if (!metadata) {
-          return HttpServerResponse.json({ error: 'Remote workspace not found' }, { status: 404 });
+          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
         }
 
         const config = loadPanConfig();
@@ -300,11 +301,11 @@ const stopRemoteWorkspaceRoute = HttpRouter.add(
         await fly.stopVm(metadata.vmName);
 
         Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
-        return HttpServerResponse.json({ success: true, message: `Workspace ${issueId} stopped` });
+        return jsonResponse({ success: true, message: `Workspace ${issueId} stopped` });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -327,7 +328,7 @@ const startRemoteAgentRoute = HttpRouter.add(
 
         const metadata = loadRemoteWorkspaceMetadata(issueId);
         if (!metadata) {
-          return HttpServerResponse.json({ error: 'Remote workspace not found' }, { status: 404 });
+          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
         }
 
         // Sync all credentials before spawning (tokens may have expired)
@@ -342,11 +343,11 @@ const startRemoteAgentRoute = HttpRouter.add(
         });
 
         Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
-        return HttpServerResponse.json(state);
+        return jsonResponse(state);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -367,18 +368,18 @@ const stopRemoteAgentRoute = HttpRouter.add(
         const metadata = loadRemoteWorkspaceMetadata(issueId);
 
         if (!metadata) {
-          return HttpServerResponse.json({ error: 'Remote workspace not found' }, { status: 404 });
+          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
         }
 
         const agentId = `agent-${issueId.toLowerCase()}`;
         await killRemoteAgent(agentId, metadata.vmName);
 
         Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
-        return HttpServerResponse.json({ success: true, message: `Agent ${agentId} stopped` });
+        return jsonResponse({ success: true, message: `Agent ${agentId} stopped` });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -403,17 +404,17 @@ const getRemoteAgentOutputRoute = HttpRouter.add(
       try: async () => {
         const metadata = loadRemoteWorkspaceMetadata(issueId);
         if (!metadata) {
-          return HttpServerResponse.json({ error: 'Remote workspace not found' }, { status: 404 });
+          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
         }
 
         const agentId = `agent-${issueId.toLowerCase()}`;
         const output = await getRemoteAgentOutput(agentId, metadata.vmName, lines);
 
-        return HttpServerResponse.json({ output });
+        return jsonResponse({ output });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),
@@ -434,22 +435,22 @@ const tellRemoteAgentRoute = HttpRouter.add(
         const { message } = body as { message?: string };
 
         if (!message) {
-          return HttpServerResponse.json({ error: 'Message is required' }, { status: 400 });
+          return jsonResponse({ error: 'Message is required' }, { status: 400 });
         }
 
         const metadata = loadRemoteWorkspaceMetadata(issueId);
         if (!metadata) {
-          return HttpServerResponse.json({ error: 'Remote workspace not found' }, { status: 404 });
+          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
         }
 
         const agentId = `agent-${issueId.toLowerCase()}`;
         await sendToRemoteAgent(agentId, metadata.vmName, message);
 
-        return HttpServerResponse.json({ success: true });
+        return jsonResponse({ success: true });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
+        return jsonResponse({ error: msg }, { status: 500 });
       },
     });
   }),

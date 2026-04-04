@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Settings route module — Effect HttpRouter.Layer (PAN-428 B15)
  *
@@ -80,12 +81,12 @@ const getSettingsRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const settings = loadSettingsApi();
-        return HttpServerResponse.json(settings);
+        return jsonResponse(settings);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error loading settings:', error);
-        return HttpServerResponse.json({ error: 'Failed to load settings: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to load settings: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -100,12 +101,12 @@ const getAvailableModelsRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const availableModels = getAvailableModelsApi();
-        return HttpServerResponse.json(availableModels);
+        return jsonResponse(availableModels);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error loading available models:', error);
-        return HttpServerResponse.json({ error: 'Failed to load available models: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to load available models: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -120,12 +121,12 @@ const getOptimalDefaultsRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const optimalDefaults = getOptimalDefaultsApi();
-        return HttpServerResponse.json(optimalDefaults);
+        return jsonResponse(optimalDefaults);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting optimal defaults:', error);
-        return HttpServerResponse.json({ error: 'Failed to get optimal defaults: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get optimal defaults: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -141,7 +142,7 @@ const postTestApiKeyRoute = HttpRouter.add(
     const { provider, apiKey, model } = body as Record<string, string | undefined>;
 
     if (!provider || !apiKey) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Provider and apiKey are required' },
         { status: 400 },
       );
@@ -305,11 +306,11 @@ const postTestApiKeyRoute = HttpRouter.add(
             error = `Unknown provider: ${provider}`;
         }
 
-        return HttpServerResponse.json({ success, error, response, latencyMs, model: model || 'default' });
+        return jsonResponse({ success, error, response, latencyMs, model: model || 'default' });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error testing API key:', error);
-          return HttpServerResponse.json({ error: 'Failed to test API key: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to test API key: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -327,14 +328,14 @@ const postValidateApiKeyRoute = HttpRouter.add(
     const { provider, apiKey } = body as Record<string, string | undefined>;
 
     if (!provider || !apiKey) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Provider and apiKey are required' },
         { status: 400 },
       );
     }
 
     if (!['openai', 'google', 'zai'].includes(provider)) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: `Unsupported provider: ${provider}` },
         { status: 400 },
       );
@@ -424,7 +425,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           valid,
           provider,
           models: valid ? models : undefined,
@@ -433,7 +434,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error validating API key:', error);
-          return HttpServerResponse.json({ error: 'Failed to validate API key: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to validate API key: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -455,7 +456,7 @@ const putSettingsRoute = HttpRouter.add(
 
         const validation = validateSettingsApi(newSettings);
         if (!validation.valid) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: validation.errors.join('; ') },
             { status: 400 },
           );
@@ -463,7 +464,7 @@ const putSettingsRoute = HttpRouter.add(
 
         saveSettingsApi(newSettings);
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: 'Settings saved to config.yaml',
           warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
@@ -472,7 +473,7 @@ const putSettingsRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error saving settings:', error);
-        return HttpServerResponse.json({ error: 'Failed to save settings: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to save settings: ' + msg }, { status: 500 });
       },
     });
   }),

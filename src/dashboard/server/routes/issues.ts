@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Issues route module — Effect HttpRouter.Layer (PAN-428 B6)
  *
@@ -133,7 +134,7 @@ const getIssuesRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const urlOpt = HttpServerRequest.toURL(request);
     if (Option.isNone(urlOpt)) {
-      return HttpServerResponse.json({ error: 'Bad Request' }, { status: 400 });
+      return jsonResponse({ error: 'Bad Request' }, { status: 400 });
     }
     const searchParams = urlOpt.value.searchParams;
     const cycle = searchParams.get('cycle') ?? undefined;
@@ -141,7 +142,7 @@ const getIssuesRoute = HttpRouter.add(
 
     const issueDataService = getIssueDataService();
     const issues = issueDataService.getIssues({ cycle, includeCompleted });
-    return HttpServerResponse.json(issues);
+    return jsonResponse(issues);
   }),
 );
 
@@ -159,7 +160,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
         try {
         const apiKey = getLinearApiKey();
         if (!apiKey) {
-          return HttpServerResponse.json({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
+          return jsonResponse({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
         }
 
         const query = `
@@ -188,7 +189,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
         const issue = json.data?.issue;
 
         if (!issue) {
-          return HttpServerResponse.json({ error: 'Issue not found' }, { status: 404 });
+          return jsonResponse({ error: 'Issue not found' }, { status: 404 });
         }
 
         const desc = (issue.description || '').toLowerCase();
@@ -236,7 +237,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
 
         const isComplex = reasons.length >= 2 || subsystems.length > 1 || estimatedTasks >= 4;
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           issue: {
             id: issue.id,
             identifier: issue.identifier,
@@ -257,7 +258,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error analyzing issue:', error);
-          return HttpServerResponse.json({ error: 'Failed to analyze issue: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to analyze issue: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -281,12 +282,12 @@ const postIssuePlanRoute = HttpRouter.add(
         const { answers, tasks } = body as any;
 
         if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
-          return HttpServerResponse.json({ error: 'Tasks are required' }, { status: 400 });
+          return jsonResponse({ error: 'Tasks are required' }, { status: 400 });
         }
 
         const apiKey = getLinearApiKey();
         if (!apiKey) {
-          return HttpServerResponse.json({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
+          return jsonResponse({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
         }
 
         const query = `
@@ -310,7 +311,7 @@ const postIssuePlanRoute = HttpRouter.add(
         const issue = json.data?.issue;
 
         if (!issue) {
-          return HttpServerResponse.json({ error: 'Issue not found' }, { status: 404 });
+          return jsonResponse({ error: 'Issue not found' }, { status: 404 });
         }
 
         const issuePrefix = issue.identifier.split('-')[0];
@@ -344,7 +345,7 @@ const postIssuePlanRoute = HttpRouter.add(
           prdFiles,
         });
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           complexity,
           existingPRDs: prdFiles.length > 0 ? prdFiles.map((f: string) => f.replace(projectPath, '.')) : undefined,
@@ -358,7 +359,7 @@ const postIssuePlanRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error creating plan:', error);
-          return HttpServerResponse.json({ error: 'Failed to create plan: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to create plan: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -378,12 +379,12 @@ const getIssueHandoffsRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const handoffs = readIssueHandoffEvents(issueId);
-        return HttpServerResponse.json({ handoffs });
+        return jsonResponse({ handoffs });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting issue handoffs:', error);
-        return HttpServerResponse.json({ error: 'Failed to get issue handoffs: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get issue handoffs: ' + msg }, { status: 500 });
       },
     });
   }),
@@ -456,7 +457,7 @@ const postIssueCloseRoute = HttpRouter.add(
           }));
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: result.success,
           message: result.success
             ? `Closed ${issueId}${reason ? ': ' + reason : ''}`
@@ -466,7 +467,7 @@ const postIssueCloseRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error closing issue:', error);
-          return HttpServerResponse.json({ error: 'Failed to close: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to close: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -503,7 +504,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           const { stdout: sessions } = await execAsync('tmux list-sessions -F "#{session_name}" 2>/dev/null || true');
           const workAgentSession = sessions.trim().split('\n').find((s: string) => s === `agent-${issueLowerForCheck}`);
           if (workAgentSession) {
-            return HttpServerResponse.json({
+            return jsonResponse({
               error: `Cannot start planning: work agent already running for ${id.toUpperCase()}`,
               hint: 'Stop the agent first or use the terminal view to interact with it',
               existingSession: workAgentSession,
@@ -609,7 +610,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         } else if (trackerTypeForIssue === 'rally') {
           const rallyConfig = getRallyConfig();
           if (!rallyConfig) {
-            return HttpServerResponse.json(
+            return jsonResponse(
               { error: 'RALLY_API_KEY not configured. Set it in ~/.panopticon.env' },
               { status: 500 },
             );
@@ -641,7 +642,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           // Linear
           const apiKey = getLinearApiKey();
           if (!apiKey) {
-            return HttpServerResponse.json({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
+            return jsonResponse({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
           }
 
           const issueQuery = `
@@ -667,7 +668,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           const linearIssue = issueJson.data?.issue;
 
           if (!linearIssue) {
-            return HttpServerResponse.json({ error: 'Issue not found' }, { status: 404 });
+            return jsonResponse({ error: 'Issue not found' }, { status: 404 });
           }
 
           issue = {
@@ -734,11 +735,11 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           payload: { issueId: id, sessionName },
         }));
 
-        return HttpServerResponse.json(responseBody);
+        return jsonResponse(responseBody);
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('[start-planning] Error:', error);
-          return HttpServerResponse.json({ error: 'Failed to start planning: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to start planning: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -888,7 +889,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           issueId: id,
           revertedState,
@@ -900,7 +901,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error aborting planning:', error);
-          return HttpServerResponse.json({ error: 'Failed to abort planning: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to abort planning: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1132,7 +1133,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           payload: { issueId: id, status: 'completed' },
         }));
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           issueId: id,
           newState,
@@ -1144,7 +1145,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error completing planning:', error);
-          return HttpServerResponse.json({ error: 'Failed to complete planning: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to complete planning: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1297,11 +1298,11 @@ const postIssueResetRoute = HttpRouter.add(
         issueDataService.invalidateTracker('linear').catch(() => {});
         issueDataService.invalidateTracker('rally').catch(() => {});
 
-        return HttpServerResponse.json({ success: true, cleanupLog });
+        return jsonResponse({ success: true, cleanupLog });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Reset failed:', error);
-          return HttpServerResponse.json({ success: false, error: msg, cleanupLog }, { status: 500 });
+          return jsonResponse({ success: false, error: msg, cleanupLog }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1447,11 +1448,11 @@ const postIssueCancelRoute = HttpRouter.add(
         issueDataService.invalidateTracker('github').catch(() => {});
         issueDataService.invalidateTracker('linear').catch(() => {});
 
-        return HttpServerResponse.json({ success: true, cleanupLog });
+        return jsonResponse({ success: true, cleanupLog });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('[cancel] Failed:', error);
-          return HttpServerResponse.json({ success: false, error: msg, cleanupLog }, { status: 500 });
+          return jsonResponse({ success: false, error: msg, cleanupLog }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1484,7 +1485,7 @@ const postIssueReopenRoute = HttpRouter.add(
         if (issueSource === 'rally') {
           const rallyConfig = getRallyConfig();
           if (!rallyConfig) {
-            return HttpServerResponse.json({ error: 'Rally not configured' }, { status: 400 });
+            return jsonResponse({ error: 'Rally not configured' }, { status: 400 });
           }
           const { RallyTracker } = await import('../../../lib/tracker/rally.js');
           const tracker = new RallyTracker({
@@ -1500,7 +1501,7 @@ const postIssueReopenRoute = HttpRouter.add(
         } else if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
           const ghConfig = getGitHubConfig();
           if (!ghConfig) {
-            return HttpServerResponse.json({ error: 'GitHub not configured' }, { status: 400 });
+            return jsonResponse({ error: 'GitHub not configured' }, { status: 400 });
           }
           const { owner, repo, number } = githubCheck;
 
@@ -1515,7 +1516,7 @@ const postIssueReopenRoute = HttpRouter.add(
           });
           if (!reopenRes.ok) {
             const errBody = await reopenRes.text().catch(() => '');
-            return HttpServerResponse.json(
+            return jsonResponse(
               { error: `GitHub API rejected reopen: ${reopenRes.status} ${reopenRes.statusText}. ${errBody}`.trim() },
               { status: reopenRes.status },
             );
@@ -1541,20 +1542,20 @@ const postIssueReopenRoute = HttpRouter.add(
         } else {
           const linearKey = process.env['LINEAR_API_KEY'] || '';
           if (!linearKey) {
-            return HttpServerResponse.json({ error: 'LINEAR_API_KEY not configured' }, { status: 400 });
+            return jsonResponse({ error: 'LINEAR_API_KEY not configured' }, { status: 400 });
           }
 
           const { LinearClient } = await import('@linear/sdk');
           const client = new LinearClient({ apiKey: linearKey });
           const issue = await client.issue(id);
           if (!issue) {
-            return HttpServerResponse.json({ error: `Issue ${id} not found` }, { status: 404 });
+            return jsonResponse({ error: `Issue ${id} not found` }, { status: 404 });
           }
 
           issueIdentifier = issue.identifier;
           const team = await issue.team;
           if (!team) {
-            return HttpServerResponse.json({ error: 'Could not determine team for issue' }, { status: 400 });
+            return jsonResponse({ error: 'Could not determine team for issue' }, { status: 400 });
           }
 
           const states = await team.states();
@@ -1565,7 +1566,7 @@ const postIssueReopenRoute = HttpRouter.add(
             states.nodes.find((s: any) => s.type === 'unstarted');
 
           if (!targetState) {
-            return HttpServerResponse.json({ error: 'No suitable state found for transition' }, { status: 400 });
+            return jsonResponse({ error: 'No suitable state found for transition' }, { status: 400 });
           }
 
           await issue.update({ stateId: targetState.id });
@@ -1580,7 +1581,7 @@ const postIssueReopenRoute = HttpRouter.add(
           resetPostMergeState(id.toUpperCase());
         } catch { /* non-fatal */ }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Issue ${id} reopened and moved to ${newState}`,
           issueId: issueIdentifier,
@@ -1592,7 +1593,7 @@ const postIssueReopenRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error reopening issue:', error);
-          return HttpServerResponse.json({ error: 'Failed to reopen issue: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to reopen issue: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1618,7 +1619,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
 
         const validStatuses = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
         if (!targetStatus || !validStatuses.includes(targetStatus)) {
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: `Invalid targetStatus. Must be one of: ${validStatuses.join(', ')}` },
             { status: 400 },
           );
@@ -1668,7 +1669,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           } else if (issueSource === 'rally') {
             const rallyConfig = getRallyConfig();
             if (!rallyConfig) {
-              return HttpServerResponse.json({ error: 'Rally not configured for sync' }, { status: 400 });
+              return jsonResponse({ error: 'Rally not configured for sync' }, { status: 400 });
             }
             const { RallyTracker } = await import('../../../lib/tracker/rally.js');
             const tracker = new RallyTracker({
@@ -1681,18 +1682,18 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           } else {
             const linearKey = process.env['LINEAR_API_KEY'] || '';
             if (!linearKey) {
-              return HttpServerResponse.json({ error: 'LINEAR_API_KEY not configured for sync' }, { status: 400 });
+              return jsonResponse({ error: 'LINEAR_API_KEY not configured for sync' }, { status: 400 });
             }
             const { LinearClient } = await import('@linear/sdk');
             const client = new LinearClient({ apiKey: linearKey });
             const issue = await client.issue(id);
             if (!issue) {
-              return HttpServerResponse.json({ error: `Issue ${id} not found in Linear` }, { status: 404 });
+              return jsonResponse({ error: `Issue ${id} not found in Linear` }, { status: 404 });
             }
 
             const team = await issue.team;
             if (!team) {
-              return HttpServerResponse.json({ error: 'Could not determine team for issue' }, { status: 400 });
+              return jsonResponse({ error: 'Could not determine team for issue' }, { status: 400 });
             }
 
             const states = await team.states();
@@ -1703,7 +1704,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
             const targetState = states.nodes.find((s: any) => s.type === targetStateType);
 
             if (!targetState) {
-              return HttpServerResponse.json(
+              return jsonResponse(
                 { error: `Could not find state of type '${targetStateType}' for team` },
                 { status: 400 },
               );
@@ -1733,7 +1734,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           payload: { issueId: id },
         }));
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Issue ${id} moved to ${targetStatus}`,
           issueId: id,
@@ -1744,7 +1745,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error moving issue status:', error);
-          return HttpServerResponse.json({ error: 'Failed to move issue status: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to move issue status: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1811,7 +1812,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
           cleanupLog.push(`Removed agent state: ${agentDir}`);
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Workspace cleaned up for ${id}`,
           cleanupLog,
@@ -1819,7 +1820,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error cleaning up workspace:', error);
-          return HttpServerResponse.json({ error: 'Failed to cleanup workspace: ' + msg, cleanupLog }, { status: 500 });
+          return jsonResponse({ error: 'Failed to cleanup workspace: ' + msg, cleanupLog }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1883,7 +1884,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
         issueDataService.invalidateTracker('github').catch(() => {});
         issueDataService.invalidateTracker('linear').catch(() => {});
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: result.success,
           message: `Deep wipe completed for ${id}`,
           cleanupLog: result.steps.flatMap((s: any) => s.details || []),
@@ -1891,7 +1892,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error in deep wipe:', error);
-          return HttpServerResponse.json({ error: 'Deep wipe failed: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Deep wipe failed: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1924,7 +1925,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
           projectPath = getProjectPath(undefined, issuePrefix);
         }
         if (!projectPath) {
-          return HttpServerResponse.json({ error: `Could not resolve project path for ${id}` }, { status: 400 });
+          return jsonResponse({ error: `Could not resolve project path for ${id}` }, { status: 400 });
         }
 
         const ctx: any = {
@@ -1957,7 +1958,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
           issueDataService.invalidateTracker('linear').catch(() => {});
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: result.success,
           issueId: result.issueId,
           steps: result.steps.map((s: any) => ({
@@ -1970,7 +1971,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error(`[close-out] Error for ${id}:`, error);
-          return HttpServerResponse.json({ error: msg }, { status: 500 });
+          return jsonResponse({ error: msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -2082,7 +2083,7 @@ const getIssueBeadsRoute = HttpRouter.add(
           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         });
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           tasks,
           workspacePath,
           count: tasks.length,
@@ -2092,7 +2093,7 @@ const getIssueBeadsRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error fetching beads:', error);
-          return HttpServerResponse.json({ error: 'Failed to fetch beads: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to fetch beads: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -2115,7 +2116,7 @@ const getIssueCostsRoute = HttpRouter.add(
         const issueData = getCostsForIssue(id);
 
         if (!issueData) {
-          return HttpServerResponse.json({
+          return jsonResponse({
             issueId: id.toUpperCase(),
             totalCost: 0,
             totalTokens: 0,
@@ -2132,7 +2133,7 @@ const getIssueCostsRoute = HttpRouter.add(
           });
         }
 
-        return HttpServerResponse.json({
+        return jsonResponse({
           issueId: id.toUpperCase(),
           totalCost: issueData.totalCost,
           totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
@@ -2162,7 +2163,7 @@ const getIssueCostsRoute = HttpRouter.add(
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting issue costs:', error);
-        return HttpServerResponse.json({ error: 'Failed to get issue costs: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to get issue costs: ' + msg }, { status: 500 });
       },
     });
   }),
