@@ -3,6 +3,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
+import { writeFile } from 'fs/promises';
 import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
@@ -147,7 +148,7 @@ function detectTestCommand(projectPath: string): string {
 /**
  * Notify TLDR daemon to reindex changed files after merge
  */
-async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
+export async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
   try {
     console.log(`[merge-agent] Notifying TLDR daemon to reindex changed files...`);
 
@@ -227,11 +228,42 @@ const _completedPostMerge = new Set<string>();
 const _closeIssueFailures = new Map<string, number>();
 const MAX_CLOSE_RETRIES = 3;
 
-export async function postMergeLifecycle(issueId: string, projectPath: string): Promise<void> {
+export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string): Promise<void> {
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
   if (_completedPostMerge.has(issueId)) {
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
     return;
+  }
+
+  // Step 0: Write pending lifecycle file and spawn detached deploy script.
+  // The deploy script rebuilds dist/, kills this server, and starts a fresh process.
+  // The fresh process reads the pending file on startup and runs the lifecycle steps
+  // with correct module chunk references (no ERR_MODULE_NOT_FOUND after merge).
+  const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
+  const repoRoot = __dirname.includes('/src/')
+    ? __dirname.replace(/\/src\/.*$/, '')
+    : join(__dirname, '..');
+  const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
+
+  try {
+    const pendingData = JSON.stringify({
+      issueId,
+      projectPath,
+      sourceBranch: sourceBranch ?? '',
+      timestamp: Date.now(),
+    });
+    await writeFile(pendingFile, pendingData, 'utf-8');
+    console.log(`[merge-agent] Wrote pending lifecycle file: ${pendingFile}`);
+
+    const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? ''], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+    console.log(`[merge-agent] Spawned detached deploy script (pid ${child.pid}) — server will restart with new build`);
+    return;
+  } catch (err: any) {
+    console.warn(`[merge-agent] Failed to spawn deploy script: ${err.message}. Falling through to in-process lifecycle (may fail on stale chunks).`);
   }
 
   console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
@@ -808,7 +840,7 @@ export async function spawnMergeAgent(context: MergeConflictContext): Promise<Me
               logMergeHistory(context, result);
 
               // Run post-merge cleanup (move PRD, update issue status)
-              await postMergeLifecycle(context.issueId, context.projectPath);
+              await postMergeLifecycle(context.issueId, context.projectPath, context.sourceBranch);
 
               // Notify TLDR daemon to reindex changed files
               await notifyTldrDaemon(context.projectPath, context.sourceBranch);
@@ -1327,7 +1359,7 @@ Report any issues or conflicts you encountered.`;
                 logActivity('merge_complete', `Merge completed by specialist${skipNote}`);
 
                 // Run post-merge cleanup (move PRD, update issue status)
-                await postMergeLifecycle(issueId, projectPath);
+                await postMergeLifecycle(issueId, projectPath, sourceBranch);
 
                 // Restore stashed changes
                 if (stashCreated) {

@@ -1,0 +1,220 @@
+/**
+ * Tests for PAN-444: postMergeLifecycle step 0 — pending file write + deploy spawn.
+ * Covers the new step 0 logic in src/lib/cloister/merge-agent.ts.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { join } from 'path';
+
+// ── child_process mock — spawn ────────────────────────────────────────────────
+const mockUnref = vi.hoisted(() => vi.fn());
+const mockSpawnChild = vi.hoisted(() => ({ pid: 12345, unref: mockUnref }));
+const mockSpawn = vi.hoisted(() => vi.fn(() => mockSpawnChild));
+const mockExec = vi.hoisted(() => vi.fn((_cmd: string, _opts: any, cb: any) => {
+  if (typeof _opts === 'function') _opts(null, '', '');
+  else if (cb) cb(null, '', '');
+}));
+
+const kCustom = Symbol.for('nodejs.util.promisify.custom');
+(mockExec as any)[kCustom] = vi.fn().mockResolvedValue({ stdout: '', stderr: '' });
+
+vi.mock('child_process', () => ({
+  spawn: mockSpawn,
+  exec: mockExec,
+}));
+
+// ── fs/promises mock ──────────────────────────────────────────────────────────
+const mockWriteFile = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
+
+vi.mock('fs/promises', () => ({
+  writeFile: mockWriteFile,
+}));
+
+// ── fs mock ───────────────────────────────────────────────────────────────────
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    readFileSync: vi.fn().mockReturnValue(''),
+    writeFileSync: vi.fn(),
+    existsSync: vi.fn().mockReturnValue(false),
+    mkdirSync: vi.fn(),
+    appendFileSync: vi.fn(),
+  };
+});
+
+// ── Other dependency mocks ────────────────────────────────────────────────────
+vi.mock('../../../src/lib/tmux.js', () => ({
+  sendKeysAsync: vi.fn().mockResolvedValue(undefined),
+  sessionExists: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('../../../src/lib/paths.js', () => ({
+  PANOPTICON_HOME: '/tmp/panopticon-test',
+}));
+
+vi.mock('../../../src/lib/tracker-utils.js', () => ({
+  resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: false }),
+}));
+
+vi.mock('../../../src/lib/cloister/specialists.js', () => ({
+  getSessionId: vi.fn().mockReturnValue(null),
+  recordWake: vi.fn(),
+  getTmuxSessionName: vi.fn().mockReturnValue('test-session'),
+  wakeSpecialist: vi.fn().mockResolvedValue({ success: false }),
+  spawnEphemeralSpecialist: vi.fn().mockResolvedValue({ success: false }),
+  isRunning: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssue: vi.fn().mockReturnValue(null),
+  loadProjectsConfig: vi.fn().mockReturnValue({ projects: {} }),
+}));
+
+vi.mock('../../../src/lib/cloister/validation.js', () => ({
+  runMergeValidation: vi.fn(),
+  autoRevertMerge: vi.fn(),
+  runQualityGates: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/activity-log.js', () => ({
+  logActivity: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/git-utils.js', () => ({
+  cleanupStaleLocks: vi.fn().mockResolvedValue({ found: [], removed: [], errors: [] }),
+}));
+
+// ── Subject ───────────────────────────────────────────────────────────────────
+import { postMergeLifecycle, resetPostMergeState } from '../../../src/lib/cloister/merge-agent.js';
+
+const ISSUE_ID = 'PAN-444';
+const PROJECT_PATH = '/tmp/test-project';
+const SOURCE_BRANCH = 'feature/pan-444';
+const PENDING_FILE = '/tmp/panopticon-test/pending-post-merge.json';
+
+describe('postMergeLifecycle — step 0 deploy handoff', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetPostMergeState(ISSUE_ID);
+    mockWriteFile.mockResolvedValue(undefined);
+    mockSpawn.mockReturnValue(mockSpawnChild);
+  });
+
+  it('writes pending lifecycle file with correct data', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    const [filePath, content, encoding] = mockWriteFile.mock.calls[0];
+    expect(filePath).toBe(PENDING_FILE);
+    expect(encoding).toBe('utf-8');
+
+    const parsed = JSON.parse(content as string);
+    expect(parsed.issueId).toBe(ISSUE_ID);
+    expect(parsed.projectPath).toBe(PROJECT_PATH);
+    expect(parsed.sourceBranch).toBe(SOURCE_BRANCH);
+    expect(typeof parsed.timestamp).toBe('number');
+    expect(parsed.timestamp).toBeGreaterThan(0);
+  });
+
+  it('defaults sourceBranch to empty string when not provided', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH);
+
+    const [, content] = mockWriteFile.mock.calls[0];
+    const parsed = JSON.parse(content as string);
+    expect(parsed.sourceBranch).toBe('');
+  });
+
+  it('spawns deploy script with detached:true and stdio:ignore', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(mockSpawn).toHaveBeenCalledOnce();
+    const [, , spawnOpts] = mockSpawn.mock.calls[0];
+    expect(spawnOpts.detached).toBe(true);
+    expect(spawnOpts.stdio).toBe('ignore');
+  });
+
+  it('calls child.unref() to allow parent process to exit independently', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+    expect(mockUnref).toHaveBeenCalledOnce();
+  });
+
+  it('passes repoRoot, issueId, projectPath, sourceBranch to deploy script', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    const [, args] = mockSpawn.mock.calls[0];
+    expect(args[1]).toBe(ISSUE_ID);
+    expect(args[2]).toBe(PROJECT_PATH);
+    expect(args[3]).toBe(SOURCE_BRANCH);
+    // args[0] is repoRoot — just verify it's a non-empty string
+    expect(typeof args[0]).toBe('string');
+    expect(args[0].length).toBeGreaterThan(0);
+  });
+
+  it('returns immediately after successful spawn (does not run in-process lifecycle)', async () => {
+    const result = await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    expect(result).toBeUndefined();
+    // If lifecycle ran in-process, it would try to dynamic import lifecycle modules.
+    // Since we only mocked spawn and writeFile, reaching this point means it returned early.
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('falls through to in-process lifecycle when writeFile throws', async () => {
+    mockWriteFile.mockRejectedValue(new Error('disk full'));
+
+    // Should not throw — catches the error and falls through
+    await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).resolves.not.toThrow();
+
+    // Spawn should not be called since writeFile threw
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it('falls through to in-process lifecycle when spawn throws', async () => {
+    mockSpawn.mockImplementation(() => { throw new Error('spawn ENOENT'); });
+
+    // Should not throw — catches and falls through
+    await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).resolves.not.toThrow();
+  });
+
+  it('step 0 does not run when idempotency guard is set', async () => {
+    // Guard is set externally (simulating a second invocation after in-process lifecycle ran).
+    // The guard check fires before step 0, so writeFile is never called.
+    // We verify this by NOT calling resetPostMergeState before a second invocation.
+    // First, run with writeFile failing so the in-process path runs and sets the guard.
+    mockWriteFile.mockRejectedValueOnce(new Error('disk full'));
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    // Now the guard is set. On re-entry, step 0 must not fire.
+    vi.clearAllMocks();
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+});
+
+describe('postMergeLifecycle — repoRoot derivation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetPostMergeState(ISSUE_ID);
+    mockWriteFile.mockResolvedValue(undefined);
+    mockSpawn.mockReturnValue(mockSpawnChild);
+  });
+
+  it('deploy script path ends with scripts/post-merge-deploy.sh', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    const [scriptPath] = mockSpawn.mock.calls[0];
+    expect(scriptPath).toMatch(/scripts\/post-merge-deploy\.sh$/);
+  });
+
+  it('deploy script path does not traverse through src/ (repoRoot is stripped above src/)', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    const [scriptPath] = mockSpawn.mock.calls[0];
+    // scripts/post-merge-deploy.sh should be a direct child of repoRoot,
+    // not nested inside src/ or lib/
+    expect(scriptPath).not.toMatch(/\/src\/scripts\//);
+    expect(scriptPath).not.toMatch(/\/lib\/scripts\//);
+  });
+});
