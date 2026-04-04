@@ -97,14 +97,14 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
   const { data, isLoading, error } = useQuery<ResourcesSnapshot>({
     queryKey: ['resources'],
     queryFn: fetchResources,
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   });
 
   const { data: selectedHistory } = useQuery<ContainerHistory>({
     queryKey: ['container-history', selectedContainer?.id],
     queryFn: () => fetchContainerHistory(selectedContainer!.id),
     enabled: !!selectedContainer,
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   });
 
   if (isLoading) {

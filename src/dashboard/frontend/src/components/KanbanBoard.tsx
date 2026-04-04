@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle } from '../lib/store';
 import {
   DndContext,
   DragOverlay,
@@ -132,6 +131,28 @@ function getLabelStyle(label: string): string {
 
 function getCostColor(_cost: number): string {
   return 'bg-surface-overlay text-content-subtle';
+}
+
+async function fetchIssues(cycle: string = 'current', includeCompleted: boolean = false): Promise<Issue[]> {
+  const params = new URLSearchParams();
+  params.set('cycle', cycle);
+  if (includeCompleted) params.set('includeCompleted', 'true');
+  const res = await fetch(`/api/issues?${params}`);
+  if (!res.ok) throw new Error('Failed to fetch issues');
+  return res.json();
+}
+
+async function fetchAgents(): Promise<Agent[]> {
+  const res = await fetch('/api/agents');
+  if (!res.ok) throw new Error('Failed to fetch agents');
+  return res.json();
+}
+
+async function fetchSpecialists(): Promise<SpecialistAgent[]> {
+  const res = await fetch('/api/specialists');
+  if (!res.ok) throw new Error('Failed to fetch specialists');
+  const data = await res.json();
+  return data.specialists ?? data;
 }
 
 function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<string, Issue[]> {
@@ -753,32 +774,22 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const selectedIssue = externalSelectedIssue !== undefined ? externalSelectedIssue : internalSelectedIssue;
   const onSelectIssue = externalOnSelectIssue || setInternalSelectedIssue;
 
-  // Try Zustand store first (event-sourced via WebSocket RPC)
-  // Fall back to React Query polling if store hasn't bootstrapped (e.g. Express server without /ws/rpc)
-  const storeBootstrapped = useDashboardStore((s) => s.bootstrapComplete);
-  const storeIssues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
-  const storeAgents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const storeSpecialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
-
-  // React Query fallback — only fetches if store hasn't bootstrapped
-  const { data: polledIssues, isLoading: polledLoading, error: polledError } = useQuery({
+  const { data: issues, isLoading: issuesLoading, error: issuesError } = useQuery({
     queryKey: ['issues', cycleFilter, includeCompleted],
     queryFn: () => fetchIssues(cycleFilter, includeCompleted),
-    refetchInterval: storeBootstrapped ? false : 5000,
-    enabled: !storeBootstrapped,
-  });
-  const { data: polledAgents = [] } = useQuery({
-    queryKey: ['agents'],
-    queryFn: async () => { const r = await fetch('/api/agents'); return r.json(); },
-    refetchInterval: storeBootstrapped ? false : 5000,
-    enabled: !storeBootstrapped,
   });
 
-  const issues = storeBootstrapped ? storeIssues : (polledIssues ?? []);
-  const issuesLoading = storeBootstrapped ? false : polledLoading;
-  const issuesError = storeBootstrapped ? null : (polledError ?? null);
-  const agents = storeBootstrapped ? storeAgents : polledAgents;
-  const specialists = storeBootstrapped ? storeSpecialists : [];
+  const { data: agents = [] } = useQuery({
+    queryKey: ['agents'],
+    queryFn: fetchAgents,
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+
+  const { data: specialists = [] } = useQuery({
+    queryKey: ['specialists'],
+    queryFn: fetchSpecialists,
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
 
   // DnD sensors
   const sensors = useSensors(
@@ -979,6 +990,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const { data: issueCosts = {}, isLoading: costsLoading } = useQuery({
     queryKey: ['issueCosts'],
     queryFn: fetchIssueCosts,
+    refetchInterval: 30000, // Refresh every 30 seconds
     staleTime: 10000,
   });
 

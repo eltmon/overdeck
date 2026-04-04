@@ -311,7 +311,7 @@ export function CostsPage() {
   const { data: costs, isLoading } = useQuery({
     queryKey: ['costs-by-issue'],
     queryFn: fetchCosts,
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   });
 
   const { data: globalTrends } = useQuery({

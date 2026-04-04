@@ -146,7 +146,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       }
       return data;
     },
-    refetchInterval: (workspaceCreating || containersStarting) ? 5000 : 30000,
+    refetchInterval: (workspaceCreating || containersStarting) ? 2000 : 5000,
   });
 
   const { data: reviewStatus, isLoading: reviewStatusLoading } = useQuery<ReviewStatus>({
@@ -156,7 +156,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
       if (!res.ok) throw new Error('Failed to fetch review status');
       return res.json();
     },
-    refetchInterval: 30000,
+    refetchInterval: 3000,
   });
 
   const { data: prdContent } = useQuery({

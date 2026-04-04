@@ -92,7 +92,7 @@ export function useConvoyStatus(convoyId: string | undefined) {
     queryKey: ['convoy', convoyId],
     queryFn: () => fetchConvoyStatus(convoyId!),
     enabled: !!convoyId,
-    refetchInterval: 10000,
+    refetchInterval: 2000, // Refresh every 2 seconds for active convoy
   });
 }
 
