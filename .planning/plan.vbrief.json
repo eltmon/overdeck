@@ -1,170 +1,108 @@
 {
-  "vBRIEFInfo": {
-    "version": "0.5",
-    "created": "2026-04-04T00:00:00.000Z"
-  },
-  "plan": {
-    "id": "PAN-436",
-    "title": "Dashboard shows zero stats on load — missing skeleton/loading states",
-    "status": "approved",
-    "items": [
-      {
-        "id": "bootstrap-gate",
-        "title": "Create BootstrapGate wrapper component",
-        "status": "completed",
-        "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/BootstrapGate.tsx — a wrapper component that checks selectIsBootstrapped from the Zustand store and renders either children (when bootstrapped) or a fallback skeleton."
-        },
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-436"
-        },
-        "subItems": [
-          {
-            "id": "bootstrap-gate.ac1",
-            "title": "Component accepts children and fallback ReactNode props",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "bootstrap-gate.ac2",
-            "title": "Reads selectIsBootstrapped from useDashboardStore",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "bootstrap-gate.ac3",
-            "title": "Renders fallback when bootstrapComplete is false, children when true",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "skeleton-components",
-        "title": "Create shimmer skeleton components for each view",
-        "status": "completed",
-        "narrative": {
-          "Action": "Create skeleton placeholder components with animate-pulse shimmer for KanbanSkeleton, AgentListSkeleton, GodViewSkeleton, and HeaderSkeleton."
-        },
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-436"
-        },
-        "subItems": [
-          {
-            "id": "skeleton-components.ac1",
-            "title": "Each skeleton visually approximates the layout of its corresponding real component",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "skeleton-components.ac2",
-            "title": "All use animate-pulse for shimmer effect",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "skeleton-components.ac3",
-            "title": "Use existing Tailwind theme tokens (bg-surface-2, rounded, etc.)",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "skeleton-components.ac4",
-            "title": "No external dependencies — pure Tailwind CSS",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "wire-bootstrap-gates",
-        "title": "Wire BootstrapGate into App.tsx and Header",
-        "status": "completed",
-        "narrative": {
-          "Action": "Wrap store-consuming tab views (kanban, agents, god-view) with BootstrapGate in App.tsx. Header has no store-dependent count badges in the current implementation."
-        },
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-436"
-        },
-        "subItems": [
-          {
-            "id": "wire-bootstrap-gates.ac1",
-            "title": "Kanban tab shows KanbanSkeleton until bootstrapComplete",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "wire-bootstrap-gates.ac2",
-            "title": "Agents tab shows AgentListSkeleton until bootstrapComplete",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "wire-bootstrap-gates.ac3",
-            "title": "GodView shows GodViewSkeleton until bootstrapComplete",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "wire-bootstrap-gates.ac4",
-            "title": "Header count badges don't show 0 during bootstrap",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "wire-bootstrap-gates.ac5",
-            "title": "React Query views (MissionControl, HandoffsPage, etc.) are NOT wrapped — they have their own loading states",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "verify-build-test",
-        "title": "Verify build and visual test",
-        "status": "completed",
-        "narrative": {
-          "Action": "Run npm run build to ensure no type errors or build failures. Verify skeletons transition smoothly to real content."
-        },
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-436"
-        },
-        "subItems": [
-          {
-            "id": "verify-build-test.ac1",
-            "title": "npm run build succeeds with no errors",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "verify-build-test.ac2",
-            "title": "No flash of zero/empty state on page load",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "verify-build-test.ac3",
-            "title": "Skeleton → real content transition is smooth",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "verify-build-test.ac4",
-            "title": "Existing React Query loading states unchanged",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      }
-    ],
-    "edges": [
-      { "from": "bootstrap-gate", "to": "wire-bootstrap-gates", "type": "blocks" },
-      { "from": "skeleton-components", "to": "wire-bootstrap-gates", "type": "blocks" },
-      { "from": "wire-bootstrap-gates", "to": "verify-build-test", "type": "blocks" }
-    ]
-  }
+  "issue": "PAN-437",
+  "title": "Instant dashboard startup via persistent projection cache (T3Code pattern)",
+  "version": 1,
+  "items": [
+    {
+      "id": "pan-437-1",
+      "title": "Non-blocking IssueDataService start",
+      "description": "Remove await from startSharedIssueService() in main.ts. Split IssueDataService.start() to call loadCachedData() and pushSnapshot() immediately, then fire off API fetches in background without awaiting. The onIssuesChanged callback already wired in read-model.ts will handle incremental updates when fetches complete.",
+      "difficulty": "medium",
+      "files": [
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/services/issue-data-service.ts"
+      ],
+      "acceptance_criteria": [
+        "Server starts and accepts WebSocket connections without waiting for API fetches",
+        "Initial getSnapshot RPC returns cached issue data (from SQLite L2 cache)",
+        "When API fetches complete, domain events update the read model and clients get incremental updates",
+        "No regression — if no cached data exists, first snapshot has empty issues until fetches complete"
+      ],
+      "depends_on": [],
+      "status": "completed"
+    },
+    {
+      "id": "pan-437-2",
+      "title": "Persistent projection cache service",
+      "description": "Create ProjectionCacheService that persists the full DashboardSnapshot to a projection_cache table in panopticon.db. Add the table schema to openEventDb(). Implement load() to read cached projection and save() with 100ms debounce to write on every event application.",
+      "difficulty": "medium",
+      "files": [
+        "src/dashboard/server/event-store.ts",
+        "src/dashboard/server/services/projection-cache.ts"
+      ],
+      "acceptance_criteria": [
+        "projection_cache table created in panopticon.db with key, data, sequence, updated_at columns",
+        "ProjectionCacheService.load() returns parsed DashboardSnapshot or null",
+        "ProjectionCacheService.save() upserts serialized snapshot with debounce",
+        "Corrupted JSON in cache is caught and returns null (fallback to fresh bootstrap)",
+        "No sync/blocking calls — all SQLite operations use the existing DbAdapter pattern"
+      ],
+      "depends_on": [],
+      "status": "completed"
+    },
+    {
+      "id": "pan-437-3",
+      "title": "Read model bootstrap from projection cache",
+      "description": "Modify ReadModelServiceLive bootstrap to try loading from ProjectionCacheService first. If a valid projection exists, use it as initial state and skip all lib module calls (agents, specialists, review statuses). Wire applyEvent to debounced-save the projection after every event. Fall back to existing bootstrap if no cache exists.",
+      "difficulty": "complex",
+      "files": [
+        "src/dashboard/server/read-model.ts"
+      ],
+      "acceptance_criteria": [
+        "On restart with populated cache: read model bootstraps from projection_cache in under 50ms",
+        "On restart with empty cache: falls back to existing lib-based bootstrap (no regression)",
+        "Every applyEvent triggers debounced projection save",
+        "Projection sequence tracks event store sequence correctly",
+        "If projection sequence < event store sequence, missing events are replayed on top of cached state"
+      ],
+      "depends_on": [
+        "pan-437-1",
+        "pan-437-2"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "pan-437-4",
+      "title": "Client-side snapshot cache (localStorage SWR)",
+      "description": "Create snapshotCache.ts with helpers to save/load DashboardSnapshot to localStorage (versioned key, 2MB cap, strip output buffers). Modify EventRouter to load cached snapshot on mount before WebSocket connects. Modify store to persist snapshot on every syncSnapshot. bootstrapComplete set to true from either cache or fresh data.",
+      "difficulty": "medium",
+      "files": [
+        "src/dashboard/frontend/src/lib/snapshotCache.ts",
+        "src/dashboard/frontend/src/components/EventRouter.tsx",
+        "src/dashboard/frontend/src/lib/store.ts"
+      ],
+      "acceptance_criteria": [
+        "On page load with cached snapshot: UI renders immediately from localStorage (before WebSocket connects)",
+        "bootstrapComplete is true from localStorage cache — skeletons disappear instantly on repeat visits",
+        "Cache is versioned (pan-snapshot-cache-v1) — old versions are ignored gracefully",
+        "Output buffers (agentOutputById, recentActivity) stripped before caching to stay under 2MB",
+        "Fresh snapshot from WebSocket overwrites stale cache cleanly"
+      ],
+      "depends_on": [
+        "pan-437-1"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "pan-437-5",
+      "title": "Freshness indicator component",
+      "description": "Create FreshnessIndicator.tsx component that shows data staleness in the header. Shows 'Data from Xm ago' when rendering stale cache, 'Updating...' while waiting for fresh data, and 'Just now' when fresh snapshot arrives (fades after 5s). Add to dashboard header/layout.",
+      "difficulty": "simple",
+      "files": [
+        "src/dashboard/frontend/src/components/FreshnessIndicator.tsx",
+        "src/dashboard/frontend/src/components/Header.tsx"
+      ],
+      "acceptance_criteria": [
+        "Shows relative timestamp ('Data from 2m ago') when rendering stale cached data",
+        "Shows 'Updating...' with subtle pulse when WebSocket connected but fresh snapshot not yet received",
+        "Shows 'Just now' when fresh data arrives, fades after 5 seconds",
+        "Positioned in header bar, non-intrusive, uses existing design system colors",
+        "Updates reactively from Zustand store timestamp"
+      ],
+      "depends_on": [
+        "pan-437-4"
+      ],
+      "status": "completed"
+    }
+  ]
 }
