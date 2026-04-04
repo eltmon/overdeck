@@ -6,13 +6,28 @@
  *
  * IMPORTANT: This module is safe to import in both server and CLI contexts.
  * Never use execSync here — this is synchronous SQLite, not a subprocess.
+ *
+ * Dual-runtime (PAN-428):
+ *   - Bun: uses bun:sqlite (better-sqlite3 is a native addon — ERR_DLOPEN_FAILED in Bun)
+ *   - Node: uses better-sqlite3
+ * In both cases the external API is identical: pragma(), exec(), prepare(), close().
  */
 
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
+import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { getPanopticonHome } from '../paths.js';
 import { runMigrations } from './schema.js';
+
+declare const Bun: unknown;
+
+function isBunRuntime(): boolean {
+  return typeof Bun !== 'undefined';
+}
+
+// createRequire allows synchronous require() in ESM — works in both Bun and Node
+const _require = createRequire(import.meta.url);
 
 let _db: Database.Database | null = null;
 
@@ -38,7 +53,32 @@ export function getDatabase(): Database.Database {
   }
 
   const dbPath = getDatabasePath();
-  _db = new Database(dbPath);
+
+  if (isBunRuntime()) {
+    // better-sqlite3 is a native Node.js addon that fails in Bun with ERR_DLOPEN_FAILED.
+    // Use bun:sqlite instead, with a pragma() shim for API compatibility.
+    const { Database: BunDatabase } = _require('bun:sqlite') as { Database: new (path: string) => any };
+    const bunDb = new BunDatabase(dbPath);
+
+    // bun:sqlite has no pragma() method — shim it using exec() and query().get()
+    bunDb.pragma = function (sql: string, options?: { simple?: boolean }): any {
+      if (options?.simple) {
+        // Read-only: return the scalar value directly (e.g. db.pragma('user_version', { simple: true }))
+        const key = sql.trim();
+        const row = bunDb.query(`PRAGMA ${key}`).get() as Record<string, unknown> | null;
+        return row?.[key] ?? null;
+      }
+      // Set or no-return pragma (e.g. 'journal_mode = WAL', 'foreign_keys = ON')
+      bunDb.exec(`PRAGMA ${sql}`);
+      return undefined;
+    };
+
+    _db = bunDb as Database.Database;
+  } else {
+    // Node.js path: load better-sqlite3 lazily (avoids import-time native addon load)
+    const BetterSqlite3 = _require('better-sqlite3');
+    _db = new BetterSqlite3(dbPath) as Database.Database;
+  }
 
   // Enable WAL mode for concurrent readers + single writer
   _db.pragma('journal_mode = WAL');
