@@ -445,9 +445,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                   </>
                 )}
                 <button
-                  onClick={() => setMinimized(true)}
+                  onClick={onClose}
                   className="p-2 text-content-subtle hover:text-content hover:bg-surface-overlay rounded-lg transition-colors"
-                  title="Hide (planning continues in background)"
+                  title="Close (planning continues in background)"
                 >
                   <X className="w-5 h-5" />
                 </button>
