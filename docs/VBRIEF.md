@@ -1,10 +1,10 @@
 # vBRIEF Plan Format
 
-Panopticon uses [vBRIEF v0.5](https://github.com/visionik/vBRIEF) for machine-readable work plans.
+Panopticon uses [vBRIEF v0.5](https://github.com/deftai/vBRIEF) for machine-readable work plans.
 
 ## Specification
 
-The canonical vBRIEF specification is maintained at **[github.com/visionik/vBRIEF](https://github.com/visionik/vBRIEF)**.
+The canonical vBRIEF specification is maintained at **[github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)**.
 
 Panopticon's plan files (`plan.vbrief.json`) conform to this spec with metadata extensions for issue tracking and difficulty estimation.
 
@@ -98,7 +98,7 @@ The vBRIEF spec supports arbitrary `metadata` on items and subItems. Panopticon 
 
 These extensions are NOT part of the vBRIEF core spec. We've opened a feature request to standardize them:
 
-**[vBRIEF Issue #XX: Support for difficulty, issue labels, and AC kind](https://github.com/visionik/vBRIEF/issues/XX)**
+**[vBRIEF Issue #XX: Support for difficulty, issue labels, and AC kind](https://github.com/deftai/vBRIEF/issues/XX)**
 
 If you use Panopticon and want these fields standardized in the vBRIEF spec, please comment on that issue.
 

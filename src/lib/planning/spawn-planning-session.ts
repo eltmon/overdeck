@@ -231,7 +231,7 @@ When discovery is complete:
 
 ### vBRIEF Plan Format (REQUIRED)
 
-The plan file MUST conform to vBRIEF v0.5 spec (https://github.com/visionik/vBRIEF).
+The plan file MUST conform to vBRIEF v0.5 spec (https://github.com/deftai/vBRIEF).
 It MUST have exactly two top-level keys: \`vBRIEFInfo\` and \`plan\`.
 
 \`\`\`json
