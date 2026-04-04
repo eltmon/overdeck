@@ -6,7 +6,7 @@
  * - GitHub REST + ETags (304s are FREE, don't count against rate limit)
  * - Linear incremental fetching via updatedAt filter
  * - Rally TTL-based caching
- * - Change detection + socket.io push
+ * - Change detection + event store push (via onIssuesChanged callback)
  * - Adaptive backoff on rate limit pressure
  * - Instant serve from cache (sub-100ms dashboard loads)
  */

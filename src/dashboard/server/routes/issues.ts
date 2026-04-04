@@ -45,9 +45,8 @@ import { EventStoreService } from '../services/domain-services.js';
 const execAsync = promisify(exec);
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
-// The Effect server has no socket.io, so we supply a no-op io shim.
-// The service is started lazily on first use so background polling begins
-// at server startup without blocking route registration.
+// Started by main.ts on boot. Updates flow through the ReadModel via
+// onIssuesChanged callback → event store → WebSocket RPC.
 
 function getIssueDataService(): IssueDataService {
   // Use the shared singleton — started by server.ts on boot

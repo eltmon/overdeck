@@ -22,7 +22,7 @@ function isNetworkError(error: unknown): boolean {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchInterval: 60_000,      // 60s fallback poll (socket.io handles real-time)
+      refetchInterval: 60_000,      // 60s fallback poll (WebSocket RPC handles real-time)
       staleTime: 30_000,            // Data considered fresh for 30s
       refetchIntervalInBackground: false, // Don't poll when tab is hidden
       retry: (failureCount, error) => isNetworkError(error) && failureCount < 3,
