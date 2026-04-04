@@ -14,6 +14,8 @@ import {
   selectAgentOutput,
   selectIsBootstrapped,
   selectResources,
+  selectIssues,
+  selectIssuesByCycle,
   type DashboardState,
 } from '../lib/store'
 import type {
@@ -247,5 +249,55 @@ describe('selectors', () => {
 
   it('selectResources returns resource stats', () => {
     expect(selectResources(state)).toEqual({ containers: 5, networks: 3 })
+  })
+})
+
+// ─── selectIssues / selectIssuesByCycle ───────────────────────────────────────
+
+describe('selectIssues', () => {
+  it('returns raw issues array', () => {
+    const issues = [{ id: 'PAN-1' }, { id: 'PAN-2' }]
+    const state: DashboardState = { ...emptyState, issuesRaw: issues }
+    expect(selectIssues(state)).toEqual(issues)
+  })
+
+  it('returns empty array when no issues', () => {
+    expect(selectIssues(emptyState)).toEqual([])
+  })
+})
+
+describe('selectIssuesByCycle', () => {
+  const issues = [
+    { id: 'PAN-1', canonicalStatus: 'todo', state: 'todo' },
+    { id: 'PAN-2', canonicalStatus: 'in_progress', state: 'started' },
+    { id: 'PAN-3', canonicalStatus: 'done', state: 'done' },
+    { id: 'PAN-4', canonicalStatus: 'canceled', state: 'canceled' },
+    { id: 'PAN-5', canonicalStatus: 'in_review', state: 'in_review' },
+  ]
+  const state: DashboardState = { ...emptyState, issuesRaw: issues }
+
+  it('excludes done and canceled issues when includeCompleted=false', () => {
+    const result = selectIssuesByCycle('current', false)(state) as Array<{ id: string }>
+    expect(result.map(i => i.id)).toEqual(['PAN-1', 'PAN-2', 'PAN-5'])
+  })
+
+  it('includes all issues when includeCompleted=true', () => {
+    const result = selectIssuesByCycle('current', true)(state)
+    expect(result).toHaveLength(5)
+  })
+
+  it('filters by state field as well as canonicalStatus', () => {
+    const mixedIssues = [
+      { id: 'A', state: 'done' },
+      { id: 'B', canonicalStatus: 'canceled' },
+      { id: 'C', state: 'todo' },
+    ]
+    const s: DashboardState = { ...emptyState, issuesRaw: mixedIssues }
+    const result = selectIssuesByCycle('all', false)(s) as Array<{ id: string }>
+    expect(result.map(i => i.id)).toEqual(['C'])
+  })
+
+  it('returns empty array when no issues', () => {
+    expect(selectIssuesByCycle('current', false)(emptyState)).toEqual([])
   })
 })
