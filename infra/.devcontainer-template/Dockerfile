@@ -7,7 +7,12 @@ RUN apk add --no-cache \
     curl \
     jq \
     bash \
-    tmux
+    tmux \
+    unzip
+
+# Install Bun system-wide
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash && \
+    ln -sf /usr/local/bin/bun /usr/local/bin/bunx
 
 # Use existing node user (UID/GID 1000) from base image
 # Set working directory
@@ -19,7 +24,7 @@ WORKDIR /workspaces/panopticon
 RUN mkdir -p /workspaces/panopticon/node_modules \
     /workspaces/panopticon/src/dashboard/frontend/node_modules \
     /workspaces/panopticon/src/dashboard/server/node_modules \
-    /workspaces/panopticon/packages/shared/node_modules \
+    /workspaces/panopticon/packages/contracts/node_modules \
     /home/node/.npm && \
     chown -R node:node /workspaces/panopticon /home/node/.npm
 

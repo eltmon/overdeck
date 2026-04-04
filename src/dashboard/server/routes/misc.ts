@@ -74,6 +74,7 @@ import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/hea
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { CacheService } from '../services/cache-service.js';
+import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
 
@@ -1087,6 +1088,7 @@ const postPlanningMessageRoute = HttpRouter.add(
 
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
+    const eventStore = yield* EventStoreService;
 
     if (!message) {
       return HttpServerResponse.json({ error: 'Message required' }, { status: 400 });
@@ -1163,6 +1165,11 @@ const postPlanningMessageRoute = HttpRouter.add(
           await execAsync(`tmux load-buffer "${messageFile}"`, { encoding: 'utf-8' });
           await execAsync(`tmux paste-buffer -t ${sessionName}`, { encoding: 'utf-8' });
           await execAsync(`tmux send-keys -t ${sessionName} Enter`, { encoding: 'utf-8' });
+          Effect.runSync(eventStore.append({
+            type: 'planning.sync',
+            timestamp: new Date().toISOString(),
+            payload: { issueId, status: 'running', message: 'User message sent' },
+          }));
           return HttpServerResponse.json({
             success: true,
             sessionName,
@@ -1267,6 +1274,12 @@ Continue the PLANNING session. Do NOT implement anything.
             encoding: 'utf-8',
           });
         } catch {}
+
+        Effect.runSync(eventStore.append({
+          type: 'planning.sync',
+          timestamp: new Date().toISOString(),
+          payload: { issueId, status: 'running', message: 'User message sent' },
+        }));
 
         return HttpServerResponse.json({
           success: true,

@@ -5,7 +5,7 @@
   ],
   "service": "dev",
   "workspaceFolder": "/workspaces/panopticon",
-  "postCreateCommand": "cd src/dashboard/frontend && npm install && cd ../server && npm install",
+  "postCreateCommand": "bun install",
   "customizations": {
     "vscode": {
       "settings": {

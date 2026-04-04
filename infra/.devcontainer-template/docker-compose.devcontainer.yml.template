@@ -13,7 +13,7 @@ services:
     user: node
     volumes:
       - ../:/workspaces/panopticon:cached
-      - npm-cache:/home/node/.npm
+      - bun-store:/root/.bun/install/cache
     command: sleep infinity
     networks:
       - devnet
@@ -30,26 +30,19 @@ services:
     working_dir: /workspaces/panopticon
     command: >
       sh -c "
-        echo '📦 Installing dependencies...' &&
-        npm install &&
-        echo '✅ npm install complete' &&
-        echo '🔍 Verifying critical dependencies resolve...' &&
-        node -e \"
-          const deps = ['react', 'react-dom', 'vite'];
-          const missing = deps.filter(d => { try { require.resolve(d); return false; } catch { return true; } });
-          if (missing.length) { console.error('❌ Missing deps:', missing.join(', ')); process.exit(1); }
-          console.log('✅ All critical deps resolve');
-        \" &&
-        echo '🎉 Init complete'
+        echo 'Installing dependencies...' &&
+        bun install &&
+        echo 'bun install complete' &&
+        echo 'Init complete'
       "
     volumes:
       - ../:/workspaces/panopticon:cached
-      - npm-cache:/home/node/.npm
+      - bun-store:/root/.bun/install/cache
       # Shadow ALL node_modules to avoid host permission conflicts
       - root-node-modules:/workspaces/panopticon/node_modules
       - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
       - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
-      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
+      - packages-contracts-node-modules:/workspaces/panopticon/packages/contracts/node_modules
     networks:
       - devnet
 
@@ -73,12 +66,12 @@ services:
     volumes:
       # Mount entire project so npm workspaces can find hoisted binaries
       - ../:/workspaces/panopticon:cached
-      - npm-cache:/home/node/.npm
+      - bun-store:/root/.bun/install/cache
       # Shadow ALL node_modules to avoid host permission conflicts
       - root-node-modules:/workspaces/panopticon/node_modules
       - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
       - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
-      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
+      - packages-contracts-node-modules:/workspaces/panopticon/packages/contracts/node_modules
     environment:
       - CI=true
       - CONTAINER_MODE=true
@@ -102,7 +95,7 @@ services:
       dockerfile: Dockerfile
     user: node
     working_dir: /workspaces/panopticon/src/dashboard/server
-    command: sh -c "npm run dev"
+    command: sh -c "bun run dev"
     depends_on:
       init:
         condition: service_completed_successfully
@@ -113,13 +106,13 @@ services:
     volumes:
       # Mount entire project so ../../lib/ imports work
       - ../:/workspaces/panopticon:cached
-      - npm-cache:/home/node/.npm
+      - bun-store:/root/.bun/install/cache
       # Shadow ALL node_modules to avoid host permission conflicts
-      # (npm workspaces will try to hoist/install to all workspace node_modules)
+      # (bun workspaces will try to hoist/install to all workspace node_modules)
       - root-node-modules:/workspaces/panopticon/node_modules
       - server-node-modules:/workspaces/panopticon/src/dashboard/server/node_modules
       - frontend-node-modules:/workspaces/panopticon/src/dashboard/frontend/node_modules
-      - packages-shared-node-modules:/workspaces/panopticon/packages/shared/node_modules
+      - packages-contracts-node-modules:/workspaces/panopticon/packages/contracts/node_modules
       # Mount required host paths for workspace/agent management
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${HOME}/.panopticon:/home/node/.panopticon
@@ -140,11 +133,11 @@ services:
       - "traefik.http.services.pan-api-{{FEATURE_FOLDER}}.loadbalancer.server.port=3011"
 
 volumes:
-  npm-cache:
+  bun-store:
   root-node-modules:
   frontend-node-modules:
   server-node-modules:
-  packages-shared-node-modules:
+  packages-contracts-node-modules:
 
 networks:
   devnet:
