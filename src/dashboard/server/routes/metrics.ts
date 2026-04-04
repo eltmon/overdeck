@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Metrics + Convoys route module — Effect HttpRouter.Layer (PAN-428 B16)
  *
@@ -72,7 +73,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
         .sort((a, b) => b.cost - a.cost)
         .slice(0, 5);
 
-      return HttpServerResponse.json({
+      return jsonResponse({
         today: {
           totalCost: Math.round(dailyTotal * 100) / 100,
           agentCount: status.summary.total,
@@ -89,7 +90,7 @@ const getMetricsSummaryRoute = HttpRouter.add(
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting metrics summary:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to get metrics summary: ' + msg },
         { status: 500 },
       );
@@ -107,7 +108,7 @@ const getMetricsCostsRoute = HttpRouter.add(
       const service = getCloisterService();
       const costSummary = service.getCostSummary();
 
-      return HttpServerResponse.json({
+      return jsonResponse({
         dailyTotal: costSummary.dailyTotal,
         topAgents: costSummary.topAgents,
         topIssues: costSummary.topIssues,
@@ -116,7 +117,7 @@ const getMetricsCostsRoute = HttpRouter.add(
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting cost metrics:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to get cost metrics: ' + msg },
         { status: 500 },
       );
@@ -131,7 +132,7 @@ const getMetricsHandoffsRoute = HttpRouter.add(
   '/api/metrics/handoffs',
   Effect.try({
     try: () =>
-      HttpServerResponse.json({
+      jsonResponse({
         totalHandoffs: 0,
         successRate: 0,
         byType: {},
@@ -139,7 +140,7 @@ const getMetricsHandoffsRoute = HttpRouter.add(
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting handoff metrics:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to get handoff metrics: ' + msg },
         { status: 500 },
       );
@@ -157,7 +158,7 @@ const getMetricsStuckRoute = HttpRouter.add(
       const service = getCloisterService();
       const status = service.getStatus();
 
-      return HttpServerResponse.json({
+      return jsonResponse({
         current: status.summary.stuck,
         incidents: [],
       });
@@ -165,7 +166,7 @@ const getMetricsStuckRoute = HttpRouter.add(
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting stuck agent metrics:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to get stuck agent metrics: ' + msg },
         { status: 500 },
       );
@@ -178,7 +179,7 @@ const getMetricsStuckRoute = HttpRouter.add(
 const getActivityRoute = HttpRouter.add(
   'GET',
   '/api/activity',
-  Effect.sync(() => HttpServerResponse.json(activities)),
+  Effect.sync(() => jsonResponse(activities)),
 );
 
 // ─── Route: GET /api/activity/:id ────────────────────────────────────────────
@@ -192,9 +193,9 @@ const getActivityByIdRoute = HttpRouter.add(
 
     const activity = activities.find(a => a.id === id);
     if (!activity) {
-      return HttpServerResponse.json({ error: 'Activity not found' }, { status: 404 });
+      return jsonResponse({ error: 'Activity not found' }, { status: 404 });
     }
-    return HttpServerResponse.json(activity);
+    return jsonResponse(activity);
   }),
 );
 
@@ -206,12 +207,12 @@ const getConvoysRoute = HttpRouter.add(
   Effect.try({
     try: () => {
       const convoys = listConvoys();
-      return HttpServerResponse.json({ convoys });
+      return jsonResponse({ convoys });
     },
     catch: (error: unknown) => {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error listing convoys:', error);
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Failed to list convoys: ' + msg },
         { status: 500 },
       );
@@ -232,14 +233,14 @@ const getConvoyByIdRoute = HttpRouter.add(
       try: () => {
         const convoy = getConvoyStatus(id);
         if (!convoy) {
-          return HttpServerResponse.json({ error: 'Convoy not found' }, { status: 404 });
+          return jsonResponse({ error: 'Convoy not found' }, { status: 404 });
         }
-        return HttpServerResponse.json(convoy);
+        return jsonResponse(convoy);
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting convoy status:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to get convoy status: ' + msg },
           { status: 500 },
         );
@@ -267,11 +268,11 @@ const postConvoysStartRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     if (!template) {
-      return HttpServerResponse.json({ error: 'Template name is required' }, { status: 400 });
+      return jsonResponse({ error: 'Template name is required' }, { status: 400 });
     }
 
     if (!context || !context.projectPath) {
-      return HttpServerResponse.json(
+      return jsonResponse(
         { error: 'Context with projectPath is required' },
         { status: 400 },
       );
@@ -284,11 +285,11 @@ const postConvoysStartRoute = HttpRouter.add(
           if ((context as ConvoyContext).issueId) {
             Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId: (context as ConvoyContext).issueId } }));
           }
-          return HttpServerResponse.json(convoy);
+          return jsonResponse(convoy);
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error starting convoy:', error);
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'Failed to start convoy: ' + msg },
             { status: 500 },
           );
@@ -312,11 +313,11 @@ const postConvoyStopRoute = HttpRouter.add(
       try: async () => {
         try {
           await stopConvoy(id);
-          return HttpServerResponse.json({ success: true, message: 'Convoy stopped' });
+          return jsonResponse({ success: true, message: 'Convoy stopped' });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error stopping convoy:', error);
-          return HttpServerResponse.json(
+          return jsonResponse(
             { error: 'Failed to stop convoy: ' + msg },
             { status: 500 },
           );
@@ -340,7 +341,7 @@ const getConvoyOutputRoute = HttpRouter.add(
       try: () => {
         const convoy = getConvoyStatus(id);
         if (!convoy) {
-          return HttpServerResponse.json({ error: 'Convoy not found' }, { status: 404 });
+          return jsonResponse({ error: 'Convoy not found' }, { status: 404 });
         }
 
         const outputs: Record<string, string> = {};
@@ -354,12 +355,12 @@ const getConvoyOutputRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json({ outputs });
+        return jsonResponse({ outputs });
       },
       catch: (error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting convoy output:', error);
-        return HttpServerResponse.json(
+        return jsonResponse(
           { error: 'Failed to get convoy output: ' + msg },
           { status: 500 },
         );

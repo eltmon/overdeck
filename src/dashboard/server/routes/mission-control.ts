@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Mission Control route module — Effect HttpRouter.Layer (PAN-428 B13)
  *
@@ -354,11 +355,11 @@ const getMissionControlActivityRoute = HttpRouter.add(
           }
         } catch { /* cost data optional */ }
 
-        return HttpServerResponse.json({ issueId, sections, costByStage, totalCost });
+        return jsonResponse({ issueId, sections, costByStage, totalCost });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error fetching mission control activity:', error);
-          return HttpServerResponse.json({ error: 'Failed to fetch activity: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to fetch activity: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -403,7 +404,7 @@ const getMissionControlPlanningRoute = HttpRouter.add(
         if (!existsSync(planningDir)) {
           const activePrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR, `${issueLower}-plan.md`);
           if (existsSync(activePrdPath)) result.prd = readFileSync(activePrdPath, 'utf-8');
-          return HttpServerResponse.json(result);
+          return jsonResponse(result);
         }
 
         const statePath = join(planningDir, 'STATE.md');
@@ -460,11 +461,11 @@ const getMissionControlPlanningRoute = HttpRouter.add(
         result.discussions = readArtifactDir('discussions', 'syncedAt') as any;
         result.notes = readArtifactDir('notes', 'uploadedAt') as any;
 
-        return HttpServerResponse.json(result);
+        return jsonResponse(result);
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error fetching planning artifacts:', error);
-          return HttpServerResponse.json({ error: 'Failed to fetch planning artifacts: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to fetch planning artifacts: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -493,7 +494,7 @@ const postMissionControlStatusReviewRoute = HttpRouter.add(
         const planningDir = join(workspacePath, '.planning');
 
         if (!existsSync(planningDir)) {
-          return HttpServerResponse.json({ error: 'No planning directory found' }, { status: 404 });
+          return jsonResponse({ error: 'No planning directory found' }, { status: 404 });
         }
 
         const statePath = join(planningDir, 'STATE.md');
@@ -538,7 +539,7 @@ const postMissionControlStatusReviewRoute = HttpRouter.add(
 
         const hasAnyContent = state || discussionsContent || transcriptsContent || notesContent || issueContext;
         if (!hasAnyContent) {
-          return HttpServerResponse.json({ error: 'No planning artifacts, discussions, transcripts, or issue data to review against' }, { status: 400 });
+          return jsonResponse({ error: 'No planning artifacts, discussions, transcripts, or issue data to review against' }, { status: 400 });
         }
 
         let gitDiff = '';
@@ -593,7 +594,7 @@ const postMissionControlStatusReviewRoute = HttpRouter.add(
             const cachedReview = readFileSync(statusReviewPath, 'utf-8');
             const reviewedAt = statSync(statusReviewPath).mtime.toISOString();
             console.log(`[status-review] ${issueId}: no changes detected, returning cached review`);
-            return HttpServerResponse.json({ success: true, statusReview: cachedReview, reviewedAt, cached: true });
+            return jsonResponse({ success: true, statusReview: cachedReview, reviewedAt, cached: true });
           }
         }
 
@@ -716,11 +717,11 @@ ${issueContext ? `## Issue Tracker Data\n${issueContext}\n` : ''}---
         writeFileSync(hashPath, contentHash, 'utf-8');
 
         Effect.runSync(eventStore.append({ type: 'planning.sync', timestamp: new Date().toISOString(), payload: { issueId, status: 'reviewing' } }));
-        return HttpServerResponse.json({ success: true, statusReview: review, reviewedAt: now });
+        return jsonResponse({ success: true, statusReview: review, reviewedAt: now });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error generating status review:', error);
-          return HttpServerResponse.json({ error: 'Failed to generate status review: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to generate status review: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -746,11 +747,11 @@ const postMissionControlUploadRoute = HttpRouter.add(
         const issuePrefix = issueId.split('-')[0];
 
         if (!type || !filename || !content) {
-          return HttpServerResponse.json({ error: 'type, filename, and content are required' }, { status: 400 });
+          return jsonResponse({ error: 'type, filename, and content are required' }, { status: 400 });
         }
 
         if (!['transcript', 'note'].includes(type)) {
-          return HttpServerResponse.json({ error: 'type must be transcript or note' }, { status: 400 });
+          return jsonResponse({ error: 'type must be transcript or note' }, { status: 400 });
         }
 
         let safeName = (filename as string).replace(/[^a-zA-Z0-9._-]/g, '-');
@@ -773,11 +774,11 @@ const postMissionControlUploadRoute = HttpRouter.add(
         const filePath = join(dirPath, safeName + ext);
         writeFileSync(filePath, processedContent, 'utf-8');
 
-        return HttpServerResponse.json({ success: true, path: filePath });
+        return jsonResponse({ success: true, path: filePath });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error uploading artifact:', error);
-          return HttpServerResponse.json({ error: 'Failed to upload artifact: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to upload artifact: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -803,7 +804,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
         const issuePrefix = issueId.split('-')[0];
 
         if (!tracker || !['github', 'linear', 'rally'].includes(tracker)) {
-          return HttpServerResponse.json({ error: 'tracker must be github, linear, or rally' }, { status: 400 });
+          return jsonResponse({ error: 'tracker must be github, linear, or rally' }, { status: 400 });
         }
 
         const projectPath = getProjectPath(undefined, issuePrefix);
@@ -816,7 +817,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
         if (tracker === 'github') {
           const ghConfig = getGitHubConfig();
           if (!ghConfig) {
-            return HttpServerResponse.json({ error: 'GitHub not configured' }, { status: 400 });
+            return jsonResponse({ error: 'GitHub not configured' }, { status: 400 });
           }
 
           try {
@@ -859,7 +860,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
         } else if (tracker === 'linear') {
           const linearApiKey = getLinearApiKey();
           if (!linearApiKey) {
-            return HttpServerResponse.json({ error: 'Linear not configured' }, { status: 400 });
+            return jsonResponse({ error: 'Linear not configured' }, { status: 400 });
           }
 
           try {
@@ -940,11 +941,11 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
           }
         }
 
-        return HttpServerResponse.json({ synced: syncedFiles.length, files: syncedFiles });
+        return jsonResponse({ synced: syncedFiles.length, files: syncedFiles });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error syncing discussions:', error);
-          return HttpServerResponse.json({ error: 'Failed to sync discussions: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to sync discussions: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -987,11 +988,11 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
 
         const sessionName = `planning-${issueLower}`;
         Effect.runSync(eventStore.append({ type: 'planning.started', timestamp: new Date().toISOString(), payload: { issueId, sessionName } }));
-        return HttpServerResponse.json({ success: true, path: planningDir });
+        return jsonResponse({ success: true, path: planningDir });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error initializing planning directory:', error);
-          return HttpServerResponse.json({ error: 'Failed to initialize planning directory: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to initialize planning directory: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1210,11 +1211,11 @@ const getMissionControlProjectsRoute = HttpRouter.add(
           });
         }
 
-        return HttpServerResponse.json(projectTree);
+        return jsonResponse(projectTree);
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error fetching project tree:', error);
-          return HttpServerResponse.json({ error: 'Failed to fetch project tree: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to fetch project tree: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),

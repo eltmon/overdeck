@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Cloister route module — Effect HttpRouter.Layer (PAN-428 B11)
  *
@@ -40,11 +41,11 @@ const getCloisterStatusRoute = HttpRouter.add(
     try {
       const service = getCloisterService();
       const status = service.getStatus();
-      return HttpServerResponse.json(status);
+      return jsonResponse(status);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting Cloister status:', error);
-      return HttpServerResponse.json({ error: 'Failed to get Cloister status: ' + msg }, { status: 500 });
+      return jsonResponse({ error: 'Failed to get Cloister status: ' + msg }, { status: 500 });
     }
   }),
 );
@@ -59,11 +60,11 @@ const postCloisterStartRoute = HttpRouter.add(
       try {
         const service = getCloisterService();
         await service.start();
-        return HttpServerResponse.json({ success: true, message: 'Cloister started' });
+        return jsonResponse({ success: true, message: 'Cloister started' });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error starting Cloister:', error);
-        return HttpServerResponse.json({ error: 'Failed to start Cloister: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to start Cloister: ' + msg }, { status: 500 });
       }
     },
     catch: (err) => new Error(String(err)),
@@ -79,11 +80,11 @@ const postCloisterStopRoute = HttpRouter.add(
     try {
       const service = getCloisterService();
       service.stop();
-      return HttpServerResponse.json({ success: true, message: 'Cloister stopped (agents still running)' });
+      return jsonResponse({ success: true, message: 'Cloister stopped (agents still running)' });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error stopping Cloister:', error);
-      return HttpServerResponse.json({ error: 'Failed to stop Cloister: ' + msg }, { status: 500 });
+      return jsonResponse({ error: 'Failed to stop Cloister: ' + msg }, { status: 500 });
     }
   }),
 );
@@ -107,7 +108,7 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
             payload: { agentId, issueId: agentId.replace(/^agent-/, '').toUpperCase() },
           }));
         }
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: 'Emergency stop executed',
           killedAgents,
@@ -115,7 +116,7 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error executing emergency stop:', error);
-        return HttpServerResponse.json({ error: 'Failed to execute emergency stop: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to execute emergency stop: ' + msg }, { status: 500 });
       }
     });
   }),
@@ -130,11 +131,11 @@ const postCloisterResumeSpawnsRoute = HttpRouter.add(
     try {
       const service = getCloisterService();
       service.resumeSpawns();
-      return HttpServerResponse.json({ success: true, message: 'Agent spawns resumed' });
+      return jsonResponse({ success: true, message: 'Agent spawns resumed' });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error resuming spawns:', error);
-      return HttpServerResponse.json({ error: 'Failed to resume spawns: ' + msg }, { status: 500 });
+      return jsonResponse({ error: 'Failed to resume spawns: ' + msg }, { status: 500 });
     }
   }),
 );
@@ -148,11 +149,11 @@ const getCloisterSpawnStatusRoute = HttpRouter.add(
     try {
       const service = getCloisterService();
       const isPaused = service.isSpawnPaused();
-      return HttpServerResponse.json({ spawnsPaused: isPaused });
+      return jsonResponse({ spawnsPaused: isPaused });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error checking spawn status:', error);
-      return HttpServerResponse.json({ error: 'Failed to check spawn status: ' + msg }, { status: 500 });
+      return jsonResponse({ error: 'Failed to check spawn status: ' + msg }, { status: 500 });
     }
   }),
 );
@@ -165,11 +166,11 @@ const getCloisterConfigRoute = HttpRouter.add(
   Effect.sync(() => {
     try {
       const config = loadCloisterConfig();
-      return HttpServerResponse.json(config);
+      return jsonResponse(config);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error loading Cloister config:', error);
-      return HttpServerResponse.json({ error: 'Failed to load Cloister config: ' + msg }, { status: 500 });
+      return jsonResponse({ error: 'Failed to load Cloister config: ' + msg }, { status: 500 });
     }
   }),
 );
@@ -186,11 +187,11 @@ const putCloisterConfigRoute = HttpRouter.add(
         const service = getCloisterService();
         saveCloisterConfig(updates);
         service.reloadConfig();
-        return HttpServerResponse.json({ success: true, config: updates });
+        return jsonResponse({ success: true, config: updates });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error updating Cloister config:', error);
-        return HttpServerResponse.json({ error: 'Failed to update Cloister config: ' + msg }, { status: 500 });
+        return jsonResponse({ error: 'Failed to update Cloister config: ' + msg }, { status: 500 });
       }
     });
   }),
@@ -205,11 +206,11 @@ const getCloisterAgentsHealthRoute = HttpRouter.add(
     try {
       const service = getCloisterService();
       const agentHealths = service.getAllAgentHealth();
-      return HttpServerResponse.json({ agents: agentHealths });
+      return jsonResponse({ agents: agentHealths });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting agents health:', error);
-      return HttpServerResponse.json({ error: 'Failed to get agents health: ' + msg }, { status: 500 });
+      return jsonResponse({ error: 'Failed to get agents health: ' + msg }, { status: 500 });
     }
   }),
 );

@@ -1,3 +1,4 @@
+import { jsonResponse } from "./http-helpers.js";
 /**
  * Dashboard HTTP server — Effect-based with dual-runtime support (PAN-428 B5)
  *
@@ -78,7 +79,7 @@ const PlatformServicesLive = Layer.unwrap(
 const healthRouteLayer = HttpRouter.add(
   'GET',
   '/api/health',
-  HttpServerResponse.json({ status: 'ok' }),
+  jsonResponse({ status: 'ok' }),
 );
 
 // ─── Static file route ────────────────────────────────────────────────────────

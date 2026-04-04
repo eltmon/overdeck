@@ -1,3 +1,4 @@
+import { jsonResponse } from "../http-helpers.js";
 /**
  * Agents route module — Effect HttpRouter.Layer (PAN-428 B7)
  *
@@ -275,7 +276,7 @@ const getAgentsRoute = HttpRouter.add(
         const now = Date.now();
 
         if (agentsCache.data && (now - agentsCache.timestamp) < AGENTS_CACHE_TTL_MS) {
-          return HttpServerResponse.json(agentsCache.data);
+          return jsonResponse(agentsCache.data);
         }
 
         const { stdout } = await execAsync('tmux list-sessions -F "#{session_name}|#{session_created}" 2>/dev/null || true');
@@ -539,10 +540,10 @@ const getAgentsRoute = HttpRouter.add(
 
         const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...startingAgents, ...failedAgents, ...stoppedAgents];
         agentsCache = { data: allAgents, timestamp: now };
-        return HttpServerResponse.json(allAgents);
+        return jsonResponse(allAgents);
         } catch (error: unknown) {
           console.error('Error listing agents:', error);
-          return HttpServerResponse.json([]);
+          return jsonResponse([]);
         }
       },
       catch: (err) => new Error(String(err)),
@@ -609,7 +610,7 @@ const getAgentOutputRoute = HttpRouter.add(
             stdout = '';
           }
 
-          return HttpServerResponse.json({ output: stdout });
+          return jsonResponse({ output: stdout });
         } catch (error: unknown) {
           // Try saved log on error
           try {
@@ -617,10 +618,10 @@ const getAgentOutputRoute = HttpRouter.add(
             const savedLog = join(agentStateDir, 'output.log');
             if (existsSync(savedLog)) {
               const logContent = readFileSync(savedLog, 'utf-8');
-              return HttpServerResponse.json({ output: logContent });
+              return jsonResponse({ output: logContent });
             }
           } catch {}
-          return HttpServerResponse.json({ output: '' });
+          return jsonResponse({ output: '' });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -643,7 +644,7 @@ const postAgentMessageRoute = HttpRouter.add(
         try {
           const { message } = body as any;
           if (!message) {
-            return HttpServerResponse.json({ error: 'Message required' }, { status: 400 });
+            return jsonResponse({ error: 'Message required' }, { status: 400 });
           }
 
           const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
@@ -667,14 +668,14 @@ const postAgentMessageRoute = HttpRouter.add(
               flyExecCmd(vmName, `tmux send-keys -t '${id}' -l '${escapedMessage}' && tmux send-keys -t '${id}' Enter`),
               { timeout: 15000 }
             );
-            return HttpServerResponse.json({ success: true, remote: true });
+            return jsonResponse({ success: true, remote: true });
           } else {
             await messageAgent(id, message);
-            return HttpServerResponse.json({ success: true });
+            return jsonResponse({ success: true });
           }
         } catch (error: unknown) {
           console.error('Error sending message:', error);
-          return HttpServerResponse.json({ error: 'Failed to send message' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to send message' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -701,10 +702,10 @@ const deleteAgentRoute = HttpRouter.add(
             timestamp: new Date().toISOString(),
             payload: { agentId: id },
           }));
-          return HttpServerResponse.json({ success: true });
+          return jsonResponse({ success: true });
         } catch (error: unknown) {
           console.error('Error stopping agent:', error);
-          return HttpServerResponse.json({ error: 'Failed to stop agent' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to stop agent' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -731,7 +732,7 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
           const endTime = new Date();
           const startTime = new Date(endTime.getTime() - parseInt(hours) * 60 * 60 * 1000);
           const events = getHealthHistory(id, startTime.toISOString(), endTime.toISOString());
-          return HttpServerResponse.json({
+          return jsonResponse({
             agentId: id,
             startTime: startTime.toISOString(),
             endTime: endTime.toISOString(),
@@ -739,7 +740,7 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
           });
         } catch (error: unknown) {
           console.error('Error fetching health history:', error);
-          return HttpServerResponse.json({ error: 'Failed to fetch health history' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to fetch health history' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -769,10 +770,10 @@ const postAgentPokeRoute = HttpRouter.add(
             "What's your current status?";
           const pokeMsg = message || defaultPokeMessage;
           await messageAgent(id, pokeMsg);
-          return HttpServerResponse.json({ success: true, message: 'Agent poked successfully' });
+          return jsonResponse({ success: true, message: 'Agent poked successfully' });
         } catch (error: unknown) {
           console.error('Error poking agent:', error);
-          return HttpServerResponse.json({ error: 'Failed to poke agent' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to poke agent' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -793,10 +794,10 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
       try: async () => {
         try {
           const questions = await getAgentPendingQuestions(id);
-          return HttpServerResponse.json({ pending: questions.length > 0, questions });
+          return jsonResponse({ pending: questions.length > 0, questions });
         } catch (error: unknown) {
           console.error('Error checking pending questions:', error);
-          return HttpServerResponse.json({ pending: false, questions: [] });
+          return jsonResponse({ pending: false, questions: [] });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -819,12 +820,12 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
         try {
           const { answers } = body as any;
           if (!answers || !Array.isArray(answers) || answers.length === 0) {
-            return HttpServerResponse.json({ error: 'answers array required' }, { status: 400 });
+            return jsonResponse({ error: 'answers array required' }, { status: 400 });
           }
 
           const pendingQuestions = await getAgentPendingQuestions(id);
           if (pendingQuestions.length === 0) {
-            return HttpServerResponse.json({ error: 'No pending questions found' }, { status: 400 });
+            return jsonResponse({ error: 'No pending questions found' }, { status: 400 });
           }
 
           const questionSet = pendingQuestions[0];
@@ -853,10 +854,10 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
           }
 
           await execAsync(`tmux send-keys -t "${id}" C-m`);
-          return HttpServerResponse.json({ success: true });
+          return jsonResponse({ success: true });
         } catch (error: unknown) {
           console.error('Error sending answer:', error);
-          return HttpServerResponse.json({ error: 'Failed to send answer' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to send answer' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -883,10 +884,10 @@ const postAgentHeartbeatRoute = HttpRouter.add(
             lastActivity: timestamp || new Date().toISOString(),
             currentTool: tool,
           });
-          return HttpServerResponse.json({ success: true });
+          return jsonResponse({ success: true });
         } catch (error: unknown) {
           console.error('Error saving heartbeat:', error);
-          return HttpServerResponse.json({ error: 'Failed to save heartbeat' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to save heartbeat' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -911,10 +912,10 @@ const getAgentActivityRoute = HttpRouter.add(
       try: async () => {
         try {
           const activity = getActivity(id, limit);
-          return HttpServerResponse.json({ activity });
+          return jsonResponse({ activity });
         } catch (error: unknown) {
           console.error('Error reading activity:', error);
-          return HttpServerResponse.json({ error: 'Failed to read activity' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to read activity' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -936,11 +937,11 @@ const getAgentFilesRoute = HttpRouter.add(
         try {
           const agentState = getAgentState(id);
           if (!agentState?.workspace) {
-            return HttpServerResponse.json({ files: [] });
+            return jsonResponse({ files: [] });
           }
           const workspacePath = agentState.workspace;
           if (!existsSync(workspacePath)) {
-            return HttpServerResponse.json({ files: [] });
+            return jsonResponse({ files: [] });
           }
           const { stdout } = await execAsync(
             'git diff --name-status HEAD 2>/dev/null || git status --porcelain 2>/dev/null || echo ""',
@@ -957,10 +958,10 @@ const getAgentFilesRoute = HttpRouter.add(
               return { status: '?', path: l.trim() };
             })
             .filter(f => f.path);
-          return HttpServerResponse.json({ files });
+          return jsonResponse({ files });
         } catch (error: unknown) {
           console.error('[god-view] files error:', error);
-          return HttpServerResponse.json({ files: [] });
+          return jsonResponse({ files: [] });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -995,10 +996,10 @@ const getAgentTimelineRoute = HttpRouter.add(
             events.unshift({ timestamp: agentState.startedAt, type: 'started', message: 'Agent started' });
           }
           events.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-          return HttpServerResponse.json({ timeline: events.slice(0, limit) });
+          return jsonResponse({ timeline: events.slice(0, limit) });
         } catch (error: unknown) {
           console.error('[god-view] timeline error:', error);
-          return HttpServerResponse.json({ timeline: [] });
+          return jsonResponse({ timeline: [] });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1024,7 +1025,7 @@ const postAgentSuspendRoute = HttpRouter.add(
           const effectiveSessionId = sessionId || getSessionId(id);
 
           if (!effectiveSessionId) {
-            return HttpServerResponse.json({ error: 'Session ID required for suspend' }, { status: 400 });
+            return jsonResponse({ error: 'Session ID required for suspend' }, { status: 400 });
           }
 
           saveSessionId(id, effectiveSessionId);
@@ -1040,10 +1041,10 @@ const postAgentSuspendRoute = HttpRouter.add(
             payload: { agentId: id },
           }));
 
-          return HttpServerResponse.json({ success: true });
+          return jsonResponse({ success: true });
         } catch (error: unknown) {
           console.error('Error suspending agent:', error);
-          return HttpServerResponse.json({ error: 'Failed to suspend agent' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to suspend agent' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1067,13 +1068,13 @@ const postAgentResumeRoute = HttpRouter.add(
           const { message } = body as any;
           const result = await resumeAgent(id, message);
           if (result.success) {
-            return HttpServerResponse.json({ success: true });
+            return jsonResponse({ success: true });
           } else {
-            return HttpServerResponse.json({ error: result.error }, { status: 400 });
+            return jsonResponse({ error: result.error }, { status: 400 });
           }
         } catch (error: unknown) {
           console.error('Error resuming agent:', error);
-          return HttpServerResponse.json({ error: 'Failed to resume agent' }, { status: 500 });
+          return jsonResponse({ error: 'Failed to resume agent' }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1096,13 +1097,13 @@ const getAgentCloisterHealthRoute = HttpRouter.add(
           const service = getCloisterService();
           const health = service.getAgentHealth(id);
           if (!health) {
-            return HttpServerResponse.json({ error: 'Agent not found or runtime not available' }, { status: 404 });
+            return jsonResponse({ error: 'Agent not found or runtime not available' }, { status: 404 });
           }
-          return HttpServerResponse.json(health);
+          return jsonResponse(health);
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error getting agent health:', error);
-          return HttpServerResponse.json({ error: 'Failed to get agent health: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to get agent health: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1124,12 +1125,12 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
         try {
           const agentState = getAgentState(id);
           if (!agentState) {
-            return HttpServerResponse.json({ error: 'Agent not found' }, { status: 404 });
+            return jsonResponse({ error: 'Agent not found' }, { status: 404 });
           }
 
           const runtime = getRuntimeForAgent(id);
           if (!runtime) {
-            return HttpServerResponse.json({ error: 'Runtime not found for agent' }, { status: 404 });
+            return jsonResponse({ error: 'Runtime not found for agent' }, { status: 404 });
           }
 
           const health = getAgentHealth(id, runtime);
@@ -1144,7 +1145,7 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
 
           if (triggers.length > 0) {
             const trigger = triggers[0];
-            return HttpServerResponse.json({
+            return jsonResponse({
               suggested: true,
               trigger: trigger.type,
               currentModel: agentState.model,
@@ -1153,7 +1154,7 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
             });
           }
 
-          return HttpServerResponse.json({
+          return jsonResponse({
             suggested: false,
             trigger: null,
             currentModel: agentState.model,
@@ -1163,7 +1164,7 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error getting handoff suggestion:', error);
-          return HttpServerResponse.json({ error: 'Failed to get handoff suggestion: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to get handoff suggestion: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1186,7 +1187,7 @@ const postAgentHandoffRoute = HttpRouter.add(
         try {
           const { toModel, reason } = body as any;
           if (!toModel) {
-            return HttpServerResponse.json({ error: 'toModel is required' }, { status: 400 });
+            return jsonResponse({ error: 'toModel is required' }, { status: 400 });
           }
 
           const result = await performHandoff(id, {
@@ -1195,18 +1196,18 @@ const postAgentHandoffRoute = HttpRouter.add(
           });
 
           if (result.success) {
-            return HttpServerResponse.json({
+            return jsonResponse({
               success: true,
               newAgentId: result.newAgentId,
               newSessionId: result.newSessionId,
             });
           } else {
-            return HttpServerResponse.json({ success: false, error: result.error }, { status: 500 });
+            return jsonResponse({ success: false, error: result.error }, { status: 500 });
           }
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error executing handoff:', error);
-          return HttpServerResponse.json({ error: 'Failed to execute handoff: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to execute handoff: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1227,11 +1228,11 @@ const getAgentHandoffsRoute = HttpRouter.add(
       try: async () => {
         try {
           const handoffs = readAgentHandoffEvents(id);
-          return HttpServerResponse.json({ handoffs });
+          return jsonResponse({ handoffs });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error getting agent handoffs:', error);
-          return HttpServerResponse.json({ error: 'Failed to get agent handoffs: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to get agent handoffs: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1253,7 +1254,7 @@ const getAgentCostRoute = HttpRouter.add(
         try {
           const agentState = getAgentState(id);
           if (!agentState) {
-            return HttpServerResponse.json({ error: 'Agent not found' }, { status: 404 });
+            return jsonResponse({ error: 'Agent not found' }, { status: 404 });
           }
 
           let cost = 0;
@@ -1328,7 +1329,7 @@ const getAgentCostRoute = HttpRouter.add(
             }
           }
 
-          return HttpServerResponse.json({
+          return jsonResponse({
             agentId: id,
             model: detectedModel || agentState.model,
             tokens: {
@@ -1342,7 +1343,7 @@ const getAgentCostRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error getting agent cost:', error);
-          return HttpServerResponse.json({ error: 'Failed to get agent cost: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to get agent cost: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
@@ -1365,7 +1366,7 @@ const postAgentsRoute = HttpRouter.add(
         const { issueId, projectId } = body as any;
 
         if (!issueId) {
-          return HttpServerResponse.json({ error: 'issueId required' }, { status: 400 });
+          return jsonResponse({ error: 'issueId required' }, { status: 400 });
         }
 
         const issueLower = issueId.toLowerCase();
@@ -1386,7 +1387,7 @@ const postAgentsRoute = HttpRouter.add(
           const completedPrdPath = join(projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR, `${issueLower}-plan.md`);
           const hasCompletedPrd = existsSync(completedPrdPath);
           if (!hasCompletedPrd) {
-            return HttpServerResponse.json({
+            return jsonResponse({
               error: `No PRD found for ${issueId}. Create a PRD before starting work.`,
               hint: 'Use "pan work plan" to create a PRD draft, then start work.',
               issueId,
@@ -1403,7 +1404,7 @@ const postAgentsRoute = HttpRouter.add(
               { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
             );
           } catch (wsErr) {
-            return HttpServerResponse.json({
+            return jsonResponse({
               error: `Failed to create workspace for ${issueId}: ${(wsErr as Error).message}`,
               hint: 'Try creating the workspace manually: pan workspace create ' + issueId + ' --local',
             }, { status: 500 });
@@ -1449,7 +1450,7 @@ const postAgentsRoute = HttpRouter.add(
           const reason = !hasPlan
             ? 'No plan.vbrief.json found — planning has not run for this issue.'
             : 'Planning started but did not complete (.planning-complete marker missing).';
-          return HttpServerResponse.json({
+          return jsonResponse({
             error: reason,
             hint: 'Run planning first (click Plan button or use /plan skill). The planning agent produces a vBRIEF plan which is then converted to beads automatically.',
             issueId,
@@ -1460,7 +1461,7 @@ const postAgentsRoute = HttpRouter.add(
           const planContent = JSON.parse(readFileSync(planPath, 'utf-8'));
           const itemCount = planContent?.plan?.items?.length ?? 0;
           if (itemCount === 0) {
-            return HttpServerResponse.json({
+            return jsonResponse({
               error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
               hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
               issueId,
@@ -1479,7 +1480,7 @@ const postAgentsRoute = HttpRouter.add(
         } catch {}
 
         if (!hasBeads) {
-          return HttpServerResponse.json({
+          return jsonResponse({
             error: `Plan exists but no beads tasks found for ${issueId}. createBeadsFromVBrief may have failed during planning.`,
             hint: 'Re-run planning or manually trigger beads creation from the plan.',
             issueId,
@@ -1564,7 +1565,7 @@ const postAgentsRoute = HttpRouter.add(
             timestamp: new Date().toISOString(),
             payload: { agentId: issueId, issueId },
           }));
-          return HttpServerResponse.json({
+          return jsonResponse({
             success: true,
             message: `Starting remote agent for ${issueId}`,
             remote: true,
@@ -1747,7 +1748,7 @@ const postAgentsRoute = HttpRouter.add(
                 }
               })();
 
-              return HttpServerResponse.json({
+              return jsonResponse({
                 success: true,
                 message: `Starting containers and agent for ${issueId} (this may take a few minutes)`,
                 startingContainers: true,
@@ -1768,7 +1769,7 @@ const postAgentsRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { agentId: issueId, issueId },
         }));
-        return HttpServerResponse.json({
+        return jsonResponse({
           success: true,
           message: `Starting agent for ${issueId}`,
           activityId,
@@ -1777,7 +1778,7 @@ const postAgentsRoute = HttpRouter.add(
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('Error starting agent:', error);
-          return HttpServerResponse.json({ error: 'Failed to start agent: ' + msg }, { status: 500 });
+          return jsonResponse({ error: 'Failed to start agent: ' + msg }, { status: 500 });
         }
       },
       catch: (err) => new Error(String(err)),
