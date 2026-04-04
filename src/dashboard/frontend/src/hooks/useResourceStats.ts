@@ -1,52 +1,22 @@
 /**
- * useResourceStats — subscribes to `resources:updated` Socket.io events
- * and injects data into TanStack Query cache for the ['resources'] key.
+ * useResourceStats — bridges Zustand store resources into TanStack Query cache.
  *
- * Uses the existing socket connection from useSocketIssues if present,
- * otherwise creates its own. The hook is idempotent — safe to call multiple times.
+ * The EventRouter applies `resources.updated` domain events to the store.
+ * This hook syncs that data into the ['resources'] query key so components
+ * using useQuery(['resources']) get live updates without polling.
  */
 
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { io, Socket } from 'socket.io-client';
-import type { ResourcesSnapshot } from '../types';
-
-let sharedSocket: Socket | null = null;
-let socketRefCount = 0;
-
-function getSharedSocket(): Socket {
-  if (!sharedSocket || !sharedSocket.connected) {
-    sharedSocket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-    });
-  }
-  return sharedSocket;
-}
+import { useDashboardStore, selectResources } from '../lib/store';
 
 export function useResourceStats(): void {
   const queryClient = useQueryClient();
+  const resources = useDashboardStore(selectResources);
 
   useEffect(() => {
-    const socket = getSharedSocket();
-    socketRefCount++;
-
-    const handleUpdate = (snapshot: ResourcesSnapshot) => {
-      queryClient.setQueryData(['resources'], snapshot);
-    };
-
-    socket.on('resources:updated', handleUpdate);
-
-    return () => {
-      socket.off('resources:updated', handleUpdate);
-      socketRefCount--;
-      if (socketRefCount <= 0 && sharedSocket) {
-        sharedSocket.disconnect();
-        sharedSocket = null;
-        socketRefCount = 0;
-      }
-    };
-  }, [queryClient]);
+    if (resources) {
+      queryClient.setQueryData(['resources'], resources);
+    }
+  }, [resources, queryClient]);
 }

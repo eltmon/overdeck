@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
-import { io } from 'socket.io-client';
+import { useDashboardStore } from '../lib/store';
 import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
@@ -304,26 +304,22 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     startAgentMutation.mutate();
   };
 
-  // Listen for planning:failed socket event while in starting/planning step
+  // Watch for planning failures via domain events (applied to store by EventRouter).
+  // When the store sequence advances, check planning status via REST.
+  const storeSequence = useDashboardStore((s) => s.sequence);
   useEffect(() => {
     if (!isOpen || (step !== 'starting' && step !== 'planning')) return;
-
-    const socket = io({
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-
-    socket.on('planning:failed', ({ issueId, error: errMsg }: { issueId: string; error: string }) => {
-      if (issueId === issue.identifier) {
-        setError(errMsg);
-        setStep('error');
-      }
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [isOpen, step, issue.identifier]);
+    // Re-check planning status when new events arrive
+    fetch(`/api/planning/${issue.identifier}/status`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.status === 'failed' || data?.error) {
+          setError(data.error || 'Planning failed');
+          setStep('error');
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, step, issue.identifier, storeSequence]);
 
   if (!isOpen) return null;
 
