@@ -18,8 +18,11 @@ export type SequenceNumber = typeof SequenceNumber.Type
 export const AgentStatus = Schema.Literals(["starting", "running", "stopped", "error", "unknown"])
 export type AgentStatus = typeof AgentStatus.Type
 
-export const AgentPhase = Schema.Literals(["exploration", "implementation", "testing", "documentation", "pre_push", "post_push"])
+export const AgentPhase = Schema.Literals(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push"])
 export type AgentPhase = typeof AgentPhase.Type
+
+export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear"])
+export type AgentResolution = typeof AgentResolution.Type
 
 export const SpecialistType = Schema.Literals(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"])
 export type SpecialistType = typeof SpecialistType.Type
@@ -52,6 +55,12 @@ export const AgentSnapshot = Schema.Struct({
   sessionId: Schema.optional(Schema.String),
   phase: Schema.optional(AgentPhase),
   runtimeState: Schema.optional(Schema.String),
+  // Enrichment fields (PAN-440)
+  agentPhase: Schema.optional(AgentPhase),
+  hasPendingQuestion: Schema.optional(Schema.Boolean),
+  pendingQuestionCount: Schema.optional(Schema.Number),
+  resolution: Schema.optional(AgentResolution),
+  resolutionCount: Schema.optional(Schema.Number),
 })
 export type AgentSnapshot = typeof AgentSnapshot.Type
 
