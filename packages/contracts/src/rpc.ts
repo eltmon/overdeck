@@ -2,7 +2,7 @@ import { Schema } from "effect"
 import * as Rpc from "effect/unstable/rpc/Rpc"
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup"
 import { DomainEvent } from "./events"
-import { DashboardSnapshot, SequenceNumber } from "./types"
+import { DashboardSnapshot, IssueId, SequenceNumber, WorkspaceDetail } from "./types"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
 
@@ -16,11 +16,21 @@ export const WS_METHODS = {
   getSnapshot: "pan.getSnapshot",
   replayEvents: "pan.replayEvents",
 
+  // Workspace detail (batched)
+  getWorkspaceDetail: "pan.getWorkspaceDetail",
+
   // Terminal control
   terminalOpen: "pan.terminalOpen",
   terminalWrite: "pan.terminalWrite",
   terminalResize: "pan.terminalResize",
   terminalClose: "pan.terminalClose",
+
+  // Commands (trigger mutations via RPC)
+  startPlanning: "pan.startPlanning",
+  startAgent: "pan.startAgent",
+  deepWipe: "pan.deepWipe",
+  sendTerminalInput: "pan.sendTerminalInput",
+  resizeTerminal: "pan.resizeTerminal",
 } as const
 
 // ─── Error types ──────────────────────────────────────────────────────────────
@@ -108,18 +118,64 @@ export const TerminalCloseRpc = Rpc.make(WS_METHODS.terminalClose, {
   error: PanRpcError,
 })
 
+/** 10. Get batched workspace detail (unary) — replaces 5 separate HTTP calls */
+export const GetWorkspaceDetailRpc = Rpc.make(WS_METHODS.getWorkspaceDetail, {
+  payload: Schema.Struct({ issueId: IssueId }),
+  success: WorkspaceDetail,
+  error: PanRpcError,
+})
+
+/** 11. Start planning for an issue (command) */
+export const StartPlanningRpc = Rpc.make(WS_METHODS.startPlanning, {
+  payload: Schema.Struct({ issueId: IssueId, options: Schema.optional(Schema.Unknown) }),
+  success: Schema.Struct({ queued: Schema.Boolean }),
+  error: PanRpcError,
+})
+
+/** 12. Start a work agent for an issue (command) */
+export const StartAgentRpc = Rpc.make(WS_METHODS.startAgent, {
+  payload: Schema.Struct({ issueId: IssueId, options: Schema.optional(Schema.Unknown) }),
+  success: Schema.Struct({ agentId: Schema.String }),
+  error: PanRpcError,
+})
+
+/** 13. Deep-wipe a workspace (destructive command — requires explicit confirmation) */
+export const DeepWipeRpc = Rpc.make(WS_METHODS.deepWipe, {
+  payload: Schema.Struct({ issueId: IssueId, deleteWorkspace: Schema.optional(Schema.Boolean) }),
+  success: Schema.Struct({ wiped: Schema.Boolean }),
+  error: PanRpcError,
+})
+
+/** 14. Send input to a terminal session (command) */
+export const SendTerminalInputRpc = Rpc.make(WS_METHODS.sendTerminalInput, {
+  payload: Schema.Struct({ sessionName: Schema.String, data: Schema.String }),
+  error: PanRpcError,
+})
+
+/** 15. Resize a terminal session (command) */
+export const ResizeTerminalRpc = Rpc.make(WS_METHODS.resizeTerminal, {
+  payload: Schema.Struct({ sessionName: Schema.String, cols: Schema.Number, rows: Schema.Number }),
+  error: PanRpcError,
+})
+
 // ─── RPC Group ────────────────────────────────────────────────────────────────
 
-/** All 9 Panopticon WebSocket RPC methods */
+/** All 15 Panopticon WebSocket RPC methods */
 export const PanRpcGroup = RpcGroup.make(
   SubscribeDomainEventsRpc,
   SubscribeTerminalRpc,
   SubscribeAgentOutputRpc,
   GetSnapshotRpc,
   ReplayEventsRpc,
+  GetWorkspaceDetailRpc,
   TerminalOpenRpc,
   TerminalWriteRpc,
   TerminalResizeRpc,
   TerminalCloseRpc,
+  StartPlanningRpc,
+  StartAgentRpc,
+  DeepWipeRpc,
+  SendTerminalInputRpc,
+  ResizeTerminalRpc,
 )
 export type PanRpcGroup = typeof PanRpcGroup
