@@ -386,10 +386,12 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       (output) => {
         const dataStr = output.data;
 
-        // Clear the "Connecting" message on first real data
+        // On first real data, clear the "Connecting/Waiting" message.
+        // Use reset() instead of clear() — reset reinitializes the terminal
+        // which properly handles alternate screen buffer TUIs (Claude Code).
         if (!hasReceivedData) {
           hasReceivedData = true;
-          term.clear();
+          term.reset();
         }
 
         // DEBUG: Log incoming data
