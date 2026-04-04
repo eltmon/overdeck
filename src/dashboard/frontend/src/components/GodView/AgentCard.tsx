@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
-import { useGodViewStore } from '../../hooks/useGodViewSocket';
+import { selectGodViewAgentOutput, selectGodViewAgentStatuses } from '../../hooks/useGodViewSocket';
+import { useDashboardStore } from '../../lib/store';
 import type { Agent } from '../../types';
 
 interface AgentCardProps {
@@ -52,8 +53,10 @@ function UptimeCounter({ startedAt }: { startedAt: string }) {
 }
 
 export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: AgentCardProps) {
-  const terminalLines = useGodViewStore((s) => s.agentOutput[agent.id] || []);
-  const liveStatus = useGodViewStore((s) => s.agentStatuses[agent.id] || agent.status);
+  const agentOutput = useDashboardStore(selectGodViewAgentOutput);
+  const agentStatuses = useDashboardStore(selectGodViewAgentStatuses);
+  const terminalLines = agentOutput[agent.id] || [];
+  const liveStatus = agentStatuses[agent.id] || agent.status;
 
   const phaseColor = agent.agentPhase ? PHASE_COLORS[agent.agentPhase] || 'var(--gv-blue)' : 'var(--gv-blue)';
 

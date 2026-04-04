@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { GitCommit, TestTube, AlertTriangle, ArrowRightLeft, Activity } from 'lucide-react';
-import { useGodViewStore } from '../../hooks/useGodViewSocket';
+import { selectGodViewActivityFeed, GodViewActivityEvent } from '../../hooks/useGodViewSocket';
+import { useDashboardStore } from '../../lib/store';
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
   commit: <GitCommit className="w-3 h-3 shrink-0" />,
@@ -26,7 +27,7 @@ function timeAgo(ts: string) {
 }
 
 export function ActivityFeed() {
-  const events = useGodViewStore((s) => s.activityFeed);
+  const events = useDashboardStore(selectGodViewActivityFeed);
 
   return (
     <div className="flex flex-col gap-1 overflow-y-auto flex-1">
@@ -43,7 +44,7 @@ export function ActivityFeed() {
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {events.map((event, i) => {
+            {events.map((event: GodViewActivityEvent, i: number) => {
               const color = EVENT_COLORS[event.type] || EVENT_COLORS.activity;
               const icon = EVENT_ICONS[event.type] || EVENT_ICONS.activity;
               return (
