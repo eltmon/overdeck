@@ -3,17 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "module": "./src/index.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
   "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts",
-      "require": "./src/index.ts"
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
     }
   },
   "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -21,6 +24,8 @@
   },
   "devDependencies": {
     "@effect/language-service": "catalog:",
+    "tsdown": "^0.21.7",
     "typescript": "catalog:"
-  }
+  },
+  "files": ["dist"]
 }
