@@ -102,6 +102,7 @@
       "dependencies": {
         "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
         "@linear/sdk": "^29.0.0",
+        "@panopticon/contracts": "workspace:*",
         "@types/ws": "^8.18.1",
         "cors": "^2.8.5",
         "express": "^4.18.2",
