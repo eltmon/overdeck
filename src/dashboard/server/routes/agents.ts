@@ -73,6 +73,15 @@ import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getGitHubConfig, getLinearApiKey } from '../services/tracker-config.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
+import {
+  getClaudeProjectDir as getClaudeProjectDirShared,
+  getActiveSessionPath as getActiveSessionPathShared,
+  getAgentWorkspace as getAgentWorkspaceShared,
+  getAgentJsonlPath as getAgentJsonlPathShared,
+  getPendingQuestions as getPendingQuestionsShared,
+  getAgentPendingQuestions as getAgentPendingQuestionsShared,
+  type PendingQuestion,
+} from '../../../lib/agent-enrichment.js';
 import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
@@ -165,105 +174,13 @@ async function getGitStatusAsync(workspacePath: string): Promise<{ branch: strin
   }
 }
 
-function getClaudeProjectDir(workspacePath: string): string {
-  const dirName = workspacePath.replace(/^\//, '').replace(/\//g, '-');
-  return join(homedir(), '.claude', 'projects', `-${dirName}`);
-}
-
-function getActiveSessionPath(projectDir: string): string | null {
-  if (!existsSync(projectDir)) return null;
-  try {
-    const files = readdirSync(projectDir)
-      .filter(f => f.endsWith('.jsonl'))
-      .map(f => ({
-        name: f,
-        path: join(projectDir, f),
-        mtime: statSync(join(projectDir, f)).mtime.getTime(),
-      }))
-      .sort((a, b) => b.mtime - a.mtime);
-    return files.length > 0 ? files[0].path : null;
-  } catch {
-    return null;
-  }
-}
-
-async function getAgentWorkspace(agentId: string): Promise<string | null> {
-  const stateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
-  if (existsSync(stateFile)) {
-    try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-      if (state.workspace) return state.workspace;
-    } catch {}
-  }
-  try {
-    const { stdout: paneCwd } = await execAsync(
-      `tmux display-message -t ${agentId} -p '#{pane_current_path}' 2>/dev/null`,
-      { encoding: 'utf-8' }
-    );
-    const trimmed = paneCwd.trim();
-    if (trimmed && existsSync(trimmed)) return trimmed;
-  } catch {}
-  const issueId = agentId.replace(/^(agent-|planning-)/, '').toUpperCase();
-  const prefix = issueId.split('-')[0];
-  try {
-    const projectPath = getProjectPath(undefined, prefix);
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-    if (existsSync(workspacePath)) return workspacePath;
-    return projectPath;
-  } catch {
-    return null;
-  }
-}
-
-async function getAgentJsonlPath(agentId: string): Promise<string | null> {
-  const workspace = await getAgentWorkspace(agentId);
-  if (!workspace) return null;
-  const projectDir = getClaudeProjectDir(workspace);
-  return getActiveSessionPath(projectDir);
-}
-
-interface QuestionOption { label: string; description: string; }
-interface Question { question: string; header: string; options: QuestionOption[]; multiSelect: boolean; }
-interface PendingQuestion { toolId: string; timestamp: string; questions: Question[]; }
-
-async function getPendingQuestions(jsonlPath: string): Promise<PendingQuestion[]> {
-  if (!existsSync(jsonlPath)) return [];
-  try {
-    const content = await readFile(jsonlPath, 'utf-8');
-    const lines = content.split('\n').filter(line => line.trim());
-    const toolCalls = new Map<string, PendingQuestion>();
-    const answeredIds = new Set<string>();
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line);
-        const messageContent = entry.message?.content;
-        if (!Array.isArray(messageContent)) continue;
-        for (const item of messageContent) {
-          if (item.type === 'tool_use' && item.name === 'AskUserQuestion') {
-            toolCalls.set(item.id, {
-              toolId: item.id,
-              timestamp: entry.timestamp || new Date().toISOString(),
-              questions: item.input?.questions || [],
-            });
-          }
-          if (item.type === 'tool_result' && item.tool_use_id) {
-            answeredIds.add(item.tool_use_id);
-          }
-        }
-      } catch {}
-    }
-    return Array.from(toolCalls.entries())
-      .filter(([id]) => !answeredIds.has(id))
-      .map(([, question]) => question);
-  } catch {
-    return [];
-  }
-}
-
-async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
-  const jsonlPath = await getAgentJsonlPath(agentId);
-  if (!jsonlPath) return [];
-  return getPendingQuestions(jsonlPath);
+// Shared enrichment utilities (PAN-440) — aliases for readability
+const getClaudeProjectDir = getClaudeProjectDirShared;
+const getActiveSessionPath = getActiveSessionPathShared;
+const getAgentWorkspace = getAgentWorkspaceShared;
+const getAgentJsonlPath = getAgentJsonlPathShared;
+const getPendingQuestions = getPendingQuestionsShared;
+const getAgentPendingQuestions = getAgentPendingQuestionsShared;
 }
 
 function flyExecCmd(vmName: string, command: string): string {

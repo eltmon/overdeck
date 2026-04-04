@@ -13,7 +13,7 @@
  */
 
 import { listRunningAgents } from '../../../lib/agents.js'
-import { computeAgentEnrichment, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
+import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
 import { getEventStore } from '../event-store.js'
 import type { AgentEnrichmentChangedEvent } from '@panopticon/contracts'
@@ -23,6 +23,8 @@ import type { AgentEnrichmentChangedEvent } from '@panopticon/contracts'
 interface EnrichmentServiceState {
   timer: ReturnType<typeof setInterval> | null
   lastEnrichment: Map<string, AgentEnrichment>
+  /** Last known JSONL file mtime per agent — skip re-scan if unchanged */
+  lastMtime: Map<string, number | null>
 }
 
 // ─── Diff helpers ─────────────────────────────────────────────────────────────
@@ -64,9 +66,17 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           reviewStatus?.mergeStatus === 'merging'
       }
 
+      // Skip JSONL scan if file mtime is unchanged (avoids I/O on static sessions)
+      const currentMtime = await getAgentJsonlMtime(agentId)
+      const prevMtime = state.lastMtime.get(agentId)
+      const jsonlUnchanged = prevMtime !== undefined && currentMtime === prevMtime
+      state.lastMtime.set(agentId, currentMtime)
+
       let enrichment: AgentEnrichment
       try {
-        enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist)
+        // If JSONL hasn't changed, only re-check runtime state (resolution/phase)
+        // by passing a flag that skips the expensive JSONL scan.
+        enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, jsonlUnchanged)
       } catch {
         return
       }
@@ -99,11 +109,12 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
     }),
   )
 
-  // Clean up stale enrichment entries for agents that have stopped
+  // Clean up stale entries for agents that have stopped
   const activeIds = new Set(runningAgents.map(a => a.id))
   for (const id of state.lastEnrichment.keys()) {
     if (!activeIds.has(id)) {
       state.lastEnrichment.delete(id)
+      state.lastMtime.delete(id)
     }
   }
 }
@@ -115,6 +126,7 @@ const POLL_INTERVAL_MS = 3_000
 const serviceState: EnrichmentServiceState = {
   timer: null,
   lastEnrichment: new Map(),
+  lastMtime: new Map(),
 }
 
 export function startAgentEnrichmentService(): void {
@@ -133,4 +145,5 @@ export function stopAgentEnrichmentService(): void {
     serviceState.timer = null
   }
   serviceState.lastEnrichment.clear()
+  serviceState.lastMtime.clear()
 }

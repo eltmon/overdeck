@@ -158,6 +158,21 @@ export async function getAgentPendingQuestions(agentId: string): Promise<Pending
   return getPendingQuestions(jsonlPath)
 }
 
+/**
+ * Get the mtime (ms since epoch) of the agent's active JSONL session file.
+ * Returns null if the file doesn't exist or the path can't be resolved.
+ * Used by AgentEnrichmentService to skip JSONL scans when the file is unchanged.
+ */
+export async function getAgentJsonlMtime(agentId: string): Promise<number | null> {
+  const jsonlPath = await getAgentJsonlPath(agentId)
+  if (!jsonlPath || !existsSync(jsonlPath)) return null
+  try {
+    return statSync(jsonlPath).mtime.getTime()
+  } catch {
+    return null
+  }
+}
+
 // ─── Enrichment computation ───────────────────────────────────────────────────
 
 /**
@@ -166,11 +181,13 @@ export async function getAgentPendingQuestions(agentId: string): Promise<Pending
  * @param agentId - Agent session name (e.g. 'agent-pan-440', 'planning-pan-440')
  * @param startedAt - ISO timestamp when the agent started (filters stale questions)
  * @param hasActiveSpecialist - Whether the agent's issue has an active specialist running
+ * @param skipJsonlScan - Skip JSONL file scan (use when mtime is unchanged); still reads runtime state
  */
 export async function computeAgentEnrichment(
   agentId: string,
   startedAt?: string,
   hasActiveSpecialist?: boolean,
+  skipJsonlScan?: boolean,
 ): Promise<AgentEnrichment> {
   const isPlanning = agentId.startsWith('planning-')
 
@@ -192,13 +209,17 @@ export async function computeAgentEnrichment(
     (runtimeState?.currentTool === 'AskUserQuestion')
 
   // Get pending questions, filtered by agent start time
-  let pendingQuestions = await getAgentPendingQuestions(agentId)
-  if (pendingQuestions.length > 0 && startedAt) {
-    const agentStartTime = new Date(startedAt).getTime()
-    pendingQuestions = pendingQuestions.filter(q => {
-      const qTime = new Date(q.timestamp).getTime()
-      return !isNaN(qTime) && qTime >= agentStartTime
-    })
+  // Skip JSONL scan when mtime is unchanged (optimization for static TUI sessions)
+  let pendingQuestions: PendingQuestion[] = []
+  if (!skipJsonlScan) {
+    pendingQuestions = await getAgentPendingQuestions(agentId)
+    if (pendingQuestions.length > 0 && startedAt) {
+      const agentStartTime = new Date(startedAt).getTime()
+      pendingQuestions = pendingQuestions.filter(q => {
+        const qTime = new Date(q.timestamp).getTime()
+        return !isNaN(qTime) && qTime >= agentStartTime
+      })
+    }
   }
 
   const hasPendingQuestion =
