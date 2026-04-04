@@ -208,7 +208,11 @@ export const TerminalServiceLive = Layer.effect(
       spawnPty(state.sessionName, cols, rows).then((proc) => {
         state.ptyProcess = proc;
 
-        // Suppress initial stale burst ~200ms, then force repaint via dimension toggle.
+        // Stale data suppression: the initial burst from tmux attach is rendered at the
+        // OLD dimensions (80×24 default). We suppress for 200ms, then do a dimension
+        // toggle to force a repaint at the correct size. After the toggle completes,
+        // we forward the repaint data. If no repaint arrives (static TUI), we force
+        // forwarding on anyway so the terminal isn't blank.
         let forwarding = false;
 
         proc.onData((data) => {
@@ -219,7 +223,6 @@ export const TerminalServiceLive = Layer.effect(
         });
 
         setTimeout(() => {
-          forwarding = true;
           // Guard: if the PTY already exited, skip the dimension toggle entirely.
           if (!state.ptyProcess) return;
           // Dimension toggle: cols → cols-1 → cols (two SIGWINCHs, last at correct size).
@@ -227,9 +230,19 @@ export const TerminalServiceLive = Layer.effect(
           execAsync(`tmux resize-window -t ${state.sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
             .then(() => new Promise<void>((r) => setTimeout(r, 50)))
             .then(() => {
-              if (!state.ptyProcess) return; // PTY may have died during the wait
+              if (!state.ptyProcess) return;
+              // Enable forwarding BEFORE the final resize so the repaint data gets through
+              forwarding = true;
               try { proc.resize(cols, rows); } catch { return; /* PTY dead */ }
               return execAsync(`tmux resize-window -t ${state.sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
+            })
+            .then(() => {
+              // Safety net: if no data arrived after the toggle (static TUI),
+              // force a tmux refresh to push current screen content
+              setTimeout(() => {
+                if (!state.ptyProcess) return;
+                execAsync(`tmux refresh-client -t ${state.sessionName} 2>/dev/null || true`).catch(() => {});
+              }, 100);
             })
             .catch(() => {/* ignore resize errors */});
         }, 200);
