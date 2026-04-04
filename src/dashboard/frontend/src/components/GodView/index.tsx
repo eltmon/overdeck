@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence } from 'framer-motion';
 import './theme.css';
 
@@ -17,8 +18,13 @@ import { AgentGrid } from './AgentGrid';
 import { GodViewSidebar } from './Sidebar';
 import { AgentFocusView } from './FocusView';
 import { useGodViewSocket } from '../../hooks/useGodViewSocket';
-import { useDashboardStore, selectAgentList } from '../../lib/store';
 import type { Agent } from '../../types';
+
+async function fetchAgents(): Promise<Agent[]> {
+  const res = await fetch('/api/agents');
+  if (!res.ok) throw new Error('Failed to fetch agents');
+  return res.json();
+}
 
 export function GodViewPage() {
   const [focusedAgentId, setFocusedAgentId] = useState<string | null>(null);
@@ -26,8 +32,12 @@ export function GodViewPage() {
   // Connect to God View socket events
   useGodViewSocket();
 
-  // Agents from Zustand store (event-sourced — no polling)
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  // Fetch agents (5s poll)
+  const { data: agents = [] } = useQuery({
+    queryKey: ['agents'],
+    queryFn: fetchAgents,
+    refetchInterval: 5000,
+  });
 
   const focusedAgent = focusedAgentId ? agents.find((a) => a.id === focusedAgentId) : null;
 

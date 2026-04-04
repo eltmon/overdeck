@@ -29,7 +29,7 @@ export function TerminalView({ agentId }: TerminalViewProps) {
   const { data: output, isLoading, refetch } = useQuery({
     queryKey: ['agent-output', agentId],
     queryFn: () => fetchOutput(agentId),
-    refetchInterval: 30000,
+    refetchInterval: 2000,
   });
 
   const sendMutation = useMutation({
