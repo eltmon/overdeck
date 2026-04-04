@@ -370,12 +370,8 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     const unsubscribe = getTransport().subscribe(
       (client) => {
-        // Show reconnecting message on retry (not first connect)
         if (hasReceivedData) {
           term.writeln('\r\n\x1b[33m● Connection lost. Reconnecting...\x1b[0m');
-        } else if (!hasReceivedData) {
-          // Still waiting for first data — update status
-          term.write('\r\x1b[2K\x1b[33m● Waiting for session to start...\x1b[0m');
         }
         return client[WS_METHODS.subscribeTerminal]({
           sessionName,
@@ -386,12 +382,8 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       (output) => {
         const dataStr = output.data;
 
-        // On first real data, clear the "Connecting/Waiting" message.
-        // Use reset() instead of clear() — reset reinitializes the terminal
-        // which properly handles alternate screen buffer TUIs (Claude Code).
         if (!hasReceivedData) {
           hasReceivedData = true;
-          term.reset();
         }
 
         // DEBUG: Log incoming data
