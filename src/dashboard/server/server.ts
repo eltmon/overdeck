@@ -15,7 +15,8 @@ import { jsonResponse } from "./http-helpers.js";
 import { Effect, FileSystem, Layer, Option, Path } from 'effect';
 import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { ServerConfig } from './config.js';
-import { EventStoreServiceLive, SnapshotServiceLive } from './services/domain-services.js';
+import { EventStoreServiceLive } from './services/domain-services.js';
+import { ReadModelServiceLive } from './read-model.js';
 import { TerminalServiceLive } from './services/terminal-service.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
@@ -186,11 +187,13 @@ export const makeRoutesLayer = Layer.mergeAll(
   staticRouteLayer,
 );
 
-// ─── Domain service layers ────────────────────────────────────────────────────
+// ─── Domain service layers (PAN-433: ReadModel replaces SnapshotService) ─────
+// ReadModelServiceLive bootstraps during construction (reads lib modules, JSON-cleans).
+// EventStoreServiceLive depends on ReadModelService (wires event subscription → read model).
 
 const DomainServicesLive = Layer.mergeAll(
-  EventStoreServiceLive,
-  SnapshotServiceLive.pipe(Layer.provide(EventStoreServiceLive)),
+  ReadModelServiceLive,
+  EventStoreServiceLive.pipe(Layer.provide(ReadModelServiceLive)),
   TerminalServiceLive,
 );
 

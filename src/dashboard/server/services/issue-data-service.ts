@@ -99,6 +99,12 @@ export class IssueDataService {
   private linearLastFullRefresh = 0;
   private started = false;
   private shadowStateModule: any = null;
+  private _onIssuesChanged: ((issues: unknown[]) => void) | null = null;
+
+  /** Register a callback invoked whenever issue data changes (PAN-433). */
+  onIssuesChanged(fn: (issues: unknown[]) => void): void {
+    this._onIssuesChanged = fn;
+  }
 
   constructor(io: SocketIOServer, cache: CacheService) {
     this.io = io;
@@ -417,11 +423,13 @@ export class IssueDataService {
   private pushSnapshot(): void {
     const issues = this.getIssues();
     this.io.emit('issues:snapshot', issues);
+    this._onIssuesChanged?.(issues);
   }
 
   private pushUpdated(): void {
     const issues = this.getIssues();
     this.io.emit('issues:updated', issues);
+    this._onIssuesChanged?.(issues);
   }
 
   /**

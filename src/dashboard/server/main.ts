@@ -13,7 +13,7 @@ import { startSharedIssueService } from './services/issue-service-singleton.js';
 declare const Bun: unknown;
 
 // Start the shared IssueDataService before the server
-// This ensures issue data is available when routes start handling requests
+// This ensures issue data is available when the read model bootstraps
 await startSharedIssueService();
 console.log('[panopticon] IssueDataService started');
 

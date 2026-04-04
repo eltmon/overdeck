@@ -11,25 +11,46 @@ export type AgentId = typeof AgentId.Type
 export const SequenceNumber = Schema.Number
 export type SequenceNumber = typeof SequenceNumber.Type
 
+// ─── Strict literal types (PAN-433) ──────────────────────────────────────────
+// Safe because the read model only contains values from typed events or
+// explicitly cleaned bootstrap data.
+
+export const AgentStatus = Schema.Literals(["starting", "running", "stopped", "error", "unknown"])
+export type AgentStatus = typeof AgentStatus.Type
+
+export const AgentPhase = Schema.Literals(["exploration", "implementation", "testing", "documentation", "pre_push", "post_push"])
+export type AgentPhase = typeof AgentPhase.Type
+
+export const SpecialistType = Schema.Literals(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"])
+export type SpecialistType = typeof SpecialistType.Type
+
+export const SpecialistState = Schema.Literals(["active", "sleeping", "uninitialized"])
+export type SpecialistState = typeof SpecialistState.Type
+
+export const ReviewStatusValue = Schema.Literals(["pending", "reviewing", "passed", "failed", "blocked"])
+export type ReviewStatusValue = typeof ReviewStatusValue.Type
+
+export const TestStatusValue = Schema.Literals(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"])
+export type TestStatusValue = typeof TestStatusValue.Type
+
+export const MergeStatusValue = Schema.Literals(["pending", "merging", "merged", "failed"])
+export type MergeStatusValue = typeof MergeStatusValue.Type
+
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
-// Use Schema.String for status/phase/state fields — the existing codebase has
-// many status values that evolved over time. Strict literals cause the snapshot
-// to fail validation when any agent has an unexpected value. We can tighten
-// these once the Effect server is the sole data source.
 export const AgentSnapshot = Schema.Struct({
   id: AgentId,
   issueId: IssueId,
   workspace: Schema.optional(Schema.String),
   runtime: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
-  status: Schema.String,
+  status: AgentStatus,
   startedAt: Schema.optional(Schema.String),
   lastActivity: Schema.optional(Schema.String),
   branch: Schema.optional(Schema.String),
   costSoFar: Schema.optional(Schema.Number),
   sessionId: Schema.optional(Schema.String),
-  phase: Schema.optional(Schema.String),
+  phase: Schema.optional(AgentPhase),
   runtimeState: Schema.optional(Schema.String),
 })
 export type AgentSnapshot = typeof AgentSnapshot.Type
@@ -37,8 +58,8 @@ export type AgentSnapshot = typeof AgentSnapshot.Type
 // ─── Specialist ───────────────────────────────────────────────────────────────
 
 export const SpecialistSnapshot = Schema.Struct({
-  name: Schema.String,
-  state: Schema.String,
+  name: SpecialistType,
+  state: SpecialistState,
   isRunning: Schema.Boolean,
   currentIssue: Schema.optional(Schema.String),
   lastWake: Schema.optional(Schema.String),
@@ -49,9 +70,9 @@ export type SpecialistSnapshot = typeof SpecialistSnapshot.Type
 
 export const ReviewStatusSnapshot = Schema.Struct({
   issueId: IssueId,
-  reviewStatus: Schema.optional(Schema.String),
-  testStatus: Schema.optional(Schema.String),
-  mergeStatus: Schema.optional(Schema.String),
+  reviewStatus: Schema.optional(ReviewStatusValue),
+  testStatus: Schema.optional(TestStatusValue),
+  mergeStatus: Schema.optional(MergeStatusValue),
   readyForMerge: Schema.optional(Schema.Boolean),
   updatedAt: Schema.optional(Schema.String),
   prUrl: Schema.optional(Schema.String),
@@ -82,28 +103,7 @@ export const WorkspaceDetail = Schema.Struct({
 })
 export type WorkspaceDetail = typeof WorkspaceDetail.Type
 
-// ─── Backward-compatible exports (used by events.ts) ─────────────────────────
-
-export const AgentStatus = Schema.String
-export type AgentStatus = string
-
-export const AgentPhase = Schema.String  
-export type AgentPhase = string
-
-export const SpecialistType = Schema.String
-export type SpecialistType = string
-
-export const SpecialistState = Schema.String
-export type SpecialistState = string
-
-export const ReviewStatusValue = Schema.String
-export type ReviewStatusValue = string
-
-export const TestStatusValue = Schema.String
-export type TestStatusValue = string
-
-export const MergeStatusValue = Schema.String
-export type MergeStatusValue = string
+// ─── Resource Stats ──────────────────────────────────────────────────────────
 
 export const ResourceStats = Schema.Struct({
   containers: Schema.Array(Schema.Struct({

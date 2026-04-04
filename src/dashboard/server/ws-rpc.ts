@@ -10,7 +10,8 @@ import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panopticon/contracts';
-import { EventStoreService, SnapshotService } from './services/domain-services.js';
+import { EventStoreService } from './services/domain-services.js';
+import { ReadModelService } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import type { DomainEvent } from '@panopticon/contracts';
 import type { StoredEvent } from './event-store.js';
@@ -31,7 +32,7 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
 const PanRpcLayer = PanRpcGroup.toLayer(
   Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
-    const snapshotService = yield* SnapshotService;
+    const readModel = yield* ReadModelService;
     const terminalService = yield* TerminalService;
 
     return PanRpcGroup.of({
@@ -61,9 +62,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           }),
         ),
 
-      // ── getSnapshot ──────────────────────────────────────────────────────────
+      // ── getSnapshot — returns clean read model data (PAN-433) ─────────────────
       [WS_METHODS.getSnapshot]: (_input) =>
-        snapshotService.getSnapshot.pipe(
+        readModel.getSnapshot.pipe(
           Effect.mapError(
             (cause) =>
               new PanRpcError({
