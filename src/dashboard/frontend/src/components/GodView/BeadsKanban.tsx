@@ -21,7 +21,7 @@ export function BeadsKanban({ agentId }: BeadsKanbanProps) {
       if (!res.ok) return null;
       return res.json();
     },
-    refetchInterval: 10000,
+    refetchInterval: 30000,
     enabled: !!agentId,
   });
 

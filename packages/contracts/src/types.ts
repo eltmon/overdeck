@@ -132,3 +132,25 @@ export const DashboardSnapshot = Schema.Struct({
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type
+
+// ─── WorkspaceDetail ──────────────────────────────────────────────────────────
+
+/** Batched response for the detail panel — replaces 5 separate HTTP calls */
+export const WorkspaceDetail = Schema.Struct({
+  issueId: IssueId,
+  /** Local filesystem path to workspace */
+  workspacePath: Schema.optional(Schema.String),
+  /** Git branch */
+  branch: Schema.optional(Schema.String),
+  /** Review / pipeline status */
+  reviewStatus: Schema.optional(ReviewStatusSnapshot),
+  /** Active agent for this issue (if any) */
+  agent: Schema.optional(AgentSnapshot),
+  /** Planning state (if in planning phase) */
+  planningStatus: Schema.optional(Schema.String),
+  /** Aggregated cost in USD */
+  totalCostUsd: Schema.optional(Schema.Number),
+  /** Recent agent output lines */
+  recentOutput: Schema.optional(Schema.Array(Schema.String)),
+})
+export type WorkspaceDetail = typeof WorkspaceDetail.Type
