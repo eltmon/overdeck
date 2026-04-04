@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDashboardStore, selectAgentList, selectSpecialistList } from '../lib/store';
 import {
   DndContext,
   DragOverlay,
@@ -140,19 +141,6 @@ async function fetchIssues(cycle: string = 'current', includeCompleted: boolean 
   const res = await fetch(`/api/issues?${params}`);
   if (!res.ok) throw new Error('Failed to fetch issues');
   return res.json();
-}
-
-async function fetchAgents(): Promise<Agent[]> {
-  const res = await fetch('/api/agents');
-  if (!res.ok) throw new Error('Failed to fetch agents');
-  return res.json();
-}
-
-async function fetchSpecialists(): Promise<SpecialistAgent[]> {
-  const res = await fetch('/api/specialists');
-  if (!res.ok) throw new Error('Failed to fetch specialists');
-  const data = await res.json();
-  return data.specialists ?? data;
 }
 
 function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<string, Issue[]> {
@@ -779,17 +767,9 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     queryFn: () => fetchIssues(cycleFilter, includeCompleted),
   });
 
-  const { data: agents = [] } = useQuery({
-    queryKey: ['agents'],
-    queryFn: fetchAgents,
-    refetchInterval: 5000, // Refresh every 5 seconds
-  });
-
-  const { data: specialists = [] } = useQuery({
-    queryKey: ['specialists'],
-    queryFn: fetchSpecialists,
-    refetchInterval: 5000, // Refresh every 5 seconds
-  });
+  // Agents and specialists from Zustand store (event-sourced — no polling)
+  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
 
   // DnD sensors
   const sensors = useSensors(

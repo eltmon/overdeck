@@ -10,6 +10,7 @@ import { ActivityPanel } from './components/ActivityPanel';
 import { ConvoyPanel } from './components/ConvoyPanel';
 import { HandoffsPage } from './components/HandoffsPage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
+import { EventRouter } from './components/EventRouter';
 import { MetricsSummaryRow } from './components/MetricsSummaryRow';
 import { MetricsPage } from './components/MetricsPage';
 import { CostsPage } from './components/CostsPage';
@@ -23,6 +24,7 @@ import { DetailPanelLayout } from './components/DetailPanelLayout';
 import { AlertTriangle } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useSocketIssues } from './hooks/useSocketIssues';
+import { useDashboardStore, selectAgentList } from './lib/store';
 
 interface TrackerStatusItem {
   type: string;
@@ -61,12 +63,6 @@ const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   return PATH_TO_TAB[path] || 'kanban';
-}
-
-async function fetchAgents(): Promise<Agent[]> {
-  const res = await fetch('/api/agents');
-  if (!res.ok) throw new Error('Failed to fetch agents');
-  return res.json();
 }
 
 async function fetchIssues(): Promise<Issue[]> {
@@ -135,12 +131,9 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  // Fetch agents to find if selected issue has an agent
-  const { data: agents = [] } = useQuery({
-    queryKey: ['agents'],
-    queryFn: fetchAgents,
-    refetchInterval: 5000,
-  });
+  // Agents from Zustand store (event-sourced — no polling)
+  // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
+  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
   // Fetch issues to get issue URLs
   const { data: issues = [] } = useQuery({
@@ -246,6 +239,8 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden transition-colors duration-150" style={{ backgroundColor: '#101622' }}>
+      {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
+      <EventRouter />
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
