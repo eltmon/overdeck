@@ -241,17 +241,78 @@ If PRDs are found:
 - Include their paths in the planning prompt so the agent reads them
 - Tell the agent to add them to `plan.references`
 
+### Step 9: vBRIEF Viewer in Dashboard
+
+Add a "vBRIEF" button to issue cards (alongside the existing "Beads Tasks" button) that opens a rich viewer for the plan.
+
+**UI: VBriefViewer component**
+
+A panel/dialog that renders the full vBRIEF plan with:
+
+- **Header** — plan title, status badge (color-coded), uid, author, created/updated timestamps
+- **Narratives** — rendered as markdown sections (Problem, Proposal, Constraint, Risk, etc.)
+- **References** — clickable links to PRDs, GitHub issues, specs
+- **Items** — expandable cards for each task:
+  - Title, status badge, difficulty badge, priority badge
+  - Narrative (Action) rendered as markdown
+  - Acceptance criteria (subItems) as a checklist with status indicators
+  - Created/completed timestamps
+  - Dependencies (edges visualized or listed)
+- **DAG view toggle** — switch between list view and the existing PlanDAG graph
+- **Metadata** — sequence number, author, issueLabel
+- **Raw JSON toggle** — collapsible raw JSON view for debugging
+
+**Where it appears:**
+- Issue card action button: "vBRIEF" (next to "Beads Tasks")
+- Inspector panel: new tab alongside existing tabs
+- Plan dialog: accessible from the Tasks panel
+
+**API endpoint:**
+Already exists: `GET /api/workspaces/:issueId/plan` returns the vBRIEF JSON. The viewer just needs to render it nicely.
+
+**Key dependencies:**
+- `react-markdown` + `remark-gfm` — already being added for PAN-451 (conversation view)
+- Existing `PlanDAG` component for the graph toggle
+- Existing Tailwind styling patterns
+
+**Component structure:**
+```
+VBriefViewer
+├── VBriefHeader (title, status, uid, author, timestamps)
+├── VBriefNarratives (markdown-rendered narrative sections)
+├── VBriefReferences (clickable link list)
+├── ViewToggle: [List] [DAG]
+├── VBriefItemList (expandable item cards)
+│   └── VBriefItemCard
+│       ├── Status/difficulty/priority badges
+│       ├── Narrative (markdown)
+│       ├── AcceptanceCriteriaChecklist
+│       └── Dependencies (edge list)
+└── RawJsonToggle (collapsible JSON view)
+```
+
 ## Files Changed
 
 | File | Action |
 |------|--------|
+| **Spec fields** | |
 | `src/lib/vbrief/types.ts` | Add `uid`, `author`, `sequence`, `references`, `created`, `updated`, `completed`, `priority` |
 | `src/lib/vbrief/io.ts` | Update `updateItemStatus`/`updateSubItemStatus` to set timestamps + sequence |
 | `src/lib/vbrief/beads.ts` | Update `syncBeadStatusToVBrief` to set `completed` timestamp + sequence |
 | `src/lib/planning/spawn-planning-session.ts` | Update prompt template with all new fields + PRD discovery |
+| **Artifact hardening** | |
 | `src/dashboard/server/routes/issues.ts` | `complete-planning`: auto-copy STATE.md + vbrief to docs/prds/active/ |
 | `src/dashboard/server/routes/issues.ts` | `start-planning`: copy existing PRDs into workspace .planning/ |
+| **Documentation** | |
 | `docs/VBRIEF.md` | Document new fields |
+| `CLAUDE.md` | Add vBRIEF section with spec references |
+| **Dashboard viewer** | |
+| `src/dashboard/frontend/src/components/vbrief/VBriefViewer.tsx` | CREATE — main viewer component |
+| `src/dashboard/frontend/src/components/vbrief/VBriefHeader.tsx` | CREATE — title, metadata, badges |
+| `src/dashboard/frontend/src/components/vbrief/VBriefNarratives.tsx` | CREATE — markdown narrative sections |
+| `src/dashboard/frontend/src/components/vbrief/VBriefItemCard.tsx` | CREATE — expandable item with AC checklist |
+| `src/dashboard/frontend/src/components/KanbanBoard.tsx` | MODIFY — add "vBRIEF" button to issue cards |
+| `src/dashboard/frontend/src/components/InspectorPanel.tsx` | MODIFY — add vBRIEF tab |
 
 ## Testing
 
@@ -280,6 +341,22 @@ tests/integration/start-planning.test.ts
   - start-planning copies PRD from docs/prds/active/ to workspace .planning/
   - start-planning prompt includes PRD path when found
   - start-planning works when no PRD exists
+
+tests/frontend/VBriefViewer.test.tsx
+  - Renders plan header with title, status badge, uid
+  - Renders author and timestamps
+  - Renders narratives as markdown (Problem, Proposal sections)
+  - Renders references as clickable links
+  - Renders items with expandable cards
+  - Item cards show difficulty and priority badges
+  - Item cards show AC checklist with status indicators
+  - Completed AC shows checkmark, pending shows empty circle
+  - DAG tab renders PlanDAGViewer component (reuses existing)
+  - List/DAG toggle remembers preference in localStorage
+  - Raw JSON toggle shows formatted JSON
+  - "vBRIEF" button appears on kanban issue cards
+  - Clicking "vBRIEF" button opens the viewer
+  - Handles missing plan gracefully (shows "No plan" message)
 ```
 
 ## Notes
