@@ -119,7 +119,8 @@ export class IssueDataService {
   }
 
   /**
-   * Start background polling. Immediately does one full fetch for instant data.
+   * Start background polling. Returns immediately after loading cached data.
+   * API fetches run in the background and push incremental updates.
    */
   async start(): Promise<void> {
     if (this.started) return;
@@ -131,21 +132,24 @@ export class IssueDataService {
     // Load any cached data from SQLite so getIssues() works instantly
     this.loadCachedData();
 
-    // Immediately fetch all trackers (cold start)
-    await Promise.allSettled([
+    // Push snapshot immediately with stale cached data so read model has
+    // something to work with before the background fetches complete.
+    this.pushSnapshot();
+
+    // Kick off all tracker fetches in the background — do NOT await.
+    // Each poll calls pushUpdated() when done → incremental client updates.
+    void Promise.allSettled([
       this.pollGitHub(),
       this.pollLinear(),
       this.pollRally(),
-    ]);
-
-    // Push initial snapshot to any connected clients
-    this.pushSnapshot();
-
-    // Start recurring timers
-    this.scheduleNext('github');
-    this.scheduleNext('linear');
-    this.scheduleNext('rally');
-
+    ]).then(() => {
+      // Final snapshot push after all initial fetches complete
+      this.pushSnapshot();
+      // Start recurring timers (after first fetch completes)
+      this.scheduleNext('github');
+      this.scheduleNext('linear');
+      this.scheduleNext('rally');
+    });
   }
 
   /**
