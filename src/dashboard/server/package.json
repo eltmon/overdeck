@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run main.ts",
     "start": "node dist/index.js",
-    "build": "node esbuild.config.mjs"
+    "build": "tsdown"
   },
   "dependencies": {
     "@panopticon/contracts": "workspace:*",
@@ -22,7 +22,7 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "@types/node": "^20.10.0",
-    "esbuild": "^0.20.0",
+    "tsdown": "^0.21.7",
     "tsx": "^4.7.0",
     "typescript": "catalog:"
   }
