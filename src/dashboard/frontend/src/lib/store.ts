@@ -54,11 +54,11 @@ function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): Dashb
 }
 
 function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
-  return { ...applyEventShared(state, event), bootstrapComplete: state.bootstrapComplete }
+  return { ...applyEventShared(state, event), bootstrapComplete: state.bootstrapComplete, snapshotTimestamp: state.snapshotTimestamp }
 }
 
 function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardState {
-  return { ...applyEventsShared(state, events), bootstrapComplete: state.bootstrapComplete }
+  return { ...applyEventsShared(state, events), bootstrapComplete: state.bootstrapComplete, snapshotTimestamp: state.snapshotTimestamp }
 }
 
 // ─── Zustand store ────────────────────────────────────────────────────────────
