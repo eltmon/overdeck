@@ -14,7 +14,8 @@ import { useEffect, useRef } from 'react'
 import { useDashboardStore } from '../lib/store'
 import { createRecoveryCoordinator, type RecoveryCoordinator } from '../lib/recoveryCoordinator'
 import { getTransport, type PanRpcProtocolClient } from '../lib/wsTransport'
-import type { DomainEvent } from '@panopticon/contracts'
+import type { DomainEvent, DashboardSnapshot } from '@panopticon/contracts'
+import { WS_METHODS } from '@panopticon/contracts'
 import { Stream } from 'effect'
 
 // ─── EventRouter component ────────────────────────────────────────────────────
@@ -36,8 +37,8 @@ export function EventRouter() {
       coordinator.beginSnapshotRecovery('bootstrap')
       try {
         const snapshot = await transport.request((client) =>
-          (client as PanRpcProtocolClient).getSnapshot({}),
-        )
+          (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
+        ) as DashboardSnapshot
         syncSnapshot(snapshot)
         const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
         if (needsReplay) {
@@ -56,7 +57,7 @@ export function EventRouter() {
       coordinator.beginReplayRecovery()
       try {
         const events = await transport.request((client) =>
-          (client as PanRpcProtocolClient).replayEvents({ fromSequence }),
+          (client as PanRpcProtocolClient)[WS_METHODS.replayEvents]({ fromSequence }),
         )
         const typed = events as DomainEvent[]
         if (typed.length > 0) {
@@ -106,9 +107,7 @@ export function EventRouter() {
     // ── Subscribe to domain events ────────────────────────────────────────────
     const unsubscribe = transport.subscribe(
       (client) =>
-        (client as PanRpcProtocolClient).subscribeDomainEvents({}) as unknown as ReturnType<
-          typeof Stream.make<DomainEvent, Error>
-        >,
+        (client as PanRpcProtocolClient)[WS_METHODS.subscribeDomainEvents]({}) as unknown as Stream.Stream<DomainEvent, Error>,
       (event) => handleEvent(event as DomainEvent),
     )
 

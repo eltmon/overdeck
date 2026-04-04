@@ -42,7 +42,7 @@ function createPanRpcProtocolLayer(url?: string) {
 // ─── WsTransport ─────────────────────────────────────────────────────────────
 
 interface SubscribeOptions {
-  readonly retryDelay?: Duration.DurationInput
+  readonly retryDelay?: Duration.Input
 }
 
 const DEFAULT_RETRY_DELAY = Duration.millis(250)
@@ -130,10 +130,12 @@ export class WsTransport {
         Effect.retry(Schedule.fixed(retryDelay)),
         Effect.forever,
       ),
-      (exit) => {
-        if (active && Exit.isFailure(exit)) {
-          console.warn('[WsTransport] subscription exited unexpectedly')
-        }
+      {
+        onExit: (exit) => {
+          if (active && Exit.isFailure(exit)) {
+            console.warn('[WsTransport] subscription exited unexpectedly')
+          }
+        },
       },
     )
 
@@ -145,7 +147,7 @@ export class WsTransport {
 
   dispose(): void {
     this.disposed = true
-    this.runtime.runSync(Scope.close(this.clientScope, Exit.unit))
+    this.runtime.runSync(Scope.close(this.clientScope, Exit.void))
   }
 }
 

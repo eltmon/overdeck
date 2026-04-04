@@ -241,7 +241,7 @@ function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     default: {
-      const _exhaustive: never = event
+      void (event as never)
       return state
     }
   }
