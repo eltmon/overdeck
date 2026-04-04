@@ -232,7 +232,29 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         },
       }
 
-    case 'planning.started':
+    case 'planning.started': {
+      const sessionName = event.payload.sessionName as string
+      const issueId = event.payload.issueId as string
+      if (sessionName) {
+        return {
+          ...state,
+          sequence: Math.max(state.sequence, event.sequence),
+          agentsById: {
+            ...state.agentsById,
+            [sessionName]: {
+              ...state.agentsById[sessionName],
+              id: sessionName,
+              issueId,
+              status: 'running',
+              startedAt: event.timestamp,
+              runtime: 'claude',
+              agentPhase: 'planning' as const,
+            },
+          },
+        }
+      }
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+    }
     case 'planning.failed':
     case 'planning.sync':
     case 'plan.item_status_changed':
