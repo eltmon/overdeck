@@ -10,7 +10,7 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -72,7 +72,7 @@ async function spawnConversationSession(
   issueId?: string,
 ): Promise<void> {
   const stateDir = join(homedir(), '.panopticon', 'conversations', tmuxSession);
-  mkdirSync(stateDir, { recursive: true });
+  await mkdir(stateDir, { recursive: true });
 
   const launcherScript = join(stateDir, 'launcher.sh');
   const envExports = [
@@ -83,7 +83,7 @@ async function spawnConversationSession(
     ...(issueId ? [`export PANOPTICON_ISSUE_ID="${issueId}"`] : []),
   ].join('\n');
 
-  writeFileSync(launcherScript, `#!/bin/bash
+  await writeFile(launcherScript, `#!/bin/bash
 ${envExports}
 cd "${cwd}"
 trap '' HUP
