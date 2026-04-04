@@ -1,0 +1,250 @@
+/**
+ * Unit tests for the DashboardStore event reducers and selectors (PAN-428 B4)
+ */
+
+import { describe, it, expect } from 'vitest'
+import {
+  syncSnapshotReducer,
+  applyEventReducer,
+  applyEventsReducer,
+  selectAgentList,
+  selectAgentById,
+  selectSpecialistList,
+  selectReviewStatus,
+  selectAgentOutput,
+  selectIsBootstrapped,
+  selectResources,
+  type DashboardState,
+} from '../lib/store'
+import type {
+  AgentSnapshot,
+  DashboardSnapshot,
+  DomainEvent,
+  SpecialistSnapshot,
+} from '@panopticon/contracts'
+
+// ─── Test fixtures ────────────────────────────────────────────────────────────
+
+const baseAgent: AgentSnapshot = {
+  id: 'agent-1',
+  issueId: 'PAN-1',
+  workspace: '/ws/1',
+  runtime: 'claude-code',
+  model: 'claude-sonnet-4',
+  status: 'running',
+  startedAt: '2026-01-01T00:00:00Z',
+}
+
+const baseSpec: SpecialistSnapshot = {
+  name: 'review-agent',
+  state: 'active',
+  isRunning: true,
+}
+
+const emptyState: DashboardState = {
+  bootstrapComplete: false,
+  sequence: 0,
+  agentsById: {},
+  specialistsByName: {},
+  reviewStatusByIssueId: {},
+  resources: null,
+  agentOutputById: {},
+  issuesRaw: [],
+  recentActivity: [],
+  shadowInferenceByIssueId: {},
+}
+
+function makeSnapshot(seq = 5): DashboardSnapshot {
+  return {
+    sequence: seq,
+    agents: [baseAgent],
+    specialists: [baseSpec],
+    reviewStatuses: [],
+    timestamp: '2026-01-01T00:00:00Z',
+  }
+}
+
+function makeEvent(type: DomainEvent['type'], seq: number, payload: Record<string, unknown> = {}): DomainEvent {
+  return { type, sequence: seq, timestamp: new Date().toISOString(), payload } as DomainEvent
+}
+
+// ─── syncSnapshotReducer ──────────────────────────────────────────────────────
+
+describe('syncSnapshotReducer', () => {
+  it('sets bootstrapComplete and populates state from snapshot', () => {
+    const next = syncSnapshotReducer(emptyState, makeSnapshot(10))
+    expect(next.bootstrapComplete).toBe(true)
+    expect(next.sequence).toBe(10)
+    expect(Object.keys(next.agentsById)).toHaveLength(1)
+    expect(next.agentsById['agent-1']).toEqual(baseAgent)
+    expect(next.specialistsByName['review-agent']).toEqual(baseSpec)
+  })
+})
+
+// ─── Agent event reducers ─────────────────────────────────────────────────────
+
+describe('applyEventReducer — agent events', () => {
+  it('agent.created adds agent to store', () => {
+    const event = makeEvent('agent.created', 1, { agentId: 'agent-1', issueId: 'PAN-1', agent: baseAgent })
+    const next = applyEventReducer(emptyState, event)
+    expect(next.agentsById['agent-1']).toEqual(baseAgent)
+    expect(next.sequence).toBe(1)
+  })
+
+  it('agent.started adds agent to store', () => {
+    const event = makeEvent('agent.started', 2, { agentId: 'agent-1', issueId: 'PAN-1', agent: baseAgent })
+    const next = applyEventReducer(emptyState, event)
+    expect(next.agentsById['agent-1']).toEqual(baseAgent)
+  })
+
+  it('agent.stopped removes agent from store', () => {
+    const state: DashboardState = { ...emptyState, agentsById: { 'agent-1': baseAgent } }
+    const event = makeEvent('agent.stopped', 3, { agentId: 'agent-1', issueId: 'PAN-1' })
+    const next = applyEventReducer(state, event)
+    expect(next.agentsById['agent-1']).toBeUndefined()
+    expect(Object.keys(next.agentsById)).toHaveLength(0)
+  })
+
+  it('agent.status_changed updates agent status', () => {
+    const state: DashboardState = { ...emptyState, agentsById: { 'agent-1': baseAgent } }
+    const event = makeEvent('agent.status_changed', 4, { agentId: 'agent-1', status: 'stopped' })
+    const next = applyEventReducer(state, event)
+    expect(next.agentsById['agent-1']!.status).toBe('stopped')
+  })
+
+  it('agent.status_changed is a no-op if agent not found', () => {
+    const event = makeEvent('agent.status_changed', 5, { agentId: 'unknown', status: 'stopped' })
+    const next = applyEventReducer(emptyState, event)
+    expect(next).toBe(emptyState)
+  })
+
+  it('agent.output_received appends lines and caps at 200', () => {
+    const state: DashboardState = {
+      ...emptyState,
+      agentOutputById: { 'agent-1': ['existing line'] },
+    }
+    const event = makeEvent('agent.output_received', 6, {
+      agentId: 'agent-1',
+      lines: ['line 1', 'line 2'],
+    })
+    const next = applyEventReducer(state, event)
+    expect(next.agentOutputById['agent-1']).toEqual(['existing line', 'line 1', 'line 2'])
+  })
+
+  it('agent.output_received caps at 200 lines', () => {
+    const bigOutput = Array.from({ length: 199 }, (_, i) => `line ${i}`)
+    const state: DashboardState = { ...emptyState, agentOutputById: { 'a1': bigOutput } }
+    const event = makeEvent('agent.output_received', 7, { agentId: 'a1', lines: ['x', 'y'] })
+    const next = applyEventReducer(state, event)
+    expect(next.agentOutputById['a1']!.length).toBe(200)
+  })
+})
+
+// ─── Pipeline / review reducers ───────────────────────────────────────────────
+
+describe('applyEventReducer — review/pipeline events', () => {
+  it('pipeline.status_changed updates review status', () => {
+    const status = {
+      issueId: 'PAN-1',
+      reviewStatus: 'passed' as const,
+      testStatus: 'pending' as const,
+      readyForMerge: false,
+      updatedAt: '2026-01-01T00:00:00Z',
+    }
+    const event = makeEvent('pipeline.status_changed', 8, { issueId: 'PAN-1', status })
+    const next = applyEventReducer(emptyState, event)
+    expect(next.reviewStatusByIssueId['PAN-1']).toEqual(status)
+  })
+})
+
+// ─── Resource / activity reducers ─────────────────────────────────────────────
+
+describe('applyEventReducer — resources and activity', () => {
+  it('resources.updated sets resource stats', () => {
+    const resources = { containers: 3, networks: 2 }
+    const event = makeEvent('resources.updated', 9, { resources })
+    const next = applyEventReducer(emptyState, event)
+    expect(next.resources).toEqual(resources)
+  })
+
+  it('shadow.inference_update stores content per issue', () => {
+    const event = makeEvent('shadow.inference_update', 10, {
+      issueId: 'PAN-42',
+      content: 'Agent is working on...',
+    })
+    const next = applyEventReducer(emptyState, event)
+    expect(next.shadowInferenceByIssueId['PAN-42']).toBe('Agent is working on...')
+  })
+})
+
+// ─── applyEventsReducer ───────────────────────────────────────────────────────
+
+describe('applyEventsReducer', () => {
+  it('applies a batch of events in order', () => {
+    const events: DomainEvent[] = [
+      makeEvent('agent.created', 1, { agentId: 'a1', issueId: 'PAN-1', agent: baseAgent }),
+      makeEvent('agent.stopped', 2, { agentId: 'a1', issueId: 'PAN-1' }),
+    ]
+    const next = applyEventsReducer(emptyState, events)
+    expect(next.agentsById['a1']).toBeUndefined()
+    expect(next.sequence).toBe(2)
+  })
+
+  it('sequence is set to maximum seen across events', () => {
+    const events: DomainEvent[] = [
+      makeEvent('agent.created', 5, { agentId: 'a1', issueId: 'PAN-1', agent: baseAgent }),
+      makeEvent('agent.stopped', 7, { agentId: 'a1', issueId: 'PAN-1' }),
+    ]
+    const next = applyEventsReducer(emptyState, events)
+    expect(next.sequence).toBe(7)
+  })
+})
+
+// ─── Selectors ────────────────────────────────────────────────────────────────
+
+describe('selectors', () => {
+  const state: DashboardState = {
+    ...emptyState,
+    bootstrapComplete: true,
+    agentsById: { 'a1': baseAgent },
+    specialistsByName: { 'review-agent': baseSpec },
+    agentOutputById: { 'a1': ['line 1', 'line 2'] },
+    resources: { containers: 5, networks: 3 },
+  }
+
+  it('selectAgentList returns array of agents', () => {
+    expect(selectAgentList(state)).toEqual([baseAgent])
+  })
+
+  it('selectAgentById returns agent for known id', () => {
+    expect(selectAgentById('a1')(state)).toEqual(baseAgent)
+  })
+
+  it('selectAgentById returns undefined for unknown id', () => {
+    expect(selectAgentById('unknown')(state)).toBeUndefined()
+  })
+
+  it('selectSpecialistList returns array of specialists', () => {
+    expect(selectSpecialistList(state)).toEqual([baseSpec])
+  })
+
+  it('selectReviewStatus returns undefined when not present', () => {
+    expect(selectReviewStatus('PAN-1')(state)).toBeUndefined()
+  })
+
+  it('selectAgentOutput returns lines for known agent', () => {
+    expect(selectAgentOutput('a1')(state)).toEqual(['line 1', 'line 2'])
+  })
+
+  it('selectAgentOutput returns empty array for unknown agent', () => {
+    expect(selectAgentOutput('unknown')(state)).toEqual([])
+  })
+
+  it('selectIsBootstrapped returns true when bootstrapped', () => {
+    expect(selectIsBootstrapped(state)).toBe(true)
+  })
+
+  it('selectResources returns resource stats', () => {
+    expect(selectResources(state)).toEqual({ containers: 5, networks: 3 })
+  })
+})
