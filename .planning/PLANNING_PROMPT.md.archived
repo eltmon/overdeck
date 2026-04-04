@@ -1,0 +1,116 @@
+<!-- panopticon:orchestration-context-start -->
+<!-- This is Panopticon orchestration context injected automatically.
+     It contains planning session setup instructions, not agent reasoning.
+     Session summarizers should SKIP this block and focus on the agent's
+     actual work, decisions, and tradeoffs that follow. -->
+
+# Planning Session: PAN-436
+
+## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
+
+**YOU ARE IN PLANNING MODE. DO NOT:**
+- Write or modify any code files (except STATE.md)
+- Run implementation commands (npm install, docker compose, make, etc.)
+- Create actual features or functionality
+- Start implementing the solution
+
+**YOU SHOULD ONLY:**
+- Ask clarifying questions (use AskUserQuestion tool)
+- Explore the codebase to understand context (read files, grep)
+- Generate planning artifacts:
+  - STATE.md (decisions, approach, architecture)
+  - Beads tasks (via `bd create`)
+  - Implementation plan at `docs/prds/active/{issue-id}-plan.md` (copy of STATE.md, required for dashboard)
+- Present options and tradeoffs for the user to decide
+
+When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
+
+---
+
+## Issue Details
+- **ID:** PAN-436
+- **Title:** Dashboard shows zero stats on load — missing skeleton/loading states
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/436
+
+## Description
+## Problem
+
+When the dashboard loads, all stats show as zeros/empty until the server's `getSnapshot` RPC completes. This creates a jarring UX — the user sees a fully rendered but empty dashboard for several seconds before data appears.
+
+The `selectIsBootstrapped` selector exists in the store but **no component checks it**. Every component renders immediately with default empty state.
+
+## Root Cause
+
+1. **No loading gates**: Components render without waiting for `bootstrapComplete`
+2. **Server bootstrap delay**: The server fetches issues from GitHub/Linear APIs on startup (500-700ms per repo, multiple repos). Until this completes, the snapshot has partial data.
+3. **No cached state**: The dashboard doesn't persist the last known state to localStorage, so every page load starts from zero.
+
+## Proposed Fix
+
+1. **Skeleton components**: Key dashboard views (Board, Agents, Mission Control) should check `selectIsBootstrapped` and show skeleton/shimmer placeholders until true
+2. **Stale-while-revalidate**: Cache the last snapshot to localStorage. On load, render cached data immediately (with a subtle "updating..." indicator), then replace with fresh data when the snapshot arrives
+3. **Progressive rendering**: The `EventRouter` already fetches the snapshot then subscribes to events. Components should render as data becomes available rather than waiting for everything.
+
+## Affected Views
+
+- Board (kanban columns show empty)
+- Agents page (count shows 0)
+- Mission Control (all metrics at 0)
+- Any view that reads from the store before bootstrap completes
+
+## References
+
+- `selectIsBootstrapped` selector: `src/dashboard/frontend/src/lib/store.ts:98`
+- `EventRouter` bootstrap: `src/dashboard/frontend/src/components/EventRouter.tsx:36`
+- `bootstrapComplete` flag: set by `syncSnapshot` reducer after first `getSnapshot` RPC succeeds
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+---
+
+## Your Mission
+
+You are a planning agent conducting a **discovery session** for this issue.
+
+### Phase 1: Understand Context
+1. **If a spec file was provided above**, read it thoroughly — it's your primary input
+2. Read the codebase to understand relevant files and patterns
+3. Identify what subsystems/files this issue affects
+4. Note any existing patterns we should follow
+
+### Phase 2: Discovery Conversation
+Use AskUserQuestion tool to ask contextual questions:
+- What's the scope? What's explicitly OUT of scope?
+- Any technical constraints or preferences?
+- What does "done" look like?
+- Are there edge cases we need to handle?
+
+### Difficulty Estimation
+
+For each sub-task, estimate difficulty using this rubric:
+
+| Level | When to Use | Model |
+|-------|-------------|-------|
+| `trivial` | Typo, comment, formatting only | haiku |
+| `simple` | Bug fix, single file, obvious change | haiku |
+| `medium` | New feature, 3-5 files, standard patterns | sonnet |
+| `complex` | Refactor, migration, 6+ files, some risk | sonnet |
+| `expert` | Architecture, security, performance, high risk | opus |
+
+### Phase 3: Generate Artifacts (NO CODE!)
+When discovery is complete:
+1. Create STATE.md with decisions made
+2. Copy STATE.md to implementation plan at `docs/prds/active/{issue-id}-plan.md` (required for dashboard)
+3. Create a vBRIEF plan file at `.planning/plan.vbrief.json` (structured machine-readable plan)
+4. Summarize the plan and STOP
+
+**DO NOT run `bd create` commands.** Beads tasks are created automatically from `plan.vbrief.json` by Cloister when planning completes.
+
+**IMPORTANT:** Create the plan file BEFORE creating beads tasks.
+**NOTE:** `*-spec.md` files are human-written specs — do NOT overwrite them. Your output is `*-plan.md`.
+
+**Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
+
+Start by exploring the codebase to understand the context, then begin the discovery conversation.
+
+<!-- panopticon:orchestration-context-end -->
