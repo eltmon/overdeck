@@ -98,7 +98,7 @@ export async function openEventDb(): Promise<DbAdapter> {
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA foreign_keys = ON');
     db.exec('PRAGMA synchronous = NORMAL');
-    // Ensure events table exists (Bun doesn't run the shared schema migrations)
+    // Ensure required tables exist (Bun doesn't run the shared schema migrations)
     db.exec(`
       CREATE TABLE IF NOT EXISTS events (
         sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,6 +108,14 @@ export async function openEventDb(): Promise<DbAdapter> {
       )
     `);
     db.exec(`CREATE INDEX IF NOT EXISTS events_timestamp_idx ON events (timestamp)`);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS projection_cache (
+        key        TEXT PRIMARY KEY,
+        data       TEXT NOT NULL,
+        sequence   INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
     return db as unknown as DbAdapter;
   } else {
     // Node.js: use shared database connection — migrations run there
@@ -195,6 +203,7 @@ export function createEventStore(db: DbAdapter): EventStore {
 // ─── Module-level singleton ───────────────────────────────────────────────────
 
 let _store: EventStore | null = null;
+let _db: DbAdapter | null = null;
 let _initPromise: Promise<EventStore> | null = null;
 
 /**
@@ -206,13 +215,29 @@ export async function initEventStore(): Promise<EventStore> {
   if (_initPromise) return _initPromise;
 
   _initPromise = openEventDb().then((db) => {
+    _db = db;
     const store = createEventStore(db);
     store.compact();
     _store = store;
+    // Initialize projection cache with same DB connection
+    import('./services/projection-cache.js').then(({ initProjectionCache }) => {
+      initProjectionCache(db);
+    }).catch(() => { /* module not available yet */ });
     return store;
   });
 
   return _initPromise;
+}
+
+/**
+ * Return the shared DbAdapter after initEventStore() has resolved.
+ * Used by services that need access to the same DB connection.
+ */
+export function getSharedDb(): DbAdapter {
+  if (!_db) {
+    throw new Error('[event-store] getSharedDb() called before initEventStore() resolved.');
+  }
+  return _db;
 }
 
 /**

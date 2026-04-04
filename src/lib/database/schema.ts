@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /**
  * Initialize the complete database schema.
@@ -153,6 +153,14 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_events_timestamp
       ON events(timestamp);
+
+    -- ===== Projection Cache (PAN-437: instant dashboard startup) =====
+    CREATE TABLE IF NOT EXISTS projection_cache (
+      key        TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,     -- JSON-serialized DashboardSnapshot
+      sequence   INTEGER NOT NULL,  -- Last event sequence applied
+      updated_at TEXT NOT NULL      -- ISO timestamp
+    );
   `);
 
   // Record schema version
@@ -236,6 +244,18 @@ export function runMigrations(db: Database.Database): void {
 
       CREATE INDEX IF NOT EXISTS idx_events_timestamp
         ON events(timestamp);
+    `);
+  }
+
+  // v4 → v5: add projection_cache table (PAN-437: instant dashboard startup)
+  if (currentVersion < 5) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS projection_cache (
+        key        TEXT PRIMARY KEY,
+        data       TEXT NOT NULL,
+        sequence   INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `);
   }
 
