@@ -11,9 +11,9 @@
  * PlanDAGViewer: data-fetching wrapper that loads from /api/workspaces/:issueId/plan
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { io } from 'socket.io-client';
+import { useDashboardStore } from '../lib/store';
 import ReactFlow, {
   type Node,
   type Edge,
@@ -386,59 +386,14 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }:
     staleTime: 30_000,
   });
 
-  // Subscribe to live status updates via socket.io
-  // Socket is created once on mount and kept stable — avoid recreating on every render.
-  const issueIdRef = useRef(issueId);
-  issueIdRef.current = issueId;
-  const queryClientRef = useRef(queryClient);
-  queryClientRef.current = queryClient;
-
+  // Refetch plan data when domain events arrive (plan.item_status_changed, etc.)
+  // EventRouter applies events to the store, advancing the sequence number.
+  const storeSequence = useDashboardStore((s) => s.sequence);
   useEffect(() => {
-    const socket = io({ path: '/socket.io', transports: ['websocket', 'polling'] });
-
-    socket.on('plan:item-status-changed', (event: { issueId: string; itemId: string; status: VBriefItemStatus }) => {
-      if (event.issueId.toLowerCase() !== issueIdRef.current.toLowerCase()) return;
-
-      queryClientRef.current.setQueryData<VBriefDocument>(['plan', issueIdRef.current], (prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          plan: {
-            ...prev.plan,
-            items: prev.plan.items.map(item =>
-              item.id === event.itemId ? { ...item, status: event.status } : item
-            ),
-          },
-        };
-      });
-    });
-
-    socket.on('plan:subitem-status-changed', (event: { issueId: string; itemId: string; subItemId: string; status: VBriefItemStatus }) => {
-      if (event.issueId.toLowerCase() !== issueIdRef.current.toLowerCase()) return;
-
-      queryClientRef.current.setQueryData<VBriefDocument>(['plan', issueIdRef.current], (prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          plan: {
-            ...prev.plan,
-            items: prev.plan.items.map(item =>
-              item.id === event.itemId
-                ? {
-                    ...item,
-                    subItems: (item.subItems ?? []).map(s =>
-                      s.id === event.subItemId ? { ...s, status: event.status } : s
-                    ),
-                  }
-                : item
-            ),
-          },
-        };
-      });
-    });
-
-    return () => { socket.disconnect(); };
-  }, []); // empty deps: socket created once, refs keep values current
+    if (storeSequence > 0) {
+      queryClient.invalidateQueries({ queryKey: ['plan', issueId] });
+    }
+  }, [storeSequence, issueId, queryClient]);
 
   if (isLoading) {
     return (

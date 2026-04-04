@@ -6,7 +6,7 @@ import { BeadsKanban } from './BeadsKanban';
 import { FileActivityTree } from './FileActivityTree';
 import { AgentTimeline } from './AgentTimeline';
 import { ActionBar } from './ActionBar';
-import { useGodViewStore } from '../../hooks/useGodViewSocket';
+import { useDashboardStore, selectAgentOutput, selectAgentById } from '../../lib/store';
 import type { Agent } from '../../types';
 
 interface FocusViewProps {
@@ -28,8 +28,9 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export function AgentFocusView({ agent, onClose }: FocusViewProps) {
-  const terminalLines = useGodViewStore((s) => s.agentOutput[agent.id] || []);
-  const liveStatus = useGodViewStore((s) => s.agentStatuses[agent.id] || agent.status);
+  const terminalLines = useDashboardStore(selectAgentOutput(agent.id));
+  const liveAgent = useDashboardStore(selectAgentById(agent.id));
+  const liveStatus = liveAgent?.status ?? agent.status;
 
   const statusColor: Record<string, string> = {
     healthy: 'var(--gv-green)',
