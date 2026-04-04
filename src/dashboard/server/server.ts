@@ -15,7 +15,19 @@ import { Effect, FileSystem, Layer, Option, Path } from 'effect';
 import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { ServerConfig } from './config.js';
 import { EventStoreServiceLive, SnapshotServiceLive } from './services/domain-services.js';
-import { websocketRpcRouteLayer } from './ws-rpc.js';
+import { websocketRpcRouteLayer } from './ws-rpc.js'
+import { issuesRouteLayer } from './routes/issues.js'
+import { agentsRouteLayer } from './routes/agents.js'
+import { workspacesRouteLayer } from './routes/workspaces.js'
+import { specialistsRouteLayer } from './routes/specialists.js'
+import { costsRouteLayer } from './routes/costs.js'
+import { cloisterRouteLayer } from './routes/cloister.js'
+import { resourcesRouteLayer } from './routes/resources.js'
+import { missionControlRouteLayer } from './routes/mission-control.js'
+import { remoteRouteLayer } from './routes/remote.js'
+import { settingsRouteLayer } from './routes/settings.js'
+import { metricsRouteLayer } from './routes/metrics.js'
+import { miscRouteLayer } from './routes/misc.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
 
@@ -148,6 +160,18 @@ const staticRouteLayer = HttpRouter.add(
 export const makeRoutesLayer = Layer.mergeAll(
   healthRouteLayer,
   websocketRpcRouteLayer,
+  issuesRouteLayer,
+  agentsRouteLayer,
+  workspacesRouteLayer,
+  specialistsRouteLayer,
+  costsRouteLayer,
+  cloisterRouteLayer,
+  resourcesRouteLayer,
+  missionControlRouteLayer,
+  remoteRouteLayer,
+  settingsRouteLayer,
+  metricsRouteLayer,
+  miscRouteLayer,
   staticRouteLayer,
 );
 

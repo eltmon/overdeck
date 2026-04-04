@@ -337,87 +337,91 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     // Set specialist state to idle and clear queue.
     // CRITICAL: No `await` between the mergeStatus write above and the guard check below.
-    try {
-      const { getTmuxSessionName, checkSpecialistQueue, completeSpecialistTask } =
-        await import('../../../lib/cloister/specialists.js');
-      const tmuxSession = getTmuxSessionName(`${specialist}-agent` as SpecialistType);
-      saveAgentRuntimeState(tmuxSession, {
-        state: 'idle',
-        lastActivity: new Date().toISOString(),
-      });
-      console.log(`[specialists/done] Set ${specialist}-agent to idle`);
-
-      // Clear this issue from the specialist's queue
-      const queue = checkSpecialistQueue(`${specialist}-agent` as SpecialistType);
-      for (const item of queue.items) {
-        if (item.payload?.issueId?.toLowerCase() === normalizedIssueId.toLowerCase()) {
-          completeSpecialistTask(`${specialist}-agent` as SpecialistType, item.id);
-          console.log(`[specialists/done] Cleared ${normalizedIssueId} from ${specialist}-agent queue`);
-        }
-      }
-    } catch (err) {
-      console.error(`[specialists/done] Error managing specialist state:`, err);
-    }
-
-    // When inspect specialist reports success, save checkpoint
-    if (specialist === 'inspect' && status === 'passed') {
+    yield* Effect.promise(async () => {
       try {
-        const { onInspectComplete } = await import('../../../lib/cloister/inspect-agent.js');
-        // Extract beadId from notes (format: "Bead <beadId> matches spec...")
-        const beadMatch = notes?.match(/[Bb]ead\s+(\S+)/);
-        const beadId = beadMatch?.[1] || 'unknown';
-        // Resolve project to get workspace path
-        const project = resolveProjectFromIssue(normalizedIssueId);
-        if (project) {
-          const workspacePath = join(
-            project.projectPath,
-            'workspaces',
-            `feature-${normalizedIssueId.toLowerCase()}`,
-          );
-          if (existsSync(workspacePath)) {
-            onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath);
+        const { getTmuxSessionName, checkSpecialistQueue, completeSpecialistTask } =
+          await import('../../../lib/cloister/specialists.js');
+        const tmuxSession = getTmuxSessionName(`${specialist}-agent` as SpecialistType);
+        saveAgentRuntimeState(tmuxSession, {
+          state: 'idle',
+          lastActivity: new Date().toISOString(),
+        });
+        console.log(`[specialists/done] Set ${specialist}-agent to idle`);
 
-            // Sync bead completion to vBRIEF plan
-            try {
-              const updatedItemId = syncBeadStatusToVBrief(beadId, workspacePath, 'completed');
-              if (updatedItemId) {
-                // Check which tasks are now unblocked and wake the work agent
-                try {
-                  const unblockedItems = getUnblockedItems(workspacePath, updatedItemId);
-                  if (unblockedItems.length > 0) {
-                    console.log(
-                      `[auto-wake] ${normalizedIssueId}: items unblocked after "${updatedItemId}": ${unblockedItems.join(', ')}`,
-                    );
-                    const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-                    const doc = readWorkspacePlan(workspacePath);
-                    const unblockedTitles = unblockedItems
-                      .map((id) => {
-                        const it = doc?.plan.items.find((i) => i.id === id);
-                        return it ? `"${it.title}"` : `"${id}"`;
-                      })
-                      .join(', ');
-                    const wakeMsg = `DAG SCHEDULER: Task${unblockedItems.length > 1 ? 's' : ''} now unblocked after completing "${updatedItemId}": ${unblockedTitles}. Pick up the next available task.`;
-                    await messageAgent(workAgentId, wakeMsg).catch((err: unknown) => {
-                      const errMsg = err instanceof Error ? err.message : String(err);
-                      console.log(
-                        `[auto-wake] Could not wake ${workAgentId} (may not be running): ${errMsg}`,
-                      );
-                    });
-                  }
-                } catch (wakeErr: unknown) {
-                  const errMsg = wakeErr instanceof Error ? wakeErr.message : String(wakeErr);
-                  console.warn(`[auto-wake] Failed to check unblocked items: ${errMsg}`);
-                }
-              }
-            } catch (syncErr: unknown) {
-              const errMsg = syncErr instanceof Error ? syncErr.message : String(syncErr);
-              console.warn(`[specialists/done] vBRIEF sync failed: ${errMsg}`);
-            }
+        // Clear this issue from the specialist's queue
+        const queue = checkSpecialistQueue(`${specialist}-agent` as SpecialistType);
+        for (const item of queue.items) {
+          if (item.payload?.issueId?.toLowerCase() === normalizedIssueId.toLowerCase()) {
+            completeSpecialistTask(`${specialist}-agent` as SpecialistType, item.id);
+            console.log(`[specialists/done] Cleared ${normalizedIssueId} from ${specialist}-agent queue`);
           }
         }
       } catch (err) {
-        console.error(`[specialists/done] Error saving inspect checkpoint:`, err);
+        console.error(`[specialists/done] Error managing specialist state:`, err);
       }
+    });
+
+    // When inspect specialist reports success, save checkpoint
+    if (specialist === 'inspect' && status === 'passed') {
+      yield* Effect.promise(async () => {
+        try {
+          const { onInspectComplete } = await import('../../../lib/cloister/inspect-agent.js');
+          // Extract beadId from notes (format: "Bead <beadId> matches spec...")
+          const beadMatch = notes?.match(/[Bb]ead\s+(\S+)/);
+          const beadId = beadMatch?.[1] || 'unknown';
+          // Resolve project to get workspace path
+          const project = resolveProjectFromIssue(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath);
+
+              // Sync bead completion to vBRIEF plan
+              try {
+                const updatedItemId = syncBeadStatusToVBrief(beadId, workspacePath, 'completed');
+                if (updatedItemId) {
+                  // Check which tasks are now unblocked and wake the work agent
+                  try {
+                    const unblockedItems = getUnblockedItems(workspacePath, updatedItemId);
+                    if (unblockedItems.length > 0) {
+                      console.log(
+                        `[auto-wake] ${normalizedIssueId}: items unblocked after "${updatedItemId}": ${unblockedItems.join(', ')}`,
+                      );
+                      const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
+                      const doc = readWorkspacePlan(workspacePath);
+                      const unblockedTitles = unblockedItems
+                        .map((id) => {
+                          const it = doc?.plan.items.find((i) => i.id === id);
+                          return it ? `"${it.title}"` : `"${id}"`;
+                        })
+                        .join(', ');
+                      const wakeMsg = `DAG SCHEDULER: Task${unblockedItems.length > 1 ? 's' : ''} now unblocked after completing "${updatedItemId}": ${unblockedTitles}. Pick up the next available task.`;
+                      await messageAgent(workAgentId, wakeMsg).catch((err: unknown) => {
+                        const errMsg = err instanceof Error ? err.message : String(err);
+                        console.log(
+                          `[auto-wake] Could not wake ${workAgentId} (may not be running): ${errMsg}`,
+                        );
+                      });
+                    }
+                  } catch (wakeErr: unknown) {
+                    const errMsg = wakeErr instanceof Error ? wakeErr.message : String(wakeErr);
+                    console.warn(`[auto-wake] Failed to check unblocked items: ${errMsg}`);
+                  }
+                }
+              } catch (syncErr: unknown) {
+                const errMsg = syncErr instanceof Error ? syncErr.message : String(syncErr);
+                console.warn(`[specialists/done] vBRIEF sync failed: ${errMsg}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[specialists/done] Error saving inspect checkpoint:`, err);
+        }
+      });
     }
 
     // When test specialist reports success, mark as ready for merge.
