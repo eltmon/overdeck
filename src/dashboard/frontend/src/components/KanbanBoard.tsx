@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useDashboardStore, selectAgentList, selectSpecialistList } from '../lib/store';
+import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle } from '../lib/store';
 import {
   DndContext,
   DragOverlay,
@@ -132,15 +132,6 @@ function getLabelStyle(label: string): string {
 
 function getCostColor(_cost: number): string {
   return 'bg-surface-overlay text-content-subtle';
-}
-
-async function fetchIssues(cycle: string = 'current', includeCompleted: boolean = false): Promise<Issue[]> {
-  const params = new URLSearchParams();
-  params.set('cycle', cycle);
-  if (includeCompleted) params.set('includeCompleted', 'true');
-  const res = await fetch(`/api/issues?${params}`);
-  if (!res.ok) throw new Error('Failed to fetch issues');
-  return res.json();
 }
 
 function groupByStatus(issues: Issue[], showClosedOut: boolean = false): Record<string, Issue[]> {
@@ -762,10 +753,10 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const selectedIssue = externalSelectedIssue !== undefined ? externalSelectedIssue : internalSelectedIssue;
   const onSelectIssue = externalOnSelectIssue || setInternalSelectedIssue;
 
-  const { data: issues, isLoading: issuesLoading, error: issuesError } = useQuery({
-    queryKey: ['issues', cycleFilter, includeCompleted],
-    queryFn: () => fetchIssues(cycleFilter, includeCompleted),
-  });
+  const rawIssues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted))
+  const issues = rawIssues as unknown as Issue[]
+  const issuesLoading = !useDashboardStore((s) => s.bootstrapComplete)
+  const issuesError = null
 
   // Agents and specialists from Zustand store (event-sourced — no polling)
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
@@ -970,7 +961,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const { data: issueCosts = {}, isLoading: costsLoading } = useQuery({
     queryKey: ['issueCosts'],
     queryFn: fetchIssueCosts,
-    refetchInterval: 30000, // Refresh every 30 seconds
     staleTime: 10000,
   });
 

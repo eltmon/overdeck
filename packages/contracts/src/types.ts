@@ -128,6 +128,7 @@ export const DashboardSnapshot = Schema.Struct({
   specialists: Schema.Array(SpecialistSnapshot),
   reviewStatuses: Schema.Array(ReviewStatusSnapshot),
   resources: Schema.optional(ResourceStats),
+  issues: Schema.optional(Schema.Array(Schema.Unknown)),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type
