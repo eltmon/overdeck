@@ -70,8 +70,8 @@ export const ServerConfigLayer = Layer.effect(
     }
 
     const host = process.env['HOST'] ?? '0.0.0.0';
-    const linearApiKey = process.env['LINEAR_API_KEY'] ?? null;
-    const anthropicApiKey = process.env['ANTHROPIC_API_KEY'] ?? null;
+    const linearApiKey = process.env['LINEAR_API_KEY'] || null;
+    const anthropicApiKey = process.env['ANTHROPIC_API_KEY'] || null;
     const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
     const panopticonHome =
       process.env['PANOPTICON_HOME'] ?? `${process.env['HOME'] ?? homedir()}/.panopticon`;
