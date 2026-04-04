@@ -71,6 +71,7 @@ import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
+import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
 
@@ -254,6 +255,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
   '/api/specialists/done',
   Effect.gen(function* () {
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
     const { specialist, issueId, status, notes } = body as {
       specialist: string;
       issueId: string;
@@ -482,6 +484,21 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     }
 
+    // Emit domain event for specialist completion/failure
+    if (status === 'passed') {
+      Effect.runSync(eventStore.append({
+        type: 'specialist.completed',
+        timestamp: new Date().toISOString(),
+        payload: { name: `${specialist}-agent`, issueId: normalizedIssueId },
+      }));
+    } else {
+      Effect.runSync(eventStore.append({
+        type: 'specialist.failed',
+        timestamp: new Date().toISOString(),
+        payload: { name: `${specialist}-agent`, issueId: normalizedIssueId, error: notes || `${specialist} failed` },
+      }));
+    }
+
     return HttpServerResponse.json({
       success: true,
       specialist,
@@ -594,6 +611,7 @@ const postSpecialistWakeRoute = HttpRouter.add(
     const name = params['name'] as string;
     const body = yield* readJsonBody;
     const { sessionId } = body as { sessionId?: string };
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -642,6 +660,19 @@ const postSpecialistWakeRoute = HttpRouter.add(
         );
 
         recordWake(name as SpecialistType, useSessionId!);
+
+        Effect.runSync(eventStore.append({
+          type: 'specialist.started',
+          timestamp: new Date().toISOString(),
+          payload: {
+            specialist: {
+              name: name as SpecialistType,
+              state: 'active',
+              isRunning: true,
+              lastWake: new Date().toISOString(),
+            },
+          },
+        }));
 
         return HttpServerResponse.json({
           success: true,
@@ -762,6 +793,7 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
     const { issueId, status, notes } = body as {
       issueId?: string;
       status?: string;
@@ -809,6 +841,21 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
             state: 'idle',
             lastActivity: new Date().toISOString(),
           });
+        }
+
+        // Emit domain event based on status
+        if (status === 'passed') {
+          Effect.runSync(eventStore.append({
+            type: 'specialist.completed',
+            timestamp: new Date().toISOString(),
+            payload: { name: name as SpecialistType, issueId },
+          }));
+        } else if (status === 'failed' || status === 'blocked') {
+          Effect.runSync(eventStore.append({
+            type: 'specialist.failed',
+            timestamp: new Date().toISOString(),
+            payload: { name: name as SpecialistType, issueId, error: notes || `${name} reported ${status}` },
+          }));
         }
 
         return HttpServerResponse.json({ success: true });
@@ -1158,6 +1205,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
     const { issueId, status } = body as { issueId?: string; status?: string };
 
     if (!issueId || !status) {
@@ -1320,6 +1368,12 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
           });
           completeSpecialistTask(name as SpecialistType, nextValidTask.id);
         }
+
+        Effect.runSync(eventStore.append({
+          type: 'specialist.completed',
+          timestamp: new Date().toISOString(),
+          payload: { name: name as SpecialistType, issueId },
+        }));
 
         return HttpServerResponse.json({
           success: true,

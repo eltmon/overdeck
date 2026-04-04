@@ -39,6 +39,7 @@ import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { readIssueHandoffEvents } from '../../../lib/cloister/handoff-logger.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { CacheService } from '../services/cache-service.js';
+import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
 
@@ -410,6 +411,7 @@ const postIssueCloseRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -458,6 +460,14 @@ const postIssueCloseRoute = HttpRouter.add(
           issueDataService.invalidateTracker('linear').catch(() => {});
         }
 
+        if (result.success) {
+          Effect.runSync(eventStore.append({
+            type: 'issues.updated',
+            timestamp: new Date().toISOString(),
+            payload: { issueId },
+          }));
+        }
+
         return HttpServerResponse.json({
           success: result.success,
           message: result.success
@@ -484,6 +494,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -727,6 +738,12 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           },
         };
 
+        Effect.runSync(eventStore.append({
+          type: 'planning.started',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, sessionName },
+        }));
+
         return HttpServerResponse.json(responseBody);
       },
       catch: (error: unknown) => {
@@ -907,6 +924,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -1113,6 +1131,12 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         } else {
           newState = 'Skipped (already in progress)';
         }
+
+        Effect.runSync(eventStore.append({
+          type: 'planning.sync',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, status: 'completed' },
+        }));
 
         return HttpServerResponse.json({
           success: true,
@@ -1584,6 +1608,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -1699,6 +1724,12 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           backlog: 'Backlog', todo: 'Todo', in_progress: 'In Progress',
           in_review: 'In Review', done: 'Done',
         };
+
+        Effect.runSync(eventStore.append({
+          type: 'issues.updated',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id },
+        }));
 
         return HttpServerResponse.json({
           success: true,
