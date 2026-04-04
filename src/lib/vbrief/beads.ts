@@ -54,65 +54,13 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     }
   }
 
-  // Read the vBRIEF plan — handle both formats:
-  // 1. Standard: { vBRIEFInfo: {...}, plan: { id, items, edges } }
-  // 2. Flat: { issue, title, items, edges? } (produced by some planning prompts)
-  let doc: VBriefDocument | null = null;
-  try {
-    doc = readWorkspacePlan(workspacePath);
-  } catch {
-    // readWorkspacePlan may throw on format mismatch, try flat format
+  // Read the vBRIEF plan — must be spec-compliant format
+  const doc = readWorkspacePlan(workspacePath);
+  if (!doc) {
+    return { success: false, created: [], errors: ['No plan.vbrief.json found in workspace'], beadIds };
   }
 
-  let plan: { id: string; items: VBriefItem[]; edges: Array<{ from: string; to: string; type: string }> };
-
-  if (doc?.plan) {
-    plan = doc.plan;
-  } else {
-    // Try flat format: read raw JSON
-    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    if (!existsSync(planPath)) {
-      return { success: false, created: [], errors: ['No plan.vbrief.json found in workspace'], beadIds };
-    }
-    try {
-      const raw = JSON.parse(readFileSync(planPath, 'utf-8'));
-      plan = {
-        id: raw.issue || raw.issueId || raw.issue_id || raw.id || raw.plan?.id || '',
-        items: raw.items || raw.plan?.items || [],
-        edges: raw.edges || raw.plan?.edges || [],
-      };
-      if (!plan.id) {
-        return { success: false, created: [], errors: ['plan.vbrief.json missing id/issue field'], beadIds };
-      }
-    } catch (parseErr: any) {
-      return { success: false, created: [], errors: [`Failed to parse plan.vbrief.json: ${parseErr.message}`], beadIds };
-    }
-  }
-
-  // Normalize item fields — flat format may use 'description' instead of 'narrative.Action'
-  for (const item of plan.items) {
-    if (!item.narrative && (item as any).description) {
-      item.narrative = { Action: (item as any).description };
-    }
-    if (!item.metadata && (item as any).difficulty) {
-      item.metadata = { difficulty: (item as any).difficulty, issueLabel: plan.id.toLowerCase() };
-    }
-    if (!item.status) item.status = 'pending';
-    if (!item.subItems) {
-      // Convert flat 'acceptance' array to subItems
-      const acc = (item as any).acceptance;
-      if (Array.isArray(acc)) {
-        item.subItems = acc.map((a: string, i: number) => ({
-          id: `${item.id}.ac${i + 1}`,
-          title: a,
-          status: 'pending' as VBriefItemStatus,
-          metadata: { kind: 'acceptance_criterion' },
-        }));
-      } else {
-        item.subItems = [];
-      }
-    }
-  }
+  const { plan } = doc;
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
   // Re-planning means "the old plan was invalid" — start fresh.
