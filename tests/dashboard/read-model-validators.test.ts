@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toAgentStatus,
   toAgentPhase,
+  toAgentResolution,
   toSpecialistType,
   toSpecialistState,
   toReviewStatus,
@@ -42,6 +43,7 @@ describe('toAgentStatus', () => {
 
 describe('toAgentPhase', () => {
   it('passes through valid phases', () => {
+    expect(toAgentPhase('planning')).toBe('planning')
     expect(toAgentPhase('exploration')).toBe('exploration')
     expect(toAgentPhase('implementation')).toBe('implementation')
     expect(toAgentPhase('testing')).toBe('testing')
@@ -134,6 +136,27 @@ describe('toTestStatus', () => {
     expect(toTestStatus('PASSED')).toBeUndefined()
     expect(toTestStatus(null)).toBeUndefined()
     expect(toTestStatus(undefined)).toBeUndefined()
+  })
+})
+
+// ─── toAgentResolution ────────────────────────────────────────────────────────
+
+describe('toAgentResolution', () => {
+  it('passes through valid resolutions', () => {
+    expect(toAgentResolution('working')).toBe('working')
+    expect(toAgentResolution('done')).toBe('done')
+    expect(toAgentResolution('needs_input')).toBe('needs_input')
+    expect(toAgentResolution('stuck')).toBe('stuck')
+    expect(toAgentResolution('completed')).toBe('completed')
+    expect(toAgentResolution('unclear')).toBe('unclear')
+  })
+
+  it('returns undefined for invalid values', () => {
+    expect(toAgentResolution('idle')).toBeUndefined()
+    expect(toAgentResolution('DONE')).toBeUndefined()
+    expect(toAgentResolution(null)).toBeUndefined()
+    expect(toAgentResolution(undefined)).toBeUndefined()
+    expect(toAgentResolution('')).toBeUndefined()
   })
 })
 

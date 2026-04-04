@@ -116,19 +116,21 @@ export const ReadModelServiceLive = Layer.effect(
 
       // Compute enrichment for all agents in parallel during bootstrap
       // so the initial snapshot already has badges/buttons data (no 3s gap).
-      const enrichmentResults = await Promise.all(
-        running.map(async (a) => {
-          const reviewStatus = getReviewStatus(a.issueId)
-          const hasActiveSpecialist =
-            reviewStatus?.reviewStatus === 'reviewing' ||
-            reviewStatus?.testStatus === 'testing' ||
-            reviewStatus?.mergeStatus === 'merging'
-          try {
-            return await computeAgentEnrichment(a.id, a.startedAt, hasActiveSpecialist)
-          } catch {
-            return undefined
-          }
-        })
+      const enrichmentResults = yield* Effect.promise(() =>
+        Promise.all(
+          running.map(async (a) => {
+            const reviewStatus = getReviewStatus(a.issueId)
+            const hasActiveSpecialist =
+              reviewStatus?.reviewStatus === 'reviewing' ||
+              reviewStatus?.testStatus === 'testing' ||
+              reviewStatus?.mergeStatus === 'merging'
+            try {
+              return await computeAgentEnrichment(a.id, a.startedAt, hasActiveSpecialist)
+            } catch {
+              return undefined
+            }
+          })
+        )
       )
 
       for (let i = 0; i < running.length; i++) {
