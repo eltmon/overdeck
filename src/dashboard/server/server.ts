@@ -15,6 +15,7 @@ import { Effect, FileSystem, Layer, Option, Path } from 'effect';
 import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { ServerConfig } from './config.js';
 import { EventStoreServiceLive, SnapshotServiceLive } from './services/domain-services.js';
+import { TerminalServiceLive } from './services/terminal-service.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { agentsRouteLayer } from './routes/agents.js'
@@ -180,6 +181,7 @@ export const makeRoutesLayer = Layer.mergeAll(
 const DomainServicesLive = Layer.mergeAll(
   EventStoreServiceLive,
   SnapshotServiceLive.pipe(Layer.provide(EventStoreServiceLive)),
+  TerminalServiceLive,
 );
 
 // ─── Full server layer ────────────────────────────────────────────────────────

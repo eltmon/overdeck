@@ -3,14 +3,15 @@
  *
  * Connects the PanRpcGroup contract to the server-side service layer.
  * Terminal RPC methods (subscribeTerminal, terminalOpen/Write/Resize/Close)
- * are stubbed here; B20 replaces the stubs with dual-runtime PTY logic.
+ * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Stream } from 'effect';
-import { HttpRouter, HttpServerResponse } from 'effect/unstable/http';
+import { Effect, Layer, Stream } from 'effect';
+import { HttpRouter } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panopticon/contracts';
 import { EventStoreService, SnapshotService } from './services/domain-services.js';
+import { TerminalService } from './services/terminal-service.js';
 import type { DomainEvent } from '@panopticon/contracts';
 import type { StoredEvent } from './event-store.js';
 
@@ -31,6 +32,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
   Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
     const snapshotService = yield* SnapshotService;
+    const terminalService = yield* TerminalService;
 
     return PanRpcGroup.of({
       // ── subscribeDomainEvents ────────────────────────────────────────────────
@@ -39,11 +41,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Stream.map(storedToDomainEvent),
         ),
 
-      // ── subscribeTerminal — stub (B20) ───────────────────────────────────────
-      [WS_METHODS.subscribeTerminal]: (_input) =>
-        Stream.fail(
-          new PanRpcError({ message: 'Terminal streaming not yet implemented (B20)', code: 'NOT_IMPLEMENTED' }),
-        ),
+      // ── subscribeTerminal — live PTY stream (B20) ────────────────────────────
+      [WS_METHODS.subscribeTerminal]: (input) =>
+        terminalService.streamSession(input.sessionName, input.cols, input.rows),
 
       // ── subscribeAgentOutput — live agent stdout lines ───────────────────────
       // Filtered view of the domain event stream for a specific agent
@@ -86,32 +86,21 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           ),
         ),
 
-      // ── terminalOpen — stub (B20) ────────────────────────────────────────────
-      [WS_METHODS.terminalOpen]: (_input) =>
-        Effect.fail(
-          new PanRpcError({
-            message: 'Terminal not yet implemented (B20)',
-            code: 'NOT_IMPLEMENTED',
-          }),
-        ) as Effect.Effect<{ sessionName: string }, PanRpcError>,
+      // ── terminalOpen — live PTY (B20) ───────────────────────────────────────
+      [WS_METHODS.terminalOpen]: (input) =>
+        terminalService.open(input.sessionName, input.cols, input.rows),
 
-      // ── terminalWrite — stub (B20) ───────────────────────────────────────────
-      [WS_METHODS.terminalWrite]: (_input) =>
-        Effect.fail(
-          new PanRpcError({ message: 'Terminal not yet implemented (B20)', code: 'NOT_IMPLEMENTED' }),
-        ),
+      // ── terminalWrite — live PTY (B20) ──────────────────────────────────────
+      [WS_METHODS.terminalWrite]: (input) =>
+        terminalService.write(input.sessionName, input.data),
 
-      // ── terminalResize — stub (B20) ──────────────────────────────────────────
-      [WS_METHODS.terminalResize]: (_input) =>
-        Effect.fail(
-          new PanRpcError({ message: 'Terminal not yet implemented (B20)', code: 'NOT_IMPLEMENTED' }),
-        ),
+      // ── terminalResize — live PTY (B20) ─────────────────────────────────────
+      [WS_METHODS.terminalResize]: (input) =>
+        terminalService.resize(input.sessionName, input.cols, input.rows),
 
-      // ── terminalClose — stub (B20) ───────────────────────────────────────────
-      [WS_METHODS.terminalClose]: (_input) =>
-        Effect.fail(
-          new PanRpcError({ message: 'Terminal not yet implemented (B20)', code: 'NOT_IMPLEMENTED' }),
-        ),
+      // ── terminalClose — live PTY (B20) ──────────────────────────────────────
+      [WS_METHODS.terminalClose]: (input) =>
+        terminalService.close(input.sessionName),
     });
   }),
 );
