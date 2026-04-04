@@ -64,6 +64,9 @@ docker-compose.devcontainer.yml
 # Pan sync manifest (tracks what pan sync installed — workspace-specific)
 .claude/.panopticon-manifest.json
 
+# Workspace node_modules symlink (points to main repo, not real content)
+src/dashboard/frontend/node_modules
+
 # Beads daemon files
 .beads/
 

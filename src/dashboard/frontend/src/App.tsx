@@ -20,6 +20,10 @@ import { MissionControl } from './components/MissionControl';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
 import { Header, Tab } from './components/Header';
+import { BootstrapGate } from './components/BootstrapGate';
+import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
+import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
+import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
 import { AlertTriangle } from 'lucide-react';
 import { Agent, Issue } from './types';
@@ -269,35 +273,43 @@ export default function App() {
           </div>
         )}
         {activeTab === 'kanban' && (
-          <>
-            <div className={`flex-1 overflow-auto p-6 ${selectedIssue ? '' : 'w-full'}`}>
-              <MetricsSummaryRow />
-              <KanbanBoard
-                selectedIssue={selectedIssue}
-                onSelectIssue={setSelectedIssue}
-              />
+          <BootstrapGate fallback={
+            <div className="flex-1 overflow-auto p-6 w-full">
+              <KanbanSkeleton />
             </div>
-            {selectedIssue && selectedIssueData && (
-              <DetailPanelLayout
-                agent={selectedIssueAgent ?? undefined}
-                issueId={selectedIssue}
-                issueUrl={selectedIssueData.url}
-                issue={selectedIssueData}
-                onClose={() => setSelectedIssue(null)}
-              />
-            )}
-          </>
+          }>
+            <>
+              <div className={`flex-1 overflow-auto p-6 ${selectedIssue ? '' : 'w-full'}`}>
+                <MetricsSummaryRow />
+                <KanbanBoard
+                  selectedIssue={selectedIssue}
+                  onSelectIssue={setSelectedIssue}
+                />
+              </div>
+              {selectedIssue && selectedIssueData && (
+                <DetailPanelLayout
+                  agent={selectedIssueAgent ?? undefined}
+                  issueId={selectedIssue}
+                  issueUrl={selectedIssueData.url}
+                  issue={selectedIssueData}
+                  onClose={() => setSelectedIssue(null)}
+                />
+              )}
+            </>
+          </BootstrapGate>
         )}
         {activeTab === 'agents' && (
-          <div className="p-6 w-full">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <AgentList
-                selectedAgent={selectedAgent}
-                onSelectAgent={setSelectedAgent}
-              />
-              {selectedAgent && <AgentOutputPanel agentId={selectedAgent} />}
+          <BootstrapGate fallback={<AgentListSkeleton />}>
+            <div className="p-6 w-full">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <AgentList
+                  selectedAgent={selectedAgent}
+                  onSelectAgent={setSelectedAgent}
+                />
+                {selectedAgent && <AgentOutputPanel agentId={selectedAgent} />}
+              </div>
             </div>
-          </div>
+          </BootstrapGate>
         )}
         {activeTab === 'resources' && (
           <div className="w-full h-full overflow-hidden">
@@ -350,9 +362,15 @@ export default function App() {
           </div>
         )}
         {activeTab === 'god-view' && (
-          <div className="w-full h-full overflow-hidden">
-            <GodViewPage />
-          </div>
+          <BootstrapGate fallback={
+            <div className="w-full h-full overflow-hidden">
+              <GodViewSkeleton />
+            </div>
+          }>
+            <div className="w-full h-full overflow-hidden">
+              <GodViewPage />
+            </div>
+          </BootstrapGate>
         )}
       </main>
 
