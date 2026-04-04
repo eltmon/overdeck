@@ -64,45 +64,32 @@ bun add --dev tsdown --cwd src/dashboard/server
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: ['main.ts'],
+  entry: { server: 'main.ts' },  // output as server.js (CLI expects dist/dashboard/server.js)
   outDir: '../../../dist/dashboard',
   format: 'esm',
   platform: 'node',
+  shims: true,  // auto-injects __filename, __dirname, AND createRequire for ESM→CJS interop
   clean: false,  // Don't nuke dist/dashboard/public/ (frontend build)
   sourcemap: true,
-  external: [
-    // Native bindings — require() at runtime, cannot bundle
-    '@homebridge/node-pty-prebuilt-multiarch',
-    'better-sqlite3',
-    'ssh2',
-    // Bun-specific — dynamic import at runtime, not available during Node builds
-    'bun:sqlite',
-    '@effect/platform-bun',
-    '@effect/platform-bun/BunHttpServer',
-    '@effect/platform-bun/BunServices',
-    '@effect/platform-bun/BunRuntime',
-  ],
-  banner: {
-    js: [
-      "import { createRequire as __panopticonCreateRequire } from 'module';",
-      "const require = __panopticonCreateRequire(import.meta.url);",
-    ].join('\n'),
-  },
-  footer: {
-    js: [
-      "var __filename = (await import('url')).fileURLToPath(import.meta.url);",
-      "var __dirname = (await import('path')).dirname(__filename);",
-    ].join('\n'),
+  deps: {
+    neverBundle: [
+      // Native bindings — require() at runtime, cannot bundle
+      '@homebridge/node-pty-prebuilt-multiarch',
+      'better-sqlite3',
+      'ssh2',
+      // Bun-specific — dynamic import at runtime, not available during Node builds
+      /^bun:/,
+      /^@effect\/platform-bun/,
+    ],
   },
 });
 ```
 
 **Critical details:**
-- `outDir` must be `../../../dist/dashboard` so the output lands at `dist/dashboard/main.js`
-- If tsdown names the output `main.js` instead of `server.js`, either use tsdown's `outputFileName` option or rename in the build script
+- `entry: { server: 'main.ts' }` — object key becomes the output filename, producing `dist/dashboard/server.js` (matching what `src/cli/index.ts:178` expects)
+- `shims: true` — replaces BOTH the esbuild banner (`createRequire`) and footer (`__filename`/`__dirname`). tsdown auto-injects `createRequire` for any `require()` calls in ESM output when `platform: 'node'`, and `__filename`/`__dirname` when `shims` is enabled. No manual banner/footer needed.
+- `deps.neverBundle` — replaces esbuild's `external` option. Accepts strings and regex patterns. The regex `/^@effect\/platform-bun/` catches all deep paths (`BunHttpServer`, `BunServices`, `BunRuntime`) without listing each individually.
 - `clean: false` is essential — the frontend build writes to `dist/dashboard/public/` and must not be deleted
-- The banner injects `createRequire` so that `better-sqlite3` and `node-pty` can use `require()` from ESM
-- The footer injects `__filename`/`__dirname` because native bindings reference them
 
 ### Step 3: Update build script
 
@@ -114,13 +101,21 @@ In `src/dashboard/server/package.json`, change:
 
 Remove `esbuild` from devDependencies. Add `tsdown`.
 
-### Step 4: Handle output filename
+### Step 4: Verify output filename
 
-The CLI expects `dist/dashboard/server.js` (see `src/cli/index.ts:178`). tsdown may output `main.js` (matching the entry point name). Options:
+The CLI expects `dist/dashboard/server.js` (see `src/cli/index.ts:178`). The config uses `entry: { server: 'main.ts' }` which should produce `server.js`. After the first build, verify:
 
-1. **Preferred:** Use tsdown's entry config to control the output name: `entry: { server: 'main.ts' }` — this should produce `dist/dashboard/server.js`
-2. **Fallback:** Update the build script to rename: `tsdown && mv ../../../dist/dashboard/main.js ../../../dist/dashboard/server.js`
-3. **Last resort:** Update `src/cli/index.ts:178` to reference `server.js` or `main.js` (whichever tsdown produces)
+```bash
+ls -la dist/dashboard/server.js
+```
+
+If tsdown produces `server.mjs` instead of `server.js`, add `outExtensions` to force `.js`:
+
+```typescript
+outExtensions: () => ({ js: '.js' }),
+```
+
+(T3Code's desktop config uses this pattern.)
 
 ### Step 5: Delete old config
 
@@ -154,10 +149,12 @@ All of these must pass:
 
 ## Risks
 
-- **tsdown banner/footer support:** Verify tsdown supports `banner` and `footer` options. If not, use a wrapper script that prepends/appends the polyfills after bundling.
-- **Output filename:** tsdown may not support custom output filenames the same way esbuild does. Test the `entry: { server: 'main.ts' }` approach first.
-- **External resolution:** Verify that externaled packages with deep paths (e.g., `@effect/platform-bun/BunHttpServer`) are correctly excluded. tsdown might need glob patterns instead.
-- **Dual-runtime dynamic imports:** The `main.ts` file uses `await import('@effect/platform-bun/BunRuntime')` inside a conditional. Verify the bundler doesn't try to resolve this at build time.
+All originally identified risks have been resolved by tsdown's built-in features:
+
+- ~~**Banner/footer support**~~ — **RESOLVED.** `shims: true` auto-injects `createRequire` (for `require()` in ESM) and `__filename`/`__dirname`. No manual banner/footer needed. Docs confirm this is always-on for `platform: 'node'` ESM output (createRequire) and opt-in via `shims` (__filename/__dirname).
+- ~~**Output filename**~~ — **RESOLVED.** `entry: { server: 'main.ts' }` produces `server.js`. T3Code uses this pattern. If `.mjs` extension appears, use `outExtensions: () => ({ js: '.js' })` (T3Code desktop config uses this).
+- ~~**External resolution with deep paths**~~ — **RESOLVED.** `deps.neverBundle` accepts regex patterns. `/^@effect\/platform-bun/` catches all deep paths. Docs confirm regex support.
+- **Dual-runtime dynamic imports:** The `main.ts` file uses `await import('@effect/platform-bun/BunRuntime')` inside a conditional. The `deps.neverBundle` regex excludes these from bundling, so they remain as runtime dynamic imports. Verify the bundler doesn't error on unresolvable dynamic imports for external packages — tsdown should skip them since they're marked external.
 
 ## Part 2: Build contracts package with tsdown
 
