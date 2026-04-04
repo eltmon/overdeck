@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService } from './services/issue-service-singleton.js';
-import { startAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 
 declare const Bun: unknown;
 
@@ -22,6 +22,10 @@ console.log('[panopticon] IssueDataService started');
 // for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
 startAgentEnrichmentService();
 console.log('[panopticon] AgentEnrichmentService started');
+
+// Clean up enrichment poller on graceful shutdown
+process.once('SIGTERM', () => stopAgentEnrichmentService());
+process.once('SIGINT', () => stopAgentEnrichmentService());
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 
