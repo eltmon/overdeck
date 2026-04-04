@@ -181,7 +181,6 @@ const getAgentWorkspace = getAgentWorkspaceShared;
 const getAgentJsonlPath = getAgentJsonlPathShared;
 const getPendingQuestions = getPendingQuestionsShared;
 const getAgentPendingQuestions = getAgentPendingQuestionsShared;
-}
 
 function flyExecCmd(vmName: string, command: string): string {
   const appName = vmName.replace(/\/.*$/, ''); // simplified: use vmName as app name
