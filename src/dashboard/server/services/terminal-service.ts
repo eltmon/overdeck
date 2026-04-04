@@ -11,7 +11,7 @@
  *  - On stream/close: do NOT kill the PTY — just remove from tracking.
  */
 
-import { Effect, Layer, Queue, ServiceMap, Stream } from 'effect';
+import { Cause, Effect, Layer, Queue, ServiceMap, Stream } from 'effect';
 import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
 import { promisify } from 'node:util';
@@ -154,7 +154,7 @@ interface TerminalSessionState {
   lastRows: number;
   pendingInput: string[];
   /** Queue used by the Effect stream to receive terminal output chunks. */
-  queue: Queue.Queue<TerminalOutput> | null;
+  queue: Queue.Queue<TerminalOutput, PanRpcError | Cause.Done> | null;
 }
 
 // ─── Service interface ────────────────────────────────────────────────────────
@@ -195,8 +195,8 @@ export const TerminalServiceLive = Layer.effect(
 
         proc.onData((data) => {
           if (!forwarding) return;
-          if (state.queue && !Queue.isShutdown(state.queue)) {
-            Queue.offerUnsafe(state.queue, { sessionName: state.sessionName, data });
+          if (state.queue && state.queue.state._tag !== "Done") {
+            Queue.offerUnsafe(Queue.asEnqueue(state.queue), { sessionName: state.sessionName, data });
           }
         });
 
@@ -215,8 +215,8 @@ export const TerminalServiceLive = Layer.effect(
 
         proc.onExit((exitCode) => {
           console.log(`[terminal-service] PTY for ${state.sessionName} exited with code ${exitCode}`);
-          if (state.queue && !Queue.isShutdown(state.queue)) {
-            Queue.endUnsafe(state.queue);
+          if (state.queue && state.queue.state._tag !== "Done") {
+            Queue.endUnsafe(Queue.asEnqueue(state.queue));
           }
           sessions.delete(state.sessionName);
         });
@@ -228,8 +228,8 @@ export const TerminalServiceLive = Layer.effect(
         state.pendingInput.length = 0;
       }).catch((err) => {
         console.error(`[terminal-service] Failed to spawn PTY for ${state.sessionName}:`, err);
-        if (state.queue && !Queue.isShutdown(state.queue)) {
-          Queue.endUnsafe(state.queue);
+        if (state.queue && state.queue.state._tag !== "Done") {
+          Queue.endUnsafe(Queue.asEnqueue(state.queue));
         }
         sessions.delete(state.sessionName);
       });
@@ -310,8 +310,8 @@ export const TerminalServiceLive = Layer.effect(
         if (!state) return;
         // Do NOT kill the PTY — just remove from tracking. The PTY exits
         // naturally when pipes close; the tmux session survives independently.
-        if (state.queue && !Queue.isShutdown(state.queue)) {
-          Queue.endUnsafe(state.queue);
+        if (state.queue && state.queue.state._tag !== "Done") {
+          Queue.endUnsafe(Queue.asEnqueue(state.queue));
         }
         sessions.delete(sessionName);
       });
