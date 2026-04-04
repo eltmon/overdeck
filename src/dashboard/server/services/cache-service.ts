@@ -8,10 +8,33 @@
  * Tracks rate limits per tracker for adaptive backoff.
  */
 
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
+import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
+
+declare const Bun: unknown;
+const _require = createRequire(import.meta.url);
+
+function openSqliteDb(dbPath: string): Database.Database {
+  if (typeof Bun !== 'undefined') {
+    const { Database: BunDatabase } = _require('bun:sqlite') as { Database: new (path: string) => any };
+    const bunDb = new BunDatabase(dbPath);
+    bunDb.pragma = function (sql: string, options?: { simple?: boolean }): any {
+      if (options?.simple) {
+        const key = sql.trim();
+        const row = bunDb.query(`PRAGMA ${key}`).get() as Record<string, unknown> | null;
+        return row?.[key] ?? null;
+      }
+      bunDb.exec(`PRAGMA ${sql}`);
+      return undefined;
+    };
+    return bunDb as Database.Database;
+  }
+  const BetterSqlite3 = _require('better-sqlite3');
+  return new BetterSqlite3(dbPath) as Database.Database;
+}
 
 const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
 const CACHE_DB_PATH = join(PANOPTICON_HOME, 'cache.db');
@@ -62,7 +85,7 @@ export class CacheService {
       mkdirSync(PANOPTICON_HOME, { recursive: true });
     }
 
-    this.db = new Database(CACHE_DB_PATH);
+    this.db = openSqliteDb(CACHE_DB_PATH);
     this.db.pragma('journal_mode = WAL');
     this.createSchema();
   }

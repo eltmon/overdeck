@@ -5,10 +5,33 @@
  * Stores health state transitions for visualization and analysis.
  */
 
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
+import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { PANOPTICON_HOME } from '../paths.js';
+
+declare const Bun: unknown;
+const _require = createRequire(import.meta.url);
+
+function openSqliteDb(dbPath: string): Database.Database {
+  if (typeof Bun !== 'undefined') {
+    const { Database: BunDatabase } = _require('bun:sqlite') as { Database: new (path: string) => any };
+    const bunDb = new BunDatabase(dbPath);
+    bunDb.pragma = function (sql: string, options?: { simple?: boolean }): any {
+      if (options?.simple) {
+        const key = sql.trim();
+        const row = bunDb.query(`PRAGMA ${key}`).get() as Record<string, unknown> | null;
+        return row?.[key] ?? null;
+      }
+      bunDb.exec(`PRAGMA ${sql}`);
+      return undefined;
+    };
+    return bunDb as Database.Database;
+  }
+  const BetterSqlite3 = _require('better-sqlite3');
+  return new BetterSqlite3(dbPath) as Database.Database;
+}
 import type { HealthState } from '../runtimes/types.js';
 
 const CLOISTER_DB_PATH = join(PANOPTICON_HOME, 'cloister.db');
@@ -49,7 +72,7 @@ export function initHealthDatabase(): Database.Database {
   }
 
   // Open or create database
-  db = new Database(CLOISTER_DB_PATH);
+  db = openSqliteDb(CLOISTER_DB_PATH);
 
   // Enable WAL mode for better concurrency
   db.pragma('journal_mode = WAL');
