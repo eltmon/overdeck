@@ -105,3 +105,4 @@ Full PRD scope: 22 beads (B0–B21) as specified in `docs/prds/planned/pan-428-d
 ## Specialist Feedback
 
 - **[2026-04-04T01:49Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-04T01:56Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
