@@ -18,7 +18,7 @@ export type SequenceNumber = typeof SequenceNumber.Type
 export const AgentStatus = Schema.Literals(["starting", "running", "stopped", "error", "unknown"])
 export type AgentStatus = typeof AgentStatus.Type
 
-export const AgentPhase = Schema.Literals(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push"])
+export const AgentPhase = Schema.Literals(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"])
 export type AgentPhase = typeof AgentPhase.Type
 
 export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear"])
