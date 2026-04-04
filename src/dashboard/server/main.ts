@@ -10,6 +10,7 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 
 declare const Bun: unknown;
 
@@ -23,9 +24,19 @@ console.log('[panopticon] IssueDataService started');
 startAgentEnrichmentService();
 console.log('[panopticon] AgentEnrichmentService started');
 
-// Clean up enrichment poller on graceful shutdown
-process.once('SIGTERM', () => stopAgentEnrichmentService());
-process.once('SIGINT', () => stopAgentEnrichmentService());
+// Start background conversation lifecycle polling (10s interval)
+startConversationLifecycleService();
+console.log('[panopticon] ConversationLifecycleService started');
+
+// Clean up pollers on graceful shutdown
+process.once('SIGTERM', () => {
+  stopAgentEnrichmentService();
+  stopConversationLifecycleService();
+});
+process.once('SIGINT', () => {
+  stopAgentEnrichmentService();
+  stopConversationLifecycleService();
+});
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 
