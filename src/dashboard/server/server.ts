@@ -99,10 +99,16 @@ const staticRouteLayer = HttpRouter.add(
     const pathService = yield* Path.Path;
 
     // Resolve static directory: PANOPTICON_FRONTEND_DIR env var or default
-    // Use import.meta.dir (Bun) or __dirname (Node) to resolve relative to this file
-    // This file is at src/dashboard/server/server.ts → project root is ../../../
-    const selfDir = typeof import.meta.dir === 'string' ? import.meta.dir : process.cwd();
-    const projectRoot = pathService.resolve(selfDir, '..', '..', '..');
+    // When running from source (Bun): import.meta.dir = src/dashboard/server → ../../.. = project root
+    // When running from bundle (Node): import.meta.url = dist/dashboard/server.js → ../.. = project root
+    // Fallback: CWD (works if started from project root)
+    const selfUrl = new URL(import.meta.url);
+    const selfPath = selfUrl.protocol === 'file:' ? pathService.dirname(selfUrl.pathname) : process.cwd();
+    // Detect if we're in dist/ (bundled) or src/ (source)
+    const inDist = selfPath.includes('/dist/');
+    const projectRoot = inDist
+      ? pathService.resolve(selfPath, '..', '..')  // dist/dashboard/ → project root
+      : pathService.resolve(selfPath, '..', '..', '..'); // src/dashboard/server/ → project root
     const staticDir =
       process.env['PANOPTICON_FRONTEND_DIR'] ??
       pathService.resolve(projectRoot, 'dist', 'dashboard', 'public');

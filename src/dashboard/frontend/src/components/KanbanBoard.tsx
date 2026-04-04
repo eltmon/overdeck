@@ -753,14 +753,32 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const selectedIssue = externalSelectedIssue !== undefined ? externalSelectedIssue : internalSelectedIssue;
   const onSelectIssue = externalOnSelectIssue || setInternalSelectedIssue;
 
-  const rawIssues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted))
-  const issues = rawIssues as unknown as Issue[]
-  const issuesLoading = !useDashboardStore((s) => s.bootstrapComplete)
-  const issuesError = null
+  // Try Zustand store first (event-sourced via WebSocket RPC)
+  // Fall back to React Query polling if store hasn't bootstrapped (e.g. Express server without /ws/rpc)
+  const storeBootstrapped = useDashboardStore((s) => s.bootstrapComplete);
+  const storeIssues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
+  const storeAgents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const storeSpecialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
 
-  // Agents and specialists from Zustand store (event-sourced — no polling)
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
+  // React Query fallback — only fetches if store hasn't bootstrapped
+  const { data: polledIssues, isLoading: polledLoading, error: polledError } = useQuery({
+    queryKey: ['issues', cycleFilter, includeCompleted],
+    queryFn: () => fetchIssues(cycleFilter, includeCompleted),
+    refetchInterval: storeBootstrapped ? false : 5000,
+    enabled: !storeBootstrapped,
+  });
+  const { data: polledAgents = [] } = useQuery({
+    queryKey: ['agents'],
+    queryFn: async () => { const r = await fetch('/api/agents'); return r.json(); },
+    refetchInterval: storeBootstrapped ? false : 5000,
+    enabled: !storeBootstrapped,
+  });
+
+  const issues = storeBootstrapped ? storeIssues : (polledIssues ?? []);
+  const issuesLoading = storeBootstrapped ? false : polledLoading;
+  const issuesError = storeBootstrapped ? null : (polledError ?? null);
+  const agents = storeBootstrapped ? storeAgents : polledAgents;
+  const specialists = storeBootstrapped ? storeSpecialists : [];
 
   // DnD sensors
   const sensors = useSensors(
