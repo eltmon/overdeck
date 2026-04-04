@@ -47,6 +47,7 @@
 | [cost-tracking.md](./cost-tracking.md) | Cost tracking: live recording, reconciler, session-to-agent mapping, SQLite schema |
 | [TLDR.md](./TLDR.md) | TLDR code analysis — architecture, hooks, index lifecycle, API |
 | [CONFIGURATION.md § External Services](./CONFIGURATION.md#external-service-integrations) | Cloudflare tunnels, Hume EVI, and adding new integrations |
+| [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format — spec reference, Panopticon extensions, field reference |
 
 ---
 
