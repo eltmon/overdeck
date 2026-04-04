@@ -1,18 +1,16 @@
 /**
- * Shared IssueDataService singleton — used by both domain-services (snapshot)
- * and issue route handlers (polling). Avoids circular imports.
+ * Shared IssueDataService singleton — used by read model (bootstrap),
+ * route handlers (force-refresh, diagnostics), and event emission.
  */
 import { IssueDataService } from './issue-data-service.js';
 import { CacheService } from './cache-service.js';
-
-const noopIo = { emit: () => {}, on: () => {} } as any;
 
 let _service: IssueDataService | null = null;
 let _startPromise: Promise<void> | null = null;
 
 export function getSharedIssueService(): IssueDataService {
   if (!_service) {
-    _service = new IssueDataService(noopIo, new CacheService());
+    _service = new IssueDataService(new CacheService());
   }
   return _service;
 }

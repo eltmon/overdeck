@@ -74,7 +74,6 @@ import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
@@ -96,18 +95,9 @@ const panopticonVersion: string = readPackageVersion();
 
 // ─── IssueDataService singleton (for cache-status) ───────────────────────────
 
-const noopIo = { emit: () => {}, on: () => {} } as any;
-let _issueDataService: IssueDataService | null = null;
-
 function getIssueDataService(): IssueDataService {
-  if (!_issueDataService) {
-    const cache = new CacheService();
-    _issueDataService = new IssueDataService(noopIo, cache);
-    _issueDataService.start().catch((err: unknown) => {
-      console.error('[misc-route] IssueDataService.start() failed:', err);
-    });
-  }
-  return _issueDataService;
+  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
+  return getSharedIssueService();
 }
 
 // ─── Project mappings helpers ─────────────────────────────────────────────────

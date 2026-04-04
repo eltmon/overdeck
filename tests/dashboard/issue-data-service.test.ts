@@ -80,7 +80,7 @@ describe('IssueDataService - getIssues cycle filter', () => {
       isStale: vi.fn(() => true),
       invalidate: vi.fn(),
     };
-    service = new IssueDataService(mockIo, mockCache);
+    service = new IssueDataService(mockCache);
   });
 
   afterEach(() => {
