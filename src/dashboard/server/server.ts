@@ -159,7 +159,6 @@ const staticRouteLayer = HttpRouter.add(
 // ─── Route composition ────────────────────────────────────────────────────────
 
 export const makeRoutesLayer = Layer.mergeAll(
-  HttpRouter.cors(),
   healthRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,
@@ -201,7 +200,7 @@ export const makeServerLayer = Layer.unwrap(
     );
 
     const serverApplicationLayer = Layer.mergeAll(
-      HttpRouter.serve(makeRoutesLayer),
+      HttpRouter.serve(makeRoutesLayer, { disableLogger: true }),
       httpListeningLayer,
     );
 

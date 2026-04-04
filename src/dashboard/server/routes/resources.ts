@@ -22,6 +22,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerResponse } from 'effect/unstable/http';
 
 import { DockerStatsCollector } from '../../../lib/docker-stats.js';
+import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
 
@@ -190,6 +191,7 @@ const deleteDockerContainerRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     if (!/^[a-f0-9]{12,64}$/.test(id)) {
       return HttpServerResponse.json({ error: 'Invalid container ID' }, { status: 400 });
@@ -198,6 +200,7 @@ const deleteDockerContainerRoute = HttpRouter.add(
     return yield* Effect.tryPromise({
       try: async () => {
         await execAsync(`docker rm "${id}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
+        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return HttpServerResponse.json({ ok: true });
       },
       catch: (error: unknown) => {
@@ -214,9 +217,11 @@ const postPruneContainersRoute = HttpRouter.add(
   'POST',
   '/api/resources/docker/prune-containers',
   Effect.gen(function* () {
+    const eventStore = yield* EventStoreService;
     return yield* Effect.tryPromise({
       try: async () => {
         const { stdout } = await execAsync('docker container prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 });
+        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return HttpServerResponse.json({ ok: true, output: stdout.trim() });
       },
       catch: (error: unknown) => {
@@ -235,6 +240,7 @@ const deleteDockerNetworkRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)) {
       return HttpServerResponse.json({ error: 'Invalid network name' }, { status: 400 });
@@ -243,6 +249,7 @@ const deleteDockerNetworkRoute = HttpRouter.add(
     return yield* Effect.tryPromise({
       try: async () => {
         await execAsync(`docker network rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
+        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return HttpServerResponse.json({ ok: true });
       },
       catch: (error: unknown) => {
@@ -261,6 +268,7 @@ const deleteDockerVolumeRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)) {
       return HttpServerResponse.json({ error: 'Invalid volume name' }, { status: 400 });
@@ -269,6 +277,7 @@ const deleteDockerVolumeRoute = HttpRouter.add(
     return yield* Effect.tryPromise({
       try: async () => {
         await execAsync(`docker volume rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
+        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return HttpServerResponse.json({ ok: true });
       },
       catch: (error: unknown) => {
@@ -285,9 +294,11 @@ const postPruneVolumesRoute = HttpRouter.add(
   'POST',
   '/api/resources/docker/prune-volumes',
   Effect.gen(function* () {
+    const eventStore = yield* EventStoreService;
     return yield* Effect.tryPromise({
       try: async () => {
         const { stdout } = await execAsync('docker volume prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 });
+        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return HttpServerResponse.json({ ok: true, output: stdout.trim() });
       },
       catch: (error: unknown) => {

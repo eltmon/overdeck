@@ -21,6 +21,7 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { readEvents } from '../../../lib/costs/index.js';
@@ -263,6 +264,7 @@ const postConvoysStartRoute = HttpRouter.add(
     }
 
     const { template, context } = body;
+    const eventStore = yield* EventStoreService;
 
     if (!template) {
       return HttpServerResponse.json({ error: 'Template name is required' }, { status: 400 });
@@ -278,6 +280,9 @@ const postConvoysStartRoute = HttpRouter.add(
     return yield* Effect.tryPromise({
       try: async () => {
         const convoy = await startConvoy(template, context as ConvoyContext);
+        if ((context as ConvoyContext).issueId) {
+          Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId: (context as ConvoyContext).issueId } }));
+        }
         return HttpServerResponse.json(convoy);
       },
       catch: (error: unknown) => {

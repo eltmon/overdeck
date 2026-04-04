@@ -130,7 +130,12 @@ services:
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.rule=Host(`api-{{FEATURE_FOLDER}}.pan.localhost`)"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.entrypoints=websecure"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.tls=true"
+      - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.middlewares=pan-cors-{{FEATURE_FOLDER}}"
       - "traefik.http.services.pan-api-{{FEATURE_FOLDER}}.loadbalancer.server.port=3011"
+      - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH"
+      - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolalloworiginlist=https://{{FEATURE_FOLDER}}.pan.localhost"
+      - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With"
+      - "traefik.http.middlewares.pan-cors-{{FEATURE_FOLDER}}.headers.accesscontrolallowcredentials=true"
 
 volumes:
   bun-store:

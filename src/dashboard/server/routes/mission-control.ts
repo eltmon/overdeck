@@ -27,6 +27,7 @@ import { promisify } from 'node:util';
 
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { EventStoreService } from '../services/domain-services.js';
 
 import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
@@ -475,6 +476,7 @@ const postMissionControlStatusReviewRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -708,6 +710,7 @@ ${issueContext ? `## Issue Tracker Data\n${issueContext}\n` : ''}---
         writeFileSync(statusReviewPath, review, 'utf-8');
         writeFileSync(hashPath, contentHash, 'utf-8');
 
+        Effect.runSync(eventStore.append({ type: 'planning.sync', timestamp: new Date().toISOString(), payload: { issueId, status: 'reviewing' } }));
         return HttpServerResponse.json({ success: true, statusReview: review, reviewedAt: now });
       },
       catch: (error: unknown) => {
@@ -948,6 +951,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -970,6 +974,8 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
           }
         }
 
+        const sessionName = `planning-${issueLower}`;
+        Effect.runSync(eventStore.append({ type: 'planning.started', timestamp: new Date().toISOString(), payload: { issueId, sessionName } }));
         return HttpServerResponse.json({ success: true, path: planningDir });
       },
       catch: (error: unknown) => {
