@@ -7,32 +7,47 @@ How Panopticon's TypeScript source is built into distributable artifacts.
 | Command | What it does |
 |---------|-------------|
 | `npm run build` | Full build: CLI + scripts + dashboard (frontend + server) |
-| `npm run build:cli` | CLI only via tsup → `dist/cli/index.js`, `dist/index.js` |
-| `npm run build:scripts` | Helper scripts via esbuild → `scripts/record-cost-event.js` |
-| `npm run build:dashboard` | Dashboard frontend (Vite) + server (esbuild) |
+| `npm run build:cli` | CLI via tsdown → `dist/cli/index.js`, `dist/index.js` |
+| `npm run build:contracts` | Contracts via tsdown → `packages/contracts/dist/` (ESM + CJS) |
+| `npm run build:scripts` | Helper scripts via tsdown → `scripts/record-cost-event.js` |
+| `npm run build:dashboard` | Dashboard frontend (Vite) + server (tsdown) |
 | `npm run build:dashboard:frontend` | React frontend → `dist/dashboard/public/` |
-| `npm run build:dashboard:server` | Express server → `dist/dashboard/server.js` + copies prompt templates |
+| `npm run build:dashboard:server` | Effect server → `dist/dashboard/server.js` + copies prompt templates |
 | `npm run dev` | Development mode via tsx watch (runs from source, no build needed) |
 
 ## Build Tools
 
-### tsup (CLI)
+### tsdown (CLI, Server, Contracts, Scripts)
 
-Configured in `tsup.config.ts`. Bundles the CLI and library entry points.
+All TypeScript bundling uses [tsdown](https://tsdown.dev/) (powered by Rolldown, the Rust-based bundler). Four separate configs:
 
+**CLI** — `tsdown.config.ts` (repo root)
 - **Entry points**: `src/cli/index.ts`, `src/index.ts`
 - **Format**: ESM
-- **Output**: `dist/cli/index.js`, `dist/index.js`
-- **`clean: true`**: Wipes `dist/` before building (dashboard build runs after, so this is fine)
+- **Output**: `dist/cli/index.js`, `dist/index.js`, plus type declarations
+- **`shims: true`**: Auto-injects `createRequire`, `__filename`, `__dirname` for ESM→CJS interop
+- **`deps.alwaysBundle`**: Workspace packages (`@panopticon/*`) are bundled into the output
+- **`clean: true`**: Wipes `dist/` before building (dashboard build runs after)
 
-### esbuild (Dashboard Server)
+**Dashboard Server** — `src/dashboard/server/tsdown.config.ts`
+- **Entry point**: `main.ts` → `dist/dashboard/server.js`
+- **Format**: ESM, platform: node
+- **`shims: true`**: Auto-injects `createRequire`, `__filename`, `__dirname`
+- **`deps.alwaysBundle`**: `@panopticon/*` workspace packages
+- **`deps.neverBundle`**: Native bindings (`node-pty`, `better-sqlite3`, `ssh2`) and Bun-specific modules (`bun:*`, `@effect/platform-bun/*`)
+- **`clean: false`**: Preserves `dist/dashboard/public/` (frontend build output)
+- **Code-split**: Rolldown produces multiple chunks (entry + shared modules)
 
-Configured in `src/dashboard/server/esbuild.config.mjs`. Bundles the Express server into a single file.
+**Contracts** — `packages/contracts/tsdown.config.ts`
+- **Entry point**: `src/index.ts`
+- **Format**: ESM (`.mjs`) + CJS (`.cjs`) dual output
+- **Output**: `packages/contracts/dist/`
+- **Type declarations**: `.d.mts`
+- Note: TypeScript consumers still import from raw source (`./src/index.ts`) via the `exports` map. Only the CJS `require` path uses compiled output.
 
-- **Entry point**: `src/dashboard/server/index.ts`
-- **Output**: `dist/dashboard/server.js`
-- **Format**: ESM with CJS compatibility shims
-- **External**: `node-pty`, `better-sqlite3`, `ssh2` (native modules)
+**Cost Script** — `scripts/tsdown.config.ts`
+- **Entry point**: `record-cost-event.ts` → `scripts/record-cost-event.js`
+- **Standalone**: Bundles everything (including `better-sqlite3` JS wrapper) for deployment to `~/.panopticon/bin/`
 
 ### Vite (Dashboard Frontend)
 
@@ -45,12 +60,11 @@ Standard Vite + React build configured in `src/dashboard/frontend/`.
 
 **This is a critical detail that affects runtime file resolution.**
 
-esbuild bundles all server code into a single `dist/dashboard/server.js`. The esbuild config includes a footer that polyfills `__dirname`:
+tsdown bundles server code into `dist/dashboard/server.js` (plus code-split chunks). The `shims: true` option auto-injects `__dirname` resolution for ESM:
 
 ```javascript
-var __dirname = (await import('path')).dirname(
-  (await import('url')).fileURLToPath(import.meta.url)
-);
+// Injected by tsdown shims
+var __dirname = /* dirname of import.meta.url */;
 ```
 
 This means `__dirname` in the bundled code resolves to **`dist/dashboard/`** — the directory where `server.js` lives. Any code that uses `join(__dirname, 'relative/path')` must have files placed relative to `dist/dashboard/`, not relative to the original source location.
@@ -85,10 +99,13 @@ After `npm run build`:
 ```
 dist/
 ├── cli/
-│   └── index.js              # CLI entry point (tsup)
-├── index.js                   # Library entry point (tsup)
+│   ├── index.js              # CLI entry point (tsdown)
+│   └── index.d.ts            # CLI type declaration
+├── index.js                   # Library entry point (tsdown)
+├── index.d.ts                 # Library type declaration
 ├── dashboard/
-│   ├── server.js              # Express server bundle (esbuild)
+│   ├── server.js              # Effect server entry (tsdown)
+│   ├── *.js                   # Server code-split chunks (tsdown/Rolldown)
 │   ├── prompts/               # Specialist prompt templates (copied)
 │   │   ├── merge-agent.md
 │   │   ├── review-agent.md
@@ -100,7 +117,7 @@ dist/
 │       └── assets/
 │           ├── index-*.css
 │           └── index-*.js
-├── *.js                       # CLI command chunks (tsup code-split)
+├── *.js                       # CLI code-split chunks (tsdown/Rolldown)
 └── *.js.map                   # Source maps
 ```
 
@@ -129,6 +146,6 @@ If new non-JS files need to be available at runtime (templates, configs, etc.):
 
 **"Template not found" errors**: The prompt `.md` files are missing from `dist/dashboard/prompts/`. Run `npm run build:dashboard:server` to copy them, or do a full `npm run build`.
 
-**"Module not found" for native modules**: `better-sqlite3`, `node-pty`, and `ssh2` are marked as external in esbuild and must be installed as runtime dependencies. Run `npm rebuild better-sqlite3` after Node.js version changes.
+**"Module not found" for native modules**: `better-sqlite3`, `node-pty`, and `ssh2` are marked as external in the tsdown config (`deps.neverBundle`) and must be installed as runtime dependencies. Run `npm rebuild better-sqlite3` after Node.js version changes.
 
 **Frontend not updating**: Vite builds to `dist/dashboard/public/`. If changes don't appear, clear browser cache or check that `build:dashboard:frontend` ran.

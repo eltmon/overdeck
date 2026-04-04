@@ -54,8 +54,8 @@ This means:
 
 ## Project Structure
 
-- **Stack**: TypeScript, Node.js 22+, React dashboard, SQLite, Socket.io
-- **Build**: `npm run build` (esbuild for server, vite for frontend)
+- **Stack**: TypeScript, Node.js 22+, React dashboard, SQLite, Effect.js
+- **Build**: `npm run build` (tsdown for CLI/server/contracts, Vite for frontend)
 - **Dev**: `npm run dev` (tsx watch)
 - **Dashboard**: Must use Node 22 — `node dist/dashboard/server.js` from repo root
 - **Issue tracking**: GitHub Issues (PAN-XXX prefix), NOT Linear
@@ -74,35 +74,34 @@ await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
 
 Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
 
-## Dashboard Terminal WebSocket Architecture
+## Dashboard Terminal Architecture (Effect RPC)
 
-The dashboard shows live terminal output via a WebSocket endpoint (`/ws/terminal?session=<name>`).
+The dashboard shows live terminal output via Effect RPC over a single WebSocket at `/ws/rpc`.
 
-The server uses `node-pty` to spawn `tmux attach-session` for real-time terminal emulation
-(ANSI escape sequences, cursor positioning, alternate screen buffer).
+All terminal methods are part of `PanRpcGroup` (defined in `@panopticon/contracts`):
+- `subscribeTerminal(sessionName, cols, rows)` → `Stream<TerminalOutput>` — live PTY data
+- `terminalWrite(sessionName, data)` — send keyboard input
+- `terminalResize(sessionName, cols, rows)` — resize the PTY
+- `terminalClose(sessionName)` — close the session
 
-**CRITICAL: Defer PTY spawn + suppress stale data (PAN-417).**
+**Server side**: `TerminalService` (`src/dashboard/server/services/terminal-service.ts`)
+manages PTY lifecycle. Uses `node-pty` on Node, `Bun.spawn()` on Bun. Implements deferred
+PTY spawn — the PTY is not started until `subscribeTerminal` provides initial dimensions.
 
-Both local and remote handlers MUST wait for the first `resize` message from the client
-before spawning the PTY/SSH session. This ensures the PTY starts at the correct dimensions.
+**Client side**: `XTerminal.tsx` uses `WsTransport.subscribe()` for the data stream and
+`WsTransport.request()` for write/resize/close. Auto-reconnection is built into the
+transport layer — no manual WebSocket management needed.
 
-- **Local**: `startLocalPty(cols, rows)` — spawns PTY only on first resize message
-- **Remote**: `startFly(cols, rows)` — spawns SSH only on first resize message
-- **Client** (`XTerminal.tsx`): Sends dimensions immediately on WebSocket open
-
-**Stale data suppression (local path):** When the PTY attaches, tmux sends the screen
-content rendered at the OLD size (80×24 default). This stale burst must be **suppressed**
-for ~200ms. After the delay, forwarding starts and a dimension toggle (`cols→cols-1→cols`)
-forces two SIGWINCHs, guaranteeing Claude fully repaints its TUI at the correct size.
-Without this, the stale 80×24 content appears garbled in the wider xterm.js terminal.
+**Stale data suppression**: When the PTY attaches, tmux sends content rendered at the
+OLD size (80×24 default). This burst is suppressed for ~200ms, then a dimension toggle
+forces SIGWINCHs to guarantee a full repaint at the correct size.
 
 **Session lifecycle rules:**
-- On WebSocket close, do NOT kill the PTY — just remove from tracking. The PTY exits
-  naturally when pipes close. The tmux session survives independently.
-- Do NOT pre-resize tmux windows to arbitrary large sizes (e.g., 200×50). Let the PTY
-  spawn handle sizing via the client's actual dimensions.
-- The local planning launcher script MUST export TERM/COLORTERM/LANG (matching the
-  remote launcher) for proper Claude Code rendering.
+- On subscription end, do NOT kill the PTY — the tmux session survives independently.
+- Do NOT pre-resize tmux windows to arbitrary large sizes. Let the PTY spawn handle
+  sizing via the client's actual dimensions from `subscribeTerminal`.
+- The local planning launcher script MUST export TERM/COLORTERM/LANG for proper
+  Claude Code rendering.
 
 ## Verification Gate (PAN-174)
 
