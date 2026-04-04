@@ -17,6 +17,7 @@ import { getTransport, type PanRpcProtocolClient } from '../lib/wsTransport'
 import type { DomainEvent, DashboardSnapshot } from '@panopticon/contracts'
 import { WS_METHODS } from '@panopticon/contracts'
 import { Stream } from 'effect'
+import { loadSnapshotFromCache } from '../lib/snapshotCache'
 
 // ─── EventRouter component ────────────────────────────────────────────────────
 
@@ -31,6 +32,12 @@ export function EventRouter() {
     const transport = getTransport()
     const coordinator = createRecoveryCoordinator()
     recovery.current = coordinator
+
+    // ── Instant render: load from localStorage cache ─────────────────────────
+    const cached = loadSnapshotFromCache()
+    if (cached) {
+      syncSnapshot(cached)
+    }
 
     // ── Bootstrap: fetch initial snapshot ───────────────────────────────────
     async function bootstrap() {
