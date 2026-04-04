@@ -1847,9 +1847,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       if (confirmingStartTimer.current) clearTimeout(confirmingStartTimer.current);
       startAgentMutation.mutate();
     } else {
-      // First click — show inline confirm, auto-reset after 3s
+      // First click — show inline confirm, auto-reset after 6s
       setConfirmingStart(true);
-      confirmingStartTimer.current = setTimeout(() => setConfirmingStart(false), 3000);
+      confirmingStartTimer.current = setTimeout(() => setConfirmingStart(false), 6000);
     }
   };
 
