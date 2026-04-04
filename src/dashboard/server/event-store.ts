@@ -8,14 +8,16 @@
  * - Dual-runtime: bun:sqlite on Bun, better-sqlite3 on Node
  *
  * Usage:
- *   const store = createEventStore();
+ *   const store = await initEventStore();
  *   const seq = store.append({ type: 'agent.started', ... });
  *   const past = store.readFrom(0);
  *   const unsub = store.subscribe(event => console.log(event));
  */
 
 import { EventEmitter } from 'node:events';
-import { getDatabase } from '../../lib/database/index.js';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { getPanopticonHome } from '../../lib/paths.js';
 import type { DomainEvent } from '@panopticon/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -39,6 +41,21 @@ export interface EventStore {
   subscribe(fn: EventSubscriber): Unsubscribe;
   /** Run 7-day retention compaction. Called at startup. */
   compact(): void;
+  /** Return the highest sequence number in the store (0 if empty). */
+  getLatestSequence(): number;
+}
+
+// ─── Minimal DB interface (compatible with bun:sqlite and better-sqlite3) ────
+
+interface PreparedStatement<R = Record<string, unknown>> {
+  run(params?: Record<string, unknown>): { changes: number };
+  get(params?: Record<string, unknown>): R | undefined | null;
+  all(params?: Record<string, unknown>): R[];
+}
+
+export interface DbAdapter {
+  prepare<R = Record<string, unknown>>(sql: string): PreparedStatement<R>;
+  exec(sql: string): void;
 }
 
 // ─── Row shape from SQLite ─────────────────────────────────────────────────────
@@ -59,49 +76,90 @@ function rowToStored(row: EventRow): StoredEvent {
   };
 }
 
+// ─── Runtime-aware DB initializer ────────────────────────────────────────────
+
+declare const Bun: unknown;
+
+/**
+ * Open the panopticon.db database using the appropriate driver for the runtime.
+ * Under Bun: uses bun:sqlite (native, no native addons needed).
+ * Under Node: uses the shared getDatabase() which applies migrations.
+ */
+export async function openEventDb(): Promise<DbAdapter> {
+  const home = getPanopticonHome();
+  if (!existsSync(home)) {
+    mkdirSync(home, { recursive: true });
+  }
+  const dbPath = join(home, 'panopticon.db');
+
+  if (typeof Bun !== 'undefined') {
+    const { Database } = await import('bun:sqlite');
+    const db = new Database(dbPath, { create: true });
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA foreign_keys = ON');
+    db.exec('PRAGMA synchronous = NORMAL');
+    // Ensure events table exists (Bun doesn't run the shared schema migrations)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS events (
+        sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
+        type      TEXT    NOT NULL,
+        timestamp TEXT    NOT NULL,
+        payload   TEXT    NOT NULL DEFAULT '{}'
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS events_timestamp_idx ON events (timestamp)`);
+    return db as unknown as DbAdapter;
+  } else {
+    // Node.js: use shared database connection — migrations run there
+    const { getDatabase } = await import('../../lib/database/index.js');
+    return getDatabase() as unknown as DbAdapter;
+  }
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 /**
- * Create and initialize an EventStore backed by panopticon.db.
- * Runs compaction on first call. Safe to call multiple times — returns the same
- * singleton (singleton is managed by the caller via module-level export below).
+ * Create an EventStore from a pre-opened DbAdapter.
+ * Call openEventDb() first to get the adapter.
  */
-export function createEventStore(): EventStore {
-  const db = getDatabase();
+export function createEventStore(db: DbAdapter): EventStore {
   const emitter = new EventEmitter();
   // Allow many subscribers (one per WebSocket connection)
   emitter.setMaxListeners(0);
 
   // Prepared statements for hot path performance
-  const insertStmt = db.prepare<{ type: string; timestamp: string; payload: string }, void>(
-    `INSERT INTO events (type, timestamp, payload) VALUES ($type, $timestamp, $payload)`,
+  // Use :name syntax — both better-sqlite3 and bun:sqlite accept { name: value } params
+  const insertStmt = db.prepare<void>(
+    `INSERT INTO events (type, timestamp, payload) VALUES (:type, :timestamp, :payload)`,
   );
-
-  const readFromStmt = db.prepare<{ fromSequence: number }, EventRow>(
-    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > $fromSequence ORDER BY sequence ASC`,
+  const readFromStmt = db.prepare<EventRow>(
+    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > :fromSequence ORDER BY sequence ASC`,
   );
-
-  const compactStmt = db.prepare<{ cutoff: string }, void>(
-    `DELETE FROM events WHERE timestamp < $cutoff`,
+  const compactStmt = db.prepare<void>(
+    `DELETE FROM events WHERE timestamp < :cutoff`,
+  );
+  const latestSeqStmt = db.prepare<{ seq: number | null }>(
+    `SELECT MAX(sequence) AS seq FROM events`,
+  );
+  const lastRowIdStmt = db.prepare<{ sequence: number }>(
+    `SELECT last_insert_rowid() AS sequence`,
   );
 
   function append(event: Omit<DomainEvent, 'sequence'>): number {
-    const timestamp = event.timestamp ?? new Date().toISOString();
-    const payload = JSON.stringify((event as Record<string, unknown>).payload ?? {});
+    const timestamp =
+      (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
+    const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
     insertStmt.run({ type: event.type, timestamp, payload });
 
-    // Read back the sequence number assigned by SQLite AUTOINCREMENT
-    const row = db.prepare<[], { sequence: number }>(
-      `SELECT last_insert_rowid() AS sequence`,
-    ).get();
+    const row = lastRowIdStmt.get();
     const sequence = row?.sequence ?? 0;
 
     const stored: StoredEvent = {
       sequence,
       type: event.type,
       timestamp,
-      payload: (event as Record<string, unknown>).payload ?? {},
+      payload: (event as Record<string, unknown>)['payload'] ?? {},
     };
 
     emitter.emit('event', stored);
@@ -126,21 +184,47 @@ export function createEventStore(): EventStore {
     }
   }
 
-  return { append, readFrom, subscribe, compact };
+  function getLatestSequence(): number {
+    const row = latestSeqStmt.get();
+    return row?.seq ?? 0;
+  }
+
+  return { append, readFrom, subscribe, compact, getLatestSequence };
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────
 
 let _store: EventStore | null = null;
+let _initPromise: Promise<EventStore> | null = null;
 
 /**
- * Get the process-singleton EventStore.
- * Creates and compacts on first call.
+ * Initialize and return the process-singleton EventStore (async, Bun-compatible).
+ * Idempotent — returns the same store on subsequent calls.
+ */
+export async function initEventStore(): Promise<EventStore> {
+  if (_store) return _store;
+  if (_initPromise) return _initPromise;
+
+  _initPromise = openEventDb().then((db) => {
+    const store = createEventStore(db);
+    store.compact();
+    _store = store;
+    return store;
+  });
+
+  return _initPromise;
+}
+
+/**
+ * Synchronous accessor — returns the store if already initialized, throws otherwise.
+ * Used by legacy callers that expect a sync API (event-store unit tests, etc.)
  */
 export function getEventStore(): EventStore {
   if (!_store) {
-    _store = createEventStore();
-    _store.compact();
+    throw new Error(
+      '[event-store] getEventStore() called before initEventStore() resolved. ' +
+      'Use initEventStore() for async initialization.',
+    );
   }
   return _store;
 }
