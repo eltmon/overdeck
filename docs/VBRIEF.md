@@ -96,11 +96,13 @@ The vBRIEF spec supports arbitrary `metadata` on items and subItems. Panopticon 
 | `metadata.issueLabel` | items | Issue ID for beads label filtering (e.g., `"pan-436"`) |
 | `metadata.kind` | subItems | `"acceptance_criterion"` — marks subItem as an AC for verification gate |
 
-These extensions are NOT part of the vBRIEF core spec. We've opened a feature request to standardize them:
+These extensions are NOT part of the vBRIEF core spec. We've opened a feature request to standardize them as first-class fields:
 
-**[vBRIEF Issue #XX: Support for difficulty, issue labels, and AC kind](https://github.com/deftai/vBRIEF/issues/XX)**
+**[deftai/vBRIEF#1: Proposal: add difficulty, issueRef, and kind fields to PlanItem](https://github.com/deftai/vBRIEF/issues/1)**
 
-If you use Panopticon and want these fields standardized in the vBRIEF spec, please comment on that issue.
+If you use Panopticon and want these fields standardized in the vBRIEF spec, please comment on that issue. Until they're accepted, we use `metadata` as the workaround per vBRIEF Section 2.1's unknown-field preservation rule.
+
+We also maintain a [fork of the vBRIEF spec](https://github.com/eltmon/vBRIEF) in case we need to extend the schema before upstream adoption.
 
 ## Common Mistakes
 
