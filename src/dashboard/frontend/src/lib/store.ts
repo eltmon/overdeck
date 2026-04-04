@@ -90,6 +90,7 @@ function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): Dashb
     specialistsByName,
     reviewStatusByIssueId,
     resources: snapshot.resources ?? null,
+    issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
   }
 }
 
@@ -292,6 +293,18 @@ export const selectAgentOutput =
 export const selectIsBootstrapped = (s: DashboardState): boolean => s.bootstrapComplete
 
 export const selectResources = (s: DashboardState): ResourceStats | null => s.resources
+
+export const selectIssues = (s: DashboardState): unknown[] => s.issuesRaw
+
+export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =>
+  (s: DashboardState): unknown[] => {
+    const issues = s.issuesRaw as Array<Record<string, unknown>>
+    if (includeCompleted) return issues
+    return issues.filter(
+      (i) => i['state'] !== 'done' && i['state'] !== 'canceled' &&
+             i['canonicalStatus'] !== 'done' && i['canonicalStatus'] !== 'canceled',
+    )
+  }
 
 // ─── Export pure functions for testing ────────────────────────────────────────
 

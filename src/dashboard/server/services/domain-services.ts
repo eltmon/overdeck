@@ -124,7 +124,13 @@ export const SnapshotServiceLive = Layer.effect(
         prUrl: rs.prUrl,
       }));
 
-      return { sequence, agents, specialists, reviewStatuses, timestamp };
+      // ── Issues from IssueDataService cache (lazy import to avoid circular deps) ─
+      const { getSharedIssueService, startSharedIssueService } =
+        yield* Effect.promise(() => import('./issue-service-singleton.js'));
+      startSharedIssueService(); // non-blocking start
+      const issues = getSharedIssueService().getIssues();
+
+      return { sequence, agents, specialists, reviewStatuses, issues, timestamp };
     });
 
     return { getSnapshot };

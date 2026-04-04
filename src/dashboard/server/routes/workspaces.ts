@@ -50,6 +50,7 @@ import {
 } from '../../../lib/projects.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
+import { EventStoreService } from '../services/domain-services.js';
 import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
@@ -2498,6 +2499,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -2694,6 +2696,11 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
           if (result.success) {
             console.log(`[request-review] Spawned review specialist for ${issueId}`);
+            Effect.runSync(eventStore.append({
+              type: 'pipeline.review-completed',
+              timestamp: new Date().toISOString(),
+              payload: { issueId, status: 'reviewing' },
+            }));
             return HttpServerResponse.json({
               success: true,
               queued: false,
@@ -3259,10 +3266,18 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
         const result = await triggerMerge(issueId);
+        if (result.success) {
+          Effect.runSync(eventStore.append({
+            type: 'pipeline.merge-ready',
+            timestamp: new Date().toISOString(),
+            payload: { issueId, mergeStatus: result.mergeStatus ?? 'merged' },
+          }));
+        }
         const { statusCode, ...body } = result;
         return HttpServerResponse.json(body, { status: statusCode });
       },

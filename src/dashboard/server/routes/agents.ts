@@ -72,6 +72,7 @@ import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getGitHubConfig, getLinearApiKey } from '../services/tracker-config.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
+import { EventStoreService } from '../services/domain-services.js';
 
 const execAsync = promisify(exec);
 
@@ -683,10 +684,16 @@ const deleteAgentRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
         stopAgent(id);
+        Effect.runSync(eventStore.append({
+          type: 'agent.stopped',
+          timestamp: new Date().toISOString(),
+          payload: { agentId: id },
+        }));
         return HttpServerResponse.json({ success: true });
       },
       catch: (error: unknown) => {
@@ -984,6 +991,7 @@ const postAgentSuspendRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -1001,6 +1009,11 @@ const postAgentSuspendRoute = HttpRouter.add(
           suspendedAt: new Date().toISOString(),
           sessionId: effectiveSessionId,
         });
+        Effect.runSync(eventStore.append({
+          type: 'agent.stopped',
+          timestamp: new Date().toISOString(),
+          payload: { agentId: id },
+        }));
 
         return HttpServerResponse.json({ success: true });
       },
@@ -1306,6 +1319,7 @@ const postAgentsRoute = HttpRouter.add(
   '/api/agents',
   Effect.gen(function* () {
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -1506,6 +1520,11 @@ const postAgentsRoute = HttpRouter.add(
             }
           }
 
+          Effect.runSync(eventStore.append({
+            type: 'agent.started',
+            timestamp: new Date().toISOString(),
+            payload: { agentId: issueId, issueId },
+          }));
           return HttpServerResponse.json({
             success: true,
             message: `Starting remote agent for ${issueId}`,
@@ -1705,6 +1724,11 @@ const postAgentsRoute = HttpRouter.add(
         const activityId = spawnPanCommand(['work', 'issue', issueId, '--phase', phase], workspacePath);
         await updateIssueStatus();
 
+        Effect.runSync(eventStore.append({
+          type: 'agent.started',
+          timestamp: new Date().toISOString(),
+          payload: { agentId: issueId, issueId },
+        }));
         return HttpServerResponse.json({
           success: true,
           message: `Starting agent for ${issueId}`,

@@ -23,8 +23,7 @@ import { Header, Tab } from './components/Header';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
 import { AlertTriangle } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useSocketIssues } from './hooks/useSocketIssues';
-import { useDashboardStore, selectAgentList } from './lib/store';
+import { useDashboardStore, selectAgentList, selectIssues } from './lib/store';
 
 interface TrackerStatusItem {
   type: string;
@@ -65,12 +64,6 @@ function getTabFromPath(): Tab {
   return PATH_TO_TAB[path] || 'kanban';
 }
 
-async function fetchIssues(): Promise<Issue[]> {
-  const res = await fetch('/api/issues');
-  if (!res.ok) throw new Error('Failed to fetch issues');
-  return res.json();
-}
-
 async function fetchTrackerStatus(): Promise<TrackerStatus> {
   const res = await fetch('/api/tracker-status');
   if (!res.ok) throw new Error('Failed to fetch tracker status');
@@ -99,9 +92,6 @@ export default function App() {
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
-
-  // Real-time issue updates via socket.io
-  useSocketIssues();
 
   // Check tracker status for missing API keys
   const { data: trackerStatus } = useQuery({
@@ -135,11 +125,8 @@ export default function App() {
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
-  // Fetch issues to get issue URLs
-  const { data: issues = [] } = useQuery({
-    queryKey: ['issues'],
-    queryFn: fetchIssues,
-  });
+  // Issues from Zustand store (event-sourced via snapshot — no polling)
+  const issues = useDashboardStore(selectIssues) as unknown as Issue[];
 
   // Poll for pending confirmations
   const { data: confirmations = [] } = useQuery({
