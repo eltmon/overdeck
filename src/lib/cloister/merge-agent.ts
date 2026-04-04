@@ -148,7 +148,7 @@ function detectTestCommand(projectPath: string): string {
 /**
  * Notify TLDR daemon to reindex changed files after merge
  */
-async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
+export async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
   try {
     console.log(`[merge-agent] Notifying TLDR daemon to reindex changed files...`);
 
