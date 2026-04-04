@@ -159,6 +159,73 @@ All of these must pass:
 - **External resolution:** Verify that externaled packages with deep paths (e.g., `@effect/platform-bun/BunHttpServer`) are correctly excluded. tsdown might need glob patterns instead.
 - **Dual-runtime dynamic imports:** The `main.ts` file uses `await import('@effect/platform-bun/BunRuntime')` inside a conditional. Verify the bundler doesn't try to resolve this at build time.
 
+## Part 2: Build contracts package with tsdown
+
+Currently `@panopticon/contracts` is consumed as raw TypeScript — `"main": "./src/index.ts"`. This works but diverges from T3Code's pattern where contracts are precompiled. Adding a tsdown build step produces proper `.mjs` + `.cjs` + `.d.ts` outputs, making the package a proper publishable unit.
+
+### Step 7: Add tsdown to contracts
+
+In `packages/contracts/`:
+
+```bash
+bun add --dev tsdown --cwd packages/contracts
+```
+
+### Step 8: Add build scripts to `packages/contracts/package.json`
+
+Update to match T3Code's pattern:
+
+```json
+{
+  "scripts": {
+    "dev": "tsdown src/index.ts --format esm,cjs --dts --watch --clean",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean",
+    "typecheck": "tsc --noEmit"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"]
+}
+```
+
+Note: `types` and the `import` export still point at raw `.ts` source — this gives TypeScript consumers (the server bundler, Vite frontend) direct access to the source types without needing a separate `tsc --build` step. Only the CJS `require` path uses the compiled output.
+
+### Step 9: Wire contracts build into the top-level build
+
+In root `package.json`, update the build order so contracts builds before the server:
+
+```json
+"build:contracts": "cd packages/contracts && npm run build",
+"build:dashboard:server": "npm run build:contracts && cd src/dashboard/server && npm run build && mkdir -p ../../../dist/dashboard/prompts && cp ../../lib/cloister/prompts/*.md ../../../dist/dashboard/prompts/"
+```
+
+### Step 10: Verify contracts build
+
+```bash
+cd packages/contracts && npx tsdown src/index.ts --format esm,cjs --dts --clean
+```
+
+Should produce:
+- `dist/index.mjs` (ESM)
+- `dist/index.cjs` (CJS)
+- `dist/index.d.ts` (types)
+
+### Contracts verification
+
+1. `npm run build:contracts` succeeds
+2. `dist/index.mjs` and `dist/index.cjs` exist in `packages/contracts/`
+3. Server build still resolves `@panopticon/contracts` correctly
+4. Frontend build still resolves `@panopticon/contracts` correctly
+5. All tests pass — no import resolution changes
+
 ## Files Changed
 
 | File | Action |
@@ -167,6 +234,8 @@ All of these must pass:
 | `src/dashboard/server/package.json` | MODIFY — swap esbuild for tsdown, update build script |
 | `src/dashboard/server/esbuild.config.mjs` | DELETE |
 | `src/dashboard/server/esbuild.config.mjs.old` | DELETE (if exists) |
+| `packages/contracts/package.json` | MODIFY — add tsdown build, update exports |
+| `package.json` (root) | MODIFY — add `build:contracts` script, wire into build order |
 | `bun.lock` | AUTO-UPDATE |
 
-No changes to source code. No changes to CLI, frontend, or contracts.
+No changes to source code. No changes to CLI or frontend build.
