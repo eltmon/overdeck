@@ -135,7 +135,7 @@ This is the hot path that records costs as agents work.
 1. Claude Code fires a `PostToolUse` hook after every tool use
 2. The hook payload includes `session_id` and `transcript_path`
 3. `~/.panopticon/bin/heartbeat-hook` (bash) receives this, does heartbeat/activity tracking, then calls `record-cost-event.js`
-4. `record-cost-event.js` (esbuild-bundled TypeScript):
+4. `record-cost-event.js` (tsdown-bundled TypeScript):
    - Reads the byte offset it last processed for this session from `~/.panopticon/costs/state/<session-id>.offset`
    - Opens the transcript JSONL file and reads only NEW bytes from that offset
    - Parses each new line looking for `type: "assistant"` entries with `message.usage`
@@ -164,11 +164,9 @@ The hook resolves issue IDs in this order:
 
 ### Build Requirements
 
-The `record-cost-event.js` is bundled with esbuild. Because it imports `better-sqlite3` (CJS native module) and runs as ESM, the build MUST include:
-- `createRequire` banner for CJS compatibility
-- NO `--external:better-sqlite3` (the script runs standalone from `~/.panopticon/bin/` where `node_modules` is not available)
-
-Build config: `scripts/build-cost-script.mjs`
+The `record-cost-event.js` is bundled with tsdown (`scripts/tsdown.config.ts`). Because it imports `better-sqlite3` (CJS native module) and runs as ESM, the build uses:
+- `shims: true` — auto-injects `createRequire` for CJS compatibility
+- Everything is bundled (the script runs standalone from `~/.panopticon/bin/` where `node_modules` is not available)
 
 ### Error Handling Concern
 
@@ -290,7 +288,7 @@ For the cost breakdown modal (PAN-77), costs need to be attributed by pipeline s
 
 The `build:scripts` command in `package.json` used `--format=esm` without the `createRequire` banner. `better-sqlite3` uses CJS `require("fs")` internally, which fails in ESM without the polyfill. The script crashed with `Dynamic require of "fs" is not supported` but the heartbeat hook swallowed the error silently.
 
-**Fix**: Created `scripts/build-cost-script.mjs` with proper esbuild config matching the server build pattern.
+**Fix**: Created proper build config (originally esbuild, now `scripts/tsdown.config.ts` with `shims: true`).
 
 ### 2. Deacon patrolWorkAgentResolutions — getEnabledSpecialists not defined
 
@@ -310,7 +308,7 @@ The heartbeat hook and record-cost-event.ts only matched `pan|min|aud` in git br
 |------|---------|
 | `scripts/record-cost-event.ts` | Live recording script source |
 | `scripts/record-cost-event.js` | Built bundle (deployed to `~/.panopticon/bin/`) |
-| `scripts/build-cost-script.mjs` | esbuild config for the recording script |
+| `scripts/tsdown.config.ts` | tsdown config for the recording script |
 | `scripts/heartbeat-hook` | Bash hook source (deployed to `~/.panopticon/bin/`) |
 | `src/lib/costs/events.ts` | `appendCostEvent()` — triple-write to JSONL, SQLite, WAL |
 | `src/lib/costs/migration.ts` | Original one-time migration (preserved, superseded by reconciler) |

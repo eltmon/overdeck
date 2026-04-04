@@ -41,7 +41,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [BUILD.md](./BUILD.md) | Build pipeline, esbuild config, `__dirname` resolution, prompt template copying |
+| [BUILD.md](./BUILD.md) | Build pipeline (tsdown + Vite), `__dirname` resolution, prompt template copying |
 | [ARCHITECTURE-CACHING.md](./ARCHITECTURE-CACHING.md) | Dashboard API caching, real-time push, and rate limit management |
 | [DNS_SETUP.md](./DNS_SETUP.md) | Local DNS resolution for development |
 | [cost-tracking.md](./cost-tracking.md) | Cost tracking: live recording, reconciler, session-to-agent mapping, SQLite schema |
@@ -148,7 +148,7 @@
 - **"ETag"** / **"304"** / **"backoff"** → ARCHITECTURE-CACHING.md
 
 ### Build & Development
-- **"build"** / **"esbuild"** / **"tsup"** / **"vite"** → BUILD.md
+- **"build"** / **"tsdown"** / **"rolldown"** / **"vite"** → BUILD.md
 - **"__dirname"** / **"bundled server"** / **"prompt template"** → BUILD.md
 - **"dist"** / **"production build"** → BUILD.md
 
