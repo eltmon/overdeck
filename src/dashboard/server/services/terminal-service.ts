@@ -220,7 +220,15 @@ export const TerminalServiceLive = Layer.effect(
           console.log(`[terminal-service] PTY for ${state.sessionName} exited with code ${exitCode}`);
           state.ptyProcess = null; // Mark dead so resize guards work
           if (state.queue && state.queue.state._tag !== "Done") {
-            Queue.endUnsafe(Queue.asEnqueue(state.queue));
+            if (exitCode !== 0) {
+              // Non-zero exit (e.g., tmux session doesn't exist yet) — fail with error
+              // so WsTransport.subscribe() retries instead of treating it as clean end.
+              Queue.failUnsafe(Queue.asEnqueue(state.queue),
+                new PanRpcError({ message: `PTY exited with code ${exitCode}`, code: 'TERMINAL_PTY_EXIT' }),
+              );
+            } else {
+              Queue.endUnsafe(Queue.asEnqueue(state.queue));
+            }
           }
           sessions.delete(state.sessionName);
         });
