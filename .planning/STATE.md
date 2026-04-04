@@ -101,3 +101,7 @@ Full PRD scope: 22 beads (B0–B21) as specified in `docs/prds/planned/pan-428-d
 - **PRD**: `docs/prds/planned/pan-428-dashboard-data-layer-architecture.md`
 - **T3Code**: `/home/eltmon/Projects/t3code` (server.ts, ws.ts, rpc.ts, store.ts, wsTransport.ts)
 - **Current server**: `src/dashboard/server/index.ts` (15,793 lines, 185 routes)
+
+## Specialist Feedback
+
+- **[2026-04-04T01:49Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
