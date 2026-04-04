@@ -16,7 +16,8 @@ const POLL_INTERVAL_MS = 10_000;
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-async function tmuxSessionExists(sessionName: string): Promise<boolean> {
+/** Exported for testing. Checks whether a named tmux session exists. */
+export async function tmuxSessionExists(sessionName: string): Promise<boolean> {
   try {
     await execAsync(`tmux has-session -t ${sessionName} 2>/dev/null`, { encoding: 'utf-8' });
     return true;
@@ -25,14 +26,20 @@ async function tmuxSessionExists(sessionName: string): Promise<boolean> {
   }
 }
 
-async function pollOnce(): Promise<void> {
+/**
+ * Poll all active conversations and mark as ended any whose tmux session is gone.
+ * Exported for testing — pass a custom sessionChecker to avoid real tmux calls.
+ */
+export async function pollConversations(
+  sessionChecker: (name: string) => Promise<boolean> = tmuxSessionExists,
+): Promise<void> {
   try {
     const conversations = listConversations();
     const active = conversations.filter(c => c.status === 'active');
 
     await Promise.all(
       active.map(async (conv) => {
-        const alive = await tmuxSessionExists(conv.tmuxSession);
+        const alive = await sessionChecker(conv.tmuxSession);
         if (!alive) {
           console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`);
           markConversationEnded(conv.name);
@@ -47,7 +54,7 @@ async function pollOnce(): Promise<void> {
 
 function scheduleNext(): void {
   pollTimer = setTimeout(async () => {
-    await pollOnce();
+    await pollConversations(tmuxSessionExists);
     scheduleNext();
   }, POLL_INTERVAL_MS);
 }
