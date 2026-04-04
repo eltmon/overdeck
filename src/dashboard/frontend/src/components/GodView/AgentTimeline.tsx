@@ -31,7 +31,7 @@ export function AgentTimeline({ agentId }: AgentTimelineProps) {
       if (!res.ok) return { timeline: [] };
       return res.json() as Promise<{ timeline: TimelineEvent[] }>;
     },
-    refetchInterval: 15000,
+    refetchInterval: 30000,
     enabled: !!agentId,
   });
 

@@ -96,7 +96,7 @@ export function CloisterStatusBar() {
       if (!res.ok) return null;
       return res.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   const runningEphemeral: Array<{ projectKey: string; specialistType: string }> =

@@ -25,7 +25,7 @@ export function FileActivityTree({ agentId }: FileActivityTreeProps) {
       if (!res.ok) return { files: [] };
       return res.json() as Promise<{ files: FileEntry[] }>;
     },
-    refetchInterval: 15000,
+    refetchInterval: 30000,
     enabled: !!agentId,
   });
 

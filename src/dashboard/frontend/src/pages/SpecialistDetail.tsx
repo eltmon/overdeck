@@ -121,7 +121,7 @@ export function SpecialistDetail() {
     queryKey: ['grace-period', project, type],
     queryFn: () => fetchGracePeriod(project!, type!),
     enabled: !!project && !!type,
-    refetchInterval: 1000,
+    refetchInterval: 30000,
   });
 
   const regenerateMutation = useMutation({

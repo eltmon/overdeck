@@ -135,7 +135,7 @@ export function HandoffsPage() {
   const { data: handoffsData, isLoading: isLoadingHandoffs } = useQuery({
     queryKey: ['handoffs'],
     queryFn: () => fetchHandoffs(50),
-    refetchInterval: 10000, // Refresh every 10 seconds
+    refetchInterval: 30000, // Refresh every 10 seconds
   });
 
   const { data: stats, isLoading: isLoadingStats } = useQuery({
@@ -147,7 +147,7 @@ export function HandoffsPage() {
   const { data: specialistHandoffsData, isLoading: isLoadingSpecialistHandoffs } = useQuery({
     queryKey: ['specialist-handoffs'],
     queryFn: () => fetchSpecialistHandoffs(50),
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   const { data: specialistStats, isLoading: isLoadingSpecialistStats } = useQuery({

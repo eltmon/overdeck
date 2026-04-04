@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDashboardStore, selectAgentList, selectSpecialistList } from '../lib/store';
 import { Brain, Cpu, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle } from 'lucide-react';
 import { type SpecialistAgent } from './SpecialistAgentCard';
 import { IssueAgentCard, type IssueAgent, type CloisterHealth } from './IssueAgentCard';
@@ -36,19 +37,6 @@ interface ActivityEntry {
 interface AgentListProps {
   selectedAgent: string | null;
   onSelectAgent: (agentId: string | null) => void;
-}
-
-async function fetchAgents(): Promise<IssueAgent[]> {
-  const res = await fetch('/api/agents');
-  if (!res.ok) throw new Error('Failed to fetch agents');
-  return res.json();
-}
-
-async function fetchSpecialists(): Promise<SpecialistAgent[]> {
-  const res = await fetch('/api/specialists');
-  if (!res.ok) throw new Error('Failed to fetch specialists');
-  const data = await res.json();
-  return data.specialists ?? data;
 }
 
 interface ProjectSpecialistStatus {
@@ -117,17 +105,15 @@ function formatTimeAgo(timestamp: string | null): string {
 
 export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   const queryClient = useQueryClient();
-  const { data: agents, isLoading: agentsLoading, error: agentsError } = useQuery({
-    queryKey: ['agents'],
-    queryFn: fetchAgents,
-    refetchInterval: 3000,
-  });
+  // Agents and specialists from Zustand store (event-sourced — no polling)
+  const agentsFromStore = useDashboardStore(selectAgentList);
+  const agents = agentsFromStore as unknown as IssueAgent[];
+  const agentsLoading = false;
+  const agentsError = null;
 
-  const { data: specialists, isLoading: specialistsLoading } = useQuery({
-    queryKey: ['specialists'],
-    queryFn: fetchSpecialists,
-    refetchInterval: 5000,
-  });
+  const specialistsFromStore = useDashboardStore(selectSpecialistList);
+  const specialists = specialistsFromStore as unknown as SpecialistAgent[];
+  const specialistsLoading = false;
 
   const { data: runningProjectSpecialists } = useQuery({
     queryKey: ['project-specialists-running'],
