@@ -279,20 +279,22 @@ const postConvoysStartRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        const convoy = await startConvoy(template, context as ConvoyContext);
-        if ((context as ConvoyContext).issueId) {
-          Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId: (context as ConvoyContext).issueId } }));
+        try {
+          const convoy = await startConvoy(template, context as ConvoyContext);
+          if ((context as ConvoyContext).issueId) {
+            Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId: (context as ConvoyContext).issueId } }));
+          }
+          return HttpServerResponse.json(convoy);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error starting convoy:', error);
+          return HttpServerResponse.json(
+            { error: 'Failed to start convoy: ' + msg },
+            { status: 500 },
+          );
         }
-        return HttpServerResponse.json(convoy);
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error starting convoy:', error);
-        return HttpServerResponse.json(
-          { error: 'Failed to start convoy: ' + msg },
-          { status: 500 },
-        );
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -308,17 +310,19 @@ const postConvoyStopRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
-        await stopConvoy(id);
-        return HttpServerResponse.json({ success: true, message: 'Convoy stopped' });
+        try {
+          await stopConvoy(id);
+          return HttpServerResponse.json({ success: true, message: 'Convoy stopped' });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error stopping convoy:', error);
+          return HttpServerResponse.json(
+            { error: 'Failed to stop convoy: ' + msg },
+            { status: 500 },
+          );
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error stopping convoy:', error);
-        return HttpServerResponse.json(
-          { error: 'Failed to stop convoy: ' + msg },
-          { status: 500 },
-        );
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );

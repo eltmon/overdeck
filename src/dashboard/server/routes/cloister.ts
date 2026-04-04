@@ -56,15 +56,17 @@ const postCloisterStartRoute = HttpRouter.add(
   '/api/cloister/start',
   Effect.tryPromise({
     try: async () => {
-      const service = getCloisterService();
-      await service.start();
-      return HttpServerResponse.json({ success: true, message: 'Cloister started' });
+      try {
+        const service = getCloisterService();
+        await service.start();
+        return HttpServerResponse.json({ success: true, message: 'Cloister started' });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error starting Cloister:', error);
+        return HttpServerResponse.json({ error: 'Failed to start Cloister: ' + msg }, { status: 500 });
+      }
     },
-    catch: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error starting Cloister:', error);
-      return HttpServerResponse.json({ error: 'Failed to start Cloister: ' + msg }, { status: 500 });
-    },
+    catch: (err) => new Error(String(err)),
   }),
 );
 

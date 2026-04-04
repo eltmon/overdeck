@@ -53,18 +53,10 @@ const noopIo = {
   on: () => {},
 } as any;
 
-let _issueDataService: IssueDataService | null = null;
-
 function getIssueDataService(): IssueDataService {
-  if (!_issueDataService) {
-    const cache = new CacheService();
-    _issueDataService = new IssueDataService(noopIo, cache);
-    // Start background polling (non-blocking)
-    _issueDataService.start().catch((err: unknown) => {
-      console.error('[issues-route] IssueDataService.start() failed:', err);
-    });
-  }
-  return _issueDataService;
+  // Use the shared singleton — started by server.ts on boot
+  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
+  return getSharedIssueService();
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -147,18 +139,9 @@ const getIssuesRoute = HttpRouter.add(
     const cycle = searchParams.get('cycle') ?? undefined;
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
-        const issueDataService = getIssueDataService();
-        const issues = issueDataService.getIssues({ cycle, includeCompleted });
-        return HttpServerResponse.json(issues);
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error fetching issues:', error);
-        return HttpServerResponse.json({ error: 'Failed to fetch issues: ' + msg }, { status: 500 });
-      },
-    });
+    const issueDataService = getIssueDataService();
+    const issues = issueDataService.getIssues({ cycle, includeCompleted });
+    return HttpServerResponse.json(issues);
   }),
 );
 
@@ -173,6 +156,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const apiKey = getLinearApiKey();
         if (!apiKey) {
           return HttpServerResponse.json({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
@@ -270,12 +254,13 @@ const getIssueAnalyzeRoute = HttpRouter.add(
             estimatedTasks: Math.max(estimatedTasks, subsystems.length + 1),
           },
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error analyzing issue:', error);
+          return HttpServerResponse.json({ error: 'Failed to analyze issue: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error analyzing issue:', error);
-        return HttpServerResponse.json({ error: 'Failed to analyze issue: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -292,6 +277,7 @@ const postIssuePlanRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { answers, tasks } = body as any;
 
         if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
@@ -369,12 +355,13 @@ const postIssuePlanRoute = HttpRouter.add(
           },
           prdCommitted: result.prdCommitted,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error creating plan:', error);
+          return HttpServerResponse.json({ error: 'Failed to create plan: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error creating plan:', error);
-        return HttpServerResponse.json({ error: 'Failed to create plan: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -415,6 +402,7 @@ const postIssueCloseRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { reason } = body as any;
         const issuePrefix = issueId.split('-')[0];
         const projectPath = getProjectPath(undefined, issuePrefix);
@@ -475,12 +463,13 @@ const postIssueCloseRoute = HttpRouter.add(
             : `Close failed for ${issueId}`,
           steps: result.steps,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error closing issue:', error);
+          return HttpServerResponse.json({ error: 'Failed to close: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error closing issue:', error);
-        return HttpServerResponse.json({ error: 'Failed to close: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -498,6 +487,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const {
           skipWorkspace = false,
           startDocker = false,
@@ -745,12 +735,13 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         }));
 
         return HttpServerResponse.json(responseBody);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('[start-planning] Error:', error);
+          return HttpServerResponse.json({ error: 'Failed to start planning: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[start-planning] Error:', error);
-        return HttpServerResponse.json({ error: 'Failed to start planning: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -767,6 +758,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { deleteWorkspace } = body as any;
         const githubCheck = isGitHubIssue(id);
 
@@ -905,12 +897,13 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           workspacePreserved: !deleteWorkspace && !workspaceDeleted,
           workspaceError,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error aborting planning:', error);
+          return HttpServerResponse.json({ error: 'Failed to abort planning: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error aborting planning:', error);
-        return HttpServerResponse.json({ error: 'Failed to abort planning: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -928,6 +921,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const skipKill = (body as any)?.skipKill === true;
         const sessionName = `planning-${id.toLowerCase()}`;
         const issueLower = id.toLowerCase();
@@ -1147,12 +1141,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
             ? 'Planning complete and pushed to git - ready for execution'
             : 'Planning complete - ready for execution',
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error completing planning:', error);
+          return HttpServerResponse.json({ error: 'Failed to complete planning: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error completing planning:', error);
-        return HttpServerResponse.json({ error: 'Failed to complete planning: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1169,6 +1164,7 @@ const postIssueResetRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const issueLower = id.toLowerCase();
 
         // Kill local tmux sessions
@@ -1302,12 +1298,13 @@ const postIssueResetRoute = HttpRouter.add(
         issueDataService.invalidateTracker('rally').catch(() => {});
 
         return HttpServerResponse.json({ success: true, cleanupLog });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Reset failed:', error);
+          return HttpServerResponse.json({ success: false, error: msg, cleanupLog }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Reset failed:', error);
-        return HttpServerResponse.json({ success: false, error: msg, cleanupLog }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1325,6 +1322,7 @@ const postIssueCancelRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { wipeWorkspace = false } = body as any;
         const issueLower = id.toLowerCase();
 
@@ -1450,12 +1448,13 @@ const postIssueCancelRoute = HttpRouter.add(
         issueDataService.invalidateTracker('linear').catch(() => {});
 
         return HttpServerResponse.json({ success: true, cleanupLog });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('[cancel] Failed:', error);
+          return HttpServerResponse.json({ success: false, error: msg, cleanupLog }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[cancel] Failed:', error);
-        return HttpServerResponse.json({ success: false, error: msg, cleanupLog }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1472,6 +1471,7 @@ const postIssueReopenRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { reason } = body as any || {};
         const githubCheck = isGitHubIssue(id);
 
@@ -1589,12 +1589,13 @@ const postIssueReopenRoute = HttpRouter.add(
           agentRunning: false,
           nextStep: `Start an agent: pan work issue ${id}`,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error reopening issue:', error);
+          return HttpServerResponse.json({ error: 'Failed to reopen issue: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error reopening issue:', error);
-        return HttpServerResponse.json({ error: 'Failed to reopen issue: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1612,6 +1613,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { targetStatus, syncToTracker = false } = body as any || {};
 
         const validStatuses = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
@@ -1739,12 +1741,13 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           syncToTracker,
           shadowState: shadowResult,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error moving issue status:', error);
+          return HttpServerResponse.json({ error: 'Failed to move issue status: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error moving issue status:', error);
-        return HttpServerResponse.json({ error: 'Failed to move issue status: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1761,6 +1764,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const issueLower = id.toLowerCase();
         const githubCheck = isGitHubIssue(id);
 
@@ -1812,12 +1816,13 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
           message: `Workspace cleaned up for ${id}`,
           cleanupLog,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error cleaning up workspace:', error);
+          return HttpServerResponse.json({ error: 'Failed to cleanup workspace: ' + msg, cleanupLog }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error cleaning up workspace:', error);
-        return HttpServerResponse.json({ error: 'Failed to cleanup workspace: ' + msg, cleanupLog }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1834,6 +1839,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { deleteWorkspace = false } = body as any || {};
         const { deepWipe } = await import('../../../lib/lifecycle/index.js');
 
@@ -1882,12 +1888,13 @@ const postIssueDeepWipeRoute = HttpRouter.add(
           message: `Deep wipe completed for ${id}`,
           cleanupLog: result.steps.flatMap((s: any) => s.details || []),
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error in deep wipe:', error);
+          return HttpServerResponse.json({ error: 'Deep wipe failed: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error in deep wipe:', error);
-        return HttpServerResponse.json({ error: 'Deep wipe failed: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1903,6 +1910,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const { closeOut } = await import('../../../lib/lifecycle/index.js');
         const githubCheck = isGitHubIssue(id);
         let projectPath = '';
@@ -1959,12 +1967,13 @@ const postIssueCloseOutRoute = HttpRouter.add(
           })),
           error: result.success ? undefined : result.steps.find((s: any) => !s.success)?.error,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error(`[close-out] Error for ${id}:`, error);
+          return HttpServerResponse.json({ error: msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[close-out] Error for ${id}:`, error);
-        return HttpServerResponse.json({ error: msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
@@ -1980,6 +1989,7 @@ const getIssueBeadsRoute = HttpRouter.add(
 
     return yield* Effect.tryPromise({
       try: async () => {
+        try {
         const issueLower = id.toLowerCase();
         const githubCheck = isGitHubIssue(id);
         let projectPath = '';
@@ -2079,12 +2089,13 @@ const getIssueBeadsRoute = HttpRouter.add(
           source: querySource,
           isRemote: isRemoteWorkspace,
         });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('Error fetching beads:', error);
+          return HttpServerResponse.json({ error: 'Failed to fetch beads: ' + msg }, { status: 500 });
+        }
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error fetching beads:', error);
-        return HttpServerResponse.json({ error: 'Failed to fetch beads: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(String(err)),
     });
   }),
 );
