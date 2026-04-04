@@ -1,170 +1,65 @@
 {
-  "vBRIEFInfo": {
-    "version": "0.5",
-    "created": "2026-04-04T00:00:00.000Z"
-  },
-  "plan": {
-    "id": "PAN-436",
-    "title": "Dashboard shows zero stats on load — missing skeleton/loading states",
-    "status": "approved",
-    "items": [
-      {
-        "id": "bootstrap-gate",
-        "title": "Create BootstrapGate wrapper component",
-        "status": "completed",
-        "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/BootstrapGate.tsx — a wrapper component that checks selectIsBootstrapped from the Zustand store and renders either children (when bootstrapped) or a fallback skeleton."
-        },
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-436"
-        },
-        "subItems": [
-          {
-            "id": "bootstrap-gate.ac1",
-            "title": "Component accepts children and fallback ReactNode props",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "bootstrap-gate.ac2",
-            "title": "Reads selectIsBootstrapped from useDashboardStore",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "bootstrap-gate.ac3",
-            "title": "Renders fallback when bootstrapComplete is false, children when true",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "skeleton-components",
-        "title": "Create shimmer skeleton components for each view",
-        "status": "completed",
-        "narrative": {
-          "Action": "Create skeleton placeholder components with animate-pulse shimmer for KanbanSkeleton, AgentListSkeleton, GodViewSkeleton, and HeaderSkeleton."
-        },
-        "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-436"
-        },
-        "subItems": [
-          {
-            "id": "skeleton-components.ac1",
-            "title": "Each skeleton visually approximates the layout of its corresponding real component",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "skeleton-components.ac2",
-            "title": "All use animate-pulse for shimmer effect",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "skeleton-components.ac3",
-            "title": "Use existing Tailwind theme tokens (bg-surface-2, rounded, etc.)",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "skeleton-components.ac4",
-            "title": "No external dependencies — pure Tailwind CSS",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "wire-bootstrap-gates",
-        "title": "Wire BootstrapGate into App.tsx and Header",
-        "status": "completed",
-        "narrative": {
-          "Action": "Wrap store-consuming tab views (kanban, agents, god-view) with BootstrapGate in App.tsx. Header has no store-dependent count badges in the current implementation."
-        },
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-436"
-        },
-        "subItems": [
-          {
-            "id": "wire-bootstrap-gates.ac1",
-            "title": "Kanban tab shows KanbanSkeleton until bootstrapComplete",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "wire-bootstrap-gates.ac2",
-            "title": "Agents tab shows AgentListSkeleton until bootstrapComplete",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "wire-bootstrap-gates.ac3",
-            "title": "GodView shows GodViewSkeleton until bootstrapComplete",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "wire-bootstrap-gates.ac4",
-            "title": "Header count badges don't show 0 during bootstrap",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "wire-bootstrap-gates.ac5",
-            "title": "React Query views (MissionControl, HandoffsPage, etc.) are NOT wrapped — they have their own loading states",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "verify-build-test",
-        "title": "Verify build and visual test",
-        "status": "completed",
-        "narrative": {
-          "Action": "Run npm run build to ensure no type errors or build failures. Verify skeletons transition smoothly to real content."
-        },
-        "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-436"
-        },
-        "subItems": [
-          {
-            "id": "verify-build-test.ac1",
-            "title": "npm run build succeeds with no errors",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "verify-build-test.ac2",
-            "title": "No flash of zero/empty state on page load",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "verify-build-test.ac3",
-            "title": "Skeleton → real content transition is smooth",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "verify-build-test.ac4",
-            "title": "Existing React Query loading states unchanged",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      }
-    ],
-    "edges": [
-      { "from": "bootstrap-gate", "to": "wire-bootstrap-gates", "type": "blocks" },
-      { "from": "skeleton-components", "to": "wire-bootstrap-gates", "type": "blocks" },
-      { "from": "wire-bootstrap-gates", "to": "verify-build-test", "type": "blocks" }
-    ]
-  }
+  "issue": "PAN-444",
+  "title": "Auto-deploy: rebuild + restart dashboard server after merge to main",
+  "difficulty": "medium",
+  "model": "sonnet",
+  "items": [
+    {
+      "id": "deploy-script",
+      "title": "Create post-merge deploy script",
+      "description": "New script at scripts/post-merge-deploy.sh that: (1) runs npm run build && npm link from repo root, (2) kills server processes on ports 3010/3011/3012, (3) detects runtime mode (bun dev vs node prod) and starts new server, (4) polls /api/health with 30s timeout. Accepts args: REPO_ROOT, ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH. Logs to /tmp/panopticon-deploy.log.",
+      "difficulty": "simple",
+      "files": [
+        "scripts/post-merge-deploy.sh"
+      ],
+      "acceptance": [
+        "Script builds project and links globally",
+        "Script kills old server and starts new one in correct mode",
+        "Script waits for health check before exiting",
+        "Script is executable (chmod +x)"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "lifecycle-step0",
+      "title": "Add deploy step 0 to postMergeLifecycle",
+      "description": "Modify postMergeLifecycle() in src/lib/cloister/merge-agent.ts to: (1) write {issueId, projectPath, sourceBranch, timestamp} to ~/.panopticon/pending-post-merge.json, (2) spawn scripts/post-merge-deploy.sh as detached process, (3) return immediately. If spawn fails, log warning and fall through to existing lifecycle (best-effort). Must use execAsync/spawn (no execSync per CLAUDE.md rules).",
+      "difficulty": "medium",
+      "files": [
+        "src/lib/cloister/merge-agent.ts"
+      ],
+      "acceptance": [
+        "Pending file written before deploy script spawned",
+        "Deploy script spawned detached with unref()",
+        "Function returns immediately after spawn",
+        "Graceful fallback if spawn fails",
+        "No execSync used"
+      ],
+      "depends": [
+        "deploy-script"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "startup-hook",
+      "title": "Add pending lifecycle startup hook to server",
+      "description": "Modify src/dashboard/server/main.ts to check for ~/.panopticon/pending-post-merge.json after server is ready. If found: read contents, delete file, validate timestamp (ignore if > 1 hour old), then schedule postMergeLifecycle(issueId, projectPath) after 3s delay. Also call notifyTldrDaemon if sourceBranch is present. Use fs/promises (no sync FS calls per CLAUDE.md rules).",
+      "difficulty": "medium",
+      "files": [
+        "src/dashboard/server/main.ts"
+      ],
+      "acceptance": [
+        "Pending file detected and processed on startup",
+        "Stale files (> 1h) logged and deleted without running lifecycle",
+        "postMergeLifecycle runs successfully in fresh process",
+        "TLDR daemon notified if sourceBranch present",
+        "No sync FS calls used",
+        "Missing pending file is a silent no-op"
+      ],
+      "depends": [
+        "lifecycle-step0"
+      ],
+      "status": "completed"
+    }
+  ]
 }
