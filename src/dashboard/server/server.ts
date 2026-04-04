@@ -99,10 +99,13 @@ const staticRouteLayer = HttpRouter.add(
     const pathService = yield* Path.Path;
 
     // Resolve static directory: PANOPTICON_FRONTEND_DIR env var or default
-    // Default: dist/dashboard/public relative to CWD (same as old Express server)
+    // Use import.meta.dir (Bun) or __dirname (Node) to resolve relative to this file
+    // This file is at src/dashboard/server/server.ts → project root is ../../../
+    const selfDir = typeof import.meta.dir === 'string' ? import.meta.dir : process.cwd();
+    const projectRoot = pathService.resolve(selfDir, '..', '..', '..');
     const staticDir =
       process.env['PANOPTICON_FRONTEND_DIR'] ??
-      pathService.resolve(process.cwd(), 'dist', 'dashboard', 'public');
+      pathService.resolve(projectRoot, 'dist', 'dashboard', 'public');
 
     const staticRoot = pathService.resolve(staticDir);
     const urlPath = url.value.pathname === '/' ? '/index.html' : url.value.pathname;

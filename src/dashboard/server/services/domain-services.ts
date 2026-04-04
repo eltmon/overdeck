@@ -128,7 +128,9 @@ export const SnapshotServiceLive = Layer.effect(
       const { getSharedIssueService, startSharedIssueService } =
         yield* Effect.promise(() => import('./issue-service-singleton.js'));
       startSharedIssueService(); // non-blocking start
-      const issues = getSharedIssueService().getIssues();
+      // JSON round-trip strips undefined values which Effect Schema/RPC can't serialize
+      const rawIssues = getSharedIssueService().getIssues();
+      const issues = JSON.parse(JSON.stringify(rawIssues));
 
       return { sequence, agents, specialists, reviewStatuses, issues, timestamp };
     });
