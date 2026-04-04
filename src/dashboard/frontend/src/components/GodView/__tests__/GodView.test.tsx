@@ -1,93 +1,24 @@
 /**
- * God View tests (PAN-341)
+ * God View tests (PAN-341, updated PAN-433)
  *
  * Tests cover pure-logic units that don't require external packages:
- * - useGodViewStore Zustand state management
+ * - useGodViewStore (system health, focus state)
+ * - GodView selector functions (agent output, statuses, activity from DashboardStore)
  * - ANSI parsing logic (CanvasTerminal internals)
- * - Activity feed aggregation logic
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 
-// ─── useGodViewStore ──────────────────────────────────────────────────────────
+// ─── useGodViewStore (reduced — agent data now lives in DashboardStore) ───────
 
-import { useGodViewStore } from '../../../hooks/useGodViewSocket';
+import { useGodViewStore, selectGodViewAgentOutput, selectGodViewAgentStatuses, selectGodViewActivityFeed } from '../../../hooks/useGodViewSocket';
 
 describe('useGodViewStore', () => {
   beforeEach(() => {
     useGodViewStore.setState({
-      agentOutput: {},
-      agentStatuses: {},
-      activityFeed: [],
       systemHealth: null,
       focusedAgentId: null,
     });
-  });
-
-  it('setAgentOutput stores lines by agentId', () => {
-    useGodViewStore.getState().setAgentOutput('agent-1', ['line1', 'line2']);
-    expect(useGodViewStore.getState().agentOutput['agent-1']).toEqual(['line1', 'line2']);
-  });
-
-  it('setAgentOutput overwrites existing lines', () => {
-    useGodViewStore.getState().setAgentOutput('agent-1', ['old']);
-    useGodViewStore.getState().setAgentOutput('agent-1', ['new1', 'new2']);
-    expect(useGodViewStore.getState().agentOutput['agent-1']).toEqual(['new1', 'new2']);
-  });
-
-  it('setAgentOutput isolates different agents', () => {
-    useGodViewStore.getState().setAgentOutput('agent-1', ['a']);
-    useGodViewStore.getState().setAgentOutput('agent-2', ['b']);
-    expect(useGodViewStore.getState().agentOutput['agent-1']).toEqual(['a']);
-    expect(useGodViewStore.getState().agentOutput['agent-2']).toEqual(['b']);
-  });
-
-  it('setAgentStatus stores status by agentId', () => {
-    useGodViewStore.getState().setAgentStatus('agent-1', 'healthy');
-    expect(useGodViewStore.getState().agentStatuses['agent-1']).toBe('healthy');
-  });
-
-  it('setAgentStatus updates existing status', () => {
-    useGodViewStore.getState().setAgentStatus('agent-1', 'healthy');
-    useGodViewStore.getState().setAgentStatus('agent-1', 'stuck');
-    expect(useGodViewStore.getState().agentStatuses['agent-1']).toBe('stuck');
-  });
-
-  it('setAgentStatus isolates different agents', () => {
-    useGodViewStore.getState().setAgentStatus('agent-1', 'healthy');
-    useGodViewStore.getState().setAgentStatus('agent-2', 'warning');
-    expect(useGodViewStore.getState().agentStatuses['agent-1']).toBe('healthy');
-    expect(useGodViewStore.getState().agentStatuses['agent-2']).toBe('warning');
-  });
-
-  it('appendActivityEvents adds events newest-first relative to existing feed', () => {
-    const events = [
-      { agentId: 'a', timestamp: '2026-01-01T10:00:00Z', type: 'commit', message: 'first' },
-      { agentId: 'b', timestamp: '2026-01-01T11:00:00Z', type: 'activity', message: 'second' },
-    ];
-    useGodViewStore.getState().appendActivityEvents(events);
-    const feed = useGodViewStore.getState().activityFeed;
-    expect(feed).toHaveLength(2);
-    expect(feed.map(e => e.agentId)).toContain('a');
-    expect(feed.map(e => e.agentId)).toContain('b');
-  });
-
-  it('appendActivityEvents deduplicates by agentId+timestamp', () => {
-    const event = { agentId: 'a', timestamp: '2026-01-01T10:00:00Z', type: 'commit', message: 'x' };
-    useGodViewStore.getState().appendActivityEvents([event]);
-    useGodViewStore.getState().appendActivityEvents([event]); // duplicate
-    expect(useGodViewStore.getState().activityFeed).toHaveLength(1);
-  });
-
-  it('appendActivityEvents caps at 50 events', () => {
-    const events = Array.from({ length: 60 }, (_, i) => ({
-      agentId: `agent-${i}`,
-      timestamp: new Date(Date.now() - i * 1000).toISOString(),
-      type: 'activity',
-      message: `event ${i}`,
-    }));
-    useGodViewStore.getState().appendActivityEvents(events);
-    expect(useGodViewStore.getState().activityFeed.length).toBeLessThanOrEqual(50);
   });
 
   it('setSystemHealth stores health data', () => {
@@ -112,6 +43,25 @@ describe('useGodViewStore', () => {
     useGodViewStore.getState().setFocusedAgentId('agent-42');
     useGodViewStore.getState().setFocusedAgentId(null);
     expect(useGodViewStore.getState().focusedAgentId).toBeNull();
+  });
+});
+
+// ─── GodView selectors (read from DashboardStore) ────────────────────────────
+
+describe('GodView selectors', () => {
+  it('selectGodViewAgentOutput returns agentOutputById', () => {
+    const state = { agentOutputById: { 'a1': ['line1'], 'a2': ['line2'] } };
+    expect(selectGodViewAgentOutput(state)).toEqual({ 'a1': ['line1'], 'a2': ['line2'] });
+  });
+
+  it('selectGodViewAgentStatuses extracts status from agentsById', () => {
+    const state = { agentsById: { 'a1': { status: 'running' }, 'a2': { status: 'stopped' } } };
+    expect(selectGodViewAgentStatuses(state)).toEqual({ 'a1': 'running', 'a2': 'stopped' });
+  });
+
+  it('selectGodViewActivityFeed returns recentActivity', () => {
+    const events = [{ agentId: 'a', timestamp: 'T', type: 'x', message: 'y' }];
+    expect(selectGodViewActivityFeed({ recentActivity: events })).toEqual(events);
   });
 });
 

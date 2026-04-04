@@ -23,10 +23,6 @@ export default defineConfig({
         target: isContainerMode ? 'ws://server:3011' : 'ws://localhost:3011',
         ws: true,
       },
-      '/socket.io': {
-        target: isContainerMode ? 'http://server:3011' : 'http://localhost:3011',
-        ws: true,
-      },
     },
   },
   build: {
