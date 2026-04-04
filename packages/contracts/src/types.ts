@@ -37,9 +37,9 @@ export type AgentRuntimeStateValue = typeof AgentRuntimeStateValue.Type
 export const AgentSnapshot = Schema.Struct({
   id: AgentId,
   issueId: IssueId,
-  workspace: Schema.String,
-  runtime: Schema.String,
-  model: Schema.String,
+  workspace: Schema.optional(Schema.String),
+  runtime: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
   status: AgentStatus,
   startedAt: Schema.String,
   lastActivity: Schema.optional(Schema.String),
