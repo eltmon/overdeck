@@ -2,6 +2,8 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import { getTransport } from '../lib/wsTransport';
+import { WS_METHODS } from '@panopticon/contracts';
 
 // Debounce utility to prevent resize spam
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (...args: Parameters<T>) => void {
@@ -36,11 +38,8 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const maxReconnectAttempts = 5;
-  const [shouldReconnect, setShouldReconnect] = useState(true);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const connectedRef = useRef(false);
 
   // Auto-copy state from localStorage or prop
   const [autoCopyOnSelect, setAutoCopyOnSelect] = useState(() => {
@@ -73,10 +72,25 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     }
   }, [autoCopyOnSelect]);
 
-  // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, max 30s
-  const getReconnectDelay = (attempt: number): number => {
-    return Math.min(1000 * Math.pow(2, attempt), 30000);
-  };
+  // Send data to terminal via RPC (fire-and-forget)
+  const sendTerminalData = useCallback((data: string) => {
+    if (!connectedRef.current) return;
+    getTransport().request(
+      (client) => client[WS_METHODS.terminalWrite]({ sessionName, data }),
+    ).catch(() => {
+      // Silently ignore write failures — transport handles reconnection
+    });
+  }, [sessionName]);
+
+  // Send resize to terminal via RPC (fire-and-forget)
+  const sendTerminalResize = useCallback((cols: number, rows: number) => {
+    if (!connectedRef.current) return;
+    getTransport().request(
+      (client) => client[WS_METHODS.terminalResize]({ sessionName, cols, rows }),
+    ).catch(() => {
+      // Silently ignore resize failures
+    });
+  }, [sessionName]);
 
   // Copy selected text to clipboard
   const copySelection = useCallback(async () => {
@@ -111,14 +125,11 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     try {
       const text = await navigator.clipboard.readText();
-      // Send pasted text to WebSocket if open
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(text);
-      }
+      sendTerminalData(text);
     } catch (err) {
       console.error('Failed to read from clipboard:', err);
     }
-  }, []);
+  }, [sendTerminalData]);
 
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
@@ -188,12 +199,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
   const connect = useCallback(() => {
     if (!terminalRef.current || !sessionName) return;
-
-    // Clear any pending reconnect timer
-    if (reconnectTimer.current) {
-      clearTimeout(reconnectTimer.current);
-      reconnectTimer.current = null;
-    }
 
     // Ensure container has dimensions before creating terminal
     const container = terminalRef.current;
@@ -292,29 +297,6 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       terminalRef.current.addEventListener('wheel', handleWheel, { passive: false });
     }
 
-    // Connect to WebSocket on same port as the page (frontend and API are served together)
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}`;
-
-    const ws = new WebSocket(wsUrl);
-    // IMPORTANT: Use arraybuffer for synchronous binary processing
-    // Default 'blob' requires async handling which can cause out-of-order writes
-    ws.binaryType = 'arraybuffer';
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      console.log('XTerminal: WebSocket opened');
-      reconnectAttempts.current = 0;
-      term!.clear();
-
-      // CRITICAL: Send dimensions IMMEDIATELY on connection, before any data flows
-      // The server waits for this resize message before starting the SSH session
-      // This ensures tmux is created with the correct dimensions from the start
-      fit?.fit();
-      console.log('XTerminal: Sending initial dimensions:', term!.cols, 'x', term!.rows);
-      ws.send(JSON.stringify({ type: 'resize', cols: term!.cols, rows: term!.rows }));
-    };
-
     // DEBUG: Enable detailed logging to diagnose terminal corruption
     // Set localStorage.setItem('DEBUG_TERMINAL', '1') to enable
     const DEBUG_TERMINAL = localStorage.getItem('DEBUG_TERMINAL') === '1';
@@ -373,78 +355,56 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       });
     };
 
-    ws.onmessage = (event) => {
-      let dataStr = '';
+    // Fit terminal to get accurate dimensions before subscribing
+    fit?.fit();
+    const initialCols = term.cols;
+    const initialRows = term.rows;
+    console.log('XTerminal: Starting RPC subscription with dimensions:', initialCols, 'x', initialRows);
 
-      // Normalize data to string
-      if (event.data instanceof ArrayBuffer) {
-        dataStr = new TextDecoder().decode(new Uint8Array(event.data));
-      } else if (typeof event.data === 'string') {
-        dataStr = event.data;
-      }
+    // Subscribe to terminal output stream via Effect RPC
+    // The transport handles reconnection automatically
+    connectedRef.current = true;
+    term.clear();
 
-      // DEBUG: Log incoming data
-      if (DEBUG_TERMINAL) {
-        debugMsgCount++;
-        const logEntry = `[${new Date().toISOString()}] RECV #${debugMsgCount} len=${dataStr.length}\n  DATA: ${escapeForLog(dataStr).slice(0, 500)}${dataStr.length > 500 ? '...' : ''}`;
-        debugLog.push(logEntry);
-        if (debugMsgCount <= 20 || debugMsgCount % 100 === 0) {
-          console.log(`XTerminal-debug: RECV #${debugMsgCount} len=${dataStr.length}`);
+    const unsubscribe = getTransport().subscribe(
+      (client) => client[WS_METHODS.subscribeTerminal]({
+        sessionName,
+        cols: initialCols,
+        rows: initialRows,
+      }),
+      (output) => {
+        const dataStr = output.data;
+
+        // DEBUG: Log incoming data
+        if (DEBUG_TERMINAL) {
+          debugMsgCount++;
+          const logEntry = `[${new Date().toISOString()}] RECV #${debugMsgCount} len=${dataStr.length}\n  DATA: ${escapeForLog(dataStr).slice(0, 500)}${dataStr.length > 500 ? '...' : ''}`;
+          debugLog.push(logEntry);
+          if (debugMsgCount <= 20 || debugMsgCount % 100 === 0) {
+            console.log(`XTerminal-debug: RECV #${debugMsgCount} len=${dataStr.length}`);
+          }
         }
-      }
 
-      // Add to queue and trigger processing
-      writeQueue.push(dataStr);
-      processWriteQueue();
-    };
+        // Add to queue and trigger processing
+        writeQueue.push(dataStr);
+        processWriteQueue();
+      },
+    );
 
-    ws.onclose = (event) => {
-      console.log('XTerminal: WebSocket closed', event.code, event.reason);
+    unsubscribeRef.current = unsubscribe;
 
-      if (!shouldReconnect) {
-        term!.writeln('\r\n\x1b[33m● Session disconnected\x1b[0m');
-        onDisconnectRef.current?.();
-        return;
-      }
-
-      // Always attempt reconnection when shouldReconnect is true, even for
-      // code 1000 (normal close). The server sends 1000 when the PTY exits,
-      // which can happen if the tmux session is killed and recreated during
-      // workspace setup retries. The session may be alive again by the time
-      // we reconnect.
-      if (reconnectAttempts.current < maxReconnectAttempts) {
-        const delay = getReconnectDelay(reconnectAttempts.current);
-        reconnectAttempts.current += 1;
-
-        term!.writeln(`\r\n\x1b[33m● Connection lost. Reconnecting in ${delay / 1000}s (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...\x1b[0m`);
-
-        reconnectTimer.current = setTimeout(() => {
-          connect();
-        }, delay);
-      } else {
-        term!.writeln('\r\n\x1b[31m● Connection lost after multiple attempts.\x1b[0m');
-        onDisconnectRef.current?.();
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    term.onData((data: string) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
+    // Wire keyboard input to terminal write RPC
+    const onDataDisposable = term.onData((data: string) => {
+      sendTerminalData(data);
     });
 
-    term.onResize(({ cols, rows }: { cols: number; rows: number }) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols, rows }));
-      }
+    // Wire resize events to terminal resize RPC
+    const onResizeDisposable = term.onResize(({ cols, rows }: { cols: number; rows: number }) => {
+      sendTerminalResize(cols, rows);
     });
 
     const handleResize = debounce(() => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (connectedRef.current) {
         fit?.fit();
       }
     }, 200);
@@ -452,16 +412,20 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      setShouldReconnect(false);
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-      }
-      ws.close();
+      connectedRef.current = false;
+      onDataDisposable.dispose();
+      onResizeDisposable.dispose();
+      unsubscribe();
+      unsubscribeRef.current = null;
+      // Close the terminal session on the server
+      getTransport().request(
+        (client) => client[WS_METHODS.terminalClose]({ sessionName }),
+      ).catch(() => { /* ignore cleanup errors */ });
       term?.dispose();
       terminalInstance.current = null;
       fitAddon.current = null;
     };
-  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu]);
+  }, [sessionName, autoCopyOnSelect, handleKeyDown, handleContextMenu, sendTerminalData, sendTerminalResize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -482,7 +446,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
   useEffect(() => {
     const debouncedFit = debounce(() => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
+      if (connectedRef.current) {
         fitAddon.current?.fit();
       }
     }, 200);

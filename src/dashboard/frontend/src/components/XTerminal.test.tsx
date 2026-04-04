@@ -33,6 +33,14 @@ vi.mock('@xterm/addon-fit', () => ({
 
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
+// Mock wsTransport — XTerminal uses getTransport() for RPC calls
+vi.mock('../lib/wsTransport', () => ({
+  getTransport: () => ({
+    subscribe: () => () => {},
+    request: () => Promise.resolve(),
+  }),
+}));
+
 // Mock localStorage
 const localStorageMock: Storage = {
   getItem: vi.fn(),
