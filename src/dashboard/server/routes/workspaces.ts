@@ -1,0 +1,3665 @@
+/**
+ * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
+ *
+ * Implements all /api/workspaces/* endpoints from the Express server:
+ *   GET    /api/workspaces/:issueId
+ *   POST   /api/workspaces
+ *   GET    /api/workspaces/:issueId/plan
+ *   GET    /api/workspaces/:issueId/clean/preview
+ *   POST   /api/workspaces/:issueId/clean
+ *   POST   /api/workspaces/:issueId/containerize
+ *   POST   /api/workspaces/:issueId/start
+ *   POST   /api/workspaces/:issueId/containers/:containerName/:action
+ *   POST   /api/workspaces/:issueId/refresh-db
+ *   GET    /api/workspaces/:issueId/review-status
+ *   POST   /api/workspaces/:issueId/review-status
+ *   POST   /api/workspaces/:issueId/review
+ *   POST   /api/workspaces/:issueId/request-review
+ *   POST   /api/workspaces/:issueId/reset-review
+ *   POST   /api/workspaces/:issueId/sync-main
+ *   POST   /api/workspaces/:issueId/merge
+ *   POST   /api/workspaces/:issueId/approve
+ *   DELETE /api/workspaces/:issueId/pending
+ *   GET    /api/workspaces/:issueId/tldr
+ */
+
+import { exec, spawn } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { promisify } from 'node:util';
+import { crc32 } from 'node:zlib';
+
+import { Effect, Layer, Option } from 'effect';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+
+import {
+  resolveProjectFromIssue,
+  listProjects,
+  findProjectByTeam,
+  extractTeamPrefix,
+} from '../../../lib/projects.js';
+import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
+import { getGitHubConfig } from '../services/tracker-config.js';
+import {
+  getReviewStatus,
+  setReviewStatus as setReviewStatusBase,
+  type ReviewStatus,
+} from '../../../lib/review-status.js';
+import {
+  computeQueuePositionFromStatus,
+  findPositionInQueue,
+} from '../../../lib/queue-position.js';
+import {
+  messageAgent,
+  saveAgentRuntimeState,
+  getAgentRuntimeState,
+  transitionIssueToInReview,
+} from '../../../lib/agents.js';
+import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
+import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { criticalPath } from '../../../lib/vbrief/dag.js';
+import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
+import { checkSpecialistQueue } from '../../../lib/cloister/specialists.js';
+import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
+import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
+import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
+import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
+import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
+import { unlinkSync } from 'node:fs';
+
+const execAsync = promisify(exec);
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PORT = parseInt(process.env.API_PORT || process.env.PORT || '3011', 10);
+const MAX_AUTO_REQUEUE = 7;
+
+// Track server-managed merges to prevent double-lifecycle triggers
+const _serverManagedMerges = new Set<string>();
+
+// ─── Activity log (in-memory, shared with server startup) ─────────────────────
+
+interface ActivityEntry {
+  id: string;
+  timestamp: string;
+  command: string;
+  status: 'running' | 'completed' | 'failed';
+  output: string[];
+}
+
+const activityLog: ActivityEntry[] = [];
+
+function logActivity(entry: ActivityEntry): void {
+  activityLog.unshift(entry);
+  if (activityLog.length > 100) activityLog.pop();
+}
+
+function updateActivity(id: string, updates: Partial<ActivityEntry>): void {
+  const entry = activityLog.find(e => e.id === id);
+  if (entry) Object.assign(entry, updates);
+}
+
+function appendActivityOutput(id: string, line: string): void {
+  const entry = activityLog.find(e => e.id === id);
+  if (entry) {
+    entry.output.push(line);
+    if (entry.output.length > 500) entry.output.shift();
+  }
+}
+
+// ─── Pending operations (in-memory) ──────────────────────────────────────────
+
+interface PendingOperation {
+  type: 'review' | 'merge' | 'approve' | 'start' | 'clean' | 'containerize' | 'refresh-db';
+  status: 'running' | 'completed' | 'failed';
+  startedAt: string;
+  error?: string;
+}
+
+const pendingOperations = new Map<string, PendingOperation>();
+
+function setPendingOperation(issueId: string, type: PendingOperation['type']): void {
+  pendingOperations.set(issueId.toLowerCase(), {
+    type,
+    status: 'running',
+    startedAt: new Date().toISOString(),
+  });
+}
+
+function completePendingOperation(issueId: string, error?: string | null): void {
+  const op = pendingOperations.get(issueId.toLowerCase());
+  if (op) {
+    op.status = error ? 'failed' : 'completed';
+    if (error) op.error = error;
+  }
+}
+
+function getPendingOperation(issueId: string): PendingOperation | null {
+  return pendingOperations.get(issueId.toLowerCase()) ?? null;
+}
+
+function clearPendingOperation(issueId: string): void {
+  pendingOperations.delete(issueId.toLowerCase());
+}
+
+// ─── Local helpers ────────────────────────────────────────────────────────────
+
+function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
+  if (issuePrefix) {
+    const issueId = `${issuePrefix}-1`;
+    const resolved = resolveProjectFromIssue(issueId);
+    if (resolved) return resolved.projectPath;
+  }
+  if (issuePrefix) {
+    const config = getGitHubConfig();
+    if (config) {
+      for (const { owner, repo, prefix } of config.repos) {
+        const repoPrefix = prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '');
+        if (repoPrefix.toUpperCase() === issuePrefix.toUpperCase()) {
+          const possiblePaths = [
+            join(homedir(), 'Projects', repo),
+            join(homedir(), 'Projects', repo.replace(/-cli$/, '')),
+            join(homedir(), 'Projects', owner, repo),
+          ];
+          for (const path of possiblePaths) {
+            if (existsSync(path)) return path;
+          }
+        }
+      }
+    }
+  }
+  return join(homedir(), 'Projects');
+}
+
+function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
+  try {
+    const meta = loadWorkspaceMetadata(issueId);
+    if (meta?.location) return meta.location as 'local' | 'remote';
+  } catch { /* non-fatal */ }
+  return undefined;
+}
+
+interface WorkspaceInfo {
+  exists: boolean;
+  isRemote: boolean;
+  vmName?: string;
+  remotePath?: string;
+  localPath?: string;
+  agentId?: string;
+}
+
+function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
+  try {
+    const meta = loadWorkspaceMetadata(issueId);
+    if (meta?.location === 'remote' && meta.vmName) {
+      return {
+        exists: true,
+        isRemote: true,
+        vmName: meta.vmName,
+        remotePath: meta.remotePath,
+        agentId: meta.agentId,
+      };
+    }
+  } catch { /* non-fatal */ }
+
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspaceName = `feature-${issueLower}`;
+  const workspacePath = join(projectPath, 'workspaces', workspaceName);
+
+  if (!existsSync(workspacePath)) {
+    return { exists: false, isRemote: false };
+  }
+
+  return {
+    exists: true,
+    isRemote: false,
+    localPath: workspacePath,
+  };
+}
+
+function isGitHubIssue(issueId: string): {
+  isGitHub: boolean;
+  owner?: string;
+  repo?: string;
+  number?: number;
+} {
+  const resolved = resolveGitHubIssueShared(issueId);
+  if (resolved.isGitHub) {
+    return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
+  }
+  return { isGitHub: false };
+}
+
+function spawnPanCommand(args: string[], description: string, cwd?: string): string {
+  const activityId = Date.now().toString();
+  logActivity({
+    id: activityId,
+    timestamp: new Date().toISOString(),
+    command: `pan ${args.join(' ')}`,
+    status: 'running',
+    output: [],
+  });
+
+  const child = spawn('pan', args, {
+    cwd: cwd || process.cwd(),
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  child.stdout?.on('data', (data) => {
+    data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+      appendActivityOutput(activityId, line);
+    });
+  });
+  child.stderr?.on('data', (data) => {
+    data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+      appendActivityOutput(activityId, `[stderr] ${line}`);
+    });
+  });
+  child.on('close', (code) => {
+    updateActivity(activityId, { status: code === 0 ? 'completed' : 'failed' });
+  });
+
+  return activityId;
+}
+
+async function getGitStatusAsync(workspacePath: string): Promise<{
+  branch: string;
+  uncommittedFiles: number;
+  latestCommit: string;
+} | null> {
+  try {
+    const [branchResult, statusResult, logResult] = await Promise.all([
+      execAsync('git rev-parse --abbrev-ref HEAD', { cwd: workspacePath, encoding: 'utf-8' }),
+      execAsync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' }),
+      execAsync('git log -1 --format="%s"', { cwd: workspacePath, encoding: 'utf-8' }),
+    ]);
+    return {
+      branch: branchResult.stdout.trim(),
+      uncommittedFiles: statusResult.stdout.trim() ? statusResult.stdout.trim().split('\n').length : 0,
+      latestCommit: logResult.stdout.trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function getRepoGitStatusAsync(workspacePath: string): Promise<{
+  ahead: number;
+  behind: number;
+  hasOrigin: boolean;
+} | null> {
+  try {
+    const { stdout: remoteOut } = await execAsync('git remote -v', { cwd: workspacePath, encoding: 'utf-8' });
+    if (!remoteOut.includes('origin')) return { ahead: 0, behind: 0, hasOrigin: false };
+    const { stdout: revlistOut } = await execAsync(
+      'git rev-list --left-right --count HEAD...origin/HEAD 2>/dev/null || echo "0\t0"',
+      { cwd: workspacePath, encoding: 'utf-8' }
+    );
+    const parts = revlistOut.trim().split('\t');
+    return {
+      ahead: parseInt(parts[0] || '0', 10),
+      behind: parseInt(parts[1] || '0', 10),
+      hasOrigin: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function getContainerStatusAsync(
+  issueId: string,
+  projectPath?: string
+): Promise<Record<string, { running: boolean; uptime: string | null; status?: string }>> {
+  const result: Record<string, { running: boolean; uptime: string | null; status?: string }> = {};
+  try {
+    const { stdout } = await execAsync(
+      `docker ps -a --format "{{.Names}}\\t{{.Status}}" 2>/dev/null | grep "${issueId.toLowerCase()}" || true`,
+      { encoding: 'utf-8' }
+    );
+    for (const line of stdout.trim().split('\n').filter(Boolean)) {
+      const [name, ...statusParts] = line.split('\t');
+      const statusStr = statusParts.join('\t');
+      const running = statusStr.toLowerCase().startsWith('up');
+      const uptimeMatch = statusStr.match(/Up (.+)/);
+      result[name] = {
+        running,
+        uptime: running ? (uptimeMatch ? uptimeMatch[1] : null) : null,
+        status: statusStr,
+      };
+    }
+  } catch { /* non-fatal */ }
+  return result;
+}
+
+async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<string | null> {
+  try {
+    const issueLower = issueId.toLowerCase();
+    const branchName = `feature/${issueLower}`;
+    const { stdout } = await execAsync(
+      `gh pr view ${branchName} --json url --jq .url 2>/dev/null || true`,
+      { cwd: workspacePath, encoding: 'utf-8' }
+    );
+    const url = stdout.trim();
+    return url || null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensurePRExists(
+  issueId: string
+): Promise<{ created: boolean; prUrl?: string; error?: string }> {
+  try {
+    const issueLower = issueId.toLowerCase();
+    const branchName = `feature/${issueLower}`;
+    // Check for existing PR
+    const { stdout: existingOut } = await execAsync(
+      `gh pr view ${branchName} --json url --jq .url 2>/dev/null || true`,
+      { encoding: 'utf-8' }
+    );
+    const existing = existingOut.trim();
+    if (existing) return { created: false, prUrl: existing };
+    // Create PR
+    const { stdout: createOut } = await execAsync(
+      `gh pr create --head ${branchName} --base main --title "${issueId}" --body "Automated PR for ${issueId}" --json url --jq .url`,
+      { encoding: 'utf-8' }
+    );
+    const prUrl = createOut.trim();
+    return { created: true, prUrl };
+  } catch (err: any) {
+    return { created: false, error: err.message };
+  }
+}
+
+function getFlyAppName(vmName: string): string {
+  const match = vmName.match(/^([^-]+-[^-]+)/);
+  return match ? match[1] : vmName;
+}
+
+function flyExecCmd(vmName: string, command: string): string {
+  const appName = getFlyAppName(vmName);
+  return `fly ssh console -a ${appName} -C "${command.replace(/"/g, '\\"')}"`;
+}
+
+async function repairFlywayIfNeeded(
+  issueId: string,
+  pgContainer: string,
+  dbName: string,
+  projectConfig: any,
+  workspacePath: string,
+  log?: (msg: string) => void
+): Promise<{ repaired: boolean; message: string }> {
+  const emit = log || ((msg: string) => console.log(`[flyway-repair] ${msg}`));
+
+  try {
+    await execAsync(`docker exec "${pgContainer}" pg_isready -U postgres`, {
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+  } catch {
+    return { repaired: false, message: 'Postgres container not ready, skipping Flyway check' };
+  }
+
+  let rowCount = 0;
+  try {
+    const { stdout } = await execAsync(
+      `docker exec "${pgContainer}" psql -U postgres -d ${dbName} -t -A -c "SELECT count(*) FROM flyway_schema_history;"`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    rowCount = parseInt(stdout.trim(), 10) || 0;
+  } catch {
+    rowCount = 0;
+  }
+
+  if (rowCount >= 10) {
+    return { repaired: false, message: `Flyway schema_history has ${rowCount} entries, no repair needed` };
+  }
+
+  emit(`Flyway schema_history has only ${rowCount} entries — repairing`);
+
+  const seedRelPath = projectConfig.workspace?.database?.seed_file;
+  if (!seedRelPath) {
+    return { repaired: false, message: 'No seed_file configured, cannot locate Flyway baseline' };
+  }
+
+  const seedFile = join(projectConfig.path, seedRelPath);
+  const flywayFile = join(dirname(seedFile), 'zzz-flyway-workspace-baseline.sql');
+  if (!existsSync(flywayFile)) {
+    return { repaired: false, message: `Flyway baseline not found: ${flywayFile}` };
+  }
+
+  emit(`Loading Flyway baseline from ${flywayFile}`);
+  await execAsync(
+    `docker exec -i "${pgContainer}" psql -U postgres -d ${dbName} < "${flywayFile}"`,
+    { encoding: 'utf-8', timeout: 60000 }
+  );
+
+  const migrationsRelPath = projectConfig.workspace?.database?.migrations?.path;
+  if (migrationsRelPath) {
+    const migrationsDir = join(workspacePath, migrationsRelPath);
+    if (existsSync(migrationsDir)) {
+      emit(`Syncing Flyway checksums from workspace migrations`);
+      const migrationFiles = readdirSync(migrationsDir).filter(f => /^V\d+__.*\.sql$/.test(f));
+      const updates: string[] = [];
+
+      for (const file of migrationFiles) {
+        const version = file.match(/^V(\d+)__/)?.[1];
+        if (!version) continue;
+        let content = readFileSync(join(migrationsDir, file));
+        if (content[0] === 0xEF && content[1] === 0xBB && content[2] === 0xBF) {
+          content = content.slice(3);
+        }
+        const lines = content.toString('utf-8').split(/\r?\n/);
+        const checksum = crc32(Buffer.from(lines.join(''), 'utf-8')) | 0;
+        updates.push(
+          `UPDATE flyway_schema_history SET checksum = ${checksum} WHERE version = '${version}' AND checksum IS NOT NULL;`
+        );
+      }
+
+      if (updates.length > 0) {
+        const tmpSql = `/tmp/flyway-checksum-sync-${Date.now()}.sql`;
+        writeFileSync(tmpSql, updates.join('\n'));
+        try {
+          const { stdout } = await execAsync(
+            `docker exec -i "${pgContainer}" psql -U postgres -d ${dbName} < "${tmpSql}"`,
+            { encoding: 'utf-8', timeout: 30000 }
+          );
+          const updatedCount = (stdout.match(/UPDATE \d+/g) || [])
+            .reduce((sum, m) => sum + parseInt(m.replace('UPDATE ', ''), 10), 0);
+          emit(`Synced ${migrationFiles.length} migration checksums (${updatedCount} rows updated)`);
+        } finally {
+          try { unlinkSync(tmpSql); } catch {}
+        }
+      }
+    }
+  }
+
+  try {
+    const { stdout } = await execAsync(
+      `docker exec "${pgContainer}" psql -U postgres -d ${dbName} -t -A -c "SELECT count(*) FROM flyway_schema_history;"`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    const newCount = parseInt(stdout.trim(), 10) || 0;
+    emit(`Repair complete: flyway_schema_history now has ${newCount} entries (was ${rowCount})`);
+    return { repaired: true, message: `Repaired Flyway schema_history: ${rowCount} → ${newCount} entries` };
+  } catch (err: any) {
+    return { repaired: false, message: `Repair may have failed: ${err.message}` };
+  }
+}
+
+function getIndexStats(workspacePath: string): {
+  fileCount?: number;
+  indexAge?: string;
+  edgeCount?: number;
+} {
+  const tldrPath = join(workspacePath, '.tldr');
+  if (!existsSync(tldrPath)) return {};
+  try {
+    let indexAge: string | undefined;
+    const langPath = join(tldrPath, 'languages.json');
+    if (existsSync(langPath)) {
+      const langData = JSON.parse(readFileSync(langPath, 'utf-8'));
+      if (langData.timestamp) {
+        const ageMs = Date.now() - langData.timestamp * 1000;
+        const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+        indexAge =
+          ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+      }
+    }
+    if (!indexAge) {
+      const stats = statSync(tldrPath);
+      const ageMs = Date.now() - stats.mtimeMs;
+      const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+      indexAge =
+        ageHours === 0 ? 'now' : ageHours < 24 ? `${ageHours}h ago` : `${Math.floor(ageHours / 24)}d ago`;
+    }
+    let fileCount: number | undefined;
+    let edgeCount: number | undefined;
+    const cgPath = join(tldrPath, 'cache', 'call_graph.json');
+    if (existsSync(cgPath)) {
+      const cg = JSON.parse(readFileSync(cgPath, 'utf-8'));
+      edgeCount = Array.isArray(cg.edges) ? cg.edges.length : undefined;
+      if (Array.isArray(cg.edges)) {
+        const files = new Set<string>();
+        for (const e of cg.edges) {
+          if (e.from_file) files.add(e.from_file);
+          if (e.to_file) files.add(e.to_file);
+        }
+        fileCount = files.size;
+      }
+    }
+    return { fileCount, indexAge, edgeCount };
+  } catch (err) {
+    console.error(`[getIndexStats] Error for ${workspacePath}:`, err);
+    return {};
+  }
+}
+
+// setReviewStatus wrapper (mirrors the index.ts version; side-effects are
+// intentionally omitted here — the server-side side-effects (auto-PR, auto-merge)
+// live in the Express server until full migration is complete).
+function setReviewStatus(issueId: string, update: Partial<ReviewStatus>): ReviewStatus {
+  return setReviewStatusBase(issueId, update);
+}
+
+// ─── Read JSON body helper ────────────────────────────────────────────────────
+
+const readJsonBody = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const text = yield* request.text;
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {};
+  }
+});
+
+// ─── Route: GET /api/workspaces/:issueId ─────────────────────────────────────
+
+const getWorkspaceRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const issuePrefix = issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const issueLower = issueId.toLowerCase();
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+
+        if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+          return HttpServerResponse.json({
+            exists: true,
+            issueId,
+            isRemote: true,
+            vmName: workspaceInfo.vmName,
+            remotePath: workspaceInfo.remotePath,
+            agentId: workspaceInfo.agentId,
+            path: `${workspaceInfo.vmName}:${workspaceInfo.remotePath}`,
+            location: 'remote',
+            message: `Workspace is on remote Fly machine: ${workspaceInfo.vmName}`,
+          });
+        }
+
+        const workspaceName = `feature-${issueLower}`;
+        const workspacePath = join(projectPath, 'workspaces', workspaceName);
+
+        if (!existsSync(workspacePath)) {
+          return HttpServerResponse.json({ exists: false, issueId });
+        }
+
+        const gitFile = join(workspacePath, '.git');
+        const apiGit = join(workspacePath, 'api', '.git');
+        const feGit = join(workspacePath, 'fe', '.git');
+        const srcGit = join(workspacePath, 'src', '.git');
+        const devcontainer = join(workspacePath, '.devcontainer');
+        const claudeMd = join(workspacePath, 'CLAUDE.md');
+
+        const hasValidStructure =
+          existsSync(gitFile) ||
+          existsSync(apiGit) ||
+          existsSync(feGit) ||
+          existsSync(srcGit) ||
+          existsSync(devcontainer) ||
+          existsSync(claudeMd);
+
+        if (!hasValidStructure) {
+          const location = getWorkspaceLocation(issueId);
+          return HttpServerResponse.json({
+            exists: true,
+            corrupted: true,
+            issueId,
+            path: workspacePath,
+            message: 'Workspace exists but is not a valid git worktree or containerized workspace',
+            location,
+          });
+        }
+
+        const projectConfig = findProjectByTeam(issuePrefix);
+        const dnsDomain = projectConfig?.workspace?.dns?.domain || 'localhost';
+        const featureFolder = `feature-${issueLower}`;
+
+        let frontendUrl = `https://${featureFolder}.${dnsDomain}`;
+        let apiUrl = `https://api-${featureFolder}.${dnsDomain}`;
+
+        if (projectConfig?.workspace?.dns?.entries) {
+          const entries = projectConfig.workspace.dns.entries;
+          if (entries[0]) {
+            frontendUrl = `https://${entries[0]
+              .replace('{{FEATURE_FOLDER}}', featureFolder)
+              .replace('{{DOMAIN}}', dnsDomain)}`;
+          }
+          if (entries[1]) {
+            apiUrl = `https://${entries[1]
+              .replace('{{FEATURE_FOLDER}}', featureFolder)
+              .replace('{{DOMAIN}}', dnsDomain)}`;
+          }
+        }
+
+        let services: { name: string; url?: string }[] = [];
+        const stateMd = join(workspacePath, '.planning', 'STATE.md');
+        const workspaceMd = join(workspacePath, 'WORKSPACE.md');
+        const dockerCompose = join(workspacePath, 'docker-compose.yml');
+
+        const urlSourceFile = existsSync(stateMd)
+          ? stateMd
+          : existsSync(workspaceMd)
+          ? workspaceMd
+          : null;
+
+        if (urlSourceFile) {
+          try {
+            const content = readFileSync(urlSourceFile, 'utf-8');
+            const urlMatches = content.matchAll(/(\w+):\s*(https?:\/\/[^\s\n]+)/gi);
+            for (const match of urlMatches) {
+              services.push({ name: match[1], url: match[2] });
+            }
+          } catch {}
+        }
+
+        if (services.length === 0) {
+          services = [
+            { name: 'Frontend', url: frontendUrl },
+            { name: 'API', url: apiUrl },
+          ];
+        }
+
+        const devcontainerPath = join(workspacePath, '.devcontainer');
+        const hasDocker =
+          existsSync(dockerCompose) ||
+          existsSync(join(workspacePath, 'compose.yaml')) ||
+          existsSync(join(devcontainerPath, 'docker-compose.yml')) ||
+          existsSync(join(devcontainerPath, 'docker-compose.devcontainer.yml')) ||
+          existsSync(join(devcontainerPath, 'compose.yaml')) ||
+          existsSync(join(devcontainerPath, 'compose.infra.yml')) ||
+          existsSync(devcontainerPath);
+
+        const canContainerize = !hasDocker && existsSync(join(projectPath, 'infra', 'new-feature'));
+
+        const agentSession = `agent-${issueLower}`;
+        const [git, repoGit, containers, mrUrl, sessionsResult, paneResult] = await Promise.all([
+          getGitStatusAsync(workspacePath),
+          getRepoGitStatusAsync(workspacePath),
+          hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
+          getMrUrlAsync(issueId, workspacePath),
+          execAsync('tmux list-sessions 2>/dev/null || echo ""').catch(() => ({ stdout: '' })),
+          execAsync(
+            `tmux capture-pane -t "${agentSession}" -p 2>/dev/null | tail -50`
+          ).catch(() => ({ stdout: '' })),
+        ]);
+
+        let hasAgent = false;
+        let agentSessionId: string | null = null;
+        let agentModel: string | undefined;
+        let agentModelFull: string | undefined;
+
+        const sessions = sessionsResult.stdout;
+        if (sessions.includes(agentSession)) {
+          hasAgent = true;
+          agentSessionId = agentSession;
+
+          const paneOutput = paneResult.stdout;
+          const modelMatch = paneOutput.match(/\[(Opus|Sonnet|Haiku)[^\]]*\]/i);
+          agentModel = modelMatch ? modelMatch[1] : undefined;
+
+          const fullModel = getActiveSessionModel(workspacePath);
+          if (fullModel) agentModelFull = fullModel;
+        }
+
+        const pendingOperation = getPendingOperation(issueId);
+        const location = getWorkspaceLocation(issueId);
+
+        return HttpServerResponse.json({
+          exists: true,
+          issueId,
+          path: workspacePath,
+          frontendUrl,
+          apiUrl,
+          mrUrl,
+          hasAgent,
+          agentSessionId,
+          agentModel,
+          agentModelFull,
+          git,
+          repoGit,
+          services,
+          containers,
+          hasDocker,
+          canContainerize,
+          pendingOperation,
+          location,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error getting workspace info:', error);
+        return HttpServerResponse.json({ error: 'Failed to get workspace info: ' + msg }, { status: 500 });
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces ─────────────────────────────────────────────
+
+const postWorkspacesRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces',
+  Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { issueId, projectId } = body as { issueId?: string; projectId?: string };
+
+    if (!issueId) {
+      return HttpServerResponse.json({ error: 'issueId required' }, { status: 400 });
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const issuePrefix = issueId.split('-')[0];
+        const projectPath = getProjectPath(projectId, issuePrefix);
+        const activityId = spawnPanCommand(
+          ['workspace', 'create', issueId],
+          `Create workspace for ${issueId}`,
+          projectPath
+        );
+        return HttpServerResponse.json({
+          success: true,
+          message: `Creating workspace for ${issueId}`,
+          activityId,
+          projectPath,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error creating workspace:', error);
+        return HttpServerResponse.json({ error: 'Failed to create workspace: ' + msg }, { status: 500 });
+      },
+    });
+  })
+);
+
+// ─── Route: GET /api/workspaces/:issueId/plan ─────────────────────────────────
+
+const getWorkspacePlanRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/plan',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const issuePrefix = issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const issueLower = issueId.toLowerCase();
+    const workspaceName = `feature-${issueLower}`;
+    const workspacePath = join(projectPath, 'workspaces', workspaceName);
+
+    const planPath = findPlan(workspacePath);
+    if (!planPath) {
+      return HttpServerResponse.json(
+        { error: 'No vBRIEF plan found for this workspace' },
+        { status: 404 }
+      );
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const doc = readPlan(planPath);
+        const cp = criticalPath(doc);
+        return HttpServerResponse.json({ ...doc, criticalPath: cp });
+      },
+      catch: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        return HttpServerResponse.json({ error: 'Failed to read plan: ' + msg }, { status: 500 });
+      },
+    });
+  })
+);
+
+// ─── Route: GET /api/workspaces/:issueId/clean/preview ───────────────────────
+
+const getWorkspaceCleanPreviewRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/clean/preview',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const issuePrefix = issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const issueLower = issueId.toLowerCase();
+    const workspaceName = `feature-${issueLower}`;
+    const workspacePath = join(projectPath, 'workspaces', workspaceName);
+
+    if (!existsSync(workspacePath)) {
+      return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 404 });
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const excludeDirs = [
+          'node_modules', 'target', 'dist', 'build', '.git', '__pycache__', '.cache', '.next', 'coverage',
+        ];
+        const excludePattern = excludeDirs.map(d => `-name "${d}" -prune`).join(' -o ');
+        const findCmd = `find "${workspacePath}" \\( ${excludePattern} \\) -o -type f -print 2>/dev/null | head -500`;
+        const { stdout: filesOutput } = await execAsync(findCmd, {
+          encoding: 'utf-8',
+          maxBuffer: 10 * 1024 * 1024,
+        });
+        const files = filesOutput.trim()
+          ? filesOutput.trim().split('\n').map(f => f.replace(workspacePath + '/', ''))
+          : [];
+
+        let totalSize = '0';
+        try {
+          const duCmd = `du -sh "${workspacePath}" --exclude=node_modules --exclude=target --exclude=dist --exclude=.git 2>/dev/null | cut -f1`;
+          const { stdout: sizeOutput } = await execAsync(duCmd, {
+            encoding: 'utf-8',
+            maxBuffer: 10 * 1024 * 1024,
+          });
+          totalSize = sizeOutput.trim() || '0';
+        } catch {
+          totalSize = 'unknown';
+        }
+
+        const codeFiles = files.filter(f =>
+          /\.(ts|tsx|js|jsx|java|py|rs|go|rb|php|cs|swift|kt)$/.test(f)
+        );
+        const configFiles = files.filter(
+          f => /\.(json|yaml|yml|toml|xml|env|md)$/.test(f) || f.includes('config')
+        );
+        const otherFiles = files.filter(f => !codeFiles.includes(f) && !configFiles.includes(f));
+
+        let diffAnalysis: {
+          modifiedFiles: string[];
+          newFiles: string[];
+          unchangedFiles: string[];
+          comparedAgainst: string;
+          error?: string;
+        } = { modifiedFiles: [], newFiles: [], unchangedFiles: [], comparedAgainst: 'main' };
+
+        try {
+          const subrepos: { prefix: string; gitRoot: string }[] = [];
+          const possibleSubrepos = ['fe', 'api', 'frontend', 'backend', 'web', 'server'];
+          for (const subdir of possibleSubrepos) {
+            const subdirPath = join(workspacePath, subdir);
+            if (existsSync(join(subdirPath, '.git'))) {
+              subrepos.push({ prefix: subdir + '/', gitRoot: subdirPath });
+            }
+          }
+
+          let mainGitRoot: string | null = null;
+          const possibleRoots = [projectPath, join(projectPath, '..'), workspacePath];
+          for (const root of possibleRoots) {
+            if (existsSync(join(root, '.git'))) {
+              mainGitRoot = root;
+              break;
+            }
+          }
+
+          const filesToCheck = codeFiles.slice(0, 100);
+          const reposUsed: string[] = [];
+
+          for (const file of filesToCheck) {
+            const workspaceFilePath = join(workspacePath, file);
+            let gitRoot: string | null = null;
+            let relativePath = file;
+
+            for (const { prefix, gitRoot: subGitRoot } of subrepos) {
+              if (file.startsWith(prefix)) {
+                gitRoot = subGitRoot;
+                relativePath = file.slice(prefix.length);
+                if (!reposUsed.includes(prefix)) reposUsed.push(prefix);
+                break;
+              }
+            }
+
+            if (!gitRoot && mainGitRoot) {
+              gitRoot = mainGitRoot;
+              if (!reposUsed.includes('main')) reposUsed.push('main');
+            }
+
+            if (!gitRoot) {
+              diffAnalysis.newFiles.push(file);
+              continue;
+            }
+
+            try {
+              const branchName = `feature/${issueLower}`;
+              let compareRef = 'main';
+              try {
+                await execAsync(`git rev-parse --verify ${branchName} 2>/dev/null`, {
+                  cwd: gitRoot,
+                  encoding: 'utf-8',
+                  maxBuffer: 10 * 1024 * 1024,
+                });
+                compareRef = branchName;
+              } catch {
+                try {
+                  await execAsync(`git rev-parse --verify main 2>/dev/null`, {
+                    cwd: gitRoot,
+                    encoding: 'utf-8',
+                    maxBuffer: 10 * 1024 * 1024,
+                  });
+                } catch {
+                  compareRef = 'master';
+                }
+              }
+
+              const { stdout: gitContent } = await execAsync(
+                `git show ${compareRef}:${relativePath} 2>/dev/null`,
+                { cwd: gitRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+              );
+              const workspaceContent = readFileSync(workspaceFilePath, 'utf-8');
+              if (gitContent === workspaceContent) {
+                diffAnalysis.unchangedFiles.push(file);
+              } else {
+                diffAnalysis.modifiedFiles.push(file);
+              }
+            } catch {
+              diffAnalysis.newFiles.push(file);
+            }
+          }
+
+          diffAnalysis.comparedAgainst =
+            reposUsed.length > 0 ? `${reposUsed.join(', ')} repos (main branch)` : 'main';
+
+          if (subrepos.length === 0 && !mainGitRoot) {
+            diffAnalysis.error = 'Could not find git repository to compare against';
+          }
+        } catch (diffError: any) {
+          diffAnalysis.error = `Diff analysis failed: ${diffError.message}`;
+        }
+
+        return HttpServerResponse.json({
+          workspacePath,
+          totalSize,
+          fileCount: files.length,
+          codeFiles: codeFiles.slice(0, 50),
+          configFiles: configFiles.slice(0, 30),
+          otherFiles: otherFiles.slice(0, 20),
+          hasMore: files.length > 100,
+          backupPath: join(
+            projectPath,
+            'workspaces',
+            `.backup-${workspaceName}-${Date.now()}`
+          ),
+          diffAnalysis,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error previewing workspace:', error);
+        return HttpServerResponse.json(
+          { error: 'Failed to preview workspace: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/clean ───────────────────────────────
+
+const postWorkspaceCleanRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/clean',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const body = yield* readJsonBody;
+    const { createBackup } = body as { createBackup?: boolean };
+
+    const issuePrefix = issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const issueLower = issueId.toLowerCase();
+    const workspaceName = `feature-${issueLower}`;
+    const workspacePath = join(projectPath, 'workspaces', workspaceName);
+
+    if (!existsSync(workspacePath)) {
+      return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 404 });
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        let backupPath: string | null = null;
+
+        if (createBackup) {
+          backupPath = join(
+            projectPath,
+            'workspaces',
+            `.backup-${workspaceName}-${Date.now()}`
+          );
+          console.log(`Creating backup: ${workspacePath} -> ${backupPath}`);
+          await execAsync(
+            `rsync -a --quiet --exclude=node_modules --exclude=target --exclude=dist --exclude=.git --exclude=__pycache__ --exclude=.cache --exclude=.next --exclude=coverage "${workspacePath}/" "${backupPath}/"`,
+            { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
+          );
+        }
+
+        console.log(`Removing corrupted workspace: ${workspacePath}`);
+        try {
+          await execAsync(`rm -rf "${workspacePath}"`, {
+            encoding: 'utf-8',
+            maxBuffer: 50 * 1024 * 1024,
+          });
+        } catch {
+          console.log('Regular rm failed, using Docker to clean up root-owned files...');
+          await execAsync(
+            `docker run --rm -v "${workspacePath}:/cleanup" alpine sh -c "rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?* 2>/dev/null || true"`,
+            { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
+          );
+          await execAsync(`rmdir "${workspacePath}"`, { encoding: 'utf-8' });
+        }
+
+        const activityId = spawnPanCommand(
+          ['workspace', 'create', issueId],
+          `Recreate workspace for ${issueId}`,
+          projectPath
+        );
+
+        return HttpServerResponse.json({
+          success: true,
+          message: createBackup
+            ? `Backed up to ${backupPath} and recreating workspace for ${issueId}`
+            : `Cleaned corrupted workspace and recreating for ${issueId}`,
+          activityId,
+          projectPath,
+          backupPath,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error cleaning workspace:', error);
+        return HttpServerResponse.json(
+          { error: 'Failed to clean workspace: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/containerize ───────────────────────
+
+const postWorkspaceContainerizeRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/containerize',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const issuePrefix = issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const issueLower = issueId.toLowerCase();
+
+    const newFeatureScript = join(projectPath, 'infra', 'new-feature');
+    if (!existsSync(newFeatureScript)) {
+      return HttpServerResponse.json(
+        { error: 'Project does not support containerization (no infra/new-feature script)' },
+        { status: 400 }
+      );
+    }
+
+    const workspaceName = `feature-${issueLower}`;
+    const workspacePath = join(projectPath, 'workspaces', workspaceName);
+    if (existsSync(join(workspacePath, '.devcontainer'))) {
+      return HttpServerResponse.json({ error: 'Workspace is already containerized' }, { status: 400 });
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        try {
+          await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+        } catch {
+          return HttpServerResponse.json(
+            { error: 'Docker is not running. Start Docker Desktop first.' },
+            { status: 400 }
+          );
+        }
+
+        if (existsSync(workspacePath)) {
+          await execAsync(`pan workspace destroy ${issueId} --force 2>/dev/null || true`, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+          });
+        }
+
+        const featureName = issueLower;
+        const activityId = Date.now().toString();
+
+        logActivity({
+          id: activityId,
+          timestamp: new Date().toISOString(),
+          command: `./new-feature ${featureName}`,
+          status: 'running',
+          output: [],
+        });
+
+        const child = spawn('./new-feature', [featureName], {
+          cwd: join(projectPath, 'infra'),
+          detached: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        child.stdout?.on('data', (data) => {
+          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+            appendActivityOutput(activityId, line);
+          });
+        });
+        child.stderr?.on('data', (data) => {
+          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+            appendActivityOutput(activityId, `[stderr] ${line}`);
+          });
+        });
+
+        child.on('close', (code) => {
+          appendActivityOutput(
+            activityId,
+            `[${new Date().toISOString()}] new-feature exited with code ${code}`
+          );
+          if (code === 0) {
+            appendActivityOutput(activityId, '');
+            appendActivityOutput(activityId, '=== Starting containers ===');
+
+            const workspaceDir = join(projectPath, 'workspaces', `feature-${featureName}`);
+            const uid = process.getuid?.() ?? 1000;
+            const gid = process.getgid?.() ?? 1000;
+            const devUp = spawn('./dev', ['all'], {
+              cwd: workspaceDir,
+              detached: true,
+              stdio: ['ignore', 'pipe', 'pipe'],
+              env: {
+                ...process.env,
+                UID: String(uid),
+                GID: String(gid),
+                DOCKER_USER: `${uid}:${gid}`,
+              },
+            });
+
+            devUp.stdout?.on('data', (data) => {
+              data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+                appendActivityOutput(activityId, line);
+              });
+            });
+            devUp.stderr?.on('data', (data) => {
+              data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+                appendActivityOutput(activityId, `[stderr] ${line}`);
+              });
+            });
+            devUp.on('close', (devCode) => {
+              appendActivityOutput(
+                activityId,
+                `[${new Date().toISOString()}] ./dev all exited with code ${devCode}`
+              );
+              updateActivity(activityId, { status: devCode === 0 ? 'completed' : 'failed' });
+            });
+            devUp.on('error', (err) => {
+              appendActivityOutput(activityId, `[error] ${err.message}`);
+              updateActivity(activityId, { status: 'failed' });
+            });
+          } else {
+            updateActivity(activityId, { status: 'failed' });
+          }
+        });
+
+        child.on('error', (err) => {
+          appendActivityOutput(activityId, `[error] ${err.message}`);
+          updateActivity(activityId, { status: 'failed' });
+        });
+
+        return HttpServerResponse.json({
+          success: true,
+          message: `Containerizing workspace for ${issueId}`,
+          activityId,
+          projectPath,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error containerizing workspace:', error);
+        return HttpServerResponse.json(
+          { error: 'Failed to containerize workspace: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/start ───────────────────────────────
+
+const postWorkspaceStartRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/start',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const issuePrefix = issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const issueLower = issueId.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+    if (!existsSync(workspacePath)) {
+      return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 400 });
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        // Copy planning artifacts from project root if needed
+        const workspacePlanningDir = join(workspacePath, '.planning');
+        if (!existsSync(join(workspacePlanningDir, 'STATE.md'))) {
+          const legacyPlanningDir = join(projectPath, '.planning', issueLower);
+          if (existsSync(legacyPlanningDir)) {
+            try {
+              mkdirSync(workspacePlanningDir, { recursive: true });
+              await execAsync(
+                `cp -r "${legacyPlanningDir}/"* "${workspacePlanningDir}/"`,
+                { encoding: 'utf-8', shell: '/bin/bash' }
+              );
+              console.log(
+                `[workspace/start] Copied planning from ${legacyPlanningDir} to workspace for ${issueId}`
+              );
+            } catch (e) {
+              console.warn(`[workspace/start] Could not copy planning: ${e}`);
+            }
+          }
+        }
+
+        const workspaceBeadsDir = join(workspacePath, '.beads');
+        if (!existsSync(workspaceBeadsDir)) {
+          const projectRootBeadsDir = join(projectPath, '.beads');
+          if (existsSync(projectRootBeadsDir)) {
+            try {
+              await execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, {
+                encoding: 'utf-8',
+              });
+              console.log(
+                `[workspace/start] Copied beads from project root to workspace for ${issueId}`
+              );
+            } catch (e) {
+              console.warn(`[workspace/start] Could not copy beads: ${e}`);
+            }
+          }
+        }
+
+        // Check for ./dev script
+        const devScript = join(workspacePath, 'dev');
+        const devScriptInContainer = join(workspacePath, '.devcontainer', 'dev');
+
+        if (!existsSync(devScript)) {
+          if (existsSync(devScriptInContainer)) {
+            try {
+              symlinkSync('.devcontainer/dev', devScript);
+              chmodSync(devScriptInContainer, 0o755);
+              console.log(`[workspace/start] Repaired: created ./dev symlink for ${issueId}`);
+            } catch (repairErr) {
+              return HttpServerResponse.json(
+                {
+                  error: `Workspace has no ./dev script and repair failed: ${repairErr}`,
+                },
+                { status: 400 }
+              );
+            }
+          } else {
+            return HttpServerResponse.json(
+              { error: 'Workspace has no ./dev script (checked root and .devcontainer/)' },
+              { status: 400 }
+            );
+          }
+        }
+
+        // Repair .env if needed
+        const envFilePath = join(workspacePath, '.env');
+        const teamPrefix = extractTeamPrefix(issueId);
+        const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+        if (projectConfig?.workspace?.ports && projectConfig?.workspace?.env?.template) {
+          const featureFolder = `feature-${issueLower}`;
+          let needsRepair = !existsSync(envFilePath);
+
+          if (!needsRepair && existsSync(envFilePath)) {
+            const existingEnv = readFileSync(envFilePath, 'utf-8');
+            for (const portName of Object.keys(projectConfig.workspace.ports)) {
+              const portVar = `${portName.toUpperCase()}_PORT`;
+              if (!existingEnv.includes(portVar)) {
+                needsRepair = true;
+                break;
+              }
+            }
+          }
+
+          if (needsRepair) {
+            try {
+              const placeholders: Record<string, string> = { FEATURE_FOLDER: featureFolder };
+              for (const [portName, portConfig] of Object.entries(
+                projectConfig.workspace.ports
+              )) {
+                const portFile = join(projectPath, `.${portName}-ports`);
+                const range = (portConfig as any).range as [number, number];
+                let content = '';
+                if (existsSync(portFile)) content = readFileSync(portFile, 'utf-8');
+                const lines = content.split('\n').filter(Boolean);
+                let port: number | null = null;
+                for (const line of lines) {
+                  const [folder, p] = line.split(':');
+                  if (folder === featureFolder) {
+                    port = parseInt(p, 10);
+                    break;
+                  }
+                }
+                if (!port) {
+                  const usedPorts = new Set(lines.map(l => parseInt(l.split(':')[1], 10)));
+                  for (let p = range[0]; p <= range[1]; p++) {
+                    if (!usedPorts.has(p)) {
+                      port = p;
+                      writeFileSync(
+                        portFile,
+                        content +
+                          (content.endsWith('\n') || !content ? '' : '\n') +
+                          `${featureFolder}:${port}\n`
+                      );
+                      break;
+                    }
+                  }
+                }
+                if (port) placeholders[`${portName.toUpperCase()}_PORT`] = String(port);
+              }
+              let envContent = projectConfig.workspace.env.template;
+              for (const [key, value] of Object.entries(placeholders)) {
+                envContent = envContent.replace(
+                  new RegExp(`\\{\\{${key}\\}\\}`, 'g'),
+                  value
+                );
+              }
+              writeFileSync(envFilePath, envContent);
+              console.log(
+                `[workspace/start] Repaired: created .env with port assignments for ${issueId}`
+              );
+            } catch (envErr) {
+              console.warn(
+                `[workspace/start] Could not repair .env for ${issueId}: ${envErr}`
+              );
+            }
+          }
+        }
+
+        // Check Docker is running
+        try {
+          await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+        } catch {
+          return HttpServerResponse.json(
+            { error: 'Docker is not running. Start Docker Desktop first.' },
+            { status: 400 }
+          );
+        }
+
+        // Pre-start Flyway repair if applicable
+        if (projectConfig?.workspace?.database?.migrations?.type === 'flyway') {
+          try {
+            const composePaths = [
+              join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
+              join(workspacePath, 'docker-compose.yml'),
+            ];
+            let compFile: string | undefined;
+            for (const cp of composePaths) {
+              if (existsSync(cp)) { compFile = cp; break; }
+            }
+            if (compFile) {
+              const { stdout: pnOut } = await execAsync(
+                `docker compose -f "${compFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+                { encoding: 'utf-8' }
+              );
+              const composeName = pnOut.trim();
+              if (composeName) {
+                const pgContainer = `${composeName}-postgres-1`;
+                const result = await repairFlywayIfNeeded(
+                  issueId,
+                  pgContainer,
+                  'myn',
+                  projectConfig,
+                  workspacePath
+                );
+                if (result.repaired) {
+                  console.log(`[workspace/start] Pre-start Flyway repair: ${result.message}`);
+                }
+              }
+            }
+          } catch (preCheckErr: any) {
+            console.log(
+              `[workspace/start] Pre-start Flyway check skipped: ${preCheckErr.message}`
+            );
+          }
+        }
+
+        const activityId = Date.now().toString();
+        logActivity({
+          id: activityId,
+          timestamp: new Date().toISOString(),
+          command: `./dev all (${issueId})`,
+          status: 'running',
+          output: [],
+        });
+
+        const uid = process.getuid?.() ?? 1000;
+        const gid = process.getgid?.() ?? 1000;
+
+        const child = spawn('./dev', ['all'], {
+          cwd: workspacePath,
+          detached: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: {
+            ...process.env,
+            UID: String(uid),
+            GID: String(gid),
+            DOCKER_USER: `${uid}:${gid}`,
+          },
+        });
+
+        child.stdout?.on('data', (data) => {
+          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+            appendActivityOutput(activityId, line);
+          });
+        });
+        child.stderr?.on('data', (data) => {
+          data.toString().split('\n').filter(Boolean).forEach((line: string) => {
+            appendActivityOutput(activityId, `[stderr] ${line}`);
+          });
+        });
+
+        child.on('close', (code) => {
+          appendActivityOutput(
+            activityId,
+            `[${new Date().toISOString()}] ./dev all exited with code ${code}`
+          );
+
+          if (code !== 0 && projectConfig?.workspace?.database?.migrations?.type === 'flyway') {
+            (async () => {
+              try {
+                const composePaths = [
+                  join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
+                  join(workspacePath, 'docker-compose.yml'),
+                ];
+                let composeFile: string | undefined;
+                for (const cp of composePaths) {
+                  if (existsSync(cp)) { composeFile = cp; break; }
+                }
+                if (!composeFile) return;
+
+                const { stdout: pnOut } = await execAsync(
+                  `docker compose -f "${composeFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+                  { encoding: 'utf-8' }
+                );
+                const composeName = pnOut.trim();
+                if (!composeName) return;
+
+                const apiContainer = `${composeName}-api-1`;
+                const pgContainer = `${composeName}-postgres-1`;
+
+                const { stdout: apiStatus } = await execAsync(
+                  `docker ps -a --filter "name=^${apiContainer}$" --format "{{.Status}}" 2>/dev/null`,
+                  { encoding: 'utf-8' }
+                );
+                if (!apiStatus.trim().startsWith('Exited')) return;
+
+                const { stdout: logs } = await execAsync(
+                  `docker logs --tail 50 "${apiContainer}" 2>&1 || true`,
+                  { encoding: 'utf-8', timeout: 10000 }
+                );
+                if (!logs.toLowerCase().includes('flyway')) return;
+
+                appendActivityOutput(activityId, '');
+                appendActivityOutput(
+                  activityId,
+                  '=== Detected Flyway failure — attempting auto-repair ==='
+                );
+
+                const result = await repairFlywayIfNeeded(
+                  issueId,
+                  pgContainer,
+                  'myn',
+                  projectConfig,
+                  workspacePath,
+                  (msg) => appendActivityOutput(activityId, `[flyway-repair] ${msg}`)
+                );
+
+                if (result.repaired) {
+                  appendActivityOutput(activityId, `[flyway-repair] Restarting API container...`);
+                  await execAsync(`docker start "${apiContainer}"`, {
+                    encoding: 'utf-8',
+                    timeout: 30000,
+                  });
+                  appendActivityOutput(
+                    activityId,
+                    `[flyway-repair] API container restarted successfully`
+                  );
+                  updateActivity(activityId, { status: 'completed' });
+                  return;
+                }
+              } catch (repairErr: any) {
+                appendActivityOutput(
+                  activityId,
+                  `[flyway-repair] Auto-repair failed: ${repairErr.message}`
+                );
+              }
+              updateActivity(activityId, { status: 'failed' });
+            })();
+          } else {
+            updateActivity(activityId, { status: code === 0 ? 'completed' : 'failed' });
+          }
+        });
+
+        child.on('error', (err) => {
+          appendActivityOutput(activityId, `[error] ${err.message}`);
+          updateActivity(activityId, { status: 'failed' });
+        });
+
+        return HttpServerResponse.json({
+          success: true,
+          message: `Starting containers for ${issueId}`,
+          activityId,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error starting containers:', error);
+        return HttpServerResponse.json(
+          { error: 'Failed to start containers: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/containers/:containerName/:action ───
+
+const postWorkspaceContainerActionRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/containers/:containerName/:action',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const containerName = params['containerName'] ?? '';
+    const action = params['action'] ?? '';
+
+    if (!['start', 'stop', 'restart'].includes(action)) {
+      return HttpServerResponse.json(
+        { error: 'Invalid action. Must be start, stop, or restart.' },
+        { status: 400 }
+      );
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const teamPrefix = extractTeamPrefix(issueId);
+        const containerProjectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+        const projectPaths = containerProjectConfig
+          ? [
+              join(
+                containerProjectConfig.path,
+                'workspaces',
+                `feature-${issueId.toLowerCase()}`
+              ),
+            ]
+          : listProjects().map(p =>
+              join(p.path, 'workspaces', `feature-${issueId.toLowerCase()}`)
+            );
+
+        let workspacePath: string | null = null;
+        let composeFile: string | null = null;
+
+        for (const path of projectPaths) {
+          if (existsSync(path)) {
+            workspacePath = path;
+            const composePaths = [
+              join(path, '.devcontainer/docker-compose.devcontainer.yml'),
+              join(path, 'docker-compose.yml'),
+              join(path, 'docker-compose.yaml'),
+            ];
+            for (const cp of composePaths) {
+              if (existsSync(cp)) {
+                composeFile = cp;
+                break;
+              }
+            }
+            break;
+          }
+        }
+
+        if (!workspacePath) {
+          return HttpServerResponse.json(
+            { error: `Workspace not found for ${issueId}` },
+            { status: 404 }
+          );
+        }
+
+        if (!composeFile) {
+          return HttpServerResponse.json(
+            { error: `No docker-compose file found in workspace` },
+            { status: 404 }
+          );
+        }
+
+        try {
+          await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
+        } catch {
+          return HttpServerResponse.json(
+            { error: 'Docker is not running. Start Docker Desktop first.' },
+            { status: 400 }
+          );
+        }
+
+        const serviceMap: Record<string, string[]> = {
+          frontend: ['fe', 'frontend'],
+          api: ['api'],
+          dev: ['dev'],
+          postgres: ['postgres'],
+          redis: ['redis'],
+          fe: ['fe', 'frontend'],
+        };
+
+        const serviceNames = serviceMap[containerName.toLowerCase()];
+        if (!serviceNames) {
+          return HttpServerResponse.json(
+            {
+              error: `Unknown container: ${containerName}. Valid: ${Object.keys(serviceMap).join(', ')}`,
+            },
+            { status: 400 }
+          );
+        }
+
+        const { stdout: projectNameOut } = await execAsync(
+          `docker compose -f "${composeFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+          { encoding: 'utf-8' }
+        );
+        const projectName = projectNameOut.trim();
+
+        // Pre-start Flyway repair for API containers
+        if (
+          containerName.toLowerCase() === 'api' &&
+          ['start', 'restart'].includes(action)
+        ) {
+          const tPrefix = extractTeamPrefix(issueId);
+          const pConfig = tPrefix ? findProjectByTeam(tPrefix) : null;
+          if (
+            pConfig?.workspace?.database?.migrations?.type === 'flyway' &&
+            projectName
+          ) {
+            const pgContainer = `${projectName}-postgres-1`;
+            try {
+              const result = await repairFlywayIfNeeded(
+                issueId,
+                pgContainer,
+                'myn',
+                pConfig,
+                workspacePath!
+              );
+              if (result.repaired) {
+                console.log(`[container-control] ${result.message}`);
+              }
+            } catch (repairErr: any) {
+              console.warn(
+                `[container-control] Flyway pre-check failed (non-fatal): ${repairErr.message}`
+              );
+            }
+          }
+        }
+
+        let success = false;
+        let lastError = '';
+
+        for (const serviceName of serviceNames) {
+          try {
+            const cmd = `docker compose -f "${composeFile}" ${projectName ? `--project-name "${projectName}"` : ''} ${action} ${serviceName}`;
+            console.log(`[container-control] Running: ${cmd}`);
+            await execAsync(cmd, { encoding: 'utf-8', timeout: 30000 });
+            success = true;
+            console.log(
+              `[container-control] Successfully ${action}ed ${serviceName} for ${issueId}`
+            );
+            break;
+          } catch (err: any) {
+            lastError = err.message || String(err);
+          }
+        }
+
+        if (success) {
+          return HttpServerResponse.json({
+            success: true,
+            message: `Container ${containerName} ${action}ed successfully`,
+          });
+        } else {
+          return HttpServerResponse.json(
+            { error: `Failed to ${action} ${containerName}: ${lastError}` },
+            { status: 500 }
+          );
+        }
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`Error performing container action:`, error);
+        return HttpServerResponse.json(
+          { error: `Failed to ${action} container: ${msg}` },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/refresh-db ─────────────────────────
+
+const postWorkspaceRefreshDbRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/refresh-db',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    const teamPrefix = extractTeamPrefix(issueId);
+    const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+
+    if (!projectConfig) {
+      return HttpServerResponse.json(
+        { error: `No project found for issue prefix: ${issueId}` },
+        { status: 404 }
+      );
+    }
+
+    const dbConfig = projectConfig.workspace?.database;
+    if (!dbConfig?.seed_file) {
+      return HttpServerResponse.json(
+        { error: 'No seed_file configured in projects.yaml database config' },
+        { status: 400 }
+      );
+    }
+
+    const seedFile = join(projectConfig.path, dbConfig.seed_file);
+    if (!existsSync(seedFile)) {
+      return HttpServerResponse.json(
+        { error: `Seed file not found: ${seedFile}` },
+        { status: 400 }
+      );
+    }
+
+    const flywayFile = join(dirname(seedFile), 'zzz-flyway-workspace-baseline.sql');
+    if (!existsSync(flywayFile)) {
+      return HttpServerResponse.json(
+        { error: `Flyway baseline not found: ${flywayFile}` },
+        { status: 400 }
+      );
+    }
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const issueLower = issueId.toLowerCase();
+        const featureFolder = `feature-${issueLower}`;
+        const workspacesDir = projectConfig.workspace?.workspaces_dir || 'workspaces';
+        const workspacePath = join(projectConfig.path, workspacesDir, featureFolder);
+
+        if (!existsSync(workspacePath)) {
+          return HttpServerResponse.json(
+            { error: `Workspace not found: ${featureFolder}` },
+            { status: 404 }
+          );
+        }
+
+        const composePaths = [
+          join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
+          join(workspacePath, 'docker-compose.yml'),
+          join(workspacePath, 'docker-compose.yaml'),
+        ];
+        let composeFile: string | null = null;
+        for (const cp of composePaths) {
+          if (existsSync(cp)) { composeFile = cp; break; }
+        }
+
+        if (!composeFile) {
+          return HttpServerResponse.json(
+            { error: 'No docker-compose file found in workspace' },
+            { status: 404 }
+          );
+        }
+
+        const { stdout: projectNameOut } = await execAsync(
+          `docker compose -f "${composeFile}" config --format json 2>/dev/null | jq -r '.name // empty'`,
+          { encoding: 'utf-8' }
+        );
+        const projectName = projectNameOut.trim();
+
+        if (!projectName) {
+          return HttpServerResponse.json(
+            { error: 'Could not determine docker compose project name' },
+            { status: 500 }
+          );
+        }
+
+        const pgContainer = `${projectName}-postgres-1`;
+        const apiContainer = `${projectName}-api-1`;
+
+        console.log(`[refresh-db] Starting DB refresh for ${issueId} (project: ${projectName})`);
+
+        try {
+          await execAsync(`docker stop "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 });
+        } catch {
+          console.log(`[refresh-db] API container not running or already stopped`);
+        }
+
+        await execAsync(
+          `docker exec "${pgContainer}" psql -U postgres -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'myn' AND pid <> pg_backend_pid();"`,
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        await execAsync(
+          `docker exec "${pgContainer}" psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS myn;"`,
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        await execAsync(
+          `docker exec "${pgContainer}" psql -U postgres -d postgres -c "CREATE DATABASE myn OWNER postgres;"`,
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+
+        console.log(`[refresh-db] Loading seed file: ${seedFile}`);
+        await execAsync(
+          `docker exec -i "${pgContainer}" psql -U postgres -d myn < "${seedFile}"`,
+          { encoding: 'utf-8', timeout: 600000 }
+        );
+
+        const repairResult = await repairFlywayIfNeeded(
+          issueId,
+          pgContainer,
+          'myn',
+          projectConfig,
+          workspacePath,
+          (msg) => console.log(`[refresh-db] ${msg}`)
+        );
+        console.log(`[refresh-db] Flyway setup: ${repairResult.message}`);
+
+        try {
+          await execAsync(`docker start "${apiContainer}"`, { encoding: 'utf-8', timeout: 30000 });
+        } catch {
+          console.log(`[refresh-db] Could not start API container (may need manual start)`);
+        }
+
+        let customerCount = 0;
+        try {
+          const { stdout } = await execAsync(
+            `docker exec "${pgContainer}" psql -U postgres -d myn -t -A -c "SELECT count(*) FROM customer;"`,
+            { encoding: 'utf-8', timeout: 10000 }
+          );
+          customerCount = parseInt(stdout.trim(), 10) || 0;
+        } catch {}
+
+        console.log(
+          `[refresh-db] DB refresh complete for ${issueId}: ${customerCount} customers`
+        );
+
+        return HttpServerResponse.json({
+          success: true,
+          message: `Database refreshed successfully`,
+          customerCount,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[refresh-db] Error refreshing DB for ${issueId}:`, error);
+        return HttpServerResponse.json(
+          { error: `Failed to refresh database: ${msg}` },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: GET /api/workspaces/:issueId/review-status ───────────────────────
+
+const getWorkspaceReviewStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/review-status',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const status = getReviewStatus(issueId);
+        const base = status || {
+          issueId,
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          readyForMerge: false,
+        };
+
+        let { queuePosition, activeSpecialist } = computeQueuePositionFromStatus(status);
+
+        if (queuePosition === null) {
+          try {
+            const reviewQueue = checkSpecialistQueue('review-agent');
+            const reviewPos = findPositionInQueue(issueId, reviewQueue.items);
+            if (reviewPos > 0) {
+              queuePosition = reviewPos;
+              activeSpecialist = 'review';
+            } else {
+              const testQueue = checkSpecialistQueue('test-agent');
+              const testPos = findPositionInQueue(issueId, testQueue.items);
+              if (testPos > 0) {
+                queuePosition = testPos;
+                activeSpecialist = 'test';
+              } else {
+                const mergeQueue = checkSpecialistQueue('merge-agent');
+                const mergePos = findPositionInQueue(issueId, mergeQueue.items);
+                if (mergePos > 0) {
+                  queuePosition = mergePos;
+                  activeSpecialist = 'merge';
+                }
+              }
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn(`[review-status] Queue lookup failed for ${issueId} (non-fatal): ${msg}`);
+          }
+        }
+
+        return HttpServerResponse.json({ ...base, queuePosition, activeSpecialist });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error getting review status:', error);
+        return HttpServerResponse.json(
+          { error: 'Failed to get review status: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/review-status ──────────────────────
+
+const postWorkspaceReviewStatusRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/review-status',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const body = yield* readJsonBody;
+    const { reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes } = body as {
+      reviewStatus?: string;
+      testStatus?: string;
+      mergeStatus?: string;
+      reviewNotes?: string;
+      testNotes?: string;
+    };
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const update: Partial<ReviewStatus> = {};
+        if (reviewStatus) update.reviewStatus = reviewStatus as any;
+        if (testStatus) update.testStatus = testStatus as any;
+        if (mergeStatus) update.mergeStatus = mergeStatus as any;
+        if (reviewNotes) update.reviewNotes = reviewNotes;
+        if (testNotes) update.testNotes = testNotes;
+
+        const status = setReviewStatus(issueId, update);
+        console.log(`[review-status] Updated ${issueId}:`, status);
+
+        const { getTmuxSessionName, checkSpecialistQueue: cSQ, completeSpecialistTask } =
+          await import('../../../lib/cloister/specialists.js');
+
+        if (reviewStatus && ['passed', 'blocked', 'failed'].includes(reviewStatus)) {
+          const tmuxSession = getTmuxSessionName('review-agent');
+          saveAgentRuntimeState(tmuxSession, {
+            state: 'idle',
+            lastActivity: new Date().toISOString(),
+          });
+          console.log(`[review-status] Set review-agent to idle`);
+
+          const queue = cSQ('review-agent');
+          for (const item of queue.items) {
+            if (item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()) {
+              completeSpecialistTask('review-agent', item.id);
+              console.log(`[review-status] Cleared ${issueId} from review-agent queue`);
+            }
+          }
+
+          if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
+            const agentId = `agent-${issueId.toLowerCase()}`;
+            const apiUrl =
+              process.env.DASHBOARD_URL ||
+              `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+            const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above BEFORE resubmitting\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests to verify your fixes\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.`;
+            try {
+              const { writeFeedbackFile } = await import(
+                '../../../lib/cloister/feedback-writer.js'
+              );
+              const wsInfo = getWorkspaceInfoForIssue(issueId);
+              const fileResult = await writeFeedbackFile({
+                issueId,
+                workspacePath: wsInfo.localPath,
+                specialist: 'review-agent',
+                outcome: reviewStatus === 'blocked' ? 'changes-requested' : 'failed',
+                summary: `Review ${reviewStatus.toUpperCase()}: ${(reviewNotes || '').slice(0, 80)}`,
+                markdownBody: feedbackBody,
+              });
+              if (!fileResult.success) {
+                console.error(
+                  `[review-status] Failed to write feedback file for ${issueId}: ${fileResult.error}`
+                );
+              } else {
+                const msg = `SPECIALIST FEEDBACK: review-agent reported ${reviewStatus.toUpperCase()} for ${issueId}.\nRead and address: ${fileResult.relativePath}`;
+                await messageAgent(agentId, msg);
+                console.log(
+                  `[review-status] Auto-sent feedback to ${agentId} (file: ${fileResult.relativePath})`
+                );
+              }
+            } catch (err) {
+              console.error(`[review-status] Failed to send feedback to ${agentId}:`, err);
+            }
+          }
+
+          if (reviewStatus === 'passed') {
+            const issueLower = issueId.toLowerCase();
+            const issuePrefix = issueId.split('-')[0];
+            const projectPath = getProjectPath(undefined, issuePrefix);
+            const testWorkspace =
+              body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
+            const testBranch = body.branch || `feature/${issueLower}`;
+
+            const { autoQueueTestAgentAndNotify } = await import(
+              '../../../lib/cloister/test-agent-queue.js'
+            );
+            try {
+              await autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent);
+            } catch (err) {
+              console.error(
+                `[review-status] Unhandled error in autoQueueTestAgentAndNotify for ${issueId}:`,
+                err
+              );
+            }
+          }
+        }
+
+        if (testStatus && ['passed', 'failed', 'skipped'].includes(testStatus)) {
+          const tmuxSession = getTmuxSessionName('test-agent');
+          saveAgentRuntimeState(tmuxSession, {
+            state: 'idle',
+            lastActivity: new Date().toISOString(),
+          });
+          console.log(`[review-status] Set test-agent to idle`);
+
+          const queue = cSQ('test-agent');
+          for (const item of queue.items) {
+            if (item.payload?.issueId?.toLowerCase() === issueId.toLowerCase()) {
+              completeSpecialistTask('test-agent', item.id);
+              console.log(`[review-status] Cleared ${issueId} from test-agent queue`);
+            }
+          }
+
+          if (testStatus === 'failed' && testNotes) {
+            const agentId = `agent-${issueId.toLowerCase()}`;
+            const apiUrl =
+              process.env.DASHBOARD_URL ||
+              `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+            const feedbackBody = `TESTS FAILED for ${issueId}:\n\n${testNotes}\n\n## REQUIRED: Fix ALL test failures BEFORE resubmitting\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite to verify your fixes pass\n4. Commit and push ALL changes\n5. ONLY THEN resubmit:\ncurl -X POST ${apiUrl}/api/workspaces/${issueId}/request-review -H "Content-Type: application/json" -d '{}'\n\nDo NOT run the curl command until steps 1-4 are complete. Do NOT stop until review passes.`;
+            try {
+              const { writeFeedbackFile } = await import(
+                '../../../lib/cloister/feedback-writer.js'
+              );
+              const wsInfo = getWorkspaceInfoForIssue(issueId);
+              const fileResult = await writeFeedbackFile({
+                issueId,
+                workspacePath: wsInfo.localPath,
+                specialist: 'test-agent',
+                outcome: 'failed',
+                summary: `Tests FAILED: ${(testNotes || '').slice(0, 80)}`,
+                markdownBody: feedbackBody,
+              });
+              if (!fileResult.success) {
+                console.error(
+                  `[review-status] Failed to write test feedback file for ${issueId}: ${fileResult.error}`
+                );
+              } else {
+                const msg = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\nRead and address: ${fileResult.relativePath}`;
+                await messageAgent(agentId, msg);
+                console.log(
+                  `[review-status] Auto-sent test failure to ${agentId} (file: ${fileResult.relativePath})`
+                );
+              }
+            } catch (err) {
+              console.error(`[review-status] Failed to send test feedback to ${agentId}:`, err);
+            }
+          }
+
+          if (testStatus === 'passed') {
+            try {
+              const agentId = `agent-${issueId.toLowerCase()}`;
+              await messageAgent(
+                agentId,
+                `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete — ready for merge. You may stop working on this issue.`
+              );
+              console.log(`[review-status] Notified ${agentId} that all checks passed`);
+            } catch (err) {
+              console.log(
+                `[review-status] Could not notify work agent for ${issueId} (may not be running): ${(err as Error).message}`
+              );
+            }
+          }
+        }
+
+        return HttpServerResponse.json(status);
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error updating review status:', error);
+        return HttpServerResponse.json(
+          { error: 'Failed to update review status: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/review ─────────────────────────────
+
+const postWorkspaceReviewRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/review',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = yield* readJsonBody;
+
+    const urlOpt = HttpServerRequest.toURL(request);
+    const forceReview =
+      (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
+      (body as any)?.force === true;
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const issuePrefix = issueId.split('-')[0];
+        const projectPath = getProjectPath(undefined, issuePrefix);
+        const issueLower = issueId.toLowerCase();
+        const branchName = `feature/${issueLower}`;
+
+        const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+        const workspacePath = workspaceInfo.isRemote
+          ? workspaceInfo.remotePath!
+          : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+        const existingStatus = getReviewStatus(issueId);
+
+        if (existingStatus?.reviewNotes && ['blocked', 'failed'].includes(existingStatus.reviewStatus || '')) {
+          const infraFailurePatterns = [
+            'Failed to send task',
+            "can't find pane",
+            'Command failed: tmux',
+            'Operation timed out',
+            'specialist.*not running',
+            'specialist.*busy',
+            'wakeSpecialistOrQueue',
+          ];
+          const isInfraFailure = infraFailurePatterns.some(pattern =>
+            new RegExp(pattern, 'i').test(existingStatus.reviewNotes || '')
+          );
+
+          if (!isInfraFailure && !forceReview) {
+            return HttpServerResponse.json({
+              success: false,
+              alreadyReviewed: true,
+              message: `Review already completed with status: ${existingStatus.reviewStatus}`,
+              reviewNotes: existingStatus.reviewNotes,
+              hint: 'Address the review feedback before requesting another review, or use force=true to override',
+            });
+          }
+
+          console.log(
+            `[review] Re-triggering review for ${issueId} (${isInfraFailure ? 'infrastructure failure' : 'forced'})`
+          );
+        }
+
+        if (existingStatus?.reviewStatus === 'passed' && !forceReview) {
+          console.log(`[review] Skipping ${issueId}: already passed review`);
+          return HttpServerResponse.json({
+            success: false,
+            alreadyReviewed: true,
+            message: `Review already passed for ${issueId}`,
+            hint: 'Issue already passed review — proceed to testing or merge',
+          });
+        }
+
+        if (existingStatus?.mergeStatus === 'merged') {
+          console.log(`[review] Skipping ${issueId}: already merged`);
+          return HttpServerResponse.json({
+            success: false,
+            alreadyMerged: true,
+            message: `${issueId} is already merged`,
+          });
+        }
+
+        if (!workspaceInfo.exists) {
+          return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 400 });
+        }
+
+        // Reset review status
+        setPendingOperation(issueId, 'review');
+        const reviewReset: Record<string, unknown> = {
+          reviewStatus: 'reviewing',
+          testStatus: 'pending',
+          autoRequeueCount: 0,
+          verificationCycleCount: 0,
+          verificationStatus: 'pending',
+          verificationNotes: undefined,
+        };
+        if (forceReview) {
+          reviewReset.readyForMerge = false;
+          reviewReset.mergeStatus = 'pending';
+          reviewReset.reviewNotes = undefined;
+          reviewReset.testNotes = undefined;
+        }
+        setReviewStatus(issueId, reviewReset);
+
+        // Respond immediately
+        // Run pipeline in background
+        (async () => {
+          try {
+            transitionIssueToInReview(issueId, workspacePath).catch((err: any) => {
+              console.warn(`[review] Could not transition ${issueId} to in_review: ${err.message}`);
+            });
+
+            try {
+              if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+                await execAsync(
+                  flyExecCmd(
+                    workspaceInfo.vmName,
+                    `cd ${workspacePath} && git push origin ${branchName} 2>&1 || true`
+                  ),
+                  { encoding: 'utf-8', timeout: 30000 }
+                );
+              } else {
+                await execAsync(`git push origin ${branchName}`, {
+                  cwd: workspacePath,
+                  encoding: 'utf-8',
+                });
+              }
+            } catch (pushErr: any) {
+              console.log(`Feature branch push note: ${pushErr.message}`);
+            }
+
+            if (!workspaceInfo.isRemote) {
+              try {
+                const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
+                const commits = await getWorkspaceGitInfo(workspacePath);
+                setReviewStatus(issueId, { lastReviewCommits: commits });
+              } catch {}
+            }
+
+            const verifyOutcome = await runVerificationForIssue(
+              issueId,
+              workspacePath,
+              workspaceInfo,
+              'review'
+            );
+            if (verifyOutcome.outcome === 'failed') {
+              completePendingOperation(
+                issueId,
+                `Verification failed at ${verifyOutcome.failedCheck}`
+              );
+              setReviewStatus(issueId, {
+                reviewStatus: 'failed',
+                reviewNotes: `Verification failed at ${verifyOutcome.failedCheck}`,
+              });
+              return;
+            }
+            if (verifyOutcome.outcome === 'error') {
+              completePendingOperation(
+                issueId,
+                `Verification infrastructure error: ${verifyOutcome.message}`
+              );
+              setReviewStatus(issueId, {
+                reviewStatus: 'failed',
+                reviewNotes: `Verification error: ${verifyOutcome.message}`,
+              });
+              return;
+            }
+
+            const {
+              spawnEphemeralSpecialist: spawnEphemeral,
+              isRunning,
+              getTmuxSessionName,
+              submitToSpecialistQueue,
+            } = await import('../../../lib/cloister/specialists.js');
+
+            const reviewResolvedProject = resolveProjectFromIssue(issueId);
+            const reviewProjectKey = reviewResolvedProject?.projectKey ?? null;
+            const reviewSession = getTmuxSessionName(
+              'review-agent',
+              reviewProjectKey ?? undefined
+            );
+            const reviewRunning = await isRunning('review-agent', reviewProjectKey ?? undefined);
+            const reviewState = getAgentRuntimeState(reviewSession);
+            const reviewIdle =
+              reviewState?.state === 'idle' ||
+              reviewState?.state === 'suspended' ||
+              !reviewRunning;
+
+            const isRemoteWorkspace = workspaceInfo.isRemote && workspaceInfo.vmName;
+            const flyAppName = isRemoteWorkspace ? getFlyAppName(workspaceInfo.vmName!) : '';
+            const sshPrefix = isRemoteWorkspace ? `fly ssh console -a ${flyAppName} -C "` : '';
+            const sshSuffix = isRemoteWorkspace ? '"' : '';
+            const cdPrefix = isRemoteWorkspace ? `cd ${workspacePath} && ` : '';
+            const workspaceAccessInstructions = isRemoteWorkspace
+              ? `**REMOTE WORKSPACE** - Fly.io to access:\n   fly ssh console -a ${flyAppName}\n   cd ${workspacePath}`
+              : `cd ${workspacePath}`;
+
+            if (!reviewIdle) {
+              console.log(`[review] review-agent busy, queuing ${issueId}`);
+              submitToSpecialistQueue('review-agent', {
+                priority: 'normal',
+                source: 'review-endpoint',
+                issueId,
+                workspace: workspacePath,
+                branch: branchName,
+                isRemote: workspaceInfo.isRemote,
+                vmName: workspaceInfo.vmName,
+              });
+              completePendingOperation(issueId, null);
+              return;
+            }
+
+            const reviewPrompt = `STRICT REVIEW for ${issueId}
+
+You are a DEMANDING code reviewer. Find EVERY issue before code can proceed to testing.
+DO NOT BE NICE. BE THOROUGH.
+
+=== CONTEXT ===
+ISSUE: ${issueId}
+WORKSPACE: ${workspacePath}${isRemoteWorkspace ? ` (REMOTE on ${workspaceInfo.vmName})` : ''}
+BRANCH: ${branchName}
+PROJECT: ${projectPath}
+${isRemoteWorkspace ? `REMOTE VM: ${workspaceInfo.vmName} (Fly machine)` : ''}
+
+=== WORKSPACE ACCESS ===
+${workspaceAccessInstructions}
+
+=== MANDATORY REQUIREMENTS (Block if ANY violated) ===
+1. **Tests Required** - Every new function MUST have test files. No exceptions.
+2. **No In-Memory Only Storage** - Important data MUST persist to files/DB.
+3. **No Dead Code** - Remove unused imports, functions, variables.
+4. **Error Handling** - All async operations must handle errors.
+5. **Type Safety** - No \`any\` without justification.
+
+=== YOUR TASK ===
+1. ${workspaceAccessInstructions}
+2. Review ALL changes: ${sshPrefix}${cdPrefix}git diff main...${branchName}${sshSuffix}
+3. Check EVERY file for issues
+4. List EVERY issue found with file:line references
+
+**IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.**
+**The TEST agent will run tests in the next step. Just verify test FILES exist.**
+
+=== WHEN DONE ===
+**IF ANY ISSUES FOUND:**
+- Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[list issues]"}'
+- Use /send-feedback-to-agent to notify agent-${issueLower}
+- DO NOT hand off to test-agent
+
+**IF CODE IS PERFECT:**
+- Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
+- The test-agent will be automatically dispatched when you post reviewStatus:"passed". Do NOT manually queue the test-agent.
+- After posting the status, your work is DONE. Do not do anything else.`;
+
+            let reviewResult: { success: boolean; message: string; error?: string };
+            if (reviewProjectKey) {
+              reviewResult = await spawnEphemeral(reviewProjectKey, 'review-agent', {
+                issueId,
+                branch: branchName,
+                workspace: workspacePath,
+                promptOverride: reviewPrompt,
+              });
+            } else {
+              console.error(
+                `[review] Could not resolve project for ${issueId} — cannot spawn review specialist`
+              );
+              reviewResult = {
+                success: false,
+                message: `No project configured for ${issueId}. Add it to projects.yaml.`,
+              };
+            }
+
+            if (!reviewResult.success) {
+              if (reviewResult.error === 'specialist_busy') {
+                console.warn(
+                  `[review] review-agent busy for ${issueId}, reverting to pending for retry`
+                );
+                completePendingOperation(issueId, null);
+                setReviewStatus(issueId, { reviewStatus: 'pending' });
+                return;
+              }
+              console.warn(
+                `[review] review-agent failed to wake: ${reviewResult.message}`
+              );
+              completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
+              setReviewStatus(issueId, {
+                reviewStatus: 'failed',
+                reviewNotes: reviewResult.message,
+              });
+              return;
+            }
+
+            console.log(`[review] Review pipeline started for ${issueId}`);
+            completePendingOperation(issueId, null);
+          } catch (error: any) {
+            console.error(`[review] Error starting review:`, error);
+            completePendingOperation(issueId, error.message);
+            setReviewStatus(issueId, { reviewStatus: 'failed', reviewNotes: error.message });
+          }
+        })();
+
+        return HttpServerResponse.json({
+          success: true,
+          message: `Review pipeline starting for ${issueId}`,
+          pipeline: 'verification → review → test',
+          note: 'Watch the status panel for progress.',
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error starting review:', error);
+        return HttpServerResponse.json(
+          { error: 'Failed to start review: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/request-review ─────────────────────
+
+const postWorkspaceRequestReviewRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/request-review',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const body = yield* readJsonBody;
+    const { message } = body as { message?: string };
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const existingStatus = getReviewStatus(issueId);
+
+        if (existingStatus?.mergeStatus === 'merged') {
+          console.log(`[request-review] Rejecting ${issueId}: already merged`);
+          return HttpServerResponse.json({
+            success: false,
+            alreadyMerged: true,
+            message: `${issueId} is already merged. Use Reopen or Reset Reviews first.`,
+          });
+        }
+
+        if (existingStatus?.reviewStatus === 'passed') {
+          if (existingStatus.testStatus === 'failed') {
+            console.log(
+              `[request-review] ${issueId}: review passed but tests failed — re-queuing test specialist`
+            );
+            setReviewStatus(issueId, { testStatus: 'pending' });
+
+            try {
+              const resolved = resolveProjectFromIssue(issueId);
+              if (!resolved) {
+                console.error(
+                  `[request-review] No project configured for ${issueId} — cannot spawn test specialist`
+                );
+                setReviewStatus(issueId, {
+                  testStatus: 'dispatch_failed',
+                  testNotes: 'No project configured',
+                });
+              } else {
+                const workspacePath = join(
+                  resolved.projectPath,
+                  'workspaces',
+                  `feature-${issueId.toLowerCase()}`
+                );
+                const branchName = `feature/${issueId.toLowerCase()}`;
+                setReviewStatus(issueId, { testStatus: 'testing' });
+                const { spawnEphemeralSpecialist } = await import(
+                  '../../../lib/cloister/specialists.js'
+                );
+                const testResult = await spawnEphemeralSpecialist(
+                  resolved.projectKey,
+                  'test-agent',
+                  { issueId, workspace: workspacePath, branch: branchName }
+                );
+                console.log(
+                  `[request-review] Test specialist ${testResult.success ? 'spawned' : 'failed'} for ${issueId}`
+                );
+                if (!testResult.success) {
+                  setReviewStatus(issueId, {
+                    testStatus: 'dispatch_failed',
+                    testNotes: `Test dispatch failed: ${testResult.error || testResult.message}`,
+                  });
+                }
+              }
+            } catch (err: any) {
+              console.warn(
+                `[request-review] Failed to queue test specialist for ${issueId}: ${err.message}`
+              );
+            }
+            return HttpServerResponse.json({
+              success: true,
+              requeued: true,
+              message: `Tests re-queued for ${issueId} (review already passed)`,
+            });
+          }
+          console.log(
+            `[request-review] ${issueId}: review already passed — returning success no-op`
+          );
+          return HttpServerResponse.json({
+            success: true,
+            alreadyPassed: true,
+            message: `Review already passed for ${issueId}`,
+          });
+        }
+
+        const currentCount = existingStatus?.autoRequeueCount || 0;
+
+        if (currentCount >= MAX_AUTO_REQUEUE) {
+          console.log(
+            `[request-review] Circuit breaker: ${issueId} exceeded max auto-requeues (${currentCount}/${MAX_AUTO_REQUEUE})`
+          );
+          return HttpServerResponse.json(
+            {
+              success: false,
+              error: 'Circuit breaker triggered',
+              message: `Maximum automatic re-review requests (${MAX_AUTO_REQUEUE}) exceeded. Human intervention required.`,
+              autoRequeueCount: currentCount,
+              hint: 'A human must click the Review button to continue.',
+            },
+            { status: 429 }
+          );
+        }
+
+        const issuePrefix = issueId.split('-')[0];
+        const projectPath = getProjectPath(undefined, issuePrefix);
+        const issueLower = issueId.toLowerCase();
+        const branchName = `feature/${issueLower}`;
+
+        const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+        const workspacePath = workspaceInfo.isRemote
+          ? workspaceInfo.remotePath!
+          : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+        if (!workspaceInfo.exists) {
+          return HttpServerResponse.json(
+            { success: false, error: 'Workspace does not exist' },
+            { status: 400 }
+          );
+        }
+
+        transitionIssueToInReview(issueId, workspacePath).catch((err: any) => {
+          console.warn(
+            `[request-review] Could not transition ${issueId} to in_review: ${err.message}`
+          );
+        });
+
+        const newCount = currentCount + 1;
+        const reviewNotes = message
+          ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}`
+          : undefined;
+
+        let requestReviewCommits: Record<string, string> | undefined;
+        if (!workspaceInfo.isRemote) {
+          try {
+            const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
+            requestReviewCommits = await getWorkspaceGitInfo(workspacePath);
+          } catch {}
+        }
+
+        const reqVerifyOutcome = await runVerificationForIssue(
+          issueId,
+          workspacePath,
+          workspaceInfo,
+          'request-review'
+        );
+        if (reqVerifyOutcome.outcome === 'failed') {
+          return HttpServerResponse.json({
+            success: false,
+            verificationFailed: true,
+            failedCheck: reqVerifyOutcome.failedCheck,
+            message: `Verification failed at ${reqVerifyOutcome.failedCheck} — fix and resubmit`,
+            cycleCount: reqVerifyOutcome.cycleCount,
+            maxCycles: reqVerifyOutcome.maxCycles,
+          });
+        }
+        if (reqVerifyOutcome.outcome === 'error') {
+          return HttpServerResponse.json(
+            {
+              success: false,
+              error: `Verification infrastructure error: ${reqVerifyOutcome.message}`,
+              autoRequeueCount: currentCount,
+            },
+            { status: 500 }
+          );
+        }
+
+        setReviewStatus(issueId, {
+          reviewStatus: 'reviewing',
+          testStatus: 'pending',
+          autoRequeueCount: newCount,
+          reviewNotes,
+          ...(requestReviewCommits ? { lastReviewCommits: requestReviewCommits } : {}),
+        });
+
+        console.log(
+          `[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`
+        );
+
+        try {
+          const { spawnEphemeralSpecialist } = await import(
+            '../../../lib/cloister/specialists.js'
+          );
+          const resolved = resolveProjectFromIssue(issueId);
+
+          if (!resolved) {
+            return HttpServerResponse.json(
+              {
+                success: false,
+                error: `No project configured for ${issueId}. Add it to projects.yaml.`,
+                autoRequeueCount: newCount,
+              },
+              { status: 500 }
+            );
+          }
+
+          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'review-agent', {
+            issueId,
+            workspace: workspacePath,
+            branch: branchName,
+          });
+
+          if (result.success) {
+            console.log(`[request-review] Spawned review specialist for ${issueId}`);
+            return HttpServerResponse.json({
+              success: true,
+              queued: false,
+              message: `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
+              autoRequeueCount: newCount,
+              remainingRequeues: MAX_AUTO_REQUEUE - newCount,
+            });
+          } else if (result.error === 'specialist_busy') {
+            console.warn(
+              `[request-review] Review specialist busy for ${issueId}, reverting to pending`
+            );
+            setReviewStatus(issueId, { reviewStatus: 'pending' });
+            return HttpServerResponse.json(
+              {
+                success: false,
+                error: 'Review specialist busy, will retry',
+                retryable: true,
+                autoRequeueCount: newCount,
+              },
+              { status: 409 }
+            );
+          } else {
+            console.warn(
+              `[request-review] Dispatch failed for ${issueId}, rolling back to pending: ${result.error}`
+            );
+            setReviewStatus(issueId, {
+              reviewStatus: 'dispatch_failed',
+              reviewNotes: `Dispatch failed: ${result.error || result.message}`,
+            });
+            return HttpServerResponse.json(
+              {
+                success: false,
+                error: result.error || 'Failed to spawn review specialist',
+                autoRequeueCount: newCount,
+              },
+              { status: 500 }
+            );
+          }
+        } catch (error: any) {
+          console.error(`[request-review] Error:`, error);
+          setReviewStatus(issueId, {
+            reviewStatus: 'dispatch_failed',
+            reviewNotes: `Dispatch error: ${error.message}`,
+          });
+          return HttpServerResponse.json(
+            { success: false, error: error.message, autoRequeueCount: newCount },
+            { status: 500 }
+          );
+        }
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error in request-review:', error);
+        return HttpServerResponse.json(
+          { error: 'Failed to request review: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/reset-review ───────────────────────
+
+const postWorkspaceResetReviewRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/reset-review',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const body = yield* readJsonBody;
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+        if (!workspaceInfo.exists) {
+          return HttpServerResponse.json(
+            { success: false, error: 'Workspace does not exist' },
+            { status: 400 }
+          );
+        }
+
+        console.log(`[reset-review] Human-initiated pipeline reset for ${issueId}`);
+
+        const { checkSpecialistQueue: cSQ, completeSpecialistTask } = await import(
+          '../../../lib/cloister/specialists.js'
+        );
+
+        for (const specialist of ['review-agent', 'test-agent', 'merge-agent']) {
+          const queue = cSQ(specialist as any);
+          for (const item of queue.items) {
+            if (item.payload?.issueId?.toUpperCase() === issueId.toUpperCase()) {
+              completeSpecialistTask(specialist as any, item.id);
+              console.log(`[reset-review] Removed ${issueId} from ${specialist} queue`);
+            }
+          }
+        }
+
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          mergeStatus: 'pending',
+          reviewNotes: undefined,
+          testNotes: undefined,
+          mergeNotes: undefined,
+          readyForMerge: false,
+          autoRequeueCount: 0,
+          verificationStatus: 'pending',
+          verificationNotes: undefined,
+          verificationCycleCount: 0,
+        });
+
+        try {
+          const { resetPostMergeState } = await import(
+            '../../../lib/cloister/merge-agent.js'
+          );
+          resetPostMergeState(issueId);
+        } catch {}
+
+        console.log(
+          `[reset-review] Pipeline state reset for ${issueId} — awaiting agent to request review`
+        );
+
+        const rerun = (body as any)?.rerun === true;
+        if (rerun) {
+          try {
+            const { dispatchToSpecialist } = await import(
+              '../../../lib/cloister/specialists.js'
+            );
+            const resolved = resolveProjectFromIssue(issueId);
+            if (resolved) {
+              const wsInfo = getWorkspaceInfoForIssue(issueId);
+              const issueLower = issueId.toLowerCase();
+              const wsPath =
+                wsInfo.localPath ||
+                join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
+
+              setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+
+              dispatchToSpecialist({
+                specialistType: 'review-agent',
+                projectKey: resolved.projectKey,
+                issueId,
+                workspacePath: wsPath,
+                projectPath: resolved.projectPath,
+              })
+                .then(result => {
+                  if (result.success) {
+                    console.log(`[reset-review] Re-dispatched review for ${issueId}`);
+                  } else {
+                    console.warn(
+                      `[reset-review] Re-dispatch failed for ${issueId}: ${result.error}`
+                    );
+                    setReviewStatus(issueId, { reviewStatus: 'pending' });
+                  }
+                })
+                .catch(err => {
+                  console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${err}`);
+                  setReviewStatus(issueId, { reviewStatus: 'pending' });
+                });
+            } else {
+              console.warn(
+                `[reset-review] Could not resolve project for ${issueId}, skipping re-dispatch`
+              );
+            }
+          } catch (rerunErr) {
+            console.warn(`[reset-review] Re-dispatch error for ${issueId}: ${rerunErr}`);
+          }
+        }
+
+        return HttpServerResponse.json({
+          success: true,
+          message: rerun
+            ? `Pipeline reset and review re-dispatched for ${issueId}.`
+            : `Review cycles reset for ${issueId}. Agent can now request review when ready.`,
+          rerun,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[reset-review] Error:`, error);
+        return HttpServerResponse.json({ success: false, error: msg }, { status: 500 });
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/sync-main ──────────────────────────
+
+const postWorkspaceSyncMainRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/sync-main',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const issuePrefix = issueId.split('-')[0];
+        const projectPath = getProjectPath(undefined, issuePrefix);
+        const issueLower = issueId.toLowerCase();
+
+        const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+        if (workspaceInfo.isRemote) {
+          return HttpServerResponse.json(
+            {
+              success: false,
+              error: 'Sync with Main is not supported for remote workspaces',
+            },
+            { status: 400 }
+          );
+        }
+
+        const workspacePath =
+          workspaceInfo.localPath ||
+          join(projectPath, 'workspaces', `feature-${issueLower}`);
+
+        if (!existsSync(workspacePath)) {
+          return HttpServerResponse.json(
+            { success: false, error: 'Workspace does not exist' },
+            { status: 400 }
+          );
+        }
+
+        console.log(`[sync-main] Starting sync for ${issueId} at ${workspacePath}`);
+
+        const result = await syncMainIntoWorkspace(workspacePath, issueId);
+
+        if (result.success) {
+          if (result.alreadyUpToDate) {
+            return HttpServerResponse.json({
+              success: true,
+              alreadyUpToDate: true,
+              message: 'Already up to date with main',
+            });
+          }
+          return HttpServerResponse.json({
+            success: true,
+            commitCount: result.commitCount || 0,
+            changedFiles: result.changedFiles || [],
+            message: `Synced ${result.commitCount || 0} commit(s) from main`,
+          });
+        } else {
+          const status = result.reason?.includes('uncommitted') ? 400 : 500;
+          return HttpServerResponse.json(
+            {
+              success: false,
+              error: result.reason || 'Sync failed',
+              conflictFiles: result.conflictFiles,
+            },
+            { status }
+          );
+        }
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[sync-main] Unexpected error for ${issueId}:`, error);
+        return HttpServerResponse.json(
+          { success: false, error: msg || 'Unexpected error during sync' },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Shared triggerMerge logic ────────────────────────────────────────────────
+
+interface TriggerMergeResult {
+  success: boolean;
+  statusCode: number;
+  error?: string;
+  message?: string;
+  reviewStatus?: string;
+  testStatus?: string;
+  mergeStatus?: string;
+  prUrl?: string;
+  remote?: boolean;
+  repos?: Array<{ repo: string; success: boolean; message: string; testsStatus?: string }>;
+  testsStatus?: string;
+  note?: string;
+  mergeResult?: unknown;
+}
+
+async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
+  const reviewStatus = getReviewStatus(issueId);
+  if (!reviewStatus?.readyForMerge) {
+    return {
+      success: false,
+      statusCode: 400,
+      error: 'Cannot merge: review and tests have not passed yet',
+      reviewStatus: reviewStatus?.reviewStatus || 'pending',
+      testStatus: reviewStatus?.testStatus || 'pending',
+    };
+  }
+
+  if (reviewStatus?.mergeStatus === 'merging') {
+    const pendingOp = getPendingOperation(issueId);
+    const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
+    if (activelyMerging) {
+      return {
+        success: false,
+        statusCode: 400,
+        error: 'Merge already in progress',
+        mergeStatus: 'merging',
+      };
+    }
+    console.log(
+      `[merge] Clearing stuck mergeStatus for ${issueId} (pending op: ${pendingOp?.status ?? 'absent'})`
+    );
+    setReviewStatus(issueId, { mergeStatus: undefined });
+  }
+
+  if (reviewStatus?.mergeStatus === 'merged') {
+    return { success: false, statusCode: 400, error: 'Already merged', mergeStatus: 'merged' };
+  }
+
+  const issuePrefix = issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const branchName = `feature/${issueLower}`;
+
+  const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+
+  setReviewStatus(issueId, { mergeStatus: 'merging' });
+
+  const normalizedMergeId = issueId.toUpperCase();
+  _serverManagedMerges.add(normalizedMergeId);
+  setPendingOperation(issueId, 'merge');
+
+  try {
+    if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+      console.log(
+        `[merge] Remote workspace detected for ${issueId}, using GitHub PR merge...`
+      );
+
+      const prResult = await ensurePRExists(issueId);
+      if (!prResult.prUrl) {
+        const error = `Failed to create PR: ${prResult.error || 'Unknown error'}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 400, error };
+      }
+
+      const prMatch = prResult.prUrl.match(/\/pull\/(\d+)/);
+      if (!prMatch) {
+        const error = `Could not parse PR number from URL: ${prResult.prUrl}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 400, error };
+      }
+      const prNumber = prMatch[1];
+
+      try {
+        console.log(`[merge] Merging PR #${prNumber} for ${issueId}...`);
+        const { stdout: mergeOutput } = await execAsync(
+          `gh pr merge ${prNumber} --repo eltmon/panopticon-cli --squash`,
+          { encoding: 'utf-8' }
+        );
+        console.log(`[merge] PR merge output: ${mergeOutput}`);
+
+        setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+        completePendingOperation(issueId, null);
+
+        // Signal merge complete
+        const { onMergeComplete } = await import('../../../lib/cloister/merge-agent.js');
+        onMergeComplete(issueId);
+
+        return {
+          success: true,
+          statusCode: 200,
+          message: `Successfully merged PR #${prNumber} for ${issueId}`,
+          prUrl: prResult.prUrl,
+          remote: true,
+        };
+      } catch (remoteErr: any) {
+        console.error(`[merge] Remote merge failed for ${issueId}:`, remoteErr);
+        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        completePendingOperation(issueId, remoteErr.message);
+        return {
+          success: false,
+          statusCode: 500,
+          error: `Remote merge failed: ${remoteErr.message}`,
+        };
+      }
+    }
+
+    if (!existsSync(workspacePath)) {
+      completePendingOperation(issueId, 'Workspace does not exist');
+      return { success: false, statusCode: 400, error: 'Workspace does not exist' };
+    }
+
+    const projectConfig = findProjectByTeam(issuePrefix);
+    const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
+
+    if (isPolyrepo && projectConfig?.workspace?.repos) {
+      console.log(`[merge] Polyrepo detected for ${issueId}, using merge-agent per repo...`);
+      const repos = projectConfig.workspace.repos;
+      const defaultBranch = projectConfig.workspace.default_branch || 'main';
+      const mergeResults: Array<{
+        repo: string;
+        success: boolean;
+        message: string;
+        testsStatus?: string;
+      }> = [];
+
+      for (const repo of repos) {
+        const repoMainPath = join(projectPath, repo.path);
+        const repoWorkspacePath = join(workspacePath, repo.name);
+
+        if (
+          !existsSync(repoWorkspacePath) ||
+          !existsSync(join(repoWorkspacePath, '.git'))
+        ) {
+          console.log(`[merge] Skipping ${repo.name}: workspace repo not found`);
+          continue;
+        }
+
+        try {
+          const { stdout: diffStat } = await execAsync(
+            `git diff ${defaultBranch}..${branchName} --stat`,
+            { cwd: repoMainPath, encoding: 'utf-8' }
+          );
+          if (!diffStat.trim()) {
+            console.log(`[merge] Skipping ${repo.name}: no changes on ${branchName}`);
+            mergeResults.push({ repo: repo.name, success: true, message: 'No changes, skipped' });
+            continue;
+          }
+          console.log(`[merge] ${repo.name}: found changes on ${branchName}`);
+        } catch {
+          console.log(`[merge] Skipping ${repo.name}: branch ${branchName} not found`);
+          mergeResults.push({
+            repo: repo.name,
+            success: true,
+            message: 'Branch not found, skipped',
+          });
+          continue;
+        }
+
+        try {
+          await execAsync(`git push origin ${branchName}`, {
+            cwd: repoWorkspacePath,
+            encoding: 'utf-8',
+          });
+        } catch (pushErr: any) {
+          console.log(`[merge] Push note for ${repo.name}: ${pushErr.message}`);
+        }
+
+        try {
+          const { spawnMergeAgentForBranches } = await import(
+            '../../../lib/cloister/merge-agent.js'
+          );
+          const mergeResult = await spawnMergeAgentForBranches(
+            repoMainPath,
+            branchName,
+            defaultBranch,
+            issueId,
+            { skipDoneReport: true }
+          );
+
+          if (mergeResult.success) {
+            mergeResults.push({
+              repo: repo.name,
+              success: true,
+              message: 'Merged via merge-agent',
+              testsStatus: mergeResult.testsStatus,
+            });
+          } else {
+            const error = mergeResult.reason || mergeResult.notes || 'Merge-agent failed';
+            mergeResults.push({ repo: repo.name, success: false, message: error });
+          }
+        } catch (mergeErr: any) {
+          mergeResults.push({ repo: repo.name, success: false, message: mergeErr.message });
+        }
+      }
+
+      const failedRepos = mergeResults.filter(r => !r.success);
+
+      if (failedRepos.length > 0) {
+        const error = `Polyrepo merge failed for: ${failedRepos
+          .map(r => `${r.repo} (${r.message})`)
+          .join(', ')}`;
+        setReviewStatus(issueId, { mergeStatus: 'failed' });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 500, error, repos: mergeResults };
+      }
+
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      completePendingOperation(issueId, null);
+
+      const { onMergeComplete } = await import('../../../lib/cloister/merge-agent.js');
+      onMergeComplete(issueId);
+
+      return {
+        success: true,
+        statusCode: 200,
+        message: `Polyrepo merge complete for ${issueId}`,
+        repos: mergeResults,
+      };
+    }
+
+    // Monorepo / single-repo merge
+    try {
+      await execAsync(`git push origin ${branchName}`, {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+      });
+    } catch (pushErr: any) {
+      console.log(`Feature branch push note: ${pushErr.message}`);
+    }
+
+    const { spawnMergeAgentForBranches, onMergeComplete } = await import(
+      '../../../lib/cloister/merge-agent.js'
+    );
+
+    console.log(`[merge] Starting merge-agent for ${issueId}...`);
+
+    const mergeResult = await spawnMergeAgentForBranches(projectPath, branchName, 'main', issueId);
+
+    if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      completePendingOperation(issueId, null);
+      onMergeComplete(issueId);
+      return {
+        success: true,
+        statusCode: 200,
+        message: `Successfully merged ${issueId} to main and closed issue`,
+        testsStatus: 'PASS',
+      };
+    } else if (mergeResult.success) {
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      completePendingOperation(issueId, null);
+      onMergeComplete(issueId);
+      return {
+        success: true,
+        statusCode: 200,
+        message: `Merged ${issueId} to main and closed issue`,
+        testsStatus: mergeResult.testsStatus,
+        note: mergeResult.testsStatus === 'SKIP' ? 'Tests were skipped' : undefined,
+      };
+    } else {
+      const error = mergeResult.reason || mergeResult.notes || 'Merge failed';
+      setReviewStatus(issueId, { mergeStatus: 'failed' });
+      completePendingOperation(issueId, error);
+      return { success: false, statusCode: 500, error, mergeResult };
+    }
+  } catch (error: any) {
+    console.error(`[merge] Error:`, error);
+    setReviewStatus(issueId, { mergeStatus: 'failed' });
+    completePendingOperation(issueId, error.message);
+    return { success: false, statusCode: 500, error: error.message };
+  } finally {
+    _serverManagedMerges.delete(normalizedMergeId);
+  }
+}
+
+// ─── Route: POST /api/workspaces/:issueId/merge ───────────────────────────────
+
+const postWorkspaceMergeRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/merge',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const result = await triggerMerge(issueId);
+        const { statusCode, ...body } = result;
+        return HttpServerResponse.json(body, { status: statusCode });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error in merge endpoint:', error);
+        return HttpServerResponse.json({ error: msg }, { status: 500 });
+      },
+    });
+  })
+);
+
+// ─── Route: POST /api/workspaces/:issueId/approve ────────────────────────────
+
+const postWorkspaceApproveRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/approve',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const existingStatus = getReviewStatus(issueId);
+        if (
+          existingStatus?.readyForMerge &&
+          existingStatus.reviewStatus === 'passed' &&
+          existingStatus.testStatus === 'passed'
+        ) {
+          console.log(
+            `[approve] Review+test already passed for ${issueId}, forwarding to merge endpoint...`
+          );
+          const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+          try {
+            const mergeRes = await fetch(
+              `http://localhost:${apiPort}/api/workspaces/${issueId}/merge`,
+              { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+            );
+            const mergeData = (await mergeRes.json()) as any;
+            return HttpServerResponse.json(mergeData, { status: mergeRes.status });
+          } catch (err: any) {
+            return HttpServerResponse.json(
+              { error: `Failed to forward to merge: ${err.message}` },
+              { status: 500 }
+            );
+          }
+        }
+
+        const issuePrefix = issueId.split('-')[0];
+        const projectPath = getProjectPath(undefined, issuePrefix);
+        const issueLower = issueId.toLowerCase();
+        const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+        const branchName = `feature/${issueLower}`;
+
+        setPendingOperation(issueId, 'approve');
+
+        if (!existsSync(workspacePath)) {
+          completePendingOperation(issueId, 'Workspace does not exist');
+          return HttpServerResponse.json({ error: 'Workspace does not exist' }, { status: 400 });
+        }
+
+        try {
+          await execAsync(`git rev-parse --verify ${branchName}`, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+          });
+        } catch {
+          completePendingOperation(issueId, `Branch ${branchName} does not exist`);
+          return HttpServerResponse.json(
+            { error: `Branch ${branchName} does not exist` },
+            { status: 400 }
+          );
+        }
+
+        try {
+          const { stdout: status } = await execAsync(
+            'git status --porcelain -uno',
+            { cwd: workspacePath, encoding: 'utf-8' }
+          );
+          if (status.trim()) {
+            const error = `Workspace has uncommitted changes. Please commit or stash them first:\ncd ${workspacePath}\ngit status`;
+            completePendingOperation(issueId, error);
+            return HttpServerResponse.json({ error }, { status: 400 });
+          }
+        } catch {}
+
+        try {
+          await execAsync(`git push origin ${branchName}`, {
+            cwd: workspacePath,
+            encoding: 'utf-8',
+          });
+        } catch (pushErr: any) {
+          console.log(`Feature branch push note: ${pushErr.message}`);
+        }
+
+        try {
+          await execAsync('git checkout main', { cwd: projectPath, encoding: 'utf-8' });
+          await execAsync('git pull origin main --ff-only', {
+            cwd: projectPath,
+            encoding: 'utf-8',
+          });
+        } catch (checkoutErr: any) {
+          const error = `Failed to checkout/update main branch: ${checkoutErr.message}`;
+          completePendingOperation(issueId, error);
+          return HttpServerResponse.json({ error }, { status: 400 });
+        }
+
+        const { wakeSpecialist, spawnEphemeralSpecialist: spawnApproveEphemeral } =
+          await import('../../../lib/cloister/specialists.js');
+        const approveProjectKey = resolveProjectFromIssue(issueId)?.projectKey ?? null;
+
+        console.log(`[approve] Starting specialist pipeline for ${issueId}...`);
+
+        const pipelinePrompt = `STRICT REVIEW WORKFLOW for ${issueId}
+
+You are a DEMANDING code reviewer. Your job is to find EVERY issue before code can proceed.
+DO NOT BE NICE. BE THOROUGH. The code must be PERFECT before it can proceed to testing.
+
+=== CONTEXT ===
+ISSUE: ${issueId}
+WORKSPACE: ${workspacePath}
+BRANCH: ${branchName}
+PROJECT: ${projectPath}
+
+=== MANDATORY REQUIREMENTS (Block if ANY violated) ===
+1. **Tests Required** - Every new function MUST have test files. No exceptions.
+2. **No In-Memory Only Storage** - Important data MUST persist to files/DB.
+3. **No Dead Code** - Remove unused imports, functions, variables.
+4. **Error Handling** - All async operations must handle errors.
+5. **Type Safety** - No \`any\` without justification.
+
+=== YOUR TASK (EXHAUSTIVE REVIEW) ===
+1. cd ${workspacePath}
+2. Review ALL changes: git diff main...${branchName}
+3. Check EVERY file for:
+   - Missing test FILES (AUTOMATIC REJECTION)
+   - In-memory storage for persistent data (AUTOMATIC REJECTION)
+   - Security vulnerabilities
+   - Performance issues
+   - Code quality problems
+4. List EVERY issue found with file:line references
+
+**IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.**
+**The TEST agent will run tests in the next step. Just verify test FILES exist.**
+
+=== DECISION ===
+**IF ANY ISSUES FOUND:**
+- Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[detailed list of all issues found]"}'
+- Use /send-feedback-to-agent to send detailed feedback to agent-${issueId.toLowerCase()}
+- DO NOT hand off to test-agent
+
+**ONLY IF CODE IS PERFECT (rare):**
+- Update status: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
+- Queue test-agent (DO NOT use pan specialists wake directly):
+
+curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","customPrompt":"TEST TASK for ${issueId}:\\nWORKSPACE: ${workspacePath}\\nBRANCH: ${branchName}\\n\\n1. cd ${workspacePath}\\n2. Run tests: npm test\\n3. Update status via API:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/workspaces/${issueId}/review-status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready."}'
+
+=== REVIEW PHILOSOPHY ===
+- Your default answer is BLOCK, not PASS
+- Missing tests alone is enough to reject
+- In-memory storage for important data is enough to reject
+- "It works" is NOT enough - code must be EXCELLENT
+- Find EVERYTHING. The agent should learn from your feedback.`;
+
+        let reviewResult: { success: boolean; message: string; error?: string };
+        if (approveProjectKey) {
+          reviewResult = await spawnApproveEphemeral(approveProjectKey, 'review-agent', {
+            issueId,
+            branch: branchName,
+            workspace: workspacePath,
+            promptOverride: pipelinePrompt,
+          });
+        } else {
+          reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
+            waitForReady: true,
+            startIfNotRunning: true,
+          });
+        }
+
+        if (!reviewResult.success) {
+          console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}`);
+          console.log(`[approve] Falling back to direct merge...`);
+        } else {
+          console.log(
+            `[approve] Pipeline started - review-agent will queue test-agent when done`
+          );
+          completePendingOperation(issueId, null);
+          return HttpServerResponse.json({
+            success: true,
+            message: `Approval pipeline started for ${issueId}. Specialists: review → test`,
+            pipeline: 'running',
+            note: 'Watch the specialists panel for progress. Click Merge when review+test pass.',
+          });
+        }
+
+        // Fallback: direct merge via merge-agent
+        console.log(`[approve] Step 3/3: Waking merge-agent for ${issueId}...`);
+
+        try {
+          const { spawnMergeAgentForBranches } = await import(
+            '../../../lib/cloister/merge-agent.js'
+          );
+          const mergeResult = await spawnMergeAgentForBranches(
+            projectPath,
+            branchName,
+            'main',
+            issueId
+          );
+
+          if (mergeResult.success && mergeResult.testsStatus === 'PASS') {
+            console.log(`merge-agent successfully merged ${issueId}`);
+          } else if (mergeResult.success && mergeResult.testsStatus === 'SKIP') {
+            console.log(`merge-agent merged ${issueId} (tests skipped)`);
+          } else if (mergeResult.success && mergeResult.testsStatus === 'FAIL') {
+            try {
+              await execAsync('git reset --hard HEAD~1', {
+                cwd: projectPath,
+                encoding: 'utf-8',
+              });
+            } catch {}
+            const error = `merge-agent completed merge but tests failed.\nReason: ${mergeResult.reason || 'Tests did not pass'}\n\nPlease fix tests and try again.`;
+            completePendingOperation(issueId, error);
+            return HttpServerResponse.json({ error }, { status: 400 });
+          } else {
+            try {
+              await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
+            } catch {}
+            try {
+              await execAsync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8' });
+            } catch {}
+            const error = `merge-agent could not complete merge.\nReason: ${mergeResult.reason || 'Unknown'}\nFailed files: ${mergeResult.failedFiles?.join(', ') || 'N/A'}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
+            completePendingOperation(issueId, error);
+            return HttpServerResponse.json({ error }, { status: 400 });
+          }
+        } catch (agentError: any) {
+          try {
+            await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' });
+          } catch {}
+          try {
+            await execAsync('git reset --hard HEAD', { cwd: projectPath, encoding: 'utf-8' });
+          } catch {}
+          const error = `merge-agent failed to run: ${agentError.message}\n\nPlease resolve manually:\ncd ${projectPath}\ngit merge ${branchName}`;
+          completePendingOperation(issueId, error);
+          return HttpServerResponse.json({ error }, { status: 400 });
+        }
+
+        // Push merged main
+        try {
+          await execAsync('git push origin main', { cwd: projectPath, encoding: 'utf-8' });
+        } catch (pushErr: any) {
+          const error = `Merge succeeded but push failed! Your work is safe locally.\nPlease push manually: cd ${projectPath} && git push origin main\nError: ${pushErr.message}`;
+          completePendingOperation(issueId, error);
+          return HttpServerResponse.json({ error }, { status: 400 });
+        }
+
+        // Post-merge lifecycle
+        const { approve: lifecycleApprove } = await import('../../../lib/lifecycle/index.js');
+        const ghResolved = resolveGitHubIssueShared(issueId);
+        const isGitHubIssueFlag = ghResolved.isGitHub;
+        const lifecycleCtx = {
+          issueId,
+          projectPath,
+          ...(ghResolved.isGitHub
+            ? {
+                github: {
+                  owner: ghResolved.owner,
+                  repo: ghResolved.repo,
+                  number: ghResolved.number,
+                },
+              }
+            : {}),
+        };
+
+        const lifecycleResult = await lifecycleApprove(lifecycleCtx);
+        console.log(
+          `[approve] Lifecycle completed for ${issueId}: ${lifecycleResult.steps
+            .filter((s: any) => s.success && !s.skipped)
+            .map((s: any) => s.step)
+            .join(', ')}`
+        );
+
+        if (isGitHubIssueFlag) {
+          try {
+            await execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 });
+          } catch (syncError: any) {
+            console.error('pan sync failed (non-fatal):', syncError.message);
+          }
+        }
+
+        completePendingOperation(issueId);
+
+        return HttpServerResponse.json({
+          success: true,
+          message: `Approved ${issueId}: ${lifecycleResult.steps
+            .filter((s: any) => s.success && !s.skipped)
+            .map((s: any) => s.step)
+            .join(', ')}${isGitHubIssueFlag ? ', skills synced' : ''}`,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error approving workspace:', error);
+        completePendingOperation(issueId, msg);
+        return HttpServerResponse.json(
+          { error: 'Failed to approve: ' + msg },
+          { status: 500 }
+        );
+      },
+    });
+  })
+);
+
+// ─── Route: DELETE /api/workspaces/:issueId/pending ──────────────────────────
+
+const deleteWorkspacePendingRoute = HttpRouter.add(
+  'DELETE',
+  '/api/workspaces/:issueId/pending',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    clearPendingOperation(issueId);
+    return HttpServerResponse.json({ success: true });
+  })
+);
+
+// ─── Route: GET /api/workspaces/:issueId/tldr ─────────────────────────────────
+
+const getWorkspaceTldrRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/tldr',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    return yield* Effect.tryPromise({
+      try: async () => {
+        const projectRoot = process.cwd();
+        const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
+        const venvPath = join(workspacePath, '.venv');
+
+        if (!existsSync(workspacePath)) {
+          return HttpServerResponse.json({ error: 'Workspace not found' }, { status: 404 });
+        }
+
+        if (!existsSync(venvPath)) {
+          return HttpServerResponse.json({
+            available: false,
+            reason: 'No .venv found in workspace',
+          });
+        }
+
+        const service = getTldrDaemonService(workspacePath, venvPath);
+        const status = await service.getStatus();
+        const { fileCount, indexAge, edgeCount } = getIndexStats(workspacePath);
+
+        return HttpServerResponse.json({
+          available: true,
+          running: status.running,
+          pid: status.pid,
+          healthy: status.healthy,
+          workspacePath,
+          fileCount,
+          indexAge,
+          edgeCount,
+        });
+      },
+      catch: (error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('Error getting workspace TLDR status:', error);
+        return HttpServerResponse.json({ error: msg }, { status: 500 });
+      },
+    });
+  })
+);
+
+// ─── Compose all routes into a single Layer ───────────────────────────────────
+
+export const workspacesRouteLayer = Layer.mergeAll(
+  getWorkspaceRoute,
+  postWorkspacesRoute,
+  getWorkspacePlanRoute,
+  getWorkspaceCleanPreviewRoute,
+  postWorkspaceCleanRoute,
+  postWorkspaceContainerizeRoute,
+  postWorkspaceStartRoute,
+  postWorkspaceContainerActionRoute,
+  postWorkspaceRefreshDbRoute,
+  getWorkspaceReviewStatusRoute,
+  postWorkspaceReviewStatusRoute,
+  postWorkspaceReviewRoute,
+  postWorkspaceRequestReviewRoute,
+  postWorkspaceResetReviewRoute,
+  postWorkspaceSyncMainRoute,
+  postWorkspaceMergeRoute,
+  postWorkspaceApproveRoute,
+  deleteWorkspacePendingRoute,
+  getWorkspaceTldrRoute,
+);
+
+export default workspacesRouteLayer;
