@@ -743,6 +743,8 @@ script -qfec "bash '${innerScript}'" /dev/null 2>&1 | tee -a "${logFilePath}"
 
     // Spawn Claude Code via launcher script (with provider env vars)
     // -c sets tmux session working directory to project path (prevents trust prompt — PAN-384)
+    // Kill stale session first to prevent "duplicate session" error (PAN-430)
+    await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });
     await execAsync(
       `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
@@ -1602,6 +1604,8 @@ exec claude --dangerously-skip-permissions --session-id "${newSessionId}" --mode
 
     // Spawn Claude Code via launcher script (with provider env vars)
     // -c sets tmux session working directory to project path (prevents trust prompt)
+    // Kill stale session first to prevent "duplicate session" error (PAN-430)
+    await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });
     await execAsync(
       `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "bash '${launcherScript}'"`,
       { encoding: 'utf-8' }
@@ -1819,6 +1823,8 @@ export async function wakeSpecialist(
         setSessionId(name, newSessionId);
       }
 
+      // Kill stale session first to prevent "duplicate session" error (PAN-430)
+      await execAsync(`tmux kill-session -t "${tmuxSession}" 2>/dev/null || true`, { encoding: 'utf-8' });
       await execAsync(
         `tmux new-session -d -s "${tmuxSession}" -c "${cwd}"${envFlags} "${claudeCmd}"`,
         { encoding: 'utf-8' }
