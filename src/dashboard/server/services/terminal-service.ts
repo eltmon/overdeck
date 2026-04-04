@@ -202,12 +202,15 @@ export const TerminalServiceLive = Layer.effect(
 
         setTimeout(() => {
           forwarding = true;
+          // Guard: if the PTY already exited, skip the dimension toggle entirely.
+          if (!state.ptyProcess) return;
           // Dimension toggle: cols → cols-1 → cols (two SIGWINCHs, last at correct size).
-          proc.resize(cols - 1, rows);
+          try { proc.resize(cols - 1, rows); } catch { return; /* PTY dead */ }
           execAsync(`tmux resize-window -t ${state.sessionName} -x ${cols - 1} -y ${rows} 2>/dev/null || true`)
             .then(() => new Promise<void>((r) => setTimeout(r, 50)))
             .then(() => {
-              proc.resize(cols, rows);
+              if (!state.ptyProcess) return; // PTY may have died during the wait
+              try { proc.resize(cols, rows); } catch { return; /* PTY dead */ }
               return execAsync(`tmux resize-window -t ${state.sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`);
             })
             .catch(() => {/* ignore resize errors */});
@@ -215,6 +218,7 @@ export const TerminalServiceLive = Layer.effect(
 
         proc.onExit((exitCode) => {
           console.log(`[terminal-service] PTY for ${state.sessionName} exited with code ${exitCode}`);
+          state.ptyProcess = null; // Mark dead so resize guards work
           if (state.queue && state.queue.state._tag !== "Done") {
             Queue.endUnsafe(Queue.asEnqueue(state.queue));
           }
@@ -297,7 +301,7 @@ export const TerminalServiceLive = Layer.effect(
         state.lastCols = cols;
         state.lastRows = rows;
         if (state.ptyProcess) {
-          state.ptyProcess.resize(cols, rows);
+          try { state.ptyProcess.resize(cols, rows); } catch { return; /* PTY dead */ }
           yield* Effect.promise(() =>
             execAsync(`tmux resize-window -t ${sessionName} -x ${cols} -y ${rows} 2>/dev/null || true`).catch(() => {}),
           );
