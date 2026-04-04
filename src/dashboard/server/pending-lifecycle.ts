@@ -29,7 +29,7 @@ export type LifecycleRunner = (pending: PendingLifecycleData) => Promise<void>;
  * loads new content-hashed chunk filenames (no ERR_MODULE_NOT_FOUND after rebuild).
  */
 async function defaultLifecycleRunner(pending: PendingLifecycleData): Promise<void> {
-  const { postMergeLifecycle, notifyTldrDaemon } = await import('../lib/cloister/merge-agent.js');
+  const { postMergeLifecycle, notifyTldrDaemon } = await import('../../lib/cloister/merge-agent.js');
   await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch);
   if (pending.sourceBranch) {
     await notifyTldrDaemon(pending.projectPath, pending.sourceBranch);
