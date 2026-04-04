@@ -28,25 +28,25 @@ const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing"
 const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
 const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "merging", "merged", "failed"]);
 
-function toAgentStatus(v: unknown): AgentStatus {
+export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
 }
-function toAgentPhase(v: unknown): AgentPhase | undefined {
+export function toAgentPhase(v: unknown): AgentPhase | undefined {
   return v && VALID_AGENT_PHASES.has(v as AgentPhase) ? v as AgentPhase : undefined;
 }
-function toSpecialistType(v: unknown): SpecialistType | undefined {
+export function toSpecialistType(v: unknown): SpecialistType | undefined {
   return VALID_SPECIALIST_TYPES.has(v as SpecialistType) ? v as SpecialistType : undefined;
 }
-function toSpecialistState(v: unknown): SpecialistState {
+export function toSpecialistState(v: unknown): SpecialistState {
   return VALID_SPECIALIST_STATES.has(v as SpecialistState) ? v as SpecialistState : "uninitialized";
 }
-function toReviewStatus(v: unknown): ReviewStatusValue | undefined {
+export function toReviewStatus(v: unknown): ReviewStatusValue | undefined {
   return v && VALID_REVIEW_STATUSES.has(v as ReviewStatusValue) ? v as ReviewStatusValue : undefined;
 }
-function toTestStatus(v: unknown): TestStatusValue | undefined {
+export function toTestStatus(v: unknown): TestStatusValue | undefined {
   return v && VALID_TEST_STATUSES.has(v as TestStatusValue) ? v as TestStatusValue : undefined;
 }
-function toMergeStatus(v: unknown): MergeStatusValue | undefined {
+export function toMergeStatus(v: unknown): MergeStatusValue | undefined {
   return v && VALID_MERGE_STATUSES.has(v as MergeStatusValue) ? v as MergeStatusValue : undefined;
 }
 

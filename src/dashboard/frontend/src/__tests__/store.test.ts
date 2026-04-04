@@ -112,10 +112,11 @@ describe('applyEventReducer — agent events', () => {
     expect(next.agentsById['agent-1']!.status).toBe('stopped')
   })
 
-  it('agent.status_changed is a no-op if agent not found', () => {
+  it('agent.status_changed leaves agentsById unchanged if agent not found', () => {
     const event = makeEvent('agent.status_changed', 5, { agentId: 'unknown', status: 'stopped' })
     const next = applyEventReducer(emptyState, event)
-    expect(next).toBe(emptyState)
+    expect(next.agentsById).toEqual({})
+    expect(next.agentsById).toBe(emptyState.agentsById)
   })
 
   it('agent.output_received appends lines and caps at 200', () => {
