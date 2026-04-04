@@ -22,6 +22,7 @@ import {
   applyEvent as applyEventShared,
   applyEvents as applyEventsShared,
 } from '@panopticon/contracts'
+import { saveSnapshotToCache } from './snapshotCache'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -62,8 +63,10 @@ function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardSta
 export const useDashboardStore = create<DashboardStore>((set) => ({
   ...initialState,
 
-  syncSnapshot: (snapshot) =>
-    set((state) => syncSnapshot(state, snapshot)),
+  syncSnapshot: (snapshot) => {
+    saveSnapshotToCache(snapshot)
+    set((state) => syncSnapshot(state, snapshot))
+  },
 
   applyEvent: (event) =>
     set((state) => applyEvent(state, event)),
