@@ -1,94 +1,73 @@
 {
-  "issue": "PAN-440",
-  "title": "Agent enrichment missing from Effect server — INPUT badge, Watch Planning, resolution badges broken",
-  "approach": "Background poller + domain events: new AgentEnrichmentService polls JSONL + runtime.json every 3s, diffs against last known state, emits agent.enrichment_changed events. Shared reducer merges enrichment into AgentSnapshot. Bootstrap computes enrichment inline.",
+  "issueId": "PAN-436",
+  "title": "Dashboard shows zero stats on load — missing skeleton/loading states",
+  "difficulty": "medium",
   "items": [
     {
-      "id": "extend-contracts",
-      "title": "Extend AgentSnapshot schema and add enrichment event to contracts",
-      "description": "Add 'planning' to AgentPhase enum. Add agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount fields to AgentSnapshot. Create AgentEnrichmentChangedEvent schema and add to DomainEvent union. Add reducer case to applyEvent().",
-      "difficulty": "medium",
+      "id": "bootstrap-gate",
+      "title": "Create BootstrapGate wrapper component",
+      "description": "Create src/dashboard/frontend/src/components/BootstrapGate.tsx — a wrapper component that checks selectIsBootstrapped from the Zustand store and renders either children (when bootstrapped) or a fallback skeleton. Simple pattern: `const ready = useDashboardStore(selectIsBootstrapped); return ready ? children : fallback;`",
+      "difficulty": "simple",
       "files": [
-        "packages/contracts/src/types.ts",
-        "packages/contracts/src/events.ts",
-        "packages/contracts/src/event-reducers.ts"
+        "src/dashboard/frontend/src/components/BootstrapGate.tsx"
       ],
       "acceptance": [
-        "AgentPhase includes 'planning'",
-        "AgentSnapshot has all 5 enrichment fields as optional",
-        "AgentEnrichmentChangedEvent is in the DomainEvent union",
-        "applyEvent reducer merges enrichment fields into agentsById entry",
-        "contracts package builds without errors"
+        "Component accepts children and fallback ReactNode props",
+        "Reads selectIsBootstrapped from useDashboardStore",
+        "Renders fallback when bootstrapComplete is false, children when true"
       ],
       "dependencies": []
     },
     {
-      "id": "extract-enrichment-utils",
-      "title": "Extract JSONL scanning and enrichment logic to shared utility",
-      "description": "Move getPendingQuestions() and getAgentJsonlPath() from src/dashboard/server/routes/agents.ts to src/lib/agent-enrichment.ts. Add computeAgentEnrichment() that combines JSONL scan + runtime.json read + phase inference into a single enrichment object. Update the old REST endpoint to import from the new location.",
+      "id": "skeleton-components",
+      "title": "Create shimmer skeleton components for each view",
+      "description": "Create skeleton placeholder components with animate-pulse shimmer for: (1) KanbanSkeleton — 4-5 column layout with card-shaped placeholders, (2) AgentListSkeleton — list of row-shaped placeholders, (3) GodViewSkeleton — grid of card placeholders, (4) HeaderSkeleton — placeholder for sidebar count badges. Use Tailwind animate-pulse bg-surface-2 rounded classes. Match the approximate layout shape of each real component.",
       "difficulty": "medium",
       "files": [
-        "src/lib/agent-enrichment.ts",
-        "src/dashboard/server/routes/agents.ts"
+        "src/dashboard/frontend/src/components/skeletons/KanbanSkeleton.tsx",
+        "src/dashboard/frontend/src/components/skeletons/AgentListSkeleton.tsx",
+        "src/dashboard/frontend/src/components/skeletons/GodViewSkeleton.tsx",
+        "src/dashboard/frontend/src/components/skeletons/HeaderSkeleton.tsx"
       ],
       "acceptance": [
-        "getPendingQuestions() works from new location",
-        "computeAgentEnrichment(agentId) returns { agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount }",
-        "Old REST /api/agents endpoint still works (imports from new location)",
-        "Phase inference: planning- prefix → 'planning', else state.phase or 'implementation'"
+        "Each skeleton visually approximates the layout of its corresponding real component",
+        "All use animate-pulse for shimmer effect",
+        "Use existing Tailwind theme tokens (bg-surface-2, rounded, etc.)",
+        "No external dependencies — pure Tailwind CSS"
       ],
-      "dependencies": ["extend-contracts"]
+      "dependencies": []
     },
     {
-      "id": "enrichment-service",
-      "title": "Create AgentEnrichmentService background poller",
-      "description": "New service at src/dashboard/server/services/agent-enrichment-service.ts. Polls every 3s, calls computeAgentEnrichment() for each running agent, diffs against cached enrichment, emits agent.enrichment_changed events via eventStore.append(). Tracks JSONL file mtime to skip unchanged files. Respects specialist suppression for hasPendingQuestion.",
-      "difficulty": "complex",
+      "id": "wire-bootstrap-gates",
+      "title": "Wire BootstrapGate into App.tsx and Header",
+      "description": "In App.tsx, wrap store-consuming tab views (kanban, agents, god-view) with <BootstrapGate fallback={<XxxSkeleton />}>. Also gate the Header's agent/issue count badges so they don't flash '0' before bootstrap. The MetricsSummaryRow on the kanban tab should also be inside the gate since it sits above the KanbanBoard.",
+      "difficulty": "simple",
       "files": [
-        "src/dashboard/server/services/agent-enrichment-service.ts"
+        "src/dashboard/frontend/src/App.tsx",
+        "src/dashboard/frontend/src/components/Header.tsx"
       ],
       "acceptance": [
-        "Polls every ~3 seconds using setInterval (not execSync-based)",
-        "Only emits events when enrichment fields actually change (diff check)",
-        "Skips JSONL scan when file mtime unchanged",
-        "Suppresses hasPendingQuestion when agent has active specialist",
-        "Exports start()/stop() lifecycle functions",
-        "Handles agent appearing/disappearing between polls gracefully"
+        "Kanban tab shows KanbanSkeleton until bootstrapComplete",
+        "Agents tab shows AgentListSkeleton until bootstrapComplete",
+        "GodView shows GodViewSkeleton until bootstrapComplete",
+        "Header count badges don't show 0 during bootstrap",
+        "React Query views (MissionControl, HandoffsPage, etc.) are NOT wrapped — they have their own loading states"
       ],
-      "dependencies": ["extract-enrichment-utils"]
+      "dependencies": ["bootstrap-gate", "skeleton-components"]
     },
     {
-      "id": "bootstrap-and-wire",
-      "title": "Wire enrichment into read model bootstrap and server startup",
-      "description": "During ReadModelServiceLive bootstrap, compute enrichment for each agent and merge into the initial agentsById entries. Start the AgentEnrichmentService after bootstrap. Ensure enrichment service is stopped on server shutdown.",
-      "difficulty": "medium",
-      "files": [
-        "src/dashboard/server/read-model.ts"
-      ],
-      "acceptance": [
-        "Initial snapshot includes enrichment fields for all running agents",
-        "No 3s gap where badges are missing after page load",
-        "Enrichment service starts after bootstrap completes",
-        "Service is properly cleaned up on shutdown"
-      ],
-      "dependencies": ["enrichment-service"]
-    },
-    {
-      "id": "verify-frontend",
-      "title": "Verify frontend badges and buttons render correctly",
-      "description": "Build the full stack, start the dashboard, and verify: INPUT badge appears when an agent has pending questions, Done/Stuck/Blocked badges render based on resolution, Watch Planning button appears for planning agents, planning input toast fires in App.tsx. No frontend code changes should be needed.",
-      "difficulty": "medium",
+      "id": "verify-build-test",
+      "title": "Verify build and visual test",
+      "description": "Run npm run build to ensure no type errors or build failures. Visually verify in the browser that: (1) skeletons appear on fresh page load, (2) skeletons transition smoothly to real content when snapshot arrives, (3) no flash of zeros/empty state, (4) React Query views still work independently with their own loading states.",
+      "difficulty": "simple",
       "files": [],
       "acceptance": [
-        "INPUT badge visible on kanban card when agent has pending question",
-        "Done badge shows when resolution === 'done'",
-        "Stuck badge shows when resolution === 'stuck'",
-        "Blocked badge shows when resolution === 'needs_input'",
-        "Watch Planning button appears when planning agent is active",
-        "Planning input toast fires in App.tsx",
-        "GodView phase badge shows correct phase color"
+        "npm run build succeeds with no errors",
+        "No flash of zero/empty state on page load",
+        "Skeleton → real content transition is smooth",
+        "Existing React Query loading states unchanged"
       ],
-      "dependencies": ["bootstrap-and-wire"]
+      "dependencies": ["wire-bootstrap-gates"]
     }
   ]
 }
