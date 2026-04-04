@@ -592,6 +592,8 @@ exec claude --model haiku --dangerously-skip-permissions ${resumeArg} "$prompt" 
     await ensureTmuxRunning();
 
     // Start new tmux session with the launcher script
+    // Kill stale session first to prevent "duplicate session" error (PAN-430)
+    await execAsync(`tmux kill-session -t ${tmuxSessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
     await execAsync(`tmux new-session -d -s ${tmuxSessionName} "bash '${launcherScript}'"`, {
       encoding: 'utf-8',
     });

@@ -1008,6 +1008,8 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
         await new Promise(r => setTimeout(r, 1000));
 
         // Respawn in a new tmux session with the same launcher
+        // Kill stale session first to prevent "duplicate session" error (PAN-430)
+        await execAsync(`tmux kill-session -t "${agent.id}" 2>/dev/null || true`, { encoding: 'utf-8' });
         await execAsync(
           `tmux new-session -d -s "${agent.id}" -c "${workspace}" "bash ${launcherPath}"`,
           { encoding: 'utf-8' }
