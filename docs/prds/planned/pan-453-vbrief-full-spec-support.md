@@ -172,9 +172,29 @@ In `buildPlanningPrompt()`, provide the agent with discoverable references:
 - Include the issue URL from the `PlanningIssue` object
 - Tell the agent to include these in `plan.references`
 
-### Step 6: Update docs/VBRIEF.md
+### Step 6: Update all Panopticon documentation with vBRIEF references
 
-Add the new fields to the documentation with examples.
+**docs/VBRIEF.md** — Add the new fields to the documentation with examples.
+
+**CLAUDE.md** — Add a section referencing vBRIEF:
+```
+## vBRIEF Plan Format
+
+Panopticon uses vBRIEF v0.5 for machine-readable work plans.
+See [docs/VBRIEF.md](docs/VBRIEF.md) for the full spec reference.
+
+- Canonical spec: https://github.com/deftai/vBRIEF (by Deft.co)
+- Our extensions proposal: https://github.com/deftai/vBRIEF/issues/1
+- Our fork (for extensions ahead of upstream): https://github.com/eltmon/vBRIEF
+- Plans live at `.planning/plan.vbrief.json` in each workspace
+- Copied to `docs/prds/active/<ISSUE>-plan.vbrief.json` on planning completion
+```
+
+**docs/INDEX.md** — Already has VBRIEF.md reference (added today).
+
+**README.md** — Add vBRIEF to the "Built With" or "Standards" section if one exists. Reference the upstream deftai/vBRIEF repo as the canonical spec. Note that Panopticon is a reference implementation of vBRIEF for multi-agent orchestration.
+
+**Key principle:** Always reference `deftai/vBRIEF` as the canonical spec. Our fork at `eltmon/vBRIEF` is only mentioned as a fallback for extensions that haven't been accepted upstream yet. We aim to stay compatible with the upstream spec — fork only if we must break compatibility for functionality.
 
 ### Step 7: Harden complete-planning — auto-copy artifacts to docs/prds/active/
 
