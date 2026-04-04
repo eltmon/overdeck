@@ -282,6 +282,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   };
 
   const handleStopPlanning = () => {
+    // Transition away from 'planning' step IMMEDIATELY to unmount XTerminal
+    // before the API call kills the tmux session. Otherwise the user sees
+    // "Connection lost. Reconnecting..." while the mutation runs.
+    setStep('starting');  // Reuse starting step as a "completing..." state
     stopPlanningMutation.mutate();
   };
 
