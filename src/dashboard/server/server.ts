@@ -99,10 +99,10 @@ const staticRouteLayer = HttpRouter.add(
     const pathService = yield* Path.Path;
 
     // Resolve static directory: PANOPTICON_FRONTEND_DIR env var or default
-    // Default: <panopticonHome>/../../dist/dashboard/frontend (relative to ~/.panopticon)
+    // Default: dist/dashboard/public relative to CWD (same as old Express server)
     const staticDir =
       process.env['PANOPTICON_FRONTEND_DIR'] ??
-      pathService.resolve(config.panopticonHome, '..', '..', 'dist', 'dashboard', 'frontend');
+      pathService.resolve(process.cwd(), 'dist', 'dashboard', 'public');
 
     const staticRoot = pathService.resolve(staticDir);
     const urlPath = url.value.pathname === '/' ? '/index.html' : url.value.pathname;
