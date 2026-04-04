@@ -23,7 +23,7 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec, spawn } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -728,6 +728,135 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { issueId: id, sessionName },
         }));
+
+        // Write preliminary agent state so status endpoint knows planning is starting
+        const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+        mkdirSync(agentStateDir, { recursive: true });
+        writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+          id: sessionName,
+          issueId: issue.identifier,
+          workspace: workspacePath,
+          status: 'starting',
+          startedAt: new Date().toISOString(),
+          type: 'planning',
+          location: workspaceLocation,
+        }, null, 2));
+
+        // === BACKGROUND: workspace creation + agent spawning ===
+        // Runs after the response is sent. Errors logged, don't affect response.
+        (async () => {
+          try {
+            console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
+
+            // Create workspace if it doesn't exist
+            let workspaceCreated = existsSync(workspacePath) &&
+              !readdirSync(workspacePath).every((f: string) => f === '.planning');
+
+            if (!workspaceCreated) {
+              try {
+                const startDockerFlag = body.startDocker ? ' --docker' : '';
+                const createCmd = `pan workspace create ${issue.identifier} --local${startDockerFlag}`;
+                console.log(`[start-planning] Creating workspace: ${createCmd}`);
+                await execAsync(createCmd, { cwd: projectPath, encoding: 'utf-8', timeout: 120000 });
+                workspaceCreated = true;
+                console.log(`[start-planning] Workspace created successfully`);
+              } catch (err: any) {
+                console.error(`[start-planning] Workspace creation failed: ${err.message}`);
+                writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+                  id: sessionName, issueId: issue.identifier, workspace: workspacePath,
+                  status: 'failed', error: `Workspace creation failed: ${err.message}`,
+                  startedAt: new Date().toISOString(), type: 'planning', location: 'local',
+                }, null, 2));
+                return;
+              }
+            }
+
+            // Kill existing planning session if any
+            await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+            // Create planning prompt
+            const planningDir = join(workspacePath, '.planning');
+            mkdirSync(planningDir, { recursive: true });
+            for (const subdir of ['transcripts', 'discussions', 'notes']) {
+              mkdirSync(join(planningDir, subdir), { recursive: true });
+            }
+
+            // Clear stale STATE.md and .planning-complete from previous session
+            for (const staleFile of ['STATE.md', '.planning-complete']) {
+              const stalePath = join(planningDir, staleFile);
+              if (existsSync(stalePath)) {
+                console.log(`[start-planning] Clearing stale ${staleFile}`);
+                rmSync(stalePath, { force: true });
+              }
+            }
+
+            // Build planning prompt
+            let commentsSection = '';
+            if (issue.comments && issue.comments.length > 0) {
+              const commentLines = issue.comments
+                .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                .map((c: any) => {
+                  const date = c.createdAt.slice(0, 10);
+                  const body = c.body.length > 2000 ? c.body.slice(0, 2000) + ' [truncated]' : c.body;
+                  return `### ${c.author} (${date}):\n${body}`;
+                });
+              commentsSection = `\n## Issue Comments\n\n${commentLines.join('\n\n---\n\n')}\n`;
+            }
+
+            const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
+            const planningPrompt = `# Planning Session: ${issue.identifier}\n\n## Issue Details\n- **ID:** ${issue.identifier}\n- **Title:** ${issue.title}\n- **URL:** ${issue.url}\n\n## Description\n${issue.description || 'No description provided'}\n${commentsSection}\n---\n\nYou are a planning agent. Read the codebase, ask questions via AskUserQuestion, and produce:\n1. STATE.md with decisions\n2. .planning/plan.vbrief.json\n3. docs/prds/active/${issueLower}-plan.md\n\nDO NOT write code. Planning only.\n`;
+            writeFileSync(planningPromptPath, planningPrompt);
+
+            // Get planning model from settings
+            const { loadSettings, getAgentCommand, isAnthropicModel } = await import('../../../lib/settings.js');
+            const agentSettings = loadSettings();
+            const planningModel = (agentSettings.models as any).planning_agent || agentSettings.models.complexity?.expert || 'claude-opus-4-6';
+            const agentCmd = getAgentCommand(planningModel);
+            const cmdWithArgs = agentCmd.args.length > 0
+              ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
+              : `${agentCmd.command} --dangerously-skip-permissions`;
+
+            // Write launcher script
+            const promptFile = join(agentStateDir, 'init-prompt.txt');
+            const launcherScript = join(agentStateDir, 'launcher.sh');
+            const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
+            writeFileSync(promptFile, initMessage);
+            writeFileSync(launcherScript, `#!/bin/bash
+export TERM=xterm-256color
+export COLORTERM=truecolor
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+export PANOPTICON_AGENT_ID="${sessionName}"
+export PANOPTICON_ISSUE_ID="${issue.identifier}"
+export PANOPTICON_SESSION_TYPE="planning"
+cd "${workspacePath}"
+prompt=$(cat "${promptFile}")
+trap '' HUP
+${cmdWithArgs} "$prompt"
+echo ""
+echo "Planning agent has exited. Session kept alive for review."
+echo "Click 'Done' in the dashboard when ready to hand off to implementation."
+while true; do sleep 60; done
+`, { mode: 0o755 });
+
+            // Start tmux session
+            await execAsync(`TERM=xterm-256color tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`, { encoding: 'utf-8' });
+            await execAsync(`tmux set-option -t ${sessionName} destroy-unattached off 2>/dev/null || true`, { encoding: 'utf-8' });
+            await execAsync(`tmux set-option -t ${sessionName} remain-on-exit on 2>/dev/null || true`, { encoding: 'utf-8' });
+
+            // Update agent state to running
+            writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+              id: sessionName, issueId: issue.identifier, workspace: workspacePath,
+              runtime: isAnthropicModel(planningModel) ? 'claude' : 'claude-code-router',
+              model: planningModel, status: 'running',
+              startedAt: new Date().toISOString(), type: 'planning', location: 'local',
+            }, null, 2));
+
+            console.log(`[start-planning] Started local planning agent ${sessionName}`);
+          } catch (bgErr: any) {
+            console.error(`[start-planning] Background setup failed for ${issue.identifier}:`, bgErr);
+          }
+        })();
 
         return jsonResponse(responseBody);
         } catch (error: unknown) {
