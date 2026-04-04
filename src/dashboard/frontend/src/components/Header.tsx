@@ -1,5 +1,6 @@
 import { Eye, LayoutGrid, Users, Terminal, BarChart3, DollarSign, ArrowRightLeft, Settings, Sun, Moon, Compass, Search, Cpu, Activity, Server, Zap } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
+import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
 
 export type Tab = 'mission-control' | 'kanban' | 'agents' | 'resources' | 'skills' | 'health' | 'activity' | 'convoys' | 'metrics' | 'costs' | 'handoffs' | 'settings' | 'god-view';
@@ -74,7 +75,8 @@ export function Header({ activeTab, onTabChange, onSearchOpen }: HeaderProps) {
       </nav>
 
       {/* Right controls */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
+        <FreshnessIndicator />
         <button
           onClick={onSearchOpen}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors hover:bg-white/5"
