@@ -1,10 +1,17 @@
 {
-  "vBRIEFInfo": { "version": "0.5", "created": "2026-04-04T12:00:00Z" },
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-04T12:00:00Z"
+  },
   "plan": {
     "id": "pan-445",
     "title": "Planning Abort button uses native JS confirm() instead of styled dialog",
     "status": "approved",
-    "tags": ["frontend", "ux", "bug-fix"],
+    "tags": [
+      "frontend",
+      "ux",
+      "bug-fix"
+    ],
     "narratives": {
       "Problem": "The PlanDialog Abort buttons use native window.confirm() instead of the styled useConfirm() dialog from DialogProvider. One abort button (error state) has no confirmation at all. Additionally, the abort-planning endpoint's label removal error handling silently swallows all errors.",
       "Proposal": "Replace all native confirm() calls with useConfirm() from DialogProvider using the established pattern (variant: 'destructive'). Add a styled confirm to the error-state abort button. Improve error logging in the abort-planning endpoint's label removal catch block."
@@ -13,7 +20,7 @@
       {
         "id": "styled-confirm-dialog",
         "title": "Replace native confirm() with useConfirm() in PlanDialog",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-445"
@@ -25,33 +32,41 @@
           {
             "id": "styled-confirm-dialog.ac1",
             "title": "Clicking Abort in pre-start/resume view shows styled dark-themed confirmation dialog, not native browser dialog",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "styled-confirm-dialog.ac2",
             "title": "Clicking Abort in active planning toolbar shows styled confirmation dialog",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "styled-confirm-dialog.ac3",
             "title": "Clicking Abort in error/failed state shows styled confirmation dialog before aborting",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "styled-confirm-dialog.ac4",
             "title": "Cancelling the confirmation dialog does NOT trigger the abort mutation",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
       {
         "id": "label-removal-logging",
         "title": "Add error logging to abort-planning label removal",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "trivial",
           "issueLabel": "pan-445"
@@ -63,8 +78,10 @@
           {
             "id": "label-removal-logging.ac1",
             "title": "Label removal errors are logged with '[abort-planning]' prefix instead of silently swallowed",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       }
