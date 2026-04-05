@@ -34,6 +34,8 @@ import {
   GitBranch,
   Flag,
   Settings,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
@@ -219,6 +221,7 @@ export function SettingsPage() {
   const [modelsModalProvider, setModelsModalProvider] = useState<Provider | null>(null);
   const [testingModel, setTestingModel] = useState<string | null>(null);
   const [modelTestResults, setModelTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
+  const [clearingCache, setClearingCache] = useState(false);
 
   useEffect(() => {
     if (settings && !formData) {
@@ -850,6 +853,44 @@ export function SettingsPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Maintenance */}
+      <section className="space-y-3 pb-20">
+        <h2 className="text-xl font-black text-content">Maintenance</h2>
+        <div className="bg-surface-emphasis rounded-xl border border-divider p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-content flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-content-subtle" />
+                Issue Cache
+              </h3>
+              <p className="text-xs text-content-muted mt-1">
+                Clear cached issue data and re-fetch from all trackers. Use this if issue identifiers or data appear stale.
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                setClearingCache(true);
+                try {
+                  const res = await fetch('/api/cache/clear', { method: 'POST' });
+                  if (!res.ok) throw new Error(await res.text());
+                  toast.success('Issue cache cleared and re-fetched');
+                  queryClient.invalidateQueries({ queryKey: ['issues'] });
+                } catch (err: any) {
+                  toast.error(`Failed to clear cache: ${err.message}`);
+                } finally {
+                  setClearingCache(false);
+                }
+              }}
+              disabled={clearingCache}
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-divider hover:border-amber-500/50 hover:bg-amber-500/10 text-content-muted hover:text-amber-400 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {clearingCache ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {clearingCache ? 'Clearing...' : 'Clear & Refresh'}
+            </button>
+          </div>
         </div>
       </section>
 

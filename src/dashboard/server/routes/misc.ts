@@ -1446,6 +1446,22 @@ const getCacheStatusRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/cache/clear ────────────────────────────────────────────
+
+const clearCacheRoute = HttpRouter.add(
+  'POST',
+  '/api/cache/clear',
+  Effect.promise(async () => {
+    try {
+      await getIssueDataService().clearCacheAndRefresh();
+      return jsonResponse({ ok: true, message: 'Cache cleared and re-fetched' });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: msg }, { status: 500 });
+    }
+  }),
+);
+
 // ─── Route: GET /api/metrics/runtimes ────────────────────────────────────────
 
 const getMetricsRuntimesRoute = HttpRouter.add(
@@ -1665,6 +1681,7 @@ export const miscRouteLayer = Layer.mergeAll(
   postTldrStartRoute,
   postTldrStopRoute,
   getCacheStatusRoute,
+  clearCacheRoute,
   getMetricsRuntimesRoute,
   getMetricsTasksRoute,
   postShadowMonitorRoute,

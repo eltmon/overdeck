@@ -166,6 +166,27 @@ export class IssueDataService {
   }
 
   /**
+   * Clear all cached issue data and trigger a fresh re-fetch from all trackers.
+   */
+  async clearCacheAndRefresh(): Promise<void> {
+    // Clear SQLite + L1 cache for all trackers
+    for (const tracker of ['github', 'linear', 'rally']) {
+      this.cache.invalidate(tracker);
+      this.trackers[tracker].lastFetchedIssues = [];
+      this.trackers[tracker].lastFetchedAt = null;
+      this.trackers[tracker].lastError = null;
+    }
+    console.log('[IssueDataService] Cache cleared — re-fetching all trackers');
+    // Re-fetch all trackers
+    await Promise.allSettled([
+      this.pollGitHub(),
+      this.pollLinear(),
+      this.pollRally(),
+    ]);
+    this.pushSnapshot();
+  }
+
+  /**
    * Look up which tracker an issue belongs to by its identifier.
    * Returns 'github' | 'linear' | 'rally' | null.
    */
@@ -385,6 +406,17 @@ export class IssueDataService {
   }
 
   private loadCachedData(): void {
+    // Build a lookup of repo → prefix from current config for re-stamping stale identifiers
+    const repoPrefixMap = new Map<string, string>();
+    try {
+      const ghConfig = getGitHubConfig();
+      if (ghConfig) {
+        for (const { owner, repo, prefix } of ghConfig.repos) {
+          repoPrefixMap.set(`${owner}/${repo}`, prefix || repo.toUpperCase());
+        }
+      }
+    } catch { /* ignore */ }
+
     for (const tracker of ['github', 'linear', 'rally']) {
       const cached = this.cache.getStale(tracker, 'issues');
       if (cached?.data) {
@@ -404,6 +436,24 @@ export class IssueDataService {
           if (sanitizedCount > 0) {
             console.warn(`[IssueDataService] Rally cache: sanitized ${sanitizedCount} issues with object rawTrackerState (PAN-201)`);
           }
+        }
+        // Re-stamp GitHub identifiers in case prefix config changed since cache was written
+        if (tracker === 'github') {
+          cached.data = cached.data.map((issue: any) => {
+            const repoKey = issue.sourceRepo;
+            const prefix = repoKey ? repoPrefixMap.get(repoKey) : undefined;
+            if (prefix) {
+              // Extract issue number from id (github-owner-repo-NUMBER) or identifier (PREFIX-NUMBER)
+              const issueNum = issue.id?.match(/-(\d+)$/)?.[1] || issue.identifier?.match(/-(\d+)$/)?.[1];
+              if (issueNum) {
+                const expectedId = `${prefix}-${issueNum}`;
+                if (issue.identifier !== expectedId) {
+                  return { ...issue, identifier: expectedId };
+                }
+              }
+            }
+            return issue;
+          });
         }
         this.trackers[tracker].lastFetchedIssues = cached.data;
         this.trackers[tracker].lastFetchedAt = cached.lastFetchedAt;
@@ -441,13 +491,13 @@ export class IssueDataService {
       try {
         // Fetch open issues with ETag support
         const openIssues = await this.fetchGitHubRepoIssues(
-          octokit, owner, repo, 'open', prefix || repo.toUpperCase(),
+          octokit, owner, repo, 'open', prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, ''),
           `github:open:${owner}/${repo}`
         );
 
         // Fetch recently closed issues
         const closedIssues = await this.fetchGitHubRepoIssues(
-          octokit, owner, repo, 'closed', prefix || repo.toUpperCase(),
+          octokit, owner, repo, 'closed', prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, ''),
           `github:closed:${owner}/${repo}`
         );
 
@@ -584,7 +634,16 @@ export class IssueDataService {
       // 304 Not Modified — return cached data (this is FREE, no rate limit cost)
       if (err.status === 304) {
         const cached = this.cache.getStale('github', cacheKey);
-        return cached?.data || [];
+        if (!cached?.data) return [];
+        // Re-stamp identifiers in case the prefix changed since the cache was written
+        return cached.data.map((issue: any) => {
+          const issueNum = issue.id?.match(/-(\d+)$/)?.[1] || issue.identifier?.match(/-(\d+)$/)?.[1];
+          if (issueNum) {
+            const expectedId = `${issuePrefix}-${issueNum}`;
+            return issue.identifier === expectedId ? issue : { ...issue, identifier: expectedId };
+          }
+          return issue;
+        });
       }
       throw err;
     }
