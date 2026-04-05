@@ -274,4 +274,55 @@ describe('LinearClient Effect service', () => {
       });
     });
   });
+
+  describe('getComments', () => {
+    it('returns comments with author and body', async () => {
+      mockSdkIssue.mockResolvedValue({
+        ...makeRawIssue(),
+        comments: () => Promise.resolve({
+          nodes: [
+            {
+              body: 'Nice work!',
+              createdAt: '2025-01-01T00:00:00.000Z',
+              user: Promise.resolve({ name: 'Alice' }),
+            },
+            {
+              body: 'LGTM',
+              createdAt: '2025-01-02T00:00:00.000Z',
+              user: Promise.resolve({ name: 'Bob' }),
+            },
+          ],
+        }),
+      });
+
+      const { LinearClient, LinearClientLive } = await import('../linear-client.js');
+
+      const program = Effect.gen(function* () {
+        const client = yield* LinearClient;
+        return yield* client.getComments(UUID_A);
+      }).pipe(Effect.provide(LinearClientLive));
+
+      const comments = await runEffect(program);
+      expect(comments).toHaveLength(2);
+      expect(comments[0]).toEqual({ body: 'Nice work!', author: 'Alice', createdAt: '2025-01-01T00:00:00.000Z' });
+      expect(comments[1]).toEqual({ body: 'LGTM', author: 'Bob', createdAt: '2025-01-02T00:00:00.000Z' });
+    });
+
+    it('returns empty array when issue has no comments', async () => {
+      mockSdkIssue.mockResolvedValue({
+        ...makeRawIssue(),
+        comments: () => Promise.resolve({ nodes: [] }),
+      });
+
+      const { LinearClient, LinearClientLive } = await import('../linear-client.js');
+
+      const program = Effect.gen(function* () {
+        const client = yield* LinearClient;
+        return yield* client.getComments(UUID_A);
+      }).pipe(Effect.provide(LinearClientLive));
+
+      const comments = await runEffect(program);
+      expect(comments).toHaveLength(0);
+    });
+  });
 });
