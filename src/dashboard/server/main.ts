@@ -12,6 +12,8 @@ import { startSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
+import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
+import { getEventStore } from './event-store.js';
 
 declare const Bun: unknown;
 
@@ -27,6 +29,23 @@ console.log('[panopticon] IssueDataService started (non-blocking)');
 // for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
 startAgentEnrichmentService();
 console.log('[panopticon] AgentEnrichmentService started');
+
+// Wire up pipeline notifier → domain events.
+// Library code (review-status.ts) calls notifyPipeline() on every status change.
+// This handler converts those into domain events so the frontend Zustand store updates.
+setPipelineHandler((event) => {
+  if (event.type === 'status_changed') {
+    try {
+      const es = getEventStore();
+      es.append({
+        type: 'review.status_changed',
+        timestamp: new Date().toISOString(),
+        payload: { issueId: event.issueId, status: event.status },
+      } as any);
+    } catch { /* non-fatal — event store may not be ready during early boot */ }
+  }
+});
+console.log('[panopticon] Pipeline notifier → domain events wired');
 
 // Start background conversation lifecycle polling (10s interval)
 startConversationLifecycleService();
