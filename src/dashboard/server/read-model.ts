@@ -18,6 +18,9 @@ import {
 } from '@panopticon/contracts';
 import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue } from '@panopticon/contracts';
 
+// ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
+let _cachedEventStore: any = null;
+
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
@@ -274,16 +277,29 @@ export const ReadModelServiceLive = Layer.effect(
           // Persist updated snapshot to projection cache
           projectionCache?.save(buildSnapshot());
 
-          // Emit issues.snapshot event to event store (async import to avoid circular deps)
-          import('./event-store.js').then(({ getEventStore }) => {
-            try {
-              getEventStore().append({
+          // Emit issues.snapshot event to event store
+          // Uses cached reference to avoid async dynamic import delay
+          // (delay caused frontend to miss updates after patchIssue)
+          try {
+            if (!_cachedEventStore) {
+              import('./event-store.js').then(({ getEventStore }) => {
+                _cachedEventStore = getEventStore();
+                try {
+                  _cachedEventStore.append({
+                    type: 'issues.snapshot',
+                    timestamp: new Date().toISOString(),
+                    payload: { issues: cleaned },
+                  } as any);
+                } catch { /* event store not ready */ }
+              }).catch(() => {});
+            } else {
+              _cachedEventStore.append({
                 type: 'issues.snapshot',
                 timestamp: new Date().toISOString(),
                 payload: { issues: cleaned },
               } as any);
-            } catch { /* event store not ready yet */ }
-          }).catch(() => { /* module not loaded yet */ });
+            }
+          } catch { /* event store not ready yet */ }
         });
       } catch {
         console.warn('[ReadModel] IssueDataService not available at bootstrap, starting with empty issues');
