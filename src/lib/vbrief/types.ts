@@ -5,6 +5,14 @@
  * Structured plan format produced by the planning agent and consumed by
  * Cloister for programmatic beads creation and DAG visualization.
  *
+ * New in v0.5 (PAN-453):
+ *   - VBriefReference: external links (issues, PRDs, specs)
+ *   - VBriefDocument.vBRIEFInfo: author (tool identifier), description
+ *   - VBriefPlan: uid (UUID v4), sequence (write counter), references,
+ *     created, updated timestamps
+ *   - VBriefItem: created, completed timestamps
+ *   - VBriefSubItem: created, completed timestamps
+ *
  * Panopticon extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
  *   - metadata.issueLabel: issue ID for beads label filtering
