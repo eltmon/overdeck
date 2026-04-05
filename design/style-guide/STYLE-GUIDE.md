@@ -220,8 +220,10 @@ Colors are defined as CSS custom properties on `:root` (light) and via `@variant
 
 1. **OKLCH for primaries** — perceptually uniform. The primary blue is the same perceived brightness in both light and dark, just adjusted lightness (0.488 → 0.588).
 2. **`color-mix()` for dark surfaces** — not flat hex values. `neutral-950 at 95% + white` creates a near-black that's warmer and more natural than pure `#000000`.
-3. **Opacity-based borders** — `white/6%` in dark, `black/8%` in light. These are barely visible but architecturally meaningful. They define structure without creating visual noise.
+3. **Opacity-based borders** — `white/6%` in dark, `black/5%` in light. These are barely visible but architecturally meaningful. They define structure without creating visual noise.
 4. **Semantic signals are the same hue** in both modes — only the foreground (text) variant shifts for contrast. `--success` is always emerald-500; `--success-foreground` shifts from emerald-700 (light) to emerald-400 (dark).
+5. **Warm neutrals, not cold slate** — use `neutral-*` (warm gray), NEVER `slate-*` (blue-cold gray). Slate creates a harsh, clinical feel. Neutral creates the warm, premium, T3Code-like quality. This applies to ALL text colors, backgrounds, and borders in both modes.
+6. **Light mode cards are borderless** — in light mode, cards get their definition from a tiny ambient shadow (`0_1px_2px rgba(0,0,0,0.04)`) against the slightly off-white page background, NOT from explicit borders. This is the single biggest difference between "warm and premium" vs "cold and boxy".
 
 ### Signal Color Usage
 
