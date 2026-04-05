@@ -142,10 +142,39 @@ function makeGitHubClientImpl(token: string): GitHubClientShape {
     'Content-Type': 'application/json',
   };
 
+  // Track rate limit state across requests
+  let rateLimitRemaining = 5000;
+  let rateLimitResetAt = 0; // Unix timestamp in seconds
+
   async function ghFetch(url: string, init?: RequestInit): Promise<Response> {
+    // If we're near the rate limit, wait until reset time
+    if (rateLimitRemaining < 5 && rateLimitResetAt > 0) {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const waitSec = rateLimitResetAt - nowSec;
+      if (waitSec > 0) {
+        await new Promise((r) => setTimeout(r, waitSec * 1000));
+      }
+    }
+
     const res = await fetch(url, { ...init, headers: { ...headers, ...init?.headers } });
+
+    // Track rate limit headers from every response (headers may be absent in tests/mocks)
+    if (res.headers && typeof res.headers.get === 'function') {
+      const remaining = res.headers.get('x-ratelimit-remaining');
+      const resetAt = res.headers.get('x-ratelimit-reset');
+      if (remaining !== null) rateLimitRemaining = parseInt(remaining, 10);
+      if (resetAt !== null) rateLimitResetAt = parseInt(resetAt, 10);
+    }
+
     if (res.status === 404) throw new IssueNotFound({ id: url });
-    if (res.status === 429) throw new RateLimited({ retryAfter: 60 });
+    if (res.status === 429) {
+      // Respect Retry-After header if present
+      const retryAfter = res.headers && typeof res.headers.get === 'function'
+        ? res.headers.get('Retry-After')
+        : null;
+      const retryAfterSec = retryAfter ? parseInt(retryAfter, 10) : 60;
+      throw new RateLimited({ retryAfter: retryAfterSec });
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       throw new Error(`GitHub API ${res.status}: ${body}`);

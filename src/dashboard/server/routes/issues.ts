@@ -154,8 +154,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issue = await Effect.runPromise(
           linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
@@ -233,9 +232,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
           console.error('Error analyzing issue:', error);
           return jsonResponse({ error: 'Failed to analyze issue: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -250,8 +247,7 @@ const postIssuePlanRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { answers, tasks } = body as any;
 
@@ -314,9 +310,7 @@ const postIssuePlanRoute = HttpRouter.add(
           console.error('Error creating plan:', error);
           return jsonResponse({ error: 'Failed to create plan: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -354,8 +348,7 @@ const postIssueCloseRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { reason } = body as any;
         const issuePrefix = issueId.split('-')[0];
@@ -422,9 +415,7 @@ const postIssueCloseRoute = HttpRouter.add(
           console.error('Error closing issue:', error);
           return jsonResponse({ error: 'Failed to close: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -443,8 +434,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     const rally = yield* RallyClient;
     const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const {
           skipWorkspace = false,
@@ -626,9 +616,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           console.error('[start-planning] Error:', error);
           return jsonResponse({ error: 'Failed to start planning: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -644,8 +632,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { deleteWorkspace } = body as any;
         const githubCheck = isGitHubIssue(id);
@@ -752,9 +739,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           console.error('Error aborting planning:', error);
           return jsonResponse({ error: 'Failed to abort planning: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -771,8 +756,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const linear = yield* LinearClient;
     const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const skipKill = (body as any)?.skipKill === true;
         const sessionName = `planning-${id.toLowerCase()}`;
@@ -969,9 +953,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           console.error('Error completing planning:', error);
           return jsonResponse({ error: 'Failed to complete planning: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -986,8 +968,7 @@ const postIssueResetRoute = HttpRouter.add(
     const cleanupLog: string[] = [];
     const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = id.toLowerCase();
 
@@ -1096,9 +1077,7 @@ const postIssueResetRoute = HttpRouter.add(
           console.error('Reset failed:', error);
           return jsonResponse({ success: false, error: msg, cleanupLog }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1114,8 +1093,7 @@ const postIssueCancelRoute = HttpRouter.add(
     const cleanupLog: string[] = [];
     const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { wipeWorkspace = false } = body as any;
         const issueLower = id.toLowerCase();
@@ -1215,9 +1193,7 @@ const postIssueCancelRoute = HttpRouter.add(
           console.error('[cancel] Failed:', error);
           return jsonResponse({ success: false, error: msg, cleanupLog }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1233,8 +1209,7 @@ const postIssueReopenRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { reason: _reason } = body as any || {};
         const githubCheck = isGitHubIssue(id);
@@ -1298,9 +1273,7 @@ const postIssueReopenRoute = HttpRouter.add(
           console.error('Error reopening issue:', error);
           return jsonResponse({ error: 'Failed to reopen issue: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1316,8 +1289,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { targetStatus, syncToTracker = false } = body as any || {};
 
@@ -1395,9 +1367,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           console.error('Error moving issue status:', error);
           return jsonResponse({ error: 'Failed to move issue status: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1411,8 +1381,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const cleanupLog: string[] = [];
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = id.toLowerCase();
         const githubCheck = isGitHubIssue(id);
@@ -1470,9 +1439,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
           console.error('Error cleaning up workspace:', error);
           return jsonResponse({ error: 'Failed to cleanup workspace: ' + msg, cleanupLog }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1486,8 +1453,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { deleteWorkspace = false } = body as any || {};
         const { deepWipe } = await import('../../../lib/lifecycle/index.js');
@@ -1542,9 +1508,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
           console.error('Error in deep wipe:', error);
           return jsonResponse({ error: 'Deep wipe failed: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1557,8 +1521,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { closeOut } = await import('../../../lib/lifecycle/index.js');
         const githubCheck = isGitHubIssue(id);
@@ -1622,9 +1585,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
           console.error(`[close-out] Error for ${id}:`, error);
           return jsonResponse({ error: msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1637,8 +1598,7 @@ const getIssueBeadsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = id.toLowerCase();
         const githubCheck = isGitHubIssue(id);
@@ -1744,9 +1704,7 @@ const getIssueBeadsRoute = HttpRouter.add(
           console.error('Error fetching beads:', error);
           return jsonResponse({ error: 'Failed to fetch beads: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 

@@ -11,7 +11,7 @@
  *   - Issue close with label cleanup
  */
 
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Effect, Layer, Option, ServiceMap } from 'effect';
 import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { GitHubClient } from './github-client.js';
 import { GitHubClientOptionalLive } from './github-client.js';
@@ -21,6 +21,23 @@ import { RallyClient } from './rally-client.js';
 import { RallyClientLive } from './rally-client.js';
 import type { LinearState } from './linear-client.js';
 import { TrackerNotConfigured, TrackerApiError, IssueNotFound, RateLimited } from './typed-errors.js';
+import { EventStoreService } from './domain-services.js';
+import { getSharedIssueService } from './issue-service-singleton.js';
+
+// ─── Event emission helper ────────────────────────────────────────────────────
+
+/**
+ * Attempt to emit a domain event via the shared event store.
+ * Non-fatal: silently no-ops if EventStoreService is absent (e.g. in unit tests).
+ */
+function emitEvent(event: Record<string, unknown>): Effect.Effect<void, never> {
+  return Effect.gen(function* () {
+    const storeOption = yield* Effect.serviceOption(EventStoreService);
+    if (Option.isSome(storeOption)) {
+      Effect.runSync(storeOption.value.append(event));
+    }
+  });
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,6 +154,17 @@ const GITHUB_STATE_LABELS: Record<IssueState, { add: string[]; remove: string[] 
 
 // ─── Live layer implementation ────────────────────────────────────────────────
 
+/** Map IssueState to canonical status string for cache patching. */
+function canonicalStatus(state: IssueState): string {
+  switch (state) {
+    case 'open': return 'open';
+    case 'in_planning': return 'in_planning';
+    case 'in_progress': return 'in_progress';
+    case 'in_review': return 'in_review';
+    case 'closed': return 'closed';
+  }
+}
+
 export const IssueLifecycleLive = Layer.effect(
   IssueLifecycle,
   Effect.gen(function* () {
@@ -163,26 +191,30 @@ export const IssueLifecycleLive = Layer.effect(
             if (state === 'closed') {
               yield* github.closeIssue(ghInfo.owner, ghInfo.repo, ghInfo.number);
             }
-            return;
-          }
-
-          if (trackerType === 'rally') {
+          } else if (trackerType === 'rally') {
             const normalizedState =
               state === 'in_planning' || state === 'open' ? 'open'
               : state === 'in_progress' || state === 'in_review' ? 'in_progress'
               : 'closed';
             yield* rally.updateState(issueId, normalizedState);
-            return;
+          } else {
+            // Linear
+            const issue = yield* linear.getIssue(issueId);
+            const states = yield* linear.getTeamStates(issue.team.id);
+            const target = findLinearState(states, state);
+            // No-op if the issue is already in the target state
+            if (target && issue.state?.id !== target.id) {
+              yield* linear.updateState(issue.id, target.id);
+            }
           }
 
-          // Linear
-          const issue = yield* linear.getIssue(issueId);
-          const states = yield* linear.getTeamStates(issue.team.id);
-          const target = findLinearState(states, state);
-          // No-op if the issue is already in the target state
-          if (target && issue.state?.id !== target.id) {
-            yield* linear.updateState(issue.id, target.id);
-          }
+          // Patch the in-memory cache and emit a domain event (non-fatal)
+          try { getSharedIssueService().patchIssue(issueId, { canonicalStatus: canonicalStatus(state) }); } catch { /* non-fatal */ }
+          yield* emitEvent({
+            type: 'issue.transitioned',
+            timestamp: new Date().toISOString(),
+            payload: { issueId, state },
+          });
         }),
 
       addLabel: (issueId, label) =>
@@ -212,26 +244,30 @@ export const IssueLifecycleLive = Layer.effect(
           if (trackerType === 'github') {
             const ghInfo = resolveGitHubIssue(issueId);
             if (!ghInfo.isGitHub) return;
-            // Remove workflow labels then close
+            // Remove planning/in-review labels then close
             for (const label of ['in-progress', 'in-review', 'planned', 'in-planning']) {
               yield* github.removeLabel(ghInfo.owner, ghInfo.repo, ghInfo.number, label);
             }
             yield* github.closeIssue(ghInfo.owner, ghInfo.repo, ghInfo.number);
-            return;
-          }
-
-          if (trackerType === 'rally') {
+          } else if (trackerType === 'rally') {
             yield* rally.updateState(issueId, 'closed');
-            return;
+          } else {
+            // Linear
+            const issue = yield* linear.getIssue(issueId);
+            const states = yield* linear.getTeamStates(issue.team.id);
+            const target = findLinearState(states, 'closed');
+            if (target) {
+              yield* linear.updateState(issue.id, target.id);
+            }
           }
 
-          // Linear
-          const issue = yield* linear.getIssue(issueId);
-          const states = yield* linear.getTeamStates(issue.team.id);
-          const target = findLinearState(states, 'closed');
-          if (target) {
-            yield* linear.updateState(issue.id, target.id);
-          }
+          // Patch the in-memory cache and emit issue.closed domain event (non-fatal)
+          try { getSharedIssueService().patchIssue(issueId, { canonicalStatus: 'closed' }); } catch { /* non-fatal */ }
+          yield* emitEvent({
+            type: 'issue.closed',
+            timestamp: new Date().toISOString(),
+            payload: { issueId },
+          });
         }),
     };
 

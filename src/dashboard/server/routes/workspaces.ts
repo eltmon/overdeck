@@ -581,8 +581,8 @@ const getWorkspaceRoute = HttpRouter.add(
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const workspaceInfo = getWorkspaceInfoForIssue(issueId);
 
         if (workspaceInfo.isRemote && workspaceInfo.vmName) {
@@ -747,13 +747,11 @@ const getWorkspaceRoute = HttpRouter.add(
           pendingOperation,
           location,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting workspace info:', error);
         return jsonResponse({ error: 'Failed to get workspace info: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   })
 );
 
@@ -770,8 +768,8 @@ const postWorkspacesRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const issuePrefix = issueId.split('-')[0];
         const projectPath = getProjectPath(projectId, issuePrefix);
         const activityId = spawnPanCommand(
@@ -785,13 +783,11 @@ const postWorkspacesRoute = HttpRouter.add(
           activityId,
           projectPath,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error creating workspace:', error);
         return jsonResponse({ error: 'Failed to create workspace: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   })
 );
 
@@ -817,17 +813,15 @@ const getWorkspacePlanRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const doc = readPlan(planPath);
         const cp = criticalPath(doc);
         return jsonResponse({ ...doc, criticalPath: cp });
-      },
-      catch: (err: unknown) => {
+      }    catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         return jsonResponse({ error: 'Failed to read plan: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   })
 );
 
@@ -849,8 +843,8 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 404 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const excludeDirs = [
           'node_modules', 'target', 'dist', 'build', '.git', '__pycache__', '.cache', '.next', 'coverage',
         ];
@@ -1000,16 +994,14 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
           ),
           diffAnalysis,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error previewing workspace:', error);
         return jsonResponse(
           { error: 'Failed to preview workspace: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -1034,8 +1026,8 @@ const postWorkspaceCleanRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 404 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         let backupPath: string | null = null;
 
         if (createBackup) {
@@ -1081,16 +1073,14 @@ const postWorkspaceCleanRoute = HttpRouter.add(
           projectPath,
           backupPath,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error cleaning workspace:', error);
         return jsonResponse(
           { error: 'Failed to clean workspace: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -1120,8 +1110,8 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace is already containerized' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         try {
           await execAsync('docker info >/dev/null 2>&1', { encoding: 'utf-8' });
         } catch {
@@ -1227,16 +1217,14 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
           activityId,
           projectPath,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error containerizing workspace:', error);
         return jsonResponse(
           { error: 'Failed to containerize workspace: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -1257,8 +1245,8 @@ const postWorkspaceStartRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         // Copy planning artifacts from project root if needed
         const workspacePlanningDir = join(workspacePath, '.planning');
         if (!existsSync(join(workspacePlanningDir, 'STATE.md'))) {
@@ -1572,16 +1560,14 @@ const postWorkspaceStartRoute = HttpRouter.add(
           message: `Starting containers for ${issueId}`,
           activityId,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error starting containers:', error);
         return jsonResponse(
           { error: 'Failed to start containers: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -1603,8 +1589,8 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const teamPrefix = extractTeamPrefix(issueId);
         const containerProjectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
         const projectPaths = containerProjectConfig
@@ -1748,16 +1734,14 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
             { status: 500 }
           );
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error performing container action:`, error);
         return jsonResponse(
           { error: `Failed to ${action} container: ${msg}` },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -1804,8 +1788,8 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const issueLower = issueId.toLowerCase();
         const featureFolder = `feature-${issueLower}`;
         const workspacesDir = projectConfig.workspace?.workspaces_dir || 'workspaces';
@@ -1912,16 +1896,14 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
           message: `Database refreshed successfully`,
           customerCount,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[refresh-db] Error refreshing DB for ${issueId}:`, error);
         return jsonResponse(
           { error: `Failed to refresh database: ${msg}` },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -1934,8 +1916,8 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const status = getReviewStatus(issueId);
         const base = status || {
           issueId,
@@ -1975,16 +1957,14 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
         }
 
         return jsonResponse({ ...base, queuePosition, activeSpecialist });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting review status:', error);
         return jsonResponse(
           { error: 'Failed to get review status: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -2006,8 +1986,8 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       testNotes?: string;
     };
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const update: Partial<ReviewStatus> = {};
         if (reviewStatus) update.reviewStatus = reviewStatus as any;
         if (testStatus) update.testStatus = testStatus as any;
@@ -2191,16 +2171,14 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         }
 
         return jsonResponse(status);
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error updating review status:', error);
         return jsonResponse(
           { error: 'Failed to update review status: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -2220,8 +2198,8 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('force') === 'true') ||
       (body as any)?.force === true;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const issuePrefix = issueId.split('-')[0];
         const projectPath = getProjectPath(undefined, issuePrefix);
         const issueLower = issueId.toLowerCase();
@@ -2507,16 +2485,14 @@ ${workspaceAccessInstructions}
           pipeline: 'verification → review → test',
           note: 'Watch the status panel for progress.',
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error starting review:', error);
         return jsonResponse(
           { error: 'Failed to start review: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -2532,8 +2508,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const { message } = body as { message?: string };
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const existingStatus = getReviewStatus(issueId);
 
         if (existingStatus?.mergeStatus === 'merged') {
@@ -2781,16 +2757,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             { status: 500 }
           );
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error in request-review:', error);
         return jsonResponse(
           { error: 'Failed to request review: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -2804,8 +2778,8 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const workspaceInfo = getWorkspaceInfoForIssue(issueId);
         if (!workspaceInfo.exists) {
           return jsonResponse(
@@ -2909,13 +2883,11 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
             : `Review cycles reset for ${issueId}. Agent can now request review when ready.`,
           rerun,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[reset-review] Error:`, error);
         return jsonResponse({ success: false, error: msg }, { status: 500 });
-      },
-    });
+        }})
   })
 );
 
@@ -2928,8 +2900,8 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const issuePrefix = issueId.split('-')[0];
         const projectPath = getProjectPath(undefined, issuePrefix);
         const issueLower = issueId.toLowerCase();
@@ -2985,16 +2957,14 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
             { status }
           );
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[sync-main] Unexpected error for ${issueId}:`, error);
         return jsonResponse(
           { success: false, error: msg || 'Unexpected error during sync' },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -3299,8 +3269,8 @@ const postWorkspaceMergeRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const result = await triggerMerge(issueId);
         if (result.success) {
           Effect.runSync(eventStore.append({
@@ -3311,13 +3281,11 @@ const postWorkspaceMergeRoute = HttpRouter.add(
         }
         const { statusCode, ...body } = result;
         return jsonResponse(body, { status: statusCode });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error in merge endpoint:', error);
         return jsonResponse({ error: msg }, { status: 500 });
-      },
-    });
+        }})
   })
 );
 
@@ -3330,8 +3298,8 @@ const postWorkspaceApproveRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const existingStatus = getReviewStatus(issueId);
         if (
           existingStatus?.readyForMerge &&
@@ -3607,8 +3575,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
             .map((s: any) => s.step)
             .join(', ')}${isGitHubIssueFlag ? ', skills synced' : ''}`,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error approving workspace:', error);
         completePendingOperation(issueId, msg);
@@ -3616,8 +3583,7 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
           { error: 'Failed to approve: ' + msg },
           { status: 500 }
         );
-      },
-    });
+        }})
   })
 );
 
@@ -3643,8 +3609,8 @@ const getWorkspaceTldrRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const projectRoot = process.cwd();
         const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
         const venvPath = join(workspacePath, '.venv');
@@ -3674,13 +3640,11 @@ const getWorkspaceTldrRoute = HttpRouter.add(
           indexAge,
           edgeCount,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting workspace TLDR status:', error);
         return jsonResponse({ error: msg }, { status: 500 });
-      },
-    });
+        }})
   })
 );
 

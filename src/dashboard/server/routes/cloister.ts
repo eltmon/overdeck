@@ -55,8 +55,7 @@ const getCloisterStatusRoute = HttpRouter.add(
 const postCloisterStartRoute = HttpRouter.add(
   'POST',
   '/api/cloister/start',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
       try {
         const service = getCloisterService();
         await service.start();
@@ -66,21 +65,7 @@ const postCloisterStartRoute = HttpRouter.add(
         console.error('Error starting Cloister:', error);
         return jsonResponse({ error: 'Failed to start Cloister: ' + msg }, { status: 500 });
       }
-    },
-    catch: (err) => new Error(String(err)),
-  }),
-);
-
-// ─── Route: POST /api/cloister/stop ──────────────────────────────────────────
-
-const postCloisterStopRoute = HttpRouter.add(
-  'POST',
-  '/api/cloister/stop',
-  Effect.sync(() => {
-    try {
-      const service = getCloisterService();
-      service.stop();
-      return jsonResponse({ success: true, message: 'Cloister stopped (agents still running)' });
+    })
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error stopping Cloister:', error);
