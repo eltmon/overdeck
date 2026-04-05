@@ -1505,6 +1505,15 @@ const postAgentsRoute = HttpRouter.add(
         const hasPlanning = existsSync(join(workspacePath, '.planning'));
         const phase = (body as any).phase || (hasPlanning ? 'implementation' : 'exploration');
 
+        // Kill any zombie tmux session from a previous crash
+        const agentSessionName = `agent-${issueLower}`;
+        try {
+          await execAsync(`tmux has-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' });
+          // Session exists — kill it so we can start fresh
+          await execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' });
+          console.log(`[start-agent] Killed stale tmux session ${agentSessionName}`);
+        } catch { /* No existing session — good */ }
+
         // Spawn pan work issue command
         const spawnPanCommand = (args: string[], cwd?: string): string => {
           const activityId = `activity-${Date.now()}`;
