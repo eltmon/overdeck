@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, Circle, AlertCircle, GitBranch, FolderOpen, FileSearch, Cpu, Terminal } from 'lucide-react';
+import { CheckCircle2, Loader2, Circle, AlertCircle, GitBranch, FolderOpen, FileSearch, Cpu, Terminal, Package, Wrench, Container } from 'lucide-react';
 
 /** Progress event from the SSE stream. */
 export interface SetupProgressEvent {
@@ -25,7 +25,30 @@ const STEP_LABELS = [
   'Launching planning session',
 ];
 
-function StepRow({ stepNum, event }: { stepNum: number; event?: SetupProgressEvent }) {
+// Icons for workspace sub-steps (matched by label prefix)
+const SUB_STEP_ICONS: Record<string, typeof GitBranch> = {
+  'Creating git worktree': GitBranch,
+  'Installing dependencies': Package,
+  'Building workspace packages': Wrench,
+  'Installing skills': FolderOpen,
+  'Starting Docker': Container,
+};
+
+function getSubStepIcon(label: string) {
+  for (const [prefix, Icon] of Object.entries(SUB_STEP_ICONS)) {
+    if (label.startsWith(prefix)) return Icon;
+  }
+  return Circle;
+}
+
+function StatusIndicator({ status }: { status: 'active' | 'complete' | 'error' | 'pending' }) {
+  if (status === 'complete') return <CheckCircle2 className="w-4 h-4 text-green-400" />;
+  if (status === 'active') return <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />;
+  if (status === 'error') return <AlertCircle className="w-4 h-4 text-red-400" />;
+  return <Circle className="w-4 h-4 text-content-muted" />;
+}
+
+function StepRow({ stepNum, event, subSteps }: { stepNum: number; event?: SetupProgressEvent; subSteps?: SetupProgressEvent[] }) {
   const Icon = STEP_ICONS[stepNum - 1] || Circle;
   const defaultLabel = STEP_LABELS[stepNum - 1] || `Step ${stepNum}`;
 
@@ -33,58 +56,119 @@ function StepRow({ stepNum, event }: { stepNum: number; event?: SetupProgressEve
   const isComplete = event?.status === 'complete';
   const isError = event?.status === 'error';
   const isPending = !event;
+  const hasSubSteps = subSteps && subSteps.length > 0;
 
   return (
-    <div className={`flex items-start gap-4 transition-opacity duration-300 ${isPending ? 'opacity-35' : ''}`}>
-      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 transition-colors duration-300 ${
-        isComplete ? 'bg-green-500/20' :
-        isActive ? 'bg-purple-500/20' :
-        isError ? 'bg-red-500/20' :
-        'border border-divider'
-      }`}>
-        {isComplete && <CheckCircle2 className="w-4 h-4 text-green-400" />}
-        {isActive && <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />}
-        {isError && <AlertCircle className="w-4 h-4 text-red-400" />}
-        {isPending && <Circle className="w-4 h-4 text-content-muted" />}
-      </div>
-      <div className="flex-1 py-1">
-        <p className={`text-sm font-medium transition-colors duration-300 ${
-          isComplete ? 'text-green-400' :
-          isActive ? 'text-content' :
-          isError ? 'text-red-400' :
-          'text-content-muted'
+    <div>
+      <div className={`flex items-start gap-4 transition-opacity duration-300 ${isPending ? 'opacity-35' : ''}`}>
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 transition-colors duration-300 ${
+          isComplete ? 'bg-green-500/20' :
+          isActive ? 'bg-purple-500/20' :
+          isError ? 'bg-red-500/20' :
+          'border border-divider'
         }`}>
-          {event?.label || defaultLabel}
-        </p>
-        {event?.detail && (
-          <p className={`text-xs mt-0.5 font-mono ${
-            isError ? 'text-red-400/80' : 'text-content-muted'
+          <StatusIndicator status={isPending ? 'pending' : event!.status} />
+        </div>
+        <div className="flex-1 py-1">
+          <p className={`text-sm font-medium transition-colors duration-300 ${
+            isComplete ? 'text-green-400' :
+            isActive ? 'text-content' :
+            isError ? 'text-red-400' :
+            'text-content-muted'
           }`}>
-            {event.detail}
+            {event?.label || defaultLabel}
           </p>
-        )}
+          {event?.detail && !hasSubSteps && (
+            <p className={`text-xs mt-0.5 font-mono ${
+              isError ? 'text-red-400/80' : 'text-content-muted'
+            }`}>
+              {event.detail}
+            </p>
+          )}
+        </div>
+        <div className="flex-shrink-0 mt-1.5">
+          <Icon className={`w-4 h-4 ${
+            isComplete ? 'text-green-400/50' :
+            isActive ? 'text-purple-400/50' :
+            isError ? 'text-red-400/50' :
+            'text-content-muted/30'
+          }`} />
+        </div>
       </div>
-      <div className="flex-shrink-0 mt-1.5">
-        <Icon className={`w-4 h-4 ${
-          isComplete ? 'text-green-400/50' :
-          isActive ? 'text-purple-400/50' :
-          isError ? 'text-red-400/50' :
-          'text-content-muted/30'
-        }`} />
-      </div>
+
+      {/* Sub-steps (indented under main step) */}
+      {hasSubSteps && (
+        <div className="ml-12 mt-2 space-y-1.5 border-l border-divider pl-4">
+          {subSteps.map((sub, i) => {
+            const SubIcon = getSubStepIcon(sub.label);
+            return (
+              <div key={i} className={`flex items-center gap-3 transition-opacity duration-200 ${sub.status === 'active' ? '' : sub.status === 'complete' ? 'opacity-70' : 'opacity-40'}`}>
+                <SubIcon className={`w-3.5 h-3.5 flex-shrink-0 ${
+                  sub.status === 'complete' ? 'text-green-400/60' :
+                  sub.status === 'active' ? 'text-purple-400' :
+                  'text-content-muted/40'
+                }`} />
+                <span className={`text-xs ${
+                  sub.status === 'complete' ? 'text-green-400/80' :
+                  sub.status === 'active' ? 'text-content-body' :
+                  'text-content-muted'
+                }`}>
+                  {sub.label}
+                </span>
+                <span className="text-xs text-content-muted font-mono truncate">
+                  {sub.detail}
+                </span>
+                {sub.status === 'active' && <Loader2 className="w-3 h-3 text-purple-400 animate-spin flex-shrink-0" />}
+                {sub.status === 'complete' && <CheckCircle2 className="w-3 h-3 text-green-400/60 flex-shrink-0" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
 export function PlanSetupScreen({ issueIdentifier, issueTitle, steps, error }: PlanSetupScreenProps) {
   const totalSteps = STEP_LABELS.length;
-  const completedCount = steps.filter(s => s.status === 'complete').length;
+  const completedCount = steps.filter(s => s.step > 0 && s.status === 'complete' && s.label === STEP_LABELS[s.step - 1]).length;
   const progressPct = Math.round((completedCount / totalSteps) * 100);
 
-  // Map step events by step number for O(1) lookup
-  const stepMap = new Map<number, SetupProgressEvent>();
+  // Separate main step events from sub-step events
+  // Main steps: events where label matches STEP_LABELS[step-1] (exact step label)
+  // Sub-steps: events for step 1 with labels that don't match "Creating workspace"
+  const mainStepMap = new Map<number, SetupProgressEvent>();
+  const subStepsMap = new Map<number, SetupProgressEvent[]>();
+
   for (const s of steps) {
-    stepMap.set(s.step, s);
+    const expectedLabel = STEP_LABELS[s.step - 1];
+    if (s.label === expectedLabel) {
+      // This is a main step event
+      mainStepMap.set(s.step, s);
+    } else {
+      // This is a sub-step (e.g., workspace creation sub-steps)
+      const existing = subStepsMap.get(s.step) || [];
+      const idx = existing.findIndex(e => e.label === s.label);
+      if (idx >= 0) {
+        existing[idx] = s;
+      } else {
+        existing.push(s);
+      }
+      subStepsMap.set(s.step, existing);
+    }
+  }
+
+  // If step 1 has sub-steps but no main step event yet, synthesize an active main step
+  if (subStepsMap.has(1) && !mainStepMap.has(1)) {
+    const subs = subStepsMap.get(1)!;
+    const allComplete = subs.every(s => s.status === 'complete');
+    mainStepMap.set(1, {
+      step: 1,
+      total: totalSteps,
+      label: STEP_LABELS[0],
+      detail: '',
+      status: allComplete ? 'complete' : 'active',
+    });
   }
 
   return (
@@ -105,7 +189,8 @@ export function PlanSetupScreen({ issueIdentifier, issueTitle, steps, error }: P
           <StepRow
             key={i + 1}
             stepNum={i + 1}
-            event={stepMap.get(i + 1)}
+            event={mainStepMap.get(i + 1)}
+            subSteps={subStepsMap.get(i + 1)}
           />
         ))}
       </div>

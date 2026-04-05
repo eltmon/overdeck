@@ -142,8 +142,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               });
             } else if (event.type === 'progress') {
               setSetupSteps(prev => {
-                // Replace existing step or append
-                const existing = prev.findIndex(s => s.step === event.step);
                 const updated = [...prev];
                 const progressEvent: SetupProgressEvent = {
                   step: event.step,
@@ -152,6 +150,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                   detail: event.detail,
                   status: event.status,
                 };
+                // Match by step number AND label (workspace sub-steps share step 1 but have different labels)
+                const existing = updated.findIndex(s => s.step === event.step && s.label === event.label);
                 if (existing >= 0) {
                   updated[existing] = progressEvent;
                 } else {

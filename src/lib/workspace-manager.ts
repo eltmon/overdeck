@@ -23,11 +23,20 @@ import { mergeSkillsIntoWorkspace } from './skills-merge.js';
 
 const execAsync = promisify(exec);
 
+/** Progress event emitted during workspace creation. */
+export interface WorkspaceProgress {
+  label: string;
+  detail: string;
+  status: 'active' | 'complete' | 'error';
+}
+
 export interface WorkspaceCreateOptions {
   projectConfig: ProjectConfig;
   featureName: string;
   startDocker?: boolean;
   dryRun?: boolean;
+  /** Optional callback for streaming progress events during creation. */
+  onProgress?: (event: WorkspaceProgress) => void;
 }
 
 export interface WorkspaceCreateResult {
@@ -356,7 +365,10 @@ function copyProjectTemplateDirs(
  * Create a workspace
  */
 export async function createWorkspace(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
-  const { projectConfig, featureName, startDocker, dryRun } = options;
+  const { projectConfig, featureName, startDocker, dryRun, onProgress } = options;
+  const progress = (label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
+    onProgress?.({ label, detail, status });
+  };
   const result: WorkspaceCreateResult = {
     success: true,
     workspacePath: '',
@@ -400,6 +412,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
 
   // Create workspace directory
+  progress('Creating git worktree', `feature/${featureName}`);
   mkdirSync(workspacePath, { recursive: true });
   result.steps.push('Created workspace directory');
 
@@ -438,6 +451,8 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
+  progress('Creating git worktree', 'Worktree ready', 'complete');
+
   // Remove stale .planning/ directory inherited from main branch.
   // This contains STATE.md and other planning artifacts from a PREVIOUS issue.
   // If left in place, the new agent reads it and works on the wrong issue.
@@ -468,6 +483,34 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     if (composeFiles.length > 0) {
       result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
     }
+  }
+
+  // Install dependencies using the project's package manager
+  progress('Installing dependencies', projectConfig.package_manager || 'detecting...');
+  const pkgManager = projectConfig.package_manager || (existsSync(join(workspacePath, 'bun.lock')) ? 'bun' : 'npm');
+  const installCmd = pkgManager === 'bun' ? 'bun install' : `${pkgManager} install`;
+  try {
+    await execAsync(installCmd, { cwd: workspacePath, encoding: 'utf-8', timeout: 60000 });
+    result.steps.push(`Installed dependencies (${pkgManager})`);
+    progress('Installing dependencies', `${pkgManager} — done`, 'complete');
+  } catch (installErr: any) {
+    result.steps.push(`Dependency install warning: ${installErr.message?.slice(0, 100)}`);
+    progress('Installing dependencies', 'Warning (non-fatal)', 'complete');
+  }
+
+  // Build workspace packages (e.g., @panopticon/contracts) so types resolve correctly
+  const workspacePackages = projectConfig.workspace_packages;
+  if (workspacePackages && workspacePackages.length > 0) {
+    progress('Building workspace packages', workspacePackages.map(p => p.path).join(', '));
+    for (const pkg of workspacePackages) {
+      try {
+        await execAsync(pkg.build_command, { cwd: join(workspacePath, pkg.path), encoding: 'utf-8', timeout: 30000 });
+        result.steps.push(`Built workspace package: ${pkg.path}`);
+      } catch (buildErr: any) {
+        result.steps.push(`Build warning (${pkg.path}): ${buildErr.message?.slice(0, 100)}`);
+      }
+    }
+    progress('Building workspace packages', 'Packages built', 'complete');
   }
 
   // Setup TLDR code analysis for workspace (after worktree creation to ensure directory is ready)
@@ -574,6 +617,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   }
 
   // Install base Panopticon skills/agents/rules from cache
+  progress('Installing skills & templates', 'Panopticon skills, agents, rules');
   const mergeResult = mergeSkillsIntoWorkspace(workspacePath);
   const mergeTotal = mergeResult.added.length + mergeResult.updated.length;
   if (mergeTotal > 0) {
@@ -684,8 +728,11 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
+  progress('Installing skills & templates', 'Skills and templates ready', 'complete');
+
   // Start Docker containers if requested
   if (startDocker) {
+    progress('Starting Docker containers', 'Building and starting services');
     // Check for Traefik
     if (workspaceConfig.docker?.traefik) {
       // Always use the installed Traefik location (~/.panopticon/traefik/), not the
@@ -731,6 +778,10 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
         break;
       }
     }
+  }
+
+  if (startDocker) {
+    progress('Starting Docker containers', 'Containers running', 'complete');
   }
 
   // Pre-trust workspace directory in Claude Code so agents don't get the trust prompt

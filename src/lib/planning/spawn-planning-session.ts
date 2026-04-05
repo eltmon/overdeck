@@ -15,8 +15,9 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
+import { extractTeamPrefix, findProjectByTeam, findProjectByPath } from '../projects.js';
 import { loadSettings, getAgentCommand, isAnthropicModel } from '../settings.js';
+import { createWorkspace } from '../workspace-manager.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -399,15 +400,34 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     if (!workspaceCreated) {
       try {
-        const dockerFlag = startDocker ? ' --docker' : '';
-        const locationFlag = workspaceLocation === 'remote' ? ' --remote' : ' --local';
-        const createCmd = `pan workspace create ${issue.identifier}${locationFlag}${dockerFlag}`;
-        console.log(`[start-planning] Creating workspace: ${createCmd}`);
-        await execAsync(createCmd, {
-          cwd: projectPath,
-          encoding: 'utf-8',
-          timeout: startDocker ? 300000 : 120000, // 5 min with docker, 2 min without
-        });
+        const projectConfig = findProjectByPath(projectPath) || findProjectByTeam(extractTeamPrefix(issue.identifier) || '');
+        if (projectConfig?.workspace) {
+          // Use library directly for real-time progress streaming
+          console.log(`[start-planning] Creating workspace via library for ${issue.identifier}`);
+          const wsResult = await createWorkspace({
+            projectConfig,
+            featureName: issueLower,
+            startDocker,
+            onProgress: (event) => {
+              // Forward workspace sub-step progress as step 1 detail updates
+              progress(1, event.label, event.detail, event.status === 'complete' ? 'active' : event.status);
+            },
+          });
+          if (!wsResult.success) {
+            throw new Error(wsResult.errors.join('; '));
+          }
+        } else {
+          // Fallback: use CLI for projects without workspace config
+          const dockerFlag = startDocker ? ' --docker' : '';
+          const locationFlag = workspaceLocation === 'remote' ? ' --remote' : ' --local';
+          const createCmd = `pan workspace create ${issue.identifier}${locationFlag}${dockerFlag}`;
+          console.log(`[start-planning] Creating workspace via CLI: ${createCmd}`);
+          await execAsync(createCmd, {
+            cwd: projectPath,
+            encoding: 'utf-8',
+            timeout: startDocker ? 300000 : 120000,
+          });
+        }
         workspaceCreated = true;
         console.log(`[start-planning] Workspace created successfully`);
       } catch (err: any) {
