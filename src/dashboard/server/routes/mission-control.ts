@@ -701,7 +701,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
     let processedContent = content;
 
     if (safeName.endsWith('.vtt')) {
-      const { vttToMarkdown } = await import('../utils/vtt-parser.js');
+      const { vttToMarkdown } = yield* Effect.promise(() => import('../utils/vtt-parser.js'));
       processedContent = vttToMarkdown(content);
       safeName = safeName.replace(/\.vtt$/, '.md');
     }
@@ -760,38 +760,40 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
         return jsonResponse({ error: 'GitHub not configured' }, { status: 400 });
       }
 
-      try {
-        const issueNum = issueId.replace(/^[A-Z]+-/, '');
-        const { stdout } = await execAsync(
-          `gh issue view ${issueNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
-          { encoding: 'utf-8', timeout: 30000 }
-        );
-        if (stdout.trim()) {
-          const filename = `github-${issueId}-comments.md`;
-          await writeFile(join(discussionsDir, filename), `# GitHub Comments for ${issueId}\n\nSynced: ${new Date().toISOString()}\n\n---\n\n` + stdout, 'utf-8');
-          syncedFiles.push(filename);
-        }
-      } catch (err) { console.warn(`Failed to sync GitHub comments for ${issueId}:`, err); }
+      yield* Effect.promise(async () => {
+        try {
+          const issueNum = issueId.replace(/^[A-Z]+-/, '');
+          const { stdout } = await execAsync(
+            `gh issue view ${issueNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
+            { encoding: 'utf-8', timeout: 30000 }
+          );
+          if (stdout.trim()) {
+            const filename = `github-${issueId}-comments.md`;
+            await writeFile(join(discussionsDir, filename), `# GitHub Comments for ${issueId}\n\nSynced: ${new Date().toISOString()}\n\n---\n\n` + stdout, 'utf-8');
+            syncedFiles.push(filename);
+          }
+        } catch (err) { console.warn(`Failed to sync GitHub comments for ${issueId}:`, err); }
 
-      try {
-        const { stdout: prList } = await execAsync(
-          `gh pr list --repo ${ghConfig.owner}/${ghConfig.repos[0]} --head feature/${issueLower} --json number,title --jq '.[].number'`,
-          { encoding: 'utf-8', timeout: 15000 }
-        );
-        for (const prNum of prList.trim().split('\n').filter(Boolean)) {
-          try {
-            const { stdout: prComments } = await execAsync(
-              `gh pr view ${prNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
-              { encoding: 'utf-8', timeout: 15000 }
-            );
-            if (prComments.trim()) {
-              const filename = `pr-${prNum}-discussion.md`;
-              await writeFile(join(discussionsDir, filename), `# PR #${prNum} Discussion\n\nSynced: ${new Date().toISOString()}\n\n---\n\n` + prComments, 'utf-8');
-              syncedFiles.push(filename);
-            }
-          } catch { /* no PR found */ }
-        }
-      } catch { /* no PR list */ }
+        try {
+          const { stdout: prList } = await execAsync(
+            `gh pr list --repo ${ghConfig.owner}/${ghConfig.repos[0]} --head feature/${issueLower} --json number,title --jq '.[].number'`,
+            { encoding: 'utf-8', timeout: 15000 }
+          );
+          for (const prNum of prList.trim().split('\n').filter(Boolean)) {
+            try {
+              const { stdout: prComments } = await execAsync(
+                `gh pr view ${prNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
+                { encoding: 'utf-8', timeout: 15000 }
+              );
+              if (prComments.trim()) {
+                const filename = `pr-${prNum}-discussion.md`;
+                await writeFile(join(discussionsDir, filename), `# PR #${prNum} Discussion\n\nSynced: ${new Date().toISOString()}\n\n---\n\n` + prComments, 'utf-8');
+                syncedFiles.push(filename);
+              }
+            } catch { /* no PR found */ }
+          }
+        } catch { /* no PR list */ }
+      });
 
     } else if (tracker === 'linear') {
       try {

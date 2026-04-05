@@ -478,17 +478,17 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     // Emit domain event for specialist completion/failure
     if (status === 'passed') {
-      await Effect.runPromise(eventStore.append({
+      yield* eventStore.append({
         type: 'specialist.completed',
         timestamp: new Date().toISOString(),
         payload: { name: `${specialist}-agent`, issueId: normalizedIssueId },
-      }));
+      });
     } else {
-      await Effect.runPromise(eventStore.append({
+      yield* eventStore.append({
         type: 'specialist.failed',
         timestamp: new Date().toISOString(),
         payload: { name: `${specialist}-agent`, issueId: normalizedIssueId, error: notes || `${specialist} failed` },
-      }));
+      });
     }
 
     return jsonResponse({
