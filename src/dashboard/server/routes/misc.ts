@@ -62,7 +62,7 @@ import { getCloisterService } from '../../../lib/cloister/service.js';
 import { readHandoffEvents, getHandoffStats } from '../../../lib/cloister/handoff-logger.js';
 import { readSpecialistHandoffs, getSpecialistHandoffStats } from '../../../lib/cloister/specialist-handoff-logger.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
-import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix } from '../../../lib/projects.js';
+import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import {
   getLinearApiKey as getLinearApiKeyShared,
@@ -741,7 +741,7 @@ const getRegisteredProjectsRoute = HttpRouter.add(
           key: p.key,
           name: p.config.name,
           path: p.config.path,
-          linearTeam: p.getIssuePrefix(config) || null,
+          linearTeam: getIssuePrefix(p.config) || null,
           githubRepo: p.config.github_repo || null,
           linearProject: p.config.linear_project || null,
         })),
