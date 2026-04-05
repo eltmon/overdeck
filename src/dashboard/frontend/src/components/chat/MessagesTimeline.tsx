@@ -21,7 +21,7 @@ import {
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, ChevronRight, Circle } from 'lucide-react';
-import type { WorkLogEntry } from '@panopticon/contracts';
+import type { WorkLogEntry } from './chat-types';
 import { ChatMarkdown } from './ChatMarkdown';
 import {
   deriveTimelineEntries,
@@ -29,7 +29,7 @@ import {
   estimateMessagesTimelineRowHeight,
   type MessagesTimelineRow,
 } from './session-logic';
-import type { ChatMessage } from '@panopticon/contracts';
+import type { ChatMessage } from './chat-types';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Constants ────────────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@
  * for Panopticon (no ProposedPlan, no attachment handling, etc.).
  */
 
-import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
+import type { ChatMessage, WorkLogEntry } from './chat-types';
 
 // ─── Timeline entry types ─────────────────────────────────────────────────────
 
