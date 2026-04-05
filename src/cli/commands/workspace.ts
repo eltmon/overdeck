@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
-import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync, symlinkSync, lstatSync } from 'fs';
 import { join, basename, resolve } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
@@ -476,6 +476,28 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
             timeout: 300000,
           });
           dockerStarted = true;
+
+          // Docker named volumes create root-owned empty node_modules dirs on the host.
+          // Agents run on the host (not in containers), so replace them with symlinks
+          // to the main repo's node_modules so the agent can resolve dependencies.
+          const nodeModulesDirs = [
+            { workspace: join(workspacePath, 'node_modules'), main: join(projectRoot, 'node_modules') },
+            { workspace: join(workspacePath, 'src', 'dashboard', 'frontend', 'node_modules'), main: join(projectRoot, 'src', 'dashboard', 'frontend', 'node_modules') },
+          ];
+          for (const { workspace: nmDir, main: mainNm } of nodeModulesDirs) {
+            try {
+              if (existsSync(nmDir) && !lstatSync(nmDir).isSymbolicLink()) {
+                // Root-owned empty dir from Docker — remove and symlink
+                rmSync(nmDir, { recursive: true, force: true });
+                symlinkSync(mainNm, nmDir);
+              } else if (!existsSync(nmDir) && existsSync(mainNm)) {
+                symlinkSync(mainNm, nmDir);
+              }
+            } catch {
+              // May need sudo if Docker created root-owned dirs — warn but continue
+              spinner.warn(`Could not symlink ${nmDir} — may need: sudo rm -rf "${nmDir}" && ln -sf "${mainNm}" "${nmDir}"`);
+            }
+          }
         } catch (err: any) {
           dockerError = err.message;
         }
