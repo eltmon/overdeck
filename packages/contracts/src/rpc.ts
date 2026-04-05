@@ -11,6 +11,7 @@ export const WS_METHODS = {
   subscribeDomainEvents: "pan.subscribeDomainEvents",
   subscribeTerminal: "pan.subscribeTerminal",
   subscribeAgentOutput: "pan.subscribeAgentOutput",
+  subscribeConversationMessages: "pan.subscribeConversationMessages",
 
   // Snapshot / replay
   getSnapshot: "pan.getSnapshot",
@@ -53,6 +54,44 @@ export const AgentOutput = Schema.Struct({
   line: Schema.String,
 })
 export type AgentOutput = typeof AgentOutput.Type
+
+// ─── Chat / conversation message types (PAN-451) ──────────────────────────────
+
+export const ChatMessage = Schema.Struct({
+  id: Schema.String,
+  role: Schema.Literals(['user', 'assistant', 'system']),
+  text: Schema.String,
+  turnId: Schema.optional(Schema.String),
+  createdAt: Schema.String,
+  completedAt: Schema.optional(Schema.String),
+  streaming: Schema.optional(Schema.Boolean),
+})
+export type ChatMessage = typeof ChatMessage.Type
+
+export const WorkLogEntry = Schema.Struct({
+  id: Schema.String,
+  createdAt: Schema.String,
+  label: Schema.String,
+  detail: Schema.optional(Schema.String),
+  command: Schema.optional(Schema.String),
+  changedFiles: Schema.optional(Schema.Array(Schema.String)),
+  tone: Schema.Literals(['thinking', 'tool', 'info', 'error']),
+  toolTitle: Schema.optional(Schema.String),
+})
+export type WorkLogEntry = typeof WorkLogEntry.Type
+
+export const ConversationEvent = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal('messages'),
+    messages: Schema.Array(ChatMessage),
+    workLog: Schema.Array(WorkLogEntry),
+    streaming: Schema.Boolean,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal('discovering'),
+  }),
+])
+export type ConversationEvent = typeof ConversationEvent.Type
 
 // ─── RPC definitions ──────────────────────────────────────────────────────────
 
@@ -158,9 +197,17 @@ export const ResizeTerminalRpc = Rpc.make(WS_METHODS.resizeTerminal, {
   error: PanRpcError,
 })
 
+/** 16. Subscribe to structured conversation messages from a JSONL session file (stream, PAN-451) */
+export const SubscribeConversationMessagesRpc = Rpc.make(WS_METHODS.subscribeConversationMessages, {
+  payload: Schema.Struct({ conversationName: Schema.String }),
+  success: ConversationEvent,
+  error: PanRpcError,
+  stream: true,
+})
+
 // ─── RPC Group ────────────────────────────────────────────────────────────────
 
-/** All 15 Panopticon WebSocket RPC methods */
+/** All 16 Panopticon WebSocket RPC methods */
 export const PanRpcGroup = RpcGroup.make(
   SubscribeDomainEventsRpc,
   SubscribeTerminalRpc,
@@ -177,5 +224,6 @@ export const PanRpcGroup = RpcGroup.make(
   DeepWipeRpc,
   SendTerminalInputRpc,
   ResizeTerminalRpc,
+  SubscribeConversationMessagesRpc,
 )
 export type PanRpcGroup = typeof PanRpcGroup

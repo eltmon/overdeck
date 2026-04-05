@@ -25,7 +25,14 @@ import {
   markConversationEnded,
   markConversationActive,
   updateLastAttached,
+  updateSessionFile,
+  updateConversationTitle,
 } from '../../../lib/database/conversations-db.js';
+import { sendKeysAsync } from '../../../lib/tmux.js';
+import {
+  discoverSessionFile,
+  parseConversationMessages,
+} from '../services/conversation-service.js';
 
 const execAsync = promisify(exec);
 
@@ -107,6 +114,26 @@ while true; do sleep 60; done
   await execAsync(`tmux set-option -t ${tmuxSession} remain-on-exit on 2>/dev/null || true`, { encoding: 'utf-8' });
 }
 
+/**
+ * Kick off async session file discovery after spawning a conversation.
+ * Watches ~/.claude/projects/<encoded-cwd>/ for a new JSONL file and
+ * stores the path in the conversations DB when found.
+ */
+function startSessionFileDiscovery(name: string, cwd: string, spawnedAt: string): void {
+  discoverSessionFile(cwd, spawnedAt)
+    .then((path) => {
+      if (path) {
+        updateSessionFile(name, path);
+        console.log(`[conversations] Discovered session file for "${name}": ${path}`);
+      } else {
+        console.warn(`[conversations] Session file discovery timed out for "${name}"`);
+      }
+    })
+    .catch((err: unknown) => {
+      console.error(`[conversations] Session file discovery failed for "${name}":`, err);
+    });
+}
+
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 
 const getConversationsRoute = HttpRouter.add(
@@ -118,9 +145,16 @@ const getConversationsRoute = HttpRouter.add(
         const conversations = listConversations();
 
         // Enrich with live tmux status
+        // Grace period: treat recently-created active conversations as alive (tmux may not have
+        // started yet — spawn is async). After 30s we fall back to the actual tmux check.
+        const SPAWN_GRACE_MS = 30_000;
         const enriched = await Promise.all(
           conversations.map(async (conv) => {
-            const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
+            const withinGrace =
+              conv.status === 'active' &&
+              !conv.endedAt &&
+              Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
+            const sessionAlive = withinGrace || (await tmuxSessionExists(conv.tmuxSession));
             return { ...conv, sessionAlive };
           }),
         );
@@ -162,10 +196,15 @@ const postConversationRoute = HttpRouter.add(
         // Persist to DB first so the client gets a response quickly
         const conv = createConversation(name, tmuxSession, cwd, issueId);
 
+        const spawnedAt = new Date().toISOString();
+
         // Spawn tmux session in background (don't await — let ws-terminal attach when ready)
         spawnConversationSession(tmuxSession, cwd, issueId).catch((err: unknown) => {
           console.error(`[conversations] Failed to spawn session ${tmuxSession}:`, err);
         });
+
+        // Start async JSONL session file discovery — stores path in DB when found
+        startSessionFileDiscovery(name, cwd, spawnedAt);
 
         return jsonResponse(conv, { status: 201 });
       }    catch (error: unknown) {
@@ -244,13 +283,111 @@ const postConversationResumeRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: GET /api/conversations/:name/messages ────────────────────────────
+
+const getConversationMessagesRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/messages',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        // session_file is null until discovery completes after Claude Code starts
+        if (!conv.sessionFile) {
+          return jsonResponse({ discovering: true, messages: [], workLog: [], streaming: false });
+        }
+
+        const result = await parseConversationMessages(conv.sessionFile, 0);
+        return jsonResponse({
+          messages: result.messages,
+          workLog: result.workLog,
+          streaming: result.streaming,
+        });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to load messages: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: POST /api/conversations/:name/message ────────────────────────────
+
+const postConversationMessageRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/message',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
+        if (!message) {
+          return jsonResponse({ error: 'Message is required' }, { status: 400 });
+        }
+
+        // Deliver via tmux load-buffer + paste-buffer (reliable delivery pattern)
+        await sendKeysAsync(conv.tmuxSession, message, 'conversation-message');
+
+        return jsonResponse({ ok: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to send message: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
+
+const patchConversationRoute = HttpRouter.add(
+  'PATCH',
+  '/api/conversations/:name',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        const body = await req.json as { title?: string };
+        if (typeof body.title === 'string' && body.title.trim()) {
+          updateConversationTitle(name, body.title.trim());
+        }
+        return jsonResponse({ success: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to update conversation: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
   postConversationRoute,
+  patchConversationRoute,
   deleteConversationRoute,
   postConversationResumeRoute,
+  getConversationMessagesRoute,
+  postConversationMessageRoute,
 );
 
 export default conversationsRouteLayer;

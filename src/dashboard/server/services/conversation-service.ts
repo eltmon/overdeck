@@ -1,0 +1,316 @@
+/**
+ * Conversation Service (PAN-451)
+ *
+ * Provides JSONL session file discovery, parsing, and file watching for
+ * structured conversation message rendering in Mission Control.
+ *
+ * All file I/O uses fs/promises (no sync calls).
+ */
+
+import { readdir, stat, readFile, watch } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ParseResult {
+  messages: ChatMessage[];
+  workLog: WorkLogEntry[];
+  /** Byte offset after the last parsed line — pass back for incremental reads. */
+  byteOffset: number;
+  /** True when the last assistant message has no completedAt and file was modified recently. */
+  streaming: boolean;
+}
+
+// ─── CWD encoding ─────────────────────────────────────────────────────────────
+
+/**
+ * Encode a filesystem path to the Claude Code project directory name.
+ * Claude encodes the CWD by replacing path separators with hyphens
+ * (e.g. /home/user/Projects/foo → -home-user-Projects-foo).
+ */
+function encodeCwdToProjectDir(cwd: string): string {
+  return cwd.replace(/\//g, '-');
+}
+
+/** Returns ~/.claude/projects/<encoded-cwd>/ */
+function claudeProjectDir(cwd: string): string {
+  return join(homedir(), '.claude', 'projects', encodeCwdToProjectDir(cwd));
+}
+
+// ─── Session file discovery ───────────────────────────────────────────────────
+
+/**
+ * Watch for a new JSONL session file created after `afterTimestamp`.
+ *
+ * Polls every 500ms for up to 60 seconds. Returns the absolute path when found.
+ * Resolves with null if no file is discovered within the timeout.
+ */
+export async function discoverSessionFile(
+  cwd: string,
+  afterTimestamp: string,
+): Promise<string | null> {
+  const projectDir = claudeProjectDir(cwd);
+  const afterMs = new Date(afterTimestamp).getTime();
+  const deadline = Date.now() + 60_000; // 60 second timeout
+
+  while (Date.now() < deadline) {
+    try {
+      const entries = await readdir(projectDir);
+      for (const entry of entries) {
+        if (!entry.endsWith('.jsonl')) continue;
+        const fullPath = join(projectDir, entry);
+        const s = await stat(fullPath);
+        if (s.mtimeMs >= afterMs || s.birthtimeMs >= afterMs) {
+          return fullPath;
+        }
+      }
+    } catch {
+      // Project directory doesn't exist yet — Claude hasn't started
+    }
+
+    await new Promise<void>((r) => setTimeout(r, 500));
+  }
+
+  return null;
+}
+
+// ─── JSONL parsing ────────────────────────────────────────────────────────────
+
+interface JsonlEntry {
+  type?: string;
+  role?: string;
+  message?: {
+    id?: string;
+    role?: string;
+    content?: unknown[];
+    model?: string;
+    stop_reason?: string | null;
+  };
+  timestamp?: string;
+  sessionId?: string;
+  uuid?: string;
+}
+
+interface ContentBlock {
+  type?: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
+  tool_use_id?: string;
+  content?: unknown;
+  is_error?: boolean;
+}
+
+/**
+ * Parse JSONL session file from a byte offset.
+ *
+ * Returns parsed messages, work log entries, new byte offset, and streaming status.
+ * Safe to call repeatedly — incremental reads avoid re-parsing.
+ */
+export async function parseConversationMessages(
+  sessionFile: string,
+  fromByteOffset = 0,
+): Promise<ParseResult> {
+  const buffer = await readFile(sessionFile);
+  const text = buffer.toString('utf-8');
+  const newByteOffset = buffer.length;
+
+  // Parse only new content from the byte offset
+  const newText = text.slice(fromByteOffset);
+  const lines = newText.split('\n').filter((l) => l.trim());
+
+  const messages: ChatMessage[] = [];
+  const workLog: WorkLogEntry[] = [];
+
+  // Pending assistant message being assembled from content blocks
+  let pendingAssistant: ChatMessage | null = null;
+  // Map tool_use id → WorkLogEntry (waiting for tool_result)
+  const pendingToolUse = new Map<string, WorkLogEntry>();
+
+  for (const line of lines) {
+    let entry: JsonlEntry;
+    try {
+      entry = JSON.parse(line) as JsonlEntry;
+    } catch {
+      continue;
+    }
+
+    if (entry.type === 'user' && entry.message) {
+      const msg = entry.message;
+      const content = Array.isArray(msg.content) ? msg.content : [];
+
+      // Flush any pending assistant message
+      if (pendingAssistant) {
+        messages.push(pendingAssistant);
+        pendingAssistant = null;
+      }
+
+      for (const block of content as ContentBlock[]) {
+        if (block.type === 'tool_result' && block.tool_use_id) {
+          // Complete a pending WorkLogEntry
+          const pending = pendingToolUse.get(block.tool_use_id);
+          if (pending) {
+            pendingToolUse.delete(block.tool_use_id);
+            workLog.push({
+              ...pending,
+              detail: block.is_error
+                ? `Error: ${JSON.stringify(block.content)}`
+                : pending.detail,
+              tone: block.is_error ? 'error' : pending.tone,
+            });
+          }
+        } else if (block.type === 'text' && block.text) {
+          messages.push({
+            id: entry.uuid ?? `user-${messages.length}`,
+            role: 'user',
+            text: block.text,
+            createdAt: entry.timestamp ?? new Date().toISOString(),
+          });
+        }
+      }
+    } else if (entry.type === 'assistant' && entry.message) {
+      const msg = entry.message;
+      const content = Array.isArray(msg.content) ? msg.content : [];
+
+      let assistantText = '';
+      for (const block of content as ContentBlock[]) {
+        if (block.type === 'text' && block.text) {
+          assistantText += block.text;
+        } else if (block.type === 'tool_use' && block.id) {
+          // WorkLogEntry for the tool call
+          const toolEntry: WorkLogEntry = {
+            id: block.id,
+            createdAt: entry.timestamp ?? new Date().toISOString(),
+            label: block.name ?? 'tool',
+            tone: 'tool',
+            toolTitle: block.name,
+            detail: block.input ? JSON.stringify(block.input) : undefined,
+          };
+          pendingToolUse.set(block.id, toolEntry);
+        }
+      }
+
+      if (assistantText) {
+        // Flush previous pending assistant
+        if (pendingAssistant) {
+          messages.push(pendingAssistant);
+        }
+        pendingAssistant = {
+          id: msg.id ?? `asst-${messages.length}`,
+          role: 'assistant',
+          text: assistantText,
+          createdAt: entry.timestamp ?? new Date().toISOString(),
+          completedAt: msg.stop_reason ? entry.timestamp : undefined,
+          streaming: !msg.stop_reason,
+        };
+      }
+    }
+  }
+
+  // Push any remaining pending assistant
+  if (pendingAssistant) {
+    messages.push(pendingAssistant);
+  }
+
+  // Flush any tool_use entries that never got a result (still running)
+  for (const [, entry] of pendingToolUse) {
+    workLog.push(entry);
+  }
+
+  // Streaming detection: last assistant message has no stop_reason and file was modified < 5s ago
+  let streaming = false;
+  const lastMsg = messages[messages.length - 1];
+  if (lastMsg?.role === 'assistant' && !lastMsg.completedAt) {
+    const fileStat = await stat(sessionFile);
+    streaming = Date.now() - fileStat.mtimeMs < 5000;
+  }
+
+  return { messages, workLog, byteOffset: newByteOffset, streaming };
+}
+
+// ─── File watcher ─────────────────────────────────────────────────────────────
+
+export interface ConversationWatchHandle {
+  stop: () => void;
+}
+
+/**
+ * Watch a JSONL session file for appends. Calls `callback` with parse results
+ * when new content is detected. Uses fs.watch with 500ms polling fallback.
+ *
+ * Returns a handle with `stop()` to clean up.
+ */
+export function watchConversation(
+  sessionFile: string,
+  callback: (result: ParseResult) => void,
+): ConversationWatchHandle {
+  let byteOffset = 0;
+  let stopped = false;
+  let abortController: AbortController | null = null;
+  let pollInterval: ReturnType<typeof setTimeout> | null = null;
+
+  async function handleChange(): Promise<void> {
+    if (stopped) return;
+    try {
+      const result = await parseConversationMessages(sessionFile, byteOffset);
+      if (result.byteOffset > byteOffset) {
+        byteOffset = result.byteOffset;
+        callback(result);
+      }
+    } catch {
+      // File may have been rotated or is temporarily unavailable
+    }
+  }
+
+  // Try fs.watch first (inotify on Linux)
+  async function startWatch(): Promise<void> {
+    try {
+      abortController = new AbortController();
+      const watcher = watch(sessionFile, { signal: abortController.signal });
+      for await (const _event of watcher) {
+        await handleChange();
+      }
+    } catch (err) {
+      if (!stopped) {
+        // Fallback to polling on watch failure
+        startPolling();
+      }
+    }
+  }
+
+  function startPolling(): void {
+    async function poll(): Promise<void> {
+      if (stopped) return;
+      await handleChange();
+      pollInterval = setTimeout(poll, 500);
+    }
+    pollInterval = setTimeout(poll, 500);
+  }
+
+  // Start watch and fall back to polling if watch fails after 1s
+  startWatch();
+  const watchTimeout = setTimeout(() => {
+    // If watch hasn't reported any changes by now, also start polling as backup
+    if (!stopped && pollInterval === null) {
+      startPolling();
+    }
+  }, 1000);
+
+  return {
+    stop() {
+      stopped = true;
+      clearTimeout(watchTimeout);
+      if (abortController) {
+        abortController.abort();
+        abortController = null;
+      }
+      if (pollInterval !== null) {
+        clearTimeout(pollInterval);
+        pollInterval = null;
+      }
+    },
+  };
+}
