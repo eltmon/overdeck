@@ -1639,6 +1639,18 @@ const postIssueReopenRoute = HttpRouter.add(
           resetPostMergeState(id.toUpperCase());
         } catch { /* non-fatal */ }
 
+        // Clear agent completion markers so Deacon doesn't re-dispatch to specialists
+        try {
+          const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
+          for (const marker of ['completed', 'completed.processed']) {
+            const markerPath = join(agentDir, marker);
+            if (existsSync(markerPath)) {
+              rmSync(markerPath);
+              console.log(`[reopen] Cleared ${marker} marker for ${id}`);
+            }
+          }
+        } catch { /* non-fatal */ }
+
         // Recreate beads from vBRIEF plan if workspace exists but beads are missing
         let beadsRecreated = false;
         try {
