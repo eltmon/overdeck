@@ -155,3 +155,28 @@ Dependencies:
 - Editing plan fields from the viewer UI (read-only viewer)
 - Upstream spec changes to deftai/vBRIEF (separate PR)
 - Integration tests for start-planning/complete-planning endpoints (would require test server setup)
+
+## Current Status: Implementation Complete
+
+All 12 beads closed. Implementation complete.
+
+## Remaining Work
+
+None — all work complete.
+
+## Files Changed Summary
+
+| Bead | Files | Summary |
+|------|-------|---------|
+| atu | types.ts, builder.ts | New v0.5 types (VBriefReference, timestamps) + PlanBuilder methods |
+| a7o | beads.ts | Verification comments — no code changes needed |
+| tum | tests/vbrief/full-spec.test.ts | 22-test spec compliance suite |
+| al1 | src/lib/vbrief/io.ts | Timestamp/sequence updates in updateItemStatus/updateSubItemStatus |
+| 32d | spawn-planning-session.ts | buildPlanningPrompt with planningModel + full v0.5 template + PRD discovery |
+| 8hf | tests/vbrief/full-spec.test.ts | PRD discovery tests added |
+| sin | src/dashboard/server/routes/issues.ts | Async artifact copy in complete-planning |
+| aut | frontend/src/components/vbrief/* | VBriefViewer component suite (6 components + types + 24 tests) |
+| rud | KanbanBoard.tsx, InspectorPanel.tsx, VBriefDialog.tsx | vBRIEF button + dialog integration |
+| f81 | frontend/src/components/vbrief/index.ts | Barrel export |
+| 70z | docs/VBRIEF.md, CLAUDE.md, README.md | Documentation updates |
+| pi1 | src/lib/vbrief/types.ts | Header comment documenting v0.5 fields |
