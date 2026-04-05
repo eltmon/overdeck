@@ -179,7 +179,8 @@ export const IssueLifecycleLive = Layer.effect(
           const issue = yield* linear.getIssue(issueId);
           const states = yield* linear.getTeamStates(issue.team.id);
           const target = findLinearState(states, state);
-          if (target) {
+          // No-op if the issue is already in the target state
+          if (target && issue.state?.id !== target.id) {
             yield* linear.updateState(issue.id, target.id);
           }
         }),

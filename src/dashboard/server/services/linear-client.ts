@@ -5,7 +5,7 @@
  * services can call Linear via the typed-error channel instead of try/catch.
  */
 
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Duration, Effect, Layer, Schedule, ServiceMap } from 'effect';
 import { LinearClient as LinearSdkClient } from '@linear/sdk';
 import { getLinearApiKey } from './tracker-config.js';
 import {
@@ -121,6 +121,16 @@ export class LinearClient extends ServiceMap.Service<LinearClient, LinearClientS
 
 // ─── Live layer ───────────────────────────────────────────────────────────────
 
+/**
+ * Retry schedule for Linear API calls: up to 3 retries with exponential backoff,
+ * but only when the error is RateLimited (429).
+ */
+const rateLimitRetry = Effect.retry({
+  while: (err: unknown) => (err as any)?._tag === 'RateLimited',
+  times: 3,
+  schedule: Schedule.exponential(Duration.seconds(1)),
+});
+
 function wrapLinearError(tracker: string, err: unknown): TrackerApiError | RateLimited {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('429')) {
@@ -170,7 +180,7 @@ function makeLinearClientImpl(sdk: LinearSdkClient): LinearClientShape {
           if (err instanceof IssueNotFound) return err;
           return wrapLinearError('linear', err);
         },
-      }),
+      }).pipe(rateLimitRetry),
 
     getTeamStates: (teamId) =>
       Effect.tryPromise({
@@ -192,7 +202,7 @@ function makeLinearClientImpl(sdk: LinearSdkClient): LinearClientShape {
           await sdk.updateIssue(issueId, { stateId });
         },
         catch: (err) => wrapLinearError('linear', err),
-      }),
+      }).pipe(rateLimitRetry),
 
     addComment: (issueId, body) =>
       Effect.tryPromise({
@@ -200,7 +210,7 @@ function makeLinearClientImpl(sdk: LinearSdkClient): LinearClientShape {
           await sdk.createComment({ issueId, body });
         },
         catch: (err) => wrapLinearError('linear', err),
-      }),
+      }).pipe(rateLimitRetry),
 
     findOrCreateLabel: (teamId, name, color = '#666666') =>
       Effect.tryPromise({
