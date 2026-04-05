@@ -127,3 +127,23 @@ export const RallyClientLive = Layer.effect(
     } satisfies RallyClientShape;
   }),
 );
+
+/**
+ * Layer that provides a no-op RallyClient when Rally is not configured.
+ */
+export const RallyClientOptionalLive = Layer.effect(
+  RallyClient,
+  Effect.gen(function* () {
+    const config = getRallyConfig();
+    if (!config) {
+      const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
+      return {
+        getIssue: () => fail,
+        updateState: () => fail,
+        addComment: () => fail,
+      } as RallyClientShape;
+    }
+    // Config exists — delegate to RallyClientLive
+    return yield* RallyClient.pipe(Effect.provide(RallyClientLive));
+  }),
+);
