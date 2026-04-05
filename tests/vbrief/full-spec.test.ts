@@ -303,12 +303,7 @@ describe('updateSubItemStatus: v0.5 timestamp + sequence behavior', () => {
 
 describe('Planning prompt includes v0.5 field placeholders', () => {
   it('includes vBRIEFInfo.author in prompt template', async () => {
-    // Dynamically import to avoid module-level side effects
-    const { buildPlanningPrompt } = await import('../../src/lib/planning/spawn-planning-session.js').catch(
-      () => ({ buildPlanningPrompt: null })
-    ) as any;
-
-    if (!buildPlanningPrompt) return; // Skip if not exported
+    const { buildPlanningPrompt } = await import('../../src/lib/planning/spawn-planning-session.js') as any;
 
     const prompt = buildPlanningPrompt(
       {
@@ -327,5 +322,50 @@ describe('Planning prompt includes v0.5 field placeholders', () => {
     expect(prompt).toContain('uid');
     expect(prompt).toContain('sequence');
     expect(prompt).toContain('references');
+    expect(prompt).toContain('agent:claude-opus-4-6');
+  });
+});
+
+// ─── PRD discovery ────────────────────────────────────────────────────────────
+
+describe('PRD discovery scans docs/prds/ for issue-matching files', () => {
+  it('includes discovered PRD path in references when file matches', async () => {
+    // Create a PRD file matching issue ID
+    const prdDir = join(TEST_DIR, 'docs', 'prds', 'active');
+    mkdirSync(prdDir, { recursive: true });
+    writeFileSync(join(prdDir, 'PAN-999-plan.md'), '# Plan for PAN-999\n');
+
+    const { buildPlanningPrompt } = await import('../../src/lib/planning/spawn-planning-session.js') as any;
+
+    const prompt = buildPlanningPrompt(
+      {
+        identifier: 'PAN-999',
+        title: 'Test Issue',
+        description: 'Test',
+        url: 'https://github.com/example/repo/issues/999',
+        comments: [],
+      },
+      TEST_DIR,
+      'claude-opus-4-6'
+    );
+
+    expect(prompt).toContain('PAN-999-plan.md');
+  });
+
+  it('does not error when no PRD exists for the issue', async () => {
+    const { buildPlanningPrompt } = await import('../../src/lib/planning/spawn-planning-session.js') as any;
+
+    // No PRD files in TEST_DIR — should not throw
+    expect(() => buildPlanningPrompt(
+      {
+        identifier: 'PAN-000',
+        title: 'No PRD Issue',
+        description: 'Test',
+        url: 'https://github.com/example/repo/issues/0',
+        comments: [],
+      },
+      TEST_DIR,
+      'claude-opus-4-6'
+    )).not.toThrow();
   });
 });
