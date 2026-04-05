@@ -6,6 +6,7 @@ import { useDashboardStore } from '../lib/store';
 import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
+import { useConfirm } from './DialogProvider';
 
 interface PlanDialogProps {
   issue: Issue;
@@ -77,6 +78,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   // This prevents stale cache from incorrectly triggering 'complete' state
   const hasConnectedToSession = useRef(false);
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   // Start planning mutation
   const startPlanningMutation = useMutation({
@@ -289,15 +291,13 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
     stopPlanningMutation.mutate();
   };
 
-  const handleAbortPlanning = () => {
-    const confirmed = confirm(
-      'Abort planning and return to Todo?\n\n' +
-      'This will:\n' +
-      '• Stop the planning agent\n' +
-      '• Move the issue back to "Todo"\n' +
-      '• Keep the workspace (can be deleted separately)\n\n' +
-      'Any planning artifacts in the workspace will be preserved.'
-    );
+  const handleAbortPlanning = async () => {
+    const confirmed = await confirm({
+      title: 'Abort Planning',
+      message: 'Abort planning and return to Todo?\n\nThis will:\n• Stop the planning agent\n• Move the issue back to "Todo"\n• Keep the workspace (can be deleted separately)\n\nAny planning artifacts in the workspace will be preserved.',
+      confirmLabel: 'Abort Planning',
+      variant: 'destructive',
+    });
     if (confirmed) {
       abortPlanningMutation.mutate();
     }
@@ -843,9 +843,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       Close
                     </button>
                     <button
-                      onClick={() => {
-                        abortPlanningMutation.mutate();
-                      }}
+                      onClick={handleAbortPlanning}
                       disabled={abortPlanningMutation.isPending}
                       className="flex items-center gap-2 px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded-lg transition-colors disabled:opacity-50"
                     >
