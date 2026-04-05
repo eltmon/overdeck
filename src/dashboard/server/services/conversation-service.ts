@@ -112,7 +112,7 @@ interface JsonlEntry {
   message?: {
     id?: string;
     role?: string;
-    content?: unknown[];
+    content?: unknown[] | string;
     model?: string;
     stop_reason?: string | null;
     usage?: JsonlUsage;
@@ -172,7 +172,7 @@ export async function parseConversationMessages(
 
     if (entry.type === 'user' && entry.message) {
       const msg = entry.message;
-      const content = Array.isArray(msg.content) ? msg.content : [];
+      const rawContent = msg.content;
 
       // Flush any pending assistant message
       if (pendingAssistant) {
@@ -180,29 +180,44 @@ export async function parseConversationMessages(
         pendingAssistant = null;
       }
 
-      for (const block of content as ContentBlock[]) {
-        if (block.type === 'tool_result' && block.tool_use_id) {
-          // Complete a pending WorkLogEntry
-          const pending = pendingToolUse.get(block.tool_use_id);
-          if (pending) {
-            pendingToolUse.delete(block.tool_use_id);
-            workLog.push({
-              ...pending,
-              detail: block.is_error
-                ? `Error: ${JSON.stringify(block.content)}`
-                : pending.detail,
-              tone: block.is_error ? 'error' : pending.tone,
-            });
-          }
-        } else if (block.type === 'text' && block.text) {
+      // Content can be a string (plain text) or array of content blocks
+      if (typeof rawContent === 'string' && rawContent.trim()) {
+        // Skip command/system messages (XML tags from Claude Code internals)
+        if (!rawContent.startsWith('<')) {
           const ts = entry.timestamp ?? new Date().toISOString();
-          lastUserTimestamp = ts; // Track for assistant duration calculation
+          lastUserTimestamp = ts;
           messages.push({
             id: entry.uuid ?? `user-${messages.length}`,
             role: 'user',
-            text: block.text,
+            text: rawContent,
             createdAt: ts,
           });
+        }
+      } else if (Array.isArray(rawContent)) {
+        for (const block of rawContent as ContentBlock[]) {
+          if (block.type === 'tool_result' && block.tool_use_id) {
+            // Complete a pending WorkLogEntry
+            const pending = pendingToolUse.get(block.tool_use_id);
+            if (pending) {
+              pendingToolUse.delete(block.tool_use_id);
+              workLog.push({
+                ...pending,
+                detail: block.is_error
+                  ? `Error: ${JSON.stringify(block.content)}`
+                  : pending.detail,
+                tone: block.is_error ? 'error' : pending.tone,
+              });
+            }
+          } else if (block.type === 'text' && block.text) {
+            const ts = entry.timestamp ?? new Date().toISOString();
+            lastUserTimestamp = ts;
+            messages.push({
+              id: entry.uuid ?? `user-${messages.length}`,
+              role: 'user',
+              text: block.text,
+              createdAt: ts,
+            });
+          }
         }
       }
     } else if (entry.type === 'assistant' && entry.message) {

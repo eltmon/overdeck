@@ -38,6 +38,31 @@ import {
 
 const execAsync = promisify(exec);
 
+/**
+ * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
+ * Polls every 500ms for up to 30 seconds. Claude Code takes a few seconds to start.
+ */
+async function waitForClaudeReady(tmuxSession: string): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      const { stdout } = await execAsync(
+        `tmux capture-pane -t ${tmuxSession} -p 2>/dev/null`,
+        { encoding: 'utf-8' },
+      );
+      // Claude Code shows ❯ when ready for input
+      if (stdout.includes('❯')) {
+        console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
+        return;
+      }
+    } catch {
+      // Session might not exist yet
+    }
+    await new Promise<void>((r) => setTimeout(r, 500));
+  }
+  console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
+}
+
 /** Compute the deterministic JSONL session file path from cwd + session UUID. */
 function sessionFilePath(cwd: string, sessionId: string): string {
   const encodedCwd = cwd.replace(/\//g, '-');
@@ -158,8 +183,8 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
   ].join('\n');
 
   const { stdout } = await execAsync(
-    `echo ${JSON.stringify(prompt)} | claude -p --output-format json --json-schema ${JSON.stringify(schema)} --dangerously-skip-permissions`,
-    { encoding: 'utf-8', timeout: 60_000 },
+    `echo ${JSON.stringify(prompt)} | claude -p --output-format json --json-schema ${JSON.stringify(schema)} --model claude-haiku-4-5-20251001 --dangerously-skip-permissions`,
+    { encoding: 'utf-8', timeout: 30_000 },
   );
 
   // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
@@ -272,13 +297,19 @@ const postConversationRoute = HttpRouter.add(
           titleSeed: title,
         });
 
-        // Send the first message to the tmux session
-        await sendKeysAsync(tmuxSession, message, 'conversation-message');
-
-        // Kick off async AI title generation (fire-and-forget)
-        void generateAiTitle(name, message).catch((err: unknown) => {
-          console.error(`[conversations] AI title generation failed for "${name}":`, err);
-        });
+        // Wait for Claude Code to be ready, send message, and generate title — all async.
+        // Don't block the HTTP response; the frontend will poll for messages.
+        void (async () => {
+          try {
+            await waitForClaudeReady(tmuxSession);
+            await sendKeysAsync(tmuxSession, message, 'conversation-message');
+            void generateAiTitle(name, message).catch((err: unknown) => {
+              console.error(`[conversations] AI title generation failed for "${name}":`, err);
+            });
+          } catch (err) {
+            console.error(`[conversations] Failed to send first message to ${tmuxSession}:`, err);
+          }
+        })();
 
         return jsonResponse({ ...conv, sessionAlive: true }, { status: 201 });
       } catch (error: unknown) {

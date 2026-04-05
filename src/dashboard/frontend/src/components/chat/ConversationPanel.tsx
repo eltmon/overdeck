@@ -31,10 +31,11 @@ async function resumeConversation(name: string): Promise<Conversation> {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ConversationPanel({ conversation }: ConversationPanelProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const saved = localStorage.getItem('conv-panel-view-mode');
-    return saved === 'terminal' ? 'terminal' : 'conversation';
-  });
+  // Default to conversation view; persist per-conversation preference wouldn't make sense
+  // since new conversations should always start in conversation view
+  const [viewMode, setViewMode] = useState<ViewMode>('conversation');
+  // Track if terminal was ever opened — lazy mount to avoid xterm.js sizing issues
+  const [terminalEverOpened, setTerminalEverOpened] = useState(false);
 
   const [resumed, setResumed] = useState(false);
   const queryClient = useQueryClient();
@@ -61,7 +62,7 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
 
   const handleViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem('conv-panel-view-mode', mode);
+    if (mode === 'terminal') setTerminalEverOpened(true);
   }, []);
 
   const showTerminal = conversation.sessionAlive || resumed;
@@ -112,7 +113,7 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
         )}
       </div>
 
-      {/* Body */}
+      {/* Body — both views stay mounted to avoid re-connect delay on toggle */}
       <div className={styles.conversationTerminalBody}>
         {!showTerminal ? (
           // Session ended — show resume overlay
@@ -131,12 +132,23 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
               </p>
             )}
           </div>
-        ) : viewMode === 'terminal' ? (
-          // Terminal view — raw tmux output
-          <XTerminal sessionName={conversation.tmuxSession} />
         ) : (
-          // Conversation view — structured message rendering
-          <ConversationView conversation={conversation} />
+          <>
+            {/* Terminal: lazy-mount on first switch, then keep alive but offscreen when hidden.
+                Uses visibility+position instead of display:none so xterm.js gets real dimensions. */}
+            {terminalEverOpened && (
+              <div style={viewMode === 'terminal'
+                ? { display: 'contents' }
+                : { position: 'absolute', visibility: 'hidden', width: '100%', height: '100%', overflow: 'hidden' }
+              }>
+                <XTerminal sessionName={conversation.tmuxSession} />
+              </div>
+            )}
+            {/* Conversation view */}
+            {viewMode === 'conversation' && (
+              <ConversationView conversation={conversation} />
+            )}
+          </>
         )}
       </div>
     </div>
@@ -177,6 +189,17 @@ function ConversationView({ conversation }: ConversationViewProps) {
   const streaming = data?.streaming ?? false;
   const isFirstMessage = !isLoading && messages.length === 0;
 
+  // "Working" = session is alive AND either:
+  // - server reports streaming (incomplete assistant message with recent file activity)
+  // - last message is from the user (waiting for assistant response)
+  // - last assistant message has no completedAt (still generating)
+  const lastMsg = messages[messages.length - 1];
+  const isWorking = conversation.sessionAlive && messages.length > 0 && (
+    streaming ||
+    lastMsg?.role === 'user' ||
+    (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+  );
+
   return (
     <div className={styles.conversationView}>
       {isLoading ? (
@@ -194,7 +217,7 @@ function ConversationView({ conversation }: ConversationViewProps) {
         <MessagesTimeline
           messages={messages}
           workLog={workLog}
-          streaming={streaming}
+          streaming={isWorking}
         />
       )}
       <ComposerFooter conversation={conversation} />
