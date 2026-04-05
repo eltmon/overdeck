@@ -34,7 +34,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, rm, symlink, lstat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -1520,20 +1520,29 @@ const postAgentsRoute = HttpRouter.add(
         const updateIssueStatus = async () => {
           const apiKey = getLinearApiKey();
           const ghInfo = resolveGitHubIssueShared(issueId);
+          console.log(`[start-agent] updateIssueStatus for ${issueId}: isGitHub=${ghInfo.isGitHub}`);
           if (ghInfo.isGitHub) {
             const ghConfig = getGitHubConfig();
+            if (!ghConfig) {
+              console.warn(`[start-agent] No GitHub config found — cannot update labels for ${issueId}`);
+            }
             if (ghConfig) {
               const { owner, repo, number } = ghInfo;
               const token = ghConfig.token;
-              await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
-              }).catch(() => {});
-              await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-                method: 'POST',
-                headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-                body: JSON.stringify({ labels: ['in-progress'] }),
-              });
+              try {
+                await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
+                  method: 'DELETE',
+                  headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
+                }).catch(() => {});
+                const addRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
+                  method: 'POST',
+                  headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ labels: ['in-progress'] }),
+                });
+                console.log(`[start-agent] GitHub label update for ${issueId}: ${addRes.status}`);
+              } catch (labelErr: any) {
+                console.error(`[start-agent] GitHub label update failed for ${issueId}:`, labelErr.message);
+              }
             }
           } else if (apiKey) {
             try {
@@ -1664,6 +1673,29 @@ const postAgentsRoute = HttpRouter.add(
                       if (allH) { healthy = true; break; }
                     } catch {}
                     await new Promise(r => setTimeout(r, pollIntervalMs));
+                  }
+
+                  // Docker named volumes create root-owned empty node_modules on the host.
+                  // Agents run on the host, so replace with symlinks to main repo's node_modules.
+                  const nodeModulesFixes = [
+                    { ws: join(workspacePath, 'node_modules'), main: join(projectPath, 'node_modules') },
+                    { ws: join(workspacePath, 'src', 'dashboard', 'frontend', 'node_modules'), main: join(projectPath, 'src', 'dashboard', 'frontend', 'node_modules') },
+                  ];
+                  for (const { ws: nmDir, main: mainNm } of nodeModulesFixes) {
+                    try {
+                      if (existsSync(nmDir)) {
+                        const stat = await lstat(nmDir);
+                        if (!stat.isSymbolicLink()) {
+                          await rm(nmDir, { recursive: true, force: true });
+                          await symlink(mainNm, nmDir);
+                          console.log(`[start-agent] Fixed node_modules: ${nmDir} → ${mainNm}`);
+                        }
+                      } else if (existsSync(mainNm)) {
+                        await symlink(mainNm, nmDir);
+                      }
+                    } catch (nmErr: any) {
+                      console.warn(`[start-agent] Could not fix node_modules at ${nmDir}: ${nmErr.message}`);
+                    }
                   }
 
                   spawnPanCommand(['work', 'issue', issueId, '--phase', phase], workspacePath);

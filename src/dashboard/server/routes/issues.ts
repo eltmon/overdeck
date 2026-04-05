@@ -986,6 +986,19 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           } catch { /* Session might not exist */ }
         }
 
+        // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead of "Watch Planning"
+        try {
+          const planningStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+          const planningStatePath = join(planningStateDir, 'state.json');
+          if (existsSync(planningStatePath)) {
+            const planningState = JSON.parse(readFileSync(planningStatePath, 'utf-8'));
+            planningState.status = 'stopped';
+            planningState.stoppedAt = new Date().toISOString();
+            writeFileSync(planningStatePath, JSON.stringify(planningState, null, 2), 'utf-8');
+            console.log(`[complete-planning] Marked ${sessionName} as stopped`);
+          }
+        } catch { /* Non-fatal — agent status is cosmetic */ }
+
         // Determine project path
         const githubCheck = isGitHubIssue(id);
         let projectPath = '';
