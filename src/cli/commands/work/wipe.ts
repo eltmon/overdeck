@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { getIssuePrefix } from '../../../lib/projects.js';
 import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, rmSync, readFileSync, readdirSync } from 'fs';
@@ -147,7 +148,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
       const projectsConfig = yaml.load(readFileSync(projectsYamlPath, 'utf-8')) as any;
       for (const [, config] of Object.entries(projectsConfig.projects || {})) {
         const projConfig = config as any;
-        if (projConfig.linear_team?.toUpperCase() === prefix) {
+        if (getIssuePrefix(projConfig)?.toUpperCase() === prefix) {
           projectPath = projConfig.path;
           break;
         }

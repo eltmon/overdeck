@@ -41,7 +41,7 @@ Running `pan project add /path --name foo` alone causes these failures:
 
 | Missing config | Symptom |
 |----------------|---------|
-| `linear_team` (issue prefix) | Planning agents start in `$HOME`, not the project root |
+| `issue_prefix` (issue prefix) | Planning agents start in `$HOME`, not the project root |
 | Trust entry in `~/.claude.json` | Claude Code shows trust dialog, blocking autonomous agents |
 | `GITHUB_REPOS` entry | Issues don't appear on the dashboard kanban board |
 | `beads.role` in git config | Every `bd` command prints "beads.role not configured" warnings |
@@ -61,7 +61,7 @@ Ask the user for (or auto-detect from the filesystem):
 |-------|----------|---------|-------|
 | Path | Yes | `/home/eltmon/Projects/myapp` | Must exist, must have `.git/` |
 | Name | Yes | `myapp` | Short lowercase key for projects.yaml |
-| Issue prefix | Yes | `APP` | Maps `APP-123` → this project. Goes in `linear_team` field |
+| Issue prefix | Yes | `APP` | Maps `APP-123` → this project. Goes in `issue_prefix` field |
 | Tracker | Yes | `github` / `linear` / `gitlab` | Where issues live |
 | Repo slug | Yes | `owner/repo` | `github_repo` or `gitlab_repo` |
 | Workspace type | Yes | `standalone` / `monorepo` / `polyrepo` | How git worktrees work |
@@ -92,7 +92,7 @@ Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
   <project-key>:
     name: <name>
     path: <absolute-path>
-    linear_team: <PREFIX>          # CRITICAL: issue prefix for routing
+    issue_prefix: <PREFIX>          # CRITICAL: issue prefix for routing
     github_repo: <owner/repo>     # or gitlab_repo
     workspace:
       type: <standalone|monorepo|polyrepo>
@@ -111,7 +111,7 @@ Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
   <project-key>:
     name: <name>
     path: <absolute-path>
-    linear_team: <PREFIX>
+    issue_prefix: <PREFIX>
     github_repo: <owner/repo>
     workspace:
       type: <type>
@@ -161,7 +161,7 @@ Read current value, append new repo, write back. The dashboard polls this
 to fetch issues from GitHub.
 
 For **Linear** projects, issues are fetched automatically by team — no
-extra config needed beyond `linear_team` in projects.yaml.
+extra config needed beyond `issue_prefix` in projects.yaml.
 
 For **GitLab** projects, TBD — not yet supported in dashboard polling.
 
@@ -217,7 +217,7 @@ Run ALL of these checks and report pass/fail:
 pan project list | grep <name>
 
 # 2. Issue prefix resolves (won't crash)
-# Check projects.yaml has linear_team: <PREFIX>
+# Check projects.yaml has issue_prefix: <PREFIX>
 
 # 3. Trust is set in ~/.claude.json
 node -e "
@@ -275,17 +275,17 @@ Next steps:
 ## REFERENCE: Working Project Configs
 
 ### panopticon-cli (monorepo, GitHub)
-- `linear_team: PAN`, `github_repo: eltmon/panopticon-cli`
+- `issue_prefix: PAN`, `github_repo: eltmon/panopticon-cli`
 - `workspace.type: monorepo`
 - Has: dns, docker, agent, services, env, tests
 
 ### mind-your-now (polyrepo, Linear/GitLab)
-- `linear_team: MIN`, `gitlab_repo: eltmon/mind-your-now`
+- `issue_prefix: MIN`, `gitlab_repo: eltmon/mind-your-now`
 - `workspace.type: polyrepo` with 6 sub-repos
 - Has: dns, docker, database, agent, services, tunnel, hume, env, tests
 
 ### myn-cli (standalone, GitHub)
-- `linear_team: CLI`, `github_repo: mindyournow/myn-cli`
+- `issue_prefix: CLI`, `github_repo: mindyournow/myn-cli`
 - `workspace.type: standalone`
 - Has: tests
 
@@ -293,7 +293,7 @@ Next steps:
 
 ## COMMON MISTAKES
 
-1. **Missing `linear_team`** — The #1 cause of "planning agent starts in $HOME."
+1. **Missing `issue_prefix`** — The #1 cause of "planning agent starts in $HOME."
    Despite the name, this field is the issue PREFIX for ALL trackers, not just Linear.
 2. **Not in `GITHUB_REPOS`** — Issues don't appear on dashboard kanban board.
 3. **No `beads.role`** — Every `bd` command prints warning noise in agent output.

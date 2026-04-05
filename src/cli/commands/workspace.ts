@@ -14,6 +14,7 @@ import {
   findProjectByTeam,
   extractTeamPrefix,
   listProjects,
+  getIssuePrefix,
 } from '../../lib/projects.js';
 import {
   createWorkspace as createWorkspaceFromConfig,
@@ -858,8 +859,8 @@ async function createRemoteWorkspace(
   // Determine project identifier for VM name
   // Priority: team prefix from issue > linear_team from project > repo name
   let projectId = teamPrefix?.toLowerCase();
-  if (!projectId && projectConfig?.linear_team) {
-    projectId = projectConfig.linear_team.toLowerCase();
+  if (!projectId && projectConfig && getIssuePrefix(projectConfig)) {
+    projectId = getIssuePrefix(projectConfig)!.toLowerCase();
   }
   if (!projectId) {
     // Fall back to git repo name

@@ -8,7 +8,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { loadProjectsConfig } from './projects.js';
+import { loadProjectsConfig, getIssuePrefix } from './projects.js';
 
 export interface GitHubRepoConfig {
   owner: string;
@@ -60,7 +60,7 @@ export function parseGitHubRepos(): GitHubRepoConfig[] {
         if (project.github_repo) {
           const [owner, repo] = project.github_repo.split('/');
           // Derive prefix: linear_team if set, otherwise uppercase project key
-          const prefix = project.linear_team || key.toUpperCase().replace(/-/g, '');
+          const prefix = getIssuePrefix(project) || key.toUpperCase().replace(/-/g, '');
           if (owner && repo && prefix) {
             repos.push({ owner, repo, prefix: prefix.toUpperCase() });
           }
@@ -129,23 +129,12 @@ export function resolveTrackerType(issueId: string): TrackerTypeResolution {
   try {
     const { projects } = loadProjectsConfig();
     for (const [key, project] of Object.entries(projects)) {
-      // Match by linear_team first (even Rally projects may have linear_team for routing)
-      if (project.linear_team?.toUpperCase() === prefix) {
-        // Project has linear_team matching this prefix — it's a Linear project
-        // (even if it also has rally_project for cross-tracking)
+      const projectPrefix = getIssuePrefix(project) || key.toUpperCase().replace(/-/g, '');
+      if (projectPrefix?.toUpperCase() === prefix) {
+        // Prefix matches — determine tracker by what's configured
+        if (project.github_repo) return 'github';
+        if (project.rally_project) return 'rally';
         return 'linear';
-      }
-
-      // For projects without linear_team, derive prefix from project key
-      if (!project.linear_team) {
-        const derivedPrefix = key.toUpperCase().replace(/-/g, '');
-        if (derivedPrefix === prefix) {
-          // Prefix matches — determine tracker by what's configured
-          if (project.rally_project && !project.github_repo) {
-            return 'rally';
-          }
-          // github_repo projects are already caught by resolveGitHubIssue above
-        }
       }
     }
   } catch { /* ignore config errors */ }

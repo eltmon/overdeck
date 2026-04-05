@@ -421,7 +421,7 @@ projects:
   simple-app:
     name: "Simple App"
     path: /home/user/projects/simple-app
-    linear_team: APP
+    issue_prefix: APP
     # No workspace config = uses plain git worktrees
 ```
 

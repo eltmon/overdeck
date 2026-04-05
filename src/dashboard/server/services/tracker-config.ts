@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { loadConfig as loadYamlConfig } from '../../../lib/config-yaml.js';
-import { loadProjectsConfig } from '../../../lib/projects.js';
+import { loadProjectsConfig, getIssuePrefix } from '../../../lib/projects.js';
 
 // GitHub configuration
 export interface GitHubConfig {
@@ -157,7 +157,7 @@ export function getGitHubConfig(): GitHubConfig | null {
       for (const [, project] of Object.entries(projects)) {
         if (project.github_repo) {
           const [owner, repo] = project.github_repo.split('/');
-          const prefix = project.linear_team ? project.linear_team : undefined;
+          const prefix = getIssuePrefix(project) ? getIssuePrefix(project) : undefined;
           if (owner && repo) {
             repos.push({ owner, repo, prefix });
           }

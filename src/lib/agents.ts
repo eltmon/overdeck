@@ -15,7 +15,7 @@ import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCred
 import { loadConfig } from './config.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
-import { findProjectByPath } from './projects.js';
+import { findProjectByPath, getIssuePrefix } from './projects.js';
 
 const execAsync = promisify(exec);
 
@@ -440,15 +440,15 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
   }
 
   // Project has a Linear team — use Linear tracker
-  if (projectConfig.linear_team) {
+  if (getIssuePrefix(projectConfig)) {
     const config = loadConfig();
     const trackersConfig = config.trackers;
     if (!trackersConfig?.linear) {
-      throw new Error(`Project ${projectConfig.name} uses Linear (team: ${projectConfig.linear_team}) but no Linear tracker is configured in config.yaml`);
+      throw new Error(`Project ${projectConfig.name} uses Linear (team: ${getIssuePrefix(projectConfig)}) but no Linear tracker is configured in config.yaml`);
     }
     const tracker = createTrackerFromConfig(trackersConfig, 'linear');
     await tracker.transitionIssue(issueId, state);
-    console.log(`[agents] Transitioned ${issueId} to ${state} via Linear (team: ${projectConfig.linear_team})`);
+    console.log(`[agents] Transitioned ${issueId} to ${state} via Linear (team: ${getIssuePrefix(projectConfig)})`);
     return;
   }
 

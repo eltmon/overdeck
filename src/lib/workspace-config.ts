@@ -218,7 +218,8 @@ export interface TestsConfig {
 export interface ProjectConfig {
   name: string;
   path: string;
-  linear_team?: string;
+  /** Issue prefix for identifier construction (e.g., "PAN" → PAN-123) */
+  issue_prefix?: string;
   github_repo?: string;
   gitlab_repo?: string;
 

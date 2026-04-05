@@ -741,7 +741,7 @@ const getRegisteredProjectsRoute = HttpRouter.add(
           key: p.key,
           name: p.config.name,
           path: p.config.path,
-          linearTeam: p.config.linear_team || null,
+          linearTeam: p.getIssuePrefix(config) || null,
           githubRepo: p.config.github_repo || null,
           linearProject: p.config.linear_project || null,
         })),

@@ -39,7 +39,7 @@ function correctly from the start.
 Running `pan project add /path --name foo` only creates a minimal entry in
 `projects.yaml`. Without the full configuration, critical features break:
 
-- **No `linear_team`** → `resolveProjectFromIssue()` can't map issue prefixes
+- **No `issue_prefix`** → `resolveProjectFromIssue()` can't map issue prefixes
   to the project → planning agents start in `$HOME` instead of the project root
 - **No trust entry** → Claude Code shows "Quick safety check" trust dialog,
   blocking autonomous agents
@@ -58,7 +58,7 @@ Ask the user for (or detect from the filesystem):
 |-------|----------|---------|-------|
 | Path | Yes | `/home/eltmon/Projects/myapp` | Must exist, must have `.git/` |
 | Name | Yes | `myapp` | Short lowercase identifier |
-| Issue prefix | Yes | `APP` | Maps `APP-123` → this project. Goes in `linear_team` field |
+| Issue prefix | Yes | `APP` | Maps `APP-123` → this project. Goes in `issue_prefix` field |
 | Tracker | Yes | `github` or `linear` or `gitlab` | Where issues live |
 | Repo | Yes | `owner/repo` | `github_repo` or `gitlab_repo` |
 | Workspace type | Yes | `standalone`, `monorepo`, or `polyrepo` | How git worktrees work |
@@ -87,7 +87,7 @@ Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
   <project-key>:
     name: <name>
     path: <absolute-path>
-    linear_team: <PREFIX>          # CRITICAL: issue prefix for routing
+    issue_prefix: <PREFIX>          # CRITICAL: issue prefix for routing
     github_repo: <owner/repo>     # or gitlab_repo
     workspace:
       type: <standalone|monorepo|polyrepo>
@@ -106,7 +106,7 @@ Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
   <project-key>:
     name: <name>
     path: <absolute-path>
-    linear_team: <PREFIX>
+    issue_prefix: <PREFIX>
     github_repo: <owner/repo>
     workspace:
       type: <type>
@@ -248,19 +248,19 @@ Next steps:
 For comparison, here are the key fields from existing working projects:
 
 ### panopticon-cli (monorepo, GitHub)
-- `linear_team: PAN`
+- `issue_prefix: PAN`
 - `github_repo: eltmon/panopticon-cli`
 - `workspace.type: monorepo`
 - Has: dns, docker, agent, services, env, tests
 
 ### mind-your-now (polyrepo, GitLab)
-- `linear_team: MIN`
+- `issue_prefix: MIN`
 - `gitlab_repo: eltmon/mind-your-now`
 - `workspace.type: polyrepo` with 6 sub-repos
 - Has: dns, docker, database, agent, services, tunnel, hume, env, tests
 
 ### myn-cli (standalone, GitHub)
-- `linear_team: CLI`
+- `issue_prefix: CLI`
 - `github_repo: mindyournow/myn-cli`
 - `workspace.type: standalone`
 - Has: tests
@@ -269,7 +269,7 @@ For comparison, here are the key fields from existing working projects:
 
 ## COMMON MISTAKES
 
-1. **Missing `linear_team`** — The #1 cause of "planning agent starts in $HOME."
+1. **Missing `issue_prefix`** — The #1 cause of "planning agent starts in $HOME."
    Despite the name, this field is the issue PREFIX for ALL trackers, not just Linear.
 2. **Not pre-trusting the directory** — Agent gets stuck on Claude Code trust dialog.
 3. **Wrong `workspace.type`** — `standalone` = single repo, `monorepo` = one repo with

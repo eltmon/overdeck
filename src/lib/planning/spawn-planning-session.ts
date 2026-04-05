@@ -403,16 +403,21 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         const projectConfig = findProjectByPath(projectPath) || findProjectByTeam(extractTeamPrefix(issue.identifier) || '');
         if (projectConfig?.workspace) {
           // Use library directly for real-time progress streaming
-          console.log(`[start-planning] Creating workspace via library for ${issue.identifier}`);
+          console.log(`[start-planning] Creating workspace via library for ${issue.identifier}, projectConfig=${projectConfig.name}`);
           const wsResult = await createWorkspace({
             projectConfig,
             featureName: issueLower,
             startDocker,
             onProgress: (event) => {
+              console.log(`[start-planning] Workspace progress: ${event.label} — ${event.detail} [${event.status}]`);
               // Forward workspace sub-step progress as step 1 detail updates
               progress(1, event.label, event.detail, event.status === 'complete' ? 'active' : event.status);
             },
           });
+          console.log(`[start-planning] Workspace result: success=${wsResult.success}, steps=${wsResult.steps.length}, errors=${wsResult.errors.length}`);
+          if (wsResult.errors.length > 0) {
+            console.error(`[start-planning] Workspace errors:`, wsResult.errors);
+          }
           if (!wsResult.success) {
             throw new Error(wsResult.errors.join('; '));
           }

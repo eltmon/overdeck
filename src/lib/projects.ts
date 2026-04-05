@@ -78,7 +78,8 @@ export interface SpecialistConfig {
 export interface ProjectConfig {
   name: string;
   path: string;
-  linear_team?: string;
+  /** Issue prefix for identifier construction (e.g., "PAN" → PAN-123) */
+  issue_prefix?: string;
   github_repo?: string;  // e.g. "owner/repo"
   gitlab_repo?: string;  // e.g. "group/repo"
   issue_routing?: IssueRoutingRule[];
@@ -111,6 +112,11 @@ export interface ProjectConfig {
    * Defaults to ".panopticon/events".
    */
   events_path?: string;
+}
+
+/** Resolve the issue prefix for a project. */
+export function getIssuePrefix(config: ProjectConfig): string | undefined {
+  return config.issue_prefix;
 }
 
 /**
@@ -210,7 +216,7 @@ export function findProjectByTeam(teamPrefix: string): ProjectConfig | null {
   const config = loadProjectsConfig();
 
   for (const [, projectConfig] of Object.entries(config.projects)) {
-    if (projectConfig.linear_team?.toUpperCase() === teamPrefix.toUpperCase()) {
+    if (getIssuePrefix(projectConfig)?.toUpperCase() === teamPrefix.toUpperCase()) {
       return projectConfig;
     }
   }
@@ -295,17 +301,17 @@ export function resolveProjectFromIssue(
 
   // Find project by team prefix (check linear_team first, then derive from project key)
   for (const [key, projectConfig] of Object.entries(config.projects)) {
-    if (projectConfig.linear_team?.toUpperCase() === teamPrefix) {
+    if (getIssuePrefix(projectConfig)?.toUpperCase() === teamPrefix) {
       const resolvedPath = resolveProjectPath(projectConfig, labels);
       return {
         projectKey: key,
         projectName: projectConfig.name,
         projectPath: resolvedPath,
-        linearTeam: projectConfig.linear_team,
+        linearTeam: getIssuePrefix(projectConfig),
       };
     }
     // For projects without linear_team (GitHub-only or Rally-only), derive prefix from project key
-    if (!projectConfig.linear_team && (projectConfig.github_repo || projectConfig.rally_project)) {
+    if (!getIssuePrefix(projectConfig) && (projectConfig.github_repo || projectConfig.rally_project)) {
       const derivedPrefix = key.toUpperCase().replace(/-/g, '');
       if (derivedPrefix === teamPrefix) {
         const resolvedPath = resolveProjectPath(projectConfig, labels);

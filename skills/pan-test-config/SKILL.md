@@ -25,7 +25,7 @@ projects:
   myproject:
     name: "My Project"
     path: /home/user/projects/myproject
-    linear_team: PRJ
+    issue_prefix: PRJ
 
     tests:
       backend:
