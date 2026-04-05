@@ -242,7 +242,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
   const repoRoot = __dirname.includes('/src/')
     ? __dirname.replace(/\/src\/.*$/, '')
-    : join(__dirname, '..');
+    : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');
   const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
 
   try {
