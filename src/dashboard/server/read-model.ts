@@ -116,10 +116,25 @@ export const ReadModelServiceLive = Layer.effect(
         projectionCache = getProjectionCache();
         const cached = projectionCache.load();
         if (cached && cached.sequence > 0) {
+          // Validate cached agents against actual state files — remove stale entries
+          // from agents that were wiped/removed while the server was down
+          const { existsSync: existsSyncFs } = yield* Effect.promise(() => import('node:fs'));
+          const { join: joinPath } = yield* Effect.promise(() => import('node:path'));
+          const { homedir: homedirFn } = yield* Effect.promise(() => import('node:os'));
+          const agentsDir = joinPath(homedirFn(), '.panopticon', 'agents');
+          const validAgents = (cached.agents ?? []).filter((a: any) => {
+            const stateFile = joinPath(agentsDir, a.id, 'state.json');
+            return existsSyncFs(stateFile);
+          });
+          const pruned = (cached.agents ?? []).length - validAgents.length;
+          if (pruned > 0) {
+            console.log(`[ReadModel] Pruned ${pruned} stale agents from projection cache`);
+          }
+
           state = {
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
-            agentsById: Object.fromEntries((cached.agents ?? []).map((a) => [a.id, a])),
+            agentsById: Object.fromEntries(validAgents.map((a: any) => [a.id, a])),
             specialistsByName: Object.fromEntries((cached.specialists ?? []).map((s) => [s.name, s])),
             reviewStatusByIssueId: Object.fromEntries((cached.reviewStatuses ?? []).map((r) => [r.issueId, r])),
             issuesRaw: cached.issues ?? [],
