@@ -12,7 +12,7 @@ set -euo pipefail
 REPO_ROOT="${1:?REPO_ROOT required}"
 ISSUE_ID="${2:?ISSUE_ID required}"
 PROJECT_PATH="${3:?PROJECT_PATH required}"
-SOURCE_BRANCH="${4:?SOURCE_BRANCH required}"
+SOURCE_BRANCH="${4:-}"
 
 LOG_FILE="/tmp/panopticon-deploy.log"
 HEALTH_URL="http://localhost:3011/api/health"
