@@ -25,7 +25,12 @@ import {
   markConversationEnded,
   markConversationActive,
   updateLastAttached,
+  updateSessionFile,
 } from '../../../lib/database/conversations-db.js';
+import {
+  discoverSessionFile,
+  parseConversationMessages,
+} from '../services/conversation-service.js';
 
 const execAsync = promisify(exec);
 
@@ -107,6 +112,26 @@ while true; do sleep 60; done
   await execAsync(`tmux set-option -t ${tmuxSession} remain-on-exit on 2>/dev/null || true`, { encoding: 'utf-8' });
 }
 
+/**
+ * Kick off async session file discovery after spawning a conversation.
+ * Watches ~/.claude/projects/<encoded-cwd>/ for a new JSONL file and
+ * stores the path in the conversations DB when found.
+ */
+function startSessionFileDiscovery(name: string, cwd: string, spawnedAt: string): void {
+  discoverSessionFile(cwd, spawnedAt)
+    .then((path) => {
+      if (path) {
+        updateSessionFile(name, path);
+        console.log(`[conversations] Discovered session file for "${name}": ${path}`);
+      } else {
+        console.warn(`[conversations] Session file discovery timed out for "${name}"`);
+      }
+    })
+    .catch((err: unknown) => {
+      console.error(`[conversations] Session file discovery failed for "${name}":`, err);
+    });
+}
+
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
 
 const getConversationsRoute = HttpRouter.add(
@@ -162,10 +187,15 @@ const postConversationRoute = HttpRouter.add(
         // Persist to DB first so the client gets a response quickly
         const conv = createConversation(name, tmuxSession, cwd, issueId);
 
+        const spawnedAt = new Date().toISOString();
+
         // Spawn tmux session in background (don't await — let ws-terminal attach when ready)
         spawnConversationSession(tmuxSession, cwd, issueId).catch((err: unknown) => {
           console.error(`[conversations] Failed to spawn session ${tmuxSession}:`, err);
         });
+
+        // Start async JSONL session file discovery — stores path in DB when found
+        startSessionFileDiscovery(name, cwd, spawnedAt);
 
         return jsonResponse(conv, { status: 201 });
       }    catch (error: unknown) {
@@ -244,6 +274,40 @@ const postConversationResumeRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: GET /api/conversations/:name/messages ────────────────────────────
+
+const getConversationMessagesRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/messages',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        // session_file is null until discovery completes after Claude Code starts
+        if (!conv.sessionFile) {
+          return jsonResponse({ discovering: true, messages: [], workLog: [], streaming: false });
+        }
+
+        const result = await parseConversationMessages(conv.sessionFile, 0);
+        return jsonResponse({
+          messages: result.messages,
+          workLog: result.workLog,
+          streaming: result.streaming,
+        });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to load messages: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -251,6 +315,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationRoute,
   deleteConversationRoute,
   postConversationResumeRoute,
+  getConversationMessagesRoute,
 );
 
 export default conversationsRouteLayer;
