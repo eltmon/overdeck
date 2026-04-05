@@ -79,3 +79,5 @@ src/dashboard/frontend/node_modules
 # Stitch temp files
 temp/
 .panopticon.env
+.playwright-mcp/
+.playwright-mcp/
