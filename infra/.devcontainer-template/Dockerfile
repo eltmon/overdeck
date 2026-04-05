@@ -1,5 +1,5 @@
 # Development container for Panopticon Dashboard
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install development tools
 RUN apk add --no-cache \
@@ -19,12 +19,9 @@ RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash && \
 WORKDIR /workspaces/panopticon
 
 # Pre-create directories with correct ownership
-# This ensures named volumes are initialized with proper permissions
-# Note: All workspace node_modules need to be shadowed for npm workspaces to work
+# Only root node_modules is shadowed by a named volume — Bun hoists all deps there.
+# Host and container each run their own `bun install` independently.
 RUN mkdir -p /workspaces/panopticon/node_modules \
-    /workspaces/panopticon/src/dashboard/frontend/node_modules \
-    /workspaces/panopticon/src/dashboard/server/node_modules \
-    /workspaces/panopticon/packages/contracts/node_modules \
     /home/node/.npm && \
     chown -R node:node /workspaces/panopticon /home/node/.npm
 
