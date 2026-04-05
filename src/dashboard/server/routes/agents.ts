@@ -68,11 +68,10 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../../lib/paths.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
-import { getGitHubConfig, getLinearApiKey } from '../services/tracker-config.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
+import { IssueLifecycle } from '../services/issue-lifecycle.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
   getActiveSessionPath as getActiveSessionPathShared,
@@ -1282,6 +1281,7 @@ const postAgentsRoute = HttpRouter.add(
   Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
+    const lifecycle = yield* IssueLifecycle;
 
     return yield* Effect.tryPromise({
       try: async () => {
@@ -1464,25 +1464,10 @@ const postAgentsRoute = HttpRouter.add(
             prompt: agentPrompt,
           });
 
-          // Update GitHub/Linear issue status
-          const apiKey = getLinearApiKey();
-          const ghInfo = resolveGitHubIssueShared(issueId);
-          if (ghInfo.isGitHub) {
-            const ghConfig = getGitHubConfig();
-            if (ghConfig) {
-              const { owner, repo, number } = ghInfo;
-              const token = ghConfig.token;
-              await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
-              }).catch(() => {});
-              await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-                method: 'POST',
-                headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-                body: JSON.stringify({ labels: ['in-progress'] }),
-              });
-            }
-          }
+          // Update issue status via IssueLifecycle service (PAN-449)
+          await Effect.runPromise(
+            lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catchAll(() => Effect.void))
+          );
 
           Effect.runSync(eventStore.append({
             type: 'agent.started',
@@ -1517,57 +1502,11 @@ const postAgentsRoute = HttpRouter.add(
           return activityId;
         };
 
+        // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
         const updateIssueStatus = async () => {
-          const apiKey = getLinearApiKey();
-          const ghInfo = resolveGitHubIssueShared(issueId);
-          if (ghInfo.isGitHub) {
-            const ghConfig = getGitHubConfig();
-            if (ghConfig) {
-              const { owner, repo, number } = ghInfo;
-              const token = ghConfig.token;
-              await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/planned`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' },
-              }).catch(() => {});
-              await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-                method: 'POST',
-                headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-                body: JSON.stringify({ labels: ['in-progress'] }),
-              });
-            }
-          } else if (apiKey) {
-            try {
-              const getIssueQuery = `
-                query GetIssue($id: String!) {
-                  issue(id: $id) {
-                    id
-                    team { states { nodes { id name type } } }
-                  }
-                }
-              `;
-              const issueResponse = await fetch('https://api.linear.app/graphql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-                body: JSON.stringify({ query: getIssueQuery, variables: { id: issueId } }),
-              });
-              const issueJson = await issueResponse.json() as any;
-              const states = issueJson.data?.issue?.team?.states?.nodes || [];
-              const inProgressState = states.find((s: any) => s.name.toLowerCase() === 'in progress')
-                || states.find((s: any) => s.type === 'started' && !['in planning', 'in review'].includes(s.name.toLowerCase()));
-              if (inProgressState && issueJson.data?.issue?.id) {
-                const updateMutation = `
-                  mutation UpdateIssue($id: String!, $stateId: String!) {
-                    issueUpdate(id: $id, input: { stateId: $stateId }) { success }
-                  }
-                `;
-                await fetch('https://api.linear.app/graphql', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-                  body: JSON.stringify({ query: updateMutation, variables: { id: issueJson.data.issue.id, stateId: inProgressState.id } }),
-                });
-              }
-            } catch {}
-          }
+          await Effect.runPromise(
+            lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catchAll(() => Effect.void))
+          );
         };
 
         if (existsSync(workspacePath) && existsSync(devScript)) {
