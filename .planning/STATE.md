@@ -173,3 +173,9 @@ const result = await Effect.gen(function* () {
 3. **Existing service interactions** — issue-data-service.ts (1016L) is a plain class used by routes. IssueLifecycle will need to integrate with or subsume its cache-patching logic.
 4. **postMergeLifecycle idempotency** — PAN-328 guards in specialists.ts MUST be preserved during refactor.
 5. **Deep-wipe safety** — AgentSpawner.deepWipe must retain the explicit confirmation parameter requirement.
+
+## Specialist Feedback
+
+- **[2026-04-05T01:00Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-05T01:05Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+- **[2026-04-05T01:34Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`

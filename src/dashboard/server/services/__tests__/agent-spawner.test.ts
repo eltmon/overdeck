@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Cause, Effect, Exit } from 'effect';
 
-// ─── Mock fs.existsSync ───────────────────────────────────────────────────────
+// ─── Mock node:fs (existsSync + promises) ────────────────────────────────────
 
 const mockExistsSync = vi.fn();
-vi.mock('node:fs', () => ({ existsSync: mockExistsSync }));
+const mockMkdir = vi.fn().mockResolvedValue(undefined);
+const mockWriteFile = vi.fn().mockResolvedValue(undefined);
+vi.mock('node:fs', () => ({
+  existsSync: mockExistsSync,
+  promises: {
+    mkdir: mockMkdir,
+    writeFile: mockWriteFile,
+  },
+}));
 
 // ─── Mock agents.ts ───────────────────────────────────────────────────────────
 
@@ -19,6 +27,26 @@ vi.mock('../../../../lib/agents.js', () => ({
   stopAgent: mockStopAgent,
   messageAgent: mockMessageAgent,
   normalizeAgentId: (id: string) => id.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+}));
+
+// ─── Mock spawn-planning-session ─────────────────────────────────────────────
+
+const mockSpawnPlanningSession = vi.fn();
+vi.mock('../../../../lib/planning/spawn-planning-session.js', () => ({
+  spawnPlanningSession: mockSpawnPlanningSession,
+}));
+
+// ─── Mock lifecycle workflows (deepWipe) ─────────────────────────────────────
+
+const mockDeepWipe = vi.fn();
+vi.mock('../../../../lib/lifecycle/workflows.js', () => ({
+  deepWipe: mockDeepWipe,
+}));
+
+// ─── Mock projects (resolveProjectFromIssue) ─────────────────────────────────
+
+vi.mock('../../../../lib/projects.js', () => ({
+  resolveProjectFromIssue: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -175,6 +203,126 @@ describe('AgentSpawner Effect service', () => {
 
       const err = await runEffectFail(program);
       expect((err as any)._tag).toBe('AgentStartError');
+    });
+  });
+
+  describe('startPlanning', () => {
+    const PLANNING_OPTS = {
+      workspacePath: WORKSPACE,
+      projectPath: '/projects/myapp',
+      issue: {
+        id: 'uuid-1',
+        identifier: 'PAN-1',
+        title: 'Test issue',
+        description: '# Planning prompt\n\nDo things.',
+        url: 'https://github.com/org/repo/issues/1',
+        source: 'github' as const,
+      },
+    };
+
+    it('spawns a planning session when workspace exists', async () => {
+      mockSpawnPlanningSession.mockResolvedValue({ success: true });
+
+      const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
+
+      const program = Effect.gen(function* () {
+        const spawner = yield* AgentSpawner;
+        yield* spawner.startPlanning('PAN-1', PLANNING_OPTS);
+      }).pipe(Effect.provide(AgentSpawnerLive));
+
+      await runEffect(program);
+      expect(mockSpawnPlanningSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspacePath: WORKSPACE,
+          projectPath: '/projects/myapp',
+          workspaceLocation: 'local',
+        }),
+      );
+    });
+
+    it('fails with WorkspaceNotFound when workspace does not exist', async () => {
+      mockExistsSync.mockReturnValue(false);
+
+      const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
+
+      const program = Effect.gen(function* () {
+        const spawner = yield* AgentSpawner;
+        yield* spawner.startPlanning('PAN-1', PLANNING_OPTS);
+      }).pipe(Effect.provide(AgentSpawnerLive));
+
+      const err = await runEffectFail(program);
+      expect((err as any)._tag).toBe('WorkspaceNotFound');
+    });
+
+    it('wraps planning session failure as AgentStartError', async () => {
+      mockSpawnPlanningSession.mockResolvedValue({ success: false, error: 'tmux unavailable' });
+
+      const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
+
+      const program = Effect.gen(function* () {
+        const spawner = yield* AgentSpawner;
+        yield* spawner.startPlanning('PAN-1', PLANNING_OPTS);
+      }).pipe(Effect.provide(AgentSpawnerLive));
+
+      const err = await runEffectFail(program);
+      expect((err as any)._tag).toBe('AgentStartError');
+      expect((err as any).message).toContain('tmux unavailable');
+    });
+  });
+
+  describe('deepWipe', () => {
+    it('calls deepWipe with confirmed:true', async () => {
+      mockDeepWipe.mockResolvedValue({ success: true, steps: [] });
+
+      const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
+
+      const program = Effect.gen(function* () {
+        const spawner = yield* AgentSpawner;
+        yield* spawner.deepWipe('PAN-1', { confirmed: true });
+      }).pipe(Effect.provide(AgentSpawnerLive));
+
+      await runEffect(program);
+      expect(mockDeepWipe).toHaveBeenCalledWith(
+        expect.objectContaining({ issueId: 'PAN-1' }),
+        expect.objectContaining({ deleteWorkspace: true, deleteBranches: true, resetIssue: true }),
+      );
+    });
+
+    it('respects custom deleteWorkspace/deleteBranches/resetIssue options', async () => {
+      mockDeepWipe.mockResolvedValue({ success: true, steps: [] });
+
+      const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
+
+      const program = Effect.gen(function* () {
+        const spawner = yield* AgentSpawner;
+        yield* spawner.deepWipe('PAN-1', {
+          confirmed: true,
+          deleteWorkspace: false,
+          deleteBranches: false,
+          resetIssue: false,
+        });
+      }).pipe(Effect.provide(AgentSpawnerLive));
+
+      await runEffect(program);
+      expect(mockDeepWipe).toHaveBeenCalledWith(
+        expect.objectContaining({ issueId: 'PAN-1' }),
+        expect.objectContaining({ deleteWorkspace: false, deleteBranches: false, resetIssue: false }),
+      );
+    });
+
+    it('wraps deepWipe errors as AgentStartError', async () => {
+      mockDeepWipe.mockRejectedValue(new Error('branch deletion failed'));
+
+      const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
+
+      const program = Effect.gen(function* () {
+        const spawner = yield* AgentSpawner;
+        yield* spawner.deepWipe('PAN-1', { confirmed: true });
+      }).pipe(Effect.provide(AgentSpawnerLive));
+
+      const err = await runEffectFail(program);
+      expect((err as any)._tag).toBe('AgentStartError');
+      expect((err as any).message).toContain('branch deletion failed');
     });
   });
 });

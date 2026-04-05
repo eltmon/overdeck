@@ -106,8 +106,7 @@ const getMissionControlActivityRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
@@ -348,9 +347,7 @@ const getMissionControlActivityRoute = HttpRouter.add(
           console.error('Error fetching mission control activity:', error);
           return jsonResponse({ error: 'Failed to fetch activity: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -363,8 +360,7 @@ const getMissionControlPlanningRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
@@ -454,9 +450,7 @@ const getMissionControlPlanningRoute = HttpRouter.add(
           console.error('Error fetching planning artifacts:', error);
           return jsonResponse({ error: 'Failed to fetch planning artifacts: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -470,8 +464,7 @@ const postMissionControlStatusReviewRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = issueId.toLowerCase();
         const issuePrefix = issueId.split('-')[0];
@@ -710,9 +703,7 @@ ${issueContext ? `## Issue Tracker Data\n${issueContext}\n` : ''}---
           console.error('Error generating status review:', error);
           return jsonResponse({ error: 'Failed to generate status review: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -726,8 +717,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { type, filename, content } = body;
         const issueLower = issueId.toLowerCase();
@@ -767,9 +757,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
           console.error('Error uploading artifact:', error);
           return jsonResponse({ error: 'Failed to upload artifact: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -784,8 +772,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { tracker } = body;
         const issueLower = issueId.toLowerCase();
@@ -929,9 +916,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
           console.error('Error syncing discussions:', error);
           return jsonResponse({ error: 'Failed to sync discussions: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -946,8 +931,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { shadow } = body;
         const issueLower = issueId.toLowerCase();
@@ -976,9 +960,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
           console.error('Error initializing planning directory:', error);
           return jsonResponse({ error: 'Failed to initialize planning directory: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -988,8 +970,7 @@ const getMissionControlProjectsRoute = HttpRouter.add(
   'GET',
   '/api/mission-control/projects',
   Effect.gen(function* () {
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const projects = listProjects();
 
@@ -1199,9 +1180,7 @@ const getMissionControlProjectsRoute = HttpRouter.add(
           console.error('Error fetching project tree:', error);
           return jsonResponse({ error: 'Failed to fetch project tree: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 

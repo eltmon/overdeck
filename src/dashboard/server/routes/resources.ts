@@ -58,8 +58,8 @@ const getResourcesRoute = HttpRouter.add(
   'GET',
   '/api/resources',
   Effect.gen(function* () {
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const collector = dockerStatsCollector;
         const containers = collector ? collector.getStats() : [];
         const stoppedContainers: unknown[] = [];
@@ -86,12 +86,10 @@ const getResourcesRoute = HttpRouter.add(
           agents,
           updatedAt: new Date().toISOString(),
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to fetch resources: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -130,8 +128,8 @@ const getContainerDetailsRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid container ID' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         // Fetch container inspect + logs in parallel
         const [inspectResult, logsResult] = await Promise.all([
           execAsync(`docker inspect --format '{{json .}}' "${containerId}" 2>/dev/null`, { encoding: 'utf-8', timeout: 5000 })
@@ -175,12 +173,10 @@ const getContainerDetailsRoute = HttpRouter.add(
         };
 
         return jsonResponse(details);
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to fetch container details: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -198,17 +194,15 @@ const deleteDockerContainerRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid container ID' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         await execAsync(`docker rm "${id}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
         Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return jsonResponse({ ok: true });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -219,17 +213,15 @@ const postPruneContainersRoute = HttpRouter.add(
   '/api/resources/docker/prune-containers',
   Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { stdout } = await execAsync('docker container prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 });
         Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return jsonResponse({ ok: true, output: stdout.trim() });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -247,17 +239,15 @@ const deleteDockerNetworkRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid network name' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         await execAsync(`docker network rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
         Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return jsonResponse({ ok: true });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -275,17 +265,15 @@ const deleteDockerVolumeRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid volume name' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         await execAsync(`docker volume rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
         Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return jsonResponse({ ok: true });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -296,17 +284,15 @@ const postPruneVolumesRoute = HttpRouter.add(
   '/api/resources/docker/prune-volumes',
   Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { stdout } = await execAsync('docker volume prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 });
         Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
         return jsonResponse({ ok: true, output: stdout.trim() });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 

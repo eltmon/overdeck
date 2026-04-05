@@ -147,8 +147,8 @@ function getProjectPathForIssue(issuePrefix: string): string {
 const getSpecialistsRoute = HttpRouter.add(
   'GET',
   '/api/specialists',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const {
         getAllSpecialistStatus,
         getAllProjectSpecialistStatuses,
@@ -161,16 +161,14 @@ const getSpecialistsRoute = HttpRouter.add(
         specialists: legacySpecialists,
         projects: projectSpecialists,
       });
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting specialists:', error);
       return jsonResponse(
         { error: 'Failed to get specialists: ' + msg },
         { status: 500 },
       );
-    },
-  }),
+      }}),
 );
 
 // ─── Route: POST /api/specialists/reset-all ───────────────────────────────────
@@ -179,8 +177,8 @@ const getSpecialistsRoute = HttpRouter.add(
 const postSpecialistsResetAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/reset-all',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const {
         getAllSpecialists,
         clearSessionId,
@@ -235,16 +233,14 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
         results,
         reviewStatusesReset,
       });
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error resetting all specialists:', error);
       return jsonResponse(
         { error: 'Failed to reset specialists: ' + msg },
         { status: 500 },
       );
-    },
-  }),
+      }}),
 );
 
 // ─── Route: POST /api/specialists/done ───────────────────────────────────────
@@ -517,8 +513,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/logs/cleanup-all',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const { cleanupAllLogs } = await import('../../../lib/cloister/specialist-logs.js');
       const results = cleanupAllLogs();
 
@@ -528,16 +524,14 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
         byProject: results.byProject,
         message: `Cleaned up ${results.totalDeleted} old logs`,
       });
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error cleaning up all logs:', error);
       return jsonResponse(
         { error: 'Failed to clean up logs: ' + msg },
         { status: 500 },
       );
-    },
-  }),
+      }}),
 );
 
 // ─── Route: GET /api/specialists/queues ───────────────────────────────────────
@@ -546,8 +540,8 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
 const getSpecialistQueuesRoute = HttpRouter.add(
   'GET',
   '/api/specialists/queues',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const { getAllSpecialists, checkSpecialistQueue } =
         await import('../../../lib/cloister/specialists.js');
       const specialists = getAllSpecialists();
@@ -566,16 +560,14 @@ const getSpecialistQueuesRoute = HttpRouter.add(
       );
 
       return jsonResponse({ queues });
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting specialist queues:', error);
       return jsonResponse(
         { error: 'Failed to get specialist queues: ' + msg },
         { status: 500 },
       );
-    },
-  }),
+      }}),
 );
 
 // ─── Route: GET /api/specialists/projects ────────────────────────────────────
@@ -584,22 +576,20 @@ const getSpecialistQueuesRoute = HttpRouter.add(
 const getSpecialistsProjectsRoute = HttpRouter.add(
   'GET',
   '/api/specialists/projects',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const { getAllProjectSpecialistStatuses } =
         await import('../../../lib/cloister/specialists.js');
       const specialists = await getAllProjectSpecialistStatuses();
       return jsonResponse(specialists);
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting project specialists:', error);
       return jsonResponse(
         { error: 'Failed to get project specialists: ' + msg },
         { status: 500 },
       );
-    },
-  }),
+      }}),
 );
 
 // ─── Route: POST /api/specialists/:name/wake ─────────────────────────────────
@@ -614,8 +604,8 @@ const postSpecialistWakeRoute = HttpRouter.add(
     const { sessionId } = body as { sessionId?: string };
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const {
           getTmuxSessionName,
           getSessionId,
@@ -681,16 +671,14 @@ const postSpecialistWakeRoute = HttpRouter.add(
           tmuxSession,
           sessionId: useSessionId,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error waking specialist:', error);
         return jsonResponse(
           { error: 'Failed to wake specialist: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -705,8 +693,8 @@ const postSpecialistResetRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const { reinitialize = false } = body as { reinitialize?: boolean };
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const {
           clearSessionId,
           isRunning,
@@ -735,16 +723,14 @@ const postSpecialistResetRoute = HttpRouter.add(
           message: `Specialist ${name} reset`,
           sessionCleared: wasDeleted,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error resetting specialist:', error);
         return jsonResponse(
           { error: 'Failed to reset specialist: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -757,8 +743,8 @@ const postSpecialistInitRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { initializeSpecialist } = await import('../../../lib/cloister/specialists.js');
         const result = await initializeSpecialist(name as SpecialistType);
 
@@ -772,16 +758,14 @@ const postSpecialistInitRoute = HttpRouter.add(
           tmuxSession: result.tmuxSession,
           note: 'Session ID will be available after Claude responds. Use "claude config get sessionId" in the tmux session to get it, then update via /reset with reinitialize.',
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error initializing specialist:', error);
         return jsonResponse(
           { error: 'Failed to initialize specialist: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -815,8 +799,8 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         // Write status to specialist's state directory
         const specialistDir = join(homedir(), '.panopticon', 'specialists', name);
         mkdirSync(specialistDir, { recursive: true });
@@ -860,16 +844,14 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
         }
 
         return jsonResponse({ success: true });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error saving specialist status:', error);
         return jsonResponse(
           { error: 'Failed to save status: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -882,8 +864,8 @@ const getSpecialistCostRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { getSessionId } = await import('../../../lib/cloister/specialists.js');
         const sessionId = getSessionId(name as SpecialistType);
 
@@ -960,12 +942,10 @@ const getSpecialistCostRoute = HttpRouter.add(
           cacheWriteTokens,
           model: detectedModel,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         console.error('Error getting specialist cost:', error);
         return jsonResponse({ cost: 0, inputTokens: 0, outputTokens: 0 });
-      },
-    });
+        }})
   }),
 );
 
@@ -985,8 +965,8 @@ const getSpecialistQueueRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { checkSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
         const queue = checkSpecialistQueue(name as SpecialistType);
 
@@ -997,16 +977,14 @@ const getSpecialistQueueRoute = HttpRouter.add(
           totalCount: queue.items.length,
           items: queue.items,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error getting queue for ${name}:`, error);
         return jsonResponse(
           { error: `Failed to get queue for ${name}: ${msg}` },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1044,8 +1022,8 @@ const postSpecialistQueueRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId is required' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { spawnEphemeralSpecialist, submitToSpecialistQueue } =
           await import('../../../lib/cloister/specialists.js');
 
@@ -1084,16 +1062,14 @@ const postSpecialistQueueRoute = HttpRouter.add(
           queued: false,
           ...result,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error queuing work to ${name}:`, error);
         return jsonResponse(
           { error: `Failed to queue work to ${name}: ${msg}` },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1114,8 +1090,8 @@ const deleteSpecialistQueueItemRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { completeSpecialistTask } = await import('../../../lib/cloister/specialists.js');
         const success = completeSpecialistTask(name as SpecialistType, itemId);
 
@@ -1130,16 +1106,14 @@ const deleteSpecialistQueueItemRoute = HttpRouter.add(
           success: true,
           message: `Removed item ${itemId} from ${name}'s queue`,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error removing item from ${name}'s queue:`, error);
         return jsonResponse(
           { error: `Failed to remove item: ${msg}` },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1168,8 +1142,8 @@ const putSpecialistQueueReorderRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { reorderHookItems } = await import('../../../lib/hooks.js');
         const success = reorderHookItems(name, itemIds as string[]);
 
@@ -1184,16 +1158,14 @@ const putSpecialistQueueReorderRoute = HttpRouter.add(
           success: true,
           message: `Reordered queue for ${name}`,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error reordering queue for ${name}:`, error);
         return jsonResponse(
           { error: `Failed to reorder queue: ${msg}` },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1225,8 +1197,8 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const {
           getTmuxSessionName,
           completeSpecialistTask,
@@ -1382,13 +1354,11 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
           issueId,
           nextTaskQueued: !!nextValidTask,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error processing auto-complete for ${name}:`, error);
         return jsonResponse({ error: msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -1409,21 +1379,19 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { getSpecialistStatus } = await import('../../../lib/cloister/specialists.js');
         const status = await getSpecialistStatus(type, project);
         return jsonResponse(status);
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting per-project specialist status:', error);
         return jsonResponse(
           { error: 'Failed to get specialist status: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1444,8 +1412,8 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { getTmuxSessionName } = await import('../../../lib/cloister/specialists.js');
         const tmuxSession = getTmuxSessionName(type, project);
         await execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {});
@@ -1458,16 +1426,14 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
           success: true,
           message: `Killed ${type} (${project})`,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error killing per-project specialist:', error);
         return jsonResponse(
           { error: 'Failed to kill specialist: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1487,21 +1453,19 @@ const getProjectSpecialistQueueRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { checkSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
         const queue = checkSpecialistQueue(type);
         return jsonResponse(queue);
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting per-project specialist queue:', error);
         return jsonResponse(
           { error: 'Failed to get queue: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1534,8 +1498,8 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { spawnEphemeralSpecialist } = await import('../../../lib/cloister/specialists.js');
         const result = await spawnEphemeralSpecialist(project, type, {
           issueId,
@@ -1550,16 +1514,14 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
         } else {
           return jsonResponse({ error: result.message }, { status: 500 });
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error spawning specialist:', error);
         return jsonResponse(
           { error: 'Failed to spawn specialist: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1586,21 +1548,19 @@ const getProjectSpecialistRunsRoute = HttpRouter.add(
       if (offsetParam) offset = parseInt(offsetParam, 10);
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { listRunLogs } = await import('../../../lib/cloister/specialist-logs.js');
         const runs = listRunLogs(project, type, { limit, offset });
         return jsonResponse(runs);
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error listing run logs:', error);
         return jsonResponse(
           { error: 'Failed to list run logs: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1616,8 +1576,8 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
     const type = params['type'] as string;
     const runId = params['runId'] as string;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { getRunLogPath, isRunLogActive } =
           await import('../../../lib/cloister/specialist-logs.js');
 
@@ -1697,16 +1657,14 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
             Connection: 'keep-alive',
           },
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error streaming run log:', error);
         return jsonResponse(
           { error: 'Failed to stream run log: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1721,8 +1679,8 @@ const getProjectSpecialistRunRoute = HttpRouter.add(
     const type = params['type'] as string;
     const runId = params['runId'] as string;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { getRunLog, parseLogMetadata } =
           await import('../../../lib/cloister/specialist-logs.js');
         const content = getRunLog(project, type, runId);
@@ -1733,16 +1691,14 @@ const getProjectSpecialistRunRoute = HttpRouter.add(
 
         const metadata = parseLogMetadata(content);
         return jsonResponse({ runId, content, metadata });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting run log:', error);
         return jsonResponse(
           { error: 'Failed to get run log: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1763,21 +1719,19 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { terminateSpecialist } = await import('../../../lib/cloister/specialists.js');
         await terminateSpecialist(project, type);
         return jsonResponse({ success: true, message: 'Specialist terminated' });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error terminating specialist:', error);
         return jsonResponse(
           { error: 'Failed to terminate specialist: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1798,8 +1752,8 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { pauseGracePeriod } = await import('../../../lib/cloister/specialists.js');
         const success = pauseGracePeriod(project, type);
 
@@ -1811,16 +1765,14 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
             { status: 400 },
           );
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error pausing grace period:', error);
         return jsonResponse(
           { error: 'Failed to pause grace period: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1841,8 +1793,8 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { resumeGracePeriod } = await import('../../../lib/cloister/specialists.js');
         const success = resumeGracePeriod(project, type);
 
@@ -1854,16 +1806,14 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
             { status: 400 },
           );
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error resuming grace period:', error);
         return jsonResponse(
           { error: 'Failed to resume grace period: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1884,24 +1834,22 @@ const postProjectSpecialistGraceExitRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { exitGracePeriod } = await import('../../../lib/cloister/specialists.js');
         exitGracePeriod(project, type);
         return jsonResponse({
           success: true,
           message: 'Specialist terminated immediately',
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error exiting grace period:', error);
         return jsonResponse(
           { error: 'Failed to exit grace period: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1922,8 +1870,8 @@ const getProjectSpecialistGraceRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { getGracePeriodState } = await import('../../../lib/cloister/specialists.js');
         const state = getGracePeriodState(project, type);
 
@@ -1932,16 +1880,14 @@ const getProjectSpecialistGraceRoute = HttpRouter.add(
         } else {
           return jsonResponse({ error: 'No active grace period' }, { status: 404 });
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting grace period state:', error);
         return jsonResponse(
           { error: 'Failed to get grace period state: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1955,8 +1901,8 @@ const getProjectSpecialistContextRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { loadContextDigest } =
           await import('../../../lib/cloister/specialist-context.js');
         const digest = loadContextDigest(project, type);
@@ -1966,16 +1912,14 @@ const getProjectSpecialistContextRoute = HttpRouter.add(
         } else {
           return jsonResponse({ error: 'No context digest found' }, { status: 404 });
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting context digest:', error);
         return jsonResponse(
           { error: 'Failed to get context digest: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1989,8 +1933,8 @@ const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { regenerateContextDigest } =
           await import('../../../lib/cloister/specialist-context.js');
         const digest = await regenerateContextDigest(project, type);
@@ -2003,16 +1947,14 @@ const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
             { status: 500 },
           );
         }
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error regenerating context digest:', error);
         return jsonResponse(
           { error: 'Failed to regenerate context digest: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -2042,8 +1984,8 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { signalSpecialistCompletion } =
           await import('../../../lib/cloister/specialists.js');
         signalSpecialistCompletion(project, type, { status, notes });
@@ -2051,16 +1993,14 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
           success: true,
           message: 'Specialist completion signaled, grace period started',
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error signaling completion:', error);
         return jsonResponse(
           { error: 'Failed to signal completion: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -2115,8 +2055,8 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { cleanupOldLogs } = await import('../../../lib/cloister/specialist-logs.js');
         const { getSpecialistRetention } = await import('../../../lib/projects.js');
 
@@ -2128,16 +2068,14 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
           deleted,
           message: `Cleaned up ${deleted} old logs`,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error cleaning up logs:', error);
         return jsonResponse(
           { error: 'Failed to clean up logs: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 

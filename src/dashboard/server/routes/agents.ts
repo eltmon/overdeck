@@ -192,8 +192,7 @@ const getAgentsRoute = HttpRouter.add(
   'GET',
   '/api/agents',
   Effect.gen(function* () {
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const now = Date.now();
 
@@ -467,9 +466,7 @@ const getAgentsRoute = HttpRouter.add(
           console.error('Error listing agents:', error);
           return jsonResponse([]);
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -485,8 +482,7 @@ const getAgentOutputRoute = HttpRouter.add(
     const urlOpt = HttpServerRequest.toURL(request);
     const lines = Option.isSome(urlOpt) ? (urlOpt.value.searchParams.get('lines') ?? '100') : '100';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
           const remoteStateFile = join(agentStateDir, 'remote-state.json');
@@ -545,9 +541,7 @@ const getAgentOutputRoute = HttpRouter.add(
           } catch {}
           return jsonResponse({ output: '' });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -561,8 +555,7 @@ const postAgentMessageRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const { message } = body as any;
           if (!message) {
@@ -599,9 +592,7 @@ const postAgentMessageRoute = HttpRouter.add(
           console.error('Error sending message:', error);
           return jsonResponse({ error: 'Failed to send message' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -615,8 +606,7 @@ const deleteAgentRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           stopAgent(id);
           Effect.runSync(eventStore.append({
@@ -629,9 +619,7 @@ const deleteAgentRoute = HttpRouter.add(
           console.error('Error stopping agent:', error);
           return jsonResponse({ error: 'Failed to stop agent' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -647,8 +635,7 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
     const urlOpt = HttpServerRequest.toURL(request);
     const hours = Option.isSome(urlOpt) ? (urlOpt.value.searchParams.get('hours') ?? '24') : '24';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const { getHealthHistory } = await import('../../../lib/database/health-events-db.js');
           const endTime = new Date();
@@ -664,9 +651,7 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
           console.error('Error fetching health history:', error);
           return jsonResponse({ error: 'Failed to fetch health history' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -680,8 +665,7 @@ const postAgentPokeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const { message } = body as any;
           const defaultPokeMessage =
@@ -697,9 +681,7 @@ const postAgentPokeRoute = HttpRouter.add(
           console.error('Error poking agent:', error);
           return jsonResponse({ error: 'Failed to poke agent' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -712,8 +694,7 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const questions = await getAgentPendingQuestions(id);
           return jsonResponse({ pending: questions.length > 0, questions });
@@ -721,9 +702,7 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
           console.error('Error checking pending questions:', error);
           return jsonResponse({ pending: false, questions: [] });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -737,8 +716,7 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const { answers } = body as any;
           if (!answers || !Array.isArray(answers) || answers.length === 0) {
@@ -781,9 +759,7 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
           console.error('Error sending answer:', error);
           return jsonResponse({ error: 'Failed to send answer' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -797,8 +773,7 @@ const postAgentHeartbeatRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const { state, tool, timestamp } = body as any;
           saveAgentRuntimeState(id, {
@@ -811,9 +786,7 @@ const postAgentHeartbeatRoute = HttpRouter.add(
           console.error('Error saving heartbeat:', error);
           return jsonResponse({ error: 'Failed to save heartbeat' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -830,8 +803,7 @@ const getAgentActivityRoute = HttpRouter.add(
     const limitStr = Option.isSome(urlOpt) ? (urlOpt.value.searchParams.get('limit') ?? '100') : '100';
     const limit = parseInt(limitStr) || 100;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const activity = getActivity(id, limit);
           return jsonResponse({ activity });
@@ -839,9 +811,7 @@ const getAgentActivityRoute = HttpRouter.add(
           console.error('Error reading activity:', error);
           return jsonResponse({ error: 'Failed to read activity' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -854,8 +824,7 @@ const getAgentFilesRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const agentState = getAgentState(id);
           if (!agentState?.workspace) {
@@ -885,9 +854,7 @@ const getAgentFilesRoute = HttpRouter.add(
           console.error('[god-view] files error:', error);
           return jsonResponse({ files: [] });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -904,8 +871,7 @@ const getAgentTimelineRoute = HttpRouter.add(
     const limitStr = Option.isSome(urlOpt) ? (urlOpt.value.searchParams.get('limit') ?? '50') : '50';
     const limit = parseInt(limitStr) || 50;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const activity = getActivity(id, limit);
           const agentState = getAgentState(id);
@@ -923,9 +889,7 @@ const getAgentTimelineRoute = HttpRouter.add(
           console.error('[god-view] timeline error:', error);
           return jsonResponse({ timeline: [] });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -940,8 +904,7 @@ const postAgentSuspendRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const { sessionId } = body as any;
           const effectiveSessionId = sessionId || getSessionId(id);
@@ -968,9 +931,7 @@ const postAgentSuspendRoute = HttpRouter.add(
           console.error('Error suspending agent:', error);
           return jsonResponse({ error: 'Failed to suspend agent' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -984,8 +945,7 @@ const postAgentResumeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const { message } = body as any;
           const result = await resumeAgent(id, message);
@@ -998,9 +958,7 @@ const postAgentResumeRoute = HttpRouter.add(
           console.error('Error resuming agent:', error);
           return jsonResponse({ error: 'Failed to resume agent' }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1013,8 +971,7 @@ const getAgentCloisterHealthRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const service = getCloisterService();
           const health = service.getAgentHealth(id);
@@ -1027,9 +984,7 @@ const getAgentCloisterHealthRoute = HttpRouter.add(
           console.error('Error getting agent health:', error);
           return jsonResponse({ error: 'Failed to get agent health: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1042,8 +997,7 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const agentState = getAgentState(id);
           if (!agentState) {
@@ -1088,9 +1042,7 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
           console.error('Error getting handoff suggestion:', error);
           return jsonResponse({ error: 'Failed to get handoff suggestion: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1104,8 +1056,7 @@ const postAgentHandoffRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const { toModel, reason } = body as any;
           if (!toModel) {
@@ -1131,9 +1082,7 @@ const postAgentHandoffRoute = HttpRouter.add(
           console.error('Error executing handoff:', error);
           return jsonResponse({ error: 'Failed to execute handoff: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1146,8 +1095,7 @@ const getAgentHandoffsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const handoffs = readAgentHandoffEvents(id);
           return jsonResponse({ handoffs });
@@ -1156,9 +1104,7 @@ const getAgentHandoffsRoute = HttpRouter.add(
           console.error('Error getting agent handoffs:', error);
           return jsonResponse({ error: 'Failed to get agent handoffs: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1171,8 +1117,7 @@ const getAgentCostRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const agentState = getAgentState(id);
           if (!agentState) {
@@ -1267,9 +1212,7 @@ const getAgentCostRoute = HttpRouter.add(
           console.error('Error getting agent cost:', error);
           return jsonResponse({ error: 'Failed to get agent cost: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1283,8 +1226,7 @@ const postAgentsRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { issueId, projectId } = body as any;
 
@@ -1646,9 +1588,7 @@ const postAgentsRoute = HttpRouter.add(
           console.error('Error starting agent:', error);
           return jsonResponse({ error: 'Failed to start agent: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 

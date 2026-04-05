@@ -123,7 +123,7 @@
       {
         "id": "pan-449-3",
         "title": "Extract GitHubClient Effect service + tests",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-449"
@@ -159,7 +159,7 @@
           {
             "id": "pan-449-3.ac4",
             "title": "Rate limit headers tracked and respected",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -239,7 +239,7 @@
       {
         "id": "pan-449-5",
         "title": "Extract IssueLifecycle Effect service + tests",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "expert",
           "issueLabel": "pan-449"
@@ -267,7 +267,7 @@
           {
             "id": "pan-449-5.ac3",
             "title": "transitionTo patches issue-data-service cache + emits domain event",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -283,7 +283,7 @@
           {
             "id": "pan-449-5.ac5",
             "title": "close removes planning/in-review labels, emits issue.closed event",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -309,7 +309,7 @@
       {
         "id": "pan-449-6",
         "title": "Extract WorkspaceService Effect service + tests",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-449"
@@ -321,7 +321,7 @@
           {
             "id": "pan-449-6.ac1",
             "title": "WorkspaceService with create, clean, containerize methods",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -337,7 +337,7 @@
           {
             "id": "pan-449-6.ac3",
             "title": "create is idempotent (no error if workspace exists)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -345,7 +345,7 @@
           {
             "id": "pan-449-6.ac4",
             "title": "clean preview mode returns list without deleting, clean removes artifacts but preserves .planning",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -353,7 +353,7 @@
           {
             "id": "pan-449-6.ac5",
             "title": "containerize creates docker-compose.yml and starts containers",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -361,7 +361,7 @@
           {
             "id": "pan-449-6.ac6",
             "title": "Replaces all exports from src/lib/workspace-manager.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -379,7 +379,7 @@
       {
         "id": "pan-449-7",
         "title": "Extract AgentSpawner Effect service + tests",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "expert",
           "issueLabel": "pan-449"
@@ -391,7 +391,7 @@
           {
             "id": "pan-449-7.ac1",
             "title": "AgentSpawner with startWork, startPlanning, kill, deepWipe methods",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -407,7 +407,7 @@
           {
             "id": "pan-449-7.ac3",
             "title": "startPlanning: creates .planning dir, writes PLANNING_PROMPT.md, sets tmux options",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -423,7 +423,7 @@
           {
             "id": "pan-449-7.ac5",
             "title": "deepWipe: requires explicit confirmation param, removes workspace/branches/state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -431,7 +431,7 @@
           {
             "id": "pan-449-7.ac6",
             "title": "Replaces all exports from src/lib/agents.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -439,7 +439,7 @@
           {
             "id": "pan-449-7.ac7",
             "title": "Unit tests: 13+ cases covering start, planning, kill, deepWipe, beads/plan validation",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -449,7 +449,7 @@
       {
         "id": "pan-449-8",
         "title": "Refactor major route files to use Effect services",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "expert",
           "issueLabel": "pan-449"
@@ -461,7 +461,7 @@
           {
             "id": "pan-449-8.ac1",
             "title": "All 6 route files refactored to use new services",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -469,7 +469,7 @@
           {
             "id": "pan-449-8.ac2",
             "title": "Zero Effect.tryPromise wrappers remaining in these files",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -485,7 +485,7 @@
           {
             "id": "pan-449-8.ac4",
             "title": "All error handling uses Effect.catchTag with typed errors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -509,7 +509,7 @@
           {
             "id": "pan-449-8.ac7",
             "title": "Route files reduced from ~12,800 lines total to ~4,000",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -527,7 +527,7 @@
       {
         "id": "pan-449-9",
         "title": "Refactor minor route files + wire service layers in server.ts",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-449"
@@ -539,7 +539,7 @@
           {
             "id": "pan-449-9.ac1",
             "title": "All 7 minor route files refactored \u2014 zero Effect.tryPromise wrappers",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -581,7 +581,7 @@
       {
         "id": "pan-449-10",
         "title": "Update CLI callers to use Effect services",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-449"
@@ -593,7 +593,7 @@
           {
             "id": "pan-449-10.ac1",
             "title": "All 12 CLI files importing lib/agents.ts updated to use AgentSpawner service",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -601,7 +601,7 @@
           {
             "id": "pan-449-10.ac2",
             "title": "All 3 CLI files importing lib/workspace-manager.ts updated to use WorkspaceService",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -609,7 +609,7 @@
           {
             "id": "pan-449-10.ac3",
             "title": "agent-enrichment-service.ts updated to use AgentSpawner",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -617,7 +617,7 @@
           {
             "id": "pan-449-10.ac4",
             "title": "Old lib/agents.ts and lib/workspace-manager.ts removed or reduced to re-exports",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -643,7 +643,7 @@
       {
         "id": "pan-449-11",
         "title": "Integration tests + error channel tests",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-449"
@@ -655,7 +655,7 @@
           {
             "id": "pan-449-11.ac1",
             "title": "Integration tests for issue routes (6 cases: start-planning, complete-planning, abort, reset, cancel, move-status)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -663,7 +663,7 @@
           {
             "id": "pan-449-11.ac2",
             "title": "Integration tests for agent routes (5 cases: start, start-reject-no-beads, start-reject-no-plan, kill, deep-wipe)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -671,7 +671,7 @@
           {
             "id": "pan-449-11.ac3",
             "title": "Integration tests for specialist routes (4 cases: review-done, test-done, merge-done, idempotency guard)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -679,7 +679,7 @@
           {
             "id": "pan-449-11.ac4",
             "title": "Error channel tests (8 cases: one per error type \u2192 correct HTTP status + JSON shape)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
