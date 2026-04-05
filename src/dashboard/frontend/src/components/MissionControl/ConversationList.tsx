@@ -16,6 +16,8 @@ export interface Conversation {
   endedAt: string | null;
   lastAttachedAt: string | null;
   sessionAlive: boolean;
+  /** Absolute path to the Claude Code JSONL session file. Null until discovered. */
+  sessionFile?: string | null;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
