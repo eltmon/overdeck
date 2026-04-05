@@ -40,6 +40,12 @@ export interface LinearLabel {
   readonly name: string;
 }
 
+export interface LinearComment {
+  readonly body: string;
+  readonly author: string;
+  readonly createdAt: string;
+}
+
 // ─── Service interface ────────────────────────────────────────────────────────
 
 export interface LinearClientShape {
@@ -98,6 +104,13 @@ export interface LinearClientShape {
     issueId: string,
     labelId: string,
   ) => Effect.Effect<void, TrackerApiError>;
+
+  /**
+   * Get comments on an issue by UUID.
+   */
+  readonly getComments: (
+    issueId: string,
+  ) => Effect.Effect<ReadonlyArray<LinearComment>, TrackerApiError>;
 }
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
@@ -232,6 +245,25 @@ function makeLinearClientImpl(sdk: LinearSdkClient): LinearClientShape {
         },
         catch: (err) => wrapLinearError('linear', err),
       }),
+
+    getComments: (issueId) =>
+      Effect.tryPromise({
+        try: async () => {
+          const issue = await sdk.issue(issueId);
+          const commentsConn = await issue.comments();
+          return await Promise.all(
+            commentsConn.nodes.map(async (c: any) => {
+              const user = await c.user;
+              return {
+                body: (c.body ?? '') as string,
+                author: (user?.name ?? 'Unknown') as string,
+                createdAt: (c.createdAt ?? '') as string,
+              } satisfies LinearComment;
+            }),
+          );
+        },
+        catch: (err) => wrapLinearError('linear', err),
+      }),
   };
 }
 
@@ -267,6 +299,7 @@ export const LinearClientOptionalLive = Layer.effect(
         findOrCreateLabel: () => fail,
         addLabel: () => fail,
         removeLabel: () => fail,
+        getComments: () => fail,
       } as LinearClientShape;
     }
     const sdk = new LinearSdkClient({ apiKey });
