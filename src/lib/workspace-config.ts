@@ -238,6 +238,11 @@ export interface ProjectConfig {
   /** Legacy: custom workspace command (deprecated, use workspace config) */
   workspace_command?: string;
   workspace_remove_command?: string;
+
+  /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
+  package_manager?: 'bun' | 'npm' | 'pnpm';
+  /** Local workspace packages that need building before quality gates */
+  workspace_packages?: Array<{ path: string; build_command: string }>;
 }
 
 export interface ProjectsConfig {

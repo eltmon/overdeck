@@ -1561,26 +1561,20 @@ const postAgentsRoute = HttpRouter.add(
                     await new Promise(r => setTimeout(r, pollIntervalMs));
                   }
 
-                  // Docker named volumes create root-owned empty node_modules on the host.
-                  // Agents run on the host, so replace with symlinks to main repo's node_modules.
-                  const nodeModulesFixes = [
-                    { ws: join(workspacePath, 'node_modules'), main: join(projectPath, 'node_modules') },
-                    { ws: join(workspacePath, 'src', 'dashboard', 'frontend', 'node_modules'), main: join(projectPath, 'src', 'dashboard', 'frontend', 'node_modules') },
-                  ];
-                  for (const { ws: nmDir, main: mainNm } of nodeModulesFixes) {
+                  // Docker named volumes may create root-owned empty node_modules.
+                  // Remove them — workspace creation runs bun install which creates
+                  // correct workspace-aware node_modules with proper local package resolution.
+                  for (const nmDir of [join(workspacePath, 'node_modules'), join(workspacePath, 'src', 'dashboard', 'frontend', 'node_modules')]) {
                     try {
                       if (existsSync(nmDir)) {
                         const stat = await lstat(nmDir);
                         if (!stat.isSymbolicLink()) {
                           await rm(nmDir, { recursive: true, force: true });
-                          await symlink(mainNm, nmDir);
-                          console.log(`[start-agent] Fixed node_modules: ${nmDir} → ${mainNm}`);
+                          console.log(`[start-agent] Removed Docker-created ${nmDir}`);
                         }
-                      } else if (existsSync(mainNm)) {
-                        await symlink(mainNm, nmDir);
                       }
                     } catch (nmErr: any) {
-                      console.warn(`[start-agent] Could not fix node_modules at ${nmDir}: ${nmErr.message}`);
+                      console.warn(`[start-agent] Could not remove ${nmDir}: ${nmErr.message}`);
                     }
                   }
 
