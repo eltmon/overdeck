@@ -1563,6 +1563,20 @@ const postIssueDeepWipeRoute = HttpRouter.add(
           projectName,
         });
 
+        // Emit agent.stopped events so frontend removes agents from store
+        const { getEventStore } = await import('./event-store.js');
+        const eventStore = getEventStore();
+        const issueLower = id.toLowerCase();
+        for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
+          try {
+            eventStore.append({
+              type: 'agent.stopped',
+              timestamp: new Date().toISOString(),
+              payload: { agentId },
+            } as any);
+          } catch { /* non-fatal */ }
+        }
+
         const issueDataService = getIssueDataService();
         issueDataService.invalidateTracker('github').catch(() => {});
         issueDataService.invalidateTracker('linear').catch(() => {});
