@@ -15,7 +15,7 @@
       {
         "id": "pan-449-1",
         "title": "Define typed error types for all services",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-449"
@@ -27,7 +27,7 @@
           {
             "id": "pan-449-1.ac1",
             "title": "All 7 error types defined as Data.TaggedError with appropriate fields",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -35,7 +35,7 @@
           {
             "id": "pan-449-1.ac2",
             "title": "Each error type has a descriptive _tag for Effect.catchTag matching",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -43,7 +43,7 @@
           {
             "id": "pan-449-1.ac3",
             "title": "Exports are clean \u2014 one import path for all error types",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -51,7 +51,7 @@
           {
             "id": "pan-449-1.ac4",
             "title": "TypeScript compiles without errors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -61,7 +61,7 @@
       {
         "id": "pan-449-2",
         "title": "Extract LinearClient Effect service + tests",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-449"
@@ -73,7 +73,7 @@
           {
             "id": "pan-449-2.ac1",
             "title": "LinearClient service with getIssue, updateState, getTeamStates, addComment methods",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -81,7 +81,7 @@
           {
             "id": "pan-449-2.ac2",
             "title": "Uses ServiceMap.Service + Layer.effect pattern matching EventStoreService",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -89,7 +89,7 @@
           {
             "id": "pan-449-2.ac3",
             "title": "Typed errors: TrackerNotConfigured (no API key), IssueNotFound, RateLimited",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -97,7 +97,7 @@
           {
             "id": "pan-449-2.ac4",
             "title": "Built-in retry on 429 with backoff",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -105,7 +105,7 @@
           {
             "id": "pan-449-2.ac5",
             "title": "Unit tests: 7+ cases covering happy path, missing key, not found, rate limit",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -113,7 +113,7 @@
           {
             "id": "pan-449-2.ac6",
             "title": "No inline Linear GraphQL fetch() calls remain in route files after adoption",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -135,7 +135,7 @@
           {
             "id": "pan-449-3.ac1",
             "title": "GitHubClient service with getIssue, addLabel, removeLabel, createComment, closeIssue methods",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -143,7 +143,7 @@
           {
             "id": "pan-449-3.ac2",
             "title": "Uses ServiceMap.Service + Layer.effect pattern",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -151,7 +151,7 @@
           {
             "id": "pan-449-3.ac3",
             "title": "Typed errors: TrackerNotConfigured, IssueNotFound, RateLimited",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -167,7 +167,7 @@
           {
             "id": "pan-449-3.ac5",
             "title": "addLabel creates label if missing, removeLabel handles already-missing gracefully",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -175,7 +175,7 @@
           {
             "id": "pan-449-3.ac6",
             "title": "Unit tests: 6+ cases covering CRUD, 404, rate limits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
       {
         "id": "pan-449-4",
         "title": "Extract RallyClient Effect service + tests",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-449"
@@ -197,7 +197,7 @@
           {
             "id": "pan-449-4.ac1",
             "title": "RallyClient service with getIssue, updateState methods",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -205,7 +205,7 @@
           {
             "id": "pan-449-4.ac2",
             "title": "Uses ServiceMap.Service + Layer.effect pattern",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -213,7 +213,7 @@
           {
             "id": "pan-449-4.ac3",
             "title": "Maps canonical status names to Rally-specific state values",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -221,7 +221,7 @@
           {
             "id": "pan-449-4.ac4",
             "title": "Typed errors: TrackerNotConfigured, IssueNotFound",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -229,7 +229,7 @@
           {
             "id": "pan-449-4.ac5",
             "title": "Unit tests: 3+ cases covering fetch, missing key, state mapping",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -251,7 +251,7 @@
           {
             "id": "pan-449-5.ac1",
             "title": "IssueLifecycle service with transitionTo, addLabel, removeLabel, close methods",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -259,7 +259,7 @@
           {
             "id": "pan-449-5.ac2",
             "title": "transitionTo handles Linear (GraphQL mutation), GitHub (label swap), Rally (WSAPI) paths",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -275,7 +275,7 @@
           {
             "id": "pan-449-5.ac4",
             "title": "transitionTo no-ops when already in target state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -291,7 +291,7 @@
           {
             "id": "pan-449-5.ac6",
             "title": "addLabel and removeLabel are idempotent",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -299,7 +299,7 @@
           {
             "id": "pan-449-5.ac7",
             "title": "Unit tests: 10+ cases covering all tracker paths, idempotency, cache patching, events",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -329,7 +329,7 @@
           {
             "id": "pan-449-6.ac2",
             "title": "create makes git worktree, runs workspace_command, optionally starts Docker",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -369,7 +369,7 @@
           {
             "id": "pan-449-6.ac7",
             "title": "Unit tests: 7+ cases covering create, clean preview/execute, containerize, idempotency",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -399,7 +399,7 @@
           {
             "id": "pan-449-7.ac2",
             "title": "startWork: creates workspace if missing, checks beads init, creates tmux session, writes agent state, transitions issue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -415,7 +415,7 @@
           {
             "id": "pan-449-7.ac4",
             "title": "kill: SIGTERM + cleanup, preserves workspace",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -477,7 +477,7 @@
           {
             "id": "pan-449-8.ac3",
             "title": "Zero inline fetch() calls remaining",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -493,7 +493,7 @@
           {
             "id": "pan-449-8.ac5",
             "title": "postMergeLifecycle idempotency guards preserved in specialists.ts (PAN-328)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -501,7 +501,7 @@
           {
             "id": "pan-449-8.ac6",
             "title": "Deep-wipe confirmation parameter requirement preserved",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -517,7 +517,7 @@
           {
             "id": "pan-449-8.ac8",
             "title": "TypeScript strict mode passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -547,7 +547,7 @@
           {
             "id": "pan-449-9.ac2",
             "title": "server.ts composes all new service layers (LinearClientLive, GitHubClientLive, etc.)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -555,7 +555,7 @@
           {
             "id": "pan-449-9.ac3",
             "title": "Layer dependency graph correctly wired",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -563,7 +563,7 @@
           {
             "id": "pan-449-9.ac4",
             "title": "TypeScript strict mode passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -571,7 +571,7 @@
           {
             "id": "pan-449-9.ac5",
             "title": "Server starts and responds to health check",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -625,7 +625,7 @@
           {
             "id": "pan-449-10.ac5",
             "title": "CLI commands still work (manual smoke test)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -633,7 +633,7 @@
           {
             "id": "pan-449-10.ac6",
             "title": "TypeScript strict mode passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -687,7 +687,7 @@
           {
             "id": "pan-449-11.ac5",
             "title": "All tests pass with `npm test`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -697,7 +697,7 @@
       {
         "id": "pan-449-12",
         "title": "Final quality gates \u2014 typecheck, lint, full test suite",
-        "status": "pending",
+        "status": "completed",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-449"
@@ -709,7 +709,7 @@
           {
             "id": "pan-449-12.ac1",
             "title": "npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -717,7 +717,7 @@
           {
             "id": "pan-449-12.ac2",
             "title": "npm run lint passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -725,7 +725,7 @@
           {
             "id": "pan-449-12.ac3",
             "title": "npm test passes (all existing + new tests)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -733,7 +733,7 @@
           {
             "id": "pan-449-12.ac4",
             "title": "npm run build succeeds",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -741,7 +741,7 @@
           {
             "id": "pan-449-12.ac5",
             "title": "No regressions in existing functionality",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
