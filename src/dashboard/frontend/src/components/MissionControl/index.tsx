@@ -7,7 +7,7 @@ import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { DeaconStatus } from './DeaconStatus';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
-import { ConversationTerminal } from './ConversationTerminal';
+import { ConversationPanel } from '../chat/ConversationPanel';
 import type { Issue } from '../../types';
 import styles from './styles/mission-control.module.css';
 
@@ -216,7 +216,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
             (() => {
               const conv = conversations.find(c => c.name === selectedConversation);
               return conv ? (
-                <ConversationTerminal conversation={conv} />
+                <ConversationPanel conversation={conv} />
               ) : (
                 <div className={styles.contentEmpty}>
                   <div style={{ textAlign: 'center' }}>
