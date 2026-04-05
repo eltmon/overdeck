@@ -7,7 +7,11 @@
 
 import { existsSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Effect, Layer, ServiceMap } from 'effect';
+
+const execAsync = promisify(exec);
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { WorkspaceNotFound, WorkspaceCreateError } from './typed-errors.js';
 
@@ -288,9 +292,6 @@ export const WorkspaceServiceLive = Layer.effect(
               throw new WorkspaceNotFound({ id: issueId });
             }
 
-            const { execAsync } = await import('../../../lib/exec-async.js').catch(() =>
-              import('../../../lib/utils.js'),
-            ) as any;
 
             // Look for existing compose files
             const composePaths = [
