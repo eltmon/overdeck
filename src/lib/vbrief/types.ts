@@ -5,6 +5,14 @@
  * Structured plan format produced by the planning agent and consumed by
  * Cloister for programmatic beads creation and DAG visualization.
  *
+ * New in v0.5 (PAN-453):
+ *   - VBriefReference: external links (issues, PRDs, specs)
+ *   - VBriefDocument.vBRIEFInfo: author (tool identifier), description
+ *   - VBriefPlan: uid (UUID v4), sequence (write counter), references,
+ *     created, updated timestamps
+ *   - VBriefItem: created, completed timestamps
+ *   - VBriefSubItem: created, completed timestamps
+ *
  * Panopticon extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
  *   - metadata.issueLabel: issue ID for beads label filtering
@@ -20,10 +28,20 @@ export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 
+export interface VBriefReference {
+  uri: string;
+  label?: string;
+  type?: string;
+}
+
 export interface VBriefSubItem {
   id: string;
   title: string;
   status: VBriefItemStatus;
+  /** ISO 8601 datetime, set when subItem is created */
+  created?: string;
+  /** ISO 8601 datetime, set when status transitions to 'completed' */
+  completed?: string;
   metadata?: {
     kind?: string;
     [key: string]: unknown;
@@ -35,6 +53,10 @@ export interface VBriefItem {
   title: string;
   status: VBriefItemStatus;
   priority?: VBriefPriority;
+  /** ISO 8601 datetime, set when item is created */
+  created?: string;
+  /** ISO 8601 datetime, set when status transitions to 'completed' */
+  completed?: string;
   /** RFC 3339 date-time (e.g., "2025-09-01T00:00:00Z"). NOT plain date. */
   startDate?: string;
   /** RFC 3339 date-time (e.g., "2025-11-15T00:00:00Z"). NOT plain date. */
@@ -65,6 +87,16 @@ export interface VBriefPlan {
   title: string;
   status: string;
   author?: string;
+  /** UUID v4, generated once at creation */
+  uid?: string;
+  /** Monotonically incrementing write counter, starts at 1 */
+  sequence?: number;
+  /** External references (PRDs, issues, specs) */
+  references?: VBriefReference[];
+  /** ISO 8601 datetime, set at plan creation */
+  created?: string;
+  /** ISO 8601 datetime, updated on every write */
+  updated?: string;
   tags?: string[];
   narratives?: {
     Problem?: string;
@@ -85,6 +117,10 @@ export interface VBriefDocument {
     created: string;
     /** RFC 3339 date-time */
     updated?: string;
+    /** Tool identifier, e.g. "panopticon-cli/0.6.0" */
+    author?: string;
+    /** Human-readable description of the plan */
+    description?: string;
   };
   plan: VBriefPlan;
 }

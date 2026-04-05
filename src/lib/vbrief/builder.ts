@@ -5,6 +5,7 @@
  * All date fields use RFC 3339 date-time format.
  */
 
+import { createRequire } from 'module';
 import type {
   VBriefDocument,
   VBriefPlan,
@@ -14,10 +15,24 @@ import type {
   VBriefItemStatus,
   VBriefPriority,
   VBriefDifficulty,
+  VBriefReference,
 } from './types.js';
+
+const require = createRequire(import.meta.url);
+
+function getPackageVersion(): string {
+  try {
+    // Walk up from this file to find package.json
+    const pkg = require('../../../package.json') as { version: string };
+    return pkg.version;
+  } catch {
+    return '0.0.0';
+  }
+}
 
 export class PlanBuilder {
   private plan: VBriefPlan;
+  private _description?: string;
 
   constructor(id: string, title: string) {
     this.plan = {
@@ -37,6 +52,31 @@ export class PlanBuilder {
 
   author(author: string): this {
     this.plan.author = author;
+    return this;
+  }
+
+  uid(uid: string): this {
+    this.plan.uid = uid;
+    return this;
+  }
+
+  sequence(seq: number): this {
+    this.plan.sequence = seq;
+    return this;
+  }
+
+  references(refs: VBriefReference[]): this {
+    this.plan.references = refs;
+    return this;
+  }
+
+  created(timestamp: string): this {
+    this.plan.created = timestamp;
+    return this;
+  }
+
+  description(desc: string): this {
+    this._description = desc;
     return this;
   }
 
@@ -63,12 +103,14 @@ export class PlanBuilder {
     phase?: number;
     priority?: VBriefPriority;
     subItems?: VBriefSubItem[];
+    created?: string;
   }): this {
     this.plan.items.push({
       id,
       title,
       status: 'pending',
       priority: opts?.priority,
+      created: opts?.created,
       metadata: {
         difficulty: opts?.difficulty,
         phase: opts?.phase,
@@ -91,9 +133,19 @@ export class PlanBuilder {
 
   build(): VBriefDocument {
     const now = new Date().toISOString();
+    const version = getPackageVersion();
     return {
-      vBRIEFInfo: { version: '0.5', created: now },
-      plan: { ...this.plan },
+      vBRIEFInfo: {
+        version: '0.5',
+        created: now,
+        author: `panopticon-cli/${version}`,
+        description: this._description,
+      },
+      plan: {
+        ...this.plan,
+        created: this.plan.created ?? now,
+        updated: now,
+      },
     };
   }
 }

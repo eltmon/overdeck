@@ -221,3 +221,33 @@ When TLDR is available, you'll have these MCP tools:
    - 20 files × 800 tokens (TLDR) = 16k tokens (94% savings)
 
 **Use TLDR liberally to maximize your session effectiveness.**
+
+## vBRIEF Plans
+
+Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
+
+- **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
+- **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
+- **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
+- **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md)
+
+### v0.5 Fields Implemented
+
+`vBRIEFInfo`: `author` (tool identifier), `description`
+
+`plan`: `uid` (UUID v4), `author` (agent model), `sequence` (write counter), `references` (issue URL + PRDs), `created`, `updated`
+
+`items`/`subItems`: `created`, `completed` (set on status → completed)
+
+### Auto-Behaviors
+
+- `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write
+- `complete-planning` copies `STATE.md` and `plan.vbrief.json` to `docs/prds/active/<ID>-plan.*` (skip if exists)
+- `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.planning/prd.md`
+
+### Dashboard Viewer
+
+VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
+- Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
+- List / DAG / Raw JSON tabs
+- Fetches from `GET /api/workspaces/:issueId/plan`

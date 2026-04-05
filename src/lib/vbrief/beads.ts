@@ -262,9 +262,12 @@ export function syncBeadStatusToVBrief(
 
     if (!matchingItem) return null;
 
+    // io.ts handles vBRIEFInfo.updated, plan.updated, plan.sequence, and item.completed
+    // timestamps automatically. Each call below constitutes one write → one sequence increment.
     updateItemStatus(workspacePath, matchingItem.id, status);
 
-    // Also mark all AC subItems as completed when the parent item is completed
+    // Also mark all AC subItems as completed when the parent item is completed.
+    // Each updateSubItemStatus call increments sequence separately (one write per subItem).
     if (status === 'completed' && matchingItem.subItems) {
       for (const sub of matchingItem.subItems) {
         if (sub.metadata?.kind === 'acceptance_criterion' && sub.status !== 'completed') {
