@@ -157,7 +157,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
         try {
         const issue = await Effect.runPromise(
-          linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+          linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
         );
 
         if (!issue) {
@@ -256,7 +256,7 @@ const postIssuePlanRoute = HttpRouter.add(
         }
 
         const issue = await Effect.runPromise(
-          linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+          linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
         );
 
         if (!issue) {
@@ -478,7 +478,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         if (trackerTypeForIssue === 'github' && githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
           const { owner, repo, number } = githubCheck as { owner: string; repo: string; number: number };
           const ghIssue = await Effect.runPromise(
-            github.getIssue(owner, repo, number).pipe(Effect.catchAll((e) => Effect.fail(e))),
+            github.getIssue(owner, repo, number).pipe(Effect.catch((e) => Effect.fail(e))),
           );
 
           const ghConfig = getGitHubConfig();
@@ -488,7 +488,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           const ghComments = await Effect.runPromise(
             github.getComments(owner, repo, number, 50).pipe(
               Effect.map((cs) => cs.map((c) => ({ author: c.user, body: c.body, createdAt: c.createdAt }))),
-              Effect.catchAll(() => Effect.succeed([] as Array<{ author: string; body: string; createdAt: string }>)),
+              Effect.catch(() => Effect.succeed([] as Array<{ author: string; body: string; createdAt: string }>)),
             ),
           );
 
@@ -504,7 +504,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
           // Add "planning" label (ensure it exists, then apply to issue)
           await Effect.runPromise(
-            lifecycle.addLabel(id, 'planning').pipe(Effect.catchAll(() => Effect.void)),
+            lifecycle.addLabel(id, 'planning').pipe(Effect.catch(() => Effect.void)),
           );
 
         } else if (trackerTypeForIssue === 'rally') {
@@ -546,7 +546,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
           // Transition to "In Planning" state
           await Effect.runPromise(
-            lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catchAll(() => Effect.void)),
+            lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void)),
           );
         }
 
@@ -646,13 +646,13 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           sessionName = `planning-${id.toLowerCase()}`;
           // Remove planning label via IssueLifecycle
           await Effect.runPromise(
-            lifecycle.removeLabel(id, 'planning').pipe(Effect.catchAll(() => Effect.void)),
+            lifecycle.removeLabel(id, 'planning').pipe(Effect.catch(() => Effect.void)),
           );
           revertedState = 'Todo (label removed)';
         } else {
           // Resolve issue identifier and session name via LinearClient, then transition to 'open' (Todo)
           const linearIssue = await Effect.runPromise(
-            linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+            linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
           );
 
           if (linearIssue) {
@@ -661,7 +661,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           }
 
           await Effect.runPromise(
-            lifecycle.transitionTo(id, 'open').pipe(Effect.catchAll(() => Effect.void)),
+            lifecycle.transitionTo(id, 'open').pipe(Effect.catch(() => Effect.void)),
           );
           revertedState = 'Todo';
         }
@@ -901,14 +901,14 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         let skipStateUpdate = false;
         if (!githubCheck?.isGitHub) {
           const currentIssue = await Effect.runPromise(
-            linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+            linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
           );
           if (currentIssue?.state.name && currentIssue.state.name.toLowerCase() !== 'in planning' && currentIssue.state.name.toLowerCase() !== 'planning') {
             // Check if already in a "started" state by seeing if it's not an unstarted/planning state
             const stateType = await Effect.runPromise(
               linear.getTeamStates(currentIssue.team.id).pipe(
                 Effect.map((states) => states.find((s) => s.id === currentIssue.state.id)?.type ?? ''),
-                Effect.catchAll(() => Effect.succeed('')),
+                Effect.catch(() => Effect.succeed('')),
               ),
             );
             if (stateType === 'started') {
@@ -921,22 +921,22 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           if (githubCheck.isGitHub) {
             // GitHub: remove 'planning' label, add 'planned' label
             await Effect.runPromise(
-              lifecycle.removeLabel(id, 'planning').pipe(Effect.catchAll(() => Effect.void)),
+              lifecycle.removeLabel(id, 'planning').pipe(Effect.catch(() => Effect.void)),
             );
             await Effect.runPromise(
-              lifecycle.addLabel(id, 'planned').pipe(Effect.catchAll(() => Effect.void)),
+              lifecycle.addLabel(id, 'planned').pipe(Effect.catch(() => Effect.void)),
             );
           } else {
             // Linear: transition to 'open' (maps to unstarted — Planned/Todo/Ready)
             const updatedIssue = await Effect.runPromise(
-              linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+              linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
             );
             await Effect.runPromise(
-              lifecycle.transitionTo(id, 'open').pipe(Effect.catchAll(() => Effect.void)),
+              lifecycle.transitionTo(id, 'open').pipe(Effect.catch(() => Effect.void)),
             );
             // Re-fetch to get new state name for response
             const refreshed = await Effect.runPromise(
-              linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+              linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
             );
             newState = refreshed?.state.name ?? (updatedIssue?.state.name ?? 'Planned');
           }
@@ -1054,7 +1054,7 @@ const postIssueResetRoute = HttpRouter.add(
         if (githubCheck.isGitHub) {
           for (const label of ['in-progress', 'review-ready']) {
             await Effect.runPromise(
-              lifecycle.removeLabel(id, label).pipe(Effect.catchAll(() => Effect.void)),
+              lifecycle.removeLabel(id, label).pipe(Effect.catch(() => Effect.void)),
             );
             cleanupLog.push(`Removed GitHub label: ${label}`);
           }
@@ -1063,7 +1063,7 @@ const postIssueResetRoute = HttpRouter.add(
           await Effect.runPromise(
             lifecycle.transitionTo(id, 'open').pipe(
               Effect.tap(() => Effect.sync(() => cleanupLog.push('Reset Linear status to: Todo'))),
-              Effect.catchAll((err) =>
+              Effect.catch((err) =>
                 Effect.sync(() => cleanupLog.push(`Linear reset warning: ${String(err)}`)),
               ),
             ),
@@ -1071,7 +1071,7 @@ const postIssueResetRoute = HttpRouter.add(
           // Remove workflow labels (no-op for Linear, but kept for consistency)
           for (const label of ['review ready', 'planning']) {
             await Effect.runPromise(
-              lifecycle.removeLabel(id, label).pipe(Effect.catchAll(() => Effect.void)),
+              lifecycle.removeLabel(id, label).pipe(Effect.catch(() => Effect.void)),
             );
           }
         }
@@ -1181,7 +1181,7 @@ const postIssueCancelRoute = HttpRouter.add(
         await Effect.runPromise(
           lifecycle.close(id).pipe(
             Effect.tap(() => Effect.sync(() => cleanupLog.push('Closed issue via lifecycle service'))),
-            Effect.catchAll((err) =>
+            Effect.catch((err) =>
               Effect.sync(() => cleanupLog.push(`Close warning: ${String(err)}`)),
             ),
           ),
@@ -1235,7 +1235,7 @@ const postIssueReopenRoute = HttpRouter.add(
 
         // Transition to 'in_progress' via IssueLifecycle (handles all three trackers)
         await Effect.runPromise(
-          lifecycle.transitionTo(id, 'in_progress').pipe(Effect.catchAll(() => Effect.void)),
+          lifecycle.transitionTo(id, 'in_progress').pipe(Effect.catch(() => Effect.void)),
         );
 
         if (issueSource === 'rally') {
@@ -1245,10 +1245,10 @@ const postIssueReopenRoute = HttpRouter.add(
         } else if (githubCheck.isGitHub) {
           // Also clean up done/needs-close-out labels and ensure in-progress is set
           await Effect.runPromise(
-            lifecycle.removeLabel(id, 'done').pipe(Effect.catchAll(() => Effect.void)),
+            lifecycle.removeLabel(id, 'done').pipe(Effect.catch(() => Effect.void)),
           );
           await Effect.runPromise(
-            lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catchAll(() => Effect.void)),
+            lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catch(() => Effect.void)),
           );
           issueDataService.invalidateTracker('github').catch(() => {});
           newState = 'In Progress';
@@ -1256,7 +1256,7 @@ const postIssueReopenRoute = HttpRouter.add(
         } else {
           // Linear: fetch updated state name
           const updatedIssue = await Effect.runPromise(
-            linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+            linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
           );
           issueIdentifier = updatedIssue?.identifier ?? id;
           newState = updatedIssue?.state.name ?? 'In Progress';
@@ -1393,7 +1393,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           if (lifecycleState) {
             await Effect.runPromise(
               lifecycle.transitionTo(id, lifecycleState).pipe(
-                Effect.catchAll((err) =>
+                Effect.catch((err) =>
                   Effect.sync(() => console.error(`Tracker sync failed for ${id}:`, String(err))),
                 ),
               ),

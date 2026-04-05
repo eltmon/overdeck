@@ -836,7 +836,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
           try {
             // Resolve issue UUID from identifier, then fetch comments
             const issue = await Effect.runPromise(
-              linear.getIssue(issueId).pipe(Effect.catchAll(() => Effect.succeed(null))),
+              linear.getIssue(issueId).pipe(Effect.catch(() => Effect.succeed(null))),
             );
 
             if (!issue) {
@@ -844,7 +844,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
             }
 
             const comments = await Effect.runPromise(
-              linear.getComments(issue.id).pipe(Effect.catchAll(() => Effect.succeed([]))),
+              linear.getComments(issue.id).pipe(Effect.catch(() => Effect.succeed([]))),
             );
 
             if (comments.length > 0) {
