@@ -6,14 +6,16 @@
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Layer, Queue, Stream } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panopticon/contracts';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
-import type { DomainEvent } from '@panopticon/contracts';
+import { getConversationByName } from '../../lib/database/conversations-db.js';
+import { parseConversationMessages, watchConversation } from './services/conversation-service.js';
+import type { ConversationEvent, DomainEvent } from '@panopticon/contracts';
 import type { StoredEvent } from './event-store.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -102,6 +104,54 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       // ── terminalClose — live PTY (B20) ──────────────────────────────────────
       [WS_METHODS.terminalClose]: (input) =>
         terminalService.close(input.sessionName),
+
+      // ── subscribeConversationMessages — live JSONL stream (PAN-451) ──────────
+      [WS_METHODS.subscribeConversationMessages]: (input) =>
+        Stream.unwrap(
+          Effect.gen(function* () {
+            const conv = getConversationByName(input.conversationName);
+
+            if (!conv || !conv.sessionFile) {
+              // Session file not yet discovered — emit a single discovering event
+              return Stream.make<ConversationEvent>({ kind: 'discovering' });
+            }
+
+            const sessionFile = conv.sessionFile;
+
+            return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
+              Effect.acquireRelease(
+                Effect.promise(async () => {
+                  // Emit current state immediately on subscribe
+                  const initial = await parseConversationMessages(sessionFile, 0);
+                  Queue.offerUnsafe(queue, {
+                    kind: 'messages' as const,
+                    messages: initial.messages,
+                    workLog: initial.workLog,
+                    streaming: initial.streaming,
+                  });
+
+                  // Watch for new content and stream incremental updates
+                  let byteOffset = initial.byteOffset;
+                  const handle = watchConversation(sessionFile, (result) => {
+                    byteOffset = result.byteOffset;
+                    Queue.offerUnsafe(queue, {
+                      kind: 'messages' as const,
+                      messages: result.messages,
+                      workLog: result.workLog,
+                      streaming: result.streaming,
+                    });
+                  });
+
+                  return handle;
+                }),
+                (handle) =>
+                  Effect.sync(() => {
+                    handle.stop();
+                  }),
+              ),
+            );
+          }),
+        ),
     });
   }),
 );
