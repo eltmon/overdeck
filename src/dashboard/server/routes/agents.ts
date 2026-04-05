@@ -26,15 +26,8 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec, spawn } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { readFile, rm, symlink, lstat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -135,14 +128,14 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return join(homedir(), 'Projects');
 }
 
-function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
+async function getWorkspaceLocation(issueId: string): Promise<'local' | 'remote' | undefined> {
   try {
     const workspacesDir = join(homedir(), '.panopticon', 'workspaces');
     const variations = [issueId.toLowerCase(), issueId.toUpperCase(), issueId];
     for (const v of variations) {
       const yamlPath = join(workspacesDir, `${v}.yaml`);
       if (existsSync(yamlPath)) {
-        const content = readFileSync(yamlPath, 'utf-8');
+        const content = await readFile(yamlPath, 'utf-8');
         if (content.includes('location: remote')) return 'remote';
         return 'local';
       }
@@ -212,13 +205,13 @@ const getAgentsRoute = HttpRouter.add(
         const failedAgentIds: string[] = [];
 
         if (existsSync(agentsDir)) {
-          const dirs = readdirSync(agentsDir).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
+          const dirs = (await readdir(agentsDir)).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
           for (const dir of dirs) {
             const inLocalList = agentLines.some(line => line.startsWith(dir + '|'));
             const remoteStateFile = join(agentsDir, dir, 'remote-state.json');
             if (existsSync(remoteStateFile)) {
               try {
-                const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+                const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
                 if (state.location === 'remote' && state.status === 'running' && !inLocalList) {
                   remoteAgentIds.push(dir);
                 }
@@ -228,7 +221,7 @@ const getAgentsRoute = HttpRouter.add(
               const localStateFile = join(agentsDir, dir, 'state.json');
               if (existsSync(localStateFile)) {
                 try {
-                  const state = JSON.parse(readFileSync(localStateFile, 'utf-8'));
+                  const state = JSON.parse(await readFile(localStateFile, 'utf-8'));
                   if (state.status === 'starting') {
                     startingAgentIds.push(dir);
                   } else if (state.status === 'failed') {
@@ -251,10 +244,10 @@ const getAgentsRoute = HttpRouter.add(
             let health: any = { consecutiveFailures: 0, killCount: 0 };
 
             if (existsSync(stateFile)) {
-              try { state = { ...state, ...JSON.parse(readFileSync(stateFile, 'utf-8')) }; } catch {}
+              try { state = { ...state, ...JSON.parse(await readFile(stateFile, 'utf-8')) }; } catch {}
             }
             if (existsSync(healthFile)) {
-              try { health = { ...health, ...JSON.parse(readFileSync(healthFile, 'utf-8')) }; } catch {}
+              try { health = { ...health, ...JSON.parse(await readFile(healthFile, 'utf-8')) }; } catch {}
             }
 
             const gitStatus = state.workspace ? await getGitStatusAsync(state.workspace) : null;
@@ -279,20 +272,16 @@ const getAgentsRoute = HttpRouter.add(
               || issueReviewStatus?.testStatus === 'testing'
               || issueReviewStatus?.mergeStatus === 'merging';
 
-            const workspaceLocation = getWorkspaceLocation(issueId);
+            const workspaceLocation = await getWorkspaceLocation(issueId);
 
             let contextPercent: number | null = null;
             let initialContextPercent: number | null = null;
             const agentCtxDir = join(homedir(), '.panopticon', 'agents', name);
             try {
               const ctxFile = join(agentCtxDir, 'context-pct');
-              if (existsSync(ctxFile)) {
-                contextPercent = parseInt(readFileSync(ctxFile, 'utf-8').trim(), 10) || null;
-              }
+              contextPercent = parseInt((await readFile(ctxFile, 'utf-8').catch(() => '')).trim(), 10) || null;
               const initCtxFile = join(agentCtxDir, 'initial-context-pct');
-              if (existsSync(initCtxFile)) {
-                initialContextPercent = parseInt(readFileSync(initCtxFile, 'utf-8').trim(), 10) || null;
-              }
+              initialContextPercent = parseInt((await readFile(initCtxFile, 'utf-8').catch(() => '')).trim(), 10) || null;
             } catch {}
 
             return {
@@ -324,9 +313,9 @@ const getAgentsRoute = HttpRouter.add(
             const remoteStateFile = join(homedir(), '.panopticon', 'agents', name, 'remote-state.json');
             const isPlanning = name.startsWith('planning-');
             try {
-              const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+              const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
               const issueId = state.issueId?.toUpperCase() || name.replace(/^(agent-|planning-)/, '').toUpperCase();
-              const workspaceLocation = getWorkspaceLocation(issueId);
+              const workspaceLocation = await getWorkspaceLocation(issueId);
               return {
                 id: name,
                 issueId,
@@ -352,7 +341,7 @@ const getAgentsRoute = HttpRouter.add(
 
         const stoppedAgents: any[] = [];
         if (existsSync(agentsDir)) {
-          const allDirs = readdirSync(agentsDir).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
+          const allDirs = (await readdir(agentsDir)).filter(d => d.startsWith('agent-') || d.startsWith('planning-'));
           const alreadyListed = new Set([
             ...agentLines.map(l => l.split('|')[0]),
             ...remoteAgentIds,
@@ -362,11 +351,11 @@ const getAgentsRoute = HttpRouter.add(
             const stateFile = join(agentsDir, dir, 'state.json');
             if (!existsSync(stateFile)) continue;
             try {
-              const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+              const state = JSON.parse(await readFile(stateFile, 'utf-8'));
               const runtimeFile = join(agentsDir, dir, 'runtime.json');
               let runtimeData: any = {};
               if (existsSync(runtimeFile)) {
-                try { runtimeData = JSON.parse(readFileSync(runtimeFile, 'utf-8')); } catch {}
+                try { runtimeData = JSON.parse(await readFile(runtimeFile, 'utf-8')); } catch {}
               }
               const hasCompletedMarker = existsSync(join(agentsDir, dir, 'completed')) ||
                 existsSync(join(agentsDir, dir, 'completed.processed'));
@@ -403,10 +392,10 @@ const getAgentsRoute = HttpRouter.add(
           }
         }
 
-        const startingAgents = startingAgentIds.map(dir => {
+        const startingAgents = (await Promise.all(startingAgentIds.map(async dir => {
           const stateFile = join(agentsDir, dir, 'state.json');
           try {
-            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+            const state = JSON.parse(await readFile(stateFile, 'utf-8'));
             const isPlanning = dir.startsWith('planning-');
             const issueId = state.issueId?.toUpperCase() ||
               (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
@@ -429,12 +418,12 @@ const getAgentsRoute = HttpRouter.add(
               message: state.message || 'Starting...',
             };
           } catch { return null; }
-        }).filter(Boolean);
+        }))).filter(Boolean);
 
-        const failedAgents = failedAgentIds.map(dir => {
+        const failedAgents = (await Promise.all(failedAgentIds.map(async dir => {
           const stateFile = join(agentsDir, dir, 'state.json');
           try {
-            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+            const state = JSON.parse(await readFile(stateFile, 'utf-8'));
             const isPlanning = dir.startsWith('planning-');
             const issueId = state.issueId?.toUpperCase() ||
               (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
@@ -457,7 +446,7 @@ const getAgentsRoute = HttpRouter.add(
               error: state.error || 'Unknown error',
             };
           } catch { return null; }
-        }).filter(Boolean);
+        }))).filter(Boolean);
 
         const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...startingAgents, ...failedAgents, ...stoppedAgents];
         agentsCache = { data: allAgents, timestamp: now };
@@ -491,7 +480,7 @@ const getAgentOutputRoute = HttpRouter.add(
 
           if (existsSync(remoteStateFile)) {
             try {
-              const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+              const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
               if (state.location === 'remote' && state.vmName) {
                 isRemote = true;
                 vmName = state.vmName;
@@ -516,8 +505,8 @@ const getAgentOutputRoute = HttpRouter.add(
 
           if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
             const savedLog = join(agentStateDir, 'output.log');
-            if (existsSync(savedLog)) {
-              const logContent = readFileSync(savedLog, 'utf-8');
+            const logContent = await readFile(savedLog, 'utf-8').catch(() => null);
+            if (logContent) {
               const logLines = logContent.split('\n');
               const numLines = parseInt(String(lines), 10) || 100;
               stdout = logLines.slice(-numLines).join('\n');
@@ -534,10 +523,8 @@ const getAgentOutputRoute = HttpRouter.add(
           try {
             const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
             const savedLog = join(agentStateDir, 'output.log');
-            if (existsSync(savedLog)) {
-              const logContent = readFileSync(savedLog, 'utf-8');
-              return jsonResponse({ output: logContent });
-            }
+            const logContent = await readFile(savedLog, 'utf-8').catch(() => null);
+            if (logContent) return jsonResponse({ output: logContent });
           } catch {}
           return jsonResponse({ output: '' });
         }
@@ -569,7 +556,7 @@ const postAgentMessageRoute = HttpRouter.add(
 
           if (existsSync(remoteStateFile)) {
             try {
-              const state = JSON.parse(readFileSync(remoteStateFile, 'utf-8'));
+              const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
               if (state.location === 'remote' && state.vmName) {
                 isRemote = true;
                 vmName = state.vmName;
@@ -609,7 +596,7 @@ const deleteAgentRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
         try {
           stopAgent(id);
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'agent.stopped',
             timestamp: new Date().toISOString(),
             payload: { agentId: id },
@@ -920,7 +907,7 @@ const postAgentSuspendRoute = HttpRouter.add(
             suspendedAt: new Date().toISOString(),
             sessionId: effectiveSessionId,
           });
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'agent.stopped',
             timestamp: new Date().toISOString(),
             payload: { agentId: id },
@@ -1140,8 +1127,8 @@ const getAgentCostRoute = HttpRouter.add(
             const projectDir = join(claudeProjectsDir, projectDirName);
             const sessionsIndexPath = join(projectDir, 'sessions-index.json');
 
-            const parseJsonlCost = (filePath: string) => {
-              const jsonlContent = readFileSync(filePath, 'utf-8');
+            const parseJsonlCost = async (filePath: string) => {
+              const jsonlContent = await readFile(filePath, 'utf-8');
               const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
               for (const line of lines) {
                 try {
@@ -1163,10 +1150,10 @@ const getAgentCostRoute = HttpRouter.add(
 
             if (existsSync(sessionsIndexPath)) {
               try {
-                const indexContent = JSON.parse(readFileSync(sessionsIndexPath, 'utf-8'));
+                const indexContent = JSON.parse(await readFile(sessionsIndexPath, 'utf-8'));
                 for (const sessionEntry of (indexContent.entries || [])) {
                   if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
-                    parseJsonlCost(sessionEntry.fullPath);
+                    await parseJsonlCost(sessionEntry.fullPath);
                   }
                 }
               } catch {}
@@ -1174,9 +1161,9 @@ const getAgentCostRoute = HttpRouter.add(
 
             if (inputTokens === 0 && existsSync(projectDir)) {
               try {
-                const files = readdirSync(projectDir).filter(f => f.endsWith('.jsonl'));
+                const files = (await readdir(projectDir)).filter(f => f.endsWith('.jsonl'));
                 for (const file of files) {
-                  parseJsonlCost(join(projectDir, file));
+                  await parseJsonlCost(join(projectDir, file));
                 }
               } catch {}
             }
@@ -1378,8 +1365,7 @@ const postAgentsRoute = HttpRouter.add(
         const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');
         if (existsSync(planningPromptPath)) {
           try {
-            const { renameSync } = await import('node:fs');
-            renameSync(planningPromptPath, planningPromptPath + '.archived');
+            await rename(planningPromptPath, planningPromptPath + '.archived');
           } catch {}
         }
 
@@ -1411,12 +1397,12 @@ const postAgentsRoute = HttpRouter.add(
             lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
           );
 
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'agent.started',
             timestamp: new Date().toISOString(),
             payload: { agentId: issueId, issueId },
           }));
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'issue.statusChanged',
             timestamp: new Date().toISOString(),
             payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
@@ -1473,7 +1459,7 @@ const postAgentsRoute = HttpRouter.add(
           } catch {}
 
           if (dockerRunning) {
-            const getComposeProjectName = (id: string, pPath?: string): string => {
+            const getComposeProjectName = async (id: string, pPath?: string): Promise<string> => {
               const lower = id.toLowerCase();
               const featureFolder = `feature-${lower}`;
               if (pPath) {
@@ -1484,7 +1470,7 @@ const postAgentsRoute = HttpRouter.add(
                 for (const devPath of devScriptPaths) {
                   try {
                     if (existsSync(devPath)) {
-                      const content = readFileSync(devPath, 'utf-8');
+                      const content = await readFile(devPath, 'utf-8');
                       const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
                       if (match) return `${match[1]}${featureFolder}`;
                       const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
@@ -1496,7 +1482,7 @@ const postAgentsRoute = HttpRouter.add(
               return featureFolder;
             };
 
-            const featureName = getComposeProjectName(issueId, projectPath);
+            const featureName = await getComposeProjectName(issueId, projectPath);
             let containersReady = false;
 
             try {
@@ -1515,8 +1501,8 @@ const postAgentsRoute = HttpRouter.add(
             if (!containersReady) {
               const earlyAgentId = `agent-${issueLower}`;
               const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
-              mkdirSync(earlyStateDir, { recursive: true });
-              writeFileSync(join(earlyStateDir, 'state.json'), JSON.stringify({
+              await mkdir(earlyStateDir, { recursive: true });
+              await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
                 id: earlyAgentId,
                 issueId,
                 status: 'starting',
@@ -1585,7 +1571,7 @@ const postAgentsRoute = HttpRouter.add(
                 }
               })();
 
-              Effect.runSync(eventStore.append({
+              await Effect.runPromise(eventStore.append({
                 type: 'issue.statusChanged',
                 timestamp: new Date().toISOString(),
                 payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
@@ -1607,12 +1593,12 @@ const postAgentsRoute = HttpRouter.add(
         const activityId = spawnPanCommand(['work', 'issue', issueId, '--phase', phase], workspacePath);
         await updateIssueStatus();
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'agent.started',
           timestamp: new Date().toISOString(),
           payload: { agentId: issueId, issueId },
         }));
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },

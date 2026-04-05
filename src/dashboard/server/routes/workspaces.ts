@@ -25,16 +25,8 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec, spawn } from 'node:child_process';
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync } from 'node:fs';
+import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -77,7 +69,6 @@ import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
-import { unlinkSync } from 'node:fs';
 
 const execAsync = promisify(exec);
 
@@ -454,13 +445,13 @@ async function repairFlywayIfNeeded(
     const migrationsDir = join(workspacePath, migrationsRelPath);
     if (existsSync(migrationsDir)) {
       emit(`Syncing Flyway checksums from workspace migrations`);
-      const migrationFiles = readdirSync(migrationsDir).filter(f => /^V\d+__.*\.sql$/.test(f));
+      const migrationFiles = (await readdir(migrationsDir)).filter(f => /^V\d+__.*\.sql$/.test(f));
       const updates: string[] = [];
 
       for (const file of migrationFiles) {
         const version = file.match(/^V(\d+)__/)?.[1];
         if (!version) continue;
-        let content = readFileSync(join(migrationsDir, file));
+        let content = await readFile(join(migrationsDir, file));
         if (content[0] === 0xEF && content[1] === 0xBB && content[2] === 0xBF) {
           content = content.slice(3);
         }
@@ -473,7 +464,7 @@ async function repairFlywayIfNeeded(
 
       if (updates.length > 0) {
         const tmpSql = `/tmp/flyway-checksum-sync-${Date.now()}.sql`;
-        writeFileSync(tmpSql, updates.join('\n'));
+        await writeFile(tmpSql, updates.join('\n'));
         try {
           const { stdout } = await execAsync(
             `docker exec -i "${pgContainer}" psql -U postgres -d ${dbName} < "${tmpSql}"`,
@@ -483,7 +474,7 @@ async function repairFlywayIfNeeded(
             .reduce((sum, m) => sum + parseInt(m.replace('UPDATE ', ''), 10), 0);
           emit(`Synced ${migrationFiles.length} migration checksums (${updatedCount} rows updated)`);
         } finally {
-          try { unlinkSync(tmpSql); } catch {}
+          try { await unlink(tmpSql); } catch {}
         }
       }
     }
@@ -502,18 +493,20 @@ async function repairFlywayIfNeeded(
   }
 }
 
-function getIndexStats(workspacePath: string): {
+async function getIndexStats(workspacePath: string): Promise<{
   fileCount?: number;
   indexAge?: string;
   edgeCount?: number;
-} {
+}> {
   const tldrPath = join(workspacePath, '.tldr');
-  if (!existsSync(tldrPath)) return {};
+  const tldrExists = await access(tldrPath).then(() => true, () => false);
+  if (!tldrExists) return {};
   try {
     let indexAge: string | undefined;
     const langPath = join(tldrPath, 'languages.json');
-    if (existsSync(langPath)) {
-      const langData = JSON.parse(readFileSync(langPath, 'utf-8'));
+    const langContent = await readFile(langPath, 'utf-8').catch(() => null);
+    if (langContent) {
+      const langData = JSON.parse(langContent);
       if (langData.timestamp) {
         const ageMs = Date.now() - langData.timestamp * 1000;
         const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
@@ -522,7 +515,7 @@ function getIndexStats(workspacePath: string): {
       }
     }
     if (!indexAge) {
-      const stats = statSync(tldrPath);
+      const stats = await stat(tldrPath);
       const ageMs = Date.now() - stats.mtimeMs;
       const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
       indexAge =
@@ -531,8 +524,9 @@ function getIndexStats(workspacePath: string): {
     let fileCount: number | undefined;
     let edgeCount: number | undefined;
     const cgPath = join(tldrPath, 'cache', 'call_graph.json');
-    if (existsSync(cgPath)) {
-      const cg = JSON.parse(readFileSync(cgPath, 'utf-8'));
+    const cgContent = await readFile(cgPath, 'utf-8').catch(() => null);
+    if (cgContent) {
+      const cg = JSON.parse(cgContent);
       edgeCount = Array.isArray(cg.edges) ? cg.edges.length : undefined;
       if (Array.isArray(cg.edges)) {
         const files = new Set<string>();
@@ -667,7 +661,7 @@ const getWorkspaceRoute = HttpRouter.add(
 
         if (urlSourceFile) {
           try {
-            const content = readFileSync(urlSourceFile, 'utf-8');
+            const content = await readFile(urlSourceFile, 'utf-8');
             const urlMatches = content.matchAll(/(\w+):\s*(https?:\/\/[^\s\n]+)/gi);
             for (const match of urlMatches) {
               services.push({ name: match[1], url: match[2] });
@@ -958,7 +952,7 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
                 `git show ${compareRef}:${relativePath} 2>/dev/null`,
                 { cwd: gitRoot, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
               );
-              const workspaceContent = readFileSync(workspaceFilePath, 'utf-8');
+              const workspaceContent = await readFile(workspaceFilePath, 'utf-8');
               if (gitContent === workspaceContent) {
                 diffAnalysis.unchangedFiles.push(file);
               } else {
@@ -1253,7 +1247,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
           const legacyPlanningDir = join(projectPath, '.planning', issueLower);
           if (existsSync(legacyPlanningDir)) {
             try {
-              mkdirSync(workspacePlanningDir, { recursive: true });
+              await mkdir(workspacePlanningDir, { recursive: true });
               await execAsync(
                 `cp -r "${legacyPlanningDir}/"* "${workspacePlanningDir}/"`,
                 { encoding: 'utf-8', shell: '/bin/bash' }
@@ -1291,8 +1285,8 @@ const postWorkspaceStartRoute = HttpRouter.add(
         if (!existsSync(devScript)) {
           if (existsSync(devScriptInContainer)) {
             try {
-              symlinkSync('.devcontainer/dev', devScript);
-              chmodSync(devScriptInContainer, 0o755);
+              await symlink('.devcontainer/dev', devScript);
+              await chmod(devScriptInContainer, 0o755);
               console.log(`[workspace/start] Repaired: created ./dev symlink for ${issueId}`);
             } catch (repairErr) {
               return jsonResponse(
@@ -1320,7 +1314,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
           let needsRepair = !existsSync(envFilePath);
 
           if (!needsRepair && existsSync(envFilePath)) {
-            const existingEnv = readFileSync(envFilePath, 'utf-8');
+            const existingEnv = await readFile(envFilePath, 'utf-8');
             for (const portName of Object.keys(projectConfig.workspace.ports)) {
               const portVar = `${portName.toUpperCase()}_PORT`;
               if (!existingEnv.includes(portVar)) {
@@ -1339,7 +1333,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
                 const portFile = join(projectPath, `.${portName}-ports`);
                 const range = (portConfig as any).range as [number, number];
                 let content = '';
-                if (existsSync(portFile)) content = readFileSync(portFile, 'utf-8');
+                if (existsSync(portFile)) content = await readFile(portFile, 'utf-8');
                 const lines = content.split('\n').filter(Boolean);
                 let port: number | null = null;
                 for (const line of lines) {
@@ -1354,7 +1348,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
                   for (let p = range[0]; p <= range[1]; p++) {
                     if (!usedPorts.has(p)) {
                       port = p;
-                      writeFileSync(
+                      await writeFile(
                         portFile,
                         content +
                           (content.endsWith('\n') || !content ? '' : '\n') +
@@ -1373,7 +1367,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
                   value
                 );
               }
-              writeFileSync(envFilePath, envContent);
+              await writeFile(envFilePath, envContent);
               console.log(
                 `[workspace/start] Repaired: created .env with port assignments for ${issueId}`
               );
@@ -2053,7 +2047,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           }
 
           if (reviewStatus === 'passed') {
-            Effect.runSync(eventStore.append({
+            await Effect.runPromise(eventStore.append({
               type: 'pipeline.review-completed',
               timestamp: new Date().toISOString(),
               payload: { issueId, passed: true },
@@ -2070,7 +2064,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
             );
             try {
               await autoQueueTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent);
-              Effect.runSync(eventStore.append({
+              await Effect.runPromise(eventStore.append({
                 type: 'pipeline.test-started',
                 timestamp: new Date().toISOString(),
                 payload: { issueId },
@@ -2082,7 +2076,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
               );
             }
           } else if (['blocked', 'failed'].includes(reviewStatus)) {
-            Effect.runSync(eventStore.append({
+            await Effect.runPromise(eventStore.append({
               type: 'pipeline.review-completed',
               timestamp: new Date().toISOString(),
               payload: { issueId, passed: false },
@@ -2107,7 +2101,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           }
 
           if (testStatus === 'failed') {
-            Effect.runSync(eventStore.append({
+            await Effect.runPromise(eventStore.append({
               type: 'pipeline.test-completed',
               timestamp: new Date().toISOString(),
               payload: { issueId, passed: false },
@@ -2150,7 +2144,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           }
 
           if (testStatus === 'passed') {
-            Effect.runSync(eventStore.append({
+            await Effect.runPromise(eventStore.append({
               type: 'pipeline.test-completed',
               timestamp: new Date().toISOString(),
               payload: { issueId, passed: true },
@@ -2703,7 +2697,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
           if (result.success) {
             console.log(`[request-review] Spawned review specialist for ${issueId}`);
-            Effect.runSync(eventStore.append({
+            await Effect.runPromise(eventStore.append({
               type: 'pipeline.review-started',
               timestamp: new Date().toISOString(),
               payload: { issueId },
@@ -3273,7 +3267,7 @@ const postWorkspaceMergeRoute = HttpRouter.add(
     try {
         const result = await triggerMerge(issueId);
         if (result.success) {
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'merge.ready',
             timestamp: new Date().toISOString(),
             payload: { issueId },

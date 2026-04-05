@@ -39,13 +39,8 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync } from 'node:fs';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -483,13 +478,13 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     // Emit domain event for specialist completion/failure
     if (status === 'passed') {
-      Effect.runSync(eventStore.append({
+      await Effect.runPromise(eventStore.append({
         type: 'specialist.completed',
         timestamp: new Date().toISOString(),
         payload: { name: `${specialist}-agent`, issueId: normalizedIssueId },
       }));
     } else {
-      Effect.runSync(eventStore.append({
+      await Effect.runPromise(eventStore.append({
         type: 'specialist.failed',
         timestamp: new Date().toISOString(),
         payload: { name: `${specialist}-agent`, issueId: normalizedIssueId, error: notes || `${specialist} failed` },
@@ -652,7 +647,7 @@ const postSpecialistWakeRoute = HttpRouter.add(
 
         recordWake(name as SpecialistType, useSessionId!);
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'specialist.started',
           timestamp: new Date().toISOString(),
           payload: {
@@ -803,7 +798,7 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
     try {
         // Write status to specialist's state directory
         const specialistDir = join(homedir(), '.panopticon', 'specialists', name);
-        mkdirSync(specialistDir, { recursive: true });
+        await mkdir(specialistDir, { recursive: true });
 
         const statusFile = join(specialistDir, `${issueId}-status.json`);
         const statusData = {
@@ -814,7 +809,7 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
         };
 
-        writeFileSync(statusFile, JSON.stringify(statusData, null, 2));
+        await writeFile(statusFile, JSON.stringify(statusData, null, 2));
 
         console.log(`[specialists] ${name} reported status for ${issueId}: ${status}`);
 
@@ -830,13 +825,13 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
 
         // Emit domain event based on status
         if (status === 'passed') {
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'specialist.completed',
             timestamp: new Date().toISOString(),
             payload: { name: name as SpecialistType, issueId },
           }));
         } else if (status === 'failed' || status === 'blocked') {
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'specialist.failed',
             timestamp: new Date().toISOString(),
             payload: { name: name as SpecialistType, issueId, error: notes || `${name} reported ${status}` },
@@ -889,13 +884,13 @@ const getSpecialistCostRoute = HttpRouter.add(
         let detectedModel = '';
 
         if (existsSync(sessionsIndexPath)) {
-          const indexContent = JSON.parse(readFileSync(sessionsIndexPath, 'utf-8'));
+          const indexContent = JSON.parse(await readFile(sessionsIndexPath, 'utf-8'));
           const sessionEntry = indexContent.entries?.find(
             (e: { sessionId: string }) => e.sessionId === sessionId,
           );
 
           if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
-            const jsonlContent = readFileSync(sessionEntry.fullPath, 'utf-8');
+            const jsonlContent = await readFile(sessionEntry.fullPath, 'utf-8');
             const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
 
             for (const line of lines) {
@@ -1255,7 +1250,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 
             if (existsSync(workStateFile)) {
               try {
-                const workState = JSON.parse(readFileSync(workStateFile, 'utf-8'));
+                const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
                 workspace = workState.workspace;
                 branch = workState.branch || `feature/${issueId.toLowerCase()}`;
               } catch {}
@@ -1342,7 +1337,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
           completeSpecialistTask(name as SpecialistType, nextValidTask.id);
         }
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'specialist.completed',
           timestamp: new Date().toISOString(),
           payload: { name: name as SpecialistType, issueId },
@@ -1593,7 +1588,7 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
         const nodeStream = new ReadableStream({
           async start(controller) {
             // Send initial content
-            const content = readFileSync(logPath, 'utf-8');
+            const content = await readFile(logPath, 'utf-8').catch(() => '');
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({ type: 'content', data: content })}\n\n`,
@@ -1606,7 +1601,7 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
               if (!isRunLogActive(project, type, runId)) {
                 // Log completed — send final update and close
                 try {
-                  const finalContent = readFileSync(logPath, 'utf-8');
+                  const finalContent = await readFile(logPath, 'utf-8');
                   if (finalContent.length > lastSize) {
                     const newContent = finalContent.substring(lastSize);
                     controller.enqueue(
@@ -1624,7 +1619,7 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
               }
 
               try {
-                const currentContent = readFileSync(logPath, 'utf-8');
+                const currentContent = await readFile(logPath, 'utf-8');
                 if (currentContent.length > lastSize) {
                   const newContent = currentContent.substring(lastSize);
                   controller.enqueue(
@@ -2014,14 +2009,14 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    return yield* Effect.try({
-      try: () => {
+    return yield* Effect.tryPromise({
+      try: async () => {
         const runsDir = join(homedir(), '.panopticon', 'specialists', project, type, 'runs');
         if (!existsSync(runsDir)) {
           return jsonResponse({ log: null, message: 'No runs found' });
         }
 
-        const files = readdirSync(runsDir)
+        const files = (await readdir(runsDir))
           .filter((f) => f.endsWith('.log'))
           .sort()
           .reverse();
@@ -2030,7 +2025,7 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
           return jsonResponse({ log: null, message: 'No run logs found' });
         }
 
-        const latestLog = readFileSync(join(runsDir, files[0]), 'utf-8');
+        const latestLog = await readFile(join(runsDir, files[0]), 'utf-8');
         return jsonResponse({
           log: latestLog,
           file: files[0],
