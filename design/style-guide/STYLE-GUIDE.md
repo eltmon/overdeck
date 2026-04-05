@@ -102,10 +102,11 @@ Use Tailwind's default scale. Recommended pairings:
 Space Grotesk (`font-display`) has a distinctive double-story "g" that looks wrong at small/medium sizes in body text. DM Sans has a clean single-story open-tail "g" that is correct for body text. Getting this wrong is immediately visible and makes the UI look cheap.
 
 **Space Grotesk (`font-display`) is ONLY for:**
-- The "Panopticon" logo text
-- Page titles (e.g., "Settings", "Agent Deployment")
-- Section/column headings (e.g., "To Do", "In Progress", "In Review")
-- Large stat values (e.g., "$12.47", "5/8", "12")
+- The "Panopticon" logo/brand text
+- Numeric stat values (e.g., "$12.47", "5/8", "12") — numbers only, NOT labels
+- Page titles that are single proper nouns without "g" (use judgment — if it has a "g", use DM Sans)
+
+Space Grotesk's double-story "g" is the problem glyph. Any heading containing "g" (e.g., "In Progress", "Settings", "Agents") MUST use DM Sans instead.
 
 **DM Sans (default body font) is for EVERYTHING else:**
 - Card titles (e.g., "Real-time Stream Orchestration for Alpha-Centauri Node")
