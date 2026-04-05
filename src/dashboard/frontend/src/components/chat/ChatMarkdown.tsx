@@ -25,6 +25,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components } from 'react-markdown';
+import type { DiffsThemeNames } from '@pierre/diffs';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── LRU Cache for syntax highlighting ───────────────────────────────────────
@@ -74,7 +75,7 @@ let sharedHighlighterPromise: Promise<unknown> | null = null;
 async function getHighlighter() {
   if (!sharedHighlighterPromise) {
     sharedHighlighterPromise = import('@pierre/diffs').then((m) =>
-      m.getSharedHighlighter(),
+      m.getSharedHighlighter({ themes: ['github-dark' as DiffsThemeNames], langs: [] }),
     );
   }
   return sharedHighlighterPromise;

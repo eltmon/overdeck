@@ -135,7 +135,7 @@ export function ComposerPromptEditor({
     onError: (err: Error) => console.error('[ComposerPromptEditor]', err),
     ...(draft
       ? {
-          editorState: (editor: LexicalEditor) => {
+          editorState: (_editor: LexicalEditor) => {
             const root = $getRoot();
             const para = $createParagraphNode();
             para.append($createTextNode(draft));
@@ -172,7 +172,7 @@ export function ComposerPromptEditor({
             <ContentEditable
               className={styles.composerEditable}
               aria-placeholder={placeholder}
-              placeholder={
+              placeholder={() =>
                 !text ? (
                   <div className={styles.composerPlaceholder}>{placeholder}</div>
                 ) : null

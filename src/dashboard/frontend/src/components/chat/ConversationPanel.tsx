@@ -5,7 +5,7 @@ import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
-import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
+import type { ChatMessage, WorkLogEntry } from './chat-types';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
