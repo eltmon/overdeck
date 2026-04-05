@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle } from 'lucide-react';
+import { Circle, Loader2 } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
@@ -39,6 +39,14 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const queryClient = useQueryClient();
 
+  // Query messages at this level so we can access streaming status in the header
+  const { data: messagesData } = useQuery({
+    queryKey: ['conversation-messages', conversation.name],
+    queryFn: () => fetchMessages(conversation.name),
+    refetchInterval: conversation.sessionAlive ? 2000 : false,
+  });
+  const isStreaming = messagesData?.streaming ?? false;
+
   const resumeMutation = useMutation({
     mutationFn: () => resumeConversation(conversation.name),
     onSuccess: () => {
@@ -69,6 +77,12 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
       {/* Header bar */}
       <div className={styles.conversationTerminalHeader}>
         <span className={styles.conversationTerminalTitle}>
+          {isStreaming && (
+            <Loader2
+              size={14}
+              className={styles.spinnerIcon}
+            />
+          )}
           {conversation.title ?? conversation.name}
         </span>
         <span className={styles.conversationTerminalStatus}>
@@ -136,6 +150,7 @@ interface MessagesResponse {
   workLog: WorkLogEntry[];
   streaming: boolean;
   discovering?: boolean;
+  totalCost?: number;
 }
 
 async function fetchMessages(name: string): Promise<MessagesResponse> {
@@ -152,24 +167,21 @@ function ConversationView({ conversation }: ConversationViewProps) {
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
     queryFn: () => fetchMessages(conversation.name),
-    // Re-poll when discovering (session_file not yet stored)
-    refetchInterval: (query) => {
-      if (query.state.data?.discovering) return 2000;
-      return false;
-    },
+    // Poll every 2s while session is active for live updates.
+    // Since we don't have WebSocket push (unlike T3Code), polling is our streaming mechanism.
+    refetchInterval: conversation.sessionAlive ? 2000 : false,
   });
 
   const messages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
   const streaming = data?.streaming ?? false;
-  const discovering = data?.discovering ?? false;
-  const isFirstMessage = !isLoading && !discovering && messages.length === 0;
+  const isFirstMessage = !isLoading && messages.length === 0;
 
   return (
     <div className={styles.conversationView}>
-      {(isLoading || discovering) ? (
+      {isLoading ? (
         <div className={styles.conversationConnecting}>
-          <span>{isLoading ? 'Loading…' : 'Connecting to session…'}</span>
+          <span>Loading…</span>
         </div>
       ) : isFirstMessage ? (
         <div className={styles.conversationEmptyState}>
@@ -185,7 +197,7 @@ function ConversationView({ conversation }: ConversationViewProps) {
           streaming={streaming}
         />
       )}
-      <ComposerFooter conversation={conversation} isFirstMessage={isFirstMessage} />
+      <ComposerFooter conversation={conversation} />
     </div>
   );
 }

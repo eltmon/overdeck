@@ -38,6 +38,26 @@ const MAX_VISIBLE_WORK_LOG_ENTRIES = 6;
 const ALWAYS_UNVIRTUALIZED_TAIL_ROWS = 8;
 const AUTO_SCROLL_THRESHOLD_PX = 64;
 
+/** Format an ISO timestamp as a short time string (e.g., "3:42 PM"). */
+function formatTimestamp(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+/** Format elapsed duration between two ISO timestamps (e.g., "1.5s", "2m 30s"). */
+function formatElapsed(startIso: string, endIso: string): string {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (ms < 1000) return `${ms}ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = Math.floor(s / 60);
+  const rem = Math.round(s % 60);
+  return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface MessagesTimelineProps {
@@ -176,6 +196,9 @@ function UserMessageRow({ message }: { message: ChatMessage }) {
     <div className={styles.userMessageRow}>
       <div className={styles.userMessageBubble}>
         <p className={styles.userMessageText}>{message.text}</p>
+        <span className={styles.messageTimestamp}>
+          {formatTimestamp(message.createdAt)}
+        </span>
       </div>
     </div>
   );
@@ -190,9 +213,24 @@ function AssistantMessageRow({
   message: ChatMessage;
   isStreaming: boolean;
 }) {
+  const duration = message.completedAt
+    ? formatElapsed(message.createdAt, message.completedAt)
+    : null;
+
   return (
     <div className={styles.assistantMessageRow}>
       <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} />
+      <div className={styles.messageMetadata}>
+        <span className={styles.messageTimestamp}>
+          {formatTimestamp(message.createdAt)}
+        </span>
+        {duration && (
+          <>
+            <span className={styles.messageSeparator}>&middot;</span>
+            <span className={styles.messageTimestamp}>{duration}</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -232,6 +270,8 @@ function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
   );
 }
 
+const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
+
 function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
   const toneColor: Record<WorkLogEntry['tone'], string> = {
     thinking: 'var(--mc-text-secondary)',
@@ -240,17 +280,28 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
     error: 'var(--mc-error)',
   };
 
+  const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
+
   return (
     <div className={styles.workLogEntry}>
-      <Circle
-        size={6}
-        style={{
-          fill: toneColor[entry.tone],
-          color: toneColor[entry.tone],
-          flexShrink: 0,
-          marginTop: 2,
-        }}
-      />
+      {isTerminal ? (
+        <span
+          className={styles.workLogTerminalIcon}
+          style={{ color: toneColor[entry.tone] }}
+        >
+          {'>_'}
+        </span>
+      ) : (
+        <Circle
+          size={6}
+          style={{
+            fill: toneColor[entry.tone],
+            color: toneColor[entry.tone],
+            flexShrink: 0,
+            marginTop: 2,
+          }}
+        />
+      )}
       <span className={styles.workLogLabel}>{entry.toolTitle ?? entry.label}</span>
       {entry.detail && (
         <span className={styles.workLogDetail} title={entry.detail}>
