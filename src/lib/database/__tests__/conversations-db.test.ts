@@ -27,7 +27,7 @@ afterEach(async () => {
 describe('conversations-db', () => {
   it('createConversation inserts a row and returns it', async () => {
     const { createConversation } = await import('../conversations-db.js');
-    const conv = createConversation('test-session', 'conv-test-session', '/home/user/Projects');
+    const conv = createConversation({ name: 'test-session', tmuxSession: 'conv-test-session', cwd: '/home/user/Projects' });
     expect(conv.name).toBe('test-session');
     expect(conv.tmuxSession).toBe('conv-test-session');
     expect(conv.status).toBe('active');
@@ -37,18 +37,35 @@ describe('conversations-db', () => {
     expect(conv.createdAt).toBeTruthy();
     expect(conv.endedAt).toBeNull();
     expect(conv.lastAttachedAt).toBeNull();
+    expect(conv.titleSource).toBeNull();
+    expect(conv.titleSeed).toBeNull();
   });
 
   it('createConversation stores issueId when provided', async () => {
     const { createConversation } = await import('../conversations-db.js');
-    const conv = createConversation('with-issue', 'conv-with-issue', '/cwd', 'PAN-123');
+    const conv = createConversation({ name: 'with-issue', tmuxSession: 'conv-with-issue', cwd: '/cwd', issueId: 'PAN-123' });
     expect(conv.issueId).toBe('PAN-123');
+  });
+
+  it('createConversation stores title metadata', async () => {
+    const { createConversation } = await import('../conversations-db.js');
+    const conv = createConversation({
+      name: 'titled',
+      tmuxSession: 'conv-titled',
+      cwd: '/cwd',
+      title: 'Fix the bug',
+      titleSource: 'auto',
+      titleSeed: 'Fix the bug',
+    });
+    expect(conv.title).toBe('Fix the bug');
+    expect(conv.titleSource).toBe('auto');
+    expect(conv.titleSeed).toBe('Fix the bug');
   });
 
   it('listConversations returns all rows newest first', async () => {
     const { createConversation, listConversations } = await import('../conversations-db.js');
-    createConversation('a', 'conv-a', '/cwd');
-    createConversation('b', 'conv-b', '/cwd');
+    createConversation({ name: 'a', tmuxSession: 'conv-a', cwd: '/cwd' });
+    createConversation({ name: 'b', tmuxSession: 'conv-b', cwd: '/cwd' });
     const list = listConversations();
     expect(list).toHaveLength(2);
     // Ordered by created_at DESC — 'b' was created after 'a'
@@ -58,7 +75,7 @@ describe('conversations-db', () => {
 
   it('getConversationByName returns the matching row', async () => {
     const { createConversation, getConversationByName } = await import('../conversations-db.js');
-    createConversation('lookup-me', 'conv-lookup-me', '/cwd');
+    createConversation({ name: 'lookup-me', tmuxSession: 'conv-lookup-me', cwd: '/cwd' });
     const conv = getConversationByName('lookup-me');
     expect(conv).not.toBeNull();
     expect(conv!.name).toBe('lookup-me');
@@ -71,7 +88,7 @@ describe('conversations-db', () => {
 
   it('markConversationEnded updates status and ended_at', async () => {
     const { createConversation, markConversationEnded, getConversationByName } = await import('../conversations-db.js');
-    createConversation('end-me', 'conv-end-me', '/cwd');
+    createConversation({ name: 'end-me', tmuxSession: 'conv-end-me', cwd: '/cwd' });
     markConversationEnded('end-me');
     const conv = getConversationByName('end-me');
     expect(conv!.status).toBe('ended');
@@ -80,7 +97,7 @@ describe('conversations-db', () => {
 
   it('markConversationActive sets status to active and updates last_attached_at', async () => {
     const { createConversation, markConversationEnded, markConversationActive, getConversationByName } = await import('../conversations-db.js');
-    createConversation('cycle', 'conv-cycle', '/cwd');
+    createConversation({ name: 'cycle', tmuxSession: 'conv-cycle', cwd: '/cwd' });
     markConversationEnded('cycle');
     markConversationActive('cycle');
     const conv = getConversationByName('cycle');
@@ -90,7 +107,7 @@ describe('conversations-db', () => {
 
   it('updateLastAttached sets last_attached_at without changing status', async () => {
     const { createConversation, updateLastAttached, getConversationByName } = await import('../conversations-db.js');
-    createConversation('attach', 'conv-attach', '/cwd');
+    createConversation({ name: 'attach', tmuxSession: 'conv-attach', cwd: '/cwd' });
     updateLastAttached('attach');
     const conv = getConversationByName('attach');
     expect(conv!.status).toBe('active');
@@ -99,8 +116,8 @@ describe('conversations-db', () => {
 
   it('markAllEndedOnStartup marks all active conversations as ended', async () => {
     const { createConversation, markAllEndedOnStartup, listConversations } = await import('../conversations-db.js');
-    createConversation('x', 'conv-x', '/cwd');
-    createConversation('y', 'conv-y', '/cwd');
+    createConversation({ name: 'x', tmuxSession: 'conv-x', cwd: '/cwd' });
+    createConversation({ name: 'y', tmuxSession: 'conv-y', cwd: '/cwd' });
     markAllEndedOnStartup();
     const list = listConversations();
     expect(list.every(c => c.status === 'ended')).toBe(true);
@@ -108,7 +125,24 @@ describe('conversations-db', () => {
 
   it('name has UNIQUE constraint — duplicate throws', async () => {
     const { createConversation } = await import('../conversations-db.js');
-    createConversation('unique-name', 'conv-unique-name', '/cwd');
-    expect(() => createConversation('unique-name', 'conv-unique-name-2', '/cwd')).toThrow();
+    createConversation({ name: 'unique-name', tmuxSession: 'conv-unique-name', cwd: '/cwd' });
+    expect(() => createConversation({ name: 'unique-name', tmuxSession: 'conv-unique-name-2', cwd: '/cwd' })).toThrow();
+  });
+
+  it('canReplaceTitle returns true only for auto titles', async () => {
+    const { createConversation, canReplaceTitle, updateConversationTitle, getConversationByName } = await import('../conversations-db.js');
+    createConversation({ name: 'replaceable', tmuxSession: 'conv-replaceable', cwd: '/cwd', title: 'Fix bug', titleSource: 'auto', titleSeed: 'Fix bug' });
+    const conv = getConversationByName('replaceable')!;
+    expect(canReplaceTitle(conv)).toBe(true);
+
+    // After AI update, no longer replaceable
+    updateConversationTitle('replaceable', 'AI generated title', 'ai');
+    const updated = getConversationByName('replaceable')!;
+    expect(canReplaceTitle(updated)).toBe(false);
+
+    // Manual is never replaceable
+    updateConversationTitle('replaceable', 'User title', 'manual');
+    const manual = getConversationByName('replaceable')!;
+    expect(canReplaceTitle(manual)).toBe(false);
   });
 });

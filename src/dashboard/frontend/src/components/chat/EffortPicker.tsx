@@ -13,7 +13,7 @@ import styles from '../MissionControl/styles/mission-control.module.css';
 
 const EFFORT_LEVELS = [
   { id: 'low', label: 'Low' },
-  { id: 'medium', label: 'Medium' },
+  { id: 'medium', label: 'Medium (default)' },
   { id: 'high', label: 'High' },
   { id: 'max', label: 'Max' },
 ] as const;
@@ -41,12 +41,21 @@ interface EffortPickerProps {
   value: EffortLevel;
   onChange: (effort: EffortLevel) => void;
   disabled?: boolean;
+  /** Effort level IDs available for the current model. Empty = not supported. */
+  availableLevels?: readonly string[];
 }
 
-export function EffortPicker({ value, onChange, disabled = false }: EffortPickerProps) {
+export function EffortPicker({ value, onChange, disabled = false, availableLevels }: EffortPickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const selected = EFFORT_LEVELS.find((e) => e.id === value) ?? EFFORT_LEVELS[1]!;
+
+  // If model doesn't support effort, show a hint instead
+  const noEffort = availableLevels !== undefined && availableLevels.length === 0;
+  const filteredLevels = availableLevels && availableLevels.length > 0
+    ? EFFORT_LEVELS.filter((e) => availableLevels.includes(e.id))
+    : EFFORT_LEVELS;
+
+  const selected = filteredLevels.find((e) => e.id === value) ?? filteredLevels[0] ?? EFFORT_LEVELS[1]!;
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +74,14 @@ export function EffortPicker({ value, onChange, disabled = false }: EffortPicker
     setOpen(false);
   }
 
+  if (noEffort) {
+    return (
+      <div className={styles.pickerContainer}>
+        <span className={styles.pickerHint}>effort n/a for this model</span>
+      </div>
+    );
+  }
+
   return (
     <div ref={ref} className={styles.pickerContainer}>
       <button
@@ -79,7 +96,7 @@ export function EffortPicker({ value, onChange, disabled = false }: EffortPicker
 
       {open && (
         <div className={styles.pickerDropdown}>
-          {EFFORT_LEVELS.map((level) => (
+          {filteredLevels.map((level) => (
             <button
               key={level.id}
               className={`${styles.pickerOption} ${level.id === value ? styles.pickerOptionActive : ''}`}

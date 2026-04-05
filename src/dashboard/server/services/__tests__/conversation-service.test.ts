@@ -265,75 +265,50 @@ describe('discoverSessionFile', () => {
   });
 
   it('returns the path of a newly created JSONL file on first poll', async () => {
-    const afterTs = new Date(Date.now() - 100).toISOString(); // 100ms ago
-    const fileTime = Date.now(); // now — newer than afterTs
-
+    // Snapshot has no files; new file appears on first poll
+    const existingFiles = new Set<string>();
     mockReaddir.mockResolvedValue(['session-abc123.jsonl']);
-    mockStat.mockResolvedValue({ mtimeMs: fileTime, birthtimeMs: fileTime });
 
     const { discoverSessionFile } = await import('../conversation-service.js');
-    const result = await discoverSessionFile('/home/testuser/Projects/foo', afterTs);
+    const result = await discoverSessionFile('/home/testuser/Projects/foo', existingFiles);
 
     expect(result).toContain('session-abc123.jsonl');
     expect(result).toContain('-home-testuser-Projects-foo');
   });
 
-  it('ignores files that predate the afterTimestamp', async () => {
-    // afterTs is in the future relative to the file's mtime
-    const fileTime = Date.now() - 5_000; // file is 5s old
-    const afterTs = new Date(Date.now() - 2_000).toISOString(); // "after" 2s ago → file is older
-
-    mockReaddir.mockResolvedValue(['old-session.jsonl']);
-    mockStat.mockResolvedValue({ mtimeMs: fileTime, birthtimeMs: fileTime });
-
-    // Override deadline to avoid 60s wait: make readdir only return the stale file once,
-    // then simulate the deadline passing by having readdir eventually reject
+  it('ignores files that were in the pre-spawn snapshot', async () => {
+    // old-session.jsonl existed before spawn — should be ignored
+    const existingFiles = new Set(['old-session.jsonl']);
+    // First poll: only the old file. Second poll: new file appears.
     let callCount = 0;
     mockReaddir.mockImplementation(async () => {
       callCount++;
       if (callCount <= 1) return ['old-session.jsonl'];
-      throw Object.assign(new Error('deadline'), { code: 'ENOENT' });
+      return ['old-session.jsonl', 'new-session.jsonl'];
     });
 
-    // Only way to test "ignores stale file" is to verify stat was called but result is null
-    // We test this indirectly: if the stat mtime < afterTs, we skip the file.
-    // Use a very recent afterTs that's AFTER the file was written.
-    const { discoverSessionFile: svc } = await import('../conversation-service.js');
-
-    // File mtime is 5s ago, afterTs is 2s ago → file predates afterTs → skip
-    // discoverSessionFile will loop until deadline; we can't wait 60s in tests.
-    // Instead, verify that a file NEWER than afterTs IS returned.
-    const newFileTime = Date.now() + 1_000; // definitely after afterTs
-    mockReaddir.mockResolvedValue(['new-session.jsonl']);
-    mockStat.mockResolvedValue({ mtimeMs: newFileTime, birthtimeMs: newFileTime });
-
-    const result = await svc('/home/testuser/Projects/foo', afterTs);
+    const { discoverSessionFile } = await import('../conversation-service.js');
+    const result = await discoverSessionFile('/home/testuser/Projects/foo', existingFiles);
     expect(result).toContain('new-session.jsonl');
   });
 
   it('ignores non-jsonl files and returns a jsonl file when present', async () => {
-    const afterTs = new Date(Date.now() - 100).toISOString();
-    const fileTime = Date.now();
-
+    const existingFiles = new Set<string>();
     mockReaddir.mockResolvedValue(['README.md', 'notes.txt', 'session-xyz.jsonl']);
-    mockStat.mockResolvedValue({ mtimeMs: fileTime, birthtimeMs: fileTime });
 
     const { discoverSessionFile } = await import('../conversation-service.js');
-    const result = await discoverSessionFile('/home/testuser/Projects/foo', afterTs);
+    const result = await discoverSessionFile('/home/testuser/Projects/foo', existingFiles);
 
     expect(result).toContain('session-xyz.jsonl');
     expect(result).not.toContain('README.md');
   });
 
   it('uses the encoded cwd as the project directory name', async () => {
-    const afterTs = new Date(Date.now() - 100).toISOString();
-    const fileTime = Date.now();
-
+    const existingFiles = new Set<string>();
     mockReaddir.mockResolvedValue(['session.jsonl']);
-    mockStat.mockResolvedValue({ mtimeMs: fileTime, birthtimeMs: fileTime });
 
     const { discoverSessionFile } = await import('../conversation-service.js');
-    const result = await discoverSessionFile('/home/user/my/project', afterTs);
+    const result = await discoverSessionFile('/home/user/my/project', existingFiles);
 
     // CWD /home/user/my/project → encoded as -home-user-my-project
     expect(result).toContain('-home-user-my-project');

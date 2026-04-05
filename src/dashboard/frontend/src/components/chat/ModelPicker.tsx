@@ -14,13 +14,20 @@ import styles from '../MissionControl/styles/mission-control.module.css';
 const CLAUDE_MODELS = [
   { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
   { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-  { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
 ] as const;
 
 export type ClaudeModelId = (typeof CLAUDE_MODELS)[number]['id'];
 
+/** Effort levels supported by each model. */
+export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
+  'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
+  'claude-sonnet-4-6': ['low', 'medium', 'high'],
+  'claude-haiku-4-5-20251001': [],
+};
+
 const MODEL_STORAGE_KEY = 'conv-composer-model';
-const DEFAULT_MODEL: ClaudeModelId = 'claude-sonnet-4-6';
+const DEFAULT_MODEL: ClaudeModelId = 'claude-opus-4-6';
 
 export function loadStoredModel(): ClaudeModelId {
   try {

@@ -20,7 +20,16 @@ export interface Conversation {
   sessionFile?: string | null;
   /** Human-readable title, auto-set from first message. Null until first message sent. */
   title?: string | null;
+  /** How the title was set: 'auto', 'ai', or 'manual'. */
+  titleSource?: 'auto' | 'ai' | 'manual' | null;
+  /** Original auto-generated title seed. */
+  titleSeed?: string | null;
+  /** Cached total cost in USD. */
+  totalCost?: number;
 }
+
+/** Marker that we're in draft mode — no session spawned yet. */
+export type DraftSession = true;
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -30,18 +39,7 @@ async function fetchConversations(): Promise<Conversation[]> {
   return res.json();
 }
 
-async function createConversation(name: string): Promise<Conversation> {
-  const res = await fetch('/api/conversations', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error((err as { error?: string }).error || 'Failed to create conversation');
-  }
-  return res.json();
-}
+// No spawn API call — draft mode just shows the composer. Session is spawned on first message.
 
 async function deleteConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}`, { method: 'DELETE' });
@@ -53,11 +51,12 @@ async function deleteConversation(name: string): Promise<void> {
 interface ConversationListProps {
   selectedConversation: string | null;
   onSelectConversation: (name: string | null) => void;
+  onDraftCreated: (draft: DraftSession) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationList({ selectedConversation, onSelectConversation }: ConversationListProps) {
+export function ConversationList({ selectedConversation, onSelectConversation, onDraftCreated }: ConversationListProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const queryClient = useQueryClient();
 
@@ -67,13 +66,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     refetchInterval: 10000,
   });
 
-  const createMutation = useMutation({
-    mutationFn: createConversation,
-    onSuccess: (conv) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      onSelectConversation(conv.name);
-    },
-  });
+  // No mutation needed — draft mode is just local state
 
   const deleteMutation = useMutation({
     mutationFn: deleteConversation,
@@ -86,8 +79,8 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
   });
 
   const handleAddClick = useCallback(() => {
-    createMutation.mutate(''); // server auto-generates name
-  }, [createMutation]);
+    onDraftCreated(true);
+  }, [onDraftCreated]);
 
   return (
     <div className={styles.conversationSection}>
@@ -138,6 +131,11 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                   }}
                 />
                 <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
+                {conv.totalCost !== undefined && conv.totalCost > 0 && (
+                  <span className={styles.featureCost}>
+                    {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
+                  </span>
+                )}
                 <span
                   role="button"
                   tabIndex={0}
