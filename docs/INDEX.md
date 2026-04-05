@@ -42,6 +42,7 @@
 | Document | Description |
 |----------|-------------|
 | [BUILD.md](./BUILD.md) | Build pipeline (tsdown + Vite), `__dirname` resolution, prompt template copying |
+| [WORKSPACE-DEPENDENCIES.md](./WORKSPACE-DEPENDENCIES.md) | Workspace dependency isolation: host vs container node_modules, package_manager config, Docker volumes |
 | [ARCHITECTURE-CACHING.md](./ARCHITECTURE-CACHING.md) | Dashboard API caching, real-time push, and rate limit management |
 | [DNS_SETUP.md](./DNS_SETUP.md) | Local DNS resolution for development |
 | [cost-tracking.md](./cost-tracking.md) | Cost tracking: live recording, reconciler, session-to-agent mapping, SQLite schema |
