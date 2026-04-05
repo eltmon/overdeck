@@ -60,7 +60,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, o
   const [isExpanded, setIsExpanded] = useState(true);
   const queryClient = useQueryClient();
 
-  const { data: conversations = [] } = useQuery({
+  const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: fetchConversations,
     refetchInterval: 10000,
@@ -112,7 +112,12 @@ export function ConversationList({ selectedConversation, onSelectConversation, o
       {isExpanded && (
         <div className={styles.conversationList}>
           {/* Session list */}
-          {conversations.length === 0 ? (
+          {isLoading ? (
+            <div className={styles.skeletonList}>
+              <div className={styles.skeletonItem} />
+              <div className={styles.skeletonItem} />
+            </div>
+          ) : conversations.length === 0 ? (
             <div className={styles.conversationEmpty}>No conversations yet</div>
           ) : (
             conversations.map(conv => (

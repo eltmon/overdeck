@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /**
  * Initialize the complete database schema.
@@ -338,6 +338,15 @@ export function runMigrations(db: Database.Database): void {
   if (currentVersion < 10) {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN total_cost REAL DEFAULT 0`);
+    } catch { /* already exists */ }
+  }
+
+  // v10 → v11: expression index for UPPER(issue_id) on cost_events
+  // The N+1 queries in getCostsByIssueFromDb use UPPER(issue_id) which defeats
+  // the existing idx_cost_issue_id index. This expression index fixes that.
+  if (currentVersion < 11) {
+    try {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_cost_issue_upper ON cost_events(UPPER(issue_id))`);
     } catch { /* already exists */ }
   }
 

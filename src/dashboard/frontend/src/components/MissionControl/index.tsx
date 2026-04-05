@@ -197,7 +197,12 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
 
           <div className={styles.projectTree}>
             {isLoading && projects.length === 0 ? (
-              <div className={styles.emptyProject}>Loading projects...</div>
+              <div className={styles.skeletonList}>
+                <div className={styles.skeletonItem} style={{ width: '60%' }} />
+                <div className={styles.skeletonItem} style={{ width: '80%' }} />
+                <div className={styles.skeletonItem} style={{ width: '45%' }} />
+                <div className={styles.skeletonItem} style={{ width: '70%' }} />
+              </div>
             ) : projects.length === 0 ? (
               <div className={styles.emptyProject}>No projects configured</div>
             ) : (
