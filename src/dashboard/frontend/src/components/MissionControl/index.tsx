@@ -107,7 +107,8 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
-    setSelectedConversation(null); // clear conversation selection
+    setSelectedConversation(null);
+    setIsDraft(false);
   }, []);
 
   const handleSelectConversation = useCallback((name: string | null) => {
@@ -238,7 +239,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
             (() => {
               const conv = conversations.find(c => c.name === selectedConversation);
               return conv ? (
-                <ConversationPanel conversation={conv} />
+                <ConversationPanel key={conv.name} conversation={conv} />
               ) : (
                 <div className={styles.contentEmpty}>
                   <div style={{ textAlign: 'center' }}>
