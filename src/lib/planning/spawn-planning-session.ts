@@ -73,6 +73,15 @@ export interface PlanningIssue {
   comments?: Array<{ author: string; body: string; createdAt: string }>;
 }
 
+/** Progress event emitted during planning session setup. */
+export interface PlanningProgress {
+  step: number;
+  total: number;
+  label: string;
+  detail: string;
+  status: 'active' | 'complete' | 'error';
+}
+
 export interface SpawnPlanningOptions {
   issue: PlanningIssue;
   workspacePath: string;
@@ -81,6 +90,8 @@ export interface SpawnPlanningOptions {
   workspaceLocation: 'local' | 'remote';
   startDocker?: boolean;
   shadowMode?: boolean;
+  /** Optional callback for streaming progress events to the client. */
+  onProgress?: (event: PlanningProgress) => void;
 }
 
 export interface SpawnPlanningResult {
@@ -368,14 +379,21 @@ Start by exploring the codebase to understand the context, then begin the discov
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+
+  const TOTAL_STEPS = 5;
+  const progress = (step: number, label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
+    onProgress?.({ step, total: TOTAL_STEPS, label, detail, status });
+  };
 
   try {
     console.log(`[start-planning] Background setup starting for ${issue.identifier}`);
 
-    // ── Create workspace if needed ─────────────────────────────────────────
+    // ── Step 1: Create workspace if needed ─────────────────────────────────
+    progress(1, 'Creating workspace', `${issueLower} on ${projectPath.split('/').pop() || 'project'}`);
+
     let workspaceCreated = existsSync(workspacePath) &&
       !readdirSync(workspacePath).every((f: string) => f === '.planning');
 
@@ -398,6 +416,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         // artifacts to land in the wrong place (PAN-358).
         const errorMsg = `Workspace creation failed: ${err.message}`;
         console.error(`[start-planning] ABORTING: ${errorMsg}`);
+        progress(1, 'Creating workspace', errorMsg, 'error');
         writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
           id: sessionName, issueId: issue.identifier, workspace: workspacePath,
           status: 'failed', error: errorMsg,
@@ -407,10 +426,15 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       }
     }
 
-    // ── Kill existing planning session if any ──────────────────────────────
+    progress(1, 'Creating workspace', workspaceCreated ? 'Workspace ready' : 'Already exists', 'complete');
+
+    // ── Step 2: Prepare planning environment ──────────────────────────────
+    progress(2, 'Preparing planning environment', '.planning/ directory structure');
+
+    // Kill existing planning session if any
     await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, { encoding: 'utf-8' });
 
-    // ── Create planning directory structure ─────────────────────────────────
+    // Create planning directory structure
     const planningDir = join(workspacePath, '.planning');
     mkdirSync(planningDir, { recursive: true });
     for (const subdir of ['transcripts', 'discussions', 'notes']) {
@@ -438,13 +462,18 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       }
     }
 
-    // ── Determine planning model (before prompt so it's injected) ─────────
+    progress(2, 'Preparing planning environment', 'Environment ready', 'complete');
+
+    // ── Step 3: Load specs & PRDs ────────────────────────────────────────
+    progress(3, 'Loading specs & PRDs', `Searching for ${issue.identifier} specs`);
+
+    // Determine planning model (before prompt so it's injected)
     const agentSettings = loadSettings();
     const planningModel = (agentSettings.models as any).planning_agent
       || agentSettings.models.complexity?.expert
       || 'claude-opus-4-6';
 
-    // ── Discover and copy PRD files to workspace ───────────────────────────
+    // Discover and copy PRD files to workspace
     const prdFiles = discoverPrdFiles(workspacePath, issue.identifier);
     if (prdFiles.length > 0) {
       const prdDestPath = join(planningDir, 'prd.md');
@@ -460,7 +489,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       }
     }
 
-    // ── Write planning prompt ──────────────────────────────────────────────
+    progress(3, 'Loading specs & PRDs', prdFiles.length > 0 ? prdFiles[0].label : 'No PRDs found', 'complete');
+
+    // ── Step 4: Configure agent ─────────────────────────────────────────
+    progress(4, 'Configuring agent', planningModel);
+
     const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
     const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel);
     writeFileSync(planningPromptPath, planningPrompt);
@@ -498,7 +531,11 @@ echo "[launcher] Keep-alive loop starting at $(date)" >> /tmp/pan-launcher-debug
 while true; do sleep 60; done
 `, { mode: 0o755 });
 
-    // ── Spawn tmux session ─────────────────────────────────────────────────
+    progress(4, 'Configuring agent', `${planningModel} — prompt & launcher ready`, 'complete');
+
+    // ── Step 5: Launch planning session ───────────────────────────────────
+    progress(5, 'Launching planning session', sessionName);
+
     await ensureTmuxRunning();
     await execAsync(
       `TERM=xterm-256color tmux new-session -d -s ${sessionName} "bash '${launcherScript}'"`,
@@ -528,6 +565,8 @@ while true; do sleep 60; done
       type: 'planning',
       location: workspaceLocation,
     }, null, 2));
+
+    progress(5, 'Launching planning session', 'Agent running', 'complete');
 
     console.log(`[start-planning] Started local planning agent ${sessionName}`);
     return { success: true };

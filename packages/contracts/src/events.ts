@@ -277,6 +277,19 @@ export const IssuesUpdatedEvent = Schema.Struct({
 })
 export type IssuesUpdatedEvent = typeof IssuesUpdatedEvent.Type
 
+/** Patch a single issue's status in the read model without a full snapshot refresh. */
+export const IssueStatusChangedEvent = Schema.Struct({
+  type: Schema.Literal("issue.statusChanged"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    status: Schema.String,
+    canonicalStatus: Schema.String,
+  }),
+})
+export type IssueStatusChangedEvent = typeof IssueStatusChangedEvent.Type
+
 // ─── Activity Events ──────────────────────────────────────────────────────────
 
 /** Replaces socket.io `godview:activity` */
@@ -343,6 +356,7 @@ export const DomainEvent = Schema.Union([
   ResourcesUpdatedEvent,
   IssuesSnapshotEvent,
   IssuesUpdatedEvent,
+  IssueStatusChangedEvent,
   ActivityUpdatedEvent,
   ShadowInferenceUpdateEvent,
   CostEventRecordedEvent,

@@ -1416,6 +1416,11 @@ const postAgentsRoute = HttpRouter.add(
             timestamp: new Date().toISOString(),
             payload: { agentId: issueId, issueId },
           }));
+          Effect.runSync(eventStore.append({
+            type: 'issue.statusChanged',
+            timestamp: new Date().toISOString(),
+            payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
+          }));
           try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
           return jsonResponse({
             success: true,
@@ -1586,6 +1591,11 @@ const postAgentsRoute = HttpRouter.add(
                 }
               })();
 
+              Effect.runSync(eventStore.append({
+                type: 'issue.statusChanged',
+                timestamp: new Date().toISOString(),
+                payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
+              }));
               try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
               return jsonResponse({
                 success: true,
@@ -1607,6 +1617,11 @@ const postAgentsRoute = HttpRouter.add(
           type: 'agent.started',
           timestamp: new Date().toISOString(),
           payload: { agentId: issueId, issueId },
+        }));
+        Effect.runSync(eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
         }));
         try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
         return jsonResponse({

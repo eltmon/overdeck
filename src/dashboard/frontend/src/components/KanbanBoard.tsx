@@ -28,6 +28,7 @@ import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
+import { DeepWipeDialog } from './DeepWipeDialog';
 
 
 // Difficulty badge colors
@@ -1873,26 +1874,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     onPlan();
   };
 
-  // Deep wipe mutation - completely resets issue state
-  const deepWipeMutation = useMutation({
-    mutationFn: async (options: { deleteWorkspace: boolean }) => {
-      const res = await fetch(`/api/issues/${issue.identifier}/deep-wipe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteWorkspace: options.deleteWorkspace }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Deep wipe failed');
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      console.log('Deep wipe completed:', data.cleanupLog);
-    },
-  });
+  // Deep wipe is now handled by the DeepWipeDialog component (PAN-461)
 
   return (
     <div
@@ -2256,7 +2238,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
           {STATUS_LABELS[issue.status] === 'backlog' && <TodoButton issue={issue} />}
           <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
+          <DeepWipeButton issue={issue} />
         </div>
       )}
 
@@ -2327,7 +2309,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             Reset
           </button>
           <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
+          <DeepWipeButton issue={issue} />
         </div>
       )}
 
@@ -2337,7 +2319,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           <ResetPipelineButton issue={issue} />
           <ReopenSection issue={issue} inline />
           <CancelButton issue={issue} />
-          <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
+          <DeepWipeButton issue={issue} />
         </div>
       )}
 
@@ -2362,7 +2344,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           </button>
           <ReopenSection issue={issue} inline />
           <CloseOutSection issue={issue} />
-          <DeepWipeButton issue={issue} deepWipeMutation={deepWipeMutation} />
+          <DeepWipeButton issue={issue} />
         </div>
       )}
 
@@ -2421,24 +2403,24 @@ function ResetPipelineButton({ issue }: { issue: Issue }) {
   );
 }
 
-// Deep wipe button - available from any issue state
-function DeepWipeButton({ issue, deepWipeMutation }: { issue: Issue; deepWipeMutation: any }) {
-  const confirm = useConfirm();
+// Deep wipe button - opens progress dialog
+function DeepWipeButton({ issue }: { issue: Issue }) {
+  const [isOpen, setIsOpen] = useState(false);
   return (
-    <button
-      onClick={async (e) => {
-        e.stopPropagation();
-        if (await confirm({ title: 'Deep Wipe', message: `Deep wipe ${issue.identifier}? This will clean up ALL state:\n\n• Kill agents\n• Delete agent state\n• Delete workspace & branches\n• Reset issue to Todo/Open\n\nThis is irreversible.`, variant: 'destructive', confirmLabel: 'Wipe Everything' })) {
-          deepWipeMutation.mutate({ deleteWorkspace: true });
-        }
-      }}
-      disabled={deepWipeMutation.isPending}
-      className="flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors disabled:opacity-50 ml-auto"
-      title="Deep wipe: delete workspace, branches, agent state — start completely fresh"
-    >
-      {deepWipeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-      {deepWipeMutation.isPending ? 'Wiping...' : 'Wipe'}
-    </button>
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+        className="flex items-center gap-1 text-xs text-red-400/60 hover:text-red-400 transition-colors ml-auto"
+        title="Deep wipe: delete workspace, branches, agent state — start completely fresh"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+        Wipe
+      </button>
+      <DeepWipeDialog issue={issue} isOpen={isOpen} onClose={() => setIsOpen(false)} />
+    </>
   );
 }
 
