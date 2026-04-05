@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs
 import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { extractTeamPrefix, loadProjectsConfig, PROJECTS_CONFIG_FILE } from '../../lib/projects.js';
+import { extractTeamPrefix, loadProjectsConfig, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -34,7 +34,7 @@ function loadFullProjects(): ExtendedProjectConfig[] {
 function findFullProjectByTeam(teamPrefix: string): ExtendedProjectConfig | null {
   const projects = loadFullProjects();
   return projects.find(
-    (p) => p.linear_team?.toUpperCase() === teamPrefix.toUpperCase()
+    (p) => getIssuePrefix(p)?.toUpperCase() === teamPrefix.toUpperCase()
   ) || null;
 }
 
@@ -84,7 +84,7 @@ async function snapshotCommand(options: {
     if (options.project) {
       const projects = loadFullProjects();
       projectConfig = projects.find(
-        (p) => p.key === options.project || p.linear_team === options.project?.toUpperCase()
+        (p) => p.key === options.project || getIssuePrefix(p) === options.project?.toUpperCase()
       );
     } else {
       // Try to detect from current directory
@@ -548,7 +548,7 @@ async function configCommand(project?: string): Promise<void> {
   let projectConfig: ExtendedProjectConfig | undefined;
   if (project) {
     projectConfig = projects.find(
-      (p) => p.key === project || p.linear_team === project.toUpperCase()
+      (p) => p.key === project || getIssuePrefix(p) === project.toUpperCase()
     );
   } else {
     const cwd = process.cwd();
@@ -558,7 +558,7 @@ async function configCommand(project?: string): Promise<void> {
   if (!projectConfig) {
     console.log(chalk.red('Project not found'));
     console.log(chalk.dim('\nAvailable projects:'));
-    projects.forEach((p) => console.log(chalk.dim(`  ${p.key} (${p.linear_team || 'no team'})`)));
+    projects.forEach((p) => console.log(chalk.dim(`  ${p.key} (${getIssuePrefix(p) || 'no team'})`)));
     return;
   }
 

@@ -14,7 +14,7 @@ import { loadConfig } from './config.js';
 import { createFlyProviderFromConfig } from './remote/index.js';
 import { saveWorkspaceMetadata } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
-import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from './projects.js';
+import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue, getIssuePrefix } from './projects.js';
 
 const execAsync = promisify(exec);
 
@@ -48,8 +48,8 @@ export async function createRemoteWorkspace(
 
   // Determine project identifier for VM name
   let projectId = teamPrefix?.toLowerCase();
-  if (!projectId && projectConfig?.linear_team) {
-    projectId = projectConfig.linear_team.toLowerCase();
+  if (!projectId && projectConfig && getIssuePrefix(projectConfig)) {
+    projectId = getIssuePrefix(projectConfig)!.toLowerCase();
   }
   if (!projectId) {
     try {

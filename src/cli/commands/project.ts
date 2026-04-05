@@ -11,6 +11,7 @@ import {
   PROJECTS_CONFIG_FILE,
   ProjectConfig,
   IssueRoutingRule,
+  getIssuePrefix,
 } from '../../lib/projects.js';
 
 // Get path to bundled git hooks
@@ -124,7 +125,7 @@ export async function projectAddCommand(
   };
 
   if (linearTeam) {
-    projectConfig.linear_team = linearTeam.toUpperCase();
+    projectConfig.issue_prefix = linearTeam.toUpperCase();
   }
 
   if (options.rallyProject) {
@@ -291,8 +292,8 @@ export async function projectListCommand(options: ListOptions = {}): Promise<voi
 
     console.log(`${statusIcon} ${chalk.bold(config.name)} ${chalk.dim(`(${key})`)}`);
     console.log(`  ${chalk.dim(config.path)}`);
-    if (config.linear_team) {
-      console.log(`  ${chalk.cyan(`Linear: ${config.linear_team}`)}`);
+    if (getIssuePrefix(config)) {
+      console.log(`  ${chalk.cyan(`Linear: ${getIssuePrefix(config)}`)}`);
     }
     if (config.rally_project) {
       console.log(`  ${chalk.cyan(`Rally: ${config.rally_project}`)}`);
@@ -378,8 +379,8 @@ export async function projectShowCommand(keyOrName: string): Promise<void> {
   console.log(chalk.bold(`\nProject: ${foundKey}\n`));
   console.log(`  Name:   ${found.name}`);
   console.log(`  Path:   ${pathStatus} ${found.path}`);
-  if (found.linear_team) {
-    console.log(`  Team:   ${found.linear_team}`);
+  if (getIssuePrefix(found)) {
+    console.log(`  Team:   ${getIssuePrefix(found)}`);
   }
   if (found.rally_project) {
     console.log(`  Rally:  ${found.rally_project}`);

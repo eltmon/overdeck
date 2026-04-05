@@ -30,7 +30,7 @@ projects:
   myproject:
     name: "My Project"
     path: /home/user/projects/myproject
-    linear_team: PRJ
+    issue_prefix: PRJ
 
     workspace:
       # 'polyrepo' = multiple git repos, 'monorepo' = single repo (default)
@@ -167,7 +167,7 @@ projects:
   myapp:
     name: "My App"
     path: /home/user/projects/myapp
-    linear_team: APP
+    issue_prefix: APP
     # No workspace config needed - uses defaults
 ```
 
@@ -178,7 +178,7 @@ projects:
   myapp:
     name: "My App"
     path: /home/user/projects/myapp
-    linear_team: APP
+    issue_prefix: APP
     workspace:
       services:
         - name: api
@@ -196,7 +196,7 @@ projects:
   myapp:
     name: "My App"
     path: /home/user/projects/myapp
-    linear_team: APP
+    issue_prefix: APP
     workspace:
       type: polyrepo
       repos:

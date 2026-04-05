@@ -14,6 +14,7 @@ vi.mock('fs', async () => {
 // Mock projects module
 vi.mock('../../src/lib/projects.js', () => ({
   loadProjectsConfig: vi.fn(),
+  getIssuePrefix: (config: any) => config?.issue_prefix,
 }));
 
 import { resolveTrackerType } from '../../src/lib/tracker-utils.js';
@@ -35,7 +36,7 @@ describe('resolveTrackerType', () => {
           name: 'Panopticon',
           path: '/home/user/panopticon',
           github_repo: 'eltmon/panopticon-cli',
-          linear_team: 'PAN',
+          issue_prefix: 'PAN',
         },
       },
     });
@@ -57,13 +58,13 @@ describe('resolveTrackerType', () => {
     expect(resolveTrackerType('ACME-42')).toBe('rally');
   });
 
-  it('returns "linear" for issues matching a project with linear_team', () => {
+  it('returns "linear" for issues matching a project with issue_prefix', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
         myapp: {
           name: 'My App',
           path: '/home/user/myapp',
-          linear_team: 'MIN',
+          issue_prefix: 'MIN',
         },
       },
     });
@@ -71,19 +72,19 @@ describe('resolveTrackerType', () => {
     expect(resolveTrackerType('MIN-456')).toBe('linear');
   });
 
-  it('returns "linear" for issues with linear_team even if rally_project is also set', () => {
+  it('returns "rally" for issues with issue_prefix when rally_project is configured', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
         hybrid: {
           name: 'Hybrid Project',
           path: '/home/user/hybrid',
-          linear_team: 'HYB',
+          issue_prefix: 'HYB',
           rally_project: '/project/999',
         },
       },
     });
 
-    expect(resolveTrackerType('HYB-10')).toBe('linear');
+    expect(resolveTrackerType('HYB-10')).toBe('rally');
   });
 
   it('returns "linear" as fallback for unknown prefixes', () => {
@@ -93,7 +94,7 @@ describe('resolveTrackerType', () => {
           name: 'Panopticon',
           path: '/home/user/panopticon',
           github_repo: 'eltmon/panopticon-cli',
-          linear_team: 'PAN',
+          issue_prefix: 'PAN',
         },
       },
     });
