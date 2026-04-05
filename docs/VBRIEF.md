@@ -20,12 +20,23 @@ Every `plan.vbrief.json` MUST have exactly two top-level keys per the vBRIEF spe
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-04T12:00:00Z"
+    "created": "2026-04-04T12:00:00Z",
+    "author": "panopticon-cli/0.6.0",
+    "description": "Plan for PAN-436: Dashboard skeleton loading states"
   },
   "plan": {
     "id": "pan-436",
     "title": "Dashboard skeleton loading states",
     "status": "approved",
+    "uid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 3,
+    "created": "2026-04-04T12:00:00Z",
+    "updated": "2026-04-04T18:30:00Z",
+    "references": [
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/436", "label": "PAN-436", "type": "issue" },
+      { "uri": "docs/prds/active/PAN-436-plan.md", "label": "PAN-436-plan.md", "type": "prd" }
+    ],
     "tags": ["frontend", "ux"],
     "narratives": {
       "Problem": "Dashboard shows zeros on load — no loading indicators",
@@ -36,6 +47,8 @@ Every `plan.vbrief.json` MUST have exactly two top-level keys per the vBRIEF spe
         "id": "bootstrap-gate",
         "title": "Create BootstrapGate wrapper component",
         "status": "pending",
+        "priority": "high",
+        "created": "2026-04-04T12:00:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-436"
@@ -64,17 +77,51 @@ Every `plan.vbrief.json` MUST have exactly two top-level keys per the vBRIEF spe
 
 ### Top-Level (vBRIEF standard)
 
+#### `vBRIEFInfo` fields
+
 | Field | Required | Description |
 |-------|----------|-------------|
 | `vBRIEFInfo.version` | YES | Must be `"0.5"` |
-| `vBRIEFInfo.created` | YES | ISO 8601 timestamp |
+| `vBRIEFInfo.created` | YES | ISO 8601 timestamp — when the document was created |
+| `vBRIEFInfo.updated` | NO | ISO 8601 timestamp — updated automatically on every write |
+| `vBRIEFInfo.author` | NO | Tool identifier, e.g. `"panopticon-cli/0.6.0"` |
+| `vBRIEFInfo.description` | NO | Human-readable description: `"Plan for PAN-436: ..."` |
+
+#### `plan` fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
 | `plan.id` | YES | Issue ID in lowercase (e.g., `"pan-436"`) |
 | `plan.title` | YES | Human-readable plan title |
 | `plan.status` | YES | One of: `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, `cancelled` |
 | `plan.items` | YES | Array of work items |
 | `plan.edges` | NO | Dependency edges between items |
+| `plan.uid` | NO | UUID v4, generated once at creation — stable identifier for the plan |
+| `plan.author` | NO | Who created the plan, e.g. `"agent:claude-opus-4-6"` |
+| `plan.sequence` | NO | Monotonically incrementing write counter (starts at 1, auto-incremented by io.ts) |
+| `plan.references` | NO | External links — see [References](#references) |
+| `plan.created` | NO | ISO 8601 timestamp — when the plan was first created |
+| `plan.updated` | NO | ISO 8601 timestamp — updated automatically on every status write |
 | `plan.tags` | NO | Tags for categorization |
 | `plan.narratives` | NO | Problem/Proposal/Constraint/Risk narratives |
+
+#### References
+
+`plan.references` is an array of `VBriefReference` objects:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `uri` | YES | URL or path to the referenced resource |
+| `label` | NO | Human-readable label (e.g., `"PAN-436"`) |
+| `type` | NO | Resource type: `"issue"`, `"prd"`, `"spec"`, `"doc"` |
+
+Example:
+```json
+"references": [
+  { "uri": "https://github.com/org/repo/issues/436", "label": "PAN-436", "type": "issue" },
+  { "uri": "docs/prds/active/PAN-436-plan.md", "label": "PAN-436-plan.md", "type": "prd" }
+]
+```
 
 ### Items (vBRIEF standard)
 
@@ -83,8 +130,18 @@ Every `plan.vbrief.json` MUST have exactly two top-level keys per the vBRIEF spe
 | `id` | YES | Short kebab-case identifier |
 | `title` | YES | Task title |
 | `status` | YES | Same enum as plan.status |
+| `priority` | NO | `critical`, `high`, `medium`, `low` |
+| `created` | NO | ISO 8601 timestamp — when the item was created |
+| `completed` | NO | ISO 8601 timestamp — set automatically when status → `completed` |
 | `narrative` | NO | `{ "Action": "what to do" }` |
 | `subItems` | NO | Child items (used for acceptance criteria) |
+
+#### SubItem timestamps
+
+| Field | Description |
+|-------|-------------|
+| `subItem.created` | ISO 8601 timestamp — when the subItem was created |
+| `subItem.completed` | ISO 8601 timestamp — set automatically when status → `completed` |
 
 ### Panopticon Extensions (via `metadata`)
 
@@ -134,12 +191,13 @@ We also maintain a [fork of the vBRIEF spec](https://github.com/eltmon/vBRIEF) i
 
 ## How Panopticon Uses vBRIEF
 
-1. **Planning agent** creates `plan.vbrief.json` during the discovery session
-2. **`complete-planning`** reads the plan and creates beads tasks from items
-3. **Work agent** works through beads, updating item/subItem statuses to `completed`
-4. **Verification gate** checks all subItems with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review
-5. **Dashboard DAG viewer** renders the plan as a dependency graph (PlanDAG component)
-6. **Dashboard Tasks panel** shows beads with status from the plan
+1. **Planning agent** creates `plan.vbrief.json` during the discovery session. The planning prompt injects `vBRIEFInfo.author` (tool identifier), `plan.uid` (UUID v4), `plan.author` (agent model), `plan.sequence: 1`, and `plan.references` (issue URL + discovered PRDs).
+2. **`complete-planning`** reads the plan and creates beads tasks from items. Copies `STATE.md` and `plan.vbrief.json` to `docs/prds/active/` (skip if exists).
+3. **Work agent** works through beads, updating item/subItem statuses to `completed`. Each write increments `plan.sequence` and updates `vBRIEFInfo.updated` and `plan.updated`.
+4. **Verification gate** checks all subItems with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
+5. **Dashboard vBRIEF viewer** (`VBriefViewer`) renders the plan with List/DAG/Raw JSON tabs — accessible via the vBRIEF button on kanban cards and in InspectorPanel.
+6. **Dashboard DAG viewer** renders the plan as a dependency graph (PlanDAG component).
+7. **Dashboard Tasks panel** shows beads with status from the plan.
 
 ## Resilience
 
