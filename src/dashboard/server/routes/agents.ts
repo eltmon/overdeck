@@ -1408,7 +1408,7 @@ const postAgentsRoute = HttpRouter.add(
 
           // Update issue status via IssueLifecycle service (PAN-449)
           await Effect.runPromise(
-            lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catchAll(() => Effect.void))
+            lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
           );
 
           Effect.runSync(eventStore.append({
@@ -1456,7 +1456,7 @@ const postAgentsRoute = HttpRouter.add(
         // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
         const updateIssueStatus = async () => {
           await Effect.runPromise(
-            lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catchAll(() => Effect.void))
+            lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
           );
         };
 
