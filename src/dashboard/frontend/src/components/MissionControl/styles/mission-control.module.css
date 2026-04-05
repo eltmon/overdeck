@@ -1499,3 +1499,162 @@
   word-break: break-word;
   margin: 0;
 }
+
+/* ─── ComposerFooter ──────────────────────────────────────────────────────────── */
+
+.composerFooter {
+  border-top: 1px solid var(--mc-border);
+  background: var(--mc-bg-sidebar);
+  padding: var(--mc-space-2) var(--mc-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mc-space-2);
+  flex-shrink: 0;
+}
+
+/* Lexical editor container */
+.composerEditor {
+  position: relative;
+  min-height: 70px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  background: var(--mc-bg-main);
+  padding: var(--mc-space-2) var(--mc-space-3);
+  transition: border-color 0.15s;
+}
+
+.composerEditor:focus-within {
+  border-color: var(--mc-accent);
+}
+
+.composerEditorDisabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.composerEditable {
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+  min-height: 46px;
+  color: var(--mc-text-primary);
+  font-family: var(--mc-font-family);
+}
+
+.composerEditable p { margin: 0; }
+
+.composerPlaceholder {
+  position: absolute;
+  top: var(--mc-space-2);
+  left: var(--mc-space-3);
+  color: var(--mc-text-muted);
+  font-size: 14px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Toolbar row */
+.composerToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+}
+
+.composerToolbarSpacer {
+  flex: 1;
+}
+
+/* Send button */
+.sendButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--mc-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--mc-radius-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+  flex-shrink: 0;
+}
+
+.sendButton:hover:not(:disabled) {
+  background: var(--mc-accent-hover);
+}
+
+.sendButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Model/Effort pickers */
+.pickerContainer {
+  position: relative;
+}
+
+.pickerBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--mc-space-2);
+  font-size: var(--mc-font-size-xs);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-sm);
+  background: var(--mc-bg-main);
+  color: var(--mc-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pickerBtn:hover:not(:disabled) {
+  border-color: var(--mc-border-strong);
+  color: var(--mc-text-primary);
+}
+
+.pickerBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pickerLabel {
+  font-size: var(--mc-font-size-xs);
+}
+
+.pickerDropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  background: var(--mc-bg-main);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+
+.pickerOption {
+  padding: var(--mc-space-2) var(--mc-space-3);
+  font-size: var(--mc-font-size-sm);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--mc-radius-sm);
+  cursor: pointer;
+  color: var(--mc-text-primary);
+}
+
+.pickerOption:hover {
+  background: var(--mc-bg-hover);
+}
+
+.pickerOptionActive {
+  background: var(--mc-bg-selected);
+  font-weight: 500;
+}
