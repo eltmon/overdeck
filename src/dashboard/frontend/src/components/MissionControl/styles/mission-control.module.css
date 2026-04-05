@@ -1263,3 +1263,239 @@
   color: var(--mc-text-secondary);
   font-size: var(--mc-font-size-sm);
 }
+
+/* ─── MessagesTimeline ──────────────────────────────────────────────────────── */
+
+.messagesTimeline {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--mc-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mc-space-3);
+}
+
+/* User message — right-aligned bubble */
+.userMessageRow {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 0;
+}
+
+.userMessageBubble {
+  max-width: 80%;
+  background: var(--mc-bg-selected);
+  border-radius: 18px 18px 4px 18px; /* rounded-2xl rounded-br-sm */
+  padding: var(--mc-space-3) var(--mc-space-4);
+}
+
+.userMessageText {
+  margin: 0;
+  font-size: var(--mc-font-size-base);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Assistant message — left-aligned */
+.assistantMessageRow {
+  padding: 2px 0;
+  max-width: 100%;
+}
+
+/* Work log group */
+.workLogGroup {
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  padding: var(--mc-space-2) var(--mc-space-3);
+  background: var(--mc-bg-hover);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workLogEntry {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mc-space-2);
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-secondary);
+  min-height: 20px;
+}
+
+.workLogLabel {
+  font-weight: 500;
+  color: var(--mc-text-primary);
+  flex-shrink: 0;
+}
+
+.workLogDetail {
+  color: var(--mc-text-muted);
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.workLogExpandBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mc-accent);
+  font-size: var(--mc-font-size-xs);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  align-self: flex-start;
+}
+
+/* Working indicator */
+.workingIndicator {
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+  padding: var(--mc-space-2) 0;
+  color: var(--mc-text-muted);
+  font-size: var(--mc-font-size-sm);
+}
+
+.workingDots {
+  display: flex;
+  gap: 3px;
+}
+
+.workingDots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--mc-text-muted);
+  animation: workingDotBounce 1.2s ease-in-out infinite;
+}
+
+.workingDots span:nth-child(2) { animation-delay: 0.2s; }
+.workingDots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes workingDotBounce {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+  40% { transform: scale(1.2); opacity: 1; }
+}
+
+.workingLabel {
+  font-size: var(--mc-font-size-xs);
+}
+
+/* ─── ChatMarkdown ──────────────────────────────────────────────────────────── */
+
+.chatMarkdown {
+  font-size: var(--mc-font-size-base);
+  line-height: 1.6;
+  color: var(--mc-text-primary);
+  word-break: break-word;
+}
+
+.chatMarkdown p { margin: 0 0 var(--mc-space-2); }
+.chatMarkdown p:last-child { margin-bottom: 0; }
+.chatMarkdown ul, .chatMarkdown ol { margin: var(--mc-space-2) 0; padding-left: 24px; }
+.chatMarkdown li { margin: 2px 0; }
+.chatMarkdown h1, .chatMarkdown h2, .chatMarkdown h3 {
+  font-weight: 600;
+  margin: var(--mc-space-3) 0 var(--mc-space-2);
+  color: var(--mc-text-primary);
+}
+.chatMarkdown h1 { font-size: var(--mc-font-size-lg); }
+.chatMarkdown h2 { font-size: var(--mc-font-size-md); }
+.chatMarkdown h3 { font-size: var(--mc-font-size-base); }
+.chatMarkdown blockquote {
+  border-left: 3px solid var(--mc-border-strong);
+  margin: var(--mc-space-2) 0;
+  padding-left: var(--mc-space-3);
+  color: var(--mc-text-secondary);
+}
+.chatMarkdown table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--mc-font-size-sm);
+  margin: var(--mc-space-2) 0;
+}
+.chatMarkdown th, .chatMarkdown td {
+  border: 1px solid var(--mc-border);
+  padding: var(--mc-space-1) var(--mc-space-2);
+  text-align: left;
+}
+.chatMarkdown th { background: var(--mc-bg-hover); font-weight: 600; }
+.chatMarkdown code:not(pre code) {
+  font-family: var(--mc-font-mono);
+  font-size: 0.9em;
+  background: var(--mc-bg-hover);
+  border: 1px solid var(--mc-border);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* Code block */
+.codeBlock {
+  position: relative;
+  margin: var(--mc-space-2) 0;
+  border-radius: var(--mc-radius);
+  overflow: hidden;
+  border: 1px solid var(--mc-border);
+}
+
+.codeBlock:hover .copyButton { opacity: 1; }
+
+.copyButton {
+  position: absolute;
+  top: var(--mc-space-2);
+  right: var(--mc-space-2);
+  z-index: 1;
+  background: var(--mc-bg-sidebar);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-sm);
+  padding: 3px 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  color: var(--mc-text-secondary);
+}
+
+.copyButton:hover { color: var(--mc-text-primary); }
+
+.shikiOutput {
+  overflow-x: auto;
+  font-size: var(--mc-font-size-sm);
+}
+
+.shikiOutput :global(pre) {
+  margin: 0 !important;
+  padding: var(--mc-space-3) var(--mc-space-4) !important;
+  background: var(--mc-bg-hover) !important;
+}
+
+.codePlain {
+  margin: 0;
+  padding: var(--mc-space-3) var(--mc-space-4);
+  background: var(--mc-bg-hover);
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-font-size-sm);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.mdLink {
+  color: var(--mc-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mdFallback {
+  font-family: var(--mc-font-mono);
+  font-size: var(--mc-font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
