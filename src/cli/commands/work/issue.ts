@@ -7,19 +7,7 @@ import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../../lib/tracker-utils.js';
-
-/**
- * Get Linear API key from environment or config file
- */
-function getLinearApiKey(): string | null {
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-  return process.env.LINEAR_API_KEY || null;
-}
+import { getLinearApiKey } from '../../../lib/shadow-utils.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
