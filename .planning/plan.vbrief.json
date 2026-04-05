@@ -1,0 +1,501 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-04T18:00:00Z",
+    "author": "panopticon-cli/0.6.0",
+    "description": "Plan for PAN-453: Full vBRIEF v0.5 spec support — uid, author, sequence, references, timestamps"
+  },
+  "plan": {
+    "id": "pan-453",
+    "uid": "f7a2c3d1-8e4b-4f6a-9c1d-2b3e4f5a6b7c",
+    "title": "Full vBRIEF v0.5 spec support — uid, author, sequence, references, timestamps",
+    "status": "approved",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-04T18:00:00Z",
+    "updated": "2026-04-04T18:00:00Z",
+    "tags": ["vbrief", "spec-compliance", "types", "frontend", "documentation"],
+    "references": [
+      { "uri": "docs/prds/planned/pan-453-vbrief-full-spec-support.md", "label": "PRD", "type": "prd" },
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/453", "label": "GitHub Issue", "type": "issue" },
+      { "uri": "https://github.com/deftai/vBRIEF", "label": "vBRIEF v0.5 Spec", "type": "spec" }
+    ],
+    "narratives": {
+      "Problem": "Panopticon uses ~40% of the vBRIEF v0.5 spec. Missing fields: uid, author (both levels), sequence, references, created/updated/completed timestamps, and priority on items. We want full spec compliance for the Deft team conversation and better audit trail.",
+      "Proposal": "Implement all missing v0.5 fields across types, I/O, beads sync, planning prompt, and builder. Add artifact auto-copy and PRD discovery to the planning lifecycle. Build a rich VBriefViewer dashboard component. Update all documentation."
+    },
+    "items": [
+      {
+        "id": "update-types",
+        "title": "Update vBRIEF types with all v0.5 fields",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Add missing fields to VBriefDocument.vBRIEFInfo (author, description), VBriefPlan (uid, sequence, references, created, updated), VBriefItem (created, completed), VBriefSubItem (created, completed). Create new VBriefReference interface. All new fields are optional for backwards compatibility."
+        },
+        "subItems": [
+          {
+            "id": "update-types.ac1",
+            "title": "VBriefDocument.vBRIEFInfo has author?: string and description?: string fields",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "update-types.ac2",
+            "title": "VBriefPlan has uid?, sequence?, references?, created?, updated? fields",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "update-types.ac3",
+            "title": "VBriefItem and VBriefSubItem have created? and completed? fields",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "update-types.ac4",
+            "title": "VBriefReference interface exists with uri (required), label?, type?",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "io-timestamps",
+        "title": "Add timestamps and sequence to I/O status update functions",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Modify updateItemStatus() and updateSubItemStatus() in io.ts to: (1) set vBRIEFInfo.updated and plan.updated to current ISO timestamp, (2) increment plan.sequence (default to 1 if missing), (3) set item.completed or subItem.completed when status transitions to 'completed'."
+        },
+        "subItems": [
+          {
+            "id": "io-timestamps.ac1",
+            "title": "updateItemStatus sets vBRIEFInfo.updated and plan.updated on every call",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "io-timestamps.ac2",
+            "title": "updateItemStatus increments plan.sequence (starts at 1 if missing)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "io-timestamps.ac3",
+            "title": "updateItemStatus sets item.completed when status → 'completed'",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "io-timestamps.ac4",
+            "title": "updateSubItemStatus sets subItem.completed when status → 'completed'",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "io-timestamps.ac5",
+            "title": "updateSubItemStatus increments plan.sequence and sets updated timestamps",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "beads-sync-compat",
+        "title": "Verify beads sync compatibility with new I/O timestamps",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "syncBeadStatusToVBrief() already calls updateItemStatus() and updateSubItemStatus() — which now handle timestamps and sequence. Verify no regressions. The sequence counter will increment once per updateItemStatus call and once per each AC subItem update, which is correct (each is a distinct write)."
+        },
+        "subItems": [
+          {
+            "id": "beads-sync-compat.ac1",
+            "title": "syncBeadStatusToVBrief correctly propagates completed timestamps via io.ts calls",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "beads-sync-compat.ac2",
+            "title": "Sequence increments correctly when bead completion marks item + multiple AC subItems",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "builder-update",
+        "title": "Update PlanBuilder with new v0.5 fields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Add builder methods: uid(), sequence(), references(), description(). Update build() to emit vBRIEFInfo.author (from package.json version) and vBRIEFInfo.description. Add plan.created and plan.updated in build(). Update addTask() to accept and set created timestamp."
+        },
+        "subItems": [
+          {
+            "id": "builder-update.ac1",
+            "title": "PlanBuilder.build() emits vBRIEFInfo.author as 'panopticon-cli/<version>'",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "builder-update.ac2",
+            "title": "PlanBuilder has uid(), sequence(), references(), description() methods",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "builder-update.ac3",
+            "title": "build() sets plan.created and plan.updated to current timestamp",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "planning-prompt",
+        "title": "Update planning prompt with full v0.5 template and PRD discovery",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Modify buildPlanningPrompt() to accept planningModel parameter. Import package.json version. Update JSON template to include all new fields: vBRIEFInfo.author, description; plan.uid (instruct agent to generate UUID), plan.author (inject 'agent:<planningModel>'), plan.sequence: 1, plan.created/updated, plan.references, items[].priority, items[].created. Add PRD discovery: scan docs/prds/planned/ and docs/prds/active/ for issue-matching files, include paths in prompt and references template."
+        },
+        "subItems": [
+          {
+            "id": "planning-prompt.ac1",
+            "title": "buildPlanningPrompt accepts planningModel parameter and injects as plan.author",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "planning-prompt.ac2",
+            "title": "JSON template includes vBRIEFInfo.author with package.json version",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "planning-prompt.ac3",
+            "title": "Template includes uid, sequence, created, updated, references, items[].priority, items[].created",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "planning-prompt.ac4",
+            "title": "PRD discovery scans docs/prds/ for issue-matching files and includes in references",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "artifact-copy",
+        "title": "Auto-copy planning artifacts to docs/prds/active/ on complete-planning",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "In the complete-planning endpoint (issues.ts), after creating beads: copy .planning/STATE.md to docs/prds/active/<ISSUE-ID>-plan.md and .planning/plan.vbrief.json to docs/prds/active/<ISSUE-ID>-plan.vbrief.json. Skip if target files already exist. Use async fs operations (fs/promises), NOT sync. Ensure docs/prds/active/ directory exists before copying."
+        },
+        "subItems": [
+          {
+            "id": "artifact-copy.ac1",
+            "title": "complete-planning copies STATE.md to docs/prds/active/<ISSUE>-plan.md",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "artifact-copy.ac2",
+            "title": "complete-planning copies plan.vbrief.json to docs/prds/active/<ISSUE>-plan.vbrief.json",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "artifact-copy.ac3",
+            "title": "Copy is skipped if target file already exists (no overwrite)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "artifact-copy.ac4",
+            "title": "Uses async fs operations (fs/promises), not sync",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "prd-discovery",
+        "title": "Copy existing PRDs into workspace on start-planning",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "In start-planning (spawn-planning-session.ts), before writing PLANNING_PROMPT.md: scan docs/prds/planned/ and docs/prds/active/ for .md files matching the issue ID. Copy matching PRDs to .planning/prd.md in the workspace so the planning agent has them locally. Pass discovered paths to buildPlanningPrompt() for the references template."
+        },
+        "subItems": [
+          {
+            "id": "prd-discovery.ac1",
+            "title": "start-planning scans docs/prds/planned/ and docs/prds/active/ for issue-matching .md files",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "prd-discovery.ac2",
+            "title": "Matching PRD is copied to .planning/prd.md in the workspace",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "prd-discovery.ac3",
+            "title": "Works correctly when no PRD exists (no error, no copy)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Update documentation with vBRIEF v0.5 field reference",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Update docs/VBRIEF.md to document all new fields (uid, author, sequence, references, timestamps) with examples. Add vBRIEF section to CLAUDE.md with spec links (canonical deftai/vBRIEF, our extension proposal, our fork). Update README.md feature table to add vBRIEF, TLDR, Effect.js, and updated Beads rows."
+        },
+        "subItems": [
+          {
+            "id": "docs-update.ac1",
+            "title": "docs/VBRIEF.md documents all new v0.5 fields with examples",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "CLAUDE.md has vBRIEF section referencing canonical deftai/vBRIEF spec",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "docs-update.ac3",
+            "title": "README.md feature table includes vBRIEF, TLDR, Effect.js, Beads rows",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "backend-tests",
+        "title": "Test suite for vBRIEF v0.5 spec fields",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Create tests/vbrief/full-spec.test.ts covering: readPlan preserves uid/author/sequence/references, updateItemStatus increments sequence and sets timestamps, updateItemStatus sets completed timestamp when status → completed, updateSubItemStatus sets completed and increments sequence, syncBeadStatusToVBrief propagates timestamps correctly, planning prompt includes all new field placeholders, PRD discovery finds matching files."
+        },
+        "subItems": [
+          {
+            "id": "backend-tests.ac1",
+            "title": "readPlan preserves uid, author, sequence, references fields",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "backend-tests.ac2",
+            "title": "updateItemStatus increments sequence and sets updated timestamps",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "backend-tests.ac3",
+            "title": "updateItemStatus/updateSubItemStatus sets completed timestamp on status → completed",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "backend-tests.ac4",
+            "title": "Planning prompt template includes uid, author, sequence, references, timestamps",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "viewer-components",
+        "title": "Build VBriefViewer component suite",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Create component suite in src/dashboard/frontend/src/components/vbrief/: VBriefViewer (main container with List/DAG/Raw JSON tabs), VBriefHeader (title, status badge, uid, author, created/updated timestamps), VBriefNarratives (markdown-rendered narrative sections), VBriefReferences (clickable link list), VBriefItemCard (expandable card with status/difficulty/priority badges, narrative, AC checklist, dependencies), VBriefItemList (renders list of item cards). Uses react-markdown for narrative rendering, existing PlanDAG for DAG tab, localStorage for view preference."
+        },
+        "subItems": [
+          {
+            "id": "viewer-components.ac1",
+            "title": "VBriefViewer renders with List/DAG/Raw JSON tab switching",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-components.ac2",
+            "title": "VBriefHeader shows title, status badge, uid, author, created/updated timestamps",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-components.ac3",
+            "title": "VBriefNarratives renders Problem/Proposal sections as markdown",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-components.ac4",
+            "title": "VBriefItemCard shows difficulty/priority badges and AC checklist with status indicators",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-components.ac5",
+            "title": "Handles missing plan gracefully (shows 'No plan available' message)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "viewer-integration",
+        "title": "Integrate VBriefViewer into KanbanBoard and InspectorPanel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Add 'vBRIEF' button to issue card actions in KanbanBoard.tsx (alongside existing 'Beads Tasks' button). Add vBRIEF tab to InspectorPanel.tsx. Both use GET /api/workspaces/:issueId/plan to fetch data. Viewer opens as a panel/dialog from both locations."
+        },
+        "subItems": [
+          {
+            "id": "viewer-integration.ac1",
+            "title": "'vBRIEF' button appears on kanban issue cards with plan data available",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-integration.ac2",
+            "title": "Clicking 'vBRIEF' button opens the VBriefViewer",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-integration.ac3",
+            "title": "InspectorPanel has vBRIEF tab that renders VBriefViewer",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "viewer-tests",
+        "title": "Frontend tests for VBriefViewer components",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-04T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-453"
+        },
+        "narrative": {
+          "Action": "Create tests/frontend/VBriefViewer.test.tsx using Vitest + React Testing Library. Test: header renders title/status/uid/author/timestamps, narratives render as markdown, references render as clickable links, items expand with AC checklist, completed AC shows checkmark, DAG tab renders PlanDAG, Raw JSON toggle shows formatted JSON, missing plan shows fallback message."
+        },
+        "subItems": [
+          {
+            "id": "viewer-tests.ac1",
+            "title": "Header renders plan title, status badge, uid, author, timestamps",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-tests.ac2",
+            "title": "Item cards expand to show AC checklist with status indicators",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-tests.ac3",
+            "title": "List/DAG/Raw JSON tab switching works correctly",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "viewer-tests.ac4",
+            "title": "Missing plan shows graceful fallback message",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "update-types", "to": "io-timestamps", "type": "blocks" },
+      { "from": "update-types", "to": "builder-update", "type": "blocks" },
+      { "from": "update-types", "to": "planning-prompt", "type": "blocks" },
+      { "from": "update-types", "to": "viewer-components", "type": "blocks" },
+      { "from": "io-timestamps", "to": "beads-sync-compat", "type": "blocks" },
+      { "from": "io-timestamps", "to": "backend-tests", "type": "blocks" },
+      { "from": "beads-sync-compat", "to": "backend-tests", "type": "informs" },
+      { "from": "planning-prompt", "to": "backend-tests", "type": "blocks" },
+      { "from": "prd-discovery", "to": "planning-prompt", "type": "informs" },
+      { "from": "artifact-copy", "to": "docs-update", "type": "informs" },
+      { "from": "viewer-components", "to": "viewer-integration", "type": "blocks" },
+      { "from": "viewer-components", "to": "viewer-tests", "type": "blocks" },
+      { "from": "viewer-integration", "to": "viewer-tests", "type": "informs" }
+    ]
+  }
+}
