@@ -11,11 +11,53 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { loadSettings, getAgentCommand, isAnthropicModel } from '../settings.js';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
+function getPackageVersion(): string {
+  try {
+    const pkgPath = resolve(__dirname, '../../../package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
+    return pkg.version;
+  } catch {
+    return '0.0.0';
+  }
+}
+
+/**
+ * Discover PRD files matching an issue ID from docs/prds directories.
+ * Returns list of { path, label } for use in references template.
+ */
+function discoverPrdFiles(workspacePath: string, issueId: string): Array<{ path: string; label: string }> {
+  const issueLower = issueId.toLowerCase();
+  const searchDirs = [
+    join(workspacePath, 'docs', 'prds', 'planned'),
+    join(workspacePath, 'docs', 'prds', 'active'),
+    // Also check two levels up (worktrees)
+    join(workspacePath, '..', '..', 'docs', 'prds', 'planned'),
+    join(workspacePath, '..', '..', 'docs', 'prds', 'active'),
+  ];
+
+  const found: Array<{ path: string; label: string }> = [];
+  for (const dir of searchDirs) {
+    if (!existsSync(dir)) continue;
+    try {
+      const files = readdirSync(dir);
+      for (const file of files) {
+        if (file.toLowerCase().includes(issueLower)) {
+          found.push({ path: join(dir, file), label: file });
+        }
+      }
+    } catch { /* ignore read errors */ }
+  }
+  return found;
+}
 
 const execAsync = promisify(exec);
 
@@ -80,8 +122,11 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string): string {
+export function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string): string {
   const issueLower = issue.identifier.toLowerCase();
+  const version = getPackageVersion();
+  const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
+  const prdFiles = discoverPrdFiles(workspacePath, issue.identifier);
 
   // Build comments section
   let commentsSection = '';
@@ -236,11 +281,25 @@ It MUST have exactly two top-level keys: \`vBRIEFInfo\` and \`plan\`.
 
 \`\`\`json
 {
-  "vBRIEFInfo": { "version": "0.5", "created": "<ISO 8601 timestamp>" },
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "<ISO 8601 timestamp>",
+    "author": "panopticon-cli/${version}",
+    "description": "Plan for ${issue.identifier}: <issue title>"
+  },
   "plan": {
     "id": "${issueLower}",
     "title": "<issue title>",
     "status": "approved",
+    "uid": "<generate a UUID v4>",
+    "author": "${modelAuthor}",
+    "sequence": 1,
+    "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
+    "updated": "<ISO 8601 timestamp — same as created>",
+    "references": [
+      { "uri": "${issue.url}", "label": "${issue.identifier}", "type": "issue" }${prdFiles.length > 0 ? `,
+      ${prdFiles.map(p => `{ "uri": "${p.path}", "label": "${p.label}", "type": "prd" }`).join(',\n      ')}` : ''}
+    ],
     "tags": ["<relevant tags>"],
     "narratives": {
       "Problem": "<what problem this solves>",
@@ -251,6 +310,8 @@ It MUST have exactly two top-level keys: \`vBRIEFInfo\` and \`plan\`.
         "id": "<short-kebab-id>",
         "title": "<task title>",
         "status": "pending",
+        "priority": "medium",
+        "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
           "issueLabel": "${issueLower}"
@@ -276,6 +337,7 @@ It MUST have exactly two top-level keys: \`vBRIEFInfo\` and \`plan\`.
 **CRITICAL vBRIEF rules:**
 - The file MUST have \`vBRIEFInfo\` and \`plan\` as the ONLY top-level keys
 - \`plan.id\` MUST be the issue ID in lowercase (e.g., "${issueLower}")
+- \`plan.uid\` MUST be a freshly generated UUID v4
 - Do NOT use \`issue\`, \`issueId\`, or \`issue_id\` — use \`plan.id\`
 - \`items[].status\` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled
 - Acceptance criteria MUST be \`subItems\` with \`metadata.kind: "acceptance_criterion"\`
@@ -376,16 +438,32 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       }
     }
 
-    // ── Write planning prompt ──────────────────────────────────────────────
-    const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-    const planningPrompt = buildPlanningPrompt(issue, workspacePath);
-    writeFileSync(planningPromptPath, planningPrompt);
-
-    // ── Determine agent command ────────────────────────────────────────────
+    // ── Determine planning model (before prompt so it's injected) ─────────
     const agentSettings = loadSettings();
     const planningModel = (agentSettings.models as any).planning_agent
       || agentSettings.models.complexity?.expert
       || 'claude-opus-4-6';
+
+    // ── Discover and copy PRD files to workspace ───────────────────────────
+    const prdFiles = discoverPrdFiles(workspacePath, issue.identifier);
+    if (prdFiles.length > 0) {
+      const prdDestPath = join(planningDir, 'prd.md');
+      if (!existsSync(prdDestPath)) {
+        // Copy the first matching PRD (prefer active over planned)
+        try {
+          const prdContent = readFileSync(prdFiles[0].path, 'utf-8');
+          writeFileSync(prdDestPath, prdContent, 'utf-8');
+          console.log(`[start-planning] Copied PRD to ${prdDestPath} from ${prdFiles[0].path}`);
+        } catch (err: any) {
+          console.warn(`[start-planning] Could not copy PRD: ${err.message}`);
+        }
+      }
+    }
+
+    // ── Write planning prompt ──────────────────────────────────────────────
+    const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
+    const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel);
+    writeFileSync(planningPromptPath, planningPrompt);
     const agentCmd = getAgentCommand(planningModel);
     const cmdWithArgs = agentCmd.args.length > 0
       ? `${agentCmd.command} ${agentCmd.args.join(' ')} --dangerously-skip-permissions`
