@@ -1855,6 +1855,57 @@ async function checkSpecialistQueues(): Promise<string[]> {
 }
 
 /**
+ * PAN-464: Check Docker container health for active workspaces.
+ * Crashed containers (e.g., Vite ENOSPC) break the UAT environment.
+ * Auto-restart them so the workspace remains usable.
+ */
+async function checkWorkspaceContainerHealth(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    // Find all workspace-related containers that are exited (crashed)
+    const { stdout } = await execAsync(
+      'docker ps -a --filter "status=exited" --filter "name=panopticon-feature-" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
+      { encoding: 'utf-8', timeout: 10000 },
+    );
+    const crashed = stdout.trim().split('\n').filter(Boolean);
+    if (crashed.length === 0) return actions;
+
+    // Check if the workspace's agent is still active (only restart if agent is working)
+    for (const line of crashed) {
+      const [name] = line.split('|');
+      if (!name) continue;
+
+      // Extract issue ID from container name: panopticon-feature-pan-451-frontend-1 → pan-451
+      const match = name.match(/panopticon-feature-([\w-]+?)-(frontend|server|init)-/);
+      if (!match) continue;
+      const issueLower = match[1];
+      const agentId = `agent-${issueLower}`;
+
+      // Only restart if the agent is active (has a tmux session)
+      try {
+        await execAsync(`tmux has-session -t ${agentId} 2>/dev/null`, { encoding: 'utf-8', timeout: 3000 });
+      } catch {
+        // Agent not running — skip restart
+        continue;
+      }
+
+      // Restart the container
+      try {
+        await execAsync(`docker restart ${name}`, { encoding: 'utf-8', timeout: 30000 });
+        const msg = `[deacon] Auto-restarted crashed container ${name} (agent ${agentId} is active)`;
+        console.log(msg);
+        actions.push(msg);
+      } catch (restartErr: any) {
+        console.warn(`[deacon] Failed to restart ${name}: ${restartErr.message}`);
+      }
+    }
+  } catch {
+    // Docker not available or other error — skip silently
+  }
+  return actions;
+}
+
+/**
  * Run a single patrol cycle
  */
 export async function runPatrol(): Promise<PatrolResult> {
@@ -1894,6 +1945,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const queueActions = await checkSpecialistQueues();
   actions.push(...queueActions);
   for (const a of queueActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-464: Check workspace Docker container health and auto-restart crashed containers
+  const containerActions = await checkWorkspaceContainerHealth();
+  actions.push(...containerActions);
+  for (const a of containerActions) addLog('action', a, state.patrolCycle);
 
   // Detect dead-end agents: review blocked or tests failed but agent is idle
   const deadEndActions = await checkDeadEndAgents();

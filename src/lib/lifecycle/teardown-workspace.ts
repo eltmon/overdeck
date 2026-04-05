@@ -97,6 +97,43 @@ async function stopDocker(
 }
 
 /**
+ * Kill orphaned host processes for a workspace.
+ *
+ * When workspaces use `./dev all`, Vite/node processes run on the host (not in
+ * containers). Docker compose down doesn't touch them, so they leak and exhaust
+ * inotify watchers. This step finds and kills processes whose cwd or args
+ * reference the workspace path.
+ */
+async function killOrphanedProcesses(workspacePath: string): Promise<StepResult> {
+  const step = 'teardown:orphaned-processes';
+  try {
+    // Find PIDs with cwd matching the workspace path
+    const { stdout } = await execAsync(
+      `lsof +D "${workspacePath}" -t 2>/dev/null || true`,
+      { encoding: 'utf-8', timeout: 10000 },
+    );
+    const pids = stdout.trim().split('\n').filter(Boolean).map(p => p.trim()).filter(p => /^\d+$/.test(p));
+
+    if (pids.length === 0) {
+      return stepSkipped(step, ['No orphaned processes found']);
+    }
+
+    // Don't kill our own process or the dashboard
+    const myPid = String(process.pid);
+    const safePids = pids.filter(p => p !== myPid);
+
+    if (safePids.length === 0) {
+      return stepSkipped(step, ['No orphaned processes to kill']);
+    }
+
+    await execAsync(`kill ${safePids.join(' ')} 2>/dev/null || true`, { encoding: 'utf-8', timeout: 5000 });
+    return stepOk(step, [`Killed ${safePids.length} orphaned process(es)`]);
+  } catch {
+    return stepSkipped(step, ['Orphaned process cleanup failed (non-fatal)']);
+  }
+}
+
+/**
  * Sync workspace beads to the project-root beads database before workspace deletion.
  * Without this, beads created in the workspace's .beads/dolt/ are lost when the worktree is removed.
  */
@@ -431,6 +468,11 @@ export async function teardownWorkspace(
     // 5. Stop Docker containers (only if deleting workspace)
     if (shouldDeleteWorkspace && !opts.skipDocker) {
       results.push(await stopDocker(workspacePath, projName, issueLower));
+    }
+
+    // 5b. Kill orphaned host processes (Vite, node) that survive Docker teardown
+    if (shouldDeleteWorkspace) {
+      results.push(await killOrphanedProcesses(workspacePath));
     }
 
     // 6. Clear planning marker (before workspace deletion, or when preserving workspace)
