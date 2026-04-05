@@ -89,11 +89,6 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     createMutation.mutate(''); // server auto-generates name
   }, [createMutation]);
 
-  const handleDelete = useCallback((e: React.MouseEvent, name: string) => {
-    e.stopPropagation();
-    deleteMutation.mutate(name);
-  }, [deleteMutation]);
-
   return (
     <div className={styles.conversationSection}>
       {/* Section header */}
@@ -143,14 +138,17 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                   }}
                 />
                 <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
-                <button
+                <span
+                  role="button"
+                  tabIndex={0}
                   className={styles.conversationDeleteBtn}
-                  onClick={e => handleDelete(e, conv.name)}
+                  onClick={e => { e.stopPropagation(); deleteMutation.mutate(conv.name); }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); deleteMutation.mutate(conv.name); } }}
                   title="Stop session"
                   aria-label={`Stop ${conv.name}`}
                 >
                   ×
-                </button>
+                </span>
               </button>
             ))
           )}
