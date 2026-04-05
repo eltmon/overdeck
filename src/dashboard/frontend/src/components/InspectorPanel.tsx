@@ -18,6 +18,7 @@ import {
   Box,
   Play,
   GitMerge,
+  ScrollText,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -25,6 +26,7 @@ import { Agent, Issue } from '../types';
 import type { ContainerStatus, ReviewStatus, WorkspaceInfo } from './inspector/types';
 import { getFriendlyModelName } from './inspector/utils';
 import { BeadsDialog } from './BeadsDialog';
+import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useConfirm } from './DialogProvider';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
@@ -114,6 +116,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
   const [copied, setCopied] = useState(false);
   const [showPrdModal, setShowPrdModal] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
+  const [showVBrief, setShowVBrief] = useState(false);
   const [workspaceCreating, setWorkspaceCreating] = useState(false);
   const [containersStarting, setContainersStarting] = useState(false);
   const [containersStartedAt, setContainersStartedAt] = useState(0);
@@ -685,6 +688,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
               <ListTodo className="w-3 h-3" />
               <span>Beads Tasks</span>
             </button>
+            <button onClick={() => setShowVBrief(true)} className="flex items-center gap-1.5 text-purple-400 hover:text-purple-300">
+              <ScrollText className="w-3 h-3" />
+              <span>vBRIEF</span>
+            </button>
           </div>
         </div>
 
@@ -877,6 +884,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
 
       {/* Beads dialog */}
       {showBeads && <BeadsDialog issueId={issueId} isOpen={showBeads} onClose={() => setShowBeads(false)} />}
+
+      {/* vBRIEF dialog */}
+      {showVBrief && <VBriefDialog issueId={issueId} onClose={() => setShowVBrief(false)} />}
 
       {/* PRD Modal */}
       {showPrdModal && prdContent && (
