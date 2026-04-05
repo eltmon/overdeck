@@ -171,6 +171,13 @@ function ConversationView({ conversation }: ConversationViewProps) {
         <div className={styles.conversationConnecting}>
           <span>{isLoading ? 'Loading…' : 'Connecting to session…'}</span>
         </div>
+      ) : isFirstMessage ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateTitle}>How can I help you?</p>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            Type a message below to start the conversation.
+          </p>
+        </div>
       ) : (
         <MessagesTimeline
           messages={messages}

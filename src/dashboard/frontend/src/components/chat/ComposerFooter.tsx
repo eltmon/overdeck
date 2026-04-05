@@ -114,31 +114,34 @@ export function ComposerFooter({ conversation, isFirstMessage }: ComposerFooterP
 
   return (
     <div className={styles.composerFooter}>
-      {/* Editor */}
-      <ComposerPromptEditor
-        conversationName={conversation.name}
-        disabled={isDisabled}
-        onCommandKeyDown={handleCommandKey}
-        editorRef={editorRef}
-        onChange={setText}
-      />
+      {/* Single unified container — T3Chat style */}
+      <div className={styles.composerBox}>
+        {/* Editor (no border of its own) */}
+        <ComposerPromptEditor
+          conversationName={conversation.name}
+          disabled={isDisabled}
+          onCommandKeyDown={handleCommandKey}
+          editorRef={editorRef}
+          onChange={setText}
+        />
 
-      {/* Toolbar */}
-      <div className={styles.composerToolbar}>
-        <ModelPicker value={model} onChange={setModel} disabled={isDisabled} />
-        <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} />
+        {/* Toolbar inside the box */}
+        <div className={styles.composerToolbar}>
+          <ModelPicker value={model} onChange={setModel} disabled={isDisabled} />
+          <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} />
 
-        <div className={styles.composerToolbarSpacer} />
+          <div className={styles.composerToolbarSpacer} />
 
-        <button
-          className={styles.sendButton}
-          onClick={() => void handleSubmit()}
-          disabled={isEmpty || isDisabled}
-          type="button"
-          title="Send message (Enter)"
-        >
-          <SendHorizontal size={16} />
-        </button>
+          <button
+            className={styles.sendButton}
+            onClick={() => void handleSubmit()}
+            disabled={isEmpty || isDisabled}
+            type="button"
+            title="Send message (Enter)"
+          >
+            <SendHorizontal size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );

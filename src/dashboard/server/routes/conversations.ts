@@ -145,9 +145,16 @@ const getConversationsRoute = HttpRouter.add(
         const conversations = listConversations();
 
         // Enrich with live tmux status
+        // Grace period: treat recently-created active conversations as alive (tmux may not have
+        // started yet — spawn is async). After 30s we fall back to the actual tmux check.
+        const SPAWN_GRACE_MS = 30_000;
         const enriched = await Promise.all(
           conversations.map(async (conv) => {
-            const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
+            const withinGrace =
+              conv.status === 'active' &&
+              !conv.endedAt &&
+              Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
+            const sessionAlive = withinGrace || (await tmuxSessionExists(conv.tmuxSession));
             return { ...conv, sessionAlive };
           }),
         );

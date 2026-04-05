@@ -305,12 +305,16 @@ export function runMigrations(db: Database.Database): void {
 
   // v6 → v7: add session_file column to conversations (PAN-451)
   if (currentVersion < 7) {
-    db.exec(`ALTER TABLE conversations ADD COLUMN session_file TEXT`);
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN session_file TEXT`);
+    } catch { /* already exists */ }
   }
 
   // v7 → v8: add title column to conversations (auto-set from first message)
   if (currentVersion < 8) {
-    db.exec(`ALTER TABLE conversations ADD COLUMN title TEXT`);
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN title TEXT`);
+    } catch { /* already exists */ }
   }
 
   // After all migrations, set the version
