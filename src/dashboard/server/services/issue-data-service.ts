@@ -548,6 +548,8 @@ export class IssueDataService {
                   canonicalStatus === 'in_review' ? 'In Review' :
                   canonicalStatus === 'done' ? 'Done' :
                   canonicalStatus === 'backlog' ? 'Backlog' : 'Todo',
+          canonicalStatus,
+          state: canonicalStatus,
           priority: labelNames.some((l: string) => l.includes('priority') && l.includes('high')) ? 2 :
                     labelNames.some((l: string) => l.includes('priority') && l.includes('urgent')) ? 1 :
                     labelNames.some((l: string) => l.includes('priority') && l.includes('low')) ? 4 : 3,
