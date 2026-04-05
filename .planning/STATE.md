@@ -1,6 +1,6 @@
 # PAN-451: Conversation View — T3Code-Style Message Rendering + Tmux Toggle
 
-## Status: Planning Complete
+## Status: Implementation Complete
 
 ## Decisions
 
@@ -120,3 +120,35 @@ After `spawnConversationSession()`, kick off async session file discovery. Store
 3. **Large JSONL files** — incremental parsing essential; full re-parse on 2MB files is too slow
 4. **Streaming latency** — fs.watch is unreliable on some Linux filesystems; polling fallback at 500ms
 5. **Lexical complexity** — simplified v1 without mentions, but still ~800 lines; test thoroughly
+
+## Remaining Work
+
+None — implementation complete. All 11 beads closed, all quality gates pass.
+
+## Implementation Summary
+
+### Backend
+- **Schema v7**: `session_file TEXT` column added to conversations table
+- **conversations-db.ts**: `sessionFile` field + `updateSessionFile()` 
+- **conversation-service.ts**: `discoverSessionFile`, `parseConversationMessages`, `watchConversation` (fs.watch + 500ms polling)
+- **GET /api/conversations/:name/messages**: returns ChatMessage[]/WorkLogEntry[] or `{discovering:true}`
+- **POST /api/conversations/:name/message**: delivers message to tmux via sendKeysAsync
+- **POST /api/conversations**: triggers async session file discovery after spawn
+- **ws-rpc.ts**: `subscribeConversationMessages` RPC streams ConversationEvents
+
+### Contracts
+- `ChatMessage`, `WorkLogEntry`, `ConversationEvent` types in `@panopticon/contracts`
+- `subscribeConversationMessages` in `WS_METHODS` and `PanRpcGroup`
+
+### Frontend (src/dashboard/frontend/src/components/chat/)
+- **ConversationPanel.tsx**: Toggle [Conversation|Terminal], session lifecycle, message polling
+- **MessagesTimeline.tsx**: @tanstack/react-virtual, user bubbles, assistant (ChatMarkdown), work log groups, working indicator, auto-scroll
+- **session-logic.ts**: TimelineEntry/MessagesTimelineRow types, deriveTimelineEntries, deriveMessagesTimelineRows
+- **ChatMarkdown.tsx**: react-markdown + remark-gfm, @pierre/diffs Shiki with LRU cache, copy button
+- **ComposerPromptEditor.tsx**: Lexical, Enter=submit, draft persistence, HistoryPlugin
+- **ComposerFooter.tsx**: assembles editor + ModelPicker + EffortPicker + Send
+- **ModelPicker.tsx**: Claude Opus/Sonnet/Haiku, localStorage
+- **EffortPicker.tsx**: low/medium/high/max, localStorage
+
+### Integration
+- MissionControl uses `ConversationPanel` instead of `ConversationTerminal`
