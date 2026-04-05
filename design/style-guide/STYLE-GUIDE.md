@@ -80,19 +80,23 @@ Use Tailwind's default scale. Recommended pairings:
 
 | Element | Size | Weight | Font |
 |---------|------|--------|------|
-| Page title | `text-xl` (20px) | `font-semibold` (600) | Space Grotesk (`font-display`) |
-| Section heading | `text-lg` (18px) | `font-semibold` (600) | Space Grotesk |
-| Card title | `text-base` (16px) | `font-semibold` (600) | Space Grotesk |
+| Page title | `text-xl` (20px) | `font-semibold` (600) | DM Sans (or Space Grotesk for brand) |
+| Section heading | `text-lg` (18px) | `font-semibold` (600) | DM Sans |
+| Card title | `text-sm` (14px) | `font-semibold` (600) | DM Sans |
+| Column heading | `text-base` (16px) | `font-semibold` (600) | DM Sans |
 | Body text | `text-sm` (14px) | `font-normal` (400) | DM Sans (default) |
 | Small labels | `text-xs` (12px) | `font-medium` (500) | DM Sans |
 | Tiny badges | `text-[.625rem]` (10px) | `font-medium` (500) | DM Sans |
-| Stat values | `text-xl` (20px) | `font-semibold` (600) | Space Grotesk |
+| Stat values | `text-sm` (14px) | `font-semibold` (600) | Space Grotesk |
 | Nav items | `text-sm` (14px) | `font-medium` (500) | DM Sans |
 | Nav group labels | `text-xs` (12px) | `font-medium` (500) | DM Sans, `uppercase tracking-wider` |
+| Buttons | `text-sm` (14px) | `font-medium` (500) | DM Sans |
+| Badge text | `text-[10px]` | `font-medium` (500) | DM Sans |
+| Action links | `text-[10px]` | `font-medium` (500) | DM Sans, `uppercase tracking-widest` |
 
 ### Typography Rules
 
-1. **Never use `font-bold` (700) for body text.** Reserve 700 for page titles and stat values only.
+1. **Never use `font-bold` (700) in UI components.** T3Code uses zero `font-bold` in its component library. The weight scale is: `font-medium` (500) for everything, `font-semibold` (600) for card titles and section headings. That's it. `font-bold` (700) creates a heavy, aggressive feel that kills the premium aesthetic.
 2. **Skip at least one scale step** between heading and subheading (e.g., `text-xl` with `text-sm`, not `text-lg` with `text-base`).
 3. **Don't use 100% black text.** Use `text-foreground` (neutral-800 light / neutral-100 dark) for an ink-on-paper feel.
 4. **Monospace font is only for code, terminal output, and issue IDs.** Never for UI labels.
