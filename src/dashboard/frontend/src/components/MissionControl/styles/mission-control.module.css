@@ -1607,8 +1607,7 @@
   display: flex;
   align-items: center;
   gap: var(--mc-space-2);
-  padding: var(--mc-space-2) var(--mc-space-3) var(--mc-space-3);
-  border-top: 1px solid var(--mc-border);
+  padding: 0 var(--mc-space-3) var(--mc-space-3);
 }
 
 .composerToolbarSpacer {
