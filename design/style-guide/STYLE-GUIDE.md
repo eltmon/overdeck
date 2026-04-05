@@ -80,14 +80,14 @@ Use Tailwind's default scale. Recommended pairings:
 
 | Element | Size | Weight | Font |
 |---------|------|--------|------|
-| Page title | `text-xl` (20px) | `font-semibold` (600) | DM Sans (or Space Grotesk for brand) |
-| Section heading | `text-lg` (18px) | `font-semibold` (600) | DM Sans |
-| Card title | `text-sm` (14px) | `font-semibold` (600) | DM Sans |
-| Column heading | `text-base` (16px) | `font-semibold` (600) | DM Sans |
+| Page title | `text-xl` (20px) | `font-medium` (500) | DM Sans (or Space Grotesk for brand) |
+| Section heading | `text-lg` (18px) | `font-medium` (500) | DM Sans |
+| Card title | `text-sm` (14px) | `font-medium` (500) | DM Sans |
+| Column heading | `text-base` (16px) | `font-medium` (500) | DM Sans |
 | Body text | `text-sm` (14px) | `font-normal` (400) | DM Sans (default) |
 | Small labels | `text-xs` (12px) | `font-medium` (500) | DM Sans |
 | Tiny badges | `text-[.625rem]` (10px) | `font-medium` (500) | DM Sans |
-| Stat values | `text-sm` (14px) | `font-semibold` (600) | Space Grotesk |
+| Stat values | `text-sm` (14px) | `font-medium` (500) | Space Grotesk |
 | Nav items | `text-sm` (14px) | `font-medium` (500) | DM Sans |
 | Nav group labels | `text-xs` (12px) | `font-medium` (500) | DM Sans, `uppercase tracking-wider` |
 | Buttons | `text-sm` (14px) | `font-medium` (500) | DM Sans |
@@ -96,7 +96,7 @@ Use Tailwind's default scale. Recommended pairings:
 
 ### Typography Rules
 
-1. **Never use `font-bold` (700) in UI components.** T3Code uses zero `font-bold` in its component library. The weight scale is: `font-medium` (500) for everything, `font-semibold` (600) for card titles and section headings. That's it. `font-bold` (700) creates a heavy, aggressive feel that kills the premium aesthetic.
+1. **`font-medium` (500) for everything.** T3Code uses zero `font-bold` in its component library. Our weight scale is even simpler: `font-medium` (500) across the board — headings, card titles, column headers, stat values, buttons, labels, badges. No `font-semibold`, no `font-bold`. The uniform medium weight creates the quiet, premium feel. Hierarchy comes from font size and color contrast, not weight variation.
 2. **Skip at least one scale step** between heading and subheading (e.g., `text-xl` with `text-sm`, not `text-lg` with `text-base`).
 3. **Don't use 100% black text.** Use `text-foreground` (neutral-800 light / neutral-100 dark) for an ink-on-paper feel.
 4. **Monospace font is only for code, terminal output, and issue IDs.** Never for UI labels.
@@ -496,7 +496,7 @@ Nested dialogs:
 Header:
   flex items-center gap-3 mb-4
   Icon (if present): size-10 rounded-xl bg-primary/10 text-primary
-  Title: font-display text-lg font-semibold
+  Title: font-body text-lg font-medium
   Description: text-sm text-muted-foreground
 
 Footer:
@@ -896,7 +896,7 @@ Minimum interactive element size: **32px** (h-8). Prefer **36px** (h-9) for prim
 
 ### Board (Kanban)
 
-- Column headers: `font-display text-sm font-semibold text-muted-foreground uppercase tracking-wider`
+- Column headers: `font-body text-sm font-medium text-muted-foreground uppercase tracking-wider`
 - Column count badge: `text-xs text-muted-foreground ml-1`
 - Cards use left accent border for status (see Cards section)
 - Stats bar at top uses compact card variant with `p-3`
