@@ -1566,8 +1566,8 @@ const postIssueReopenRoute = HttpRouter.add(
             );
           }
 
-          for (const label of ['done', 'needs-close-out']) {
-            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/${label}`, {
+          for (const label of ['done', 'needs-close-out', 'in-review', 'review-ready', 'merged', 'planned', 'planning']) {
+            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/${encodeURIComponent(label)}`, {
               method: 'DELETE',
               headers: { 'Authorization': `token ${ghConfig.token}`, 'Accept': 'application/vnd.github.v3+json' },
             }).catch(() => {});
@@ -1618,6 +1618,20 @@ const postIssueReopenRoute = HttpRouter.add(
           issueDataService.invalidateTracker('linear').catch(() => {});
         }
 
+        // Reset specialist pipeline state (review/test/merge)
+        try {
+          clearReviewStatus(id.toUpperCase());
+          const { checkSpecialistQueue, completeSpecialistTask } = await import('../../../lib/cloister/specialists.js');
+          for (const specialist of ['review-agent', 'test-agent', 'merge-agent'] as const) {
+            const queue = checkSpecialistQueue(specialist);
+            for (const item of queue.items) {
+              if (item.payload?.issueId?.toUpperCase() === id.toUpperCase()) {
+                completeSpecialistTask(specialist, item.id);
+              }
+            }
+          }
+        } catch { /* non-fatal */ }
+
         // Reset post-merge state
         try {
           const { resetPostMergeState } = await import('../../../lib/cloister/merge-agent.js');
@@ -1625,11 +1639,41 @@ const postIssueReopenRoute = HttpRouter.add(
           resetPostMergeState(id.toUpperCase());
         } catch { /* non-fatal */ }
 
+        // Recreate beads from vBRIEF plan if workspace exists but beads are missing
+        let beadsRecreated = false;
+        try {
+          const issueLower = id.toLowerCase();
+          const teamPrefix = extractTeamPrefix(id);
+          const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+          const projectPath = projectConfig?.path || '';
+          if (projectPath) {
+            const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+            const { findPlan } = await import('../../../lib/vbrief/io.js');
+            const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
+            if (existsSync(workspacePath) && findPlan(workspacePath)) {
+              try {
+                const { stdout: bdCheck } = await execAsync(
+                  `bd list --json -l ${issueLower} --limit 1`,
+                  { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+                );
+                const existing = JSON.parse(bdCheck.trim() || '[]');
+                if (existing.length === 0) {
+                  const result = await createBeadsFromVBrief(workspacePath);
+                  if (result.created.length > 0) {
+                    beadsRecreated = true;
+                    console.log(`[reopen] Recreated ${result.created.length} beads for ${id} from vBRIEF plan`);
+                  }
+                }
+              } catch { /* Non-fatal — beads recreation is best-effort */ }
+            }
+          }
+        } catch { /* non-fatal */ }
+
         try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
 
         return jsonResponse({
           success: true,
-          message: `Issue ${id} reopened and moved to ${newState}`,
+          message: `Issue ${id} reopened and moved to ${newState}${beadsRecreated ? ' (beads recreated from plan)' : ''}`,
           issueId: issueIdentifier,
           newState,
           resetSummary: null,
