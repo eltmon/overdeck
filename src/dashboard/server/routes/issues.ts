@@ -24,6 +24,7 @@ import { jsonResponse } from "../http-helpers.js";
 
 import { exec, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFile, mkdir, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -1043,6 +1044,32 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
                 } catch (vbriefErr: any) {
                   console.warn(`[complete-planning] createBeadsFromVBrief failed: ${vbriefErr.message}`);
                 }
+              }
+
+              // Auto-copy planning artifacts to docs/prds/active/ (skip if already exist)
+              try {
+                const activeDir = join(gitRoot, 'docs', 'prds', 'active');
+                await mkdir(activeDir, { recursive: true });
+                const stateMd = join(planningDir, 'STATE.md');
+                const planVbrief = join(planningDir, 'plan.vbrief.json');
+                const destStateMd = join(activeDir, `${id}-plan.md`);
+                const destPlanVbrief = join(activeDir, `${id}-plan.vbrief.json`);
+                if (existsSync(stateMd)) {
+                  const stateMdExists = await access(destStateMd).then(() => true).catch(() => false);
+                  if (!stateMdExists) {
+                    await copyFile(stateMd, destStateMd);
+                    console.log(`[complete-planning] Copied STATE.md to ${destStateMd}`);
+                  }
+                }
+                if (existsSync(planVbrief)) {
+                  const vbriefExists = await access(destPlanVbrief).then(() => true).catch(() => false);
+                  if (!vbriefExists) {
+                    await copyFile(planVbrief, destPlanVbrief);
+                    console.log(`[complete-planning] Copied plan.vbrief.json to ${destPlanVbrief}`);
+                  }
+                }
+              } catch (copyErr: any) {
+                console.warn(`[complete-planning] Artifact copy failed (non-fatal): ${copyErr.message}`);
               }
 
               // Sync beads
