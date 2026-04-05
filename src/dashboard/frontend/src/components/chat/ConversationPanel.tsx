@@ -1,8 +1,11 @@
 import { useState, useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
+import { MessagesTimeline } from './MessagesTimeline';
+import { ComposerFooter } from './ComposerFooter';
+import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -127,18 +130,44 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
 }
 
 // ─── ConversationView ─────────────────────────────────────────────────────────
-// Renders the structured conversation. MessagesTimeline and ComposerFooter
-// will be wired in when those components are available.
+
+interface MessagesResponse {
+  messages: ChatMessage[];
+  workLog: WorkLogEntry[];
+  streaming: boolean;
+  discovering?: boolean;
+}
+
+async function fetchMessages(name: string): Promise<MessagesResponse> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/messages`);
+  if (!res.ok) throw new Error('Failed to fetch messages');
+  return res.json();
+}
 
 interface ConversationViewProps {
   conversation: Conversation;
 }
 
 function ConversationView({ conversation }: ConversationViewProps) {
-  // session_file is null until discovered asynchronously after Claude Code starts
-  const sessionFileKnown = conversation.sessionFile != null;
+  const { data, isLoading } = useQuery({
+    queryKey: ['conversation-messages', conversation.name],
+    queryFn: () => fetchMessages(conversation.name),
+    // Re-poll when discovering (session_file not yet stored)
+    refetchInterval: (query) => {
+      if (query.state.data?.discovering) return 2000;
+      return false;
+    },
+  });
 
-  if (!sessionFileKnown) {
+  if (isLoading || !data) {
+    return (
+      <div className={styles.conversationConnecting}>
+        <span>Loading…</span>
+      </div>
+    );
+  }
+
+  if (data.discovering) {
     return (
       <div className={styles.conversationConnecting}>
         <span>Connecting to session…</span>
@@ -146,12 +175,14 @@ function ConversationView({ conversation }: ConversationViewProps) {
     );
   }
 
-  // MessagesTimeline and ComposerFooter will be rendered here once built
   return (
     <div className={styles.conversationView}>
-      <div className={styles.conversationConnecting}>
-        <span>Loading messages…</span>
-      </div>
+      <MessagesTimeline
+        messages={data.messages}
+        workLog={data.workLog}
+        streaming={data.streaming}
+      />
+      <ComposerFooter conversation={conversation} />
     </div>
   );
 }
