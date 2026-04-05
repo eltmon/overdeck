@@ -97,6 +97,30 @@ Use Tailwind's default scale. Recommended pairings:
 3. **Don't use 100% black text.** Use `text-foreground` (neutral-800 light / neutral-100 dark) for an ink-on-paper feel.
 4. **Monospace font is only for code, terminal output, and issue IDs.** Never for UI labels.
 
+### CRITICAL: Space Grotesk vs DM Sans Boundary
+
+Space Grotesk (`font-display`) has a distinctive double-story "g" that looks wrong at small/medium sizes in body text. DM Sans has a clean single-story open-tail "g" that is correct for body text. Getting this wrong is immediately visible and makes the UI look cheap.
+
+**Space Grotesk (`font-display`) is ONLY for:**
+- The "Panopticon" logo text
+- Page titles (e.g., "Settings", "Agent Deployment")
+- Section/column headings (e.g., "To Do", "In Progress", "In Review")
+- Large stat values (e.g., "$12.47", "5/8", "12")
+
+**DM Sans (default body font) is for EVERYTHING else:**
+- Card titles (e.g., "Real-time Stream Orchestration for Alpha-Centauri Node")
+- Nav items (e.g., "Command Deck", "Board", "Agents")
+- Badge/pill text (e.g., "RUNNING", "PLANNING", "REVIEWING")
+- Button labels (e.g., "DEPLOY", "MONITOR", "REVIEW", "Current", "All")
+- Stat labels (e.g., "COST TODAY", "AGENTS", "STUCK", "HANDOFFS", "QUEUE")
+- Issue IDs when displayed as labels (e.g., "TSK-2041", "OPS-882")
+- Table/list body text
+- Dialog body text, form labels, descriptions
+- Tooltips, toasts, alerts
+- Any text that is not a top-level heading or page title
+
+**The test:** If the text is inside a card, list row, badge, button, nav item, or form — it's DM Sans. If it's a standalone page/section heading that names a view or category — it's Space Grotesk. When in doubt, use DM Sans.
+
 ---
 
 ## 3. Color System

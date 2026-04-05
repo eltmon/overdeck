@@ -263,6 +263,16 @@ body {
 }
 ```
 
+**CRITICAL: Space Grotesk vs DM Sans boundary.**
+Space Grotesk has a distinctive double-story "g" that looks wrong in body text — it makes the UI look cheap and inconsistent. DM Sans has a clean single-story open-tail "g" that is correct for body/UI text.
+
+- **Space Grotesk (`font-display`):** ONLY for the Panopticon logo, page titles, section/column headings (e.g., "To Do", "In Progress"), and large stat values (e.g., "$12.47").
+- **DM Sans (default):** EVERYTHING else — card titles, nav items, badge text ("RUNNING", "PLANNING"), button labels ("DEPLOY", "REVIEW"), stat labels ("COST TODAY", "AGENTS"), issue IDs, form text, dialog body, tooltips, toasts.
+
+The rule: if the text is inside a card, list row, badge, button, nav item, or form — it's DM Sans. If it's a standalone page/section heading — Space Grotesk. When in doubt, DM Sans.
+
+This was caught during mockup review (Stitch defaulted all labels to Space Grotesk). See `design/style-guide/STYLE-GUIDE.md` Section 2 "CRITICAL: Space Grotesk vs DM Sans Boundary" for the full specification.
+
 ### 5. Fractal Noise Texture Overlay
 
 Borrowed directly from T3Code. Adds a subtle tactile quality to the entire UI.
