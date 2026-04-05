@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { LinearClient } from '@linear/sdk';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
+import { getLinearApiKey } from '../../../lib/shadow-utils.js';
 import { getTrackerContext } from '../../../lib/cloister/work-agent-prompt.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
@@ -20,16 +21,6 @@ export interface LinearComment {
   body: string;
   author: string;
   createdAt: string;
-}
-
-function getLinearApiKey(): string | null {
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-  return process.env.LINEAR_API_KEY || null;
 }
 
 /**

@@ -11,6 +11,7 @@ import { getVBriefACStatus, syncBeadStatusToVBrief } from '../../../lib/vbrief/b
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { updateShadowState } from '../../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../../core/state-mapping.js';
+import { getLinearApiKey } from '../../../lib/shadow-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -19,16 +20,6 @@ interface DoneOptions {
   noLinear?: boolean;
   shadow?: boolean;
   force?: boolean;
-}
-
-function getLinearApiKey(): string | null {
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-  return process.env.LINEAR_API_KEY || null;
 }
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {

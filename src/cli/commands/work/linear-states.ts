@@ -1,17 +1,5 @@
 import chalk from 'chalk';
-import { readFileSync, existsSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
-
-function getLinearApiKey(): string | null {
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-  return process.env.LINEAR_API_KEY || null;
-}
+import { getLinearApiKey } from '../../../lib/shadow-utils.js';
 
 interface LinearState {
   id: string;
