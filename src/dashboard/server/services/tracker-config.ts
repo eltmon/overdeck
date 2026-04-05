@@ -157,7 +157,7 @@ export function getGitHubConfig(): GitHubConfig | null {
       for (const [, project] of Object.entries(projects)) {
         if (project.github_repo) {
           const [owner, repo] = project.github_repo.split('/');
-          const prefix = project.linear_team ? `${project.linear_team}-` : undefined;
+          const prefix = project.linear_team ? project.linear_team : undefined;
           if (owner && repo) {
             repos.push({ owner, repo, prefix });
           }
