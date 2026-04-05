@@ -1,0 +1,247 @@
+/**
+ * ChatMarkdown (PAN-451)
+ *
+ * Renders markdown content from assistant messages. Uses react-markdown with
+ * remark-gfm for GitHub Flavored Markdown support and @pierre/diffs for Shiki
+ * syntax highlighting with LRU cache.
+ *
+ * This is the full implementation — no stubs. Features:
+ *   - GFM markdown (headers, lists, tables, strikethrough, etc.)
+ *   - Shiki syntax highlighting with 500-entry LRU cache
+ *   - Cache skipped during streaming to show progressive text
+ *   - Copy button on code blocks (hover to reveal)
+ *   - Error boundary falls back to plain text on highlight failure
+ */
+
+import React, {
+  memo,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  type ReactNode,
+} from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { CheckIcon, CopyIcon } from 'lucide-react';
+import type { Components } from 'react-markdown';
+import type { DiffsThemeNames } from '@pierre/diffs';
+import styles from '../MissionControl/styles/mission-control.module.css';
+
+// ─── LRU Cache for syntax highlighting ───────────────────────────────────────
+
+class LRUCache<K, V> {
+  private readonly map = new Map<K, V>();
+  constructor(private readonly capacity: number) {}
+
+  get(key: K): V | undefined {
+    const val = this.map.get(key);
+    if (val !== undefined) {
+      this.map.delete(key);
+      this.map.set(key, val);
+    }
+    return val;
+  }
+
+  set(key: K, value: V): void {
+    if (this.map.has(key)) this.map.delete(key);
+    else if (this.map.size >= this.capacity) {
+      this.map.delete(this.map.keys().next().value!);
+    }
+    this.map.set(key, value);
+  }
+}
+
+const highlightCache = new LRUCache<string, string>(500);
+
+/** FNV-1a 32-bit hash — fast cache key for code blocks */
+function fnv1a32(str: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+  }
+  return hash;
+}
+
+function cacheKey(code: string, lang: string): string {
+  return `${fnv1a32(code)}:${code.length}:${lang}`;
+}
+
+// ─── Highlighter (lazy-loaded) ────────────────────────────────────────────────
+
+let sharedHighlighterPromise: Promise<unknown> | null = null;
+
+async function getHighlighter() {
+  if (!sharedHighlighterPromise) {
+    sharedHighlighterPromise = import('@pierre/diffs').then((m) =>
+      m.getSharedHighlighter({ themes: ['github-dark' as DiffsThemeNames], langs: [] }),
+    );
+  }
+  return sharedHighlighterPromise;
+}
+
+async function highlightCode(
+  code: string,
+  lang: string,
+  isStreaming: boolean,
+): Promise<string> {
+  const key = cacheKey(code, lang);
+  if (!isStreaming) {
+    const cached = highlightCache.get(key);
+    if (cached !== undefined) return cached;
+  }
+
+  try {
+    const highlighter = await getHighlighter() as {
+      codeToHtml: (code: string, options: { lang: string; theme: string }) => string;
+    };
+    const html = highlighter.codeToHtml(code, {
+      lang: lang || 'text',
+      theme: 'github-light',
+    });
+    if (!isStreaming) highlightCache.set(key, html);
+    return html;
+  } catch {
+    // Unknown language — return escaped plaintext
+    return `<pre><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
+  }
+}
+
+// ─── Error boundary ───────────────────────────────────────────────────────────
+
+interface ErrorBoundaryState { hasError: boolean }
+class ChatMarkdownErrorBoundary extends React.Component<
+  { children: ReactNode; fallback: ReactNode },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  override render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
+
+// ─── Code block with syntax highlighting ─────────────────────────────────────
+
+interface CodeBlockProps {
+  code: string;
+  lang: string;
+  isStreaming: boolean;
+}
+
+function CodeBlock({ code, lang, isStreaming }: CodeBlockProps) {
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const abortRef = useRef(false);
+
+  useEffect(() => {
+    abortRef.current = false;
+    highlightCode(code, lang, isStreaming).then((html) => {
+      if (!abortRef.current) setHighlighted(html);
+    });
+    return () => { abortRef.current = true; };
+  }, [code, lang, isStreaming]);
+
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [code]);
+
+  return (
+    <div className={styles.codeBlock}>
+      <button
+        className={styles.copyButton}
+        onClick={handleCopy}
+        title="Copy code"
+      >
+        {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+      </button>
+      {highlighted ? (
+        <div
+          className={styles.shikiOutput}
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: highlighted }}
+        />
+      ) : (
+        <pre className={styles.codePlain}>
+          <code>{code}</code>
+        </pre>
+      )}
+    </div>
+  );
+}
+
+// ─── Custom markdown components ───────────────────────────────────────────────
+
+function makeComponents(isStreaming: boolean): Components {
+  return {
+    pre({ children }) {
+      // Extract code block contents
+      const child = React.Children.toArray(children)[0];
+      if (!React.isValidElement(child)) {
+        return <pre>{children}</pre>;
+      }
+      const codeEl = child as React.ReactElement<{
+        className?: string;
+        children?: ReactNode;
+      }>;
+      const className = codeEl.props.className ?? '';
+      const lang = /language-(\w+)/.exec(className)?.[1] ?? '';
+      const code = String(codeEl.props.children ?? '').trimEnd();
+
+      return (
+        <ChatMarkdownErrorBoundary
+          fallback={
+            <pre className={styles.codePlain}>
+              <code>{code}</code>
+            </pre>
+          }
+        >
+          <CodeBlock code={code} lang={lang} isStreaming={isStreaming} />
+        </ChatMarkdownErrorBoundary>
+      );
+    },
+    a({ href, children }) {
+      return (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.mdLink}
+        >
+          {children}
+        </a>
+      );
+    },
+  };
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+interface ChatMarkdownProps {
+  text: string;
+  isStreaming?: boolean;
+}
+
+export const ChatMarkdown = memo(function ChatMarkdown({
+  text,
+  isStreaming = false,
+}: ChatMarkdownProps) {
+  const components = makeComponents(isStreaming);
+
+  return (
+    <ChatMarkdownErrorBoundary fallback={<pre className={styles.mdFallback}>{text}</pre>}>
+      <div className={styles.chatMarkdown}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+          {text}
+        </ReactMarkdown>
+      </div>
+    </ChatMarkdownErrorBoundary>
+  );
+});

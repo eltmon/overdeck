@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Plus, Circle } from 'lucide-react';
 import styles from './styles/mission-control.module.css';
@@ -16,6 +16,10 @@ export interface Conversation {
   endedAt: string | null;
   lastAttachedAt: string | null;
   sessionAlive: boolean;
+  /** Absolute path to the Claude Code JSONL session file. Null until discovered. */
+  sessionFile?: string | null;
+  /** Human-readable title, auto-set from first message. Null until first message sent. */
+  title?: string | null;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -55,10 +59,6 @@ interface ConversationListProps {
 
 export function ConversationList({ selectedConversation, onSelectConversation }: ConversationListProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [isAdding, setIsAdding] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const { data: conversations = [] } = useQuery({
@@ -71,13 +71,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     mutationFn: createConversation,
     onSuccess: (conv) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      setIsAdding(false);
-      setNewName('');
-      setError(null);
       onSelectConversation(conv.name);
-    },
-    onError: (err: Error) => {
-      setError(err.message);
     },
   });
 
@@ -91,39 +85,9 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     },
   });
 
-  // Focus input when showing the add form
-  useEffect(() => {
-    if (isAdding) {
-      inputRef.current?.focus();
-    }
-  }, [isAdding]);
-
   const handleAddClick = useCallback(() => {
-    setIsAdding(true);
-    setNewName('');
-    setError(null);
-  }, []);
-
-  const handleSubmit = useCallback(() => {
-    const name = newName.trim();
-    createMutation.mutate(name); // empty string → server auto-generates
-  }, [newName, createMutation]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit();
-    } else if (e.key === 'Escape') {
-      setIsAdding(false);
-      setNewName('');
-      setError(null);
-    }
-  }, [handleSubmit]);
-
-  const handleDelete = useCallback((e: React.MouseEvent, name: string) => {
-    e.stopPropagation();
-    deleteMutation.mutate(name);
-  }, [deleteMutation]);
+    createMutation.mutate(''); // server auto-generates name
+  }, [createMutation]);
 
   return (
     <div className={styles.conversationSection}>
@@ -154,25 +118,8 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
       {/* Collapsed or expanded content */}
       {isExpanded && (
         <div className={styles.conversationList}>
-          {/* Inline add form */}
-          {isAdding && (
-            <div className={styles.conversationAddForm}>
-              <input
-                ref={inputRef}
-                type="text"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Name (leave blank for auto)"
-                className={styles.conversationInput}
-                disabled={createMutation.isPending}
-              />
-              {error && <div className={styles.conversationError}>{error}</div>}
-            </div>
-          )}
-
           {/* Session list */}
-          {conversations.length === 0 && !isAdding ? (
+          {conversations.length === 0 ? (
             <div className={styles.conversationEmpty}>No conversations yet</div>
           ) : (
             conversations.map(conv => (
@@ -190,15 +137,18 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
                   }}
                 />
-                <span className={styles.conversationName}>{conv.name}</span>
-                <button
+                <span className={styles.conversationName}>{conv.title ?? conv.name}</span>
+                <span
+                  role="button"
+                  tabIndex={0}
                   className={styles.conversationDeleteBtn}
-                  onClick={e => handleDelete(e, conv.name)}
+                  onClick={e => { e.stopPropagation(); deleteMutation.mutate(conv.name); }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); deleteMutation.mutate(conv.name); } }}
                   title="Stop session"
                   aria-label={`Stop ${conv.name}`}
                 >
                   ×
-                </button>
+                </span>
               </button>
             ))
           )}

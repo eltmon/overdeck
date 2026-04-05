@@ -19,6 +19,10 @@ export interface Conversation {
   createdAt: string;
   endedAt: string | null;
   lastAttachedAt: string | null;
+  /** Absolute path to the Claude Code JSONL session file. Null until discovered (PAN-451). */
+  sessionFile: string | null;
+  /** Human-readable title, auto-set from first message content. Null until first message sent. */
+  title: string | null;
 }
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
@@ -34,6 +38,8 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     createdAt: row['created_at'] as string,
     endedAt: (row['ended_at'] as string | null) ?? null,
     lastAttachedAt: (row['last_attached_at'] as string | null) ?? null,
+    sessionFile: (row['session_file'] as string | null) ?? null,
+    title: (row['title'] as string | null) ?? null,
   };
 }
 
@@ -44,7 +50,7 @@ export function listConversations(): Conversation[] {
   const rows = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at
+              created_at, ended_at, last_attached_at, session_file, title
        FROM conversations
        ORDER BY created_at DESC`,
     )
@@ -57,7 +63,7 @@ export function getConversationByName(name: string): Conversation | null {
   const row = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at
+              created_at, ended_at, last_attached_at, session_file, title
        FROM conversations
        WHERE name = ?`,
     )
@@ -84,7 +90,7 @@ export function createConversation(
   const conv = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at
+              created_at, ended_at, last_attached_at, session_file, title
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -118,4 +124,20 @@ export function markAllEndedOnStartup(): void {
   db.prepare(
     `UPDATE conversations SET status = 'ended', ended_at = ? WHERE status = 'active'`,
   ).run(new Date().toISOString());
+}
+
+/** Store the discovered JSONL session file path for a conversation (PAN-451). */
+export function updateSessionFile(name: string, sessionFilePath: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET session_file = ? WHERE name = ?`,
+  ).run(sessionFilePath, name);
+}
+
+/** Set the human-readable title for a conversation (auto-set from first message). */
+export function updateConversationTitle(name: string, title: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET title = ? WHERE name = ?`,
+  ).run(title, name);
 }
