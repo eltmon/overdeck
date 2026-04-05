@@ -808,7 +808,9 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
                 }
               );
               revertedState = 'Todo (label removed)';
-            } catch { /* Label might not exist */ }
+            } catch (labelErr) {
+              console.log('[abort-planning] Warning: Could not remove planning label:', labelErr);
+            }
           }
         } else {
           // Linear: move back to Todo
