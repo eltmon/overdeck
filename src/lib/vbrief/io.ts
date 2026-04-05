@@ -64,7 +64,16 @@ export function updateItemStatus(workspacePath: string, itemId: string, status: 
   const item = doc.plan.items.find(i => i.id === itemId);
   if (!item) return;
 
+  const now = new Date().toISOString();
   item.status = status;
+  if (status === 'completed') {
+    item.completed = now;
+  }
+
+  // Update timestamps and increment sequence counter
+  doc.vBRIEFInfo.updated = now;
+  doc.plan.updated = now;
+  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
 
   // Atomic rename: write to .tmp then rename to avoid partial reads
   const tempPath = planPath + '.tmp';
@@ -93,7 +102,16 @@ export function updateSubItemStatus(
   const subItem = item.subItems.find(s => s.id === subItemId);
   if (!subItem) return;
 
+  const now = new Date().toISOString();
   subItem.status = status;
+  if (status === 'completed') {
+    subItem.completed = now;
+  }
+
+  // Update timestamps and increment sequence counter
+  doc.vBRIEFInfo.updated = now;
+  doc.plan.updated = now;
+  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
 
   const tempPath = planPath + '.tmp';
   writeFileSync(tempPath, JSON.stringify(doc, null, 2), 'utf-8');

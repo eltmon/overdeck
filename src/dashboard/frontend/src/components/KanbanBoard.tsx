@@ -20,13 +20,14 @@ import {
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban, XCircle, AlertCircle } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Trash2, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, Ban, XCircle, AlertCircle, ScrollText } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
 import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
+import { VBriefDialog } from './vbrief/VBriefDialog';
 
 
 // Difficulty badge colors
@@ -726,6 +727,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null); // Lifted dialog state
   const [beadsDialogIssue, setBeadsDialogIssue] = useState<Issue | null>(null); // Beads viewer
+  const [vbriefDialogIssue, setVbriefDialogIssue] = useState<Issue | null>(null); // vBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
 
@@ -1250,6 +1252,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onSelectIssue={onSelectIssue}
                     onPlan={setPlanDialogIssue}
                     onViewBeads={setBeadsDialogIssue}
+                    onViewVBrief={setVbriefDialogIssue}
                   />
                 </div>
               </DroppableColumn>
@@ -1306,6 +1309,14 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           onClose={() => setBeadsDialogIssue(null)}
         />
       )}
+
+      {/* vBRIEF Dialog - view plan for issue */}
+      {vbriefDialogIssue && (
+        <VBriefDialog
+          issueId={vbriefDialogIssue.identifier}
+          onClose={() => setVbriefDialogIssue(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1321,6 +1332,7 @@ function ColumnContent({
   onSelectIssue,
   onPlan,
   onViewBeads,
+  onViewVBrief,
 }: {
   issues: Issue[];
   agents: Agent[];
@@ -1331,6 +1343,7 @@ function ColumnContent({
   onSelectIssue: (id: string | null) => void;
   onPlan: (issue: Issue) => void;
   onViewBeads: (issue: Issue) => void;
+  onViewVBrief?: (issue: Issue) => void;
 }) {
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
 
@@ -1377,6 +1390,7 @@ function ColumnContent({
           )}
           onPlan={() => onPlan(issue)}
           onViewBeads={(i) => onViewBeads(i)}
+          onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
         />
       </DraggableCardWrapper>
     );
@@ -1709,9 +1723,10 @@ interface IssueCardProps {
   onSelect: () => void;
   onPlan: () => void; // Lifted to parent to survive re-renders
   onViewBeads?: (issue: Issue) => void;
+  onViewVBrief?: (issue: Issue) => void;
 }
 
-function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads }: IssueCardProps) {
+function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief }: IssueCardProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -2133,6 +2148,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
             Tasks
           </button>
           <button
+            onClick={() => onViewVBrief && onViewVBrief(issue)}
+            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            title="View vBRIEF plan for this issue"
+          >
+            <ScrollText className="w-3.5 h-3.5" />
+            vBRIEF
+          </button>
+          <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
               showMessageInput ? 'text-blue-400' : 'text-content-subtle hover:text-content'
@@ -2212,6 +2235,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Tasks
               </button>
               <button
+                onClick={() => onViewVBrief && onViewVBrief(issue)}
+                className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                title="View vBRIEF plan for this issue"
+              >
+                <ScrollText className="w-3.5 h-3.5" />
+                vBRIEF
+              </button>
+              <button
                 onClick={handleStartAgent}
                 disabled={startAgentMutation.isPending}
                 className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${confirmingStart ? 'text-amber-400 font-medium' : 'text-blue-400 hover:text-blue-300'}`}
@@ -2258,6 +2289,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           >
             <List className="w-3.5 h-3.5" />
             Tasks
+          </button>
+          <button
+            onClick={() => onViewVBrief && onViewVBrief(issue)}
+            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            title="View vBRIEF plan for this issue"
+          >
+            <ScrollText className="w-3.5 h-3.5" />
+            vBRIEF
           </button>
           <button
             onClick={handleStartAgent}
@@ -2312,6 +2351,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           >
             <List className="w-3.5 h-3.5" />
             Tasks
+          </button>
+          <button
+            onClick={() => onViewVBrief && onViewVBrief(issue)}
+            className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            title="View vBRIEF plan for this issue"
+          >
+            <ScrollText className="w-3.5 h-3.5" />
+            vBRIEF
           </button>
           <ReopenSection issue={issue} inline />
           <CloseOutSection issue={issue} />

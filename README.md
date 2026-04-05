@@ -69,7 +69,10 @@ Plus two specialists that run inline: **Inspect** verifies each implementation s
 | **Workspaces** | Git worktree-based feature branches with Docker isolation (local and remote via Fly.io) |
 | **Convoys** | Run parallel agents on related issues with automatic synthesis |
 | **5 Specialist Agents** | Review, test, inspect, UAT, and merge — fully automated quality pipeline |
-| **Beads** | Git-backed task tracking that survives context compaction and works offline |
+| **Beads** | Git-backed task tracking that survives context compaction and works offline — auto-synced from vBRIEF plans |
+| **vBRIEF Plans** | Machine-readable work plans (v0.5 spec) with DAG viewer, item status tracking, and auto-copied artifacts |
+| **TLDR Code Analysis** | Token-efficient codebase analysis (500–1,200 tokens/file vs 10–25k) via semantic search and call graphs |
+| **Effect.js Server** | Dashboard server built on Effect.js with typed RPC, structured concurrency, and zero sync FS calls |
 | **Cost Tracking** | Per-issue, per-stage token costs with dashboard analytics |
 | **Legacy Codebase Support** | AI self-monitoring skills that learn your codebase conventions over time ([details](docs/LEGACY-CODEBASE.md)) |
 
