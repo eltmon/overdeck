@@ -1160,9 +1160,11 @@
 .conversationTerminalTitle {
   font-size: var(--mc-font-size-sm);
   font-weight: 600;
-  font-family: var(--mc-font-mono);
   color: var(--mc-text-primary);
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .conversationTerminalStatus {
@@ -1253,6 +1255,31 @@
   overflow: hidden;
 }
 
+/* Empty state shown when no messages have been sent yet */
+.conversationEmptyState {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mc-space-3);
+  padding: var(--mc-space-8);
+  color: var(--mc-text-secondary);
+}
+
+.conversationEmptyStateTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--mc-text-primary);
+  text-align: center;
+}
+
+.conversationEmptyStateSubtitle {
+  font-size: var(--mc-font-size-sm);
+  color: var(--mc-text-muted);
+  text-align: center;
+}
+
 .conversationConnecting {
   flex: 1;
   display: flex;
@@ -1269,7 +1296,16 @@
 .messagesTimeline {
   flex: 1;
   overflow-y: auto;
-  padding: var(--mc-space-4);
+  padding: var(--mc-space-6) var(--mc-space-4) var(--mc-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mc-space-3);
+}
+
+.messagesTimelineInner {
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--mc-space-3);
@@ -1502,31 +1538,42 @@
 
 /* ─── ComposerFooter ──────────────────────────────────────────────────────────── */
 
+/* Outer wrapper: padding only, no background strip, max-width centered */
 .composerFooter {
-  border-top: 1px solid var(--mc-border);
-  background: var(--mc-bg-sidebar);
-  padding: var(--mc-space-2) var(--mc-space-3);
+  flex-shrink: 0;
+  padding: var(--mc-space-3) var(--mc-space-4) var(--mc-space-4);
+}
+
+/* Single unified container — the only visible box (T3Chat style) */
+.composerBox {
+  max-width: 760px;
+  margin: 0 auto;
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius-lg);
+  background: var(--mc-bg-main);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
-  gap: var(--mc-space-2);
-  flex-shrink: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-/* Lexical editor container */
+.composerBox:focus-within {
+  border-color: var(--mc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mc-accent) 12%, transparent);
+}
+
+.composerBoxDisabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Lexical editor inside the unified box — no border of its own */
 .composerEditor {
   position: relative;
-  min-height: 70px;
+  min-height: 60px;
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid var(--mc-border);
-  border-radius: var(--mc-radius);
-  background: var(--mc-bg-main);
-  padding: var(--mc-space-2) var(--mc-space-3);
-  transition: border-color 0.15s;
-}
-
-.composerEditor:focus-within {
-  border-color: var(--mc-accent);
+  padding: var(--mc-space-3) var(--mc-space-3) var(--mc-space-2);
 }
 
 .composerEditorDisabled {
@@ -1538,7 +1585,7 @@
   font-size: 14px;
   line-height: 1.5;
   outline: none;
-  min-height: 46px;
+  min-height: 36px;
   color: var(--mc-text-primary);
   font-family: var(--mc-font-family);
 }
@@ -1547,7 +1594,7 @@
 
 .composerPlaceholder {
   position: absolute;
-  top: var(--mc-space-2);
+  top: var(--mc-space-3);
   left: var(--mc-space-3);
   color: var(--mc-text-muted);
   font-size: 14px;
@@ -1555,18 +1602,20 @@
   user-select: none;
 }
 
-/* Toolbar row */
+/* Toolbar row: inside the box, below the textarea */
 .composerToolbar {
   display: flex;
   align-items: center;
   gap: var(--mc-space-2);
+  padding: var(--mc-space-2) var(--mc-space-3) var(--mc-space-3);
+  border-top: 1px solid var(--mc-border);
 }
 
 .composerToolbarSpacer {
   flex: 1;
 }
 
-/* Send button */
+/* Send button — rounded, inside the box */
 .sendButton {
   display: flex;
   align-items: center;
@@ -1576,7 +1625,7 @@
   background: var(--mc-accent);
   color: #fff;
   border: none;
-  border-radius: var(--mc-radius-sm);
+  border-radius: var(--mc-radius);
   cursor: pointer;
   transition: background 0.1s;
   flex-shrink: 0;

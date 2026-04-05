@@ -110,39 +110,41 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       className={styles.messagesTimeline}
       onScroll={handleScroll}
     >
-      {/* Virtual section — absolutely positioned rows */}
-      {virtualRows.length > 0 && (
-        <div
-          style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
-        >
-          {virtualItems.map((virtualItem) => {
-            const row = virtualRows[virtualItem.index]!;
-            return (
-              <div
-                key={virtualItem.key}
-                data-index={virtualItem.index}
-                ref={(el) => {
-                  if (el) rowVirtualizer.measureElement(el);
-                }}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${virtualItem.start}px)`,
-                }}
-              >
-                <TimelineRowRenderer row={row} isStreaming={streaming} />
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className={styles.messagesTimelineInner}>
+        {/* Virtual section — absolutely positioned rows */}
+        {virtualRows.length > 0 && (
+          <div
+            style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
+          >
+            {virtualItems.map((virtualItem) => {
+              const row = virtualRows[virtualItem.index]!;
+              return (
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={(el) => {
+                    if (el) rowVirtualizer.measureElement(el);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  <TimelineRowRenderer row={row} isStreaming={streaming} />
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      {/* Non-virtual tail rows — normal flow */}
-      {tailRows.map((row) => (
-        <TimelineRowRenderer key={row.id} row={row} isStreaming={streaming} />
-      ))}
+        {/* Non-virtual tail rows — normal flow */}
+        {tailRows.map((row) => (
+          <TimelineRowRenderer key={row.id} row={row} isStreaming={streaming} />
+        ))}
+      </div>
     </div>
   );
 });
