@@ -30,6 +30,7 @@ import {
 } from '../../../lib/database/conversations-db.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
 import {
+  snapshotSessionFiles,
   discoverSessionFile,
   parseConversationMessages,
 } from '../services/conversation-service.js';
@@ -115,23 +116,23 @@ while true; do sleep 60; done
 }
 
 /**
- * Kick off async session file discovery after spawning a conversation.
- * Watches ~/.claude/projects/<encoded-cwd>/ for a new JSONL file and
- * stores the path in the conversations DB when found.
+ * Discover the session file for a conversation, blocking until found.
+ * Takes a snapshot of existing files (captured BEFORE spawn) and waits
+ * for a NEW file to appear. Returns the path or null on timeout.
  */
-function startSessionFileDiscovery(name: string, cwd: string, spawnedAt: string): void {
-  discoverSessionFile(cwd, spawnedAt)
-    .then((path) => {
-      if (path) {
-        updateSessionFile(name, path);
-        console.log(`[conversations] Discovered session file for "${name}": ${path}`);
-      } else {
-        console.warn(`[conversations] Session file discovery timed out for "${name}"`);
-      }
-    })
-    .catch((err: unknown) => {
-      console.error(`[conversations] Session file discovery failed for "${name}":`, err);
-    });
+async function awaitSessionFile(
+  name: string,
+  cwd: string,
+  existingFiles: Set<string>,
+): Promise<string | null> {
+  const path = await discoverSessionFile(cwd, existingFiles);
+  if (path) {
+    updateSessionFile(name, path);
+    console.log(`[conversations] Discovered session file for "${name}": ${path}`);
+  } else {
+    console.warn(`[conversations] Session file discovery timed out for "${name}"`);
+  }
+  return path;
 }
 
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
@@ -193,20 +194,19 @@ const postConversationRoute = HttpRouter.add(
           );
         }
 
-        // Persist to DB first so the client gets a response quickly
+        // Persist to DB
         const conv = createConversation(name, tmuxSession, cwd, issueId);
 
-        const spawnedAt = new Date().toISOString();
+        // Snapshot existing JSONL files BEFORE spawning so we can detect the new one
+        const existingFiles = await snapshotSessionFiles(cwd);
 
-        // Spawn tmux session in background (don't await — let ws-terminal attach when ready)
-        spawnConversationSession(tmuxSession, cwd, issueId).catch((err: unknown) => {
-          console.error(`[conversations] Failed to spawn session ${tmuxSession}:`, err);
-        });
+        // Spawn tmux session (await so it's ready)
+        await spawnConversationSession(tmuxSession, cwd, issueId);
 
-        // Start async JSONL session file discovery — stores path in DB when found
-        startSessionFileDiscovery(name, cwd, spawnedAt);
+        // Block until we discover the new session file (up to 60s)
+        const sessionFile = await awaitSessionFile(name, cwd, existingFiles);
 
-        return jsonResponse(conv, { status: 201 });
+        return jsonResponse({ ...conv, sessionFile }, { status: 201 });
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to create conversation: ' + msg }, { status: 500 });
