@@ -11,9 +11,9 @@
     "status": "approved",
     "uid": "cf5882de-b185-44fe-bc9c-ecc9a87a5ce4",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-04-05T12:00:00Z",
-    "updated": "2026-04-05T12:00:00Z",
+    "updated": "2026-04-05T13:40:00Z",
     "references": [
       { "uri": "https://github.com/eltmon/panopticon-cli/issues/406", "label": "PAN-406", "type": "issue" }
     ],
@@ -26,9 +26,10 @@
       {
         "id": "replace-polling-with-xterminal",
         "title": "Replace polling log view with XTerminal for running agents",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-05T12:00:00Z",
+        "completed": "2026-04-05T13:40:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-406"
@@ -40,31 +41,36 @@
           {
             "id": "replace-polling-with-xterminal.ac1",
             "title": "Running agent renders XTerminal with live WebSocket terminal (no polling)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-05T13:40:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "replace-polling-with-xterminal.ac2",
             "title": "Stopped agent shows static last output from /api/agents/{id}/output",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-05T13:40:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "replace-polling-with-xterminal.ac3",
             "title": "No Status tab — terminal fills the entire panel",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-05T13:40:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "replace-polling-with-xterminal.ac4",
             "title": "No separate send-message input — user types directly in the terminal",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-05T13:40:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "replace-polling-with-xterminal.ac5",
             "title": "TypeScript compiles without errors (npm run typecheck passes)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-05T13:40:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
