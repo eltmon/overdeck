@@ -27,6 +27,7 @@ import {
   updateLastAttached,
   updateSessionFile,
 } from '../../../lib/database/conversations-db.js';
+import { sendKeysAsync } from '../../../lib/tmux.js';
 import {
   discoverSessionFile,
   parseConversationMessages,
@@ -308,6 +309,39 @@ const getConversationMessagesRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/message ────────────────────────────
+
+const postConversationMessageRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/message',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
+        if (!message) {
+          return jsonResponse({ error: 'Message is required' }, { status: 400 });
+        }
+
+        // Deliver via tmux load-buffer + paste-buffer (reliable delivery pattern)
+        await sendKeysAsync(conv.tmuxSession, message, 'conversation-message');
+
+        return jsonResponse({ ok: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to send message: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -316,6 +350,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   deleteConversationRoute,
   postConversationResumeRoute,
   getConversationMessagesRoute,
+  postConversationMessageRoute,
 );
 
 export default conversationsRouteLayer;
