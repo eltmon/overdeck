@@ -1,0 +1,314 @@
+<!-- panopticon:orchestration-context-start -->
+<!-- This is Panopticon orchestration context injected automatically.
+     It contains planning session setup instructions, not agent reasoning.
+     Session summarizers should SKIP this block and focus on the agent's
+     actual work, decisions, and tradeoffs that follow. -->
+
+# Planning Session: PAN-449
+
+## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
+
+**YOU ARE IN PLANNING MODE. DO NOT:**
+- Write or modify any code files (except STATE.md)
+- Run implementation commands (npm install, docker compose, make, etc.)
+- Create actual features or functionality
+- Start implementing the solution
+
+**YOU SHOULD ONLY:**
+- Ask clarifying questions (use AskUserQuestion tool)
+- Explore the codebase to understand context (read files, grep)
+- Generate planning artifacts:
+  - STATE.md (decisions, approach, architecture)
+  - Beads tasks (via `bd create`)
+  - Implementation plan at `docs/prds/active/{issue-id}-plan.md` (copy of STATE.md, required for dashboard)
+- Present options and tradeoffs for the user to decide
+
+When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
+
+---
+
+## Issue Details
+- **ID:** PAN-449
+- **Title:** Refactor route handlers to idiomatic Effect — extract shared services, eliminate imperative wrappers
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/449
+
+## Description
+## Problem
+
+The Effect migration (PAN-428) was a mechanical port — the old Express handler code was copied into route modules and wrapped in `Effect.tryPromise({ try: async () => { ...original code... } })`. This is Effect-in-name-only. The route modules are 15K lines of imperative code in an Effect costume.
+
+The whole point of moving to Effect was to get typed errors, composable services, and shared domain operations. We got the HTTP server and WebSocket RPC, but the route handlers themselves don't use any Effect patterns.
+
+## Current State (imperative wrappers)
+
+```typescript
+// 30+ lines per endpoint, duplicated across files
+Effect.tryPromise({
+  try: async () => {
+    const apiKey = getLinearApiKey();
+    if (!apiKey) return jsonResponse({ error: '...' }, { status: 500 });
+    const res = await fetch('https://api.linear.app/graphql', { ... });
+    const json = await res.json();
+    if (json.errors) throw new Error(json.errors[0].message);
+    // ... 50 more lines
+    try { getIssueDataService().patchIssue(id, { status }); } catch {}
+    return jsonResponse(result);
+  },
+  catch: (err) => new Error(String(err)),
+});
+```
+
+## Target State (idiomatic Effect)
+
+```typescript
+// 10 lines, typed errors, shared services
+Effect.gen(function* () {
+  const issue = yield* LinearClient.getIssue(id);
+  yield* IssueLifecycle.transitionTo(id, 'In Progress');
+  yield* AgentSpawner.start(id, { model, workspace });
+  return jsonResponse({ success: true, issue });
+}).pipe(
+  Effect.catchTag('TrackerNotConfigured', () => jsonResponse({ error: '...' }, { status: 500 })),
+  Effect.catchTag('IssueNotFound', () => jsonResponse({ error: '...' }, { status: 404 })),
+);
+```
+
+## Specific Extraction Targets
+
+### 1. Tracker API Services (biggest win)
+
+Inline `fetch()` calls to Linear GraphQL, GitHub REST, and Rally WSAPI are duplicated across routes. Extract to Effect services:
+
+| Service | Methods | Used In |
+|---------|---------|---------|
+| `LinearClient` | getIssue, updateState, getTeamStates, addComment | issues.ts, specialists.ts, mission-control.ts |
+| `GitHubClient` | getIssue, addLabel, removeLabel, createComment, closeIssue | issues.ts, specialists.ts, agents.ts |
+| `RallyClient` | getIssue, updateState | issues.ts |
+
+Each service would have typed errors (`TrackerNotConfigured`, `IssueNotFound`, `RateLimited`), built-in retry, and rate limit awareness.
+
+### 2. Issue Lifecycle Operations
+
+"Move issue to status X + patch cache + emit event" is duplicated across 9+ endpoints. Extract to:
+
+```typescript
+IssueLifecycle.transitionTo(id, status)  // handles tracker API + patchIssue + event
+IssueLifecycle.addLabel(id, label)       // handles GitHub/Linear label differences
+IssueLifecycle.close(id, reason)         // handles close-out across trackers
+```
+
+### 3. Agent Operations
+
+Agent start/stop/kill logic is spread across agents.ts route (1741 lines). Extract to:
+
+```typescript
+AgentSpawner.startWork(id, { model, workspace })
+AgentSpawner.startPlanning(id, { workspace, shadow })  // already partially done
+AgentSpawner.kill(id)
+AgentSpawner.deepWipe(id, { deleteWorkspace })
+```
+
+### 4. Workspace Operations
+
+Workspace create/clean/containerize in workspaces.ts (3711 lines!). Extract to:
+
+```typescript
+WorkspaceService.create(issueId, { location, docker })
+WorkspaceService.clean(issueId, { preview })
+WorkspaceService.containerize(issueId)
+```
+
+## Impact
+
+| Metric | Before | After (estimated) |
+|--------|--------|-------------------|
+| Route handler lines | 15,135 | ~5,000 |
+| Shared service lines | 0 | ~3,000 |
+| Duplicated tracker API calls | ~40 | 0 |
+| Duplicated state transitions | ~11 | 0 |
+| Typed error handling | 0 endpoints | all endpoints |
+
+Total server code should shrink from ~19K to ~12K lines while being more maintainable.
+
+## Testing Requirements
+
+This is a large refactor touching every route. Comprehensive tests are required at each service layer.
+
+### Tracker Service Tests
+
+```
+tests/services/linear-client.test.ts
+  - getIssue returns typed issue for valid ID
+  - getIssue fails with IssueNotFound for missing ID
+  - getIssue fails with TrackerNotConfigured when no API key
+  - updateState calls GraphQL mutation with correct variables
+  - updateState retries on rate limit (429)
+  - getTeamStates returns all states for team
+  - addComment creates comment with correct body
+
+tests/services/github-client.test.ts
+  - getIssue resolves owner/repo/number from issue ID
+  - getIssue fails with IssueNotFound for 404
+  - addLabel creates label if missing, then applies
+  - removeLabel handles already-missing label gracefully
+  - closeIssue sets state to closed
+  - rate limit headers tracked and respected
+
+tests/services/rally-client.test.ts
+  - getIssue fetches from WSAPI with correct project
+  - getIssue fails with TrackerNotConfigured when no API key
+  - updateState maps canonical status to Rally state
+```
+
+### Issue Lifecycle Tests
+
+```
+tests/services/issue-lifecycle.test.ts
+  - transitionTo updates tracker + patches cache + emits event
+  - transitionTo with Linear calls updateState GraphQL
+  - transitionTo with GitHub updates labels (removes old status labels, adds new)
+  - transitionTo no-ops when already in target state
+  - transitionTo fails gracefully when tracker API is down (cache still patched)
+  - addLabel is idempotent (no error if label exists)
+  - removeLabel is idempotent (no error if label missing)
+  - close handles Linear (state→Done) and GitHub (close issue + label) paths
+  - close removes "planning" and "in-review" labels
+  - close emits issue.closed domain event
+```
+
+### Agent Operations Tests
+
+```
+tests/services/agent-spawner.test.ts
+  - startWork creates workspace if missing
+  - startWork creates tmux session with correct env vars
+  - startWork writes agent state (state.json, runtime.json)
+  - startWork fails if beads not initialized
+  - startWork fails if plan has no items
+  - startWork transitions issue to In Progress
+  - startPlanning creates .planning directory structure
+  - startPlanning writes PLANNING_PROMPT.md with issue context
+  - startPlanning sets tmux destroy-unattached off, remain-on-exit on
+  - startPlanning background spawn creates session within 60s
+  - kill sends SIGTERM and cleans up state
+  - kill preserves workspace (only kills tmux + state)
+  - deepWipe removes workspace, branches, agent state
+  - deepWipe requires explicit confirmation parameter
+```
+
+### Workspace Operations Tests
+
+```
+tests/services/workspace-service.test.ts
+  - create makes git worktree at correct path
+  - create runs project's workspace_command if configured
+  - create with docker starts containers
+  - create is idempotent (no error if workspace exists)
+  - clean preview returns list of files to remove
+  - clean removes build artifacts but preserves .planning
+  - containerize creates docker-compose.yml
+  - containerize starts containers and waits for health
+```
+
+### Integration Tests (Route → Service → Effect)
+
+```
+tests/integration/issue-routes.test.ts
+  - POST start-planning → IssueLifecycle.transitionTo + AgentSpawner.startPlanning
+  - POST complete-planning → creates beads + IssueLifecycle.transitionTo('Planned')
+  - POST abort-planning → kills session + IssueLifecycle.transitionTo(previous) + removeLabel
+  - POST reset → IssueLifecycle.transitionTo('Todo') + cleanup
+  - POST cancel → IssueLifecycle.transitionTo('Canceled')
+  - POST move-status → IssueLifecycle.transitionTo(target)
+
+tests/integration/agent-routes.test.ts
+  - POST start → AgentSpawner.startWork + IssueLifecycle.transitionTo('In Progress')
+  - POST start rejects without beads (422)
+  - POST start rejects without plan items (422)
+  - DELETE kill → AgentSpawner.kill
+  - POST deep-wipe → AgentSpawner.deepWipe (requires deleteWorkspace param)
+
+tests/integration/specialist-routes.test.ts
+  - POST done with review passed → wakes test-agent
+  - POST done with test passed → wakes merge-agent
+  - POST done with merge passed → postMergeLifecycle
+  - POST done idempotency guard prevents double-processing
+```
+
+### Error Channel Tests
+
+```
+tests/services/error-handling.test.ts
+  - TrackerNotConfigured → 500 with helpful message
+  - IssueNotFound → 404
+  - RateLimited → 429 with retry-after header
+  - WorkspaceNotFound → 404
+  - AgentAlreadyRunning → 409
+  - BeadsNotInitialized → 422 with hint
+  - PlanEmpty → 422 with hint
+  - All errors have consistent JSON shape { error, hint?, code? }
+```
+
+## T3Code Reference
+
+T3Code's route handlers are thin — 5-15 lines each. All logic lives in services:
+- `OrchestrationEngine` — session lifecycle
+- `WorkspaceFileSystem` — file operations  
+- `CodexAppServerManager` — provider management
+
+Their `ws.ts` (main route file) is 250 lines for 15 RPC methods.
+
+## Priority
+
+Medium — this is maintainability, not a bug. But it directly impacts how fast we can ship features and how many bugs get introduced by duplicated logic.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+---
+
+## Your Mission
+
+You are a planning agent conducting a **discovery session** for this issue.
+
+### Phase 1: Understand Context
+1. **If a spec file was provided above**, read it thoroughly — it's your primary input
+2. Read the codebase to understand relevant files and patterns
+3. Identify what subsystems/files this issue affects
+4. Note any existing patterns we should follow
+
+### Phase 2: Discovery Conversation
+Use AskUserQuestion tool to ask contextual questions:
+- What's the scope? What's explicitly OUT of scope?
+- Any technical constraints or preferences?
+- What does "done" look like?
+- Are there edge cases we need to handle?
+
+### Difficulty Estimation
+
+For each sub-task, estimate difficulty using this rubric:
+
+| Level | When to Use | Model |
+|-------|-------------|-------|
+| `trivial` | Typo, comment, formatting only | haiku |
+| `simple` | Bug fix, single file, obvious change | haiku |
+| `medium` | New feature, 3-5 files, standard patterns | sonnet |
+| `complex` | Refactor, migration, 6+ files, some risk | sonnet |
+| `expert` | Architecture, security, performance, high risk | opus |
+
+### Phase 3: Generate Artifacts (NO CODE!)
+When discovery is complete:
+1. Create STATE.md with decisions made
+2. Copy STATE.md to implementation plan at `docs/prds/active/{issue-id}-plan.md` (required for dashboard)
+3. Create a vBRIEF plan file at `.planning/plan.vbrief.json` (structured machine-readable plan)
+4. Summarize the plan and STOP
+
+**DO NOT run `bd create` commands.** Beads tasks are created automatically from `plan.vbrief.json` by Cloister when planning completes.
+
+**IMPORTANT:** Create the plan file BEFORE creating beads tasks.
+**NOTE:** `*-spec.md` files are human-written specs — do NOT overwrite them. Your output is `*-plan.md`.
+
+**Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
+
+Start by exploring the codebase to understand the context, then begin the discovery conversation.
+
+<!-- panopticon:orchestration-context-end -->
