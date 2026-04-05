@@ -82,6 +82,15 @@ export interface ApproveOptions {
 }
 
 /** Options for the deep-wipe workflow */
+/** Progress event emitted during deep-wipe. */
+export interface DeepWipeProgress {
+  step: number;
+  total: number;
+  label: string;
+  detail: string;
+  status: 'active' | 'complete' | 'error';
+}
+
 export interface DeepWipeOptions {
   /** Delete workspace directory. Default: true */
   deleteWorkspace?: boolean;
@@ -97,6 +106,8 @@ export interface DeepWipeOptions {
   };
   /** Project name (for Docker compose project naming + placeholders) */
   projectName?: string;
+  /** Optional callback for streaming progress events to the client. */
+  onProgress?: (event: DeepWipeProgress) => void;
 }
 
 /** Helper to create a successful step result */

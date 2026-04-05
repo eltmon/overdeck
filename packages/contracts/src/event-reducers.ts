@@ -215,6 +215,21 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'issues.updated':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
+    case 'issue.statusChanged': {
+      const { issueId, status, canonicalStatus } = event.payload
+      const updatedIssues = (state.issuesRaw as Array<Record<string, unknown>>).map(issue => {
+        if (issue['identifier'] === issueId || issue['id'] === issueId) {
+          return { ...issue, status, canonicalStatus, state: canonicalStatus }
+        }
+        return issue
+      })
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        issuesRaw: updatedIssues,
+      }
+    }
+
     case 'activity.updated':
       return {
         ...state,

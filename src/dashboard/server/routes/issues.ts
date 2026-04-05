@@ -30,7 +30,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Effect, Layer, Option } from 'effect';
+import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
@@ -557,30 +557,15 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
         const sessionName = `planning-${issueLower}`;
 
-        // Return early with response — background workspace + agent setup runs after
-        const responseBody = {
-          success: true,
-          issue: {
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            newState: newStateName,
-            source: issue.source,
-          },
-          workspace: {
-            created: existsSync(workspacePath),
-            path: workspacePath,
-          },
-          planningAgent: {
-            started: true,
-            sessionName,
-          },
-        };
-
         Effect.runSync(eventStore.append({
           type: 'planning.started',
           timestamp: new Date().toISOString(),
           payload: { issueId: id, sessionName },
+        }));
+        Effect.runSync(eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: issue.identifier, status: newStateName, canonicalStatus: 'in_progress' },
         }));
 
         // Write preliminary agent state so status endpoint knows planning is starting
@@ -596,22 +581,64 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           location: workspaceLocation,
         }, null, 2));
 
-        // Background: workspace creation + agent spawning (fire-and-forget)
-        spawnPlanningSession({
-          issue: issue as PlanningIssue,
-          workspacePath,
-          projectPath,
-          sessionName,
-          workspaceLocation: workspaceLocation as 'local' | 'remote',
-          startDocker: body.startDocker,
-          shadowMode,
-        }).catch((err: any) => {
-          console.error(`[start-planning] Background spawn failed:`, err);
-        });
-
         try { getIssueDataService().patchIssue(issue.identifier, { status: newStateName, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
 
-        return jsonResponse(responseBody);
+        // SSE stream: await spawnPlanningSession and stream progress events
+        const encoder = new TextEncoder();
+        const nodeStream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const sendEvent = (data: Record<string, unknown>) => {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+            };
+
+            // Send initial metadata
+            sendEvent({
+              type: 'started',
+              issue: {
+                id: issue.id,
+                identifier: issue.identifier,
+                title: issue.title,
+                newState: newStateName,
+                source: issue.source,
+              },
+              workspace: { path: workspacePath },
+              sessionName,
+            });
+
+            const result = await spawnPlanningSession({
+              issue: issue as PlanningIssue,
+              workspacePath,
+              projectPath,
+              sessionName,
+              workspaceLocation: workspaceLocation as 'local' | 'remote',
+              startDocker: body.startDocker,
+              shadowMode,
+              onProgress: (event) => {
+                sendEvent({ type: 'progress', ...event });
+              },
+            });
+
+            if (result.success) {
+              sendEvent({ type: 'complete', sessionName });
+            } else {
+              sendEvent({ type: 'error', error: result.error });
+            }
+            controller.close();
+          },
+        });
+
+        const effectStream = Stream.fromReadableStream<Uint8Array, unknown>({
+          evaluate: () => nodeStream,
+          onError: (err) => err,
+        });
+
+        return HttpServerResponse.stream(effectStream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+          },
+        });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
           console.error('[start-planning] Error:', error);
@@ -632,6 +659,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
         try {
@@ -724,6 +752,11 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           }
         }
 
+        Effect.runSync(eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: issueIdentifier || id, status: revertedState, canonicalStatus: 'todo' },
+        }));
         try { getIssueDataService().patchIssue(issueIdentifier || id, { status: revertedState, canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
 
         return jsonResponse({
@@ -977,7 +1010,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           payload: { issueId: id, status: 'completed' },
         }));
 
-        try { getIssueDataService().patchIssue(id, { status: newState, canonicalStatus: newState === 'Skipped (already in progress)' ? 'in_progress' : 'todo' }); } catch { /* non-fatal */ }
+        const completeCanonical = newState === 'Skipped (already in progress)' ? 'in_progress' : 'todo';
+        Effect.runSync(eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, status: newState, canonicalStatus: completeCanonical },
+        }));
+        try { getIssueDataService().patchIssue(id, { status: newState, canonicalStatus: completeCanonical }); } catch { /* non-fatal */ }
 
         return jsonResponse({
           success: true,
@@ -1007,6 +1046,7 @@ const postIssueResetRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const cleanupLog: string[] = [];
     const lifecycle = yield* IssueLifecycle;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
         try {
@@ -1109,6 +1149,11 @@ const postIssueResetRoute = HttpRouter.add(
         issueDataService.invalidateTracker('linear').catch(() => {});
         issueDataService.invalidateTracker('rally').catch(() => {});
 
+        Effect.runSync(eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, status: 'Todo', canonicalStatus: 'todo' },
+        }));
         try { issueDataService.patchIssue(id, { status: 'Todo', canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
 
         return jsonResponse({ success: true, cleanupLog });
@@ -1132,6 +1177,7 @@ const postIssueCancelRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const cleanupLog: string[] = [];
     const lifecycle = yield* IssueLifecycle;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
         try {
@@ -1225,6 +1271,11 @@ const postIssueCancelRoute = HttpRouter.add(
         issueDataService.invalidateTracker('github').catch(() => {});
         issueDataService.invalidateTracker('linear').catch(() => {});
 
+        Effect.runSync(eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, status: 'Canceled', canonicalStatus: 'done' },
+        }));
         try { issueDataService.patchIssue(id, { status: 'Canceled', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
 
         return jsonResponse({ success: true, cleanupLog });
@@ -1248,6 +1299,7 @@ const postIssueReopenRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
         try {
@@ -1353,6 +1405,11 @@ const postIssueReopenRoute = HttpRouter.add(
           }
         } catch { /* non-fatal */ }
 
+        Effect.runSync(eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: issueIdentifier, status: newState, canonicalStatus: 'in_progress' },
+        }));
         try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
 
         return jsonResponse({
@@ -1442,13 +1499,14 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           in_review: 'In Review', done: 'Done',
         };
 
+        const displayStatus = canonicalToDisplay[targetStatus] || targetStatus;
         Effect.runSync(eventStore.append({
-          type: 'issues.updated',
+          type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
-          payload: { issueId: id },
+          payload: { issueId: id, status: displayStatus, canonicalStatus: targetStatus },
         }));
 
-        try { issueDataService.patchIssue(id, { status: canonicalToDisplay[targetStatus] || targetStatus, canonicalStatus: targetStatus }); } catch { /* non-fatal */ }
+        try { issueDataService.patchIssue(id, { status: displayStatus, canonicalStatus: targetStatus }); } catch { /* non-fatal */ }
 
         return jsonResponse({
           success: true,
@@ -1548,6 +1606,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
         try {
@@ -1582,36 +1641,69 @@ const postIssueDeepWipeRoute = HttpRouter.add(
             : {}),
         };
 
-        const result = await deepWipe(ctx, {
-          deleteWorkspace,
-          deleteBranches: deleteWorkspace,
-          resetIssue: true,
-          workspaceConfig: projectConfig?.workspace,
-          projectName,
+        // SSE stream: await deepWipe and stream progress events
+        const encoder = new TextEncoder();
+        const nodeStream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const sendEvent = (data: Record<string, unknown>) => {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+            };
+
+            sendEvent({ type: 'started', issueId: id });
+
+            const result = await deepWipe(ctx, {
+              deleteWorkspace,
+              deleteBranches: deleteWorkspace,
+              resetIssue: true,
+              workspaceConfig: projectConfig?.workspace,
+              projectName,
+              onProgress: (event) => {
+                sendEvent({ type: 'progress', ...event });
+              },
+            });
+
+            // Emit agent.stopped events so frontend removes agents from store
+            const issueLower = id.toLowerCase();
+            for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
+              try {
+                Effect.runSync(eventStore.append({
+                  type: 'agent.stopped',
+                  timestamp: new Date().toISOString(),
+                  payload: { agentId },
+                } as any));
+              } catch { /* non-fatal */ }
+            }
+            Effect.runSync(eventStore.append({
+              type: 'issue.statusChanged',
+              timestamp: new Date().toISOString(),
+              payload: { issueId: id, status: 'Todo', canonicalStatus: 'todo' },
+            }));
+
+            const issueDataService = getIssueDataService();
+            issueDataService.invalidateTracker('github').catch(() => {});
+            issueDataService.invalidateTracker('linear').catch(() => {});
+
+            if (result.success) {
+              sendEvent({ type: 'complete', message: `Deep wipe completed for ${id}` });
+            } else {
+              const failedStep = result.steps.find((s: any) => !s.success && !s.skipped);
+              sendEvent({ type: 'error', error: failedStep?.error || 'Deep wipe failed' });
+            }
+            controller.close();
+          },
         });
 
-        // Emit agent.stopped events so frontend removes agents from store
-        const { getEventStore } = await import('./event-store.js');
-        const eventStore = getEventStore();
-        const issueLower = id.toLowerCase();
-        for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
-          try {
-            eventStore.append({
-              type: 'agent.stopped',
-              timestamp: new Date().toISOString(),
-              payload: { agentId },
-            } as any);
-          } catch { /* non-fatal */ }
-        }
+        const effectStream = Stream.fromReadableStream<Uint8Array, unknown>({
+          evaluate: () => nodeStream,
+          onError: (err) => err,
+        });
 
-        const issueDataService = getIssueDataService();
-        issueDataService.invalidateTracker('github').catch(() => {});
-        issueDataService.invalidateTracker('linear').catch(() => {});
-
-        return jsonResponse({
-          success: result.success,
-          message: `Deep wipe completed for ${id}`,
-          cleanupLog: result.steps.flatMap((s: any) => s.details || []),
+        return HttpServerResponse.stream(effectStream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+          },
         });
         } catch (error: unknown) {
           const msg = error instanceof Error ? error.message : String(error);
@@ -1630,6 +1722,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
         try {
@@ -1677,6 +1770,11 @@ const postIssueCloseOutRoute = HttpRouter.add(
         if (result.success) {
           issueDataService.invalidateTracker('github').catch(() => {});
           issueDataService.invalidateTracker('linear').catch(() => {});
+          Effect.runSync(eventStore.append({
+            type: 'issue.statusChanged',
+            timestamp: new Date().toISOString(),
+            payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
+          }));
           try { issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
         }
 

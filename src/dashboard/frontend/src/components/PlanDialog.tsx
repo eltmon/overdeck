@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
@@ -7,6 +7,7 @@ import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { useConfirm } from './DialogProvider';
+import { PlanSetupScreen, type SetupProgressEvent } from './PlanSetupScreen';
 
 interface PlanDialogProps {
   issue: Issue;
@@ -47,7 +48,7 @@ interface PlanningStatus {
   hasCompletionMarker?: boolean;
 }
 
-type Step = 'checking' | 'ready' | 'starting' | 'planning' | 'complete' | 'error';
+type Step = 'checking' | 'ready' | 'starting' | 'setting-up' | 'planning' | 'complete' | 'error';
 
 // Default for startDocker - can be overridden by localStorage
 const getDefaultStartDocker = (): boolean => {
@@ -71,8 +72,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const [startDocker, setStartDocker] = useState(getDefaultStartDocker);
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
   const [shadowMode, setShadowMode] = useState(false);
-  const [watchPlanning, setWatchPlanning] = useState(false);
+  const [watchPlanning, setWatchPlanning] = useState(true);
   const [showTasksPanel, setShowTasksPanel] = useState(false);
+  const [setupSteps, setSetupSteps] = useState<SetupProgressEvent[]>([]);
+  const [setupSessionName, setSetupSessionName] = useState<string | null>(null);
 
   // Track if we've actually connected to a planning session in THIS dialog instance
   // This prevents stale cache from incorrectly triggering 'complete' state
@@ -80,44 +83,119 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   const queryClient = useQueryClient();
   const confirm = useConfirm();
 
-  // Start planning mutation
-  const startPlanningMutation = useMutation({
-    mutationFn: async () => {
+  // Start planning via SSE stream — replaces the old fire-and-forget mutation.
+  // Uses fetch with streaming body parsing since EventSource only supports GET.
+  const startPlanningViaSSE = useCallback(async () => {
+    setStep('setting-up');
+    setSetupSteps([]);
+    setSetupSessionName(null);
+    setError(null);
+
+    try {
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ startDocker, workspaceLocation, shadowMode }),
       });
+
       if (!res.ok) {
+        // Non-SSE error response (e.g. 409 conflict, 500 server error)
         const data = await res.json();
-        throw new Error(data.error || 'Failed to start planning');
-      }
-      return res.json() as Promise<StartPlanningResult>;
-    },
-    onSuccess: (data) => {
-      setResult(data);
-      if (data.planningAgent.started) {
-        if (watchPlanning) {
-          hasConnectedToSession.current = true;
-          // Invalidate stale status cache BEFORE entering planning step
-          // Without this, the status query returns cached active:false from
-          // the initial check, causing premature 'complete' transition (PAN-213)
-          queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
-          setStep('planning');
-        } else {
-          // Default: close dialog immediately, planning continues in background
-          onClose();
-        }
-      } else if (data.planningAgent.error) {
-        setError(data.planningAgent.error);
+        setError(data.error || 'Failed to start planning');
         setStep('error');
+        return;
       }
-    },
-    onError: (err: Error) => {
-      setError(err.message);
+
+      // Parse SSE stream from response body
+      const reader = res.body?.getReader();
+      if (!reader) {
+        setError('No response stream');
+        setStep('error');
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse complete SSE events from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+
+            if (event.type === 'started') {
+              // Initial metadata — build a result object for compatibility
+              setResult({
+                success: true,
+                issue: event.issue,
+                workspace: { created: true, path: event.workspace.path },
+                planningAgent: { started: true, sessionName: event.sessionName },
+              });
+            } else if (event.type === 'progress') {
+              setSetupSteps(prev => {
+                // Replace existing step or append
+                const existing = prev.findIndex(s => s.step === event.step);
+                const updated = [...prev];
+                const progressEvent: SetupProgressEvent = {
+                  step: event.step,
+                  total: event.total,
+                  label: event.label,
+                  detail: event.detail,
+                  status: event.status,
+                };
+                if (existing >= 0) {
+                  updated[existing] = progressEvent;
+                } else {
+                  updated.push(progressEvent);
+                }
+                return updated;
+              });
+
+              // If a step errored, show error state
+              if (event.status === 'error') {
+                setError(event.detail);
+                setStep('error');
+              }
+            } else if (event.type === 'complete') {
+              setSetupSessionName(event.sessionName);
+              if (watchPlanning) {
+                hasConnectedToSession.current = true;
+                queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
+                // Brief delay to let the user see the completed state
+                setTimeout(() => setStep('planning'), 600);
+              } else {
+                // Close dialog — planning continues in background
+                onClose();
+              }
+            } else if (event.type === 'error') {
+              setError(event.error || 'Planning setup failed');
+              setStep('error');
+            }
+          } catch {
+            // Ignore malformed SSE lines
+          }
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Connection failed');
       setStep('error');
-    },
-  });
+    }
+  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, watchPlanning, queryClient, onClose]);
+
+  // Legacy mutation wrapper — keeps the same handleStartPlanning interface
+  const startPlanningMutation = {
+    isPending: step === 'setting-up',
+    mutate: startPlanningViaSSE,
+  };
 
   // Poll for planning status (active session) or fetch once (viewing completed)
   const statusQuery = useQuery({
@@ -223,6 +301,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       setResult(null);
       setError(null);
       setMinimized(false);
+      setSetupSteps([]);
+      setSetupSessionName(null);
       hasConnectedToSession.current = false;
     } else if (issueChanged) {
       // Switching to a different issue - reset state and unminimize
@@ -230,6 +310,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       setResult(null);
       setError(null);
       setMinimized(false);
+      setSetupSteps([]);
+      setSetupSessionName(null);
       hasConnectedToSession.current = false;
       queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
     } else {
@@ -279,8 +361,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
   // 2. Initial check finds .planning-complete marker → step set in checking effect
 
   const handleStartPlanning = () => {
-    setStep('starting');
-    startPlanningMutation.mutate();
+    startPlanningViaSSE();
   };
 
   const handleStopPlanning = () => {
@@ -363,6 +444,12 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
           <Sparkles className="w-3 h-3 text-content" />
         </div>
         <span className="text-sm text-content font-medium">Plan: {issue.identifier}</span>
+        {step === 'setting-up' && (
+          <>
+            <Loader2 className="w-3 h-3 text-purple-400 animate-spin" />
+            <span className="px-1.5 py-0.5 bg-purple-500/30 text-purple-300 text-xs rounded">Setting up</span>
+          </>
+        )}
         {step === 'planning' && (
           <>
             <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
@@ -597,6 +684,19 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
                             type="checkbox"
+                            checked={watchPlanning}
+                            onChange={(e) => setWatchPlanning(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
+                          />
+                          <span className="text-sm text-content-body">
+                            Stay and watch planning
+                            <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
                             checked={shadowMode}
                             onChange={(e) => setShadowMode(e.target.checked)}
                             className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
@@ -622,19 +722,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             <span className="text-content-muted ml-1">(dev environment ready for testing)</span>
                           </span>
                         </label>
-
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={watchPlanning}
-                            onChange={(e) => setWatchPlanning(e.target.checked)}
-                            className="w-4 h-4 rounded border-gray-500 bg-surface-overlay text-purple-500 focus:ring-purple-500 focus:ring-offset-gray-800"
-                          />
-                          <span className="text-sm text-content-body">
-                            Stay and watch planning
-                            <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
-                          </span>
-                        </label>
                       </div>
 
                       <button
@@ -649,13 +736,23 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                 </div>
               )}
 
-              {/* Starting step */}
+              {/* Starting step — brief transition before SSE connects */}
               {step === 'starting' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
                   <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
                   <p className="text-content-body">Starting planning session...</p>
                   <p className="text-sm text-content-muted mt-2">Moving to In Planning, creating workspace, spawning agent</p>
                 </div>
+              )}
+
+              {/* Setting up step — SSE progress stream */}
+              {step === 'setting-up' && (
+                <PlanSetupScreen
+                  issueIdentifier={issue.identifier}
+                  issueTitle={issue.title}
+                  steps={setupSteps}
+                  error={error}
+                />
               )}
 
               {/* Planning step - active session with web terminal */}
@@ -669,10 +766,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                       </div>
                     ) : (
                       <>
-                        {/* Use result.planningAgent.sessionName as primary source to avoid remounts during status refetch */}
-                        {result?.planningAgent.sessionName ? (
+                        {/* Use result.planningAgent.sessionName as primary source, then setupSessionName from SSE, then status query */}
+                        {(result?.planningAgent.sessionName || setupSessionName) ? (
                           <XTerminal
-                            sessionName={result.planningAgent.sessionName}
+                            sessionName={(result?.planningAgent.sessionName || setupSessionName)!}
                             onDisconnect={() => {
                               statusQuery.refetch();
                             }}
@@ -721,21 +818,24 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                         className="flex items-center gap-1 px-3 py-1 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 text-sm rounded transition-colors disabled:opacity-50"
                         title="Stop planning and return to Todo"
                       >
-                        <X className="w-4 h-4" />
-                        Abort
+                        <Square className="w-4 h-4" />
+                        Stop
                       </button>
-                      <button
-                        onClick={() => {
-                          stopPlanningMutation.mutate();
-                          statusQuery.refetch();
-                        }}
-                        disabled={stopPlanningMutation.isPending}
-                        className="flex items-center gap-1 px-3 py-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-sm rounded transition-colors disabled:opacity-50"
-                        title="Done - mark planning complete"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        Done
-                      </button>
+                      {/* Only show Done when the planning agent has finished (session no longer active or completion marker exists) */}
+                      {(statusQuery.data && (!statusQuery.data.active || statusQuery.data.hasCompletionMarker)) && (
+                        <button
+                          onClick={() => {
+                            stopPlanningMutation.mutate();
+                            statusQuery.refetch();
+                          }}
+                          disabled={stopPlanningMutation.isPending}
+                          className="flex items-center gap-1 px-3 py-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-sm rounded transition-colors disabled:opacity-50"
+                          title="Done - mark planning complete"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Done
+                        </button>
+                      )}
                     </div>
                   </div>
                 </>
@@ -743,63 +843,47 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
 
               {/* Complete step */}
               {step === 'complete' && (
-                <div className="flex-1 flex flex-col items-center justify-center p-8">
-                  <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
-                    <CheckCircle2 className="w-10 h-10 text-green-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-content mb-2">Planning Complete</h3>
-                  <p className="text-content-subtle text-center max-w-md mb-6">
-                    The planning session has ended. Review the plan and start the execution agent.
-                  </p>
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* Scrollable content area */}
+                  <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center">
+                    <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
+                      <CheckCircle2 className="w-10 h-10 text-green-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-content mb-2">Planning Complete</h3>
+                    <p className="text-content-subtle text-center max-w-md mb-6">
+                      The planning session has ended. Review the plan and start the execution agent.
+                    </p>
 
-                  {/* PRD Link */}
-                  {getPrdPath() && (
-                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 mb-6 max-w-md w-full">
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-8 h-8 text-purple-400" />
-                        <div className="flex-1">
-                          <p className="text-sm text-content-body font-medium">Feature Plan</p>
-                          <p className="text-xs text-content-muted font-mono truncate">{getPrdPath()}</p>
+                    {/* PRD Link */}
+                    {getPrdPath() && (
+                      <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 mb-6 max-w-md w-full">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-8 h-8 text-purple-400" />
+                          <div className="flex-1">
+                            <p className="text-sm text-content-body font-medium">Feature Plan</p>
+                            <p className="text-xs text-content-muted font-mono truncate">{getPrdPath()}</p>
+                          </div>
+                          <a
+                            href={`vscode://file${getPrdPath()}`}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-content text-sm rounded-lg transition-colors"
+                            title="Open in VS Code"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Open
+                          </a>
                         </div>
-                        <a
-                          href={`vscode://file${getPrdPath()}`}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-content text-sm rounded-lg transition-colors"
-                          title="Open in VS Code"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          Open
-                        </a>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Tasks Panel - inline vBRIEF view */}
-                  <div className="w-full max-w-2xl mb-6 max-h-80 overflow-auto rounded-lg border border-divider">
-                    <BeadsTasksPanel issueId={issue.identifier} />
+                    {/* Tasks Panel - inline vBRIEF view */}
+                    <div className="w-full max-w-2xl mb-6 max-h-64 overflow-auto rounded-lg border border-divider">
+                      <BeadsTasksPanel issueId={issue.identifier} />
+                    </div>
+
                   </div>
 
-                  {result && (
-                    <div className="bg-surface-overlay/50 rounded-lg p-4 mb-6 max-w-md w-full">
-                      <p className="text-sm text-content-subtle mb-2">Summary:</p>
-                      <ul className="space-y-1 text-sm">
-                        <li className="text-content-body">
-                          <span className="text-content-muted">Issue:</span> {result.issue.identifier}
-                        </li>
-                        <li className="text-content-body">
-                          <span className="text-content-muted">State:</span>{' '}
-                          <span className="text-purple-400">{result.issue.newState}</span>
-                        </li>
-                        {result.workspace.created && (
-                          <li className="text-content-body">
-                            <span className="text-content-muted">Workspace:</span>{' '}
-                            <span className="text-blue-400 font-mono text-xs">{result.workspace.path}</span>
-                          </li>
-                        )}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
+                  {/* Pinned footer with action buttons */}
+                  <div className="border-t border-divider px-8 py-4 flex justify-center gap-3 bg-surface-raised">
                     <button
                       onClick={onClose}
                       disabled={startAgentMutation.isPending}

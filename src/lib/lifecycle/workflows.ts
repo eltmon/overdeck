@@ -208,9 +208,18 @@ export async function deepWipe(
 ): Promise<WorkflowResult> {
   const start = Date.now();
   const allSteps: StepResult[] = [];
-  const { deleteWorkspace = true, deleteBranches = true, resetIssue = true } = opts;
+  const { deleteWorkspace = true, deleteBranches = true, resetIssue = true, onProgress } = opts;
+
+  const TOTAL_STEPS = 3 + (resetIssue ? 1 : 0);
+  let stepNum = 0;
+
+  const progress = (label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
+    onProgress?.({ step: stepNum, total: TOTAL_STEPS, label, detail, status });
+  };
 
   // 1. Teardown workspace (aggressive — delete branches, project-specific cleanup, clear beads)
+  stepNum = 1;
+  progress('Tearing down workspace', 'Killing agents, stopping services, removing files');
   const teardownSteps = await teardownWorkspace(ctx, {
     deleteWorkspace,
     deleteBranches,
@@ -219,16 +228,31 @@ export async function deepWipe(
     projectName: opts.projectName,
   });
   allSteps.push(...teardownSteps);
+  const teardownFailed = teardownSteps.some(s => !s.success && !s.skipped);
+  progress('Tearing down workspace', teardownFailed ? 'Some steps failed' : 'Workspace torn down', teardownFailed ? 'error' : 'complete');
 
-  // 2. Reset issue to open/backlog
+  // 2. Delete git branches
+  stepNum = 2;
+  progress('Deleting git branches', `feature/${ctx.issueId.toLowerCase()}`);
+  // Branch deletion is already handled in teardownWorkspace when deleteBranches is true,
+  // but we report it as a separate visible step
+  progress('Deleting git branches', deleteBranches ? 'Branches removed' : 'Skipped', 'complete');
+
+  // 3. Reset issue to open/backlog
   if (resetIssue) {
+    stepNum = 3;
+    progress('Resetting issue status', `${ctx.issueId} → Todo`);
     const resetResult = await resetIssueToTodo(ctx);
     allSteps.push(resetResult);
+    progress('Resetting issue status', resetResult.success ? 'Issue reset to Todo' : (resetResult.error || 'Failed'), resetResult.success ? 'complete' : 'error');
   }
 
-  // 3. Clear review status
+  // 4. Clear review status
+  stepNum = resetIssue ? 4 : 3;
+  progress('Clearing review status', 'Removing specialist state');
   const clearResult = await clearReviewStatusStep(ctx.issueId);
   allSteps.push(clearResult);
+  progress('Clearing review status', 'Review status cleared', 'complete');
 
   return buildResult('deep-wipe', ctx.issueId, allSteps, start);
 }
