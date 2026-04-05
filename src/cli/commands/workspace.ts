@@ -19,7 +19,7 @@ import {
   createWorkspace as createWorkspaceFromConfig,
   removeWorkspace as removeWorkspaceFromConfig,
 } from '../../lib/workspace-manager.js';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 import { loadConfig } from '../../lib/config.js';
@@ -477,25 +477,15 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
           });
           dockerStarted = true;
 
-          // Docker named volumes create root-owned empty node_modules dirs on the host.
-          // Agents run on the host (not in containers), so replace them with symlinks
-          // to the main repo's node_modules so the agent can resolve dependencies.
-          const nodeModulesDirs = [
-            { workspace: join(workspacePath, 'node_modules'), main: join(projectRoot, 'node_modules') },
-            { workspace: join(workspacePath, 'src', 'dashboard', 'frontend', 'node_modules'), main: join(projectRoot, 'src', 'dashboard', 'frontend', 'node_modules') },
-          ];
-          for (const { workspace: nmDir, main: mainNm } of nodeModulesDirs) {
+          // Docker named volumes may create root-owned empty node_modules dirs.
+          // Remove them so bun install can create proper workspace-aware node_modules.
+          for (const nmDir of [join(workspacePath, 'node_modules'), join(workspacePath, 'src', 'dashboard', 'frontend', 'node_modules')]) {
             try {
               if (existsSync(nmDir) && !lstatSync(nmDir).isSymbolicLink()) {
-                // Root-owned empty dir from Docker — remove and symlink
                 rmSync(nmDir, { recursive: true, force: true });
-                symlinkSync(mainNm, nmDir);
-              } else if (!existsSync(nmDir) && existsSync(mainNm)) {
-                symlinkSync(mainNm, nmDir);
               }
             } catch {
-              // May need sudo if Docker created root-owned dirs — warn but continue
-              spinner.warn(`Could not symlink ${nmDir} — may need: sudo rm -rf "${nmDir}" && ln -sf "${mainNm}" "${nmDir}"`);
+              spinner.warn(`Could not remove Docker-created ${nmDir} — may need: sudo rm -rf "${nmDir}"`);
             }
           }
         } catch (err: any) {
@@ -503,6 +493,31 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
         }
       } else {
         dockerError = 'No docker-compose.yml found in workspace';
+      }
+    }
+
+    // Install dependencies using the project's package manager.
+    // Each worktree needs its own node_modules so that local workspace packages
+    // (e.g., @panopticon/contracts) resolve to the worktree's code, not the main repo's.
+    const pkgManager = projectConfig?.package_manager || (existsSync(join(workspacePath, 'bun.lock')) ? 'bun' : 'npm');
+    const installCmd = pkgManager === 'bun' ? 'bun install' : `${pkgManager} install`;
+    spinner.text = `Installing dependencies (${pkgManager})...`;
+    try {
+      execSync(installCmd, { cwd: workspacePath, encoding: 'utf-8', timeout: 60000, stdio: 'pipe' });
+    } catch (installErr: any) {
+      spinner.warn(`Dependency install warning: ${installErr.message?.slice(0, 200)}`);
+    }
+
+    // Build workspace packages so local dependencies have up-to-date dist/
+    const workspacePackages = (projectConfig as any)?.workspace_packages as Array<{ path: string; build_command: string }> | undefined;
+    if (workspacePackages) {
+      for (const pkg of workspacePackages) {
+        spinner.text = `Building ${pkg.path}...`;
+        try {
+          execSync(pkg.build_command, { cwd: join(workspacePath, pkg.path), encoding: 'utf-8', timeout: 30000, stdio: 'pipe' });
+        } catch (buildErr: any) {
+          spinner.warn(`Build warning (${pkg.path}): ${buildErr.message?.slice(0, 200)}`);
+        }
       }
     }
 

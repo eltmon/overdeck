@@ -59,13 +59,19 @@ These block the Node.js event loop, freezing all HTTP requests, WebSocket connec
 
 ## Workspace Setup for Agents
 
-Workspaces are git worktrees at `workspaces/feature-<issue-id>/`. They share `node_modules`
-with the main repo but may have stale or missing dependencies.
+Workspaces are git worktrees at `workspaces/feature-<issue-id>/`. Each worktree has its
+own `node_modules` created by `bun install` — **never symlink node_modules from the main repo**.
+Symlinks break local workspace package resolution (e.g., `@panopticon/contracts` would
+resolve to the main repo's stale build instead of the worktree's version).
 
 **Before running builds or tests in a workspace:**
-1. Run `bun install` from the workspace root
-2. If frontend node_modules are empty, symlink from main: `ln -sf /home/eltmon/Projects/panopticon-cli/src/dashboard/frontend/node_modules src/dashboard/frontend/node_modules`
+1. Run `bun install` from the workspace root (creates correct workspace-aware node_modules)
+2. If you modified `packages/contracts/`, rebuild: `cd packages/contracts && npm run build`
 3. Build commands use the root `node_modules/.bin/` — run from workspace root, not subdirectories
+
+**NEVER symlink node_modules** — `bun install` uses hardlinks from the global cache and is
+nearly instant (~2s). It correctly resolves `@panopticon/contracts` to the worktree's local
+`packages/contracts/` via Bun workspace resolution.
 
 **Quality gates** (must pass before `pan work done`):
 - `npm run typecheck` — TypeScript strict mode

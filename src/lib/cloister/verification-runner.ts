@@ -8,8 +8,10 @@
  * Extracted from dashboard/server to be independently testable.
  */
 
-import { basename, dirname } from 'path';
+import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { writeFeedbackFile } from './feedback-writer.js';
@@ -17,6 +19,8 @@ import { messageAgent } from '../agents.js';
 import { findProjectByPath } from '../projects.js';
 import { getVBriefACStatus } from '../vbrief/beads.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
+
+const execAsync = promisify(exec);
 
 export const VERIFICATION_MAX_CYCLES = 3;
 
@@ -83,6 +87,33 @@ export async function runVerificationForIssue(
       WORKSPACE_PATH: workspacePath,
       HOME: homedir(),
     };
+
+    // Ensure dependencies are installed and workspace packages are built.
+    // Worktrees need their own node_modules (not symlinked from main repo)
+    // so that local workspace packages like @panopticon/contracts resolve
+    // to the worktree's version, not the main repo's stale build.
+    const packageManager = projectConfig?.package_manager || 'npm';
+    const installCmd = packageManager === 'bun' ? 'bun install' : `${packageManager} install`;
+    try {
+      console.log(`[${logPrefix}] Installing dependencies: ${installCmd}`);
+      await execAsync(installCmd, { cwd: workspacePath, encoding: 'utf-8', timeout: 60000 });
+    } catch (installErr: any) {
+      console.warn(`[${logPrefix}] Dependency install warning: ${installErr.message}`);
+    }
+
+    // Build workspace packages (e.g., @panopticon/contracts) before running gates
+    const workspacePackages = (projectConfig as any)?.workspace_packages as Array<{ path: string; build_command: string }> | undefined;
+    if (workspacePackages) {
+      for (const pkg of workspacePackages) {
+        const pkgPath = join(workspacePath, pkg.path);
+        try {
+          console.log(`[${logPrefix}] Building workspace package: ${pkg.path}`);
+          await execAsync(pkg.build_command, { cwd: pkgPath, encoding: 'utf-8', timeout: 30000 });
+        } catch (buildErr: any) {
+          console.warn(`[${logPrefix}] Workspace package build warning (${pkg.path}): ${buildErr.message}`);
+        }
+      }
+    }
 
     const gateResults = await runQualityGates(gates, workspacePath, 'pre_push', {
       isRemote: workspaceInfo.isRemote,
