@@ -1,28 +1,18 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { getAgentState, saveAgentState } from '../../../lib/agents.js';
-import { existsSync, writeFileSync, readFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { execSync } from 'child_process';
 import { AGENTS_DIR } from '../../../lib/paths.js';
 import { shouldSkipTrackerUpdate } from '../../../lib/shadow-mode.js';
 import { markAsSynced } from '../../../lib/shadow-state.js';
+import { getLinearApiKey } from '../../../lib/shadow-utils.js';
 
 interface ApproveOptions {
   merge?: boolean;
   noLinear?: boolean;
   shadow?: boolean;
-}
-
-function getLinearApiKey(): string | null {
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-  return process.env.LINEAR_API_KEY || null;
 }
 
 function checkGhCli(): boolean {

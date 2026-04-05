@@ -35,13 +35,16 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
-import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
-import { cleanupWorkflowLabels } from '../../../core/state-mapping.js';
+import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { readIssueHandoffEvents } from '../../../lib/cloister/handoff-logger.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
+import { LinearClient } from '../services/linear-client.js';
+import { GitHubClient } from '../services/github-client.js';
+import { RallyClient } from '../services/rally-client.js';
 
 const execAsync = promisify(exec);
 
@@ -149,39 +152,13 @@ const getIssueAnalyzeRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
-        const apiKey = getLinearApiKey();
-        if (!apiKey) {
-          return jsonResponse({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
-        }
-
-        const query = `
-          query GetIssue($id: String!) {
-            issue(id: $id) {
-              id
-              identifier
-              title
-              description
-              priority
-              url
-              state { name }
-              labels { nodes { name } }
-              project { id name }
-            }
-          }
-        `;
-
-        const response = await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-          body: JSON.stringify({ query, variables: { id } }),
-        });
-        const json = await response.json() as any;
-        if (json.errors) throw new Error(json.errors[0]?.message || 'GraphQL error');
-        const issue = json.data?.issue;
+        const issue = await Effect.runPromise(
+          linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+        );
 
         if (!issue) {
           return jsonResponse({ error: 'Issue not found' }, { status: 404 });
@@ -221,7 +198,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
 
         if (desc.length > 500) { reasons.push('Detailed description suggests complexity'); estimatedTasks += 1; }
 
-        const labels = issue.labels?.nodes?.map((l: any) => l.name) || [];
+        const labels = issue.labels.map((l) => l.name);
         const complexLabels = ['complex', 'large', 'epic', 'multi-phase', 'architecture'];
         for (const label of labels) {
           if (complexLabels.some((cl: string) => label.toLowerCase().includes(cl))) {
@@ -238,7 +215,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
             identifier: issue.identifier,
             title: issue.title,
             description: issue.description,
-            status: issue.state?.name || 'Unknown',
+            status: issue.state.name,
             priority: issue.priority,
             url: issue.url,
             labels,
@@ -255,9 +232,7 @@ const getIssueAnalyzeRoute = HttpRouter.add(
           console.error('Error analyzing issue:', error);
           return jsonResponse({ error: 'Failed to analyze issue: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -270,9 +245,9 @@ const postIssuePlanRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
+    const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { answers, tasks } = body as any;
 
@@ -280,30 +255,9 @@ const postIssuePlanRoute = HttpRouter.add(
           return jsonResponse({ error: 'Tasks are required' }, { status: 400 });
         }
 
-        const apiKey = getLinearApiKey();
-        if (!apiKey) {
-          return jsonResponse({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
-        }
-
-        const query = `
-          query GetIssue($id: String!) {
-            issue(id: $id) {
-              id
-              identifier
-              title
-              description
-              url
-            }
-          }
-        `;
-        const response = await fetch('https://api.linear.app/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-          body: JSON.stringify({ query, variables: { id } }),
-        });
-        const json = await response.json() as any;
-        if (json.errors) throw new Error(json.errors[0]?.message || 'GraphQL error');
-        const issue = json.data?.issue;
+        const issue = await Effect.runPromise(
+          linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+        );
 
         if (!issue) {
           return jsonResponse({ error: 'Issue not found' }, { status: 404 });
@@ -356,9 +310,7 @@ const postIssuePlanRoute = HttpRouter.add(
           console.error('Error creating plan:', error);
           return jsonResponse({ error: 'Failed to create plan: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -396,8 +348,7 @@ const postIssueCloseRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { reason } = body as any;
         const issuePrefix = issueId.split('-')[0];
@@ -464,9 +415,7 @@ const postIssueCloseRoute = HttpRouter.add(
           console.error('Error closing issue:', error);
           return jsonResponse({ error: 'Failed to close: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -480,9 +429,12 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
+    const linear = yield* LinearClient;
+    const github = yield* GitHubClient;
+    const rally = yield* RallyClient;
+    const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const {
           skipWorkspace = false,
@@ -524,105 +476,45 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         let newStateName = 'In Planning';
 
         if (trackerTypeForIssue === 'github' && githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-          const config = getGitHubConfig()!;
-          const ghRes = await fetch(
-            `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}`,
-            {
-              headers: {
-                'Authorization': `token ${config.token}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'Panopticon-Dashboard',
-              },
-            }
+          const { owner, repo, number } = githubCheck as { owner: string; repo: string; number: number };
+          const ghIssue = await Effect.runPromise(
+            github.getIssue(owner, repo, number).pipe(Effect.catchAll((e) => Effect.fail(e))),
           );
-          if (!ghRes.ok) throw new Error(`GitHub API error: ${ghRes.status}`);
-          const ghIssue: any = await ghRes.json();
 
-          const repoConfig = config.repos.find((r: any) => r.owner === githubCheck.owner && r.repo === githubCheck.repo);
-          const prefix = repoConfig?.prefix || githubCheck.repo!.toUpperCase();
+          const ghConfig = getGitHubConfig();
+          const repoConfig = ghConfig?.repos.find((r: any) => r.owner === owner && r.repo === repo);
+          const prefix = repoConfig?.prefix || repo.toUpperCase();
 
-          let ghComments: Array<{ author: string; body: string; createdAt: string }> = [];
-          try {
-            const commentsRes = await fetch(
-              `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/comments?per_page=50`,
-              {
-                headers: {
-                  'Authorization': `token ${config.token}`,
-                  'Accept': 'application/vnd.github.v3+json',
-                  'User-Agent': 'Panopticon-Dashboard',
-                },
-              }
-            );
-            if (commentsRes.ok) {
-              const rawComments = await commentsRes.json() as any[];
-              ghComments = rawComments.map((c: any) => ({
-                author: c.user?.login || 'unknown',
-                body: c.body || '',
-                createdAt: c.created_at,
-              }));
-            }
-          } catch (commentErr: any) {
-            console.log(`[start-planning] Could not fetch GitHub comments: ${commentErr.message}`);
-          }
+          const ghComments = await Effect.runPromise(
+            github.getComments(owner, repo, number, 50).pipe(
+              Effect.map((cs) => cs.map((c) => ({ author: c.user, body: c.body, createdAt: c.createdAt }))),
+              Effect.catchAll(() => Effect.succeed([] as Array<{ author: string; body: string; createdAt: string }>)),
+            ),
+          );
 
           issue = {
-            id: `github-${githubCheck.owner}-${githubCheck.repo}-${githubCheck.number}`,
-            identifier: `${prefix}-${githubCheck.number}`,
+            id: `github-${owner}-${repo}-${number}`,
+            identifier: `${prefix}-${number}`,
             title: ghIssue.title,
             description: ghIssue.body || '',
-            url: ghIssue.html_url,
+            url: ghIssue.htmlUrl,
             source: 'github',
             comments: ghComments.length > 0 ? ghComments : undefined,
           };
 
-          // Add "planning" label
-          try {
-            await fetch(`https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/labels`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `token ${config.token}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json',
-                'User-Agent': 'Panopticon-Dashboard',
-              },
-              body: JSON.stringify({ name: 'planning', color: 'fbca04' }),
-            });
-          } catch { /* Label may already exist */ }
-          await fetch(
-            `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `token ${config.token}`,
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json',
-                'User-Agent': 'Panopticon-Dashboard',
-              },
-              body: JSON.stringify({ labels: ['planning'] }),
-            }
+          // Add "planning" label (ensure it exists, then apply to issue)
+          await Effect.runPromise(
+            lifecycle.addLabel(id, 'planning').pipe(Effect.catchAll(() => Effect.void)),
           );
 
         } else if (trackerTypeForIssue === 'rally') {
-          const rallyConfig = getRallyConfig();
-          if (!rallyConfig) {
-            return jsonResponse(
-              { error: 'RALLY_API_KEY not configured. Set it in ~/.panopticon.env' },
-              { status: 500 },
-            );
-          }
-
-          const { createTracker } = await import('../../../lib/tracker/factory.js');
-          const { resolveProjectFromIssue: resolveProj, getProject } = await import('../../../lib/projects.js');
-          const projectInfo = resolveProj(id);
-          const rallyProject = projectInfo ? getProject(projectInfo.projectKey)?.rally_project : undefined;
-
-          const tracker = createTracker({
-            type: 'rally',
-            project: rallyProject || rallyConfig.project,
-            server: rallyConfig.server,
-            workspace: rallyConfig.workspace,
-          });
-          const rallyIssue = await tracker.getIssue(id);
+          const rallyIssue = await Effect.runPromise(
+            rally.getIssue(id).pipe(
+              Effect.catchTag('TrackerNotConfigured', () =>
+                Effect.fail(new Error('RALLY_API_KEY not configured. Set it in ~/.panopticon.env')),
+              ),
+            ),
+          );
 
           issue = {
             id: rallyIssue.id,
@@ -635,36 +527,13 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
         } else {
           // Linear
-          const apiKey = getLinearApiKey();
-          if (!apiKey) {
-            return jsonResponse({ error: 'LINEAR_API_KEY not configured' }, { status: 500 });
-          }
-
-          const issueQuery = `
-            query GetIssue($id: String!) {
-              issue(id: $id) {
-                id
-                identifier
-                title
-                description
-                url
-                state { id name }
-                team { id key }
-              }
-            }
-          `;
-          const issueRes = await fetch('https://api.linear.app/graphql', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-            body: JSON.stringify({ query: issueQuery, variables: { id } }),
-          });
-          const issueJson = await issueRes.json() as any;
-          if (issueJson.errors) throw new Error(issueJson.errors[0]?.message || 'GraphQL error');
-          const linearIssue = issueJson.data?.issue;
-
-          if (!linearIssue) {
-            return jsonResponse({ error: 'Issue not found' }, { status: 404 });
-          }
+          const linearIssue = await Effect.runPromise(
+            linear.getIssue(id).pipe(
+              Effect.catchTag('TrackerNotConfigured', () =>
+                Effect.fail(new Error('LINEAR_API_KEY not configured')),
+              ),
+            ),
+          );
 
           issue = {
             id: linearIssue.id,
@@ -675,27 +544,10 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             source: 'linear',
           };
 
-          // Update to "In Planning" state
-          const statesQuery = `query { team(id: "${linearIssue.team.id}") { states { nodes { id name } } } }`;
-          const statesRes = await fetch('https://api.linear.app/graphql', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-            body: JSON.stringify({ query: statesQuery }),
-          });
-          const statesJson = await statesRes.json() as any;
-          const states = statesJson.data?.team?.states?.nodes || [];
-          const planningState = states.find((s: any) =>
-            s.name.toLowerCase() === 'in planning' || s.name.toLowerCase() === 'planning'
+          // Transition to "In Planning" state
+          await Effect.runPromise(
+            lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catchAll(() => Effect.void)),
           );
-          if (planningState) {
-            const updateMut = `mutation { issueUpdate(id: "${linearIssue.id}", input: { stateId: "${planningState.id}" }) { success } }`;
-            await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-              body: JSON.stringify({ query: updateMut }),
-            });
-            newStateName = planningState.name;
-          }
         }
 
         const issuePrefix = issue.identifier.split('-')[0];
@@ -764,9 +616,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
           console.error('[start-planning] Error:', error);
           return jsonResponse({ error: 'Failed to start planning: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -779,9 +629,10 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
+    const lifecycle = yield* IssueLifecycle;
+    const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { deleteWorkspace } = body as any;
         const githubCheck = isGitHubIssue(id);
@@ -793,68 +644,26 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
         if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
           issueIdentifier = id;
           sessionName = `planning-${id.toLowerCase()}`;
-          // Remove planning label
-          const config = getGitHubConfig();
-          if (config) {
-            try {
-              await fetch(
-                `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/planning`,
-                {
-                  method: 'DELETE',
-                  headers: {
-                    'Authorization': `token ${config.token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                  },
-                }
-              );
-              revertedState = 'Todo (label removed)';
-            } catch (labelErr) {
-              console.log('[abort-planning] Warning: Could not remove planning label:', labelErr);
-            }
-          }
+          // Remove planning label via IssueLifecycle
+          await Effect.runPromise(
+            lifecycle.removeLabel(id, 'planning').pipe(Effect.catchAll(() => Effect.void)),
+          );
+          revertedState = 'Todo (label removed)';
         } else {
-          // Linear: move back to Todo
-          const apiKey = getLinearApiKey();
-          if (apiKey) {
-            const issueQuery = `query GetIssue($id: String!) { issue(id: $id) { id identifier team { id } } }`;
-            const issueRes = await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-              body: JSON.stringify({ query: issueQuery, variables: { id } }),
-            });
-            const issueJson = await issueRes.json() as any;
-            const issue = issueJson.data?.issue;
+          // Resolve issue identifier and session name via LinearClient, then transition to 'open' (Todo)
+          const linearIssue = await Effect.runPromise(
+            linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+          );
 
-            if (issue) {
-              issueIdentifier = issue.identifier;
-              sessionName = `planning-${issue.identifier.toLowerCase()}`;
-
-              const statesQuery = `query GetTeamStates($teamId: String!) { team(id: $teamId) { states { nodes { id name type } } } }`;
-              const statesRes = await fetch('https://api.linear.app/graphql', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-                body: JSON.stringify({ query: statesQuery, variables: { teamId: issue.team.id } }),
-              });
-              const statesJson = await statesRes.json() as any;
-              const states = statesJson.data?.team?.states?.nodes || [];
-
-              const todoState = states.find((s: any) =>
-                s.name.toLowerCase() === 'todo' ||
-                s.name.toLowerCase() === 'to do' ||
-                s.type === 'unstarted'
-              );
-
-              if (todoState) {
-                const updateMutation = `mutation UpdateIssue($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success issue { state { name } } } }`;
-                await fetch('https://api.linear.app/graphql', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-                  body: JSON.stringify({ query: updateMutation, variables: { id: issue.id, stateId: todoState.id } }),
-                });
-                revertedState = todoState.name;
-              }
-            }
+          if (linearIssue) {
+            issueIdentifier = linearIssue.identifier;
+            sessionName = `planning-${linearIssue.identifier.toLowerCase()}`;
           }
+
+          await Effect.runPromise(
+            lifecycle.transitionTo(id, 'open').pipe(Effect.catchAll(() => Effect.void)),
+          );
+          revertedState = 'Todo';
         }
 
         // Kill tmux sessions
@@ -930,9 +739,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           console.error('Error aborting planning:', error);
           return jsonResponse({ error: 'Failed to abort planning: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -946,9 +753,10 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
+    const linear = yield* LinearClient;
+    const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const skipKill = (body as any)?.skipKill === true;
         const sessionName = `planning-${id.toLowerCase()}`;
@@ -1087,81 +895,50 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         }
 
         // Update Linear/GitHub issue state
-        let skipStateUpdate = false;
-        const apiKey = getLinearApiKey();
-        if (apiKey && !githubCheck?.isGitHub) {
-          try {
-            const checkQuery = `query { issue(id: "${id}") { state { name type } } }`;
-            const checkRes = await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-              body: JSON.stringify({ query: checkQuery }),
-            });
-            const checkData = await checkRes.json() as any;
-            const currentState = checkData.data?.issue?.state;
-            if (currentState?.type === 'started') {
-              skipStateUpdate = true;
-            }
-          } catch { /* non-fatal */ }
-        }
-
         let newState = 'Planned';
 
+        // For Linear: check if already in a 'started' state — if so, skip the transition
+        let skipStateUpdate = false;
+        if (!githubCheck?.isGitHub) {
+          const currentIssue = await Effect.runPromise(
+            linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+          );
+          if (currentIssue?.state.name && currentIssue.state.name.toLowerCase() !== 'in planning' && currentIssue.state.name.toLowerCase() !== 'planning') {
+            // Check if already in a "started" state by seeing if it's not an unstarted/planning state
+            const stateType = await Effect.runPromise(
+              linear.getTeamStates(currentIssue.team.id).pipe(
+                Effect.map((states) => states.find((s) => s.id === currentIssue.state.id)?.type ?? ''),
+                Effect.catchAll(() => Effect.succeed('')),
+              ),
+            );
+            if (stateType === 'started') {
+              skipStateUpdate = true;
+            }
+          }
+        }
+
         if (!skipStateUpdate) {
-          if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-            const config = getGitHubConfig();
-            if (config) {
-              try {
-                await fetch(
-                  `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/planning`,
-                  {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `token ${config.token}`, 'Accept': 'application/vnd.github.v3+json' },
-                  }
-                );
-              } catch { /* Non-fatal */ }
-              try {
-                await fetch(
-                  `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels`,
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `token ${config.token}`,
-                      'Accept': 'application/vnd.github.v3+json',
-                      'Content-Type': 'application/json',
-                      'User-Agent': 'Panopticon-Dashboard',
-                    },
-                    body: JSON.stringify({ labels: ['planned'] }),
-                  }
-                );
-              } catch { /* Non-fatal */ }
-            }
-          } else if (apiKey) {
-            // Linear: find and update to "Planned" state
-            const issueQuery2 = `query { issue(id: "${id}") { id team { id states { nodes { id name } } } } }`;
-            const issueRes2 = await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-              body: JSON.stringify({ query: issueQuery2 }),
-            });
-            const issueData2 = await issueRes2.json() as any;
-            const issue2 = issueData2.data?.issue;
-            if (issue2) {
-              const states = issue2.team?.states?.nodes || [];
-              const plannedState = states.find((s: any) => s.name === 'Planned')
-                || states.find((s: any) => s.name === 'Ready')
-                || states.find((s: any) => s.name === 'Todo');
-              if (plannedState) {
-                const updateMut = `mutation { issueUpdate(id: "${issue2.id}", input: { stateId: "${plannedState.id}" }) { success issue { state { name } } } }`;
-                const updateRes = await fetch('https://api.linear.app/graphql', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': apiKey },
-                  body: JSON.stringify({ query: updateMut }),
-                });
-                const updateData = await updateRes.json() as any;
-                newState = updateData.data?.issueUpdate?.issue?.state?.name || 'Planned';
-              }
-            }
+          if (githubCheck.isGitHub) {
+            // GitHub: remove 'planning' label, add 'planned' label
+            await Effect.runPromise(
+              lifecycle.removeLabel(id, 'planning').pipe(Effect.catchAll(() => Effect.void)),
+            );
+            await Effect.runPromise(
+              lifecycle.addLabel(id, 'planned').pipe(Effect.catchAll(() => Effect.void)),
+            );
+          } else {
+            // Linear: transition to 'open' (maps to unstarted — Planned/Todo/Ready)
+            const updatedIssue = await Effect.runPromise(
+              linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+            );
+            await Effect.runPromise(
+              lifecycle.transitionTo(id, 'open').pipe(Effect.catchAll(() => Effect.void)),
+            );
+            // Re-fetch to get new state name for response
+            const refreshed = await Effect.runPromise(
+              linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+            );
+            newState = refreshed?.state.name ?? (updatedIssue?.state.name ?? 'Planned');
           }
         } else {
           newState = 'Skipped (already in progress)';
@@ -1189,9 +966,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           console.error('Error completing planning:', error);
           return jsonResponse({ error: 'Failed to complete planning: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1204,9 +979,9 @@ const postIssueResetRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const cleanupLog: string[] = [];
+    const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = id.toLowerCase();
 
@@ -1276,61 +1051,28 @@ const postIssueResetRoute = HttpRouter.add(
         // Reset issue status
         const githubCheck = isGitHubIssue(id);
 
-        if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-          const ghConfig = getGitHubConfig();
-          if (ghConfig) {
-            for (const label of ['in-progress', 'review-ready']) {
-              try {
-                await fetch(
-                  `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}/labels/${encodeURIComponent(label)}`,
-                  {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `token ${ghConfig.token}`, 'Accept': 'application/vnd.github.v3+json' },
-                  }
-                );
-                cleanupLog.push(`Removed GitHub label: ${label}`);
-              } catch { /* Label might not exist */ }
-            }
+        if (githubCheck.isGitHub) {
+          for (const label of ['in-progress', 'review-ready']) {
+            await Effect.runPromise(
+              lifecycle.removeLabel(id, label).pipe(Effect.catchAll(() => Effect.void)),
+            );
+            cleanupLog.push(`Removed GitHub label: ${label}`);
           }
-        }
-
-        const linearApiKeyForReset = process.env['LINEAR_API_KEY'] || '';
-        if (!githubCheck.isGitHub && linearApiKeyForReset) {
-          try {
-            const { LinearClient } = await import('@linear/sdk');
-            const linearClient = new LinearClient({ apiKey: linearApiKeyForReset });
-            const issue = await linearClient.issue(id.toUpperCase());
-
-            if (issue) {
-              const team = await issue.team;
-              if (team) {
-                const states = await team.states();
-                const todoState = states.nodes.find((s: any) =>
-                  s.name.toLowerCase() === 'todo' ||
-                  s.name.toLowerCase() === 'to do' ||
-                  s.type === 'unstarted'
-                );
-                if (todoState) {
-                  await issue.update({ stateId: todoState.id });
-                  cleanupLog.push(`Reset Linear status to: ${todoState.name}`);
-                }
-              }
-
-              const labels = await issue.labels();
-              const labelsToRemove = labels.nodes.filter((l: any) =>
-                l.name.toLowerCase() === 'review ready' || l.name.toLowerCase() === 'planning'
-              );
-              if (labelsToRemove.length > 0) {
-                const currentLabelIds = labels.nodes.map((l: any) => l.id);
-                const newLabelIds = currentLabelIds.filter(
-                  (lid: string) => !labelsToRemove.some((lr: any) => lr.id === lid)
-                );
-                await issue.update({ labelIds: newLabelIds });
-                cleanupLog.push(`Removed labels: ${labelsToRemove.map((l: any) => l.name).join(', ')}`);
-              }
-            }
-          } catch (linearErr) {
-            cleanupLog.push(`Linear reset warning: ${(linearErr as Error).message}`);
+        } else {
+          // Linear: transition back to 'open' (Todo/unstarted)
+          await Effect.runPromise(
+            lifecycle.transitionTo(id, 'open').pipe(
+              Effect.tap(() => Effect.sync(() => cleanupLog.push('Reset Linear status to: Todo'))),
+              Effect.catchAll((err) =>
+                Effect.sync(() => cleanupLog.push(`Linear reset warning: ${String(err)}`)),
+              ),
+            ),
+          );
+          // Remove workflow labels (no-op for Linear, but kept for consistency)
+          for (const label of ['review ready', 'planning']) {
+            await Effect.runPromise(
+              lifecycle.removeLabel(id, label).pipe(Effect.catchAll(() => Effect.void)),
+            );
           }
         }
 
@@ -1348,9 +1090,7 @@ const postIssueResetRoute = HttpRouter.add(
           console.error('Reset failed:', error);
           return jsonResponse({ success: false, error: msg, cleanupLog }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1364,9 +1104,9 @@ const postIssueCancelRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
     const cleanupLog: string[] = [];
+    const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { wipeWorkspace = false } = body as any;
         const issueLower = id.toLowerCase();
@@ -1437,54 +1177,20 @@ const postIssueCancelRoute = HttpRouter.add(
         // Move issue to Canceled
         const githubCheck = isGitHubIssue(id);
 
-        if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-          const ghConfig = getGitHubConfig();
-          if (ghConfig) {
-            try {
-              await fetch(
-                `https://api.github.com/repos/${githubCheck.owner}/${githubCheck.repo}/issues/${githubCheck.number}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'Authorization': `token ${ghConfig.token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ state: 'closed', state_reason: 'not_planned' }),
-                }
-              );
-              cleanupLog.push('Closed GitHub issue as not planned');
-            } catch (ghErr: any) {
-              cleanupLog.push(`GitHub close warning: ${ghErr.message}`);
-            }
-          }
-        } else {
-          const linearApiKey = process.env['LINEAR_API_KEY'] || '';
-          if (linearApiKey) {
-            try {
-              const { LinearClient } = await import('@linear/sdk');
-              const linearClient = new LinearClient({ apiKey: linearApiKey });
-              const issue = await linearClient.issue(id.toUpperCase());
+        // Close the issue via IssueLifecycle (GitHub: closes issue; Linear: transitions to 'completed' state)
+        await Effect.runPromise(
+          lifecycle.close(id).pipe(
+            Effect.tap(() => Effect.sync(() => cleanupLog.push('Closed issue via lifecycle service'))),
+            Effect.catchAll((err) =>
+              Effect.sync(() => cleanupLog.push(`Close warning: ${String(err)}`)),
+            ),
+          ),
+        );
 
-              if (issue) {
-                const team = await issue.team;
-                if (team) {
-                  const states = await team.states();
-                  const canceledState = states.nodes.find((s: any) =>
-                    s.name.toLowerCase() === 'canceled' || s.name.toLowerCase() === 'cancelled'
-                  ) || states.nodes.find((s: any) =>
-                    s.type === 'canceled' && s.name.toLowerCase() !== 'duplicate'
-                  );
-                  if (canceledState) {
-                    await issue.update({ stateId: canceledState.id });
-                    cleanupLog.push(`Moved Linear issue to: ${canceledState.name}`);
-                  }
-                }
-              }
-            } catch (linearErr: any) {
-              cleanupLog.push(`Linear cancel warning: ${linearErr.message}`);
-            }
-          }
+        if (!githubCheck.isGitHub) {
+          cleanupLog.push('Moved Linear issue to canceled state');
+        } else {
+          cleanupLog.push('Closed GitHub issue');
         }
 
         // Invalidate caches
@@ -1500,9 +1206,7 @@ const postIssueCancelRoute = HttpRouter.add(
           console.error('[cancel] Failed:', error);
           return jsonResponse({ success: false, error: msg, cleanupLog }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1515,11 +1219,12 @@ const postIssueReopenRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
+    const lifecycle = yield* IssueLifecycle;
+    const linear = yield* LinearClient;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
-        const { reason } = body as any || {};
+        const { reason: _reason } = body as any || {};
         const githubCheck = isGitHubIssue(id);
 
         const issueDataService = getIssueDataService();
@@ -1528,95 +1233,33 @@ const postIssueReopenRoute = HttpRouter.add(
         let newState = 'In Progress';
         let issueIdentifier = id;
 
+        // Transition to 'in_progress' via IssueLifecycle (handles all three trackers)
+        await Effect.runPromise(
+          lifecycle.transitionTo(id, 'in_progress').pipe(Effect.catchAll(() => Effect.void)),
+        );
+
         if (issueSource === 'rally') {
-          const rallyConfig = getRallyConfig();
-          if (!rallyConfig) {
-            return jsonResponse({ error: 'Rally not configured' }, { status: 400 });
-          }
-          const { RallyTracker } = await import('../../../lib/tracker/rally.js');
-          const tracker = new RallyTracker({
-            apiKey: rallyConfig.apiKey,
-            server: rallyConfig.server,
-            workspace: rallyConfig.workspace,
-            project: rallyConfig.project,
-          });
-          await tracker.transitionIssue(id, 'open');
           issueDataService.invalidateTracker('rally').catch(() => {});
           newState = 'Open';
 
-        } else if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
-          const ghConfig = getGitHubConfig();
-          if (!ghConfig) {
-            return jsonResponse({ error: 'GitHub not configured' }, { status: 400 });
-          }
-          const { owner, repo, number } = githubCheck;
-
-          const reopenRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}`, {
-            method: 'PATCH',
-            headers: {
-              'Authorization': `token ${ghConfig.token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ state: 'open' }),
-          });
-          if (!reopenRes.ok) {
-            const errBody = await reopenRes.text().catch(() => '');
-            return jsonResponse(
-              { error: `GitHub API rejected reopen: ${reopenRes.status} ${reopenRes.statusText}. ${errBody}`.trim() },
-              { status: reopenRes.status },
-            );
-          }
-
-          for (const label of ['done', 'needs-close-out', 'in-review', 'review-ready', 'merged', 'planned', 'planning']) {
-            await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/${encodeURIComponent(label)}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `token ${ghConfig.token}`, 'Accept': 'application/vnd.github.v3+json' },
-            }).catch(() => {});
-          }
-          await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `token ${ghConfig.token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ labels: ['in-progress'] }),
-          }).catch(() => {});
+        } else if (githubCheck.isGitHub) {
+          // Also clean up done/needs-close-out labels and ensure in-progress is set
+          await Effect.runPromise(
+            lifecycle.removeLabel(id, 'done').pipe(Effect.catchAll(() => Effect.void)),
+          );
+          await Effect.runPromise(
+            lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catchAll(() => Effect.void)),
+          );
           issueDataService.invalidateTracker('github').catch(() => {});
+          newState = 'In Progress';
 
         } else {
-          const linearKey = process.env['LINEAR_API_KEY'] || '';
-          if (!linearKey) {
-            return jsonResponse({ error: 'LINEAR_API_KEY not configured' }, { status: 400 });
-          }
-
-          const { LinearClient } = await import('@linear/sdk');
-          const client = new LinearClient({ apiKey: linearKey });
-          const issue = await client.issue(id);
-          if (!issue) {
-            return jsonResponse({ error: `Issue ${id} not found` }, { status: 404 });
-          }
-
-          issueIdentifier = issue.identifier;
-          const team = await issue.team;
-          if (!team) {
-            return jsonResponse({ error: 'Could not determine team for issue' }, { status: 400 });
-          }
-
-          const states = await team.states();
-          const targetState =
-            states.nodes.find((s: any) => s.name.toLowerCase() === 'in progress') ||
-            states.nodes.find((s: any) => s.type === 'started') ||
-            states.nodes.find((s: any) => s.type === 'backlog') ||
-            states.nodes.find((s: any) => s.type === 'unstarted');
-
-          if (!targetState) {
-            return jsonResponse({ error: 'No suitable state found for transition' }, { status: 400 });
-          }
-
-          await issue.update({ stateId: targetState.id });
-          newState = targetState.name;
+          // Linear: fetch updated state name
+          const updatedIssue = await Effect.runPromise(
+            linear.getIssue(id).pipe(Effect.catchAll(() => Effect.succeed(null))),
+          );
+          issueIdentifier = updatedIssue?.identifier ?? id;
+          newState = updatedIssue?.state.name ?? 'In Progress';
           issueDataService.invalidateTracker('linear').catch(() => {});
         }
 
@@ -1699,9 +1342,7 @@ const postIssueReopenRoute = HttpRouter.add(
           console.error('Error reopening issue:', error);
           return jsonResponse({ error: 'Failed to reopen issue: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1715,9 +1356,9 @@ const postIssueMoveStatusRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
+    const lifecycle = yield* IssueLifecycle;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { targetStatus, syncToTracker = false } = body as any || {};
 
@@ -1743,78 +1384,20 @@ const postIssueMoveStatusRoute = HttpRouter.add(
         const githubCheck = isGitHubIssue(id);
 
         if (syncToTracker) {
-          if (githubCheck.isGitHub) {
-            try {
-              const config = getGitHubConfig();
-              if (config) {
-                const owner = githubCheck.owner!;
-                const repo = githubCheck.repo!;
-                const number = parseInt(id.split('-')[1], 10);
+          // Map canonical status to IssueState for the lifecycle service
+          const canonicalToLifecycleState: Record<string, IssueState> = {
+            backlog: 'open', todo: 'open', in_progress: 'in_progress', in_review: 'in_review', done: 'closed',
+          };
+          const lifecycleState = canonicalToLifecycleState[targetStatus];
 
-                const labelsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-                  headers: { 'Authorization': `token ${config.token}`, 'Accept': 'application/vnd.github.v3+json' },
-                });
-                const currentLabels = labelsRes.ok ? (await labelsRes.json() as any[]).map((l: any) => l.name) : [];
-                const targetLabels = cleanupWorkflowLabels(currentLabels, targetStatus);
-
-                await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels`, {
-                  method: 'PUT',
-                  headers: {
-                    'Authorization': `token ${config.token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ labels: targetLabels }),
-                });
-              }
-            } catch (githubErr: any) {
-              console.error(`GitHub label sync failed for ${id}:`, githubErr.message);
-            }
-          } else if (issueSource === 'rally') {
-            const rallyConfig = getRallyConfig();
-            if (!rallyConfig) {
-              return jsonResponse({ error: 'Rally not configured for sync' }, { status: 400 });
-            }
-            const { RallyTracker } = await import('../../../lib/tracker/rally.js');
-            const tracker = new RallyTracker({
-              apiKey: rallyConfig.apiKey,
-              server: rallyConfig.server,
-              workspace: rallyConfig.workspace,
-              project: rallyConfig.project,
-            });
-            await tracker.transitionIssue(id, issueState);
-          } else {
-            const linearKey = process.env['LINEAR_API_KEY'] || '';
-            if (!linearKey) {
-              return jsonResponse({ error: 'LINEAR_API_KEY not configured for sync' }, { status: 400 });
-            }
-            const { LinearClient } = await import('@linear/sdk');
-            const client = new LinearClient({ apiKey: linearKey });
-            const issue = await client.issue(id);
-            if (!issue) {
-              return jsonResponse({ error: `Issue ${id} not found in Linear` }, { status: 404 });
-            }
-
-            const team = await issue.team;
-            if (!team) {
-              return jsonResponse({ error: 'Could not determine team for issue' }, { status: 400 });
-            }
-
-            const states = await team.states();
-            const stateTypeMap: Record<string, string> = {
-              backlog: 'backlog', todo: 'unstarted', in_progress: 'started', in_review: 'started', done: 'completed',
-            };
-            const targetStateType = stateTypeMap[targetStatus];
-            const targetState = states.nodes.find((s: any) => s.type === targetStateType);
-
-            if (!targetState) {
-              return jsonResponse(
-                { error: `Could not find state of type '${targetStateType}' for team` },
-                { status: 400 },
-              );
-            }
-
-            await issue.update({ stateId: targetState.id });
+          if (lifecycleState) {
+            await Effect.runPromise(
+              lifecycle.transitionTo(id, lifecycleState).pipe(
+                Effect.catchAll((err) =>
+                  Effect.sync(() => console.error(`Tracker sync failed for ${id}:`, String(err))),
+                ),
+              ),
+            );
           }
         }
 
@@ -1853,9 +1436,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           console.error('Error moving issue status:', error);
           return jsonResponse({ error: 'Failed to move issue status: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1869,8 +1450,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const cleanupLog: string[] = [];
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = id.toLowerCase();
         const githubCheck = isGitHubIssue(id);
@@ -1928,9 +1508,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
           console.error('Error cleaning up workspace:', error);
           return jsonResponse({ error: 'Failed to cleanup workspace: ' + msg, cleanupLog }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -1944,8 +1522,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { deleteWorkspace = false } = body as any || {};
         const { deepWipe } = await import('../../../lib/lifecycle/index.js');
@@ -2000,9 +1577,7 @@ const postIssueDeepWipeRoute = HttpRouter.add(
           console.error('Error in deep wipe:', error);
           return jsonResponse({ error: 'Deep wipe failed: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -2015,8 +1590,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const { closeOut } = await import('../../../lib/lifecycle/index.js');
         const githubCheck = isGitHubIssue(id);
@@ -2080,9 +1654,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
           console.error(`[close-out] Error for ${id}:`, error);
           return jsonResponse({ error: msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -2095,8 +1667,7 @@ const getIssueBeadsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         const issueLower = id.toLowerCase();
         const githubCheck = isGitHubIssue(id);
@@ -2202,9 +1773,7 @@ const getIssueBeadsRoute = HttpRouter.add(
           console.error('Error fetching beads:', error);
           return jsonResponse({ error: 'Failed to fetch beads: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 

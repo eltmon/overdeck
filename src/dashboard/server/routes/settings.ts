@@ -148,8 +148,7 @@ const postTestApiKeyRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         let success = false;
         let error: string | null = null;
@@ -312,9 +311,7 @@ const postTestApiKeyRoute = HttpRouter.add(
           console.error('Error testing API key:', error);
           return jsonResponse({ error: 'Failed to test API key: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -341,8 +338,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
         let valid = false;
         let error: string | null = null;
@@ -436,9 +432,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
           console.error('Error validating API key:', error);
           return jsonResponse({ error: 'Failed to validate API key: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 

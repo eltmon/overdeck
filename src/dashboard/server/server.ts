@@ -19,6 +19,12 @@ import { ServerConfig } from './config.js';
 import { EventStoreServiceLive } from './services/domain-services.js';
 import { ReadModelServiceLive } from './read-model.js';
 import { TerminalServiceLive } from './services/terminal-service.js';
+import { LinearClientOptionalLive } from './services/linear-client.js';
+import { GitHubClientOptionalLive } from './services/github-client.js';
+import { RallyClientOptionalLive } from './services/rally-client.js';
+import { IssueLifecycleLive } from './services/issue-lifecycle.js';
+import { AgentSpawnerLive } from './services/agent-spawner.js';
+import { WorkspaceServiceLive } from './services/workspace-service.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
@@ -199,10 +205,28 @@ export const makeRoutesLayer = Layer.mergeAll(
 // ReadModelServiceLive bootstraps during construction (reads lib modules, JSON-cleans).
 // EventStoreServiceLive depends on ReadModelService (wires event subscription → read model).
 
+// ─── Tracker + lifecycle services (PAN-449) ───────────────────────────────────
+// Optional layers: server starts even if tracker keys are not configured.
+// Route handlers that need a tracker service get TrackerNotConfigured if it's absent.
+
+const TrackerClientsLive = Layer.mergeAll(
+  LinearClientOptionalLive,
+  GitHubClientOptionalLive,
+  RallyClientOptionalLive,
+);
+
+const IssueLifecycleServiceLive = IssueLifecycleLive.pipe(
+  Layer.provide(TrackerClientsLive),
+);
+
 const DomainServicesLive = Layer.mergeAll(
   ReadModelServiceLive,
   EventStoreServiceLive.pipe(Layer.provide(ReadModelServiceLive)),
   TerminalServiceLive,
+  TrackerClientsLive,
+  IssueLifecycleServiceLive,
+  AgentSpawnerLive,
+  WorkspaceServiceLive,
 );
 
 // ─── Full server layer ────────────────────────────────────────────────────────

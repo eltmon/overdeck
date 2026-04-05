@@ -22,6 +22,7 @@ import {
 } from './paths.js';
 import { sessionExists } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
+import { getLinearApiKey } from './lifecycle/types.js';
 
 const execAsync = promisify(exec);
 
@@ -523,16 +524,3 @@ function findWorkspacePath(projectPath: string, issueLower: string): string | nu
   return null;
 }
 
-/**
- * Get LINEAR_API_KEY from environment or .panopticon.env
- */
-function getLinearApiKey(): string | null {
-  if (process.env.LINEAR_API_KEY) return process.env.LINEAR_API_KEY;
-  const envFile = join(homedir(), '.panopticon.env');
-  if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
-    const match = content.match(/LINEAR_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-  return null;
-}

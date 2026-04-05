@@ -83,8 +83,7 @@ const getCostsByIssueRoute = HttpRouter.add(
   'GET',
   '/api/costs/by-issue',
   Effect.gen(function* () {
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const dbIssues = getCostsByIssueFromDb();
 
@@ -125,9 +124,7 @@ const getCostsByIssueRoute = HttpRouter.add(
           console.error('Error getting costs by issue:', error);
           return jsonResponse({ error: 'Failed to get costs by issue: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -137,8 +134,7 @@ const postCostsRebuildRoute = HttpRouter.add(
   'POST',
   '/api/costs/rebuild',
   Effect.gen(function* () {
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           console.log('Manual cost cache rebuild requested...');
 
@@ -165,9 +161,7 @@ const postCostsRebuildRoute = HttpRouter.add(
           console.error('Error rebuilding cost cache:', error);
           return jsonResponse({ error: 'Failed to rebuild cost cache: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -364,8 +358,7 @@ const postCostsSyncWalRoute = HttpRouter.add(
   'POST',
   '/api/costs/sync-wal',
   Effect.gen(function* () {
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const result = await syncWalFromAllProjects();
           return jsonResponse({ success: true, ...result });
@@ -374,9 +367,7 @@ const postCostsSyncWalRoute = HttpRouter.add(
           console.error('Error syncing WAL:', error);
           return jsonResponse({ error: 'Failed to sync WAL: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -386,8 +377,7 @@ const postCostsReconcileRoute = HttpRouter.add(
   'POST',
   '/api/costs/reconcile',
   Effect.gen(function* () {
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const result = await reconcile();
           console.log(
@@ -399,9 +389,7 @@ const postCostsReconcileRoute = HttpRouter.add(
           console.error('Error running reconciler:', error);
           return jsonResponse({ error: 'Failed to run reconciler: ' + msg }, { status: 500 });
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 

@@ -278,8 +278,7 @@ const postConvoysStartRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           const convoy = await startConvoy(template, context as ConvoyContext);
           if ((context as ConvoyContext).issueId) {
@@ -294,9 +293,7 @@ const postConvoysStartRoute = HttpRouter.add(
             { status: 500 },
           );
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 
@@ -309,8 +306,7 @@ const postConvoyStopRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
         try {
           await stopConvoy(id);
           return jsonResponse({ success: true, message: 'Convoy stopped' });
@@ -322,9 +318,7 @@ const postConvoyStopRoute = HttpRouter.add(
             { status: 500 },
           );
         }
-      },
-      catch: (err) => new Error(String(err)),
-    });
+      })
   }),
 );
 

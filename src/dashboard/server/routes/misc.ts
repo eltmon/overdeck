@@ -308,8 +308,8 @@ const readJsonBody = Effect.gen(function* () {
 const postTrackersRefreshRoute = HttpRouter.add(
   'POST',
   '/api/trackers/refresh',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const svc = getIssueDataService();
       await Promise.all([
         svc.invalidateTracker('linear'),
@@ -317,13 +317,11 @@ const postTrackersRefreshRoute = HttpRouter.add(
         svc.invalidateTracker('rally'),
       ]);
       return jsonResponse({ success: true });
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error refreshing trackers:', error);
       return jsonResponse({ error: 'Failed to refresh: ' + msg }, { status: 500 });
-    },
-  }),
+      }}),
 );
 
 // ─── Route: GET /api/project-mappings ────────────────────────────────────────
@@ -422,8 +420,8 @@ const getGodviewSystemHealthRoute = HttpRouter.add(
 const getHealthAgentsRoute = HttpRouter.add(
   'GET',
   '/api/health/agents',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const agentsDir = join(homedir(), '.panopticon', 'agents');
       if (!existsSync(agentsDir)) {
         return jsonResponse([]);
@@ -474,12 +472,10 @@ const getHealthAgentsRoute = HttpRouter.add(
 
       const visibleAgents = agents.filter(agent => agent !== null);
       return jsonResponse(visibleAgents);
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       console.error('Error fetching health:', error);
       return jsonResponse([]);
-    },
-  }),
+      }}),
 );
 
 // ─── Route: POST /api/health/agents/:id/ping ─────────────────────────────────
@@ -494,8 +490,8 @@ const postHealthAgentPingRoute = HttpRouter.add(
     // /api/health/agents/:id/ping → parts[4] = id
     const id = parts[4] || '';
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const health = await checkAgentHealthAsync(id);
 
         if (!health.alive) {
@@ -516,12 +512,10 @@ const postHealthAgentPingRoute = HttpRouter.add(
           status: 'healthy',
           hasOutput: !!health.lastOutput,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to ping agent: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -605,8 +599,8 @@ const postRallyValidateRoute = HttpRouter.add(
       return jsonResponse({ valid: false, error: 'API key is required' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const { RallyRestApi } = await import('../../../lib/tracker/rally-api.js');
         const api = new RallyRestApi({
           apiKey,
@@ -627,8 +621,7 @@ const postRallyValidateRoute = HttpRouter.add(
           message: 'Rally connection successful',
           testQueryResult: `Found ${result.QueryResult.TotalResultCount} artifacts`,
         });
-      },
-      catch: (err: unknown) => {
+      }    catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
         const isAuthError =
           error.message?.includes('Unauthorized') || error.message?.includes('401');
@@ -641,8 +634,7 @@ const postRallyValidateRoute = HttpRouter.add(
           },
           { status: 400 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -713,21 +705,19 @@ const getDeaconLogsRoute = HttpRouter.add(
 const postDeaconPatrolRoute = HttpRouter.add(
   'POST',
   '/api/deacon/patrol',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const service = getCloisterService();
       const result = await service.runDeaconPatrol();
       return jsonResponse(result);
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error running deacon patrol:', error);
       return jsonResponse(
         { error: 'Failed to run patrol: ' + msg },
         { status: 500 },
       );
-    },
-  }),
+      }}),
 );
 
 // ─── Route: GET /api/version ──────────────────────────────────────────────────
@@ -798,22 +788,20 @@ const postConfirmationRespondRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const response = confirmed ? 'y' : 'n';
         await sendKeysAsync(confirmationRequest.sessionName, response);
         pendingConfirmations.delete(id);
         return jsonResponse({ success: true, confirmed });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error sending confirmation response:', error);
         return jsonResponse(
           { error: 'Failed to send response: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -987,8 +975,8 @@ const getPlanningStatusRoute = HttpRouter.add(
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         let isRemote = false;
         let vmName = '';
         const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
@@ -1048,8 +1036,7 @@ const getPlanningStatusRoute = HttpRouter.add(
           isRemote,
           vmName: isRemote ? vmName : undefined,
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({
           active: false,
@@ -1058,8 +1045,7 @@ const getPlanningStatusRoute = HttpRouter.add(
           planningCompleted: false,
           error: msg,
         });
-      },
-    });
+        }})
   }),
 );
 
@@ -1085,8 +1071,8 @@ const postPlanningMessageRoute = HttpRouter.add(
       return jsonResponse({ error: 'Message required' }, { status: 400 });
     }
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         // Determine project path
         const githubCheck = isGitHubIssue(issueId);
         let projectPath = '';
@@ -1277,16 +1263,14 @@ Continue the PLANNING session. Do NOT implement anything.
           sessionName,
           message: 'Planning session restarted in interactive mode',
         });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error sending planning message:', error);
         return jsonResponse(
           { error: 'Failed to send message: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1303,21 +1287,19 @@ const deletePlanningSessionRoute = HttpRouter.add(
     const issueId = parts[3] || '';
     const sessionName = `planning-${issueId.toLowerCase()}`;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         await execAsync(`tmux kill-session -t ${sessionName} 2>/dev/null || true`, {
           encoding: 'utf-8',
         });
         return jsonResponse({ success: true });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse(
           { error: 'Failed to stop planning: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1326,8 +1308,8 @@ const deletePlanningSessionRoute = HttpRouter.add(
 const getTldrStatusRoute = HttpRouter.add(
   'GET',
   '/api/services/tldr/status',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
@@ -1386,13 +1368,11 @@ const getTldrStatusRoute = HttpRouter.add(
       }
 
       return jsonResponse({ daemons: results });
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting TLDR status:', error);
       return jsonResponse({ error: msg }, { status: 500 });
-    },
-  }),
+      }}),
 );
 
 // ─── Route: POST /api/services/tldr/start ────────────────────────────────────
@@ -1400,8 +1380,8 @@ const getTldrStatusRoute = HttpRouter.add(
 const postTldrStartRoute = HttpRouter.add(
   'POST',
   '/api/services/tldr/start',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
@@ -1416,13 +1396,11 @@ const postTldrStartRoute = HttpRouter.add(
       const service = getTldrDaemonService(projectRoot, venvPath);
       await service.start();
       return jsonResponse({ success: true, message: 'TLDR daemon started' });
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error starting TLDR daemon:', error);
       return jsonResponse({ error: msg }, { status: 500 });
-    },
-  }),
+      }}),
 );
 
 // ─── Route: POST /api/services/tldr/stop ─────────────────────────────────────
@@ -1430,8 +1408,8 @@ const postTldrStartRoute = HttpRouter.add(
 const postTldrStopRoute = HttpRouter.add(
   'POST',
   '/api/services/tldr/stop',
-  Effect.tryPromise({
-    try: async () => {
+  Effect.promise(async () => {
+    try {
       const { getTldrDaemonService } = await import('../../../lib/tldr-daemon.js');
       const projectRoot = process.cwd();
       const venvPath = join(projectRoot, '.venv');
@@ -1446,13 +1424,11 @@ const postTldrStopRoute = HttpRouter.add(
       const service = getTldrDaemonService(projectRoot, venvPath);
       await service.stop();
       return jsonResponse({ success: true, message: 'TLDR daemon stopped' });
-    },
-    catch: (error: unknown) => {
+    }    catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error stopping TLDR daemon:', error);
       return jsonResponse({ error: msg }, { status: 500 });
-    },
-  }),
+      }}),
 );
 
 // ─── Route: GET /api/cache-status ────────────────────────────────────────────
@@ -1570,8 +1546,8 @@ const postShadowMonitorRoute = HttpRouter.add(
     const issueLower = issueId.toLowerCase();
     const issuePrefix = issueId.split('-')[0];
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const projectPath = getProjectPath(issuePrefix);
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
@@ -1591,15 +1567,13 @@ const postShadowMonitorRoute = HttpRouter.add(
         updateInferenceDocument(workspacePath, inference);
 
         return jsonResponse({ success: true, inference });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse(
           { error: 'Failed to run monitoring agent: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
@@ -1620,8 +1594,8 @@ const postShadowObserveRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const { mode } = body as { mode?: string };
 
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const projectPath = getProjectPath(issuePrefix);
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
@@ -1650,15 +1624,13 @@ const postShadowObserveRoute = HttpRouter.add(
 
         const commentsPosted = await runObserverCycle(config);
         return jsonResponse({ success: true, commentsPosted });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse(
           { error: 'Failed to run observer: ' + msg },
           { status: 500 },
         );
-      },
-    });
+        }})
   }),
 );
 
