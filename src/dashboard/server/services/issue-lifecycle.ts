@@ -34,7 +34,7 @@ function emitEvent(event: Record<string, unknown>): Effect.Effect<void, never> {
   return Effect.gen(function* () {
     const storeOption = yield* Effect.serviceOption(EventStoreService);
     if (Option.isSome(storeOption)) {
-      Effect.runSync(storeOption.value.append(event));
+      yield* storeOption.value.append(event);
     }
   });
 }
