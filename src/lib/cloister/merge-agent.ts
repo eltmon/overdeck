@@ -300,14 +300,9 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not clean planning artifacts: ${err}`);
   }
 
-  // 3. Close issue on tracker (fire-and-forget with circuit breaker)
-  // This is decoupled from the merge lifecycle: failure to close the issue on the
-  // tracker does NOT block the merge or cause retries. The close-out ceremony handles
-  // any issues that weren't auto-closed.
-  closeIssueWithCircuitBreaker(issueId, projectPath);
-
-  // 3b. Clean up workflow labels + apply 'merged' label (non-fatal)
-  // Runs independently of close-issue — labels are cleaned even if close fails.
+  // 3. Clean up workflow labels + apply 'merged' label (non-fatal)
+  // MUST run BEFORE closing the issue — once closed on GitHub, label edits fail silently.
+  // This was the root cause of in-review labels persisting after merge (PAN-453 incident).
   try {
     const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
     const ghResolved = resolveGitHubIssue(issueId);
@@ -326,6 +321,12 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   } catch (err) {
     console.warn(`[merge-agent] Could not clean labels: ${err}`);
   }
+
+  // 3b. Close issue on tracker (fire-and-forget with circuit breaker)
+  // This is decoupled from the merge lifecycle: failure to close the issue on the
+  // tracker does NOT block the merge or cause retries. The close-out ceremony handles
+  // any issues that weren't auto-closed.
+  closeIssueWithCircuitBreaker(issueId, projectPath);
 
   // 4. Compact old beads (via lifecycle module)
   try {
