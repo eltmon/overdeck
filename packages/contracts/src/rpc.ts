@@ -59,7 +59,7 @@ export type AgentOutput = typeof AgentOutput.Type
 
 export const ChatMessage = Schema.Struct({
   id: Schema.String,
-  role: Schema.Literal('user', 'assistant', 'system'),
+  role: Schema.Literals(['user', 'assistant', 'system']),
   text: Schema.String,
   turnId: Schema.optional(Schema.String),
   createdAt: Schema.String,
@@ -75,12 +75,12 @@ export const WorkLogEntry = Schema.Struct({
   detail: Schema.optional(Schema.String),
   command: Schema.optional(Schema.String),
   changedFiles: Schema.optional(Schema.Array(Schema.String)),
-  tone: Schema.Literal('thinking', 'tool', 'info', 'error'),
+  tone: Schema.Literals(['thinking', 'tool', 'info', 'error']),
   toolTitle: Schema.optional(Schema.String),
 })
 export type WorkLogEntry = typeof WorkLogEntry.Type
 
-export const ConversationEvent = Schema.Union(
+export const ConversationEvent = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal('messages'),
     messages: Schema.Array(ChatMessage),
@@ -90,7 +90,7 @@ export const ConversationEvent = Schema.Union(
   Schema.Struct({
     kind: Schema.Literal('discovering'),
   }),
-)
+])
 export type ConversationEvent = typeof ConversationEvent.Type
 
 // ─── RPC definitions ──────────────────────────────────────────────────────────
