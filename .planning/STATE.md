@@ -33,3 +33,13 @@ DetailPanelLayout
 - `AgentOutputPanel.tsx` — out of scope (sidebar specialist logs)
 - `DetailPanelLayout.tsx` — no changes needed, it already renders TerminalPanel
 - `InspectorPanel.tsx` — no changes needed
+
+## Current Status
+
+**Implementation complete.** Bead `panopticon-ddp` closed. Awaiting inspection result.
+
+Commit: `e723fb5` — feat(PAN-406): replace polling terminal with live XTerminal for running agents
+
+## Remaining Work
+
+None — all beads closed. Pending inspection pass to signal completion.
