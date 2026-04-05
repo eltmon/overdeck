@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /**
  * Initialize the complete database schema.
@@ -173,7 +173,8 @@ export function initSchema(db: Database.Database): void {
       created_at       TEXT    NOT NULL,
       ended_at         TEXT,
       last_attached_at TEXT,
-      session_file     TEXT                                -- path to Claude Code JSONL session file (PAN-451)
+      session_file     TEXT,                               -- path to Claude Code JSONL session file (PAN-451)
+      title            TEXT                                -- human-readable title, auto-set from first message
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -305,6 +306,11 @@ export function runMigrations(db: Database.Database): void {
   // v6 → v7: add session_file column to conversations (PAN-451)
   if (currentVersion < 7) {
     db.exec(`ALTER TABLE conversations ADD COLUMN session_file TEXT`);
+  }
+
+  // v7 → v8: add title column to conversations (auto-set from first message)
+  if (currentVersion < 8) {
+    db.exec(`ALTER TABLE conversations ADD COLUMN title TEXT`);
   }
 
   // After all migrations, set the version

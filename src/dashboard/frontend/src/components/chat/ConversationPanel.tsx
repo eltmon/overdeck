@@ -69,7 +69,7 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
       {/* Header bar */}
       <div className={styles.conversationTerminalHeader}>
         <span className={styles.conversationTerminalTitle}>
-          {conversation.name}
+          {conversation.title ?? conversation.name}
         </span>
         <span className={styles.conversationTerminalStatus}>
           <Circle
@@ -159,30 +159,26 @@ function ConversationView({ conversation }: ConversationViewProps) {
     },
   });
 
-  if (isLoading || !data) {
-    return (
-      <div className={styles.conversationConnecting}>
-        <span>Loading…</span>
-      </div>
-    );
-  }
-
-  if (data.discovering) {
-    return (
-      <div className={styles.conversationConnecting}>
-        <span>Connecting to session…</span>
-      </div>
-    );
-  }
+  const messages = data?.messages ?? [];
+  const workLog = data?.workLog ?? [];
+  const streaming = data?.streaming ?? false;
+  const discovering = data?.discovering ?? false;
+  const isFirstMessage = !isLoading && !discovering && messages.length === 0;
 
   return (
     <div className={styles.conversationView}>
-      <MessagesTimeline
-        messages={data.messages}
-        workLog={data.workLog}
-        streaming={data.streaming}
-      />
-      <ComposerFooter conversation={conversation} />
+      {(isLoading || discovering) ? (
+        <div className={styles.conversationConnecting}>
+          <span>{isLoading ? 'Loading…' : 'Connecting to session…'}</span>
+        </div>
+      ) : (
+        <MessagesTimeline
+          messages={messages}
+          workLog={workLog}
+          streaming={streaming}
+        />
+      )}
+      <ComposerFooter conversation={conversation} isFirstMessage={isFirstMessage} />
     </div>
   );
 }
