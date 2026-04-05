@@ -113,8 +113,8 @@ const getConversationsRoute = HttpRouter.add(
   'GET',
   '/api/conversations',
   Effect.gen(function* () {
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const conversations = listConversations();
 
         // Enrich with live tmux status
@@ -126,12 +126,10 @@ const getConversationsRoute = HttpRouter.add(
         );
 
         return jsonResponse(enriched);
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to list conversations: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -142,8 +140,8 @@ const postConversationRoute = HttpRouter.add(
   '/api/conversations',
   Effect.gen(function* () {
     const body = yield* readJsonBody;
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const rawName = typeof body['name'] === 'string' && body['name'].trim()
           ? body['name'].trim()
           : generateConversationName();
@@ -170,12 +168,10 @@ const postConversationRoute = HttpRouter.add(
         });
 
         return jsonResponse(conv, { status: 201 });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to create conversation: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -187,8 +183,8 @@ const deleteConversationRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const conv = getConversationByName(name);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
@@ -201,12 +197,10 @@ const deleteConversationRoute = HttpRouter.add(
         markConversationEnded(name);
 
         return jsonResponse({ success: true });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to delete conversation: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
@@ -218,8 +212,8 @@ const postConversationResumeRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
-    return yield* Effect.tryPromise({
-      try: async () => {
+    return yield* Effect.promise(async () => {
+    try {
         const conv = getConversationByName(name);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
@@ -243,12 +237,10 @@ const postConversationResumeRoute = HttpRouter.add(
 
         markConversationActive(name);
         return jsonResponse({ ...conv, status: 'active', reattached: false });
-      },
-      catch: (error: unknown) => {
+      }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to resume conversation: ' + msg }, { status: 500 });
-      },
-    });
+        }})
   }),
 );
 
