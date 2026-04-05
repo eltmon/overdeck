@@ -209,7 +209,7 @@ export const IssueLifecycleLive = Layer.effect(
           }
 
           // Patch the in-memory cache and emit a domain event (non-fatal)
-          try { getSharedIssueService().patchIssue(issueId, { canonicalStatus: canonicalStatus(state) }); } catch { /* non-fatal */ }
+          yield* Effect.try(() => getSharedIssueService().patchIssue(issueId, { canonicalStatus: canonicalStatus(state) })).pipe(Effect.ignore);
           yield* emitEvent({
             type: 'issue.transitioned',
             timestamp: new Date().toISOString(),
@@ -262,7 +262,7 @@ export const IssueLifecycleLive = Layer.effect(
           }
 
           // Patch the in-memory cache and emit issue.closed domain event (non-fatal)
-          try { getSharedIssueService().patchIssue(issueId, { canonicalStatus: 'closed' }); } catch { /* non-fatal */ }
+          yield* Effect.try(() => getSharedIssueService().patchIssue(issueId, { canonicalStatus: 'closed' })).pipe(Effect.ignore);
           yield* emitEvent({
             type: 'issue.closed',
             timestamp: new Date().toISOString(),

@@ -146,9 +146,7 @@ export const AgentSpawnerLive = Layer.effect(
           const { getAgentState, spawnAgent, normalizeAgentId } = await import(
             '../../../lib/agents.js'
           ) as any;
-          const normalizedId = typeof normalizeAgentId === 'function'
-            ? normalizeAgentId(issueId)
-            : issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+          const normalizedId = normalizeAgentId(issueId);
 
           const existing = getAgentState(normalizedId);
           if (existing?.status === 'running') {

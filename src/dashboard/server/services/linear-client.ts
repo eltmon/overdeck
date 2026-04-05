@@ -126,7 +126,7 @@ export class LinearClient extends ServiceMap.Service<LinearClient, LinearClientS
  * but only when the error is RateLimited (429).
  */
 const rateLimitRetry = Effect.retry({
-  while: (err: unknown) => (err as any)?._tag === 'RateLimited',
+  while: (err: unknown) => err instanceof RateLimited,
   times: 3,
   schedule: Schedule.exponential(Duration.seconds(1)),
 });

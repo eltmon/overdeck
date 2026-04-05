@@ -5,12 +5,17 @@
  * - Effect.promise wrapping async FS operations
  * - EventStoreService.append via yield* (not runSync)
  * - httpHandler propagates errors from async routes
+ * - EventStoreService Live layer end-to-end (append + readFrom)
  */
 import { describe, it, expect, vi } from 'vitest';
 import { Effect, Layer } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { httpHandler } from '../http-handler.js';
-import { EventStoreService } from '../../services/domain-services.js';
+import { EventStoreService, EventStoreServiceLive } from '../../services/domain-services.js';
+import { ReadModelServiceLive } from '../../read-model.js';
 import { jsonResponse } from '../../http-helpers.js';
 
 /** Run a route effect and return the response status and parsed JSON body. */
@@ -62,6 +67,38 @@ describe('Effect.promise async FS pattern', () => {
     const { status, body } = await runRoute(effect);
     expect(status).toBe(500);
     expect((body as { error: string }).error).toBe('handled error');
+  });
+});
+
+describe('EventStoreServiceLive + ReadModelServiceLive end-to-end', () => {
+  it('appends and reads back an event using Live layers with real SQLite', async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'pan-470-test-'));
+    const originalHome = process.env['PANOPTICON_HOME'];
+    process.env['PANOPTICON_HOME'] = tmpDir;
+
+    try {
+      // Use vi.resetModules so initEventStore picks up PANOPTICON_HOME
+      const { EventStoreService: ESS, EventStoreServiceLive: ESL } = await import(
+        '../../services/domain-services.js'
+      );
+      const { ReadModelServiceLive: RMSL } = await import('../../read-model.js');
+
+      const program = Effect.gen(function* () {
+        const store = yield* ESS;
+        yield* store.append({ type: 'test.live', timestamp: new Date().toISOString(), payload: { x: 1 } });
+        const events = yield* store.readFrom(0);
+        return events;
+      });
+
+      const layer = ESL.pipe(Layer.provide(RMSL));
+      const events = await Effect.runPromise(Effect.provide(program, layer));
+
+      expect(events.length).toBeGreaterThanOrEqual(1);
+      expect(events.some((e) => e.type === 'test.live')).toBe(true);
+    } finally {
+      process.env['PANOPTICON_HOME'] = originalHome;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

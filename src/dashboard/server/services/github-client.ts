@@ -253,14 +253,15 @@ function makeGitHubClientImpl(token: string): GitHubClientShape {
     removeLabel: (owner, repo, number, label) =>
       Effect.tryPromise({
         try: async () => {
-          const res = await fetch(
-            `https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/${encodeURIComponent(label)}`,
-            { method: 'DELETE', headers },
-          );
-          // 404 means label was not on the issue — non-fatal
-          if (res.status !== 404 && !res.ok) {
-            const body = await res.text().catch(() => '');
-            throw new Error(`GitHub API ${res.status}: ${body}`);
+          try {
+            await ghFetch(
+              `https://api.github.com/repos/${owner}/${repo}/issues/${number}/labels/${encodeURIComponent(label)}`,
+              { method: 'DELETE' },
+            );
+          } catch (err) {
+            // 404 means label was not on the issue — non-fatal
+            if (err instanceof IssueNotFound) return;
+            throw err;
           }
         },
         catch: (err) => {
@@ -272,14 +273,15 @@ function makeGitHubClientImpl(token: string): GitHubClientShape {
     ensureLabel: (owner, repo, name, color = '0075ca', description = '') =>
       Effect.tryPromise({
         try: async () => {
-          // Try to create; if 422 (already exists), fetch it instead
+          // Try to create via ghFetch; intercept 422 (label already exists) before ghFetch
+          // throws, then fall back to fetching the existing label.
           const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/labels`, {
             method: 'POST',
-            headers,
+            headers: { ...headers, 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, color, description }),
           });
           if (res.status === 422) {
-            // Label already exists — fetch it
+            // Label already exists — fetch it via ghFetch
             const getRes = await ghFetch(
               `https://api.github.com/repos/${owner}/${repo}/labels/${encodeURIComponent(name)}`,
             );
