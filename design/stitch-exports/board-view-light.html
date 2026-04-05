@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Panopticon Board View</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#b4c5ff",
+                    "primary": "#004ac6",
+                    "on-tertiary-fixed-variant": "#004e5c",
+                    "surface-tint": "#0053db",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "error": "#ba1a1a",
+                    "on-surface": "#191c1e",
+                    "surface-bright": "#f7f9fb",
+                    "on-tertiary-fixed": "#001f26",
+                    "on-error-container": "#93000a",
+                    "surface": "#f7f9fb",
+                    "on-error": "#ffffff",
+                    "background": "#f7f9fb",
+                    "secondary-fixed": "#d3e4fe",
+                    "outline-variant": "#c3c6d7",
+                    "surface-container": "#eceef0",
+                    "primary-fixed": "#dbe1ff",
+                    "on-surface-variant": "#434655",
+                    "tertiary-fixed-dim": "#4cd7f6",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "on-primary-fixed": "#00174b",
+                    "tertiary-fixed": "#acedff",
+                    "on-primary-container": "#eeefff",
+                    "secondary": "#505f76",
+                    "primary-container": "#2563eb",
+                    "on-secondary-fixed": "#0b1c30",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "surface-variant": "#e0e3e5",
+                    "secondary-container": "#d0e1fb",
+                    "on-secondary-container": "#54647a",
+                    "on-primary": "#ffffff",
+                    "surface-dim": "#d8dadc",
+                    "tertiary": "#005e6e",
+                    "on-tertiary": "#ffffff",
+                    "on-background": "#191c1e",
+                    "on-tertiary-container": "#d7f6ff",
+                    "surface-container-highest": "#e0e3e5",
+                    "tertiary-container": "#00788c",
+                    "outline": "#737686",
+                    "error-container": "#ffdad6",
+                    "surface-container-high": "#e6e8ea",
+                    "surface-container-low": "#f2f4f6",
+                    "inverse-surface": "#2d3133",
+                    "inverse-on-surface": "#eff1f3",
+                    "on-secondary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .font-headline { font-family: 'Space Grotesk', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-nav { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="text-on-surface overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="h-screen w-[220px] fixed left-0 top-0 bg-slate-100 flex flex-col py-6 border-r border-slate-200 z-50">
+<div class="px-6 mb-10">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-xl" style="font-variation-settings: 'FILL' 1;">monitoring</span>
+</div>
+<h1 class="font-headline font-bold text-xl tracking-tight text-slate-900">Panopticon</h1>
+</div>
+</div>
+<nav class="flex-1 px-3 space-y-8 overflow-y-auto no-scrollbar">
+<!-- OPERATIONS GROUP -->
+<div>
+<p class="px-4 text-[10px] font-bold tracking-widest text-slate-500 uppercase mb-3">Operations</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-xl">terminal</span>
+<span>Command Deck</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold bg-white text-blue-600 shadow-sm rounded-lg border-l-4 border-blue-600 transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span>Board</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-xl">hub</span>
+<span>Agents</span>
+</a>
+</div>
+</div>
+<!-- INFRASTRUCTURE GROUP -->
+<div>
+<p class="px-4 text-[10px] font-bold tracking-widest text-slate-500 uppercase mb-3">Infrastructure</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-xl">cloud</span>
+<span>Nodes</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-xl">dns</span>
+<span>Clusters</span>
+</a>
+</div>
+</div>
+<!-- OBSERVABILITY -->
+<div>
+<p class="px-4 text-[10px] font-bold tracking-widest text-slate-500 uppercase mb-3">Observability</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-xl">analytics</span>
+<span>Metrics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-xl">history</span>
+<span>Logs</span>
+</a>
+</div>
+</div>
+</nav>
+<div class="mt-auto px-3 border-t border-slate-200 pt-4">
+<a class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/50 rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span>System</span>
+</a>
+<div class="mt-4 px-4 py-3 bg-white rounded-xl border border-slate-200 flex items-center gap-3">
+<img alt="User" class="w-8 h-8 rounded-full bg-slate-100" data-alt="professional portrait of a system administrator with a focused expression in a clean high-tech office environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxXzbCZ3HELp6rcd1mC22stgt5bsMYqsiRksHmuiAjHE3hNalVCcn8Y00IvicnYozTCSW2d_ZBSthygvRyj5Jn1wDHQLx65IF1thBlp7IWhkFcoqOaMzo8zLnubtEXaW2Xv7lMh3wQ1xxttFr0hB4U88Z_e4R87BqbdtVn5pS9ccrfOpiwDFCS0oYnhugOn3tyDJ5QAGhC06tKS5ajl1Jca78YieFkBF8wkQiRWha0qyk_Q_piSiwtZfRFaZTJf0jYfJ0GkT_dPhY"/>
+<div class="overflow-hidden">
+<p class="text-xs font-bold text-slate-900 truncate">Admin Core</p>
+<p class="text-[10px] text-slate-500 truncate">v2.4.0-stable</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-[220px] h-screen flex flex-col overflow-hidden">
+<!-- Top Stats Bar -->
+<header class="h-16 flex items-center justify-between px-8 bg-white/80 glass-nav z-40">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 px-4 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="text-xs font-bold text-slate-700">Live Feed</span>
+<span class="text-xs text-slate-400 ml-2">12.4ms latency</span>
+</div>
+<div class="flex items-center gap-2 px-4 py-1.5 bg-white border border-slate-200 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-sm text-blue-600">memory</span>
+<span class="text-xs font-bold text-slate-700">CPU Usage</span>
+<span class="text-xs text-slate-400 ml-1">42%</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-500 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="h-8 w-[1px] bg-slate-200"></div>
+<button class="bg-primary text-white px-5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-lg">add</span>
+<span>New Task</span>
+</button>
+</div>
+</header>
+<!-- Filter Bar -->
+<section class="px-8 py-4 bg-slate-50 border-b border-slate-200 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<h2 class="font-headline text-2xl font-bold text-slate-900">Operations Board</h2>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-md text-slate-700 hover:bg-slate-50 shadow-sm">Views</button>
+<button class="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-md text-slate-700 hover:bg-slate-50 shadow-sm">Export</button>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1 bg-slate-200/50 p-1 rounded-lg">
+<button class="px-4 py-1.5 text-xs font-bold bg-white text-blue-600 rounded-md shadow-sm transition-all">All Active</button>
+<button class="px-4 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-all">Assigned to Me</button>
+<button class="px-4 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-all">Archived</button>
+</div>
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-md">
+<span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2">Projects:</span>
+<div class="flex items-center gap-2">
+<span class="px-3 py-1 bg-blue-100 text-blue-700 text-[11px] font-bold rounded-full border border-blue-200">Alpha-Core</span>
+<span class="px-3 py-1 bg-slate-100 text-slate-600 text-[11px] font-semibold rounded-full border border-slate-200">Legacy-System</span>
+<span class="px-3 py-1 bg-slate-100 text-slate-600 text-[11px] font-semibold rounded-full border border-slate-200">Vanguard</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Kanban Board Content -->
+<section class="flex-1 p-8 overflow-x-auto flex gap-6 bg-slate-50/50 items-start">
+<!-- Column: To Do -->
+<div class="flex-shrink-0 w-80 flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<div class="flex items-center gap-2">
+<h3 class="font-headline font-bold text-slate-900">To Do</h3>
+<span class="bg-slate-200 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded">4</span>
+</div>
+<button class="text-slate-400 hover:text-slate-600"><span class="material-symbols-outlined text-lg">more_horiz</span></button>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Card 1 -->
+<div class="bg-white border border-slate-200 rounded-[4px] p-4 border-l-[3px] border-l-purple-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded">INFRA</span>
+<span class="text-[10px] text-slate-400">#PAN-102</span>
+</div>
+<h4 class="text-sm font-semibold text-slate-900 mb-1 leading-snug">Scaling Node-Cluster 04 for high-traffic event</h4>
+<p class="text-xs text-slate-500 line-clamp-2 mb-4">Preparation for the Q3 spike. Load balancing protocols need verification.</p>
+<div class="flex items-center justify-between pt-3 border-t border-slate-50">
+<div class="flex -space-x-2">
+<img class="w-6 h-6 rounded-full border-2 border-white bg-slate-100" data-alt="avatar of a developer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBly-m1J2qlRVITs8p5MXMUsZH13LnrFyFIN3MrwzOlq-EiTQzHVSz1OVOjOsk19V5Vz00X4gHrW5g8wKcnx7clPTxecAY4v2mR1vhkhV1AWIH0ALlLxFQQhYaP6zkBGiiI2_HKFJDK14hEhFdcH0EQwu4_cTvVgW1C6YYinj-Dmj0MF_KMoAp_1NkUbHO74aghD8RnBebmmAjv09UFfMYdI6gYmKLJjjRVyikkWPIsIVPA2NGaIqv-n2p5Au829-O0iidnb7dfOqg"/>
+<img class="w-6 h-6 rounded-full border-2 border-white bg-slate-100" data-alt="avatar of a systems architect" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBN_RWibNe6era7fA5TGaLSnXZ-ctWWCiLGcSEAvldJ-3R8iG6232GAPGyKFz5xOHv8LMawsHSCKwsAOXmbFW7IDBWgfT3OXbONdtRxWhiVV2zwGMxAggDYyh7rm-1HHOhAHCb9PuXaZc2NdBAPpft2D8b9lNFiIODhI2rSzPPVHisgOzFiEMRfb74ubCrSKQZT4LvrkyYjDaQPwksRun2JrVujJ1QaJNNitRMVoNjJyItB_3zQtKpiQoSkhwhP519iJZWvv7xDOr4"/>
+</div>
+<div class="flex items-center gap-1 text-slate-400 text-[10px]">
+<span class="material-symbols-outlined text-sm">schedule</span>
+<span>2d</span>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-white border border-slate-200 rounded-[4px] p-4 border-l-[3px] border-l-amber-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">OBSERV</span>
+<span class="text-[10px] text-slate-400">#PAN-094</span>
+</div>
+<h4 class="text-sm font-semibold text-slate-900 mb-1 leading-snug">Fixing latency spikes in DB cluster</h4>
+<p class="text-xs text-slate-500 line-clamp-2 mb-4">Root cause analysis needed for 500ms jitter in US-East-1.</p>
+<div class="flex items-center justify-between pt-3 border-t border-slate-50">
+<div class="flex -space-x-2">
+<img class="w-6 h-6 rounded-full border-2 border-white bg-slate-100" data-alt="avatar of a database specialist" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDS0qGCxejav2JeOHb0YW2uRosRegIFnq9YZuzxrQ0HYvLVmd6sVtHzvMK4mwCrpTivehDKXkddU9vGMW0HfuBoz8bISZKR3RZ8WSqxb-gXaUxiC_D56zDT_sFMb93nnHyRd-J10frNA8_oKrWfUM_DtJylhfDU3IbIvmlHPgZTMRjyBPToVlC4-v70Jf5vjnsYBtEUL8yh-rkUjN-czfKweoX4UPLrmMrThntFKhLQh-AiFu81jSc0CjUW-5VsxHZm-sqKOepyatE"/>
+</div>
+<div class="flex items-center gap-1 text-amber-600 text-[10px] font-bold">
+<span class="material-symbols-outlined text-sm">priority_high</span>
+<span>High</span>
+</div>
+</div>
+</div>
+</div>
+<button class="mt-2 w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-xs font-semibold hover:bg-slate-100 hover:border-slate-300 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">add</span>
+<span>Add Item</span>
+</button>
+</div>
+<!-- Column: In Progress -->
+<div class="flex-shrink-0 w-80 flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<div class="flex items-center gap-2">
+<h3 class="font-headline font-bold text-slate-900">In Progress</h3>
+<span class="bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded">2</span>
+</div>
+<button class="text-slate-400 hover:text-slate-600"><span class="material-symbols-outlined text-lg">more_horiz</span></button>
+</div>
+<div class="flex flex-col gap-3">
+<div class="bg-white border border-slate-200 rounded-[4px] p-4 border-l-[3px] border-l-blue-600 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">SYS</span>
+<span class="text-[10px] text-slate-400">#PAN-105</span>
+</div>
+<h4 class="text-sm font-semibold text-slate-900 mb-1 leading-snug">Migrating authentication to OAuth2</h4>
+<p class="text-xs text-slate-500 line-clamp-2 mb-4">Updating the identity provider middleware. Current status: 60% complete.</p>
+<div class="mt-2 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-4">
+<div class="bg-blue-600 h-full w-[60%]"></div>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-slate-50">
+<img class="w-6 h-6 rounded-full border-2 border-white bg-slate-100" data-alt="avatar of a security engineer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuANqP_tFnv0gw9kr7GqdRamIolzAWFLYa4V2MShNcXOugUX7Y-59RKYGvA7Nw-f_1nc9_Mc8xeg7k-37Ay7WVE4ArJalvzG8oGgfnJB6lF2gS8NAdHxU34L5vRkVkb8VvrB9XFLL7FN-8QrDcu5_8NEGTUEe-oXoS7lZZ9gVtXmk-gps20VKf0MyhfULYoYv7Dw4oQKduGwR3tlQyMkTMtnntAcyk8Fpkr0uDkXHzEz39G8LKgT0QBVlynPeofbiUCT3vZjGxK9u_Y"/>
+<div class="flex items-center gap-1 text-slate-400 text-[10px]">
+<span class="material-symbols-outlined text-sm">message</span>
+<span>12</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Column: In Review -->
+<div class="flex-shrink-0 w-80 flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<div class="flex items-center gap-2">
+<h3 class="font-headline font-bold text-slate-900">In Review</h3>
+<span class="bg-slate-200 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded">1</span>
+</div>
+<button class="text-slate-400 hover:text-slate-600"><span class="material-symbols-outlined text-lg">more_horiz</span></button>
+</div>
+<div class="flex flex-col gap-3">
+<div class="bg-white border border-slate-200 rounded-[4px] p-4 border-l-[3px] border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex justify-between items-start mb-2">
+<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">OPS</span>
+<span class="text-[10px] text-slate-400">#PAN-088</span>
+</div>
+<h4 class="text-sm font-semibold text-slate-900 mb-1 leading-snug">Audit trail export for compliance</h4>
+<p class="text-xs text-slate-500 line-clamp-2 mb-4">Exporting last 12 months of logs to S3 bucket. Waiting for lead approval.</p>
+<div class="flex items-center justify-between pt-3 border-t border-slate-50">
+<div class="flex -space-x-2">
+<img class="w-6 h-6 rounded-full border-2 border-white bg-slate-100" data-alt="avatar of a compliance officer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUUZO4mxUlUvkmKe_xAbQ5Un_etsNvC6XQAXNJQ-NBJhDi51pL_js_jyWSplaVsitztgLug9QppMRRyEOlnQdFDd9GBAfqq2ngqjNr8MV3uf668X_St8J4NKiy4H0fm1ycKJkXtmx8wu0XJ0IQLC3dR9tqGcgFhDmwtN3_ggEj3hqXnd4BiQ3zl8H55jvWqKwFvBj5siIJm3zSgp4EwoF0jotdajRGPkix7JMTHWK0MyrDlxJtiI8Mx-6PbkdFfxRvYVWnn2XFCsw"/>
+</div>
+<div class="flex items-center gap-1 text-emerald-600 text-[10px] font-bold">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+<span>Ready</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Action for Mobile / Quick Access (Suppressed per rules but included if primary context) -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 transition-transform z-50 md:hidden">
+<span class="material-symbols-outlined text-2xl">add</span>
+</button>
+</body></html>
