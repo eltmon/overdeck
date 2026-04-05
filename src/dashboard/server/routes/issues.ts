@@ -587,9 +587,21 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         const encoder = new TextEncoder();
         const nodeStream = new ReadableStream<Uint8Array>({
           async start(controller) {
+            let closed = false;
             const sendEvent = (data: Record<string, unknown>) => {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+              if (closed) {
+                console.warn(`[start-planning] SSE event dropped (stream closed):`, JSON.stringify(data).slice(0, 200));
+                return;
+              }
+              try {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+              } catch (err: any) {
+                console.error(`[start-planning] SSE enqueue failed:`, err.message);
+                closed = true;
+              }
             };
+
+            console.log(`[start-planning] SSE stream opened for ${id}`);
 
             // Send initial metadata
             sendEvent({
@@ -605,25 +617,35 @@ const postIssueStartPlanningRoute = HttpRouter.add(
               sessionName,
             });
 
-            const result = await spawnPlanningSession({
-              issue: issue as PlanningIssue,
-              workspacePath,
-              projectPath,
-              sessionName,
-              workspaceLocation: workspaceLocation as 'local' | 'remote',
-              startDocker: body.startDocker,
-              shadowMode,
-              onProgress: (event) => {
-                sendEvent({ type: 'progress', ...event });
-              },
-            });
+            try {
+              const result = await spawnPlanningSession({
+                issue: issue as PlanningIssue,
+                workspacePath,
+                projectPath,
+                sessionName,
+                workspaceLocation: workspaceLocation as 'local' | 'remote',
+                startDocker: body.startDocker,
+                shadowMode,
+                onProgress: (event) => {
+                  console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);
+                  sendEvent({ type: 'progress', ...event });
+                },
+              });
 
-            if (result.success) {
-              sendEvent({ type: 'complete', sessionName });
-            } else {
-              sendEvent({ type: 'error', error: result.error });
+              if (result.success) {
+                console.log(`[start-planning] SSE complete for ${id}, sessionName=${sessionName}`);
+                sendEvent({ type: 'complete', sessionName });
+              } else {
+                console.error(`[start-planning] SSE error for ${id}: ${result.error}`);
+                sendEvent({ type: 'error', error: result.error });
+              }
+            } catch (streamErr: any) {
+              console.error(`[start-planning] SSE stream exception for ${id}:`, streamErr);
+              sendEvent({ type: 'error', error: streamErr.message || 'Unexpected error during setup' });
             }
-            controller.close();
+
+            closed = true;
+            try { controller.close(); } catch { /* already closed */ }
           },
         });
 
