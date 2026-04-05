@@ -26,6 +26,7 @@ import {
   markConversationActive,
   updateLastAttached,
   updateSessionFile,
+  updateConversationTitle,
 } from '../../../lib/database/conversations-db.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
 import {
@@ -342,11 +343,40 @@ const postConversationMessageRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
+
+const patchConversationRoute = HttpRouter.add(
+  'PATCH',
+  '/api/conversations/:name',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        const body = await req.json as { title?: string };
+        if (typeof body.title === 'string' && body.title.trim()) {
+          updateConversationTitle(name, body.title.trim());
+        }
+        return jsonResponse({ success: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to update conversation: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
   getConversationsRoute,
   postConversationRoute,
+  patchConversationRoute,
   deleteConversationRoute,
   postConversationResumeRoute,
   getConversationMessagesRoute,

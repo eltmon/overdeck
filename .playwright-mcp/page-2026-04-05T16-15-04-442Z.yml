@@ -1,0 +1,219 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - button "Panopticon" [ref=e5] [cursor=pointer]:
+      - img [ref=e6]
+      - generic [ref=e9]: Panopticon
+    - generic [ref=e108]:
+      - 'generic "Cloister: Stopped" [ref=e109]':
+        - img [ref=e110]
+      - generic [ref=e115]:
+        - button "Start" [ref=e116] [cursor=pointer]
+        - button "Emergency stop - kill all agents" [ref=e117] [cursor=pointer]:
+          - img [ref=e118]
+        - button "Cloister settings" [ref=e122] [cursor=pointer]:
+          - img [ref=e123]
+    - navigation [ref=e10]:
+      - button "Board" [ref=e11] [cursor=pointer]:
+        - img [ref=e12]
+        - text: Board
+      - button "Mission Control" [ref=e17] [cursor=pointer]:
+        - img [ref=e18]
+        - text: Mission Control
+      - button "Agents" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - text: Agents
+      - button "Resources" [ref=e27] [cursor=pointer]:
+        - img [ref=e28]
+        - text: Resources
+      - button "Convoys" [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+        - text: Convoys
+      - button "Handoffs" [ref=e37] [cursor=pointer]:
+        - img [ref=e38]
+        - text: Handoffs
+      - button "Activity" [ref=e41] [cursor=pointer]:
+        - img [ref=e42]
+        - text: Activity
+      - button "Metrics" [ref=e44] [cursor=pointer]:
+        - img [ref=e45]
+        - text: Metrics
+      - button "Costs" [ref=e47] [cursor=pointer]:
+        - img [ref=e48]
+        - text: Costs
+      - button "Skills" [ref=e50] [cursor=pointer]:
+        - img [ref=e51]
+        - text: Skills
+      - button "Health" [ref=e54] [cursor=pointer]:
+        - img [ref=e55]
+        - text: Health
+      - button "Settings" [ref=e57] [cursor=pointer]:
+        - img [ref=e58]
+        - text: Settings
+      - button "God View" [ref=e61] [cursor=pointer]:
+        - img [ref=e62]
+        - text: God View
+    - generic [ref=e64]:
+      - 'generic "Data timestamp: 2026-04-05T16:13:36.508Z" [ref=e126]': 1m ago
+      - button "Search /" [ref=e65] [cursor=pointer]:
+        - img [ref=e66]
+        - generic [ref=e69]: Search
+        - generic [ref=e70]: /
+      - button "Switch to light mode" [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+  - main [ref=e78]:
+    - generic [ref=e81]:
+      - generic [ref=e82]:
+        - generic [ref=e83]:
+          - heading "Mission Control" [level=2] [ref=e84]
+          - paragraph [ref=e85]: Active features across projects
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - button "Conversations 1" [expanded] [ref=e318] [cursor=pointer]:
+              - img [ref=e89]
+              - generic [ref=e91]: Conversations
+              - generic [ref=e92]: "1"
+            - button "New conversation" [ref=e93] [cursor=pointer]:
+              - img [ref=e94]
+          - button "conv-20260405-7652 Stop conv-20260405-7652" [ref=e319] [cursor=pointer]:
+            - img [ref=e320]
+            - generic [ref=e322]: conv-20260405-7652
+            - button "Stop conv-20260405-7652" [ref=e323]: ×
+        - generic [ref=e97]:
+          - generic [ref=e324]:
+            - button "panopticon-cli 13" [ref=e325] [cursor=pointer]:
+              - img [ref=e326]
+              - generic [ref=e328]: panopticon-cli
+              - generic [ref=e329]: "13"
+            - 'button "PAN-415 Test: trace what calls complete-planning after agent finishes Has Context $3.34" [ref=e330] [cursor=pointer]':
+              - img [ref=e332]
+              - generic [ref=e335]: PAN-415
+              - generic [ref=e336]: "Test: trace what calls complete-planning after agent finishes"
+              - generic [ref=e337]: Has Context
+              - generic [ref=e338]: $3.34
+            - button "PAN-451 Conversation view — T3Code-style message rendering + tmux toggle for agent sessions Done" [ref=e339] [cursor=pointer]:
+              - img [ref=e341]
+              - generic [ref=e344]: PAN-451
+              - generic [ref=e345]: Conversation view — T3Code-style message rendering + tmux toggle for agent sessions
+              - generic [ref=e346]: Done
+            - 'button "PAN-426 Tasks panel and DAG: add toggle to show acceptance criteria subtasks Done $2.64" [ref=e347] [cursor=pointer]':
+              - img [ref=e349]
+              - generic [ref=e352]: PAN-426
+              - generic [ref=e353]: "Tasks panel and DAG: add toggle to show acceptance criteria subtasks"
+              - generic [ref=e354]: Done
+              - generic [ref=e355]: $2.64
+            - 'button "PAN-410 DAG visualization: match vBRIEF Studio quality — edge labels, status badges, item metadata Done $5.17" [ref=e356] [cursor=pointer]':
+              - img [ref=e358]
+              - generic [ref=e361]: PAN-410
+              - generic [ref=e362]: "DAG visualization: match vBRIEF Studio quality — edge labels, status badges, item metadata"
+              - generic [ref=e363]: Done
+              - generic [ref=e364]: $5.17
+            - button "PAN-449 Refactor route handlers to idiomatic Effect — extract shared services, eliminate imperative wrappers Done" [ref=e365] [cursor=pointer]:
+              - img [ref=e367]
+              - generic [ref=e370]: PAN-449
+              - generic [ref=e371]: Refactor route handlers to idiomatic Effect — extract shared services, eliminate imperative wrappers
+              - generic [ref=e372]: Done
+            - button "PAN-436 Dashboard shows zero stats on load — missing skeleton/loading states Done $22.11" [ref=e373] [cursor=pointer]:
+              - img [ref=e375]
+              - generic [ref=e378]: PAN-436
+              - generic [ref=e379]: Dashboard shows zero stats on load — missing skeleton/loading states
+              - generic [ref=e380]: Done
+              - generic [ref=e381]: $22.11
+            - 'button "PAN-428 Dashboard data layer: consolidate polling, push-first architecture Done $26.14" [ref=e382] [cursor=pointer]':
+              - img [ref=e384]
+              - generic [ref=e387]: PAN-428
+              - generic [ref=e388]: "Dashboard data layer: consolidate polling, push-first architecture"
+              - generic [ref=e389]: Done
+              - generic [ref=e390]: $26.14
+            - button "PAN-445 Planning Abort button uses native JS confirm() instead of styled dialog Done" [ref=e391] [cursor=pointer]:
+              - img [ref=e393]
+              - generic [ref=e396]: PAN-445
+              - generic [ref=e397]: Planning Abort button uses native JS confirm() instead of styled dialog
+              - generic [ref=e398]: Done
+            - button "PAN-440 Agent enrichment missing from Effect server — INPUT badge, Watch Planning, resolution badges broken Done $33.80" [ref=e399] [cursor=pointer]:
+              - img [ref=e401]
+              - generic [ref=e404]: PAN-440
+              - generic [ref=e405]: Agent enrichment missing from Effect server — INPUT badge, Watch Planning, resolution badges broken
+              - generic [ref=e406]: Done
+              - generic [ref=e407]: $33.80
+            - 'button "PAN-444 Auto-deploy: rebuild + restart dashboard server after merge to main Done $10.72" [ref=e408] [cursor=pointer]':
+              - img [ref=e410]
+              - generic [ref=e413]: PAN-444
+              - generic [ref=e414]: "Auto-deploy: rebuild + restart dashboard server after merge to main"
+              - generic [ref=e415]: Done
+              - generic [ref=e416]: $10.72
+            - 'button "PAN-416 Mission Control: conversation launcher with t3code-informed UX Done $11.01" [ref=e417] [cursor=pointer]':
+              - img [ref=e419]
+              - generic [ref=e422]: PAN-416
+              - generic [ref=e423]: "Mission Control: conversation launcher with t3code-informed UX"
+              - generic [ref=e424]: Done
+              - generic [ref=e425]: $11.01
+            - button "PAN-437 Instant dashboard startup via persistent projection cache (T3Code pattern) Done $27.80" [ref=e426] [cursor=pointer]:
+              - img [ref=e428]
+              - generic [ref=e431]: PAN-437
+              - generic [ref=e432]: Instant dashboard startup via persistent projection cache (T3Code pattern)
+              - generic [ref=e433]: Done
+              - generic [ref=e434]: $27.80
+            - button "PAN-408 Wire vBRIEF acceptance criteria into specialist pipeline Done $11.96" [ref=e435] [cursor=pointer]:
+              - img [ref=e437]
+              - generic [ref=e440]: PAN-408
+              - generic [ref=e441]: Wire vBRIEF acceptance criteria into specialist pipeline
+              - generic [ref=e442]: Done
+              - generic [ref=e443]: $11.96
+          - generic [ref=e444]:
+            - button "mind-your-now 3" [ref=e445] [cursor=pointer]:
+              - img [ref=e446]
+              - generic [ref=e448]: mind-your-now
+              - generic [ref=e449]: "3"
+            - button "MIN-827 Add household badge/icon to household-scoped tasks Idle" [ref=e450] [cursor=pointer]:
+              - img [ref=e452]
+              - generic [ref=e454]: MIN-827
+              - generic [ref=e455]: Add household badge/icon to household-scoped tasks
+              - generic [ref=e456]: Idle
+            - button "MIN-824 Onboarding tutorial is broken — content mismatched with UI after UX changes Done $8.79" [ref=e457] [cursor=pointer]:
+              - img [ref=e459]
+              - generic [ref=e462]: MIN-824
+              - generic [ref=e463]: Onboarding tutorial is broken — content mismatched with UI after UX changes
+              - generic [ref=e464]: Done
+              - generic [ref=e465]: $8.79
+            - button "MIN-826 Switch from Inter to system font stack for cleaner UI typography Planning $0.31" [ref=e466] [cursor=pointer]:
+              - img [ref=e468]
+              - generic [ref=e470]: MIN-826
+              - generic [ref=e471]: Switch from Inter to system font stack for cleaner UI typography
+              - generic [ref=e472]: Planning
+              - generic [ref=e473]: $0.31
+          - button "auricle 0" [ref=e475] [cursor=pointer]:
+            - img [ref=e476]
+            - generic [ref=e478]: auricle
+            - generic [ref=e479]: "0"
+          - button "myn-cli 0" [ref=e481] [cursor=pointer]:
+            - img [ref=e482]
+            - generic [ref=e484]: myn-cli
+            - generic [ref=e485]: "0"
+          - button "papers-please 0" [ref=e487] [cursor=pointer]:
+            - img [ref=e488]
+            - generic [ref=e490]: papers-please
+            - generic [ref=e491]: "0"
+          - button "lexerra 0" [ref=e493] [cursor=pointer]:
+            - img [ref=e494]
+            - generic [ref=e496]: lexerra
+            - generic [ref=e497]: "0"
+          - button "krux 0" [ref=e499] [cursor=pointer]:
+            - img [ref=e500]
+            - generic [ref=e502]: krux
+            - generic [ref=e503]: "0"
+        - generic [ref=e302] [cursor=pointer]:
+          - img [ref=e303]
+          - generic [ref=e305]: Deacon
+          - generic [ref=e306]: stopped
+          - img [ref=e307]
+        - generic [ref=e311]: v0.6.0
+      - generic [ref=e504]:
+        - generic [ref=e505]:
+          - generic [ref=e506]: conv-20260405-7652
+          - generic [ref=e507]:
+            - img [ref=e508]
+            - text: ended
+        - generic [ref=e511]:
+          - paragraph [ref=e512]: Session ended
+          - button "Resume Session" [ref=e513] [cursor=pointer]
+  - region "Notifications alt+T"

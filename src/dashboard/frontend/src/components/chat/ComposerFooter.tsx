@@ -11,6 +11,7 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { SendHorizontal } from 'lucide-react';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
@@ -21,6 +22,14 @@ import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
+
+async function updateConversationTitle(name: string, title: string): Promise<void> {
+  await fetch(`/api/conversations/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+}
 
 async function sendConversationMessage(
   conversationName: string,
@@ -41,16 +50,19 @@ async function sendConversationMessage(
 
 interface ComposerFooterProps {
   conversation: Conversation;
+  /** True when no messages have been sent yet — first send sets the conversation title. */
+  isFirstMessage?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ComposerFooter({ conversation }: ComposerFooterProps) {
+export function ComposerFooter({ conversation, isFirstMessage }: ComposerFooterProps) {
   const [model, setModel] = useState<ClaudeModelId>(loadStoredModel);
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
   const editorRef = useRef<LexicalEditor | null>(null);
+  const queryClient = useQueryClient();
 
   const isDisabled = !conversation.sessionAlive || sending;
   const isEmpty = text.trim() === '';
@@ -71,6 +83,14 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
     try {
       await sendConversationMessage(conversation.name, messageText);
 
+      // Auto-title from first message: truncate to 60 chars
+      if (isFirstMessage && !conversation.title) {
+        const title = messageText.slice(0, 60) + (messageText.length > 60 ? '…' : '');
+        void updateConversationTitle(conversation.name, title).then(() => {
+          void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        });
+      }
+
       // Clear editor after successful send
       editor.update(() => {
         $getRoot().clear();
@@ -83,7 +103,7 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
       // Refocus editor
       editor.focus();
     }
-  }, [conversation.name, isEmpty, isDisabled]);
+  }, [conversation.name, conversation.title, isFirstMessage, isEmpty, isDisabled, queryClient]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
