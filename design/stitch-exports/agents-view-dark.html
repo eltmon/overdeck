@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Panopticon | Agents Orchestration</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#fa746f",
+                        "on-surface": "#dee4ff",
+                        "surface-container": "#10192f",
+                        "secondary-fixed": "#f0dbff",
+                        "secondary": "#ddb7ff",
+                        "error-dim": "#c54d4a",
+                        "background": "#090e1c",
+                        "surface-container-highest": "#192542",
+                        "secondary-fixed-dim": "#e7c9ff",
+                        "primary-dim": "#699cff",
+                        "error-container": "#871f21",
+                        "surface-container-high": "#151f38",
+                        "tertiary-fixed-dim": "#40ceed",
+                        "surface-variant": "#192542",
+                        "on-primary": "#003d88",
+                        "on-secondary": "#5f00a4",
+                        "on-tertiary-fixed-variant": "#005564",
+                        "inverse-on-surface": "#505566",
+                        "on-tertiary-fixed": "#003640",
+                        "primary-fixed-dim": "#317bef",
+                        "on-secondary-fixed-variant": "#8126cf",
+                        "surface-bright": "#202b49",
+                        "secondary-container": "#590099",
+                        "tertiary-fixed": "#53ddfc",
+                        "on-secondary-container": "#d8aeff",
+                        "on-primary-fixed-variant": "#001435",
+                        "surface-container-lowest": "#000000",
+                        "on-surface-variant": "#9faacf",
+                        "on-error-container": "#ff9993",
+                        "secondary-dim": "#9c48ea",
+                        "tertiary-dim": "#40ceed",
+                        "outline": "#6a7597",
+                        "primary": "#adc6ff",
+                        "tertiary": "#8ce7ff",
+                        "on-tertiary-container": "#004b58",
+                        "tertiary-container": "#53ddfc",
+                        "primary-container": "#0e69dc",
+                        "on-secondary-fixed": "#5e00a2",
+                        "inverse-surface": "#faf8ff",
+                        "on-background": "#dee4ff",
+                        "on-primary-fixed": "#000000",
+                        "on-error": "#490006",
+                        "outline-variant": "#3c4767",
+                        "inverse-primary": "#005bc4",
+                        "on-tertiary": "#005464",
+                        "surface-tint": "#adc6ff",
+                        "surface-container-low": "#0b1326",
+                        "on-primary-container": "#ffffff",
+                        "surface-dim": "#090e1c",
+                        "surface": "#090e1c",
+                        "primary-fixed": "#4388fd",
+                        "signal-green": "#22c55e",
+                        "signal-amber": "#f59e0b",
+                        "signal-red": "#ef4444",
+                        "signal-blue": "#3b82f6",
+                        "signal-purple": "#a855f7",
+                        "signal-cyan": "#06b6d4",
+                        "obsidian-base": "#0c0f16",
+                        "obsidian-raised": "#141820",
+                        "obsidian-overlay": "#1c2130"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Space Grotesk", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #0c0f16; color: #94a3b8; }
+        h1, h2, h3, h4 { font-family: 'Space Grotesk', sans-serif; color: #e2e8f0; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1c2130; border-radius: 10px; }
+        .sidebar-item { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="flex flex-col h-screen sticky top-0 left-0 bg-[#0c0f16] docked left-0 w-[220px] border-r border-white/10 z-50">
+<div class="px-6 py-8">
+<div class="flex items-center gap-3 mb-10">
+<div class="w-8 h-8 bg-primary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-lg">view_in_ar</span>
+</div>
+<div>
+<h2 class="text-lg font-black text-white leading-none">Panopticon</h2>
+<p class="text-[10px] font-['Space_Grotesk'] font-bold uppercase tracking-widest text-gray-500">Agent Orchestration</p>
+</div>
+</div>
+<nav class="space-y-1">
+<p class="text-[10px] font-bold text-gray-600 uppercase tracking-[0.2em] mb-4 px-2">Operations</p>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 border-l-2 border-transparent hover:bg-white/5 hover:text-gray-200 transition-all font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="dashboard">dashboard</span>
+<span>Command Deck</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 border-l-2 border-transparent hover:bg-white/5 hover:text-gray-200 transition-all font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="analytics">analytics</span>
+<span>Operations</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 border-l-2 border-blue-500 bg-white/5 text-blue-400 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="smart_toy">smart_toy</span>
+<span>Agents</span>
+</a>
+<p class="text-[10px] font-bold text-gray-600 uppercase tracking-[0.2em] mb-4 mt-8 px-2">Infrastructure</p>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 border-l-2 border-transparent hover:bg-white/5 hover:text-gray-200 transition-all font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="dns">dns</span>
+<span>Infrastructure</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 border-l-2 border-transparent hover:bg-white/5 hover:text-gray-200 transition-all font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="monitoring">monitoring</span>
+<span>Observability</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 border-l-2 border-transparent hover:bg-white/5 hover:text-gray-200 transition-all font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="settings_input_component">settings_input_component</span>
+<span>System</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto border-t border-white/10 p-4">
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 hover:text-gray-200 transition-colors font-['Space_Grotesk'] text-[10px] font-bold uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="help">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 hover:text-gray-200 transition-colors font-['Space_Grotesk'] text-[10px] font-bold uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="description">description</span>
+<span>Documentation</span>
+</a>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col min-w-0 bg-[#090e1c]">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-6 h-16 bg-[#0c0f16] border-b border-white/10 sticky top-0 z-40">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">search</span>
+<input class="w-full bg-white/5 border-none rounded text-sm py-2 pl-10 focus:ring-1 focus:ring-blue-500 text-gray-300" placeholder="Search agents, logs, or metrics..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-3 ml-4">
+<button class="p-2 text-gray-400 hover:bg-white/5 rounded transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-gray-400 hover:bg-white/5 rounded transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded bg-gradient-to-br from-blue-500 to-purple-600 ml-2 overflow-hidden border border-white/10">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="professional portrait of a system administrator in low lighting with cool blue rim light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrMM8ZG7pn_I3pD5sC5IqGrD5lC-zm3_YbfLpO3JS94UI082FZMo8YES45fYkOxF2b5XBHkEpeCiYzOFUEw0axHXrtVmTSZDERfXNxIkyrAS-pM1JepxbGJ5yb7doKxFhKf9wKwx2fEWSM4uXPjwxhqerw6ruZj78GS_m9uAYOrESplV8zsqBwgEe_xMJ9DT0UZX8wmdMImo5mHxSR1dRpOOmJZ_vXPAgR-b12H_N3ihUNJXS5u_RHdjJgMZmoLIfRDg78v_aiK1I"/>
+</div>
+</div>
+</header>
+<div class="p-8 flex-1 overflow-y-auto custom-scrollbar">
+<!-- Header Section -->
+<div class="flex items-end justify-between mb-8">
+<div>
+<div class="flex items-center gap-2 text-blue-500 mb-1">
+<span class="material-symbols-outlined text-base">smart_toy</span>
+<span class="text-[10px] font-bold tracking-[0.2em] uppercase">Orchestration Module</span>
+</div>
+<h1 class="text-4xl font-black tracking-tight">Agents</h1>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded flex items-center gap-2 text-xs font-bold text-gray-300 transition-all">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+                        FILTER
+                    </button>
+<button class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded flex items-center gap-2 text-xs font-bold text-white shadow-lg shadow-blue-900/20 transition-all">
+<span class="material-symbols-outlined text-sm">add</span>
+                        DEPLOY AGENT
+                    </button>
+</div>
+</div>
+<!-- Top Section: Cloister Deacon -->
+<div class="bg-[#141820] border border-white/10 rounded-lg p-6 mb-12 flex items-center gap-8 relative overflow-hidden group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-signal-blue"></div>
+<div class="flex-shrink-0 w-24 h-24 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-xl border border-white/5 flex items-center justify-center relative">
+<span class="material-symbols-outlined text-5xl text-blue-400 opacity-80" style="font-variation-settings: 'FILL' 1;">security</span>
+<div class="absolute inset-0 bg-blue-500/5 blur-xl"></div>
+</div>
+<div class="flex-1">
+<div class="flex items-center gap-3 mb-2">
+<h2 class="text-2xl font-bold tracking-tight">Cloister Deacon</h2>
+<span class="px-2 py-0.5 bg-signal-green/10 text-signal-green text-[10px] font-black uppercase rounded border border-signal-green/20">Active</span>
+</div>
+<p class="text-sm text-gray-400 max-w-xl mb-4 leading-relaxed">Primary lifecycle manager orchestrating patrol loops, specialist handoffs, and resource reclamation across the entire cluster.</p>
+<div class="flex items-center gap-6">
+<div class="flex flex-col">
+<span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Patrol Status</span>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-signal-green animate-pulse"></div>
+<span class="text-xs font-bold text-gray-200">RUNNING</span>
+</div>
+</div>
+<div class="w-px h-8 bg-white/5"></div>
+<div class="flex flex-col">
+<span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Specialists</span>
+<span class="px-2 py-0.5 bg-signal-blue/10 text-signal-blue text-[10px] font-black uppercase rounded border border-signal-blue/20">3 Active</span>
+</div>
+<div class="w-px h-8 bg-white/5"></div>
+<div class="flex flex-col">
+<span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Last Check</span>
+<span class="text-xs font-mono text-gray-400">14:22:09 UTC</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<button class="w-40 py-2.5 bg-white/5 hover:bg-white/10 text-gray-200 text-xs font-black uppercase tracking-widest border border-white/10 rounded transition-all flex items-center justify-center gap-2 group-hover:border-blue-500/30">
+<span class="material-symbols-outlined text-sm">play_arrow</span>
+                        Start Patrol
+                    </button>
+<button class="w-40 py-2.5 bg-white/5 hover:bg-red-500/10 text-red-400 text-xs font-black uppercase tracking-widest border border-red-900/20 rounded transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">stop</span>
+                        Stop Patrol
+                    </button>
+</div>
+</div>
+<!-- Middle Section: Issue Agents -->
+<div class="flex items-center justify-between mb-4 px-2">
+<div class="flex items-center gap-4">
+<h3 class="text-lg font-bold tracking-tight">Issue Agents <span class="text-gray-500 ml-1 font-normal">(134)</span></h3>
+<div class="flex items-center gap-2 ml-4">
+<span class="w-1.5 h-1.5 rounded-full bg-signal-green"></span>
+<span class="text-[10px] font-bold text-gray-500">112 RUNNING</span>
+<span class="w-1.5 h-1.5 rounded-full bg-signal-red ml-2"></span>
+<span class="text-[10px] font-bold text-gray-500">2 STUCK</span>
+</div>
+</div>
+<div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sorted by Runtime (DESC)</div>
+</div>
+<!-- Agent List -->
+<div class="bg-[#0c0f16] border border-white/5 rounded overflow-hidden">
+<div class="grid grid-cols-12 px-6 py-3 border-b border-white/10 bg-white/[0.02]">
+<div class="col-span-4 text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">Agent Identity</div>
+<div class="col-span-3 text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">Runtime Configuration</div>
+<div class="col-span-2 text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">Usage Cost</div>
+<div class="col-span-2 text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">Duration</div>
+<div class="col-span-1 text-right text-[10px] font-black text-gray-600 uppercase tracking-[0.2em]">Phase</div>
+</div>
+<div class="divide-y divide-white/5">
+<!-- Agent Row 1 -->
+<div class="grid grid-cols-12 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors group">
+<div class="col-span-4 flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-signal-green shadow-sm shadow-signal-green/20"></div>
+<div>
+<div class="font-bold text-gray-200 text-sm group-hover:text-blue-400 transition-colors">agent-min-826</div>
+<div class="text-[10px] text-gray-500 font-mono">UID: 4492-AX-01</div>
+</div>
+</div>
+<div class="col-span-3">
+<div class="text-xs text-gray-400">claude / <span class="text-gray-300">claude-sonnet-4-6</span></div>
+</div>
+<div class="col-span-2">
+<div class="text-sm font-bold text-signal-cyan">$14.29</div>
+</div>
+<div class="col-span-2">
+<div class="text-xs font-mono text-gray-500">388h 37m</div>
+</div>
+<div class="col-span-1 text-right">
+<span class="px-2 py-0.5 bg-signal-amber/10 text-signal-amber text-[10px] font-black uppercase rounded border border-signal-amber/20">Planning</span>
+</div>
+</div>
+<!-- Agent Row 2 -->
+<div class="grid grid-cols-12 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors group">
+<div class="col-span-4 flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-signal-green"></div>
+<div>
+<div class="font-bold text-gray-200 text-sm group-hover:text-blue-400 transition-colors">agent-obs-109</div>
+<div class="text-[10px] text-gray-500 font-mono">UID: 9912-KB-92</div>
+</div>
+</div>
+<div class="col-span-3">
+<div class="text-xs text-gray-400">gpt-4o / <span class="text-gray-300">turbo-latest</span></div>
+</div>
+<div class="col-span-2">
+<div class="text-sm font-bold text-signal-cyan">$8.12</div>
+</div>
+<div class="col-span-2">
+<div class="text-xs font-mono text-gray-500">112h 04m</div>
+</div>
+<div class="col-span-1 text-right">
+<span class="px-2 py-0.5 bg-signal-blue/10 text-signal-blue text-[10px] font-black uppercase rounded border border-signal-blue/20">Working</span>
+</div>
+</div>
+<!-- Agent Row 3 -->
+<div class="grid grid-cols-12 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors group">
+<div class="col-span-4 flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-signal-red"></div>
+<div>
+<div class="font-bold text-gray-200 text-sm group-hover:text-blue-400 transition-colors">agent-sys-442</div>
+<div class="text-[10px] text-gray-500 font-mono">UID: 3301-TR-11</div>
+</div>
+</div>
+<div class="col-span-3">
+<div class="text-xs text-gray-400">llama-3 / <span class="text-gray-300">70b-instruct</span></div>
+</div>
+<div class="col-span-2">
+<div class="text-sm font-bold text-signal-cyan">$0.45</div>
+</div>
+<div class="col-span-2">
+<div class="text-xs font-mono text-gray-500">12h 19m</div>
+</div>
+<div class="col-span-1 text-right">
+<span class="px-2 py-0.5 bg-signal-red/10 text-signal-red text-[10px] font-black uppercase rounded border border-signal-red/20">Stuck</span>
+</div>
+</div>
+<!-- Agent Row 4 -->
+<div class="grid grid-cols-12 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors group">
+<div class="col-span-4 flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-gray-600"></div>
+<div>
+<div class="font-bold text-gray-200 text-sm group-hover:text-blue-400 transition-colors">agent-dev-001</div>
+<div class="text-[10px] text-gray-500 font-mono">UID: 0001-ALPHA</div>
+</div>
+</div>
+<div class="col-span-3">
+<div class="text-xs text-gray-400">local / <span class="text-gray-300">mistral-7b</span></div>
+</div>
+<div class="col-span-2">
+<div class="text-sm font-bold text-signal-cyan">$0.00</div>
+</div>
+<div class="col-span-2">
+<div class="text-xs font-mono text-gray-500">0h 00m</div>
+</div>
+<div class="col-span-1 text-right">
+<span class="px-2 py-0.5 bg-white/5 text-gray-500 text-[10px] font-black uppercase rounded border border-white/10">Idle</span>
+</div>
+</div>
+<!-- Agent Row 5 -->
+<div class="grid grid-cols-12 px-6 py-4 items-center hover:bg-white/[0.02] transition-colors group">
+<div class="col-span-4 flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-signal-green"></div>
+<div>
+<div class="font-bold text-gray-200 text-sm group-hover:text-blue-400 transition-colors">agent-qa-99</div>
+<div class="text-[10px] text-gray-500 font-mono">UID: 2288-QA-09</div>
+</div>
+</div>
+<div class="col-span-3">
+<div class="text-xs text-gray-400">anthropic / <span class="text-gray-300">claude-3-opus</span></div>
+</div>
+<div class="col-span-2">
+<div class="text-sm font-bold text-signal-cyan">$92.40</div>
+</div>
+<div class="col-span-2">
+<div class="text-xs font-mono text-gray-500">44h 12m</div>
+</div>
+<div class="col-span-1 text-right">
+<span class="px-2 py-0.5 bg-signal-purple/10 text-signal-purple text-[10px] font-black uppercase rounded border border-signal-purple/20">Review</span>
+</div>
+</div>
+</div>
+</div>
+<!-- System Footer Status -->
+<div class="mt-12 pt-8 border-t border-white/5 flex justify-between items-center text-[10px] font-bold text-gray-600 uppercase tracking-widest">
+<div class="flex items-center gap-4">
+<span>Cluster Health: 99.8%</span>
+<span>Lat: 24ms</span>
+<span>Zone: US-EAST-1</span>
+</div>
+<div>v4.6.2-PROD</div>
+</div>
+</div>
+</main>
+</body></html>

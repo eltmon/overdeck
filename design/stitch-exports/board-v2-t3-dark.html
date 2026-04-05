@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Panopticon | AI Agent Orchestration</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-background": "#dee4ff",
+            "secondary": "#ddb7ff",
+            "surface-dim": "#090e1c",
+            "on-tertiary": "#005464",
+            "outline": "#6a7597",
+            "inverse-primary": "#005bc4",
+            "on-tertiary-fixed": "#003640",
+            "inverse-on-surface": "#505566",
+            "background": "#090e1c",
+            "primary-fixed": "#4388fd",
+            "on-error": "#490006",
+            "on-primary-fixed": "#000000",
+            "tertiary-fixed-dim": "#40ceed",
+            "surface-container-highest": "#192542",
+            "surface-variant": "#192542",
+            "on-surface-variant": "#9faacf",
+            "tertiary-container": "#53ddfc",
+            "on-surface": "#dee4ff",
+            "error-dim": "#c54d4a",
+            "primary-container": "#0e69dc",
+            "on-tertiary-container": "#004b58",
+            "on-error-container": "#ff9993",
+            "primary-fixed-dim": "#317bef",
+            "on-secondary": "#5f00a4",
+            "error": "#fa746f",
+            "surface-tint": "#adc6ff",
+            "surface-container-lowest": "#000000",
+            "surface-bright": "#202b49",
+            "on-secondary-fixed-variant": "#8126cf",
+            "on-primary-fixed-variant": "#001435",
+            "on-secondary-fixed": "#5e00a2",
+            "tertiary-dim": "#40ceed",
+            "secondary-fixed-dim": "#e7c9ff",
+            "primary-dim": "#699cff",
+            "on-primary-container": "#ffffff",
+            "primary": "#adc6ff",
+            "outline-variant": "#3c4767",
+            "surface": "#090e1c",
+            "surface-container-high": "#151f38",
+            "secondary-fixed": "#f0dbff",
+            "surface-container": "#10192f",
+            "tertiary": "#8ce7ff",
+            "secondary-container": "#590099",
+            "surface-container-low": "#0b1326",
+            "tertiary-fixed": "#53ddfc",
+            "inverse-surface": "#faf8ff",
+            "error-container": "#871f21",
+            "secondary-dim": "#9c48ea",
+            "on-primary": "#003d88",
+            "on-tertiary-fixed-variant": "#005564",
+            "on-secondary-container": "#d8aeff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "headline": ["Space Grotesk", "sans-serif"],
+            "body": ["Inter", "sans-serif"],
+            "label": ["Space Grotesk", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      background-color: #0c0f16;
+      color: #dee4ff;
+      font-family: 'Inter', sans-serif;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #1c2130;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body class="dark overflow-hidden">
+<!-- SideNavBar -->
+<aside class="h-screen w-[256px] fixed left-0 top-0 bg-[#0c0f16] flex flex-col py-6 border-r border-outline-variant/10 shadow-2xl z-50">
+<div class="px-6 mb-10 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-lg">visibility</span>
+</div>
+<div class="flex flex-col">
+<span class="text-xl font-headline font-bold text-white tracking-tight">Panopticon</span>
+<span class="text-[10px] text-slate-500 font-label uppercase tracking-widest">AI Agent Orchestration</span>
+</div>
+</div>
+<nav class="flex-1 px-3 space-y-8 overflow-y-auto custom-scrollbar">
+<!-- OPERATIONS -->
+<div>
+<p class="px-4 text-[10px] font-label font-bold text-slate-600 tracking-widest mb-3">OPERATIONS</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="font-label text-sm font-medium">Command Deck</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 border-l-2 border-blue-500 bg-[#1c2130] text-blue-400 font-bold rounded-r-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">analytics</span>
+<span class="font-label text-sm font-medium">Board</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">smart_toy</span>
+<span class="font-label text-sm font-medium">Agents</span>
+</a>
+</div>
+</div>
+<!-- INFRASTRUCTURE -->
+<div>
+<p class="px-4 text-[10px] font-label font-bold text-slate-600 tracking-widest mb-3">INFRASTRUCTURE</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">memory</span>
+<span class="font-label text-sm font-medium">Resources</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">local_shipping</span>
+<span class="font-label text-sm font-medium">Convoys</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">swap_horiz</span>
+<span class="font-label text-sm font-medium">Handoffs</span>
+</a>
+</div>
+</div>
+<!-- OBSERVABILITY -->
+<div>
+<p class="px-4 text-[10px] font-label font-bold text-slate-600 tracking-widest mb-3">OBSERVABILITY</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">history</span>
+<span class="font-label text-sm font-medium">Activity</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">monitoring</span>
+<span class="font-label text-sm font-medium">Metrics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+<span class="font-label text-sm font-medium">Costs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">monitor_heart</span>
+<span class="font-label text-sm font-medium">Health</span>
+</a>
+</div>
+</div>
+<!-- SYSTEM -->
+<div>
+<p class="px-4 text-[10px] font-label font-bold text-slate-600 tracking-widest mb-3">SYSTEM</p>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">psychology</span>
+<span class="font-label text-sm font-medium">Skills</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="font-label text-sm font-medium">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors hover:bg-[#1c2130] rounded-lg" href="#">
+<span class="material-symbols-outlined text-[20px]">visibility</span>
+<span class="font-label text-sm font-medium">God View</span>
+</a>
+</div>
+</div>
+</nav>
+<div class="mt-auto px-4 pt-6 border-t border-outline-variant/10">
+<div class="flex items-center justify-between p-2 rounded-xl bg-[#141820]">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline/20">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="close-up portrait of a digital stylized avatar representing an AI system operator with sleek futuristic aesthetics" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWHAlX0-JzZ_t1eN945vVvl2juJFmd8x3pZwMIKnbptUI79bvzXZL73luz9tWBOveEpqlSVtbWzf_Lpl4_z86cXg4Qd_ZV7V0sjZ7e8PPUv8X1kt_2746OAh29DNdb7pJ-BVDJRQGcW9cEFRQ53iK_NQJiY_co7Yfy5bp6PufWpI6U0idmwR8rKoesZVXAhIN6Np4FkMLf2Jp4wqnK7F6GuQbB1XdP3ncfRQtLnVuUN0YjBGp53wQLJIwMnYNNtiqyBK_5kwh2dic"/>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-headline font-bold text-white">Operator 01</span>
+<span class="text-[10px] text-slate-500">System Admin</span>
+</div>
+</div>
+<button class="p-2 text-slate-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-sm">dark_mode</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- TopNavBar -->
+<header class="w-full h-16 ml-[256px] flex items-center justify-end px-8 fixed top-0 bg-transparent z-40">
+<div class="flex items-center gap-6">
+<div class="relative">
+<input class="bg-[#141820] border-none text-xs rounded-full px-10 py-2 w-64 text-slate-300 focus:ring-1 focus:ring-blue-500 transition-all font-body" placeholder="Search operations..." type="text"/>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">search</span>
+</div>
+<div class="flex items-center gap-4 text-slate-400">
+<button class="hover:text-white transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="hover:text-white transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Area -->
+<main class="ml-[256px] pt-16 h-screen flex flex-col">
+<!-- Stats Row -->
+<div class="px-8 py-6 flex items-center gap-3 overflow-x-auto custom-scrollbar no-scrollbar-buttons">
+<div class="bg-[#141820] border border-white/5 px-4 py-2.5 rounded-full flex items-center gap-3 shrink-0">
+<span class="text-[10px] font-label font-bold text-slate-500 tracking-widest uppercase">Cost Today</span>
+<span class="text-sm font-headline font-bold text-cyan-400">$12.47</span>
+</div>
+<div class="bg-[#141820] border border-white/5 px-4 py-2.5 rounded-full flex items-center gap-3 shrink-0">
+<span class="text-[10px] font-label font-bold text-slate-500 tracking-widest uppercase">Agents</span>
+<span class="text-sm font-headline font-bold text-white">5/8</span>
+</div>
+<div class="bg-[#141820] border border-white/5 px-4 py-2.5 rounded-full flex items-center gap-3 shrink-0">
+<span class="text-[10px] font-label font-bold text-slate-500 tracking-widest uppercase">Stuck</span>
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+<span class="text-sm font-headline font-bold text-white">1</span>
+</div>
+</div>
+<div class="bg-[#141820] border border-white/5 px-4 py-2.5 rounded-full flex items-center gap-3 shrink-0">
+<span class="text-[10px] font-label font-bold text-slate-500 tracking-widest uppercase">Handoffs</span>
+<span class="text-sm font-headline font-bold text-white">3</span>
+</div>
+<div class="bg-[#141820] border border-white/5 px-4 py-2.5 rounded-full flex items-center gap-3 shrink-0">
+<span class="text-[10px] font-label font-bold text-slate-500 tracking-widest uppercase">Queue</span>
+<span class="text-sm font-headline font-bold text-white">12</span>
+</div>
+</div>
+<!-- Filter Bar -->
+<div class="px-8 flex items-center justify-between mb-8">
+<div class="flex bg-[#141820] p-1 rounded-lg">
+<button class="px-6 py-1.5 rounded-md text-xs font-headline font-bold bg-blue-500 text-white">Current</button>
+<button class="px-6 py-1.5 rounded-md text-xs font-headline font-medium text-slate-400 hover:text-white transition-colors">All</button>
+<button class="px-6 py-1.5 rounded-md text-xs font-headline font-medium text-slate-400 hover:text-white transition-colors">Backlog</button>
+<button class="px-6 py-1.5 rounded-md text-xs font-headline font-medium text-slate-400 hover:text-white transition-colors">Cancelled</button>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex items-center gap-2 px-3 py-1.5 bg-[#1c2130] rounded-full border border-white/5">
+<div class="w-2 h-2 rounded-full bg-blue-500"></div>
+<span class="text-[11px] font-label text-slate-300">Alpha-Centauri</span>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-[#1c2130] rounded-full border border-white/5">
+<div class="w-2 h-2 rounded-full bg-purple-500"></div>
+<span class="text-[11px] font-label text-slate-300">Project Omega</span>
+</div>
+</div>
+</div>
+<!-- Kanban Board -->
+<div class="flex-1 px-8 pb-8 flex gap-6 overflow-hidden">
+<!-- To Do Column -->
+<div class="flex-1 flex flex-col min-w-[320px]">
+<div class="flex items-center justify-between mb-4 px-2">
+<div class="flex items-center gap-2">
+<h3 class="font-headline font-bold text-white tracking-tight">To Do</h3>
+<span class="text-xs font-label text-slate-500 font-bold bg-[#1c2130] px-2 py-0.5 rounded-full">45</span>
+</div>
+<button class="text-slate-500 hover:text-white">
+<span class="material-symbols-outlined text-lg">add</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+<!-- Card 1 -->
+<div class="bg-[#141820] rounded-2xl p-5 border border-white/5 relative group hover:-translate-y-1 transition-all duration-200">
+<div class="absolute left-0 top-6 bottom-6 w-[2px] bg-amber-500 rounded-r-full"></div>
+<div class="flex justify-between items-start mb-3">
+<span class="text-[10px] font-label font-bold text-slate-500 uppercase tracking-widest">TSK-2041</span>
+<span class="text-[10px] font-headline font-bold text-cyan-400">$0.12</span>
+</div>
+<h4 class="text-sm font-headline font-bold text-slate-200 mb-3 leading-relaxed">Neural Mapping Strategy for Project Omega Data Points</h4>
+<div class="flex items-center gap-2 mb-4">
+<span class="bg-amber-500/10 text-amber-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Planning</span>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-white/5">
+<div class="flex -space-x-2">
+<img alt="Agent" class="w-6 h-6 rounded-full bg-[#1c2130] border-2 border-[#141820]" data-alt="minimalist 3D render of a futuristic robot head with glowing cyan eyes on a dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLnqhdlMaEXUMA_MpVZiLkTIPTGEsqXGeQ9qDRAPsb7Pg73A58pSOZCEZgIPDilYJxaVO3aBL0v9HM3MBPqXVo2eM6MUtm0FjNsQGRrOqrFGUBZwPfusty0kjsbY-DDSYrTS7BQkMYIbfubOnhhGnQ20nfGKuczCHdH7OeoefNrmES4yBTGCR2sqsi9tYCrlXUWIhMOZYwf14ci0vpwUnZ9B5bRVUXZcvA2vsUTSiN5_jrQu_OmtDUgom_aeOR10GvbCKNArct-j4"/>
+<img alt="Agent" class="w-6 h-6 rounded-full bg-[#1c2130] border-2 border-[#141820]" data-alt="minimalist 3D render of a sleek metallic robot head with soft amber lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDI_iIrhxxMQLNjJhckjZCidrL6JelO96gmC7RVOwit9OKO6WiiVyN2SsbMfa2NpHofRZqGp8xpVBNDZuBLK_Tp8BhL06CzfpY5QmVHAeJeLE4NRuPBgq5rTEdv-XD7DDj_Ixh3YvoF05q-74tlLB6JfX2R-7zq3Hl6QOL_5sqSiVozlEBmSFRxt4qMUJLj3UmQ9fzSyJ-xG-Y9d-LpmQNlPiTlSqF110QvK2UAB1e853u7UgGLKe9-Vn_UeZbxxVPJu8PmWL3LyLI"/>
+</div>
+<button class="text-[10px] font-label font-bold text-slate-400 hover:text-blue-400 transition-colors flex items-center gap-1 uppercase tracking-widest">
+                Deploy <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-[#141820] rounded-2xl p-5 border border-white/5 relative group hover:-translate-y-1 transition-all duration-200">
+<div class="absolute left-0 top-6 bottom-6 w-[2px] bg-amber-500 rounded-r-full"></div>
+<div class="flex justify-between items-start mb-3">
+<span class="text-[10px] font-label font-bold text-slate-500 uppercase tracking-widest">TSK-2042</span>
+<span class="text-[10px] font-headline font-bold text-cyan-400">$0.08</span>
+</div>
+<h4 class="text-sm font-headline font-bold text-slate-200 mb-3 leading-relaxed">System Health Audit: Regional Convoy Latency</h4>
+<div class="flex items-center gap-2 mb-4">
+<span class="bg-amber-500/10 text-amber-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Planning</span>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-white/5">
+<div class="flex -space-x-2">
+<img alt="Agent" class="w-6 h-6 rounded-full bg-[#1c2130] border-2 border-[#141820]" data-alt="minimalist 3D render of a specialized AI probe robot with spherical design and violet highlights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFtxmq945_jmRoIz6XtI_JN6EPZ4eyngvx-xwsqG-s4naoJQUtW9pLZSmWWoRr2V54SV_EwdPTpVLiB_qt2n1sHXpftQ6ABcMrtIvvAFJW6tltUJTp9Cp4slUMjcNF0KXiSdPqyX4TPQ9Qa2v5DEs8AE8--gAUDOEc-1psEeyqs79alTDlIHH1Bg31c9s1Pt8Ebi5amuFtcSpGraRHFOYfx_uaYaIErjZVgF4BCtGe0_WC_mUCKvXfwIaac4VwmtKETCHw5JYRH3U"/>
+</div>
+<button class="text-[10px] font-label font-bold text-slate-400 hover:text-blue-400 transition-colors flex items-center gap-1 uppercase tracking-widest">
+                Deploy <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- In Progress Column -->
+<div class="flex-1 flex flex-col min-w-[320px]">
+<div class="flex items-center justify-between mb-4 px-2">
+<div class="flex items-center gap-2">
+<h3 class="font-headline font-bold text-white tracking-tight">In Progress</h3>
+<span class="text-xs font-label text-slate-500 font-bold bg-[#1c2130] px-2 py-0.5 rounded-full">3</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+<!-- Card 3 -->
+<div class="bg-[#141820] rounded-2xl p-5 border border-white/5 relative group hover:-translate-y-1 transition-all duration-200">
+<div class="absolute left-0 top-6 bottom-6 w-[2px] bg-green-500 rounded-r-full"></div>
+<div class="flex justify-between items-start mb-3">
+<span class="text-[10px] font-label font-bold text-slate-500 uppercase tracking-widest">OPS-882</span>
+<span class="text-[10px] font-headline font-bold text-cyan-400">$4.12</span>
+</div>
+<h4 class="text-sm font-headline font-bold text-slate-200 mb-3 leading-relaxed">Real-time Stream Orchestration for Alpha-Centauri Node</h4>
+<div class="flex items-center gap-2 mb-4">
+<span class="bg-green-500/10 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Running</span>
+</div>
+<div class="w-full bg-[#1c2130] h-1 rounded-full overflow-hidden mb-4">
+<div class="bg-green-500 h-full w-2/3"></div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-white/5">
+<div class="flex -space-x-2">
+<img alt="Agent" class="w-6 h-6 rounded-full bg-[#1c2130] border-2 border-[#141820]" data-alt="3D avatar of a high-performance compute agent with glowing emerald accents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGuN22Iw5jadyWkqQmZxncR9bDAvKygkuNkNy-CvXmvPh2EvIpn2G1ndsIGjmsJZFtdS3bMSd-xQgA9jPXn2gMcqnEPvkijInntbw1l88ST1wmB_kh7cO7HLm8Z2G6xutyzLpkQJz4ORJt2U57-JxpggbsK4EgbtFmEEFnNox4sptKJ6vh4kuXwl6MbQP6JEfyBrkC8Hk2r2MYFJX6BuoVfyZrbpeUHAltr_rX9tmTOoqtnQXZY8TvmDnQJgV-5kAsWylhZvLpeHA"/>
+</div>
+<button class="text-[10px] font-label font-bold text-slate-400 hover:text-white transition-colors flex items-center gap-1 uppercase tracking-widest">
+                Monitor <span class="material-symbols-outlined text-[14px]">sensors</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- In Review Column -->
+<div class="flex-1 flex flex-col min-w-[320px]">
+<div class="flex items-center justify-between mb-4 px-2">
+<div class="flex items-center gap-2">
+<h3 class="font-headline font-bold text-white tracking-tight">In Review</h3>
+<span class="text-xs font-label text-slate-500 font-bold bg-[#1c2130] px-2 py-0.5 rounded-full">2</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+<!-- Card 4 -->
+<div class="bg-[#141820] rounded-2xl p-5 border border-white/5 relative group hover:-translate-y-1 transition-all duration-200">
+<div class="absolute left-0 top-6 bottom-6 w-[2px] bg-purple-500 rounded-r-full"></div>
+<div class="flex justify-between items-start mb-3">
+<span class="text-[10px] font-label font-bold text-slate-500 uppercase tracking-widest">RVK-102</span>
+<span class="text-[10px] font-headline font-bold text-cyan-400">$0.45</span>
+</div>
+<h4 class="text-sm font-headline font-bold text-slate-200 mb-3 leading-relaxed">Semantic Logic Validation for Specialist Handoffs</h4>
+<div class="flex items-center gap-2 mb-4">
+<span class="bg-purple-500/10 text-purple-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Reviewing</span>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-white/5">
+<div class="flex -space-x-2">
+<img alt="Agent" class="w-6 h-6 rounded-full bg-[#1c2130] border-2 border-[#141820]" data-alt="stylized 3D render of a geometric auditor robot with soft purple lighting and obsidian surfaces" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdqbtzwf5fpL2AvOBFsnr2U_eJIptv5G4j3e-45FJsUaMRuojq2vAGRppOaNo2EHKyvAlbIb5qpbDgWVQlySqXaQKtLVlf0DmBO3qCa5MTxg2AXd-C6w27AwjAXYdkTl7KKQFJpow2EVK30oqPmTKruCGsf_bMJGfOcnb_IMu8ksjQatCgwjVdbkhHNFpsmAGGdHDoQl-vOoArDM3J54ugMu6mYXuSbAi4dR3BIy69MH14xAHJuIyJTYtoCuUgEDNpj7g4pAPuigg"/>
+</div>
+<button class="text-[10px] font-label font-bold text-white bg-blue-500 px-3 py-1.5 rounded-lg hover:bg-blue-600 transition-colors uppercase tracking-widest">
+                Review
+              </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Overlay for Modal/Dialog states (Hidden) -->
+<div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center">
+<div class="bg-[#141820] w-[480px] rounded-2xl border border-white/5 p-8 shadow-2xl">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-xl font-headline font-bold text-white">Agent Deployment</h2>
+<button class="text-slate-500 hover:text-white"><span class="material-symbols-outlined">close</span></button>
+</div>
+<div class="space-y-4">
+<div class="p-4 bg-[#1c2130] rounded-xl border border-white/5">
+<p class="text-xs text-slate-400 font-label mb-1 uppercase tracking-widest">Selected Agent</p>
+<p class="text-white font-headline font-bold">Specialist-Theta-9</p>
+</div>
+<div class="flex gap-4">
+<div class="flex-1 p-4 bg-[#1c2130] rounded-xl border border-white/5">
+<p class="text-xs text-slate-400 font-label mb-1 uppercase tracking-widest">Compute cost</p>
+<p class="text-white font-headline font-bold text-cyan-400">$0.04/hr</p>
+</div>
+<div class="flex-1 p-4 bg-[#1c2130] rounded-xl border border-white/5">
+<p class="text-xs text-slate-400 font-label mb-1 uppercase tracking-widest">Est. Duration</p>
+<p class="text-white font-headline font-bold">12 mins</p>
+</div>
+</div>
+</div>
+<button class="w-full bg-blue-500 text-white font-headline font-bold py-3 rounded-xl mt-8 hover:bg-blue-600 transition-all active:scale-[0.98]">Confirm Activation</button>
+</div>
+</div>
+</body></html>

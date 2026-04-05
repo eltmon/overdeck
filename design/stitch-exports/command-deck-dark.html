@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Panopticon - Command Deck</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-dim": "#699cff",
+                    "on-tertiary-fixed-variant": "#005564",
+                    "secondary": "#ddb7ff",
+                    "surface-container": "#10192f",
+                    "surface": "#090e1c",
+                    "surface-container-highest": "#192542",
+                    "tertiary-fixed-dim": "#40ceed",
+                    "tertiary-container": "#53ddfc",
+                    "surface-container-high": "#151f38",
+                    "outline": "#6a7597",
+                    "tertiary-dim": "#40ceed",
+                    "primary-fixed": "#4388fd",
+                    "on-tertiary-fixed": "#003640",
+                    "background": "#090e1c",
+                    "on-primary": "#003d88",
+                    "tertiary": "#8ce7ff",
+                    "on-secondary-fixed": "#5e00a2",
+                    "surface-container-low": "#0b1326",
+                    "outline-variant": "#3c4767",
+                    "on-surface": "#dee4ff",
+                    "primary-container": "#0e69dc",
+                    "surface-variant": "#192542",
+                    "primary": "#adc6ff",
+                    "error-container": "#871f21",
+                    "surface-container-lowest": "#000000",
+                    "secondary-dim": "#9c48ea",
+                    "on-secondary": "#5f00a4",
+                    "on-tertiary": "#005464",
+                    "on-surface-variant": "#9faacf",
+                    "error": "#fa746f",
+                    "inverse-surface": "#faf8ff",
+                    "surface-tint": "#adc6ff",
+                    "primary-fixed-dim": "#317bef",
+                    "secondary-container": "#590099",
+                    "on-primary-fixed-variant": "#001435",
+                    "secondary-fixed-dim": "#e7c9ff",
+                    "on-error-container": "#ff9993",
+                    "error-dim": "#c54d4a",
+                    "on-tertiary-container": "#004b58",
+                    "on-secondary-fixed-variant": "#8126cf",
+                    "inverse-on-surface": "#505566",
+                    "surface-dim": "#090e1c",
+                    "on-background": "#dee4ff",
+                    "on-error": "#490006",
+                    "tertiary-fixed": "#53ddfc",
+                    "on-primary-fixed": "#000000",
+                    "secondary-fixed": "#f0dbff",
+                    "on-secondary-container": "#d8aeff",
+                    "inverse-primary": "#005bc4",
+                    "on-primary-container": "#ffffff",
+                    "surface-bright": "#202b49"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #0c0f16; color: #94a3b8; }
+        h1, h2, h3, h4, .font-headline { font-family: 'Space Grotesk', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1c2130; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex min-h-screen overflow-hidden">
+<!-- SideNavBar -->
+<aside class="flex flex-col h-screen sticky top-0 left-0 bg-[#0c0f16] w-[220px] border-r border-white/10 shrink-0">
+<div class="p-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-primary-container flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-white text-lg" data-icon="terminal">terminal</span>
+</div>
+<div>
+<h1 class="text-lg font-black text-white leading-none">Panopticon</h1>
+<p class="font-['Space_Grotesk'] text-[10px] font-bold uppercase tracking-widest text-primary-dim">Agent Orchestration</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-3 space-y-1 mt-4">
+<p class="px-3 mb-2 font-['Space_Grotesk'] text-[10px] font-bold uppercase tracking-widest text-gray-500">Operations</p>
+<a class="flex items-center gap-3 px-3 py-2 border-l-2 border-blue-500 bg-white/5 text-blue-400 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span>Command Deck</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 border-l-2 border-transparent text-gray-500 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest hover:bg-white/5 hover:text-gray-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span>Operations</span>
+</a>
+<p class="px-3 mt-6 mb-2 font-['Space_Grotesk'] text-[10px] font-bold uppercase tracking-widest text-gray-500">Infrastructure</p>
+<a class="flex items-center gap-3 px-3 py-2 border-l-2 border-transparent text-gray-500 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest hover:bg-white/5 hover:text-gray-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dns">dns</span>
+<span>Infrastructure</span>
+</a>
+<p class="px-3 mt-6 mb-2 font-['Space_Grotesk'] text-[10px] font-bold uppercase tracking-widest text-gray-500">Observability</p>
+<a class="flex items-center gap-3 px-3 py-2 border-l-2 border-transparent text-gray-500 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest hover:bg-white/5 hover:text-gray-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span>Observability</span>
+</a>
+<p class="px-3 mt-6 mb-2 font-['Space_Grotesk'] text-[10px] font-bold uppercase tracking-widest text-gray-500">System</p>
+<a class="flex items-center gap-3 px-3 py-2 border-l-2 border-transparent text-gray-500 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest hover:bg-white/5 hover:text-gray-200 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span>System</span>
+</a>
+</nav>
+<div class="p-4 border-t border-white/10 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span>Support</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-500 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span>Documentation</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col h-screen overflow-hidden">
+<!-- Top Header Bar -->
+<header class="h-16 flex items-center justify-between px-6 bg-[#0c0f16] border-b border-white/10 shrink-0">
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="absolute inset-y-0 left-3 flex items-center text-gray-500">
+<span class="material-symbols-outlined text-sm" data-icon="search">search</span>
+</span>
+<input class="bg-white/5 border-none rounded-lg pl-10 pr-4 py-1.5 text-xs text-white placeholder-gray-500 focus:ring-1 focus:ring-blue-500 w-64" placeholder="Global Search..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-gray-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-gray-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded bg-surface-container-highest border border-white/10 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="User profile portrait in a minimalist digital workspace setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD01YumG5IX57yPM-M5a16fgSsKGXIOL8uK-0NK-JLcRaasJzduUrUiwcEl5rIN_Us3nA10SdTJY77LaNeunWluWYg1QHJ4HDzivz3WeOujHhn0PmZ1Jz0TRwSed-nziNN3_YPNUCGso-ymPpoQQ6UQAXYsp_JgHsgnlEVsZZARSLTLDcW70b07vKjv9Vp9olXYQAq8hppC85g30-WSPKycGJVFr0uMqTFHeogk6hYoU_Swg6JbV35Kee1pToOY1Xh7yhsUL1oLBvc"/>
+</div>
+</div>
+</header>
+<!-- Command Deck Split View -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Left Pane: Tree View (40%) -->
+<section class="w-2/5 border-r border-white/10 bg-[#0c0f16] flex flex-col overflow-hidden">
+<div class="p-4 border-b border-white/10 bg-white/[0.02]">
+<div class="flex items-center justify-between">
+<h2 class="text-xs font-bold uppercase tracking-tighter text-white">Project Explorer</h2>
+<span class="material-symbols-outlined text-sm text-gray-500 cursor-pointer" data-icon="filter_list">filter_list</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar p-2">
+<!-- Conversations Section -->
+<div class="mb-2">
+<div class="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer group">
+<span class="material-symbols-outlined text-xs text-gray-600 group-hover:text-gray-400" data-icon="keyboard_arrow_right">keyboard_arrow_right</span>
+<span class="material-symbols-outlined text-sm text-blue-400" data-icon="chat_bubble_outline">chat_bubble_outline</span>
+<span class="text-xs font-medium text-gray-300">Conversations</span>
+<span class="ml-auto text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-gray-500">0 +</span>
+</div>
+</div>
+<!-- Projects -->
+<div class="space-y-4">
+<!-- Project 1 -->
+<div>
+<div class="flex items-center gap-2 px-2 py-1.5 bg-white/5 rounded-t border-l-2 border-blue-500">
+<span class="material-symbols-outlined text-xs text-gray-400" data-icon="keyboard_arrow_down">keyboard_arrow_down</span>
+<span class="material-symbols-outlined text-sm text-gray-400" data-icon="folder">folder</span>
+<span class="text-xs font-bold text-white tracking-tight">panopticon-cli</span>
+</div>
+<div class="ml-4 border-l border-white/5">
+<!-- Issue Active -->
+<div class="relative group cursor-pointer bg-white/[0.03] border-l-2 border-blue-500 p-3 mt-1 hover:bg-white/[0.05] transition-all">
+<div class="flex items-start justify-between mb-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-green-500" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-[10px] font-mono text-gray-500">PAN-408</span>
+</div>
+<span class="text-[10px] font-bold text-cyan-400">$11.96</span>
+</div>
+<h3 class="text-xs font-medium text-white mb-2 leading-snug">Implement reactive WebSocket listeners for real-time fleet metrics</h3>
+<div class="flex gap-2">
+<span class="text-[9px] px-2 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full">Done</span>
+<span class="text-[9px] px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full">Has Context</span>
+</div>
+</div>
+<!-- Issue 2 -->
+<div class="relative group cursor-pointer p-3 border-l-2 border-transparent hover:bg-white/[0.02] transition-all">
+<div class="flex items-start justify-between mb-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-gray-600" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="text-[10px] font-mono text-gray-500">PAN-412</span>
+</div>
+<span class="text-[10px] font-bold text-cyan-400">$4.20</span>
+</div>
+<h3 class="text-xs font-medium text-gray-400 mb-2 leading-snug">Refactor orchestration layer for multi-agent concurrency</h3>
+<div class="flex gap-2">
+<span class="text-[9px] px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full">Planning</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Project 2 -->
+<div>
+<div class="flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 rounded cursor-pointer">
+<span class="material-symbols-outlined text-xs text-gray-600" data-icon="keyboard_arrow_right">keyboard_arrow_right</span>
+<span class="material-symbols-outlined text-sm text-gray-400" data-icon="folder">folder</span>
+<span class="text-xs font-bold text-gray-400 tracking-tight">mind-your-now</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Pane: Detail View (60%) -->
+<section class="flex-1 bg-[#141820] flex flex-col overflow-hidden relative">
+<!-- Background visual noise/gradient -->
+<div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(circle at 50% 50%, #3b82f6 0%, transparent 70%);"></div>
+<div class="p-8 pb-4 z-10">
+<div class="flex items-center gap-3 mb-4">
+<span class="text-[11px] font-mono font-bold px-2 py-1 bg-white/5 text-gray-400 rounded">PAN-408</span>
+<div class="h-[1px] flex-1 bg-white/5"></div>
+<div class="flex gap-4">
+<div class="flex flex-col items-end">
+<span class="text-[9px] uppercase tracking-widest text-gray-500">Duration</span>
+<span class="text-xs font-bold text-white">2h 45m</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[9px] uppercase tracking-widest text-gray-500">Total Cost</span>
+<span class="text-xs font-bold text-cyan-400">$11.96</span>
+</div>
+</div>
+</div>
+<h2 class="text-2xl font-bold text-[#e2e8f0] leading-tight mb-6 max-w-2xl">
+                        Implement reactive WebSocket listeners for real-time fleet metrics
+                    </h2>
+<!-- Tabs -->
+<div class="flex items-center gap-8 border-b border-white/5">
+<button class="pb-3 text-xs font-bold uppercase tracking-widest text-blue-400 border-b border-blue-500">Activity</button>
+<button class="pb-3 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-300">Terminal</button>
+<button class="pb-3 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-300">Tasks</button>
+<button class="pb-3 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-300">vBRIEF</button>
+</div>
+</div>
+<!-- Tab Content: Activity Timeline -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-8 pt-4 z-10">
+<div class="space-y-6 relative">
+<!-- Timeline Line -->
+<div class="absolute left-[7px] top-2 bottom-2 w-[1px] bg-white/5"></div>
+<!-- Timeline Item 1 -->
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-[14px] h-[14px] rounded-full border-2 border-[#141820] bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="text-[11px] font-bold text-gray-400">Agent "Observability-1" initialized</span>
+<span class="text-[10px] font-mono text-gray-600">14:02:11</span>
+</div>
+<div class="bg-white/[0.02] border border-white/5 p-3 rounded-lg">
+<p class="text-xs text-gray-400 leading-relaxed">Scanning codebase for existing WebSocket implementation patterns in <code class="text-blue-300 bg-blue-900/30 px-1 rounded">/src/network</code>. Found legacy event emitters.</p>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-[14px] h-[14px] rounded-full border-2 border-[#141820] bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="text-[11px] font-bold text-gray-400">Environment analysis complete</span>
+<span class="text-[10px] font-mono text-gray-600">14:15:45</span>
+</div>
+<div class="bg-white/[0.02] border border-white/5 p-3 rounded-lg">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-xs text-cyan-400" data-icon="terminal">terminal</span>
+<span class="text-[10px] font-mono text-cyan-500">npm test --grep "websocket"</span>
+</div>
+<p class="text-xs text-gray-400 leading-relaxed">Running diagnostic suite to verify baseline network latency and connection stability before implementation.</p>
+</div>
+</div>
+<!-- Timeline Item 3 -->
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-[14px] h-[14px] rounded-full border-2 border-[#141820] bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="text-[11px] font-bold text-gray-400">Code Architecture Proposal</span>
+<span class="text-[10px] font-mono text-gray-600">14:48:22</span>
+</div>
+<div class="bg-white/[0.02] border border-white/5 p-3 rounded-lg">
+<p class="text-xs text-gray-400 leading-relaxed">Generated abstract listener interface to support multiple protocol backends (WS, gRPC, SSE).</p>
+<div class="mt-3 flex gap-4">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-green-400" data-icon="add_circle">add_circle</span>
+<span class="text-[10px] text-gray-500">124 lines</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-red-400" data-icon="remove_circle">remove_circle</span>
+<span class="text-[10px] text-gray-500">42 lines</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Timeline Item 4 (Ongoing) -->
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 w-[14px] h-[14px] rounded-full border-2 border-[#141820] bg-amber-500 animate-pulse"></div>
+<div class="flex items-center justify-between mb-1">
+<span class="text-[11px] font-bold text-gray-200 italic">Agent is currently drafting unit tests...</span>
+<span class="text-[10px] font-mono text-gray-600">Active Now</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Action Bar -->
+<div class="p-6 border-t border-white/5 bg-white/[0.02] z-10">
+<div class="flex items-center gap-4">
+<div class="flex-1 relative">
+<input class="w-full bg-[#0c0f16] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50" placeholder="Instruct the agent..." type="text"/>
+<div class="absolute right-2 top-2 flex gap-2">
+<button class="p-1 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="attach_file">attach_file</span>
+</button>
+<button class="p-1 text-blue-500 hover:text-blue-400 transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="send">send</span>
+</button>
+</div>
+</div>
+<button class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-widest rounded-lg transition-all shadow-lg shadow-blue-900/20">
+                            Pause Session
+                        </button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Contextual FAB (Suppressed based on rules for Details/Focused view, but if needed for dashboard context:) -->
+<!-- <div class="fixed bottom-8 right-8">
+        <button class="w-14 h-14 bg-primary-container text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+            <span class="material-symbols-outlined text-2xl" data-icon="add">add</span>
+        </button>
+    </div> -->
+</body></html>
