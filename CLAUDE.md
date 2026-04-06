@@ -248,7 +248,7 @@ Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
 ### Auto-Behaviors
 
 - `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write
-- `complete-planning` copies `STATE.md` and `plan.vbrief.json` to `docs/prds/active/<ID>-plan.*` (skip if exists)
+- `complete-planning` copies `STATE.md` and `plan.vbrief.json` to `docs/prds/active/<issue-id>/` (skip if exists)
 - `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.planning/prd.md`
 
 ### Dashboard Viewer

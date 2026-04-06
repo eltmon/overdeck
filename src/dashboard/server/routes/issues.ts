@@ -880,14 +880,14 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           }
         }
 
-        // Auto-copy planning artifacts to docs/prds/active/ (skip if already exist)
+        // Auto-copy planning artifacts to docs/prds/active/<issue-id>/ (skip if already exist)
         try {
-          const activeDir = join(gitRoot, 'docs', 'prds', 'active');
-          await mkdir(activeDir, { recursive: true });
+          const issueActiveDir = join(gitRoot, 'docs', 'prds', 'active', id);
+          await mkdir(issueActiveDir, { recursive: true });
           const stateMd = join(planningDir, 'STATE.md');
           const planVbrief = join(planningDir, 'plan.vbrief.json');
-          const destStateMd = join(activeDir, `${id}-plan.md`);
-          const destPlanVbrief = join(activeDir, `${id}-plan.vbrief.json`);
+          const destStateMd = join(issueActiveDir, 'STATE.md');
+          const destPlanVbrief = join(issueActiveDir, 'plan.vbrief.json');
           if (existsSync(stateMd)) {
             const stateMdExists = await access(destStateMd).then(() => true).catch(() => false);
             if (!stateMdExists) {

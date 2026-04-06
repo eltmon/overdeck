@@ -3,12 +3,13 @@
 ## Status: In Progress
 
 ## Current Phase
-Working on bead panopticon-bjd (archive structure: flat → per-issue subdirectory).
+Working on bead panopticon-b6g (.gitignore injection for .pan/ subdirs).
 
 ## Completed Work
 - [x] panopticon-u6e: Copied docs/REPO-ARTIFACTS.md to workspace branch (commit: c6064e0)
 - [x] panopticon-wju: Renamed project-level .panopticon/ paths to .pan/ in wal.ts, sync-wal.ts, convoy-templates.ts, convoy.ts, remote-agents.ts, projects.ts, project.ts (commit: e5906a8)
-- [x] panopticon-d31: Updated config-yaml.ts to load .pan.yaml first, fall back to .panopticon.yaml with deprecation warning; updated hasProjectConfig, getProjectConfigPath; updated comments/strings in shadow-mode.ts, config.ts (commit: pending)
+- [x] panopticon-d31: Updated config-yaml.ts to load .pan.yaml first, fall back to .panopticon.yaml with deprecation warning; updated hasProjectConfig, getProjectConfigPath; updated comments/strings in shadow-mode.ts, config.ts (commit: fb7c862)
+- [x] panopticon-bjd: Changed archive structure from flat to per-issue subdir in complete-planning route and movePrd in archive-planning.ts; added numericSuffix to findWorkspacePath; updated planning prompts (commit: pending)
 
 ## Remaining Work
 - [ ] panopticon-wju: Rename all project-level .panopticon/ path references to .pan/
