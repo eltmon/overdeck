@@ -26,6 +26,7 @@ None
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-06T14:49Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 
 ## Summary
 

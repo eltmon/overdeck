@@ -13,7 +13,7 @@ import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
 import { migratePanopticonToPan } from '../../lib/workspace-manager.js';
-import { runMultiToolSync } from '../../lib/multi-tool-sync.js';
+import { runMultiToolSync, resolveAlsoSyncTools } from '../../lib/multi-tool-sync.js';
 
 // Get path to bundled git hooks
 const __filename = fileURLToPath(import.meta.url);
@@ -79,6 +79,41 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
                         item.status === 'symlink' ? chalk.dim('[update]') :
                         chalk.green('[new]');
           console.log(`  ${icon} ${item.name} ${label}`);
+        }
+      }
+    }
+
+    // Show .pan/skills/ source files for each registered project
+    const dryRunProjects = listProjects();
+    for (const { config } of dryRunProjects) {
+      if (!existsSync(config.path)) continue;
+      const panSkillsDir = join(config.path, '.pan', 'skills');
+      if (existsSync(panSkillsDir)) {
+        const skills = readdirSync(panSkillsDir, { withFileTypes: true })
+          .filter(e => e.isDirectory())
+          .map(e => e.name);
+        if (skills.length > 0) {
+          console.log(chalk.cyan(`\n.pan/skills/ (${config.name}):`));
+          for (const skillName of skills) {
+            console.log(`  ${chalk.green('+')} ${skillName} ${chalk.green('[project-local]')}`);
+          }
+        }
+      }
+
+      // Show multi-tool sync targets
+      const tools = resolveAlsoSyncTools(config.path);
+      if (tools.length > 0) {
+        console.log(chalk.cyan(`\nmulti-tool sync (${config.name}): ${tools.join(', ')}`));
+        const panSkillsDirExists = existsSync(join(config.path, '.pan', 'skills'));
+        if (panSkillsDirExists) {
+          const skills = readdirSync(join(config.path, '.pan', 'skills'), { withFileTypes: true })
+            .filter(e => e.isDirectory())
+            .map(e => e.name);
+          for (const tool of tools) {
+            for (const skillName of skills) {
+              console.log(`  ${chalk.green('+')} ${skillName} → ${tool}`);
+            }
+          }
         }
       }
     }
