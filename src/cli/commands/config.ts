@@ -132,7 +132,7 @@ async function configShadowCommand(options: ShadowOptions): Promise<void> {
     // Configuration files
     console.log(chalk.dim('\nConfiguration sources (highest to lowest priority):'));
     console.log(chalk.dim('  1. CLI flag --shadow / --no-shadow'));
-    console.log(chalk.dim('  2. Per-project .panopticon.yaml'));
+    console.log(chalk.dim('  2. Per-project .pan.yaml'));
     console.log(chalk.dim('  3. Global ~/.panopticon/config.yaml'));
     console.log(chalk.dim('  4. Environment SHADOW_MODE'));
     console.log(chalk.dim('  5. Default: false'));

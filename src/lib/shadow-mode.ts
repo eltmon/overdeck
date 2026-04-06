@@ -40,7 +40,7 @@ export interface ShadowModeResult {
  * Priority (highest to lowest):
  * 1. CLI flag --shadow / --no-shadow
  * 2. Existing shadow state for the issue
- * 3. Per-project .panopticon.yaml shadow.enabled
+ * 3. Per-project .pan.yaml shadow.enabled
  * 4. Global ~/.panopticon/config.yaml shadow.enabled
  * 5. Global ~/.panopticon.env SHADOW_MODE
  * 6. Default: false

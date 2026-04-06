@@ -13,7 +13,7 @@ import { listProjects } from '../projects.js';
 import { insertCostEvents } from '../database/cost-events-db.js';
 import type { CostEvent } from './events.js';
 
-const DEFAULT_EVENTS_SUBDIR = '.panopticon/events';
+const DEFAULT_EVENTS_SUBDIR = '.pan/events';
 
 export interface SyncResult {
   /** Total events imported across all projects */

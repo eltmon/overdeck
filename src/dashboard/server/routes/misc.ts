@@ -1187,7 +1187,7 @@ const postPlanningMessageRoute = HttpRouter.add(
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, vBRIEF plan at \`.planning/plan.vbrief.json\`, implementation plan at \`docs/prds/active/{issue-id}-plan.md\`)
+- Generate planning artifacts (STATE.md, vBRIEF plan at \`.planning/plan.vbrief.json\`, implementation plan at \`docs/prds/active/{issue-id}/STATE.md\`)
 - Present options and tradeoffs
 
 ---

@@ -72,7 +72,7 @@ function getConvoyStateFile(convoyId: string): string {
 
 function getConvoyOutputDir(convoyId: string, template: ConvoyTemplate): string {
   // Use template's output dir if specified, otherwise default
-  const baseDir = template.config?.outputDir || '.panopticon/convoy-output';
+  const baseDir = template.config?.outputDir || '.pan/convoy';
   return join(process.cwd(), baseDir, convoyId);
 }
 
