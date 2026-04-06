@@ -794,11 +794,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
                             }}
                           />
                         ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <div className="flex items-center gap-2 text-content-muted">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Connecting to terminal...
-                            </div>
+                          <div className="flex flex-col items-center justify-center h-full gap-2">
+                            <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+                            <p className="text-sm text-content-body">Attaching to planning session...</p>
+                            <p className="text-xs text-content-muted font-mono">planning-{issue.identifier.toLowerCase()}</p>
                           </div>
                         )}
                       </>
