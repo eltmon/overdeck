@@ -756,6 +756,38 @@ export function listRunningAgents(): (AgentState & { tmuxActive: boolean })[] {
   return agents;
 }
 
+/**
+ * Scan ~/.panopticon/agents/ for state files with bare numeric issueIds
+ * (e.g. "484" instead of "PAN-484") and log warnings to stderr.
+ *
+ * These workspaces were created before the pan- prefix convention and may
+ * cause cross-tracker pollution if their in_review transition is triggered.
+ * Called once at server startup to surface legacy state files.
+ */
+export function warnOnBareNumericIssueIds(): void {
+  if (!existsSync(AGENTS_DIR)) return;
+
+  const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory());
+
+  const legacy: string[] = [];
+  for (const dir of dirs) {
+    const state = getAgentState(dir.name);
+    if (state?.issueId && /^\d+$/.test(state.issueId)) {
+      legacy.push(`${dir.name} (issueId: "${state.issueId}")`);
+    }
+  }
+
+  if (legacy.length > 0) {
+    console.warn(
+      `[agents] WARNING: ${legacy.length} agent state file(s) have bare numeric issueIds ` +
+      `(created before the pan- prefix convention). These agents will not be able to ` +
+      `transition tracker state. Consider removing or updating them:\n` +
+      legacy.map(l => `  ~/.panopticon/agents/${l}`).join('\n')
+    );
+  }
+}
+
 export function stopAgent(agentId: string): void {
   const normalizedId = normalizeAgentId(agentId);
 
