@@ -178,7 +178,7 @@ export function ActionsSection({
           </button>
         )}
 
-        {/* Start Agent when no agent or stopped */}
+        {/* Start/Resume Agent when no agent or stopped */}
         {(!agent || agent.status === 'stopped') && (
           <>
             <button
@@ -187,7 +187,7 @@ export function ActionsSection({
               className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded hover:bg-blue-600 disabled:opacity-50 font-medium bg-pan-primary"
             >
               {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : startAgentMutation.isSuccess ? <Check className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-              {startAgentMutation.isPending ? 'Starting...' : startAgentMutation.isSuccess ? 'Started!' : 'Start Agent'}
+              {startAgentMutation.isPending ? (agent ? 'Resuming...' : 'Starting...') : startAgentMutation.isSuccess ? (agent ? 'Resumed!' : 'Started!') : (agent ? 'Resume Agent' : 'Start Agent')}
             </button>
             {!workspace?.exists && (
               <button
@@ -212,6 +212,11 @@ export function ActionsSection({
       {mergeMutation.isError && (
         <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded mt-2">
           {mergeMutation.error instanceof Error ? mergeMutation.error.message : 'Failed to merge'}
+        </div>
+      )}
+      {startAgentMutation.isError && (
+        <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded mt-2">
+          {startAgentMutation.error instanceof Error ? startAgentMutation.error.message : 'Failed to start agent'}
         </div>
       )}
       {syncMainMutation.isError && (

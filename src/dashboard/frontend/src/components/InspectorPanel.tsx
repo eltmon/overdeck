@@ -195,7 +195,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issueId, projectId: issue?.project?.id }),
       });
-      if (!res.ok) throw new Error('Failed to start agent');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to start agent');
+      }
       return res.json();
     },
     onSuccess: () => {
