@@ -3,14 +3,15 @@
 ## Status: In Progress
 
 ## Current Phase
-Working on bead panopticon-0dp (safe migration of .panopticon/ subdirs).
+Working on bead panopticon-2nu (.pan/skills/ as sync source).
 
 ## Completed Work
 - [x] panopticon-u6e: Copied docs/REPO-ARTIFACTS.md to workspace branch (commit: c6064e0)
 - [x] panopticon-wju: Renamed project-level .panopticon/ paths to .pan/ in wal.ts, sync-wal.ts, convoy-templates.ts, convoy.ts, remote-agents.ts, projects.ts, project.ts (commit: e5906a8)
 - [x] panopticon-d31: Updated config-yaml.ts to load .pan.yaml first, fall back to .panopticon.yaml with deprecation warning; updated hasProjectConfig, getProjectConfigPath; updated comments/strings in shadow-mode.ts, config.ts (commit: fb7c862)
 - [x] panopticon-bjd: Changed archive structure from flat to per-issue subdir in complete-planning route and movePrd in archive-planning.ts; added numericSuffix to findWorkspacePath; updated planning prompts (commit: 733b567)
-- [x] panopticon-b6g: Added ensurePanGitignore() to workspace-manager.ts, called during createWorkspace(); injects .pan/events/, .pan/convoy/, .pan/prompts/ into project .gitignore (commit: pending)
+- [x] panopticon-b6g: Added ensurePanGitignore() to workspace-manager.ts, called during createWorkspace(); injects .pan/events/, .pan/convoy/, .pan/prompts/ into project .gitignore (commit: 2226565)
+- [x] panopticon-0dp: Added migratePanopticonToPan() to workspace-manager.ts; called during pan sync for all registered projects; handles events/triage/health/convoy/prompts → .pan/; warns on conflict (commit: pending)
 
 ## Remaining Work
 - [ ] panopticon-wju: Rename all project-level .panopticon/ path references to .pan/

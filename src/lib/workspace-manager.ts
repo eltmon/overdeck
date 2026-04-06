@@ -4,7 +4,7 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, statSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, statSync, renameSync } from 'fs';
 import { join, dirname, basename, extname, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -22,6 +22,81 @@ import { createHumeConfig, deleteHumeConfig } from './hume.js';
 import { mergeSkillsIntoWorkspace } from './skills-merge.js';
 
 const execAsync = promisify(exec);
+
+export interface PanMigrationResult {
+  /** Subdirectories migrated from .panopticon/ to .pan/ */
+  migrated: string[];
+  /** Subdirectories skipped because .pan/<subdir> already exists */
+  skipped: string[];
+  /** Errors encountered during migration */
+  errors: string[];
+}
+
+/**
+ * Migrate existing .panopticon/<subdir> directories to .pan/<subdir> within a project.
+ *
+ * Safety rules:
+ * - If old path exists and new path does NOT exist → move old to new.
+ * - If both old and new exist → log warning and skip (never overwrite silently).
+ * - If neither exists → nothing to do.
+ * - Only migrates the specific runtime subdirs (events, convoy, prompts).
+ *   .pan/skills/ is not migrated here since it may not have existed before.
+ */
+export function migratePanopticonToPan(projectPath: string): PanMigrationResult {
+  const result: PanMigrationResult = { migrated: [], skipped: [], errors: [] };
+
+  // Map legacy .panopticon/<subdir> paths to new .pan/<subdir> paths,
+  // including convoy unification (triage + health → convoy)
+  const legacyMappings: Array<{ old: string; new: string }> = [
+    { old: '.panopticon/events', new: '.pan/events' },
+    { old: '.panopticon/triage', new: '.pan/convoy' },
+    { old: '.panopticon/health', new: '.pan/convoy' },
+    { old: '.panopticon/convoy-output', new: '.pan/convoy' },
+    { old: '.panopticon/prompts', new: '.pan/prompts' },
+  ];
+
+  for (const { old: oldRelPath, new: newRelPath } of legacyMappings) {
+    const oldPath = join(projectPath, oldRelPath);
+    const newPath = join(projectPath, newRelPath);
+
+    if (!existsSync(oldPath)) continue;
+
+    if (existsSync(newPath)) {
+      const msg = `Migration skipped: both ${oldRelPath} and ${newRelPath} exist in ${projectPath} — remove one manually`;
+      console.warn(`[panopticon] ${msg}`);
+      result.skipped.push(oldRelPath);
+      continue;
+    }
+
+    try {
+      // Ensure parent directory exists
+      const parentDir = dirname(newPath);
+      if (!existsSync(parentDir)) {
+        mkdirSync(parentDir, { recursive: true });
+      }
+      renameSync(oldPath, newPath);
+      result.migrated.push(`${oldRelPath} → ${newRelPath}`);
+    } catch (err: any) {
+      result.errors.push(`${oldRelPath}: ${err.message}`);
+    }
+  }
+
+  // Clean up empty .panopticon/ dir if nothing remains
+  const panopticonDir = join(projectPath, '.panopticon');
+  if (existsSync(panopticonDir)) {
+    try {
+      const remaining = readdirSync(panopticonDir);
+      if (remaining.length === 0) {
+        rmSync(panopticonDir);
+        result.migrated.push('.panopticon/ (empty dir removed)');
+      }
+    } catch {
+      // Non-fatal — dir may have been removed already
+    }
+  }
+
+  return result;
+}
 
 /**
  * Ensure .pan/events/, .pan/convoy/, and .pan/prompts/ are excluded from git tracking
