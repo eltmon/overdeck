@@ -22,6 +22,7 @@ None — all 6 vBRIEF items completed
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-06T23:52Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 
 ## Problem
 
