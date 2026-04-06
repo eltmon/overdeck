@@ -1,188 +1,308 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-06T12:00:00Z",
-    "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-485: Add workspace lifecycle events to fix stale UI after wipe/cleanup/abort"
+    "created": "2026-04-06T16:00:00Z",
+    "author": "panopticon-cli/0.6.0",
+    "description": "Plan for PAN-488: Project repo artifact structure: .pan/ migration + multi-tool skill sync"
   },
   "plan": {
-    "id": "pan-485",
-    "title": "Add workspace lifecycle events to fix stale UI after wipe/cleanup/abort",
+    "id": "pan-488",
+    "title": "Project repo artifact structure: .pan/ migration + multi-tool skill sync",
     "status": "approved",
-    "uid": "b7f3a1d2-9e4c-4b8a-a6d1-3f7e2c5b9a04",
+    "uid": "d7e3a1f4-8b2c-4d9e-a6f1-3c5e7b9d2a4f",
     "author": "agent:claude-opus-4-6",
     "sequence": 1,
-    "created": "2026-04-06T12:00:00Z",
-    "updated": "2026-04-06T12:00:00Z",
+    "created": "2026-04-06T16:00:00Z",
+    "updated": "2026-04-06T16:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/485", "label": "PAN-485", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/488", "label": "PAN-488", "type": "issue" }
     ],
-    "tags": ["events", "workspace-lifecycle", "ui-consistency", "contracts"],
+    "tags": ["migration", "sync", "multi-tool", "project-structure"],
     "narratives": {
-      "Problem": "Workspace operations (wipe, cleanup, abort, start-planning) don't emit domain events, so the frontend stays stale until tracker poll fires (1-3s delay).",
-      "Proposal": "Define 5 new workspace lifecycle events in contracts, emit them in the 4 affected routes, and add reducer cases. The shared reducer pattern means the frontend reacts automatically — no frontend code changes needed."
+      "Problem": "Project-level Panopticon artifacts use inconsistent, verbose paths (.panopticon/) and config names (.panopticon.yaml). Skills only sync to Claude Code. Planning archives use a flat structure that doesn't scale. No project-level skill source directory exists.",
+      "Proposal": "Rename .panopticon/ to .pan/ (project-level only), rename .panopticon.yaml to .pan.yaml with backwards compat, add .pan/skills/ as a sync source, implement multi-tool sync for 6 AI tools, change archive structure to per-issue subdirectories, and add safe workspace migration."
     },
     "items": [
       {
-        "id": "define-events",
-        "title": "Define workspace lifecycle event schemas in contracts",
-        "status": "completed",
+        "id": "add-design-doc",
+        "title": "Add docs/REPO-ARTIFACTS.md to the workspace branch",
+        "status": "pending",
         "priority": "high",
-        "created": "2026-04-06T12:00:00Z",
+        "created": "2026-04-06T16:00:00Z",
         "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-485"
+          "difficulty": "trivial",
+          "issueLabel": "pan-488"
         },
-        "narrative": {
-          "Action": "Add 5 new event schemas (WorkspaceCreatedEvent, WorkspaceWipeStartedEvent, WorkspaceDestroyedEvent, WorkspaceDeletedEvent, WorkspaceAbortedEvent) to packages/contracts/src/events.ts following the existing pattern. Add all 5 to the DomainEvent union."
-        },
+        "narrative": { "Action": "Copy docs/REPO-ARTIFACTS.md from the main worktree (/home/eltmon/Projects/panopticon-cli/docs/REPO-ARTIFACTS.md) into the workspace branch and commit it. This is the authoritative design doc — do not rewrite it." },
         "subItems": [
           {
-            "id": "define-events.ac1",
-            "title": "5 new event schemas exist in events.ts with correct type literals and payload shapes",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "define-events.ac2",
-            "title": "All 5 new events are included in the DomainEvent union",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "define-events.ac3",
-            "title": "contracts package builds cleanly with npm run build",
-            "status": "completed",
+            "id": "add-design-doc.ac1",
+            "title": "docs/REPO-ARTIFACTS.md exists in the workspace and is committed to the feature branch",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
       },
       {
-        "id": "add-reducers",
-        "title": "Add reducer cases for all workspace lifecycle events",
-        "status": "completed",
+        "id": "rename-panopticon-dirs",
+        "title": "Rename all project-level .panopticon/ path references to .pan/",
+        "status": "pending",
         "priority": "high",
-        "created": "2026-04-06T12:00:00Z",
+        "created": "2026-04-06T16:00:00Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-485"
+          "issueLabel": "pan-488"
         },
-        "narrative": {
-          "Action": "Add switch cases in applyEvent() for workspace.created (no-op), workspace.wipe_started (set wiping state on issue), workspace.destroyed (remove agents, reset to todo), workspace.deleted (same as destroyed), workspace.aborted (remove planning agent from agentsById). The exhaustive switch ensures TypeScript catches missing cases."
-        },
+        "narrative": { "Action": "Update DEFAULT_EVENTS_SUBDIR in costs/wal.ts and costs/sync-wal.ts, outputDir in convoy-templates.ts (unify triage+health to .pan/convoy), default in convoy.ts, prompt paths in remote/remote-agents.ts, events_path default in projects.ts. Update all related documentation references. Update existing unit tests to use new paths." },
         "subItems": [
           {
-            "id": "add-reducers.ac1",
-            "title": "workspace.destroyed and workspace.deleted remove agent entries and reset canonicalStatus to todo",
-            "status": "completed",
+            "id": "rename-panopticon-dirs.ac1",
+            "title": "All project-level .panopticon/ path references updated to .pan/ (grep confirms zero remaining project-level references)",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "add-reducers.ac2",
-            "title": "workspace.wipe_started sets a wiping transitional state on the issue",
-            "status": "completed",
+            "id": "rename-panopticon-dirs.ac2",
+            "title": "Convoy outputs unify under .pan/convoy (triage and health share one directory)",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "add-reducers.ac3",
-            "title": "workspace.aborted removes the planning agent from agentsById",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "add-reducers.ac4",
-            "title": "TypeScript exhaustive check passes (no compile errors)",
-            "status": "completed",
+            "id": "rename-panopticon-dirs.ac3",
+            "title": "Existing unit tests for cost WAL pass after path rename",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
       },
       {
-        "id": "emit-in-routes",
-        "title": "Emit workspace events in the 4 affected route handlers",
-        "status": "completed",
+        "id": "rename-config-yaml",
+        "title": "Rename .panopticon.yaml to .pan.yaml with backwards compat",
+        "status": "pending",
         "priority": "high",
-        "created": "2026-04-06T12:00:00Z",
+        "created": "2026-04-06T16:00:00Z",
         "metadata": {
           "difficulty": "medium",
-          "issueLabel": "pan-485"
+          "issueLabel": "pan-488"
         },
-        "narrative": {
-          "Action": "In issues.ts routes: (1) start-planning: emit workspace.created after worktree setup, before planning.started. (2) abort-planning: emit agent.stopped for the planning agent (planning-pan-<id>) after tmux kill-session; if deleteWorkspace=true also emit workspace.deleted. (3) cleanup-workspace: emit workspace.deleted after successful cleanup. (4) deep-wipe: emit workspace.wipe_started at start, workspace.destroyed at end. Use existing eventStore.append() pattern via Effect DI."
-        },
+        "narrative": { "Action": "Update loadProjectConfig() to check .pan.yaml first, fall back to .panopticon.yaml with stderr deprecation warning. Update hasProjectConfig() and getProjectConfigPath(). Update workspace setup to generate .pan.yaml. Update config command display text. Update documentation." },
         "subItems": [
           {
-            "id": "emit-in-routes.ac1",
-            "title": "start-planning emits workspace.created after worktree creation",
-            "status": "completed",
+            "id": "rename-config-yaml.ac1",
+            "title": ".pan.yaml is loaded as the canonical config filename",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "emit-in-routes.ac2",
-            "title": "deep-wipe emits workspace.wipe_started immediately and workspace.destroyed on completion",
-            "status": "completed",
+            "id": "rename-config-yaml.ac2",
+            "title": ".panopticon.yaml falls back with stderr deprecation warning",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "emit-in-routes.ac3",
-            "title": "cleanup-workspace emits workspace.deleted on success",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "emit-in-routes.ac4",
-            "title": "abort-planning emits workspace.aborted after the planning session is killed",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "emit-in-routes.ac5",
-            "title": "All new events appear in the event store audit log (SQLite events table)",
-            "status": "completed",
+            "id": "rename-config-yaml.ac3",
+            "title": "Existing workspaces with .panopticon.yaml continue to work (backwards compat verified in tests)",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
       },
       {
-        "id": "quality-gates",
-        "title": "Pass all quality gates (typecheck, lint, test)",
-        "status": "completed",
+        "id": "archive-structure",
+        "title": "Change archive structure from flat to per-issue subdirectory",
+        "status": "pending",
         "priority": "medium",
-        "created": "2026-04-06T12:00:00Z",
+        "created": "2026-04-06T16:00:00Z",
         "metadata": {
-          "difficulty": "simple",
-          "issueLabel": "pan-485"
+          "difficulty": "medium",
+          "issueLabel": "pan-488"
         },
-        "narrative": {
-          "Action": "Run npm run typecheck, npm run lint, and npm test. Fix any issues. Rebuild contracts package first since server depends on it."
-        },
+        "narrative": { "Action": "Update complete-planning in issues.ts to copy STATE.md and plan.vbrief.json to docs/prds/active/<issue-id>/ subdirectory instead of flat files. Update movePrd in archive-planning.ts to use subdirectory format for completed PRDs. Add feature-${numericSuffix} candidate to findWorkspacePath() (same pattern as getWorkspaceInfoForIssue from commit be33bfb). Existing flat archives left as-is." },
         "subItems": [
           {
-            "id": "quality-gates.ac1",
-            "title": "npm run typecheck passes",
-            "status": "completed",
+            "id": "archive-structure.ac1",
+            "title": "complete-planning archives to docs/prds/active/<issue-id>/ subdirectory",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "quality-gates.ac2",
-            "title": "npm run lint passes",
-            "status": "completed",
+            "id": "archive-structure.ac2",
+            "title": "movePrd uses subdirectory format for completed PRDs",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "quality-gates.ac3",
-            "title": "npm test passes",
-            "status": "completed",
+            "id": "archive-structure.ac3",
+            "title": "findWorkspacePath includes feature-${numericSuffix} candidate",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "pan-skills-source",
+        "title": "Add .pan/skills/ as a sync source with correct precedence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-488"
+        },
+        "narrative": { "Action": "Update planSync() and executeSync() in sync.ts to include .pan/skills/ from the project repo (at devroot) as a sync source. Precedence: 1) .claude/skills/<name>/ already exists → skip, 2) .pan/skills/<name>/ in project → write, 3) ~/.panopticon/skills/<name>/ → global fallback. Must integrate with the existing manifest-based conflict resolution." },
+        "subItems": [
+          {
+            "id": "pan-skills-source.ac1",
+            "title": ".pan/skills/ in project repo is discovered and synced to .claude/skills/",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "pan-skills-source.ac2",
+            "title": "User-owned .claude/skills/<name>/ are never overwritten by .pan/skills/<name>/",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "pan-skills-source.ac3",
+            "title": "pan sync --dry-run shows .pan/skills/ source files correctly",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "multi-tool-sync",
+        "title": "Implement multi-tool sync for all 6 AI tool targets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-488"
+        },
+        "narrative": { "Action": "Read tools.also_sync from global config merged with .pan.yaml (per-project, additive). Implement adapters for each tool: Cursor (.cursor/rules/*.mdc), Codex (AGENTS.md named blocks), Windsurf (.windsurf/rules/*.md), Cline (.clinerules/), Copilot (.github/instructions/*.instructions.md with applyTo frontmatter), Aider (CONVENTIONS.md). Each adapter must transform skill markdown into the tool's expected format. Per-project also_sync merges with global, never replaces." },
+        "subItems": [
+          {
+            "id": "multi-tool-sync.ac1",
+            "title": "pan sync writes to all tools listed in also_sync (global + per-project merged)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "multi-tool-sync.ac2",
+            "title": "Each tool adapter produces correct format (mdc, AGENTS.md blocks, etc.)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "multi-tool-sync.ac3",
+            "title": "pan sync --dry-run shows multi-tool output correctly",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "multi-tool-sync.ac4",
+            "title": "Per-project also_sync merges with global (never replaces)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "workspace-migration",
+        "title": "Safe migration of existing .panopticon/ subdirs in workspaces",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-488"
+        },
+        "narrative": { "Action": "Add a migration step in pan sync (or pan install) that renames .panopticon/ subdirs to .pan/ in active workspaces. Safety: check old path exists, verify new path does NOT already exist, then move. If both exist (partial previous run), log warning and skip — never overwrite silently. Skip ~/.panopticon/ (global tool dir, unchanged)." },
+        "subItems": [
+          {
+            "id": "workspace-migration.ac1",
+            "title": "pan sync migrates existing .panopticon/ subdirs to .pan/ in active workspaces (non-destructive)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "workspace-migration.ac2",
+            "title": "Migration skips if .pan/ subdir already exists (handles partial previous runs safely)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "workspace-migration.ac3",
+            "title": "Migration never touches ~/.panopticon/ (global tool dir)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "gitignore-injection",
+        "title": "Add .pan/events/, .pan/convoy/, .pan/prompts/ to .gitignore",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-488"
+        },
+        "narrative": { "Action": "When creating or updating a workspace, ensure .pan/events/, .pan/convoy/, .pan/prompts/ are in .gitignore. Do NOT gitignore .pan/ itself (.pan/skills/ must remain tracked). Do NOT gitignore .planning/ (committed to feature branches)." },
+        "subItems": [
+          {
+            "id": "gitignore-injection.ac1",
+            "title": ".pan/events/, .pan/convoy/, .pan/prompts/ are gitignored in new workspaces",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "gitignore-injection.ac2",
+            "title": ".pan/ itself and .planning/ are NOT gitignored",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Update documentation to match implemented behavior",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-06T16:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-488"
+        },
+        "narrative": { "Action": "Update docs/CONFIGURATION.md, docs/USAGE.md, docs/LEGACY-CODEBASE.md, docs/WORK-TYPES.md to replace .panopticon.yaml references with .pan.yaml. Verify docs/REPO-ARTIFACTS.md matches implemented behavior exactly. Update CLAUDE.md if any referenced paths changed." },
+        "subItems": [
+          {
+            "id": "docs-update.ac1",
+            "title": "All documentation references to .panopticon.yaml updated to .pan.yaml",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "docs/REPO-ARTIFACTS.md matches implemented behavior exactly",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
       }
     ],
     "edges": [
-      { "from": "define-events", "to": "add-reducers", "type": "blocks" },
-      { "from": "define-events", "to": "emit-in-routes", "type": "blocks" },
-      { "from": "add-reducers", "to": "quality-gates", "type": "blocks" },
-      { "from": "emit-in-routes", "to": "quality-gates", "type": "blocks" }
+      { "from": "add-design-doc", "to": "rename-panopticon-dirs", "type": "blocks" },
+      { "from": "rename-panopticon-dirs", "to": "workspace-migration", "type": "blocks" },
+      { "from": "rename-config-yaml", "to": "multi-tool-sync", "type": "blocks" },
+      { "from": "pan-skills-source", "to": "multi-tool-sync", "type": "blocks" },
+      { "from": "rename-panopticon-dirs", "to": "gitignore-injection", "type": "blocks" },
+      { "from": "multi-tool-sync", "to": "docs-update", "type": "blocks" },
+      { "from": "workspace-migration", "to": "docs-update", "type": "blocks" },
+      { "from": "archive-structure", "to": "docs-update", "type": "blocks" }
     ]
   }
 }
