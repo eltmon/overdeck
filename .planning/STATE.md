@@ -3,14 +3,14 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-bcs (update CONTRIBUTING.md and work-agent prompt for PR workflow)
+Implementing bead feature-pan-489-kn2 (create PR with rich description on work completion)
 
 ## Completed Work
 - [x] feature-pan-489-52e: Replace local git merge with rebase + gh pr merge --squash in triggerMerge() + add spawnRebaseAgentForBranch() to merge-agent.ts (commit: 4746686)
-- [x] feature-pan-489-4fm: Extend correctness reviewer with consistency/completeness checks section (commit: 61c59d9)
+- [x] feature-pan-489-4fm: Extend correctness reviewer with consistency/completeness checks section (commit: 2cc3939)
+- [x] feature-pan-489-bcs: Update CONTRIBUTING.md, work-agent.md, and merge-agent.md for PR-based flow (commit: 6c1a722)
 
 ## Remaining Work
-- [ ] feature-pan-489-bcs: Update CONTRIBUTING.md and work-agent prompt for PR workflow
 - [ ] feature-pan-489-kn2: Create PR with rich description on work completion
 
 ## Key Decisions

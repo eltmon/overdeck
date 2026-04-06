@@ -316,10 +316,12 @@ npm test                                         # Run tests
 git add -A && git commit -m "feat: description"  # Commit ALL changes
 git push -u origin $(git branch --show-current)  # Push
 git status                                       # Must show "nothing to commit"
-pan work done {{ISSUE_ID}} -c "Brief summary"      # Signal completion
+pan work done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates GitHub PR
 ```
 
 **IMPORTANT:** `pan work done` MUST be executed as a Bash command (via the Bash tool). Do NOT type it at the Claude Code interactive prompt — it will not work correctly.
+
+**`pan work done` creates a GitHub PR automatically.** The review and test specialists run against this PR. When both pass, the human clicks MERGE in the dashboard, which rebases the feature branch onto main and merges via `gh pr merge --squash`.
 
 **WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan work done` to signal completion.
 {{/env}}
