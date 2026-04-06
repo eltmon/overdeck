@@ -29,7 +29,7 @@ import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { crc32 } from 'node:zlib';
 
@@ -207,20 +207,24 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   } catch { /* non-fatal */ }
 
   const issuePrefix = issueId.split('-')[0];
-  const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
-  const workspaceName = `feature-${issueLower}`;
-  const workspacePath = join(projectPath, 'workspaces', workspaceName);
+  const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
-  if (!existsSync(workspacePath)) {
-    return { exists: false, isRemote: false };
+  // Scan all configured projects for legacy naming (e.g. feature-484 for PAN-484)
+  for (const { config } of listProjects()) {
+    if (!config.path) continue;
+    for (const candidate of [`feature-${issueLower}`, `feature-${numericSuffix}`]) {
+      const p = join(config.path, 'workspaces', candidate);
+      if (existsSync(p)) return { exists: true, isRemote: false, localPath: p };
+    }
   }
 
-  return {
-    exists: true,
-    isRemote: false,
-    localPath: workspacePath,
-  };
+  // Fallback: canonical path under getProjectPath
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  if (existsSync(workspacePath)) return { exists: true, isRemote: false, localPath: workspacePath };
+
+  return { exists: false, isRemote: false };
 }
 
 function isGitHubIssue(issueId: string): {
@@ -2882,10 +2886,17 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   const issuePrefix = issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const issueLower = issueId.toLowerCase();
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-  const branchName = `feature/${issueLower}`;
 
   const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+
+  // Use the actual resolved workspace path (handles legacy feature-484 naming)
+  const workspacePath = (!workspaceInfo.isRemote && workspaceInfo.localPath)
+    ? workspaceInfo.localPath
+    : join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const workspaceDirName = basename(workspacePath);
+  const branchName = workspaceDirName.startsWith('feature-')
+    ? `feature/${workspaceDirName.slice('feature-'.length)}`
+    : `feature/${issueLower}`;
 
   setReviewStatus(issueId, { mergeStatus: 'merging' });
 
