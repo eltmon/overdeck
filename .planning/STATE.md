@@ -6,7 +6,7 @@
 Complete — fix committed and pushed.
 
 ## Completed Work
-- [x] panopticon-o2g: Added orphaned verificationStatus cleanup on Cloister startup — resets 'running' → 'pending' for all stale states (commit: TBD)
+- [x] panopticon-o2g: Added orphaned verificationStatus cleanup on Cloister startup — resets 'running' → 'pending' for all stale states (commit: a0d69c1)
 
 ## Remaining Work
 None
