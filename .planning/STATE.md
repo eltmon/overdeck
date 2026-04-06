@@ -2,8 +2,10 @@
 
 ## Status: In Progress
 
+## Status: Implementation Complete
+
 ## Current Phase
-Working on bead panopticon-4xd (update documentation).
+All beads complete. Running final quality gates.
 
 ## Completed Work
 - [x] panopticon-u6e: Copied docs/REPO-ARTIFACTS.md to workspace branch (commit: c6064e0)
@@ -13,10 +15,11 @@ Working on bead panopticon-4xd (update documentation).
 - [x] panopticon-b6g: Added ensurePanGitignore() to workspace-manager.ts, called during createWorkspace(); injects .pan/events/, .pan/convoy/, .pan/prompts/ into project .gitignore (commit: 2226565)
 - [x] panopticon-0dp: Added migratePanopticonToPan() to workspace-manager.ts; called during pan sync for all registered projects; handles events/triage/health/convoy/prompts → .pan/; warns on conflict (commit: ff0d4ef)
 - [x] panopticon-2nu: Added mergePanSkillsIntoWorkspace() in skills-merge.ts; called in createWorkspace() after global cache merge; .pan/skills/ → .claude/skills/ with skip-if-exists precedence (commit: 4e564a7)
-- [x] panopticon-ihe: Created multi-tool-sync.ts with adapters for all 6 tools (cursor/codex/windsurf/cline/copilot/aider); integrated into pan sync; added tools.also_sync to YamlConfig; 18 tests pass (commit: pending)
+- [x] panopticon-ihe: Created multi-tool-sync.ts with adapters for all 6 tools (cursor/codex/windsurf/cline/copilot/aider); integrated into pan sync; added tools.also_sync to YamlConfig; 18 tests pass (commit: 798aa08)
+- [x] panopticon-4xd: Updated docs/USAGE.md .panopticon.yaml → .pan.yaml; docs/REPO-ARTIFACTS.md already comprehensive (commit: pending)
 
 ## Remaining Work
-- [ ] panopticon-4xd: Update documentation to match implemented behavior
+None
 
 ## Key Decisions
 - See Decisions Made section below for full context

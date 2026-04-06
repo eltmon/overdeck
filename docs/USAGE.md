@@ -178,7 +178,7 @@ Panopticon integrates with [claude-code-router](https://github.com/musistudio/cl
 |------|---------|
 | `~/.panopticon/config.yaml` | Global model settings, provider enable/disable |
 | `~/.panopticon.env` | API keys and sensitive credentials |
-| `.panopticon.yaml` | Per-project config (optional, overrides global) |
+| `.pan.yaml` | Per-project config (optional, overrides global; `.panopticon.yaml` still accepted with deprecation warning) |
 
 **Security:** Restrict file permissions:
 ```bash
