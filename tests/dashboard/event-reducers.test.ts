@@ -525,3 +525,166 @@ describe('applyEvents', () => {
     expect(next.sequence).toBe(7)
   })
 })
+
+// ─── Workspace Lifecycle Events (PAN-485) ────────────────────────────────────
+
+describe('applyEvent — workspace.created', () => {
+  it('is a no-op (only updates sequence)', () => {
+    const state = makeState({ agentsById: { 'agent-1': baseAgent } })
+    const next = applyEvent(state, {
+      type: 'workspace.created',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1', workspacePath: '/workspaces/feature-pan-1' },
+    })
+    expect(next.sequence).toBe(5)
+    expect(next.agentsById).toEqual(state.agentsById)
+    expect(next.issuesRaw).toEqual(state.issuesRaw)
+  })
+})
+
+describe('applyEvent — workspace.wipe_started', () => {
+  it('sets canonicalStatus and state to wiping on matching issue (by identifier)', () => {
+    const state = makeState({
+      issuesRaw: [{ identifier: 'PAN-1', canonicalStatus: 'in_progress', state: 'in_progress' }],
+    })
+    const next = applyEvent(state, {
+      type: 'workspace.wipe_started',
+      sequence: 6,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1' },
+    })
+    expect((next.issuesRaw[0] as any).canonicalStatus).toBe('wiping')
+    expect((next.issuesRaw[0] as any).state).toBe('wiping')
+  })
+
+  it('sets canonicalStatus and state to wiping on matching issue (by id)', () => {
+    const state = makeState({
+      issuesRaw: [{ id: 'issue-uuid-1', canonicalStatus: 'in_progress', state: 'in_progress' }],
+    })
+    const next = applyEvent(state, {
+      type: 'workspace.wipe_started',
+      sequence: 6,
+      timestamp: ts(),
+      payload: { issueId: 'issue-uuid-1' },
+    })
+    expect((next.issuesRaw[0] as any).canonicalStatus).toBe('wiping')
+  })
+
+  it('does not affect other issues', () => {
+    const state = makeState({
+      issuesRaw: [
+        { identifier: 'PAN-1', canonicalStatus: 'in_progress' },
+        { identifier: 'PAN-2', canonicalStatus: 'in_progress' },
+      ],
+    })
+    const next = applyEvent(state, {
+      type: 'workspace.wipe_started',
+      sequence: 6,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1' },
+    })
+    expect((next.issuesRaw[1] as any).canonicalStatus).toBe('in_progress')
+  })
+})
+
+describe('applyEvent — workspace.destroyed', () => {
+  it('removes all agents for the issue from agentsById', () => {
+    const agent2: AgentSnapshot = { ...baseAgent, id: 'agent-2', issueId: 'PAN-2' }
+    const state = makeState({
+      agentsById: { 'agent-1': baseAgent, 'agent-2': agent2 },
+      issuesRaw: [{ identifier: 'PAN-1', canonicalStatus: 'in_progress', state: 'in_progress' }],
+    })
+    const next = applyEvent(state, {
+      type: 'workspace.destroyed',
+      sequence: 7,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1' },
+    })
+    expect(next.agentsById['agent-1']).toBeUndefined()
+    expect(next.agentsById['agent-2']).toEqual(agent2)
+  })
+
+  it('resets canonicalStatus and state to todo', () => {
+    const state = makeState({
+      issuesRaw: [{ identifier: 'PAN-1', canonicalStatus: 'wiping', state: 'wiping' }],
+    })
+    const next = applyEvent(state, {
+      type: 'workspace.destroyed',
+      sequence: 7,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1' },
+    })
+    expect((next.issuesRaw[0] as any).canonicalStatus).toBe('todo')
+    expect((next.issuesRaw[0] as any).state).toBe('todo')
+  })
+
+  it('is safe when no agents exist for the issue', () => {
+    const state = makeState({ issuesRaw: [{ identifier: 'PAN-1', canonicalStatus: 'in_progress' }] })
+    const next = applyEvent(state, {
+      type: 'workspace.destroyed',
+      sequence: 7,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1' },
+    })
+    expect(next.agentsById).toEqual({})
+  })
+})
+
+describe('applyEvent — workspace.deleted', () => {
+  it('removes all agents for the issue and resets canonicalStatus to todo', () => {
+    const state = makeState({
+      agentsById: { 'agent-1': baseAgent },
+      issuesRaw: [{ identifier: 'PAN-1', canonicalStatus: 'in_progress', state: 'in_progress' }],
+    })
+    const next = applyEvent(state, {
+      type: 'workspace.deleted',
+      sequence: 8,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1' },
+    })
+    expect(next.agentsById['agent-1']).toBeUndefined()
+    expect((next.issuesRaw[0] as any).canonicalStatus).toBe('todo')
+    expect((next.issuesRaw[0] as any).state).toBe('todo')
+  })
+})
+
+describe('applyEvent — workspace.aborted', () => {
+  it('removes planning agent by sessionName when provided', () => {
+    const planningAgent: AgentSnapshot = { ...baseAgent, id: 'planning-pan-1', issueId: 'PAN-1' }
+    const workAgent: AgentSnapshot = { ...baseAgent, id: 'agent-pan-1', issueId: 'PAN-1' }
+    const state = makeState({ agentsById: { 'planning-pan-1': planningAgent, 'agent-pan-1': workAgent } })
+    const next = applyEvent(state, {
+      type: 'workspace.aborted',
+      sequence: 9,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1', sessionName: 'planning-pan-1' },
+    })
+    expect(next.agentsById['planning-pan-1']).toBeUndefined()
+    expect(next.agentsById['agent-pan-1']).toEqual(workAgent)
+  })
+
+  it('removes all agents for the issueId when sessionName is not provided', () => {
+    const agent2: AgentSnapshot = { ...baseAgent, id: 'agent-2', issueId: 'PAN-2' }
+    const state = makeState({ agentsById: { 'agent-1': baseAgent, 'agent-2': agent2 } })
+    const next = applyEvent(state, {
+      type: 'workspace.aborted',
+      sequence: 9,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1' },
+    })
+    expect(next.agentsById['agent-1']).toBeUndefined()
+    expect(next.agentsById['agent-2']).toEqual(agent2)
+  })
+
+  it('is safe when agent not found by sessionName', () => {
+    const state = makeState({ agentsById: {} })
+    const next = applyEvent(state, {
+      type: 'workspace.aborted',
+      sequence: 9,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1', sessionName: 'planning-pan-1' },
+    })
+    expect(next.agentsById).toEqual({})
+  })
+})
