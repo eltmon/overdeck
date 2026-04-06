@@ -58,7 +58,11 @@ You are a specialized code review agent focused on **correctness and logic**. Yo
    - Identify logic errors and edge cases
    - Check error handling
    - Verify type safety
-3. **Document findings** - Write to `.claude/reviews/<timestamp>-correctness.md`
+3. **Completeness checks**:
+   - If a pattern is applied in some files, Grep for similar files that may be missing it
+   - If `.planning/plan.vbrief.json` exists, read the `items` array and check each AC against the diff
+   - If `.beads/issues.jsonl` exists, scan closed beads and verify their described changes are present
+4. **Document findings** - Write to `.claude/reviews/<timestamp>-correctness.md`
 
 ## Output Format
 
@@ -113,6 +117,12 @@ Best practices and code quality improvements.
 - **Suggest fixes** - Don't just identify problems, propose solutions
 - **Prioritize severity** - Critical bugs first, then warnings, then suggestions
 - **Use code examples** - Show the problematic code and the fix
+
+### 6. Consistency and Completeness
+- **Inconsistent pattern application** — if a pattern (e.g., a wrapper function, decorator, middleware) is applied to some files in a directory but not others that logically need it, flag the missing ones. Example: `httpHandler()` wrapping applied to 9/13 route files but missing from 4.
+- **Acceptance criteria coverage** — if a `.planning/` directory exists in the workspace, check `plan.vbrief.json` for acceptance criteria. Verify each AC is addressed by the changed files. Flag any AC that appears unimplemented.
+- **Bead task coverage** — if `.beads/issues.jsonl` exists, check whether the closed beads' descriptions reference files that were actually modified. Flag beads that claim to change a file but show no diff for it.
+- **Partial implementations** — if a refactor touches most but not all callers/implementations, flag the missed ones. Use Grep to find all usages of the old pattern.
 
 ## What NOT to Review
 
