@@ -288,20 +288,20 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
  * Get available models by provider (for model selection UI)
  */
 export function getAvailableModelsApi(): {
-  anthropic: Array<{ id: ModelId; name: string }>;
-  openai: Array<{ id: ModelId; name: string }>;
-  google: Array<{ id: ModelId; name: string }>;
-  zai: Array<{ id: ModelId; name: string }>;
-  kimi: Array<{ id: ModelId; name: string }>;
-  openrouter: Array<{ id: ModelId; name: string }>;
+  anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
   const result: {
-    anthropic: Array<{ id: ModelId; name: string }>;
-    openai: Array<{ id: ModelId; name: string }>;
-    google: Array<{ id: ModelId; name: string }>;
-    zai: Array<{ id: ModelId; name: string }>;
-    kimi: Array<{ id: ModelId; name: string }>;
-    openrouter: Array<{ id: ModelId; name: string }>;
+    anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    openai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    google: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
     anthropic: [],
     openai: [],
@@ -312,7 +312,7 @@ export function getAvailableModelsApi(): {
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    const entry = { id: modelId as ModelId, name: capability.displayName };
+    const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
     switch (capability.provider) {
       case 'anthropic':
         result.anthropic.push(entry);
