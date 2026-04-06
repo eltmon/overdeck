@@ -359,3 +359,22 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
     tracker_keys: {},
   };
 }
+
+/**
+ * Save OpenRouter favorites to config.yaml
+ */
+export function saveOpenRouterFavorites(favorites: string[]): void {
+  const current = loadSettingsApi();
+  saveSettingsApi({
+    ...current,
+    openrouter: { ...current.openrouter, favorites },
+  });
+}
+
+/**
+ * Get OpenRouter favorites from config
+ */
+export function getOpenRouterFavorites(): string[] {
+  const settings = loadSettingsApi();
+  return settings.openrouter?.favorites ?? [];
+}

@@ -20,7 +20,10 @@ import {
   validateSettingsApi,
   getAvailableModelsApi,
   getOptimalDefaultsApi,
+  saveOpenRouterFavorites,
+  getOpenRouterFavorites,
 } from '../../../lib/settings-api.js';
+import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -375,6 +378,62 @@ const putSettingsRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/settings/openrouter/models ──────────────────────────────
+
+const getOpenRouterModelsRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/openrouter/models',
+  httpHandler(Effect.gen(function* () {
+    const orService = yield* OpenRouterService;
+    const models = yield* orService.fetchModels();
+    const favorites = getOpenRouterFavorites();
+    return jsonResponse({ models, favorites });
+  })),
+);
+
+// ─── Route: PUT /api/settings/openrouter/favorites ───────────────────────────
+
+const putOpenRouterFavoritesRoute = HttpRouter.add(
+  'PUT',
+  '/api/settings/openrouter/favorites',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { favorites } = body as { favorites?: unknown };
+
+    if (!Array.isArray(favorites)) {
+      return jsonResponse({ error: 'favorites must be an array of model IDs' }, { status: 400 });
+    }
+
+    const modelIds = favorites.filter((f): f is string => typeof f === 'string');
+    return yield* Effect.try({
+      try: () => {
+        saveOpenRouterFavorites(modelIds);
+        return jsonResponse({ success: true, favorites: modelIds });
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+  })),
+);
+
+// ─── Route: POST /api/settings/openrouter/test-key ───────────────────────────
+
+const postOpenRouterTestKeyRoute = HttpRouter.add(
+  'POST',
+  '/api/settings/openrouter/test-key',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const { apiKey } = body as { apiKey?: string };
+
+    if (!apiKey) {
+      return jsonResponse({ error: 'apiKey is required' }, { status: 400 });
+    }
+
+    const orService = yield* OpenRouterService;
+    const result = yield* orService.validateApiKey(apiKey);
+    return jsonResponse(result);
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const settingsRouteLayer = Layer.mergeAll(
@@ -384,6 +443,9 @@ export const settingsRouteLayer = Layer.mergeAll(
   postTestApiKeyRoute,
   postValidateApiKeyRoute,
   putSettingsRoute,
+  getOpenRouterModelsRoute,
+  putOpenRouterFavoritesRoute,
+  postOpenRouterTestKeyRoute,
 );
 
 export default settingsRouteLayer;
