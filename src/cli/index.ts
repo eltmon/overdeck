@@ -314,31 +314,26 @@ program
       console.log(chalk.dim('Starting dashboard (development mode)...'));
     }
 
-    // PAN-428: Effect.js server runs via Bun from source (no build step needed)
-    // Fallback: node dist/dashboard/server.js (for npm users without Bun)
-    const hasBun = (() => { try { execSync('bun --version', { stdio: 'pipe' }); return true; } catch { return false; } })();
-    const serverSrc = join(__dirname, '..', '..', 'src', 'dashboard', 'server', 'main.ts');
+    // Dashboard server MUST run under Node 22, not Bun.
+    // Reason: node-pty (used by /ws/terminal for live tmux streaming) is a native
+    // Node addon. Under Bun's native addon compat layer, the PTY spawns but exits
+    // immediately (code 0), breaking the terminal panel for all workspaces.
+    // Additionally, the TypeScript source has circular ESM dependencies that Node.js
+    // strict ESM rejects but Bun tolerates — so we must run the built dist/server.js,
+    // not the raw source via tsx.
+    const node22 = (() => {
+      // Prefer the nvm-managed Node 22 binary if available
+      const nvmNode = '/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node';
+      if (existsSync(nvmNode)) return nvmNode;
+      return 'node'; // fall back to PATH
+    })();
 
     if (options.detach) {
       // Run in background
-      const child = hasBun && existsSync(serverSrc)
-        ? spawn('bun', ['run', serverSrc], {
-            cwd: join(__dirname, '..', '..'),
+      const child = spawn(node22, [bundledServer], {
             detached: true,
             stdio: 'ignore',
             env: { ...process.env, DASHBOARD_PORT: String(dashboardPort) },
-          })
-        : isProduction
-        ? spawn('node', [bundledServer], {
-            detached: true,
-            stdio: 'ignore',
-            env: { ...process.env, DASHBOARD_PORT: String(dashboardPort) },
-          })
-        : spawn('npm', ['run', 'dev'], {
-            cwd: srcDashboard,
-            detached: true,
-            stdio: 'ignore',
-            shell: true,
           });
 
       // Handle spawn errors before unref
@@ -374,21 +369,9 @@ program
       }
       console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
 
-      const child = hasBun && existsSync(serverSrc)
-        ? spawn('bun', ['run', serverSrc], {
-            cwd: join(__dirname, '..', '..'),
+      const child = spawn(node22, [bundledServer], {
             stdio: 'inherit',
             env: { ...process.env, DASHBOARD_PORT: String(dashboardPort) },
-          })
-        : isProduction
-        ? spawn('node', [bundledServer], {
-            stdio: 'inherit',
-            env: { ...process.env, DASHBOARD_PORT: String(dashboardPort) },
-          })
-        : spawn('npm', ['run', 'dev'], {
-            cwd: srcDashboard,
-            stdio: 'inherit',
-            shell: true,
           });
 
       child.on('error', (err) => {
