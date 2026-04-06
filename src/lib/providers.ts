@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, ZAIModel } from './settings.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'zai';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'zai' | 'openrouter';
 
 /**
  * Provider compatibility types
@@ -96,12 +96,27 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     tested: false,
     description: 'Requires claude-code-router for API translation',
   },
+
+  openrouter: {
+    name: 'openrouter',
+    displayName: 'OpenRouter',
+    compatibility: 'direct',
+    baseUrl: 'https://openrouter.ai/api',
+    models: [], // Dynamic models fetched from OpenRouter API; IDs contain '/'
+    tested: true,
+    description: 'Anthropic-compatible API aggregator. Model IDs contain \'/\' (e.g. qwen/qwen3.6-plus:free)',
+  },
 };
 
 /**
  * Get provider for a given model ID
  */
-export function getProviderForModel(modelId: ModelId): ProviderConfig {
+export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
+  // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free')
+  if (modelId.includes('/')) {
+    return PROVIDERS.openrouter;
+  }
+
   // Check Anthropic models
   if (['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
