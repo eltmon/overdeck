@@ -48,9 +48,11 @@ src/dashboard/restart.sh
 # Workspace-specific generated files
 CLAUDE.md
 
-# Ephemeral planning artifacts — entire directory is workspace-specific.
+# Planning artifacts — tracked on feature branches, excluded from merges to main.
 # postMergeLifecycle removes them from main programmatically (PAN-337).
-.planning/
+# DO NOT gitignore .planning/ — agents and dashboard need these files throughout
+# the workspace lifecycle. See docs/PRD-REMOTE-WORKSPACES.md §Pre-requisite.
+# .planning/
 
 # Test caches (regenerated on each run)
 .cache/
