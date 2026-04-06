@@ -19,7 +19,7 @@ import {
 import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
 import { addTunnelIngress, removeTunnelIngress } from './tunnel.js';
 import { createHumeConfig, deleteHumeConfig } from './hume.js';
-import { mergeSkillsIntoWorkspace } from './skills-merge.js';
+import { mergeSkillsIntoWorkspace, mergePanSkillsIntoWorkspace } from './skills-merge.js';
 
 const execAsync = promisify(exec);
 
@@ -733,6 +733,12 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   const mergeTotal = mergeResult.added.length + mergeResult.updated.length;
   if (mergeTotal > 0) {
     result.steps.push(`Installed ${mergeTotal} Panopticon files (${mergeResult.added.length} new, ${mergeResult.updated.length} updated)`);
+  }
+
+  // Overlay project-local skills from .pan/skills/ (higher precedence than global cache)
+  const panMergeResult = mergePanSkillsIntoWorkspace(projectConfig.path, workspacePath);
+  if (panMergeResult.added.length > 0) {
+    result.steps.push(`Installed ${panMergeResult.added.length} project-local skill file(s) from .pan/skills/ (${panMergeResult.overlayed.join(', ')})`);
   }
 
   // Process agent templates (project template overlay — wins over Panopticon base)

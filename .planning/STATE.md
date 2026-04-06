@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-Working on bead panopticon-2nu (.pan/skills/ as sync source).
+Working on bead panopticon-ihe (multi-tool sync for all 6 AI tool targets).
 
 ## Completed Work
 - [x] panopticon-u6e: Copied docs/REPO-ARTIFACTS.md to workspace branch (commit: c6064e0)
@@ -11,7 +11,8 @@ Working on bead panopticon-2nu (.pan/skills/ as sync source).
 - [x] panopticon-d31: Updated config-yaml.ts to load .pan.yaml first, fall back to .panopticon.yaml with deprecation warning; updated hasProjectConfig, getProjectConfigPath; updated comments/strings in shadow-mode.ts, config.ts (commit: fb7c862)
 - [x] panopticon-bjd: Changed archive structure from flat to per-issue subdir in complete-planning route and movePrd in archive-planning.ts; added numericSuffix to findWorkspacePath; updated planning prompts (commit: 733b567)
 - [x] panopticon-b6g: Added ensurePanGitignore() to workspace-manager.ts, called during createWorkspace(); injects .pan/events/, .pan/convoy/, .pan/prompts/ into project .gitignore (commit: 2226565)
-- [x] panopticon-0dp: Added migratePanopticonToPan() to workspace-manager.ts; called during pan sync for all registered projects; handles events/triage/health/convoy/prompts → .pan/; warns on conflict (commit: pending)
+- [x] panopticon-0dp: Added migratePanopticonToPan() to workspace-manager.ts; called during pan sync for all registered projects; handles events/triage/health/convoy/prompts → .pan/; warns on conflict (commit: ff0d4ef)
+- [x] panopticon-2nu: Added mergePanSkillsIntoWorkspace() in skills-merge.ts; called in createWorkspace() after global cache merge; .pan/skills/ → .claude/skills/ with skip-if-exists precedence (commit: pending)
 
 ## Remaining Work
 - [ ] panopticon-wju: Rename all project-level .panopticon/ path references to .pan/
