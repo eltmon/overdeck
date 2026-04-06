@@ -1094,6 +1094,18 @@ const postAgentsRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
+    // Reject bare numeric IDs (e.g. "484") — they have no project prefix, so tracker
+    // routing and workspace naming both fail. Require "PAN-484" style.
+    if (/^\d+$/.test(String(issueId))) {
+      return jsonResponse(
+        {
+          error: `Invalid issueId "${issueId}": bare numeric IDs are not allowed. Use a prefixed ID (e.g. PAN-${issueId}).`,
+          hint: 'Issue IDs must include a project prefix (e.g. PAN-484, MIN-123).',
+        },
+        { status: 422 },
+      );
+    }
+
     const issueLower = issueId.toLowerCase();
 
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
