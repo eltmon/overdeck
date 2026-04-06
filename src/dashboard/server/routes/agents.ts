@@ -1465,13 +1465,20 @@ const postAgentsRoute = HttpRouter.add(
 
           console.log(`[start-agent] Resumed ${agentSessionName} session ${savedSessionId.slice(0, 8)}...`);
 
-          // Send the resume prompt via tmux after Claude starts up
-          // Use sendKeysAsync (load-buffer + paste-buffer pattern) for reliable delivery
+          // Send the resume prompt via tmux after Claude starts up.
+          // Claude may show a "Resume from summary" interactive prompt first —
+          // send Enter to dismiss it (selects default: resume from summary),
+          // then wait for Claude to be ready, then send the actual message.
           const { sendKeysAsync } = await import('../../../lib/tmux.js');
           (async () => {
-            // Wait for Claude to initialize and show the prompt
-            await new Promise(r => setTimeout(r, 5000));
+            // Wait for Claude to start and potentially show the resume prompt
+            await new Promise(r => setTimeout(r, 4000));
             try {
+              // Dismiss "Resume from summary" prompt if present (Enter selects default)
+              await execAsync(`tmux send-keys -t ${agentSessionName} Enter`, { encoding: 'utf-8' });
+              // Wait for Claude to fully initialize after dismissing
+              await new Promise(r => setTimeout(r, 3000));
+              // Now send the actual resume message
               await sendKeysAsync(agentSessionName, resumePrompt);
               console.log(`[start-agent] Sent resume prompt to ${agentSessionName}`);
             } catch (err: unknown) {
