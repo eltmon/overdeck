@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-478
+# Planning Session: PAN-485
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -28,47 +28,56 @@ When planning is complete, STOP and tell the user: "Planning complete - click Do
 ---
 
 ## Issue Details
-- **ID:** PAN-478
-- **Title:** Complete httpHandler adoption for remaining 4 route files + ensureLabel fix
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/478
+- **ID:** PAN-485
+- **Title:** Add workspace lifecycle events to fix stale UI after wipe/cleanup/abort
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/485
 
 ## Description
-## Context
+## Problem
 
-PAN-470 (PR #474) rewrote route handlers to idiomatic Effect with `httpHandler()` wrapper, but only covered 9 of 13 route files. The remaining 4 largest files still use raw `Effect.promise(async () => { try/catch })`.
+Several workspace operations complete on the backend but don't emit domain events, so the frontend stays stale until the tracker poll cycle fires (1–3s delay). Classic symptom: wipe a workspace, card doesn't update until manual refresh.
 
-Merged as-is to unblock other work — this issue tracks completing the migration.
+## Root Cause
 
-## What's Missing
+The event-sourced architecture is correct, but these routes rely on `issueDataService.invalidateTracker()` as the primary signal instead of emitting domain events:
 
-### 1. Routes not yet wrapped with `httpHandler` (4 files)
-- `agents.ts` — 0 httpHandler calls, 57 try/catch blocks
-- `issues.ts` — 0 httpHandler calls
-- `specialists.ts` — 0 httpHandler calls
-- `workspaces.ts` — 0 httpHandler calls
+| Operation | Route | Should Emit | Actually Emits |
+|---|---|---|---|
+| Deep wipe | `POST /api/issues/:id/deep-wipe` | `workspace.destroyed` | ❌ relies on tracker poll |
+| Cleanup workspace | `POST /api/issues/:id/cleanup-workspace` | `workspace.deleted` | ❌ nothing at all |
+| Abort planning | `POST /api/issues/:id/abort-planning` | `agent.stopped` for planning agent | ❌ nothing |
+| Start planning (workspace created) | `POST /api/issues/:id/start-planning` | `workspace.created` | ❌ nothing |
 
-The following 9 files ARE done:
-resources.ts (7), metrics.ts (8), misc.ts (1), mission-control.ts (7), remote.ts (9), costs.ts (11), settings.ts (6), conversations.ts (7), cloister.ts (9)
+## Fix
 
-### 2. `github-client.ts` — `ensureLabel` still uses raw `fetch()`
-`removeLabel` was fixed to use `ghFetch()` but `ensureLabel` was missed.
+### 1. Add events to contracts (`packages/contracts/src/events.ts`)
+```ts
+{ type: 'workspace.created';    payload: { issueId: string; workspacePath: string } }
+{ type: 'workspace.deleted';    payload: { issueId: string } }
+{ type: 'workspace.destroyed';  payload: { issueId: string } }
+{ type: 'workspace.wipe_started'; payload: { issueId: string } }
+```
 
-### 3. Remove redundant try/catch
-Routes that are now wrapped with `httpHandler` should let typed errors flow through the error channel instead of catching them locally.
+### 2. Emit in routes
+- `deep-wipe`: emit `workspace.wipe_started` at start, `workspace.destroyed` + `agent.stopped` (for planning agent if present) at completion
+- `cleanup-workspace`: emit `workspace.deleted`
+- `abort-planning`: emit `agent.stopped` for the planning agent when `tmux kill-session` fires
+- `start-planning`: emit `workspace.created` after worktree is set up
 
-## Approach
+### 3. Add reducers (`packages/contracts/src/event-reducers.ts`)
+- `workspace.destroyed` / `workspace.deleted` → remove agent entries for the issue, reset `canonicalStatus` to `todo`
+- `workspace.wipe_started` → set issue to a `wiping` transitional state so UI shows spinner immediately
+- `workspace.created` → set issue status to `planning`
 
-Follow the same pattern established in PAN-470:
-- Wrap each route in `httpHandler(...)` 
-- Replace `Effect.promise(async () => { try { ... } catch { ... } })` with proper Effect generators
-- Replace `Effect.runSync(service.method(...))` with `yield* service.method(...)`
-- Map typed errors to HTTP status codes via the existing `httpHandler` wrapper
+### 4. Frontend: react to new events directly
+Workspace card should update the moment the event arrives — tracker invalidation stays as a consistency backstop, not the primary signal.
 
-## References
-- PR #474 review comment with full analysis
-- `src/dashboard/server/routes/http-handler.ts` — the httpHandler wrapper (created in PAN-470)
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+## Acceptance Criteria
+- [ ] Wipe a workspace → card updates immediately (no refresh needed)
+- [ ] Cleanup workspace → card updates immediately
+- [ ] Abort planning → planning agent disappears from agent list immediately
+- [ ] Start planning → workspace card transitions to planning state immediately
+- [ ] All new events appear in the event store audit log
 
 ---
 
@@ -121,10 +130,10 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "version": "0.5",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-478: <issue title>"
+    "description": "Plan for PAN-485: <issue title>"
   },
   "plan": {
-    "id": "pan-478",
+    "id": "pan-485",
     "title": "<issue title>",
     "status": "approved",
     "uid": "<generate a UUID v4>",
@@ -133,7 +142,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/478", "label": "PAN-478", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/485", "label": "PAN-485", "type": "issue" }
     ],
     "tags": ["<relevant tags>"],
     "narratives": {
@@ -149,7 +158,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
-          "issueLabel": "pan-478"
+          "issueLabel": "pan-485"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -171,7 +180,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 **CRITICAL vBRIEF rules:**
 - The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
-- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-478")
+- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-485")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled

@@ -1,223 +1,188 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "created": "2026-04-05T12:00:00Z",
+    "created": "2026-04-06T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-478: Complete httpHandler adoption for remaining 4 route files + ensureLabel fix"
+    "description": "Plan for PAN-485: Add workspace lifecycle events to fix stale UI after wipe/cleanup/abort"
   },
   "plan": {
-    "id": "pan-478",
-    "title": "Complete httpHandler adoption for remaining 4 route files + ensureLabel fix",
-    "status": "completed",
-    "uid": "d3a7e1f4-8b2c-4f9a-a6d1-3e5c7f2b9d84",
+    "id": "pan-485",
+    "title": "Add workspace lifecycle events to fix stale UI after wipe/cleanup/abort",
+    "status": "approved",
+    "uid": "b7f3a1d2-9e4c-4b8a-a6d1-3f7e2c5b9a04",
     "author": "agent:claude-opus-4-6",
-    "sequence": 7,
-    "created": "2026-04-05T12:00:00Z",
-    "updated": "2026-04-06T02:00:00Z",
+    "sequence": 1,
+    "created": "2026-04-06T12:00:00Z",
+    "updated": "2026-04-06T12:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/478", "label": "PAN-478", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/485", "label": "PAN-485", "type": "issue" }
     ],
-    "tags": ["effect", "refactor", "routes", "error-handling"],
+    "tags": ["events", "workspace-lifecycle", "ui-consistency", "contracts"],
     "narratives": {
-      "Problem": "4 of 13 route files still use raw Effect.promise with try/catch instead of the httpHandler wrapper established in PAN-470. ensureLabel in github-client.ts uses raw fetch() instead of ghFetch().",
-      "Proposal": "Mechanically migrate all 4 route files to httpHandler pattern, improving error typing where obvious. Fix ensureLabel to use ghFetch(). Follow exact patterns from the 9 already-completed files."
+      "Problem": "Workspace operations (wipe, cleanup, abort, start-planning) don't emit domain events, so the frontend stays stale until tracker poll fires (1-3s delay).",
+      "Proposal": "Define 5 new workspace lifecycle events in contracts, emit them in the 4 affected routes, and add reducer cases. The shared reducer pattern means the frontend reacts automatically — no frontend code changes needed."
     },
     "items": [
       {
-        "id": "agents-routes",
-        "title": "Migrate agents.ts to httpHandler",
-        "status": "completed",
+        "id": "define-events",
+        "title": "Define workspace lifecycle event schemas in contracts",
+        "status": "pending",
         "priority": "high",
-        "created": "2026-04-05T12:00:00Z",
-        "completed": "2026-04-06T01:50:00Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-478"
-        },
-        "narrative": { "Action": "Wrap all 20 routes in agents.ts with httpHandler. Replace 60 try/catch blocks with typed Effect errors. Convert Effect.promise/Effect.runSync patterns to Effect.gen/yield*." },
-        "subItems": [
-          {
-            "id": "agents-routes.ac1",
-            "title": "All 20 routes wrapped with httpHandler",
-            "status": "completed",
-            "completed": "2026-04-06T01:50:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "agents-routes.ac2",
-            "title": "Zero try/catch blocks remain in agents.ts",
-            "status": "completed",
-            "completed": "2026-04-06T01:50:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "agents-routes.ac3",
-            "title": "Generic catches converted to typed errors where intent is clear",
-            "status": "completed",
-            "completed": "2026-04-06T01:50:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "issues-routes",
-        "title": "Migrate issues.ts to httpHandler",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-05T12:00:00Z",
-        "completed": "2026-04-06T01:52:00Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-478"
-        },
-        "narrative": { "Action": "Wrap all 17 routes in issues.ts with httpHandler. Replace 61 try/catch blocks with typed Effect errors." },
-        "subItems": [
-          {
-            "id": "issues-routes.ac1",
-            "title": "All 17 routes wrapped with httpHandler",
-            "status": "completed",
-            "completed": "2026-04-06T01:52:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "issues-routes.ac2",
-            "title": "Zero try/catch blocks remain in issues.ts",
-            "status": "completed",
-            "completed": "2026-04-06T01:52:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "specialists-routes",
-        "title": "Migrate specialists.ts to httpHandler",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-05T12:00:00Z",
-        "completed": "2026-04-06T01:56:00Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-478"
-        },
-        "narrative": { "Action": "Wrap all 33 routes in specialists.ts with httpHandler. Replace 45 try/catch blocks with typed Effect errors." },
-        "subItems": [
-          {
-            "id": "specialists-routes.ac1",
-            "title": "All 33 routes wrapped with httpHandler",
-            "status": "completed",
-            "completed": "2026-04-06T01:56:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "specialists-routes.ac2",
-            "title": "Zero try/catch blocks remain in specialists.ts",
-            "status": "completed",
-            "completed": "2026-04-06T01:56:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "workspaces-routes",
-        "title": "Migrate workspaces.ts to httpHandler",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-05T12:00:00Z",
-        "completed": "2026-04-06T01:58:00Z",
-        "metadata": {
-          "difficulty": "complex",
-          "issueLabel": "pan-478"
-        },
-        "narrative": { "Action": "Wrap all 19 routes in workspaces.ts with httpHandler. Replace 86 try/catch blocks with typed Effect errors. Largest file (3,669 lines)." },
-        "subItems": [
-          {
-            "id": "workspaces-routes.ac1",
-            "title": "All 19 routes wrapped with httpHandler",
-            "status": "completed",
-            "completed": "2026-04-06T01:58:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          },
-          {
-            "id": "workspaces-routes.ac2",
-            "title": "Zero try/catch blocks remain in workspaces.ts",
-            "status": "completed",
-            "completed": "2026-04-06T01:58:00Z",
-            "metadata": { "kind": "acceptance_criterion" }
-          }
-        ]
-      },
-      {
-        "id": "ensure-label-fix",
-        "title": "Fix ensureLabel to use ghFetch instead of raw fetch",
-        "status": "completed",
-        "priority": "medium",
-        "created": "2026-04-05T12:00:00Z",
-        "completed": "2026-04-06T01:48:00Z",
+        "created": "2026-04-06T12:00:00Z",
         "metadata": {
           "difficulty": "simple",
-          "issueLabel": "pan-478"
+          "issueLabel": "pan-485"
         },
-        "narrative": { "Action": "Replace raw fetch() call in ensureLabel (github-client.ts:278) with ghFetch(), matching the pattern used by removeLabel. ghFetch handles auth headers and error wrapping consistently." },
+        "narrative": {
+          "Action": "Add 5 new event schemas (WorkspaceCreatedEvent, WorkspaceWipeStartedEvent, WorkspaceDestroyedEvent, WorkspaceDeletedEvent, WorkspaceAbortedEvent) to packages/contracts/src/events.ts following the existing pattern. Add all 5 to the DomainEvent union."
+        },
         "subItems": [
           {
-            "id": "ensure-label-fix.ac1",
-            "title": "ensureLabel uses ghFetch() instead of raw fetch()",
-            "status": "completed",
-            "completed": "2026-04-06T01:48:00Z",
+            "id": "define-events.ac1",
+            "title": "5 new event schemas exist in events.ts with correct type literals and payload shapes",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
-            "id": "ensure-label-fix.ac2",
-            "title": "Rate limiting and error handling preserved",
-            "status": "completed",
-            "completed": "2026-04-06T01:48:00Z",
+            "id": "define-events.ac2",
+            "title": "All 5 events are included in the DomainEvent union",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "define-events.ac3",
+            "title": "contracts package builds cleanly with npm run build",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "add-reducers",
+        "title": "Add reducer cases for all workspace lifecycle events",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-485"
+        },
+        "narrative": {
+          "Action": "Add switch cases in applyEvent() for workspace.created (no-op), workspace.wipe_started (set wiping state on issue), workspace.destroyed (remove agents, reset to todo), workspace.deleted (same as destroyed), workspace.aborted (remove planning agent). The exhaustive switch ensures TypeScript catches missing cases."
+        },
+        "subItems": [
+          {
+            "id": "add-reducers.ac1",
+            "title": "workspace.destroyed and workspace.deleted remove agent entries and reset canonicalStatus to todo",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "add-reducers.ac2",
+            "title": "workspace.wipe_started sets a wiping transitional state on the issue",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "add-reducers.ac3",
+            "title": "workspace.aborted removes the planning agent from agentsById",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "add-reducers.ac4",
+            "title": "TypeScript exhaustive check passes (no compile errors)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "emit-in-routes",
+        "title": "Emit workspace events in the 4 affected route handlers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-485"
+        },
+        "narrative": {
+          "Action": "In issues.ts routes: (1) start-planning: emit workspace.created after worktree setup, before planning.started. (2) abort-planning: emit workspace.aborted after tmux kill-session. (3) cleanup-workspace: emit workspace.deleted after successful cleanup. (4) deep-wipe: emit workspace.wipe_started at start, workspace.destroyed at end. Use existing eventStore.append() pattern via Effect DI."
+        },
+        "subItems": [
+          {
+            "id": "emit-in-routes.ac1",
+            "title": "start-planning emits workspace.created after worktree creation",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "emit-in-routes.ac2",
+            "title": "deep-wipe emits workspace.wipe_started immediately and workspace.destroyed on completion",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "emit-in-routes.ac3",
+            "title": "cleanup-workspace emits workspace.deleted on success",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "emit-in-routes.ac4",
+            "title": "abort-planning emits workspace.aborted after session kill",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "emit-in-routes.ac5",
+            "title": "All new events appear in the event store audit log (SQLite events table)",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
       },
       {
         "id": "quality-gates",
-        "title": "Pass typecheck, lint, and tests",
-        "status": "completed",
-        "priority": "high",
-        "created": "2026-04-05T12:00:00Z",
-        "completed": "2026-04-06T02:00:00Z",
+        "title": "Pass all quality gates (typecheck, lint, test)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T12:00:00Z",
         "metadata": {
-          "difficulty": "medium",
-          "issueLabel": "pan-478"
+          "difficulty": "simple",
+          "issueLabel": "pan-485"
         },
-        "narrative": { "Action": "Run npm run typecheck, npm run lint, npm test. Fix any type errors from the migration — especially around Effect type signatures and error channel types." },
+        "narrative": {
+          "Action": "Run npm run typecheck, npm run lint, and npm test. Fix any issues. Rebuild contracts package first since server depends on it."
+        },
         "subItems": [
           {
             "id": "quality-gates.ac1",
             "title": "npm run typecheck passes",
-            "status": "completed",
-            "completed": "2026-04-06T02:00:00Z",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "quality-gates.ac2",
             "title": "npm run lint passes",
-            "status": "completed",
-            "completed": "2026-04-06T02:00:00Z",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "quality-gates.ac3",
             "title": "npm test passes",
-            "status": "completed",
-            "completed": "2026-04-06T02:00:00Z",
+            "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
       }
     ],
     "edges": [
-      { "from": "agents-routes", "to": "quality-gates", "type": "blocks" },
-      { "from": "issues-routes", "to": "quality-gates", "type": "blocks" },
-      { "from": "specialists-routes", "to": "quality-gates", "type": "blocks" },
-      { "from": "workspaces-routes", "to": "quality-gates", "type": "blocks" },
-      { "from": "ensure-label-fix", "to": "quality-gates", "type": "blocks" }
+      { "from": "define-events", "to": "add-reducers", "type": "blocks" },
+      { "from": "define-events", "to": "emit-in-routes", "type": "blocks" },
+      { "from": "add-reducers", "to": "quality-gates", "type": "blocks" },
+      { "from": "emit-in-routes", "to": "quality-gates", "type": "blocks" }
     ]
   }
 }

@@ -1,66 +1,58 @@
-# PAN-478: Complete httpHandler adoption for remaining 4 route files + ensureLabel fix
+# PAN-485: Add workspace lifecycle events to fix stale UI after wipe/cleanup/abort
 
-## Status: Implementation Complete
+## Status: Planning Complete
 
 ## Problem
 
-PAN-470 (PR #474) migrated 9 of 13 route files to idiomatic Effect with `httpHandler()`. The 4 largest files were deferred:
-
-| File | Routes | try/catch blocks | Lines |
-|------|--------|-------------------|-------|
-| agents.ts | 20 | 60 | 1,740 |
-| issues.ts | 17 | 61 | 2,031 |
-| specialists.ts | 33 | 45 | 2,126 |
-| workspaces.ts | 19 | 86 | 3,669 |
-| **Total** | **89** | **252** | **9,566** |
-
-Additionally, `ensureLabel` in `github-client.ts` still uses raw `fetch()` instead of `ghFetch()`.
+Workspace operations (deep-wipe, cleanup, abort-planning, start-planning) complete on the backend but don't emit domain events for workspace lifecycle changes. The frontend relies on tracker poll cycles (1-3s) to detect changes, causing stale UI. The event-sourced architecture is designed to handle this — we just need to wire up the missing events.
 
 ## Decisions
 
-1. **Single issue** — all 4 files + ensureLabel in one PR. Mechanical/repetitive work following established pattern.
-2. **Improve error typing** — beyond mechanical migration, convert generic `catch` blocks to typed Effect errors where intent is clear (e.g., "Issue not found" -> `IssueNotFound`, rate limiting -> `RateLimited`).
-3. **No known risk areas** — standard mechanical migration.
+1. **Both wipe events**: Emit `workspace.wipe_started` immediately (UI shows spinner), then `workspace.destroyed` on completion.
+2. **Separate `workspace.created`**: Add distinct event even though `planning.started` already exists. Separates workspace lifecycle from planning lifecycle.
+3. **`workspace.aborted` as single event**: New event type rather than reusing `agent.stopped`. The reducer handles both agent removal and workspace state in one event.
 
 ## Approach
 
-Follow the pattern from PAN-470 (see completed files like `metrics.ts`, `costs.ts`):
+### Layer 1: Contracts (packages/contracts/)
 
-1. Import `httpHandler` from `./http-handler.js`
-2. Wrap each route's Effect body in `httpHandler(...)`
-3. Replace `Effect.promise(async () => { try { ... } catch { ... } })` with `Effect.gen` or `Effect.tryPromise`
-4. Replace `Effect.runSync(service.method(...))` with `yield* service.method(...)`
-5. Remove redundant try/catch — let typed errors flow through httpHandler's error channel
-6. Where catch blocks map to obvious typed errors, use them instead of generic Error
+**events.ts** — Define 5 new event schemas:
+- `WorkspaceCreatedEvent` — `{ issueId, workspacePath }`
+- `WorkspaceWipeStartedEvent` — `{ issueId }`
+- `WorkspaceDestroyedEvent` — `{ issueId }`
+- `WorkspaceDeletedEvent` — `{ issueId }`
+- `WorkspaceAbortedEvent` — `{ issueId, sessionName? }`
 
-For ensureLabel: replace raw `fetch()` on line 278 with `ghFetch()`, matching the pattern used by `removeLabel`.
+Add all 5 to the `DomainEvent` union.
 
-## References
+**event-reducers.ts** — Add reducer cases:
+- `workspace.created` → no-op (planning.started already handles agent state)
+- `workspace.wipe_started` → update issue in `issuesRaw` to show `wiping` transitional state
+- `workspace.destroyed` → remove all agents for the issue from `agentsById`, patch issue status to `todo`
+- `workspace.deleted` → same as destroyed (remove agents, reset status)
+- `workspace.aborted` → remove planning agent from `agentsById`
 
-- `src/dashboard/server/routes/http-handler.ts` — the wrapper
-- `src/dashboard/server/services/typed-errors.ts` — typed error definitions
-- PR #474 — the PAN-470 migration (pattern reference)
+### Layer 2: Server Routes (src/dashboard/server/routes/issues.ts)
 
-## Current Phase
-Quality gates (typecheck, lint, tests)
+- **start-planning** (~line 531): Emit `workspace.created` after worktree setup, before `planning.started`
+- **abort-planning** (~line 740): Emit `workspace.aborted` after tmux kill-session
+- **cleanup-workspace** (~line 1518): Emit `workspace.deleted` after successful cleanup
+- **deep-wipe** (~line 1532): Emit `workspace.wipe_started` at start, `workspace.destroyed` at end
 
-## Completed Work
-- [x] panopticon-9y7: Fix ensureLabel to use ghFetch instead of raw fetch (commit: d01bc07)
-- [x] panopticon-aaj: Migrate agents.ts to httpHandler (commit: 5e6bac6)
-- [x] panopticon-v9w: Migrate issues.ts to httpHandler (commit: 56fabe0)
-- [x] panopticon-ayu: Migrate specialists.ts to httpHandler (commit: 37d3be2)
-- [x] panopticon-8j0: Migrate workspaces.ts to httpHandler (commit: c746ce4)
+### Layer 3: No Frontend Changes Needed
 
-## Remaining Work
-- [ ] panopticon-4k9: Pass typecheck, lint, and tests
-- [ ] panopticon-ayu: Migrate specialists.ts to httpHandler
-- [ ] panopticon-8j0: Migrate workspaces.ts to httpHandler
-- [ ] panopticon-4k9: Pass typecheck, lint, and tests
+The shared reducer in `@panopticon/contracts` is used by both the server read model and the frontend Zustand store. Once the reducer handles the new events, the frontend reacts automatically via the existing WebSocket event stream.
 
-## Key Decisions
-- ghFetch throws on !res.ok including 422; ensureLabel catches 422 error to fall back to label fetch
+## Files Changed
 
-## Specialist Feedback
-(none yet)
-- **[2026-04-06T01:46Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
-- **[2026-04-06T01:54Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+| File | Change |
+|---|---|
+| `packages/contracts/src/events.ts` | 5 new event schemas + union update |
+| `packages/contracts/src/event-reducers.ts` | 5 new reducer cases |
+| `src/dashboard/server/routes/issues.ts` | Emit events in 4 routes |
+
+## Risks
+
+- **Low**: The `default: { void (event as never) }` exhaustiveness check ensures TypeScript catches any missing reducer cases at compile time.
+- **Low**: Existing `issue.statusChanged` events in some routes provide a fallback — new events add immediacy, not correctness.
+- **Rebuild contracts**: After modifying contracts, `npm run build` in `packages/contracts/` is required before server/frontend can use the new types.
