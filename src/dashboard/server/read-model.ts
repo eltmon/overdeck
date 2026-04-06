@@ -153,13 +153,16 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Slow path: bootstrap from lib modules ────────────────────────────────
       if (!usedProjectionCache) {
         // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgents }, { getAllSpecialists, getSpecialistState }, { loadReviewStatuses, getReviewStatus }, { computeAgentEnrichment }] =
+        const [{ listRunningAgents, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { loadReviewStatuses, getReviewStatus }, { computeAgentEnrichment }] =
           yield* Effect.all([
             Effect.promise(() => import('../../lib/agents.js')),
             Effect.promise(() => import('../../lib/cloister/specialists.js')),
             Effect.promise(() => import('../../lib/review-status.js')),
             Effect.promise(() => import('../../lib/agent-enrichment.js')),
           ]);
+
+        // Warn on legacy state files with bare numeric issueIds (PAN-489)
+        warnOnBareNumericIssueIds();
 
         // ── Agents ────────────────────────────────────────────────────────────
         const running = listRunningAgents();

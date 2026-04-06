@@ -84,6 +84,20 @@ describe('AgentSpawner — integration', () => {
   });
 
   describe('startWork', () => {
+    it('fails with AgentStartError for bare numeric issueId', async () => {
+      const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
+
+      const program = Effect.gen(function* () {
+        const spawner = yield* AgentSpawner;
+        return yield* spawner.startWork('484', { workspacePath: WORKSPACE });
+      }).pipe(Effect.provide(AgentSpawnerLive));
+
+      const err = await runEffectFail(program);
+      expect((err as any)._tag).toBe('AgentStartError');
+      expect((err as any).message).toContain('bare numeric');
+      expect((err as any).message).toContain('PAN-484');
+    });
+
     it('spawns agent when all guards pass', async () => {
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 

@@ -465,16 +465,30 @@ function determineModel(options: SpawnOptions): string {
 /**
  * Shared tracker resolution logic for issue state transitions.
  *
- * Resolution order:
- * 1. Primary tracker from global config (e.g. Linear)
- * 2. Secondary tracker from global config (if configured)
- * 3. Project-specific tracker derived from the workspace path:
- *    looks up the project in projects.yaml and uses its github_repo or gitlab_repo
+ * Resolution order (by project tracker type):
+ * 1. github_repo → GitHub Issues (takes priority over issue_prefix, since projects
+ *    like panopticon-cli use GitHub Issues with a prefix, not Linear)
+ * 2. rally_project → Rally
+ * 3. issue_prefix (no github_repo) → Linear (covers gitlab+linear and pure-linear projects)
+ * 4. gitlab_repo only → warn and skip (GitLab doesn't support label-based state transitions)
  *
- * This means projects that only have a github_repo (no linear_team) will
- * still get their issues transitioned correctly without any extra config.
+ * Precedence rationale: issue_prefix was renamed from linear_team but is now also set on
+ * GitHub-hosted projects (e.g. issue_prefix: PAN for panopticon-cli GitHub Issues).
+ * github_repo must be checked first so GitHub projects don't misroute to Linear.
  */
 async function transitionIssueState(issueId: string, state: IssueState, workspacePath?: string): Promise<void> {
+  // Guard: bare numeric IDs (no alphabetic prefix, e.g. "484") must never reach
+  // any tracker API. Linear's searchIssues("484") would match MIN-484 in the wrong
+  // team. Log a warning and skip — the workspace's project must use prefixed IDs.
+  if (/^\d+$/.test(issueId)) {
+    console.warn(
+      `[agents] Skipping ${state} transition for bare numeric ID "${issueId}" — ` +
+      `issue IDs must include a project prefix (e.g. PAN-${issueId}). ` +
+      `This workspace was likely created before the pan- prefix convention.`
+    );
+    return;
+  }
+
   // Resolve the project from workspacePath — its configured tracker is authoritative.
   // Every issue MUST belong to a registered project with a tracker configured.
   const projectConfig = workspacePath ? findProjectByPath(workspacePath) : null;
@@ -482,20 +496,9 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
     throw new Error(`Cannot transition ${issueId}: no project config found for workspace ${workspacePath || '(none)'}. Register the project in projects.yaml.`);
   }
 
-  // Project has a Linear team — use Linear tracker
-  if (getIssuePrefix(projectConfig)) {
-    const config = loadConfig();
-    const trackersConfig = config.trackers;
-    if (!trackersConfig?.linear) {
-      throw new Error(`Project ${projectConfig.name} uses Linear (team: ${getIssuePrefix(projectConfig)}) but no Linear tracker is configured in config.yaml`);
-    }
-    const tracker = createTrackerFromConfig(trackersConfig, 'linear');
-    await tracker.transitionIssue(issueId, state);
-    console.log(`[agents] Transitioned ${issueId} to ${state} via Linear (team: ${getIssuePrefix(projectConfig)})`);
-    return;
-  }
-
-  // Project has a GitHub repo — use project-specific GitHub tracker
+  // Project has a GitHub repo — use GitHub Issues tracker.
+  // Checked BEFORE issue_prefix because github_repo projects (e.g. panopticon-cli)
+  // set issue_prefix for their GitHub Issue prefix (PAN-), not for Linear.
   if (projectConfig.github_repo) {
     const [owner, repo] = projectConfig.github_repo.split('/');
     const tracker = createTracker({ type: 'github', owner, repo });
@@ -517,12 +520,26 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
     return;
   }
 
+  // Project has a Linear team prefix (and no github_repo) — use Linear tracker.
+  // This covers: pure-Linear projects and gitlab+Linear projects (e.g. mind-your-now).
+  if (getIssuePrefix(projectConfig)) {
+    const config = loadConfig();
+    const trackersConfig = config.trackers;
+    if (!trackersConfig?.linear) {
+      throw new Error(`Project ${projectConfig.name} uses Linear (team: ${getIssuePrefix(projectConfig)}) but no Linear tracker is configured in config.yaml`);
+    }
+    const tracker = createTrackerFromConfig(trackersConfig, 'linear');
+    await tracker.transitionIssue(issueId, state);
+    console.log(`[agents] Transitioned ${issueId} to ${state} via Linear (team: ${getIssuePrefix(projectConfig)})`);
+    return;
+  }
+
   if (projectConfig.gitlab_repo) {
     console.warn(`[agents] GitLab project detected (${projectConfig.gitlab_repo}) but GitLab does not support ${state} label transitions`);
     return;
   }
 
-  throw new Error(`Project ${projectConfig.name} has no tracker configured (need linear_team, github_repo, or rally_project in projects.yaml)`);
+  throw new Error(`Project ${projectConfig.name} has no tracker configured (need issue_prefix, github_repo, or rally_project in projects.yaml)`);
 }
 
 export async function transitionIssueToInProgress(issueId: string, workspacePath?: string): Promise<void> {
@@ -737,6 +754,38 @@ export function listRunningAgents(): (AgentState & { tmuxActive: boolean })[] {
   }
 
   return agents;
+}
+
+/**
+ * Scan ~/.panopticon/agents/ for state files with bare numeric issueIds
+ * (e.g. "484" instead of "PAN-484") and log warnings to stderr.
+ *
+ * These workspaces were created before the pan- prefix convention and may
+ * cause cross-tracker pollution if their in_review transition is triggered.
+ * Called once at server startup to surface legacy state files.
+ */
+export function warnOnBareNumericIssueIds(): void {
+  if (!existsSync(AGENTS_DIR)) return;
+
+  const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory());
+
+  const legacy: string[] = [];
+  for (const dir of dirs) {
+    const state = getAgentState(dir.name);
+    if (state?.issueId && /^\d+$/.test(state.issueId)) {
+      legacy.push(`${dir.name} (issueId: "${state.issueId}")`);
+    }
+  }
+
+  if (legacy.length > 0) {
+    console.warn(
+      `[agents] WARNING: ${legacy.length} agent state file(s) have bare numeric issueIds ` +
+      `(created before the pan- prefix convention). These agents will not be able to ` +
+      `transition tracker state. Consider removing or updating them:\n` +
+      legacy.map(l => `  ~/.panopticon/agents/${l}`).join('\n')
+    );
+  }
 }
 
 export function stopAgent(agentId: string): void {
