@@ -1386,13 +1386,16 @@ const postAgentsRoute = HttpRouter.add(
       });
     }
 
-    // Kill any zombie tmux session from a previous crash
-    try {
-      yield* Effect.promise(() => execAsync(`tmux has-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' }));
-      // Session exists — kill it so we can start fresh
-      yield* Effect.promise(() => execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' }));
-      console.log(`[start-agent] Killed stale tmux session ${agentSessionName}`);
-    } catch { /* No existing session — good */ }
+    // Kill any zombie tmux session from a previous crash.
+    // NOTE: try/catch does NOT work with yield* in Effect.gen — Effect errors propagate
+    // through the Effect error channel, not as JS exceptions. Use .catch() in the Promise
+    // chain instead so the Effect never fails when the session doesn't exist.
+    yield* Effect.promise(() =>
+      execAsync(`tmux has-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' })
+        .then(() => execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' }))
+        .then(() => console.log(`[start-agent] Killed stale tmux session ${agentSessionName}`))
+        .catch(() => { /* No existing session — good */ })
+    );
 
     // Spawn pan work issue command
     const spawnPanCommand = (args: string[], cwd?: string): string => {
