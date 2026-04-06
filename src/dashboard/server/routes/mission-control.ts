@@ -40,6 +40,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../../lib/paths.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
+import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { loadSettings } from '../../../lib/settings.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { getAgentCommand } from '../../../lib/settings.js';
@@ -312,9 +313,12 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         transcriptParts.push(`\n--- Results ---\n${ss.notes}`);
       }
 
-      const tmuxSessionName = ss.status === 'running'
-        ? `specialist-${ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent'}`
-        : undefined;
+      let tmuxSessionName: string | undefined;
+      if (ss.status === 'running') {
+        const specialistType = ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent';
+        const resolved = resolveProjectFromIssue(issueId);
+        tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey);
+      }
 
       sections.push({
         type: ss.type,
