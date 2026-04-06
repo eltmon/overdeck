@@ -1,4 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
+import { httpHandler } from "./http-handler.js";
 /**
  * Agents route module — Effect HttpRouter.Layer (PAN-428 B7)
  *
@@ -63,6 +64,7 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../../lib/paths.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { buildResumePrompt } from '../../../lib/cloister/resume-prompt.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
@@ -188,7 +190,7 @@ function flyExecCmd(vmName: string, command: string): string {
 const getAgentsRoute = HttpRouter.add(
   'GET',
   '/api/agents',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     return yield* Effect.promise(async () => {
         try {
         const now = Date.now();
@@ -460,7 +462,7 @@ const getAgentsRoute = HttpRouter.add(
           return jsonResponse([]);
         }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/output ───────────────────────────────────────
@@ -468,7 +470,7 @@ const getAgentsRoute = HttpRouter.add(
 const getAgentOutputRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/output',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -533,7 +535,7 @@ const getAgentOutputRoute = HttpRouter.add(
           return jsonResponse({ output: '' });
         }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/agents/:id/message ─────────────────────────────────────
@@ -541,13 +543,12 @@ const getAgentOutputRoute = HttpRouter.add(
 const postAgentMessageRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/message',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
     return yield* Effect.promise(async () => {
-        try {
           const { message } = body as any;
           if (!message) {
             return jsonResponse({ error: 'Message required' }, { status: 400 });
@@ -579,12 +580,8 @@ const postAgentMessageRoute = HttpRouter.add(
             await messageAgent(id, message);
             return jsonResponse({ success: true });
           }
-        } catch (error: unknown) {
-          console.error('Error sending message:', error);
-          return jsonResponse({ error: 'Failed to send message' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: DELETE /api/agents/:id ───────────────────────────────────────────
@@ -592,13 +589,12 @@ const postAgentMessageRoute = HttpRouter.add(
 const deleteAgentRoute = HttpRouter.add(
   'DELETE',
   '/api/agents/:id',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
-        try {
           stopAgent(id);
           await Effect.runPromise(eventStore.append({
             type: 'agent.stopped',
@@ -606,12 +602,8 @@ const deleteAgentRoute = HttpRouter.add(
             payload: { agentId: id },
           }));
           return jsonResponse({ success: true });
-        } catch (error: unknown) {
-          console.error('Error stopping agent:', error);
-          return jsonResponse({ error: 'Failed to stop agent' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/health-history ───────────────────────────────
@@ -619,7 +611,7 @@ const deleteAgentRoute = HttpRouter.add(
 const getAgentHealthHistoryRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/health-history',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -627,7 +619,6 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
     const hours = Option.isSome(urlOpt) ? (urlOpt.value.searchParams.get('hours') ?? '24') : '24';
 
     return yield* Effect.promise(async () => {
-        try {
           const { getHealthHistory } = await import('../../../lib/database/health-events-db.js');
           const endTime = new Date();
           const startTime = new Date(endTime.getTime() - parseInt(hours) * 60 * 60 * 1000);
@@ -638,12 +629,8 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
             endTime: endTime.toISOString(),
             events,
           });
-        } catch (error: unknown) {
-          console.error('Error fetching health history:', error);
-          return jsonResponse({ error: 'Failed to fetch health history' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/agents/:id/poke ────────────────────────────────────────
@@ -651,13 +638,12 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
 const postAgentPokeRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/poke',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
     return yield* Effect.promise(async () => {
-        try {
           const { message } = body as any;
           const defaultPokeMessage =
             "You seem to have been inactive for a while. If you're stuck:\n" +
@@ -668,12 +654,8 @@ const postAgentPokeRoute = HttpRouter.add(
           const pokeMsg = message || defaultPokeMessage;
           await messageAgent(id, pokeMsg);
           return jsonResponse({ success: true, message: 'Agent poked successfully' });
-        } catch (error: unknown) {
-          console.error('Error poking agent:', error);
-          return jsonResponse({ error: 'Failed to poke agent' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/pending-questions ────────────────────────────
@@ -681,7 +663,7 @@ const postAgentPokeRoute = HttpRouter.add(
 const getAgentPendingQuestionsRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/pending-questions',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
@@ -694,7 +676,7 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
           return jsonResponse({ pending: false, questions: [] });
         }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/agents/:id/answer-question ─────────────────────────────
@@ -702,13 +684,12 @@ const getAgentPendingQuestionsRoute = HttpRouter.add(
 const postAgentAnswerQuestionRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/answer-question',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
     return yield* Effect.promise(async () => {
-        try {
           const { answers } = body as any;
           if (!answers || !Array.isArray(answers) || answers.length === 0) {
             return jsonResponse({ error: 'answers array required' }, { status: 400 });
@@ -746,12 +727,8 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 
           await execAsync(`tmux send-keys -t "${id}" C-m`);
           return jsonResponse({ success: true });
-        } catch (error: unknown) {
-          console.error('Error sending answer:', error);
-          return jsonResponse({ error: 'Failed to send answer' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/agents/:id/heartbeat ───────────────────────────────────
@@ -759,13 +736,12 @@ const postAgentAnswerQuestionRoute = HttpRouter.add(
 const postAgentHeartbeatRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/heartbeat',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
     return yield* Effect.promise(async () => {
-        try {
           const { state, tool, timestamp } = body as any;
           saveAgentRuntimeState(id, {
             state,
@@ -773,12 +749,8 @@ const postAgentHeartbeatRoute = HttpRouter.add(
             currentTool: tool,
           });
           return jsonResponse({ success: true });
-        } catch (error: unknown) {
-          console.error('Error saving heartbeat:', error);
-          return jsonResponse({ error: 'Failed to save heartbeat' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/activity ─────────────────────────────────────
@@ -786,7 +758,7 @@ const postAgentHeartbeatRoute = HttpRouter.add(
 const getAgentActivityRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/activity',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -795,15 +767,10 @@ const getAgentActivityRoute = HttpRouter.add(
     const limit = parseInt(limitStr) || 100;
 
     return yield* Effect.promise(async () => {
-        try {
           const activity = getActivity(id, limit);
           return jsonResponse({ activity });
-        } catch (error: unknown) {
-          console.error('Error reading activity:', error);
-          return jsonResponse({ error: 'Failed to read activity' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/files ────────────────────────────────────────
@@ -811,7 +778,7 @@ const getAgentActivityRoute = HttpRouter.add(
 const getAgentFilesRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/files',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
@@ -846,7 +813,7 @@ const getAgentFilesRoute = HttpRouter.add(
           return jsonResponse({ files: [] });
         }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/timeline ─────────────────────────────────────
@@ -854,7 +821,7 @@ const getAgentFilesRoute = HttpRouter.add(
 const getAgentTimelineRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/timeline',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -881,7 +848,7 @@ const getAgentTimelineRoute = HttpRouter.add(
           return jsonResponse({ timeline: [] });
         }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/agents/:id/suspend ─────────────────────────────────────
@@ -889,14 +856,13 @@ const getAgentTimelineRoute = HttpRouter.add(
 const postAgentSuspendRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/suspend',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
-        try {
           const { sessionId } = body as any;
           const effectiveSessionId = sessionId || getSessionId(id);
 
@@ -918,12 +884,8 @@ const postAgentSuspendRoute = HttpRouter.add(
           }));
 
           return jsonResponse({ success: true });
-        } catch (error: unknown) {
-          console.error('Error suspending agent:', error);
-          return jsonResponse({ error: 'Failed to suspend agent' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/agents/:id/resume ──────────────────────────────────────
@@ -931,13 +893,12 @@ const postAgentSuspendRoute = HttpRouter.add(
 const postAgentResumeRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/resume',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
     return yield* Effect.promise(async () => {
-        try {
           const { message } = body as any;
           const result = await resumeAgent(id, message);
           if (result.success) {
@@ -945,12 +906,8 @@ const postAgentResumeRoute = HttpRouter.add(
           } else {
             return jsonResponse({ error: result.error }, { status: 400 });
           }
-        } catch (error: unknown) {
-          console.error('Error resuming agent:', error);
-          return jsonResponse({ error: 'Failed to resume agent' }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/cloister-health ──────────────────────────────
@@ -958,25 +915,19 @@ const postAgentResumeRoute = HttpRouter.add(
 const getAgentCloisterHealthRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/cloister-health',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
     return yield* Effect.promise(async () => {
-        try {
           const service = getCloisterService();
           const health = service.getAgentHealth(id);
           if (!health) {
             return jsonResponse({ error: 'Agent not found or runtime not available' }, { status: 404 });
           }
           return jsonResponse(health);
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error getting agent health:', error);
-          return jsonResponse({ error: 'Failed to get agent health: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/handoff/suggestion ───────────────────────────
@@ -984,12 +935,11 @@ const getAgentCloisterHealthRoute = HttpRouter.add(
 const getAgentHandoffSuggestionRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/handoff/suggestion',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
     return yield* Effect.promise(async () => {
-        try {
           const agentState = getAgentState(id);
           if (!agentState) {
             return jsonResponse({ error: 'Agent not found' }, { status: 404 });
@@ -1028,13 +978,8 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
             suggestedModel: null,
             reason: 'No handoff triggers detected',
           });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error getting handoff suggestion:', error);
-          return jsonResponse({ error: 'Failed to get handoff suggestion: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/agents/:id/handoff ─────────────────────────────────────
@@ -1042,13 +987,12 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
 const postAgentHandoffRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/handoff',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
     return yield* Effect.promise(async () => {
-        try {
           const { toModel, reason } = body as any;
           if (!toModel) {
             return jsonResponse({ error: 'toModel is required' }, { status: 400 });
@@ -1068,13 +1012,8 @@ const postAgentHandoffRoute = HttpRouter.add(
           } else {
             return jsonResponse({ success: false, error: result.error }, { status: 500 });
           }
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error executing handoff:', error);
-          return jsonResponse({ error: 'Failed to execute handoff: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/handoffs ─────────────────────────────────────
@@ -1082,21 +1021,15 @@ const postAgentHandoffRoute = HttpRouter.add(
 const getAgentHandoffsRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/handoffs',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
     return yield* Effect.promise(async () => {
-        try {
           const handoffs = readAgentHandoffEvents(id);
           return jsonResponse({ handoffs });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error getting agent handoffs:', error);
-          return jsonResponse({ error: 'Failed to get agent handoffs: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/agents/:id/cost ─────────────────────────────────────────
@@ -1104,12 +1037,11 @@ const getAgentHandoffsRoute = HttpRouter.add(
 const getAgentCostRoute = HttpRouter.add(
   'GET',
   '/api/agents/:id/cost',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
     return yield* Effect.promise(async () => {
-        try {
           const agentState = getAgentState(id);
           if (!agentState) {
             return jsonResponse({ error: 'Agent not found' }, { status: 404 });
@@ -1198,13 +1130,8 @@ const getAgentCostRoute = HttpRouter.add(
             },
             cost,
           });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error getting agent cost:', error);
-          return jsonResponse({ error: 'Failed to get agent cost: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
@@ -1212,13 +1139,12 @@ const getAgentCostRoute = HttpRouter.add(
 const postAgentsRoute = HttpRouter.add(
   'POST',
   '/api/agents',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
 
     return yield* Effect.promise(async () => {
-        try {
         const { issueId, projectId } = body as any;
 
         if (!issueId) {
@@ -1448,14 +1374,14 @@ const postAgentsRoute = HttpRouter.add(
           const resumePromptFile = join(agentDir, 'resume-prompt.md');
           const userMessage = (body as any).message || undefined;
           const resumePrompt = buildResumePrompt(workspacePath, issueId, agentDir, userMessage);
-          writeFileSync(resumePromptFile, resumePrompt);
+          await writeFile(resumePromptFile, resumePrompt);
 
           // Fresh session with context prompt (not --resume, which has interactive prompts
           // and loses prompt caching). The resume prompt contains STATE.md, beads, feedback,
           // and optional user message — everything the agent needs to pick up where it left off.
           const agentModel = existingAgentState.model || 'claude-sonnet-4-6';
           const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --dangerously-skip-permissions --model ${agentModel} -p "$prompt"\n`;
-          writeFileSync(resumeLauncher, resumeContent, { mode: 0o755 });
+          await writeFile(resumeLauncher, resumeContent, { mode: 0o755 });
 
           // Spawn tmux session with fresh claude session
           const escapedCwd = workspacePath.replace(/"/g, '\\"');
@@ -1481,7 +1407,7 @@ const postAgentsRoute = HttpRouter.add(
             lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
           );
 
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'agent.started',
             timestamp: new Date().toISOString(),
             payload: {
@@ -1501,7 +1427,7 @@ const postAgentsRoute = HttpRouter.add(
               },
             },
           }));
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'issue.statusChanged',
             timestamp: new Date().toISOString(),
             payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
@@ -1703,13 +1629,8 @@ const postAgentsRoute = HttpRouter.add(
           activityId,
           projectPath,
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error starting agent:', error);
-          return jsonResponse({ error: 'Failed to start agent: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
