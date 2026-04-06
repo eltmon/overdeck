@@ -554,7 +554,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
               {step === 'checking' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
                   <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
-                  <p className="text-content-body">Checking session status...</p>
+                  <p className="text-content-body">
+                    {['In Planning', 'Planning', 'Discovery'].includes(issue.status)
+                      ? 'Reconnecting to active planning session...'
+                      : 'Checking session status...'}
+                  </p>
+                  <p className="text-content-muted text-sm mt-2">
+                    {['In Planning', 'Planning', 'Discovery'].includes(issue.status)
+                      ? 'Loading terminal for your planning agent'
+                      : 'Looking for an existing session'}
+                  </p>
                 </div>
               )}
 
