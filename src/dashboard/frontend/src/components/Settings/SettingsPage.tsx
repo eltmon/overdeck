@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
+import { OpenRouterPage } from './OpenRouterPage';
 import {
   ModelOverrideModal,
   getCapabilityMatchScore,
@@ -655,6 +656,20 @@ export function SettingsPage() {
             );
           })}
         </div>
+      </section>
+
+      {/* OpenRouter */}
+      <section className="mb-12">
+        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+          OpenRouter
+          <div className="h-px flex-1 bg-divider-strong" />
+        </h2>
+        <OpenRouterPage
+          apiKey={formData.api_keys.openrouter}
+          enabled={!!formData.models.providers.openrouter}
+          onApiKeyChange={(key) => handleApiKeyChange('openrouter', key)}
+          onToggleEnabled={() => handleProviderToggle('openrouter')}
+        />
       </section>
 
       {/* Tracker API Keys */}
