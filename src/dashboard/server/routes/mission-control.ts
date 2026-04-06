@@ -312,6 +312,10 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         transcriptParts.push(`\n--- Results ---\n${ss.notes}`);
       }
 
+      const tmuxSessionName = ss.status === 'running'
+        ? `specialist-${ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent'}`
+        : undefined;
+
       sections.push({
         type: ss.type,
         sessionId: `specialist-${ss.type}-${ss.startedAt}`,
@@ -320,6 +324,7 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         duration,
         status: ss.status,
         transcript: transcriptParts.join('\n'),
+        tmuxSession: tmuxSessionName,
       });
     }
   }
