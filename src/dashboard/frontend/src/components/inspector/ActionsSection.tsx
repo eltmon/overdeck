@@ -222,7 +222,7 @@ export function ActionsSection({
             value={resumeMessage}
             onChange={(e) => setResumeMessage(e.target.value)}
             placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from STATE.md"
-            className="w-full px-2 py-1.5 text-xs bg-pan-surface border border-pan-border rounded resize-none text-pan-text-primary placeholder:text-pan-text-secondary/50 focus:outline-none focus:border-blue-500"
+            className="w-full px-2 py-1.5 text-xs bg-[#0d1117] border border-pan-border rounded resize-none text-gray-200 placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
             rows={3}
             autoFocus
             onKeyDown={(e) => {
