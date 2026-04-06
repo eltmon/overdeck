@@ -529,6 +529,11 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     const sessionName = `planning-${issueLower}`;
 
     yield* eventStore.append({
+      type: 'workspace.created',
+      timestamp: new Date().toISOString(),
+      payload: { issueId: id, workspacePath },
+    });
+    yield* eventStore.append({
       type: 'planning.started',
       timestamp: new Date().toISOString(),
       payload: { issueId: id, sessionName },
@@ -741,6 +746,11 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
       payload: { issueId: issueIdentifier || id, status: revertedState, canonicalStatus: 'todo' },
+    });
+    yield* eventStore.append({
+      type: 'workspace.aborted',
+      timestamp: new Date().toISOString(),
+      payload: { issueId: issueIdentifier || id, sessionName },
     });
     try { getIssueDataService().patchIssue(issueIdentifier || id, { status: revertedState, canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
 
@@ -1459,6 +1469,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const cleanupLog: string[] = [];
+    const eventStore = yield* EventStoreService;
 
     const issueLower = id.toLowerCase();
     const githubCheck = isGitHubIssue(id);
@@ -1507,6 +1518,12 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
         await execAsync(`rm -rf "${agentDir}"`, { encoding: 'utf-8' });
         cleanupLog.push(`Removed agent state: ${agentDir}`);
       }
+    });
+
+    yield* eventStore.append({
+      type: 'workspace.deleted',
+      timestamp: new Date().toISOString(),
+      payload: { issueId: id },
     });
 
     return jsonResponse({
@@ -1569,6 +1586,12 @@ const postIssueDeepWipeRoute = HttpRouter.add(
 
         sendEvent({ type: 'started', issueId: id });
 
+        await Effect.runPromise(eventStore.append({
+          type: 'workspace.wipe_started',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id },
+        }));
+
         const result = await deepWipe(ctx, {
           deleteWorkspace,
           deleteBranches: deleteWorkspace,
@@ -1595,6 +1618,11 @@ const postIssueDeepWipeRoute = HttpRouter.add(
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId: id, status: 'Todo', canonicalStatus: 'todo' },
+        }));
+        await Effect.runPromise(eventStore.append({
+          type: 'workspace.destroyed',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id },
         }));
 
         const issueDataService = getIssueDataService();
