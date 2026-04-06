@@ -1448,12 +1448,12 @@ const postAgentsRoute = HttpRouter.add(
           const resumePromptFile = join(agentDir, 'resume-prompt.md');
           const userMessage = (body as any).message || undefined;
           const resumePrompt = buildResumePrompt(workspacePath, issueId, agentDir, userMessage);
-          writeFileSync(resumePromptFile, resumePrompt);
+          await writeFile(resumePromptFile, resumePrompt);
 
           // Resume the existing Claude session — keeps full conversation history and session continuity.
           // Pass the resume prompt via -p so the agent gets context about why it was resumed.
           const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --resume "${savedSessionId}" --dangerously-skip-permissions -p "$prompt"\n`;
-          writeFileSync(resumeLauncher, resumeContent, { mode: 0o755 });
+          await writeFile(resumeLauncher, resumeContent, { mode: 0o755 });
 
           // Spawn tmux session with resume command
           const escapedCwd = workspacePath.replace(/"/g, '\\"');
