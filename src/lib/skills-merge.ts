@@ -277,3 +277,59 @@ export function cleanupWorkspaceGitignore(workspacePath: string): {
   const gitignorePath = join(workspacePath, '.claude', 'skills', '.gitignore');
   return cleanupGitignore(gitignorePath);
 }
+
+/**
+ * Merge project-local skills from .pan/skills/ into a workspace's .claude/skills/.
+ *
+ * Precedence (highest wins):
+ * 1. .claude/skills/<name>/ already in workspace (user-owned or project template) → skip
+ * 2. .pan/skills/<name>/ in project repo → copy into workspace .claude/skills/
+ * 3. Global cache (handled by mergeSkillsIntoWorkspace) → baseline
+ *
+ * This should be called AFTER mergeSkillsIntoWorkspace so that project-local skills
+ * can override global cache skills (but never overwrite user-owned content).
+ */
+export function mergePanSkillsIntoWorkspace(projectPath: string, workspacePath: string): MergeResult {
+  const result: MergeResult = { added: [], updated: [], skipped: [], overlayed: [] };
+  const panSkillsDir = join(projectPath, '.pan', 'skills');
+  if (!existsSync(panSkillsDir)) return result;
+
+  const claudeSkillsDir = join(workspacePath, '.claude', 'skills');
+  const manifestPath = join(workspacePath, '.claude', '.panopticon-manifest.json');
+  const manifest = readManifest(manifestPath);
+
+  const skillDirs = readdirSync(panSkillsDir, { withFileTypes: true })
+    .filter(e => e.isDirectory())
+    .map(e => e.name);
+
+  for (const skillName of skillDirs) {
+    const sourceSkillDir = join(panSkillsDir, skillName);
+    const targetSkillDir = join(claudeSkillsDir, skillName);
+
+    // Rule #1: if target already exists (user-owned or project-template), never overwrite
+    if (existsSync(targetSkillDir)) {
+      result.skipped.push(`skills/${skillName} (already exists in .claude/skills/)`);
+      continue;
+    }
+
+    // Rule #2: copy from .pan/skills/<name>/ to workspace .claude/skills/<name>/
+    const files = collectSourceFiles(sourceSkillDir, '');
+    mkdirSync(targetSkillDir, { recursive: true });
+    let anyAdded = false;
+    for (const file of files) {
+      const targetPath = join(targetSkillDir, file.relativePath);
+      mkdirSync(dirname(targetPath), { recursive: true });
+      copyFileSync(file.absolutePath, targetPath);
+      const hash = hashFile(targetPath);
+      setManifestEntry(manifest, `skills/${skillName}/${file.relativePath}`, hash, 'pan-skills');
+      result.added.push(`skills/${skillName}/${file.relativePath}`);
+      anyAdded = true;
+    }
+    if (anyAdded) {
+      result.overlayed.push(skillName);
+    }
+  }
+
+  writeManifest(manifestPath, manifest);
+  return result;
+}

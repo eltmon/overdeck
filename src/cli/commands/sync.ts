@@ -12,6 +12,8 @@ import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
+import { migratePanopticonToPan } from '../../lib/workspace-manager.js';
+import { runMultiToolSync, resolveAlsoSyncTools } from '../../lib/multi-tool-sync.js';
 
 // Get path to bundled git hooks
 const __filename = fileURLToPath(import.meta.url);
@@ -77,6 +79,41 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
                         item.status === 'symlink' ? chalk.dim('[update]') :
                         chalk.green('[new]');
           console.log(`  ${icon} ${item.name} ${label}`);
+        }
+      }
+    }
+
+    // Show .pan/skills/ source files for each registered project
+    const dryRunProjects = listProjects();
+    for (const { config } of dryRunProjects) {
+      if (!existsSync(config.path)) continue;
+      const panSkillsDir = join(config.path, '.pan', 'skills');
+      if (existsSync(panSkillsDir)) {
+        const skills = readdirSync(panSkillsDir, { withFileTypes: true })
+          .filter(e => e.isDirectory())
+          .map(e => e.name);
+        if (skills.length > 0) {
+          console.log(chalk.cyan(`\n.pan/skills/ (${config.name}):`));
+          for (const skillName of skills) {
+            console.log(`  ${chalk.green('+')} ${skillName} ${chalk.green('[project-local]')}`);
+          }
+        }
+      }
+
+      // Show multi-tool sync targets
+      const tools = resolveAlsoSyncTools(config.path);
+      if (tools.length > 0) {
+        console.log(chalk.cyan(`\nmulti-tool sync (${config.name}): ${tools.join(', ')}`));
+        const panSkillsDirExists = existsSync(join(config.path, '.pan', 'skills'));
+        if (panSkillsDirExists) {
+          const skills = readdirSync(join(config.path, '.pan', 'skills'), { withFileTypes: true })
+            .filter(e => e.isDirectory())
+            .map(e => e.name);
+          for (const tool of tools) {
+            for (const skillName of skills) {
+              console.log(`  ${chalk.green('+')} ${skillName} → ${tool}`);
+            }
+          }
         }
       }
     }
@@ -278,8 +315,36 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
 
-  // Sync git hooks to all registered projects (branch protection)
+  // Migrate .panopticon/ → .pan/ and run multi-tool sync in all registered projects
   const projects = listProjects();
+  for (const { config } of projects) {
+    if (!existsSync(config.path)) continue;
+
+    // Migrate .panopticon/ subdirs → .pan/
+    const migResult = migratePanopticonToPan(config.path);
+    if (migResult.migrated.length > 0) {
+      console.log(chalk.cyan(`Migrated .panopticon/ → .pan/ in ${config.name}: ${migResult.migrated.join(', ')}`));
+    }
+    if (migResult.skipped.length > 0) {
+      console.log(chalk.yellow(`Migration skipped (both exist) in ${config.name}: ${migResult.skipped.join(', ')}`));
+    }
+    for (const err of migResult.errors) {
+      console.log(chalk.red(`Migration error in ${config.name}: ${err}`));
+    }
+
+    // Multi-tool skill sync (cursor, codex, windsurf, cline, copilot, aider)
+    const toolSyncResults = runMultiToolSync(config.path);
+    for (const r of toolSyncResults) {
+      if (r.written.length > 0) {
+        console.log(chalk.cyan(`Synced ${r.written.length} skill(s) to ${r.tool} in ${config.name}`));
+      }
+      for (const err of r.errors) {
+        console.log(chalk.red(`Multi-tool sync error (${r.tool}) in ${config.name}: ${err}`));
+      }
+    }
+  }
+
+  // Sync git hooks to all registered projects (branch protection)
   if (projects.length > 0 && existsSync(BUNDLED_GIT_HOOKS_DIR)) {
     const gitHooksSpinner = ora('Installing git hooks in registered projects...').start();
     let totalInstalled = 0;

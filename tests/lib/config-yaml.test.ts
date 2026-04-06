@@ -6,7 +6,7 @@ import { loadConfig, hasProjectConfig, hasGlobalConfig, getGlobalConfigPath, get
 describe('config-yaml', () => {
   const testDir = join(process.cwd(), '.test-config-yaml');
   const testGlobalConfig = join(testDir, 'global-config.yaml');
-  const testProjectConfig = join(testDir, 'project', '.panopticon.yaml');
+  const testProjectConfig = join(testDir, 'project', '.pan.yaml');
 
   beforeEach(() => {
     // Create test directories
@@ -178,7 +178,7 @@ api_keys:
       const path = getProjectConfigPath();
 
       expect(path).toBeDefined();
-      expect(path).toContain('.panopticon.yaml');
+      expect(path).toContain('.pan.yaml');
     });
   });
 });

@@ -4,7 +4,7 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, statSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, rmdirSync, statSync, renameSync } from 'fs';
 import { join, dirname, basename, extname, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -19,9 +19,111 @@ import {
 import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
 import { addTunnelIngress, removeTunnelIngress } from './tunnel.js';
 import { createHumeConfig, deleteHumeConfig } from './hume.js';
-import { mergeSkillsIntoWorkspace } from './skills-merge.js';
+import { mergeSkillsIntoWorkspace, mergePanSkillsIntoWorkspace } from './skills-merge.js';
 
 const execAsync = promisify(exec);
+
+export interface PanMigrationResult {
+  /** Subdirectories migrated from .panopticon/ to .pan/ */
+  migrated: string[];
+  /** Subdirectories skipped because .pan/<subdir> already exists */
+  skipped: string[];
+  /** Errors encountered during migration */
+  errors: string[];
+}
+
+/**
+ * Migrate existing .panopticon/<subdir> directories to .pan/<subdir> within a project.
+ *
+ * Safety rules:
+ * - If old path exists and new path does NOT exist → move old to new.
+ * - If both old and new exist → log warning and skip (never overwrite silently).
+ * - If neither exists → nothing to do.
+ * - Only migrates the specific runtime subdirs (events, convoy, prompts).
+ *   .pan/skills/ is not migrated here since it may not have existed before.
+ */
+export function migratePanopticonToPan(projectPath: string): PanMigrationResult {
+  const result: PanMigrationResult = { migrated: [], skipped: [], errors: [] };
+
+  // Map legacy .panopticon/<subdir> paths to new .pan/<subdir> paths,
+  // including convoy unification (triage + health → convoy)
+  const legacyMappings: Array<{ old: string; new: string }> = [
+    { old: '.panopticon/events', new: '.pan/events' },
+    { old: '.panopticon/triage', new: '.pan/convoy' },
+    { old: '.panopticon/health', new: '.pan/convoy' },
+    { old: '.panopticon/convoy-output', new: '.pan/convoy' },
+    { old: '.panopticon/prompts', new: '.pan/prompts' },
+  ];
+
+  for (const { old: oldRelPath, new: newRelPath } of legacyMappings) {
+    const oldPath = join(projectPath, oldRelPath);
+    const newPath = join(projectPath, newRelPath);
+
+    if (!existsSync(oldPath)) continue;
+
+    if (existsSync(newPath)) {
+      const msg = `Migration skipped: both ${oldRelPath} and ${newRelPath} exist in ${projectPath} — remove one manually`;
+      console.warn(`[panopticon] ${msg}`);
+      result.skipped.push(oldRelPath);
+      continue;
+    }
+
+    try {
+      // Ensure parent directory exists
+      const parentDir = dirname(newPath);
+      if (!existsSync(parentDir)) {
+        mkdirSync(parentDir, { recursive: true });
+      }
+      renameSync(oldPath, newPath);
+      result.migrated.push(`${oldRelPath} → ${newRelPath}`);
+    } catch (err: any) {
+      result.errors.push(`${oldRelPath}: ${err.message}`);
+    }
+  }
+
+  // Clean up empty .panopticon/ dir if nothing remains
+  const panopticonDir = join(projectPath, '.panopticon');
+  if (existsSync(panopticonDir)) {
+    try {
+      const remaining = readdirSync(panopticonDir);
+      if (remaining.length === 0) {
+        rmdirSync(panopticonDir);
+        result.migrated.push('.panopticon/ (empty dir removed)');
+      }
+    } catch {
+      // Non-fatal — dir may have been removed already
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Ensure .pan/events/, .pan/convoy/, and .pan/prompts/ are excluded from git tracking
+ * in the given project root's .gitignore. .pan/skills/ is intentionally NOT excluded
+ * since project-specific skills should be committed.
+ */
+export function ensurePanGitignore(projectPath: string): void {
+  const gitignorePath = join(projectPath, '.gitignore');
+  const requiredEntries = ['.pan/events/', '.pan/convoy/', '.pan/prompts/'];
+
+  let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
+  const lines = content.split('\n');
+
+  const missing = requiredEntries.filter(entry => !lines.some(l => l.trim() === entry));
+  if (missing.length === 0) return;
+
+  // Append missing entries with a section header if we're adding for the first time
+  if (!content.endsWith('\n') && content.length > 0) {
+    content += '\n';
+  }
+  if (!lines.some(l => l.includes('.pan/'))) {
+    content += '\n# Panopticon runtime artifacts (ephemeral, not tracked)\n';
+  }
+  content += missing.join('\n') + '\n';
+
+  writeFileSync(gitignorePath, content, 'utf-8');
+}
 
 /** Progress event emitted during workspace creation. */
 export interface WorkspaceProgress {
@@ -471,6 +573,15 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     result.steps.push('Removed stale .planning/ directory from previous issue');
   }
 
+  // Ensure .pan/events/, .pan/convoy/, .pan/prompts/ are in the project's .gitignore
+  try {
+    ensurePanGitignore(projectConfig.path);
+    result.steps.push('Verified .pan/ runtime paths are in .gitignore');
+  } catch (gitignoreErr: any) {
+    // Non-fatal — log but don't block workspace creation
+    result.steps.push(`Warning: could not update .gitignore: ${gitignoreErr.message}`);
+  }
+
   // Sanitize any docker-compose files in the workspace to use platform-agnostic paths
   // This handles files inherited from worktrees that may have hardcoded home paths
   const devcontainerDir = join(workspacePath, '.devcontainer');
@@ -622,6 +733,12 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   const mergeTotal = mergeResult.added.length + mergeResult.updated.length;
   if (mergeTotal > 0) {
     result.steps.push(`Installed ${mergeTotal} Panopticon files (${mergeResult.added.length} new, ${mergeResult.updated.length} updated)`);
+  }
+
+  // Overlay project-local skills from .pan/skills/ (higher precedence than global cache)
+  const panMergeResult = mergePanSkillsIntoWorkspace(projectConfig.path, workspacePath);
+  if (panMergeResult.added.length > 0) {
+    result.steps.push(`Installed ${panMergeResult.added.length} project-local skill file(s) from .pan/skills/ (${panMergeResult.overlayed.join(', ')})`);
   }
 
   // Process agent templates (project template overlay — wins over Panopticon base)

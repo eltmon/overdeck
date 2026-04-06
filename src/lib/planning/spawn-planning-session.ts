@@ -231,7 +231,7 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
 - Generate planning artifacts:
   - STATE.md (decisions, approach, architecture)
   - Beads tasks (via \`bd create\`)
-  - Implementation plan at \`docs/prds/active/{issue-id}-plan.md\` (copy of STATE.md, required for dashboard)
+  - Implementation plan at \`docs/prds/active/{issue-id}/STATE.md\` (copy of STATE.md, required for dashboard)
 - Present options and tradeoffs for the user to decide
 
 When planning is complete, STOP and tell the user: "Planning complete - click Done when ready to hand off to an agent for implementation."
@@ -280,7 +280,7 @@ For each sub-task, estimate difficulty using this rubric:
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
 1. Create STATE.md with decisions made
-2. Copy STATE.md to implementation plan at \`docs/prds/active/{issue-id}-plan.md\` (required for dashboard)
+2. Copy STATE.md to implementation plan at \`docs/prds/active/{issue-id}/STATE.md\` (required for dashboard)
 3. Create a vBRIEF plan file at \`.planning/plan.vbrief.json\` — **MUST follow the exact format below**
 4. Summarize the plan and STOP
 

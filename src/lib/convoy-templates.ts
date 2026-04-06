@@ -99,7 +99,7 @@ export const TRIAGE_TEMPLATE: ConvoyTemplate = {
     // This is a placeholder template; actual agents created at runtime
   ],
   config: {
-    outputDir: '.panopticon/triage',
+    outputDir: '.pan/convoy',
     maxParallel: 5, // Limit concurrent triage agents
   },
 };
@@ -120,7 +120,7 @@ export const HEALTH_MONITOR_TEMPLATE: ConvoyTemplate = {
     },
   ],
   config: {
-    outputDir: '.panopticon/health',
+    outputDir: '.pan/convoy',
   },
 };
 
