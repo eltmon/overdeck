@@ -330,6 +330,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
         .then((data: PlanningStatus & { planningCompleted?: boolean }) => {
           if (data.active) {
             // Session is running - connect to it directly (skip ready step)
+            // Seed setupSessionName so XTerminal mounts immediately without waiting for statusQuery
+            if (data.sessionName) setSetupSessionName(data.sessionName);
             hasConnectedToSession.current = true;
             setStep('planning');
           } else if (data.planningCompleted) {
@@ -339,6 +341,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
           } else if (data.sessionName && data.hasPromptFile && ['In Planning', 'Planning', 'Discovery'].includes(issue.status)) {
             // Issue is in planning state with a known session that actually started work
             // (hasPromptFile confirms workspace was created successfully)
+            if (data.sessionName) setSetupSessionName(data.sessionName);
             hasConnectedToSession.current = true;
             setStep('planning');
           } else {
