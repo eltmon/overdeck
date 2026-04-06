@@ -321,11 +321,17 @@ export const WorkspaceServiceLive = Layer.effect(
 
               // Re-run workspace creation in dry-run=false but startDocker=false to generate compose
               const { createWorkspace } = await import('../../../lib/workspace-manager.js');
-              await createWorkspace({
+              const createResult = await createWorkspace({
                 projectConfig: { ...project, name: projectName },
                 featureName: issueLower,
                 startDocker: false,
               });
+              if (!createResult.success) {
+                throw new WorkspaceCreateError({
+                  id: issueId,
+                  message: `createWorkspace failed: ${createResult.errors.join('; ')}`,
+                });
+              }
             }
 
             // Start containers

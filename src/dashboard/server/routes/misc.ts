@@ -39,15 +39,8 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { access, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,6 +68,7 @@ import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/hea
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { httpHandler } from './http-handler.js';
 
 const execAsync = promisify(exec);
 
@@ -111,29 +105,29 @@ interface ProjectMapping {
   localPath: string;
 }
 
-function getProjectMappings(): ProjectMapping[] {
+async function getProjectMappings(): Promise<ProjectMapping[]> {
   try {
-    if (existsSync(PROJECT_MAPPINGS_FILE)) {
-      return JSON.parse(readFileSync(PROJECT_MAPPINGS_FILE, 'utf-8'));
-    }
-  } catch {}
-  return [];
+    const content = await readFile(PROJECT_MAPPINGS_FILE, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return [];
+  }
 }
 
-function saveProjectMappings(mappings: ProjectMapping[]): void {
+async function saveProjectMappings(mappings: ProjectMapping[]): Promise<void> {
   const dir = join(homedir(), '.panopticon');
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(PROJECT_MAPPINGS_FILE, JSON.stringify(mappings, null, 2));
+  await mkdir(dir, { recursive: true });
+  await writeFile(PROJECT_MAPPINGS_FILE, JSON.stringify(mappings, null, 2));
 }
 
 // ─── Project path helper ──────────────────────────────────────────────────────
 
-function getProjectPath(issuePrefix?: string): string {
+async function getProjectPath(issuePrefix?: string): Promise<string> {
   if (issuePrefix) {
     const issueId = `${issuePrefix}-1`;
     const resolved = resolveProjectFromIssue(issueId);
     if (resolved) return resolved.projectPath;
-    const mappings = getProjectMappings();
+    const mappings = await getProjectMappings();
     const mapping = mappings.find(m => m.linearPrefix === issuePrefix);
     if (mapping) return mapping.localPath;
   }
@@ -221,28 +215,30 @@ const pendingConfirmations = new Map<string, ConfirmationRequest>();
 
 const METRICS_FILE = join(homedir(), '.panopticon', 'runtime-metrics.json');
 
-function loadRuntimeMetrics(): any {
+async function loadRuntimeMetrics(): Promise<any> {
   try {
-    if (existsSync(METRICS_FILE)) {
-      return JSON.parse(readFileSync(METRICS_FILE, 'utf-8'));
-    }
-  } catch {}
-  return { version: 1, tasks: [], runtimes: {}, lastUpdated: new Date().toISOString() };
+    const content = await readFile(METRICS_FILE, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return { version: 1, tasks: [], runtimes: {}, lastUpdated: new Date().toISOString() };
+  }
 }
 
 // ─── TLDR index stats helper ──────────────────────────────────────────────────
 
-function getIndexStats(
+async function getIndexStats(
   rootPath: string,
   isMain: boolean,
-): { fileCount?: number; indexAge?: string; edgeCount?: number } {
+): Promise<{ fileCount?: number; indexAge?: string; edgeCount?: number }> {
   const tldrPath = join(rootPath, '.tldr');
-  if (!existsSync(tldrPath)) return {};
+  const tldrExists = await access(tldrPath).then(() => true, () => false);
+  if (!tldrExists) return {};
   try {
     let indexAge: string | undefined;
     const langPath = join(tldrPath, 'languages.json');
-    if (existsSync(langPath)) {
-      const langData = JSON.parse(readFileSync(langPath, 'utf-8'));
+    const langContent = await readFile(langPath, 'utf-8').catch(() => null);
+    if (langContent) {
+      const langData = JSON.parse(langContent);
       if (langData.timestamp) {
         const ageMs = Date.now() - langData.timestamp * 1000;
         if (isMain) {
@@ -256,7 +252,7 @@ function getIndexStats(
       }
     }
     if (!indexAge) {
-      const stats = statSync(tldrPath);
+      const stats = await stat(tldrPath);
       const ageMs = Date.now() - stats.mtimeMs;
       if (isMain) {
         const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
@@ -271,8 +267,9 @@ function getIndexStats(
     let fileCount: number | undefined;
     let edgeCount: number | undefined;
     const cgPath = join(tldrPath, 'cache', 'call_graph.json');
-    if (existsSync(cgPath)) {
-      const cg = JSON.parse(readFileSync(cgPath, 'utf-8'));
+    const cgContent = await readFile(cgPath, 'utf-8').catch(() => null);
+    if (cgContent) {
+      const cg = JSON.parse(cgContent);
       edgeCount = Array.isArray(cg.edges) ? cg.edges.length : undefined;
       if (Array.isArray(cg.edges)) {
         const files = new Set<string>();
@@ -329,7 +326,7 @@ const postTrackersRefreshRoute = HttpRouter.add(
 const getProjectMappingsRoute = HttpRouter.add(
   'GET',
   '/api/project-mappings',
-  Effect.sync(() => jsonResponse(getProjectMappings())),
+  httpHandler(Effect.promise(() => getProjectMappings().then(m => jsonResponse(m)))),
 );
 
 // ─── Route: PUT /api/project-mappings ────────────────────────────────────────
@@ -343,7 +340,7 @@ const putProjectMappingsRoute = HttpRouter.add(
     if (!Array.isArray(mappings)) {
       return jsonResponse({ error: 'Expected array of mappings' }, { status: 400 });
     }
-    saveProjectMappings(mappings);
+    yield* Effect.promise(() => saveProjectMappings(mappings));
     return jsonResponse({ success: true, mappings });
   }),
 );
@@ -367,9 +364,9 @@ const postProjectMappingsRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.try({
-      try: () => {
-        const mappings = getProjectMappings();
+    return yield* Effect.promise(async () => {
+      try {
+        const mappings = await getProjectMappings();
         const existing = mappings.findIndex(m => m.linearProjectId === linearProjectId);
 
         const mapping: ProjectMapping = {
@@ -385,13 +382,12 @@ const postProjectMappingsRoute = HttpRouter.add(
           mappings.push(mapping);
         }
 
-        saveProjectMappings(mappings);
+        await saveProjectMappings(mappings);
         return jsonResponse({ success: true, mapping });
-      },
-      catch: (error: unknown) => {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({ error: 'Failed to save mapping: ' + msg }, { status: 500 });
-      },
+      }
     });
   }),
 );
@@ -427,7 +423,7 @@ const getHealthAgentsRoute = HttpRouter.add(
         return jsonResponse([]);
       }
 
-      const agentNames = readdirSync(agentsDir).filter(
+      const agentNames = (await readdir(agentsDir)).filter(
         name =>
           name.startsWith('agent-') ||
           name.startsWith('planning-') ||
@@ -440,11 +436,10 @@ const getHealthAgentsRoute = HttpRouter.add(
           const healthFile = join(agentsDir, name, 'health.json');
 
           let storedHealth = { consecutiveFailures: 0, killCount: 0 };
-          if (existsSync(healthFile)) {
-            try {
-              storedHealth = { ...storedHealth, ...JSON.parse(readFileSync(healthFile, 'utf-8')) };
-            } catch {}
-          }
+          try {
+            const healthContent = await readFile(healthFile, 'utf-8');
+            storedHealth = { ...storedHealth, ...JSON.parse(healthContent) };
+          } catch {}
 
           const healthStatus = await determineHealthStatusAsync(name, stateFile);
 
@@ -453,9 +448,8 @@ const getHealthAgentsRoute = HttpRouter.add(
           let contextPercent: number | null = null;
           try {
             const ctxFile = join(agentsDir, name, 'context-pct');
-            if (existsSync(ctxFile)) {
-              contextPercent = parseInt(readFileSync(ctxFile, 'utf-8').trim(), 10) || null;
-            }
+            const ctxContent = await readFile(ctxFile, 'utf-8');
+            contextPercent = parseInt(ctxContent.trim(), 10) || null;
           } catch {}
 
           return {
@@ -472,10 +466,11 @@ const getHealthAgentsRoute = HttpRouter.add(
 
       const visibleAgents = agents.filter(agent => agent !== null);
       return jsonResponse(visibleAgents);
-    }    catch (error: unknown) {
+    } catch (error: unknown) {
       console.error('Error fetching health:', error);
       return jsonResponse([]);
-      }}),
+    }
+  }),
 );
 
 // ─── Route: POST /api/health/agents/:id/ping ─────────────────────────────────
@@ -501,9 +496,10 @@ const postHealthAgentPingRoute = HttpRouter.add(
         const stateFile = join(homedir(), '.panopticon', 'agents', id, 'state.json');
         if (existsSync(stateFile)) {
           try {
-            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+            const stateContent = await readFile(stateFile, 'utf-8');
+            const state = JSON.parse(stateContent);
             state.lastPing = new Date().toISOString();
-            writeFileSync(stateFile, JSON.stringify(state, null, 2));
+            await writeFile(stateFile, JSON.stringify(state, null, 2));
           } catch {}
         }
 
@@ -908,8 +904,8 @@ const getSpecialistHandoffsStatsRoute = HttpRouter.add(
 const getSkillsRoute = HttpRouter.add(
   'GET',
   '/api/skills',
-  Effect.try({
-    try: () => {
+  Effect.promise(async () => {
+    try {
       const skills: Array<{
         name: string;
         path: string;
@@ -926,18 +922,18 @@ const getSkillsRoute = HttpRouter.add(
       for (const { path: skillsDir, source } of skillLocations) {
         if (!existsSync(skillsDir)) continue;
 
-        const entries = readdirSync(skillsDir, { withFileTypes: true });
+        const entries = await readdir(skillsDir, { withFileTypes: true });
         for (const entry of entries) {
           if (!entry.isDirectory()) continue;
 
           const skillPath = join(skillsDir, entry.name);
           const skillMdPath = join(skillPath, 'SKILL.md');
-          const hasSkillMd = existsSync(skillMdPath);
+          const hasSkillMd = await access(skillMdPath).then(() => true, () => false);
 
           let description: string | undefined;
           if (hasSkillMd) {
             try {
-              const content = readFileSync(skillMdPath, 'utf-8');
+              const content = await readFile(skillMdPath, 'utf-8');
               const firstLine = content
                 .split('\n')
                 .find(line => line.trim() && !line.startsWith('#') && !line.startsWith('---'));
@@ -950,11 +946,10 @@ const getSkillsRoute = HttpRouter.add(
       }
 
       return jsonResponse(skills);
-    },
-    catch: (error: unknown) => {
+    } catch (error: unknown) {
       console.error('Error listing skills:', error);
       return jsonResponse([]);
-    },
+    }
   }),
 );
 
@@ -972,11 +967,11 @@ const getPlanningStatusRoute = HttpRouter.add(
     const sessionName = `planning-${issueId.toLowerCase()}`;
     const issueLower = issueId.toLowerCase();
     const issuePrefix = issueId.split('-')[0];
-    const projectPath = getProjectPath(issuePrefix);
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
     return yield* Effect.promise(async () => {
-    try {
+      try {
+        const projectPath = await getProjectPath(issuePrefix);
+        const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
         let isRemote = false;
         let vmName = '';
         const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
@@ -984,8 +979,9 @@ const getPlanningStatusRoute = HttpRouter.add(
 
         let agentStarting = false;
         try {
-          if (existsSync(stateFile)) {
-            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+          const stateContent = await readFile(stateFile, 'utf-8').catch(() => null);
+          if (stateContent) {
+            const state = JSON.parse(stateContent);
             if (state.location === 'remote' && state.vmName) {
               isRemote = true;
               vmName = state.vmName;
@@ -1036,16 +1032,16 @@ const getPlanningStatusRoute = HttpRouter.add(
           isRemote,
           vmName: isRemote ? vmName : undefined,
         });
-      }    catch (error: unknown) {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse({
           active: false,
           sessionName,
-          workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
           planningCompleted: false,
           error: msg,
         });
-        }})
+      }
+    })
   }),
 );
 
@@ -1072,7 +1068,7 @@ const postPlanningMessageRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-    try {
+      try {
         // Determine project path
         const githubCheck = isGitHubIssue(issueId);
         let projectPath = '';
@@ -1115,8 +1111,9 @@ const postPlanningMessageRoute = HttpRouter.add(
         const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
         const stateFile = join(agentStateDir, 'state.json');
         try {
-          if (existsSync(stateFile)) {
-            const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+          const stateContent = await readFile(stateFile, 'utf-8').catch(() => null);
+          if (stateContent) {
+            const state = JSON.parse(stateContent);
             if (state.location === 'remote' && state.vmName) {
               isRemote = true;
             }
@@ -1138,11 +1135,11 @@ const postPlanningMessageRoute = HttpRouter.add(
 
         if (sessionExists) {
           const messageFile = join(planningDir, 'user-message.txt');
-          writeFileSync(messageFile, message);
+          await writeFile(messageFile, message);
           await execAsync(`tmux load-buffer "${messageFile}"`, { encoding: 'utf-8' });
           await execAsync(`tmux paste-buffer -t ${sessionName}`, { encoding: 'utf-8' });
           await execAsync(`tmux send-keys -t ${sessionName} Enter`, { encoding: 'utf-8' });
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'planning.sync',
             timestamp: new Date().toISOString(),
             payload: { issueId, status: 'running', message: 'User message sent' },
@@ -1157,9 +1154,9 @@ const postPlanningMessageRoute = HttpRouter.add(
         // Session not alive — restart with continuation prompt
         const outputFile = join(planningDir, 'output.jsonl');
         let conversationLog = '';
-        if (existsSync(outputFile)) {
-          const content = readFileSync(outputFile, 'utf-8');
-          const lines = content.split('\n').filter(line => line.trim());
+        const outputContent = await readFile(outputFile, 'utf-8').catch(() => null);
+        if (outputContent) {
+          const lines = outputContent.split('\n').filter(line => line.trim());
           const logParts: string[] = [];
 
           for (const line of lines) {
@@ -1212,13 +1209,13 @@ ${message}
 Continue the PLANNING session. Do NOT implement anything.
 `;
 
-        writeFileSync(continuationPromptPath, continuationPrompt);
+        await writeFile(continuationPromptPath, continuationPrompt);
 
         const agentCwd = workspacePath;
 
         if (existsSync(outputFile)) {
           const backupPath = join(planningDir, `output-${Date.now()}.jsonl`);
-          renameSync(outputFile, backupPath);
+          await rename(outputFile, backupPath);
         }
 
         const { loadSettings: loadSettingsFn, getAgentCommand } = await import('../../../lib/settings.js');
@@ -1234,9 +1231,9 @@ Continue the PLANNING session. Do NOT implement anything.
             : `${msgAgentCmd.command} --dangerously-skip-permissions`;
 
         const launcherScript = join(agentStateDir, 'continuation-launcher.sh');
-        mkdirSync(agentStateDir, { recursive: true });
+        await mkdir(agentStateDir, { recursive: true });
 
-        writeFileSync(
+        await writeFile(
           launcherScript,
           `#!/bin/bash\ncd "${agentCwd}"\nexec ${msgCmdWithArgs} "Please read the continuation prompt at ${continuationPromptPath} and continue the planning session."\n`,
           { mode: 0o755 },
@@ -1252,7 +1249,7 @@ Continue the PLANNING session. Do NOT implement anything.
           });
         } catch {}
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'planning.sync',
           timestamp: new Date().toISOString(),
           payload: { issueId, status: 'running', message: 'User message sent' },
@@ -1263,14 +1260,15 @@ Continue the PLANNING session. Do NOT implement anything.
           sessionName,
           message: 'Planning session restarted in interactive mode',
         });
-      }    catch (error: unknown) {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error sending planning message:', error);
         return jsonResponse(
           { error: 'Failed to send message: ' + msg },
           { status: 500 },
         );
-        }})
+      }
+    })
   }),
 );
 
@@ -1342,7 +1340,7 @@ const getTldrStatusRoute = HttpRouter.add(
 
       const workspacesDir = join(projectRoot, 'workspaces');
       if (existsSync(workspacesDir)) {
-        const workspaces = readdirSync(workspacesDir, { withFileTypes: true }).filter(
+        const workspaces = (await readdir(workspacesDir, { withFileTypes: true })).filter(
           d => d.isDirectory() && d.name.startsWith('feature-'),
         );
 
@@ -1467,9 +1465,9 @@ const clearCacheRoute = HttpRouter.add(
 const getMetricsRuntimesRoute = HttpRouter.add(
   'GET',
   '/api/metrics/runtimes',
-  Effect.try({
-    try: () => {
-      const metrics = loadRuntimeMetrics();
+  Effect.promise(async () => {
+    try {
+      const metrics = await loadRuntimeMetrics();
       const runtimes = metrics.runtimes || {};
 
       const comparison = Object.entries(runtimes).map(([runtime, data]: [string, any]) => ({
@@ -1502,15 +1500,14 @@ const getMetricsRuntimesRoute = HttpRouter.add(
         },
         lastUpdated: metrics.lastUpdated,
       });
-    },
-    catch: (error: unknown) => {
+    } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Error getting runtime metrics:', error);
       return jsonResponse(
         { error: 'Failed to get runtime metrics: ' + msg },
         { status: 500 },
       );
-    },
+    }
   }),
 );
 
@@ -1525,9 +1522,9 @@ const getMetricsTasksRoute = HttpRouter.add(
     const limitParam = url.searchParams.get('limit');
     const limit = limitParam ? parseInt(limitParam) : 50;
 
-    return yield* Effect.try({
-      try: () => {
-        const metrics = loadRuntimeMetrics();
+    return yield* Effect.promise(async () => {
+      try {
+        const metrics = await loadRuntimeMetrics();
         const tasks = (metrics.tasks || [])
           .sort(
             (a: any, b: any) =>
@@ -1535,15 +1532,14 @@ const getMetricsTasksRoute = HttpRouter.add(
           )
           .slice(0, limit);
         return jsonResponse({ tasks });
-      },
-      catch: (error: unknown) => {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('Error getting tasks:', error);
         return jsonResponse(
           { error: 'Failed to get tasks: ' + msg },
           { status: 500 },
         );
-      },
+      }
     });
   }),
 );
@@ -1563,8 +1559,8 @@ const postShadowMonitorRoute = HttpRouter.add(
     const issuePrefix = issueId.split('-')[0];
 
     return yield* Effect.promise(async () => {
-    try {
-        const projectPath = getProjectPath(issuePrefix);
+      try {
+        const projectPath = await getProjectPath(issuePrefix);
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
         if (!existsSync(workspacePath)) {
@@ -1583,13 +1579,14 @@ const postShadowMonitorRoute = HttpRouter.add(
         updateInferenceDocument(workspacePath, inference);
 
         return jsonResponse({ success: true, inference });
-      }    catch (error: unknown) {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse(
           { error: 'Failed to run monitoring agent: ' + msg },
           { status: 500 },
         );
-        }})
+      }
+    })
   }),
 );
 
@@ -1611,8 +1608,8 @@ const postShadowObserveRoute = HttpRouter.add(
     const { mode } = body as { mode?: string };
 
     return yield* Effect.promise(async () => {
-    try {
-        const projectPath = getProjectPath(issuePrefix);
+      try {
+        const projectPath = await getProjectPath(issuePrefix);
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
         if (!existsSync(workspacePath)) {
@@ -1640,13 +1637,14 @@ const postShadowObserveRoute = HttpRouter.add(
 
         const commentsPosted = await runObserverCycle(config);
         return jsonResponse({ success: true, commentsPosted });
-      }    catch (error: unknown) {
+      } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return jsonResponse(
           { error: 'Failed to run observer: ' + msg },
           { status: 500 },
         );
-        }})
+      }
+    })
   }),
 );
 

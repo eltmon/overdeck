@@ -15,11 +15,12 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig, saveCloisterConfig } from '../../../lib/cloister/config.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { httpHandler } from './http-handler.js';
 
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
@@ -37,17 +38,13 @@ const readJsonBody = Effect.gen(function* () {
 const getCloisterStatusRoute = HttpRouter.add(
   'GET',
   '/api/cloister/status',
-  Effect.sync(() => {
-    try {
+  httpHandler(Effect.try({
+    try: () => {
       const service = getCloisterService();
-      const status = service.getStatus();
-      return jsonResponse(status);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting Cloister status:', error);
-      return jsonResponse({ error: 'Failed to get Cloister status: ' + msg }, { status: 500 });
-    }
-  }),
+      return jsonResponse(service.getStatus());
+    },
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: POST /api/cloister/start ─────────────────────────────────────────
@@ -55,17 +52,13 @@ const getCloisterStatusRoute = HttpRouter.add(
 const postCloisterStartRoute = HttpRouter.add(
   'POST',
   '/api/cloister/start',
-  Effect.promise(async () => {
-    try {
-      const service = getCloisterService();
-      await service.start();
-      return jsonResponse({ success: true, message: 'Cloister started' });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error starting Cloister:', error);
-      return jsonResponse({ error: 'Failed to start Cloister: ' + msg }, { status: 500 });
-    }
-  }),
+  httpHandler(Effect.gen(function* () {
+    yield* Effect.tryPromise({
+      try: () => getCloisterService().start(),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse({ success: true, message: 'Cloister started' });
+  })),
 );
 
 // ─── Route: POST /api/cloister/stop ──────────────────────────────────────────
@@ -73,17 +66,13 @@ const postCloisterStartRoute = HttpRouter.add(
 const postCloisterStopRoute = HttpRouter.add(
   'POST',
   '/api/cloister/stop',
-  Effect.promise(async () => {
-    try {
-      const service = getCloisterService();
-      service.stop();
+  httpHandler(Effect.try({
+    try: () => {
+      getCloisterService().stop();
       return jsonResponse({ success: true, message: 'Cloister stopped' });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error stopping Cloister:', error);
-      return jsonResponse({ error: 'Failed to stop Cloister: ' + msg }, { status: 500 });
-    }
-  }),
+    },
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: POST /api/cloister/emergency-stop ────────────────────────────────
@@ -91,32 +80,22 @@ const postCloisterStopRoute = HttpRouter.add(
 const postCloisterEmergencyStopRoute = HttpRouter.add(
   'POST',
   '/api/cloister/emergency-stop',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
-    return yield* Effect.sync(() => {
-      try {
-        const service = getCloisterService();
-        const killedAgents = service.emergencyStop();
-        const ts = new Date().toISOString();
-        for (const agentId of killedAgents) {
-          Effect.runSync(eventStore.append({
-            type: 'agent.stopped',
-            timestamp: ts,
-            payload: { agentId, issueId: agentId.replace(/^agent-/, '').toUpperCase() },
-          }));
-        }
-        return jsonResponse({
-          success: true,
-          message: 'Emergency stop executed',
-          killedAgents,
-        });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error executing emergency stop:', error);
-        return jsonResponse({ error: 'Failed to execute emergency stop: ' + msg }, { status: 500 });
-      }
+    const killedAgents = yield* Effect.try({
+      try: () => getCloisterService().emergencyStop(),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-  }),
+    const ts = new Date().toISOString();
+    for (const agentId of killedAgents) {
+      yield* eventStore.append({
+        type: 'agent.stopped',
+        timestamp: ts,
+        payload: { agentId, issueId: agentId.replace(/^agent-/, '').toUpperCase() },
+      });
+    }
+    return jsonResponse({ success: true, message: 'Emergency stop executed', killedAgents });
+  })),
 );
 
 // ─── Route: POST /api/cloister/resume-spawns ─────────────────────────────────
@@ -124,17 +103,13 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
 const postCloisterResumeSpawnsRoute = HttpRouter.add(
   'POST',
   '/api/cloister/resume-spawns',
-  Effect.sync(() => {
-    try {
-      const service = getCloisterService();
-      service.resumeSpawns();
+  httpHandler(Effect.try({
+    try: () => {
+      getCloisterService().resumeSpawns();
       return jsonResponse({ success: true, message: 'Agent spawns resumed' });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error resuming spawns:', error);
-      return jsonResponse({ error: 'Failed to resume spawns: ' + msg }, { status: 500 });
-    }
-  }),
+    },
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: GET /api/cloister/spawn-status ───────────────────────────────────
@@ -142,17 +117,13 @@ const postCloisterResumeSpawnsRoute = HttpRouter.add(
 const getCloisterSpawnStatusRoute = HttpRouter.add(
   'GET',
   '/api/cloister/spawn-status',
-  Effect.sync(() => {
-    try {
-      const service = getCloisterService();
-      const isPaused = service.isSpawnPaused();
+  httpHandler(Effect.try({
+    try: () => {
+      const isPaused = getCloisterService().isSpawnPaused();
       return jsonResponse({ spawnsPaused: isPaused });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error checking spawn status:', error);
-      return jsonResponse({ error: 'Failed to check spawn status: ' + msg }, { status: 500 });
-    }
-  }),
+    },
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: GET /api/cloister/config ─────────────────────────────────────────
@@ -160,16 +131,10 @@ const getCloisterSpawnStatusRoute = HttpRouter.add(
 const getCloisterConfigRoute = HttpRouter.add(
   'GET',
   '/api/cloister/config',
-  Effect.sync(() => {
-    try {
-      const config = loadCloisterConfig();
-      return jsonResponse(config);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error loading Cloister config:', error);
-      return jsonResponse({ error: 'Failed to load Cloister config: ' + msg }, { status: 500 });
-    }
-  }),
+  httpHandler(Effect.try({
+    try: () => jsonResponse(loadCloisterConfig()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: PUT /api/cloister/config ─────────────────────────────────────────
@@ -177,21 +142,17 @@ const getCloisterConfigRoute = HttpRouter.add(
 const putCloisterConfigRoute = HttpRouter.add(
   'PUT',
   '/api/cloister/config',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const updates = yield* readJsonBody;
-    return yield* Effect.sync(() => {
-      try {
-        const service = getCloisterService();
+    yield* Effect.try({
+      try: () => {
         saveCloisterConfig(updates);
-        service.reloadConfig();
-        return jsonResponse({ success: true, config: updates });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error updating Cloister config:', error);
-        return jsonResponse({ error: 'Failed to update Cloister config: ' + msg }, { status: 500 });
-      }
+        getCloisterService().reloadConfig();
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-  }),
+    return jsonResponse({ success: true, config: updates });
+  })),
 );
 
 // ─── Route: GET /api/cloister/agents/health ──────────────────────────────────
@@ -199,17 +160,13 @@ const putCloisterConfigRoute = HttpRouter.add(
 const getCloisterAgentsHealthRoute = HttpRouter.add(
   'GET',
   '/api/cloister/agents/health',
-  Effect.sync(() => {
-    try {
-      const service = getCloisterService();
-      const agentHealths = service.getAllAgentHealth();
+  httpHandler(Effect.try({
+    try: () => {
+      const agentHealths = getCloisterService().getAllAgentHealth();
       return jsonResponse({ agents: agentHealths });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting agents health:', error);
-      return jsonResponse({ error: 'Failed to get agents health: ' + msg }, { status: 500 });
-    }
-  }),
+    },
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────

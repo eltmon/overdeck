@@ -34,7 +34,7 @@ function emitEvent(event: Record<string, unknown>): Effect.Effect<void, never> {
   return Effect.gen(function* () {
     const storeOption = yield* Effect.serviceOption(EventStoreService);
     if (Option.isSome(storeOption)) {
-      Effect.runSync(storeOption.value.append(event));
+      yield* storeOption.value.append(event);
     }
   });
 }
@@ -209,7 +209,7 @@ export const IssueLifecycleLive = Layer.effect(
           }
 
           // Patch the in-memory cache and emit a domain event (non-fatal)
-          try { getSharedIssueService().patchIssue(issueId, { canonicalStatus: canonicalStatus(state) }); } catch { /* non-fatal */ }
+          yield* Effect.try({ try: () => getSharedIssueService().patchIssue(issueId, { canonicalStatus: canonicalStatus(state) }), catch: () => void 0 }).pipe(Effect.ignore);
           yield* emitEvent({
             type: 'issue.transitioned',
             timestamp: new Date().toISOString(),
@@ -262,7 +262,7 @@ export const IssueLifecycleLive = Layer.effect(
           }
 
           // Patch the in-memory cache and emit issue.closed domain event (non-fatal)
-          try { getSharedIssueService().patchIssue(issueId, { canonicalStatus: 'closed' }); } catch { /* non-fatal */ }
+          yield* Effect.try({ try: () => getSharedIssueService().patchIssue(issueId, { canonicalStatus: 'closed' }), catch: () => void 0 }).pipe(Effect.ignore);
           yield* emitEvent({
             type: 'issue.closed',
             timestamp: new Date().toISOString(),

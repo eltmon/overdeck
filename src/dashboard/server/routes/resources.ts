@@ -14,16 +14,17 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readdir, readFile, access } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerResponse } from 'effect/unstable/http';
+import { HttpRouter } from 'effect/unstable/http';
 
 import { DockerStatsCollector } from '../../../lib/docker-stats.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { httpHandler } from './http-handler.js';
 
 const execAsync = promisify(exec);
 
@@ -57,40 +58,49 @@ function formatUptime(startedAt: string): string {
 const getResourcesRoute = HttpRouter.add(
   'GET',
   '/api/resources',
-  Effect.gen(function* () {
-    return yield* Effect.promise(async () => {
-    try {
-        const collector = dockerStatsCollector;
-        const containers = collector ? collector.getStats() : [];
-        const stoppedContainers: unknown[] = [];
+  httpHandler(Effect.gen(function* () {
+    const collector = dockerStatsCollector;
+    const containers = collector ? collector.getStats() : [];
+    const stoppedContainers: unknown[] = [];
 
-        // Gather active agents
-        const agentsDir = join(homedir(), '.panopticon', 'agents');
-        const agents: Record<string, unknown>[] = [];
-        if (existsSync(agentsDir)) {
-          for (const name of readdirSync(agentsDir)) {
-            const stateFile = join(agentsDir, name, 'state.json');
-            if (!existsSync(stateFile)) continue;
-            try {
-              const state = JSON.parse(readFileSync(stateFile, 'utf-8')) as Record<string, unknown>;
-              if (state.status !== 'stopped') agents.push(state);
-            } catch { /* skip */ }
-          }
-        }
+    // Gather active agents using async FS
+    const agentsDir = join(homedir(), '.panopticon', 'agents');
+    const agents: Record<string, unknown>[] = [];
 
-        return jsonResponse({
-          containers,
-          stoppedContainers,
-          networks: [],
-          volumes: [],
-          agents,
-          updatedAt: new Date().toISOString(),
+    const agentsDirExists = yield* Effect.tryPromise({
+      try: () => access(agentsDir).then(() => true, () => false),
+      catch: () => false as false,
+    });
+
+    if (agentsDirExists) {
+      const names = yield* Effect.tryPromise({
+        try: () => readdir(agentsDir),
+        catch: () => [] as string[],
+      });
+
+      for (const name of names) {
+        const stateFile = join(agentsDir, name, 'state.json');
+        const stateText = yield* Effect.tryPromise({
+          try: () => readFile(stateFile, 'utf-8'),
+          catch: () => null as null | string,
         });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to fetch resources: ' + msg }, { status: 500 });
-        }})
-  }),
+        if (!stateText) continue;
+        try {
+          const state = JSON.parse(stateText) as Record<string, unknown>;
+          if (state.status !== 'stopped') agents.push(state);
+        } catch { /* skip malformed */ }
+      }
+    }
+
+    return jsonResponse({
+      containers,
+      stoppedContainers,
+      networks: [],
+      volumes: [],
+      agents,
+      updatedAt: new Date().toISOString(),
+    });
+  })),
 );
 
 // ─── Route: GET /api/resources/:containerId/history ──────────────────────────
@@ -128,55 +138,59 @@ const getContainerDetailsRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid container ID' }, { status: 400 });
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        // Fetch container inspect + logs in parallel
-        const [inspectResult, logsResult] = await Promise.all([
+    return yield* httpHandler(Effect.gen(function* () {
+      // Fetch container inspect + logs in parallel
+      const [inspectResult, logsResult] = yield* Effect.tryPromise({
+        try: () => Promise.all([
           execAsync(`docker inspect --format '{{json .}}' "${containerId}" 2>/dev/null`, { encoding: 'utf-8', timeout: 5000 })
             .catch(() => ({ stdout: 'null' })),
           execAsync(`docker logs --tail 100 "${containerId}" 2>&1`, { encoding: 'utf-8', timeout: 5000 })
             .catch(() => ({ stdout: '' })),
-        ]);
+        ]),
+        catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+      });
 
-        const inspect = JSON.parse(inspectResult.stdout || 'null');
-        if (!inspect) {
-          return jsonResponse({ error: 'Container not found' }, { status: 404 });
+      const inspect = JSON.parse(inspectResult.stdout || 'null') as {
+        Id?: string; Name?: string; Created?: string;
+        Config?: { Image?: string; Env?: string[] };
+        State?: { Status?: string; StartedAt?: string };
+        HostConfig?: { PortBindings?: Record<string, Array<{ HostPort?: string }>> };
+      } | null;
+
+      if (!inspect) {
+        return jsonResponse({ error: 'Container not found' }, { status: 404 });
+      }
+
+      // Parse ports
+      const ports: Array<{ host: string; container: string; protocol: string }> = [];
+      const portBindings = inspect.HostConfig?.PortBindings ?? {};
+      for (const [containerPort, bindings] of Object.entries(portBindings)) {
+        const [port, protocol] = containerPort.split('/');
+        for (const binding of bindings ?? []) {
+          ports.push({ host: binding.HostPort ?? '', container: port ?? '', protocol: protocol ?? 'tcp' });
         }
+      }
 
-        // Parse ports
-        const ports: Array<{ host: string; container: string; protocol: string }> = [];
-        const portBindings = (inspect as any).HostConfig?.PortBindings ?? {};
-        for (const [containerPort, bindings] of Object.entries(portBindings)) {
-          const [port, protocol] = containerPort.split('/');
-          for (const binding of (bindings as Array<{ HostPort?: string }>) ?? []) {
-            ports.push({ host: binding.HostPort ?? '', container: port ?? '', protocol: protocol ?? 'tcp' });
-          }
-        }
+      const env: string[] = (inspect.Config?.Env ?? []).filter((e: string) => e.includes('='));
 
-        // Filter env: skip empty lines
-        const env: string[] = ((inspect as any).Config?.Env ?? []).filter((e: string) => e.includes('='));
+      const details = {
+        id: inspect.Id?.slice(0, 12) ?? containerId,
+        name: (inspect.Name ?? '').replace(/^\//, ''),
+        image: inspect.Config?.Image ?? '',
+        status: inspect.State?.Status ?? '',
+        created: inspect.Created ?? '',
+        uptime: inspect.State?.Status === 'running' && inspect.State?.StartedAt
+          ? formatUptime(inspect.State.StartedAt)
+          : '',
+        ports,
+        env,
+        logs: logsResult.stdout,
+        networkIn: 0,
+        networkOut: 0,
+      };
 
-        const details = {
-          id: (inspect as any).Id?.slice(0, 12) ?? containerId,
-          name: ((inspect as any).Name ?? '').replace(/^\//, ''),
-          image: (inspect as any).Config?.Image ?? '',
-          status: (inspect as any).State?.Status ?? '',
-          created: (inspect as any).Created ?? '',
-          uptime: (inspect as any).State?.Status === 'running' && (inspect as any).State?.StartedAt
-            ? formatUptime((inspect as any).State.StartedAt)
-            : '',
-          ports,
-          env,
-          logs: logsResult.stdout,
-          networkIn: 0,
-          networkOut: 0,
-        };
-
-        return jsonResponse(details);
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: 'Failed to fetch container details: ' + msg }, { status: 500 });
-        }})
+      return jsonResponse(details);
+    }));
   }),
 );
 
@@ -185,7 +199,7 @@ const getContainerDetailsRoute = HttpRouter.add(
 const deleteDockerContainerRoute = HttpRouter.add(
   'DELETE',
   '/api/resources/docker/container/:id',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
@@ -194,16 +208,13 @@ const deleteDockerContainerRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid container ID' }, { status: 400 });
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        await execAsync(`docker rm "${id}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
-        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
-        return jsonResponse({ ok: true });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    yield* Effect.tryPromise({
+      try: () => execAsync(`docker rm "${id}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    return jsonResponse({ ok: true });
+  })),
 );
 
 // ─── Route: POST /api/resources/docker/prune-containers ──────────────────────
@@ -211,18 +222,15 @@ const deleteDockerContainerRoute = HttpRouter.add(
 const postPruneContainersRoute = HttpRouter.add(
   'POST',
   '/api/resources/docker/prune-containers',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
-    return yield* Effect.promise(async () => {
-    try {
-        const { stdout } = await execAsync('docker container prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 });
-        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
-        return jsonResponse({ ok: true, output: stdout.trim() });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    const { stdout } = yield* Effect.tryPromise({
+      try: () => execAsync('docker container prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 }),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    return jsonResponse({ ok: true, output: stdout.trim() });
+  })),
 );
 
 // ─── Route: DELETE /api/resources/docker/network/:name ───────────────────────
@@ -230,7 +238,7 @@ const postPruneContainersRoute = HttpRouter.add(
 const deleteDockerNetworkRoute = HttpRouter.add(
   'DELETE',
   '/api/resources/docker/network/:name',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const eventStore = yield* EventStoreService;
@@ -239,16 +247,13 @@ const deleteDockerNetworkRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid network name' }, { status: 400 });
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        await execAsync(`docker network rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
-        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
-        return jsonResponse({ ok: true });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    yield* Effect.tryPromise({
+      try: () => execAsync(`docker network rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    return jsonResponse({ ok: true });
+  })),
 );
 
 // ─── Route: DELETE /api/resources/docker/volume/:name ────────────────────────
@@ -256,7 +261,7 @@ const deleteDockerNetworkRoute = HttpRouter.add(
 const deleteDockerVolumeRoute = HttpRouter.add(
   'DELETE',
   '/api/resources/docker/volume/:name',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const eventStore = yield* EventStoreService;
@@ -265,16 +270,13 @@ const deleteDockerVolumeRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid volume name' }, { status: 400 });
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        await execAsync(`docker volume rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 });
-        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
-        return jsonResponse({ ok: true });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    yield* Effect.tryPromise({
+      try: () => execAsync(`docker volume rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    return jsonResponse({ ok: true });
+  })),
 );
 
 // ─── Route: POST /api/resources/docker/prune-volumes ─────────────────────────
@@ -282,18 +284,15 @@ const deleteDockerVolumeRoute = HttpRouter.add(
 const postPruneVolumesRoute = HttpRouter.add(
   'POST',
   '/api/resources/docker/prune-volumes',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const eventStore = yield* EventStoreService;
-    return yield* Effect.promise(async () => {
-    try {
-        const { stdout } = await execAsync('docker volume prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 });
-        Effect.runSync(eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } }));
-        return jsonResponse({ ok: true, output: stdout.trim() });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    const { stdout } = yield* Effect.tryPromise({
+      try: () => execAsync('docker volume prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 }),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    return jsonResponse({ ok: true, output: stdout.trim() });
+  })),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────

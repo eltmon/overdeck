@@ -23,8 +23,8 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
-import { copyFile, mkdir, access } from 'node:fs/promises';
+import { existsSync, rmSync } from 'node:fs';
+import { copyFile, mkdir, readdir, readFile, writeFile, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -398,7 +398,7 @@ const postIssueCloseRoute = HttpRouter.add(
         }
 
         if (result.success) {
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'issues.updated',
             timestamp: new Date().toISOString(),
             payload: { issueId },
@@ -558,12 +558,12 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
         const sessionName = `planning-${issueLower}`;
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'planning.started',
           timestamp: new Date().toISOString(),
           payload: { issueId: id, sessionName },
         }));
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId: issue.identifier, status: newStateName, canonicalStatus: 'in_progress' },
@@ -571,8 +571,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
         // Write preliminary agent state so status endpoint knows planning is starting
         const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-        mkdirSync(agentStateDir, { recursive: true });
-        writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+        await mkdir(agentStateDir, { recursive: true });
+        await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
           id: sessionName,
           issueId: issue.identifier,
           workspace: workspacePath,
@@ -775,7 +775,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           }
         }
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId: issueIdentifier || id, status: revertedState, canonicalStatus: 'todo' },
@@ -829,7 +829,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
           const stateJsonPath = join(agentStateDir, 'state.json');
           if (existsSync(stateJsonPath)) {
-            const agentState = JSON.parse(readFileSync(stateJsonPath, 'utf-8'));
+            const agentState = JSON.parse(await readFile(stateJsonPath, 'utf-8'));
             if (agentState.location === 'remote' && agentState.vmName) {
               isRemotePlanning = true;
               remoteVmName = agentState.vmName;
@@ -838,7 +838,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           if (!isRemotePlanning) {
             const remoteMetadataPath = join(homedir(), '.panopticon', 'agents', sessionName, 'remote-workspace.json');
             if (existsSync(remoteMetadataPath)) {
-              const remoteMetadata = JSON.parse(readFileSync(remoteMetadataPath, 'utf-8'));
+              const remoteMetadata = JSON.parse(await readFile(remoteMetadataPath, 'utf-8'));
               if (remoteMetadata.vmName) {
                 isRemotePlanning = true;
                 remoteVmName = remoteMetadata.vmName;
@@ -858,10 +858,10 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           const planningStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
           const planningStatePath = join(planningStateDir, 'state.json');
           if (existsSync(planningStatePath)) {
-            const planningState = JSON.parse(readFileSync(planningStatePath, 'utf-8'));
+            const planningState = JSON.parse(await readFile(planningStatePath, 'utf-8'));
             planningState.status = 'stopped';
             planningState.stoppedAt = new Date().toISOString();
-            writeFileSync(planningStatePath, JSON.stringify(planningState, null, 2), 'utf-8');
+            await writeFile(planningStatePath, JSON.stringify(planningState, null, 2), 'utf-8');
             console.log(`[complete-planning] Marked ${sessionName} as stopped`);
           }
         } catch { /* Non-fatal — agent status is cosmetic */ }
@@ -942,7 +942,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
               } catch { /* bd might not be installed */ }
 
               // Write .planning-complete marker
-              writeFileSync(join(planningDir, '.planning-complete'), '', 'utf-8');
+              await writeFile(join(planningDir, '.planning-complete'), '', 'utf-8');
 
               // Git operations
               const isGitRepo = existsSync(join(gitRoot, '.git'));
@@ -1027,14 +1027,14 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           newState = 'Skipped (already in progress)';
         }
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'planning.sync',
           timestamp: new Date().toISOString(),
           payload: { issueId: id, status: 'completed' },
         }));
 
         const completeCanonical = newState === 'Skipped (already in progress)' ? 'in_progress' : 'todo';
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId: id, status: newState, canonicalStatus: completeCanonical },
@@ -1129,7 +1129,7 @@ const postIssueResetRoute = HttpRouter.add(
 
             const planningDir = join(workspacePath, '.planning');
             if (existsSync(planningDir)) {
-              const entries = readdirSync(planningDir);
+              const entries = await readdir(planningDir).catch(() => [] as string[]);
               for (const entry of entries) {
                 try { rmSync(join(planningDir, entry), { recursive: true, force: true }); } catch { /* Best effort */ }
               }
@@ -1172,7 +1172,7 @@ const postIssueResetRoute = HttpRouter.add(
         issueDataService.invalidateTracker('linear').catch(() => {});
         issueDataService.invalidateTracker('rally').catch(() => {});
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId: id, status: 'Todo', canonicalStatus: 'todo' },
@@ -1294,7 +1294,7 @@ const postIssueCancelRoute = HttpRouter.add(
         issueDataService.invalidateTracker('github').catch(() => {});
         issueDataService.invalidateTracker('linear').catch(() => {});
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId: id, status: 'Canceled', canonicalStatus: 'done' },
@@ -1428,7 +1428,7 @@ const postIssueReopenRoute = HttpRouter.add(
           }
         } catch { /* non-fatal */ }
 
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId: issueIdentifier, status: newState, canonicalStatus: 'in_progress' },
@@ -1523,7 +1523,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
         };
 
         const displayStatus = canonicalToDisplay[targetStatus] || targetStatus;
-        Effect.runSync(eventStore.append({
+        await Effect.runPromise(eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
           payload: { issueId: id, status: displayStatus, canonicalStatus: targetStatus },
@@ -1689,14 +1689,14 @@ const postIssueDeepWipeRoute = HttpRouter.add(
             const issueLower = id.toLowerCase();
             for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
               try {
-                Effect.runSync(eventStore.append({
+                await Effect.runPromise(eventStore.append({
                   type: 'agent.stopped',
                   timestamp: new Date().toISOString(),
                   payload: { agentId },
                 } as any));
               } catch { /* non-fatal */ }
             }
-            Effect.runSync(eventStore.append({
+            await Effect.runPromise(eventStore.append({
               type: 'issue.statusChanged',
               timestamp: new Date().toISOString(),
               payload: { issueId: id, status: 'Todo', canonicalStatus: 'todo' },
@@ -1793,7 +1793,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
         if (result.success) {
           issueDataService.invalidateTracker('github').catch(() => {});
           issueDataService.invalidateTracker('linear').catch(() => {});
-          Effect.runSync(eventStore.append({
+          await Effect.runPromise(eventStore.append({
             type: 'issue.statusChanged',
             timestamp: new Date().toISOString(),
             payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
@@ -1856,7 +1856,7 @@ const getIssueBeadsRoute = HttpRouter.add(
         const stateJsonPath = join(agentStateDir, 'state.json');
         if (existsSync(stateJsonPath)) {
           try {
-            const agentState = JSON.parse(readFileSync(stateJsonPath, 'utf-8'));
+            const agentState = JSON.parse(await readFile(stateJsonPath, 'utf-8'));
             if (agentState.location === 'remote' && agentState.vmName) {
               isRemoteWorkspace = true;
               remoteVmName = agentState.vmName;
@@ -1868,7 +1868,7 @@ const getIssueBeadsRoute = HttpRouter.add(
           const remoteMetadataPath = join(agentStateDir, 'remote-workspace.json');
           if (existsSync(remoteMetadataPath)) {
             try {
-              const remoteMetadata = JSON.parse(readFileSync(remoteMetadataPath, 'utf-8'));
+              const remoteMetadata = JSON.parse(await readFile(remoteMetadataPath, 'utf-8'));
               if (remoteMetadata.vmName) {
                 isRemoteWorkspace = true;
                 remoteVmName = remoteMetadata.vmName;

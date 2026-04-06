@@ -12,7 +12,7 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
   loadSettingsApi,
@@ -21,6 +21,7 @@ import {
   getAvailableModelsApi,
   getOptimalDefaultsApi,
 } from '../../../lib/settings-api.js';
+import { httpHandler } from './http-handler.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -77,19 +78,10 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
 const getSettingsRoute = HttpRouter.add(
   'GET',
   '/api/settings',
-  Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => {
-        const settings = loadSettingsApi();
-        return jsonResponse(settings);
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error loading settings:', error);
-        return jsonResponse({ error: 'Failed to load settings: ' + msg }, { status: 500 });
-      },
-    });
-  }),
+  httpHandler(Effect.try({
+    try: () => jsonResponse(loadSettingsApi()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: GET /api/settings/available-models ────────────────────────────────
@@ -97,19 +89,10 @@ const getSettingsRoute = HttpRouter.add(
 const getAvailableModelsRoute = HttpRouter.add(
   'GET',
   '/api/settings/available-models',
-  Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => {
-        const availableModels = getAvailableModelsApi();
-        return jsonResponse(availableModels);
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error loading available models:', error);
-        return jsonResponse({ error: 'Failed to load available models: ' + msg }, { status: 500 });
-      },
-    });
-  }),
+  httpHandler(Effect.try({
+    try: () => jsonResponse(getAvailableModelsApi()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: GET /api/settings/optimal-defaults ───────────────────────────────
@@ -117,19 +100,10 @@ const getAvailableModelsRoute = HttpRouter.add(
 const getOptimalDefaultsRoute = HttpRouter.add(
   'GET',
   '/api/settings/optimal-defaults',
-  Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => {
-        const optimalDefaults = getOptimalDefaultsApi();
-        return jsonResponse(optimalDefaults);
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting optimal defaults:', error);
-        return jsonResponse({ error: 'Failed to get optimal defaults: ' + msg }, { status: 500 });
-      },
-    });
-  }),
+  httpHandler(Effect.try({
+    try: () => jsonResponse(getOptimalDefaultsApi()),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: POST /api/settings/test-api-key ──────────────────────────────────
@@ -137,182 +111,142 @@ const getOptimalDefaultsRoute = HttpRouter.add(
 const postTestApiKeyRoute = HttpRouter.add(
   'POST',
   '/api/settings/test-api-key',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const { provider, apiKey, model } = body as Record<string, string | undefined>;
 
     if (!provider || !apiKey) {
-      return jsonResponse(
-        { error: 'Provider and apiKey are required' },
-        { status: 400 },
-      );
+      return jsonResponse({ error: 'Provider and apiKey are required' }, { status: 400 });
     }
 
+    // Test the API key by sending a minimal prompt. Errors are returned as
+    // response data (success: false, error: '...') rather than HTTP errors,
+    // since partial failures (wrong model, rate limits) are expected and useful.
     return yield* Effect.promise(async () => {
-        try {
-        let success = false;
-        let error: string | null = null;
-        let response: string | null = null;
-        let latencyMs = 0;
-        const testPrompt = 'What is 2+3? Reply with just the number.';
-        const expectedAnswer = '5';
+      let success = false;
+      let error: string | null = null;
+      let response: string | null = null;
+      let latencyMs = 0;
+      const testPrompt = 'What is 2+3? Reply with just the number.';
+      const expectedAnswer = '5';
+      const startTime = Date.now();
 
-        const startTime = Date.now();
-
-        switch (provider) {
-          case 'openai': {
-            const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gpt-4o-mini') : 'gpt-4o-mini';
-            try {
-              const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${apiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  model: apiModel,
-                  messages: [{ role: 'user', content: testPrompt }],
-                  max_tokens: 10,
-                }),
-              });
-              latencyMs = Date.now() - startTime;
-
-              if (resp.ok) {
-                const data = await resp.json() as any;
-                response = data.choices?.[0]?.message?.content?.trim() || '';
-                success = response.includes(expectedAnswer);
-                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
-              } else if (resp.status === 401) {
-                error = 'Invalid API key';
-              } else if (resp.status === 404) {
-                error = `Model not found: ${apiModel}`;
-              } else {
-                const errBody = await resp.text();
-                error = `HTTP ${resp.status}: ${errBody.slice(0, 100)}`;
-              }
-            } catch (err: any) {
-              error = `Network error: ${err.message}`;
+      switch (provider) {
+        case 'openai': {
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gpt-4o-mini') : 'gpt-4o-mini';
+          try {
+            const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
+            });
+            latencyMs = Date.now() - startTime;
+            if (resp.ok) {
+              const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
+              response = data.choices?.[0]?.message?.content?.trim() || '';
+              success = response.includes(expectedAnswer);
+              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 404) {
+              error = `Model not found: ${apiModel}`;
+            } else {
+              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
             }
-            break;
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
           }
-
-          case 'google': {
-            const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gemini-1.5-flash') : 'gemini-1.5-flash';
-            try {
-              const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
-              const resp = await fetch(testUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: testPrompt }] }],
-                  generationConfig: { maxOutputTokens: 10 },
-                }),
-              });
-              latencyMs = Date.now() - startTime;
-
-              if (resp.ok) {
-                const data = await resp.json() as any;
-                response = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-                success = response.includes(expectedAnswer);
-                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
-              } else if (resp.status === 400 || resp.status === 403) {
-                error = 'Invalid API key';
-              } else if (resp.status === 404) {
-                error = `Model not found: ${apiModel}`;
-              } else {
-                const errBody = await resp.text();
-                error = `HTTP ${resp.status}: ${errBody.slice(0, 100)}`;
-              }
-            } catch (err: any) {
-              error = `Network error: ${err.message}`;
-            }
-            break;
-          }
-
-          case 'kimi': {
-            const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'moonshot-v1-8k') : 'moonshot-v1-8k';
-            try {
-              const resp = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${apiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  model: apiModel,
-                  messages: [{ role: 'user', content: testPrompt }],
-                  max_tokens: 10,
-                }),
-              });
-              latencyMs = Date.now() - startTime;
-
-              if (resp.ok) {
-                const data = await resp.json() as any;
-                response = data.choices?.[0]?.message?.content?.trim() || '';
-                success = response.includes(expectedAnswer);
-                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
-              } else if (resp.status === 401) {
-                error = 'Invalid API key';
-              } else if (resp.status === 404) {
-                error = `Model not found: ${apiModel}`;
-              } else {
-                const errBody = await resp.text();
-                error = `HTTP ${resp.status}: ${errBody.slice(0, 100)}`;
-              }
-            } catch (err: any) {
-              error = `Network error: ${err.message}`;
-            }
-            break;
-          }
-
-          case 'zai': {
-            const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-4-flash') : 'glm-4-flash';
-            try {
-              const resp = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${apiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  model: apiModel,
-                  messages: [{ role: 'user', content: testPrompt }],
-                  max_tokens: 10,
-                }),
-              });
-              latencyMs = Date.now() - startTime;
-
-              if (resp.ok) {
-                const data = await resp.json() as any;
-                response = data.choices?.[0]?.message?.content?.trim() || '';
-                success = response.includes(expectedAnswer);
-                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
-              } else if (resp.status === 401) {
-                error = 'Invalid API key';
-              } else if (resp.status === 404) {
-                error = `Model not found: ${apiModel}`;
-              } else {
-                const errBody = await resp.text();
-                error = `HTTP ${resp.status}: ${errBody.slice(0, 100)}`;
-              }
-            } catch (err: any) {
-              error = `Network error: ${err.message}`;
-            }
-            break;
-          }
-
-          default:
-            error = `Unknown provider: ${provider}`;
+          break;
         }
 
-        return jsonResponse({ success, error, response, latencyMs, model: model || 'default' });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error testing API key:', error);
-          return jsonResponse({ error: 'Failed to test API key: ' + msg }, { status: 500 });
+        case 'google': {
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'gemini-1.5-flash') : 'gemini-1.5-flash';
+          try {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: testPrompt }] }], generationConfig: { maxOutputTokens: 10 } }),
+            });
+            latencyMs = Date.now() - startTime;
+            if (resp.ok) {
+              const data = await resp.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+              response = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+              success = response.includes(expectedAnswer);
+              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+            } else if (resp.status === 400 || resp.status === 403) {
+              error = 'Invalid API key';
+            } else if (resp.status === 404) {
+              error = `Model not found: ${apiModel}`;
+            } else {
+              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
         }
-      })
-  }),
+
+        case 'kimi': {
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'moonshot-v1-8k') : 'moonshot-v1-8k';
+          try {
+            const resp = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
+            });
+            latencyMs = Date.now() - startTime;
+            if (resp.ok) {
+              const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
+              response = data.choices?.[0]?.message?.content?.trim() || '';
+              success = response.includes(expectedAnswer);
+              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 404) {
+              error = `Model not found: ${apiModel}`;
+            } else {
+              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
+        case 'zai': {
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-4-flash') : 'glm-4-flash';
+          try {
+            const resp = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
+            });
+            latencyMs = Date.now() - startTime;
+            if (resp.ok) {
+              const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
+              response = data.choices?.[0]?.message?.content?.trim() || '';
+              success = response.includes(expectedAnswer);
+              if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 404) {
+              error = `Model not found: ${apiModel}`;
+            } else {
+              error = `HTTP ${resp.status}: ${(await resp.text()).slice(0, 100)}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
+        default:
+          error = `Unknown provider: ${provider}`;
+      }
+
+      return jsonResponse({ success, error, response, latencyMs, model: model || 'default' });
+    });
+  })),
 );
 
 // ─── Route: POST /api/settings/validate-api-key ──────────────────────────────
@@ -320,120 +254,98 @@ const postTestApiKeyRoute = HttpRouter.add(
 const postValidateApiKeyRoute = HttpRouter.add(
   'POST',
   '/api/settings/validate-api-key',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const { provider, apiKey } = body as Record<string, string | undefined>;
 
     if (!provider || !apiKey) {
-      return jsonResponse(
-        { error: 'Provider and apiKey are required' },
-        { status: 400 },
-      );
+      return jsonResponse({ error: 'Provider and apiKey are required' }, { status: 400 });
     }
 
     if (!['openai', 'google', 'zai'].includes(provider)) {
-      return jsonResponse(
-        { error: `Unsupported provider: ${provider}` },
-        { status: 400 },
-      );
+      return jsonResponse({ error: `Unsupported provider: ${provider}` }, { status: 400 });
     }
 
+    // Validate by listing models or sending a probe request. Errors returned as data.
     return yield* Effect.promise(async () => {
-        try {
-        let valid = false;
-        let error: string | null = null;
-        let models: string[] = [];
+      let valid = false;
+      let error: string | null = null;
+      let models: string[] = [];
 
-        switch (provider) {
-          case 'openai': {
-            try {
-              const response = await fetch('https://api.openai.com/v1/models', {
-                headers: { 'Authorization': `Bearer ${apiKey}` },
-              });
-
-              if (response.ok) {
-                const data = await response.json() as any;
-                valid = true;
-                models = data.data
-                  .map((m: any) => m.id as string)
-                  .filter((id: string) => id.includes('gpt-') || id.includes('o1') || id.includes('o3'));
-              } else if (response.status === 401) {
-                error = 'Invalid API key';
-              } else if (response.status === 429) {
-                error = 'Rate limit exceeded';
-              } else {
-                error = `HTTP error: ${response.status}`;
-              }
-            } catch (err: any) {
-              error = `Network error: ${err.message}`;
+      switch (provider) {
+        case 'openai': {
+          try {
+            const resp = await fetch('https://api.openai.com/v1/models', {
+              headers: { 'Authorization': `Bearer ${apiKey}` },
+            });
+            if (resp.ok) {
+              const data = await resp.json() as { data: Array<{ id: string }> };
+              valid = true;
+              models = data.data
+                .map(m => m.id)
+                .filter(id => id.includes('gpt-') || id.includes('o1') || id.includes('o3'));
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 429) {
+              error = 'Rate limit exceeded';
+            } else {
+              error = `HTTP error: ${resp.status}`;
             }
-            break;
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
           }
-
-          case 'google': {
-            try {
-              const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-              const response = await fetch(testUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: 'test' }] }],
-                }),
-              });
-
-              if (response.ok || response.status === 400) {
-                valid = true;
-                models = ['gemini-3-pro-preview', 'gemini-3-flash-preview'];
-              } else if (response.status === 401 || response.status === 403) {
-                error = 'Invalid API key';
-              } else if (response.status === 429) {
-                error = 'Rate limit exceeded';
-              } else {
-                error = `HTTP error: ${response.status}`;
-              }
-            } catch (err: any) {
-              error = `Network error: ${err.message}`;
-            }
-            break;
-          }
-
-          case 'zai': {
-            try {
-              const response = await fetch('https://api.zai.chat/v1/models', {
-                headers: { 'Authorization': `Bearer ${apiKey}` },
-              });
-
-              if (response.ok) {
-                const data = await response.json() as any;
-                valid = true;
-                models = data.data?.map((m: any) => m.id as string) || ['glm-4.7', 'glm-4.7-flash'];
-              } else if (response.status === 401) {
-                error = 'Invalid API key';
-              } else if (response.status === 429) {
-                error = 'Rate limit exceeded';
-              } else {
-                error = `HTTP error: ${response.status}`;
-              }
-            } catch (err: any) {
-              error = `Network error: ${err.message}`;
-            }
-            break;
-          }
+          break;
         }
 
-        return jsonResponse({
-          valid,
-          provider,
-          models: valid ? models : undefined,
-          error: error || undefined,
-        });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error validating API key:', error);
-          return jsonResponse({ error: 'Failed to validate API key: ' + msg }, { status: 500 });
+        case 'google': {
+          try {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }] }),
+            });
+            if (resp.ok || resp.status === 400) {
+              valid = true;
+              models = ['gemini-3-pro-preview', 'gemini-3-flash-preview'];
+            } else if (resp.status === 401 || resp.status === 403) {
+              error = 'Invalid API key';
+            } else if (resp.status === 429) {
+              error = 'Rate limit exceeded';
+            } else {
+              error = `HTTP error: ${resp.status}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
         }
-      })
-  }),
+
+        case 'zai': {
+          try {
+            const resp = await fetch('https://api.zai.chat/v1/models', {
+              headers: { 'Authorization': `Bearer ${apiKey}` },
+            });
+            if (resp.ok) {
+              const data = await resp.json() as { data?: Array<{ id: string }> };
+              valid = true;
+              models = data.data?.map(m => m.id) || ['glm-4.7', 'glm-4.7-flash'];
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 429) {
+              error = 'Rate limit exceeded';
+            } else {
+              error = `HTTP error: ${resp.status}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+      }
+
+      return jsonResponse({ valid, provider, models: valid ? models : undefined, error: error || undefined });
+    });
+  })),
 );
 
 // ─── Route: PUT /api/settings ─────────────────────────────────────────────────
@@ -441,36 +353,26 @@ const postValidateApiKeyRoute = HttpRouter.add(
 const putSettingsRoute = HttpRouter.add(
   'PUT',
   '/api/settings',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
 
     return yield* Effect.try({
       try: () => {
-        const newSettings = body as any;
-
+        const newSettings = body as Parameters<typeof validateSettingsApi>[0];
         const validation = validateSettingsApi(newSettings);
         if (!validation.valid) {
-          return jsonResponse(
-            { error: validation.errors.join('; ') },
-            { status: 400 },
-          );
+          return jsonResponse({ error: validation.errors.join('; ') }, { status: 400 });
         }
-
         saveSettingsApi(newSettings);
-
         return jsonResponse({
           success: true,
           message: 'Settings saved to config.yaml',
           warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
         });
       },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error saving settings:', error);
-        return jsonResponse({ error: 'Failed to save settings: ' + msg }, { status: 500 });
-      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-  }),
+  })),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────

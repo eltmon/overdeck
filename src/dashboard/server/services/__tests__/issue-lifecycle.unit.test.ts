@@ -1,9 +1,9 @@
 /**
- * Integration tests for issue-related service behaviour (PAN-449)
+ * Unit tests for IssueLifecycle service (PAN-449)
  *
- * These tests exercise IssueLifecycle with mocked tracker clients, verifying
- * that the service properly routes operations to the correct tracker and
- * handles error cases via typed error channels.
+ * Tests IssueLifecycle with mocked tracker clients, verifying that the
+ * service properly routes operations to the correct tracker and handles
+ * error cases via typed error channels.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';

@@ -1,5 +1,5 @@
 /**
- * Integration tests for specialist-related service behaviour (PAN-449)
+ * Unit tests for WorkspaceService (PAN-449)
  *
  * Tests WorkspaceService with mocked underlying workspace-manager.
  */
