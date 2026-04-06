@@ -1,5 +1,29 @@
 # PAN-488: Project repo artifact structure — .pan/ migration + multi-tool skill sync
 
+## Status: In Progress
+
+## Current Phase
+Starting implementation. Claiming bead panopticon-wju (rename .panopticon/ → .pan/ path references).
+
+## Completed Work
+- [x] panopticon-u6e: Copied docs/REPO-ARTIFACTS.md to workspace branch (commit: pending)
+
+## Remaining Work
+- [ ] panopticon-wju: Rename all project-level .panopticon/ path references to .pan/
+- [ ] panopticon-d31: Rename .panopticon.yaml to .pan.yaml with backwards compat
+- [ ] panopticon-bjd: Change archive structure from flat to per-issue subdirectory
+- [ ] panopticon-b6g: Add .pan/events/, .pan/convoy/, .pan/prompts/ to .gitignore
+- [ ] panopticon-0dp: Safe migration of existing .panopticon/ subdirs in workspaces
+- [ ] panopticon-2nu: Add .pan/skills/ as a sync source with correct precedence
+- [ ] panopticon-ihe: Implement multi-tool sync for all 6 AI tool targets
+- [ ] panopticon-4xd: Update documentation to match implemented behavior
+
+## Key Decisions
+- See Decisions Made section below for full context
+
+## Specialist Feedback
+(none yet)
+
 ## Summary
 
 Implement the repo artifact design from `docs/REPO-ARTIFACTS.md`. This consolidates
