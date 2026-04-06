@@ -27,6 +27,8 @@ None
 ## Specialist Feedback
 (none yet)
 - **[2026-04-06T14:49Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-06T14:55Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
+- **[2026-04-06T15:41Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/003-review-agent-changes-requested.md`
 
 ## Summary
 
