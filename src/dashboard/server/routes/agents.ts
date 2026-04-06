@@ -1556,6 +1556,23 @@ const postAgentsRoute = HttpRouter.add(
 
     // Containers already ready or no containers needed
     const activityId = spawnPanCommand(['work', 'issue', issueId, '--phase', phase], workspacePath);
+
+    // Write early state.json so the dashboard immediately shows agent-<id> as the
+    // active agent. Without this there's a race window between spawnPanCommand returning
+    // and pan work issue calling saveAgentState(), during which the workspace detail
+    // panel shows the stale planning-<id> session and "No saved output available."
+    const earlyAgentId = agentSessionName; // e.g. "agent-pan-488"
+    const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
+    yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
+    yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
+      id: earlyAgentId,
+      issueId,
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+      workspace: workspacePath,
+      phase,
+    }, null, 2)));
+
     yield* Effect.promise(() => updateIssueStatus());
 
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
