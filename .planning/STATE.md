@@ -3,15 +3,15 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-z90: Validate issue ID format at agent spawn time
+Implementing bead feature-pan-489-3u4: Migration scan — warn on bare numeric issueIds in state files at startup
 
 ## Completed Work
 - [x] feature-pan-489-ly3: Reordered tracker priority — github_repo before issue_prefix in transitionIssueState; 5 tests (commit: fb06757)
 
 ## Remaining Work
 - [x] feature-pan-489-ly3: Fix tracker priority — check github_repo before issue_prefix in transitionIssueState (commit: fb06757)
-- [x] feature-pan-489-7pj: Guard bare numeric IDs — warn and skip in transitionIssueState
-- [ ] feature-pan-489-z90: Validate issue ID format at agent spawn time
+- [x] feature-pan-489-7pj: Guard bare numeric IDs — warn and skip in transitionIssueState (commit: 6022189)
+- [x] feature-pan-489-z90: Validate issue ID format — 422 in route + AgentStartError in spawner, with tests
 - [ ] feature-pan-489-3u4: Migration scan — warn on bare numeric issueIds in state files at startup
 
 ## Key Decisions
