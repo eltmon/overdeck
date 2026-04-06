@@ -12,6 +12,7 @@ import { loadCloisterConfig } from './cloister/config.js';
 import { loadSettings, type ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth, requiresRouter } from './providers.js';
+import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import { loadConfig } from './config.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
@@ -36,8 +37,19 @@ function normalizeAgentId(agentId: string): string {
  * always use the latest key.
  */
 function getProviderEnvForModel(model: string): Record<string, string> {
-  const provider = getProviderForModel(model as ModelId);
+  const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') return {};
+
+  // OpenRouter API key is stored in config.yaml under providers.openrouter.api_key
+  if (provider.name === 'openrouter') {
+    const { config } = loadYamlConfig();
+    const apiKey = config.apiKeys.openrouter;
+    if (apiKey) {
+      return getProviderEnv(provider, apiKey);
+    }
+    console.warn('Warning: No OpenRouter API key configured');
+    return {};
+  }
 
   const settings = loadSettings();
   const apiKey = settings.api_keys?.[provider.name as keyof typeof settings.api_keys];
