@@ -110,10 +110,12 @@ export const selectIssues = (s: DashboardState): unknown[] => s.issuesRaw
 export const selectIssuesByCycle = (_cycle: string, includeCompleted: boolean) =>
   (s: DashboardState): unknown[] => {
     const issues = s.issuesRaw as Array<Record<string, unknown>>
+    // Always include done issues — they show in the Done column.
+    // closed-out filtering is handled downstream in groupByStatus() based on the label.
+    // Only exclude canceled when not explicitly viewing the Canceled filter.
     if (includeCompleted) return issues
     return issues.filter(
-      (i) => i['state'] !== 'done' && i['state'] !== 'canceled' &&
-             i['canonicalStatus'] !== 'done' && i['canonicalStatus'] !== 'canceled',
+      (i) => i['state'] !== 'canceled' && i['canonicalStatus'] !== 'canceled',
     )
   }
 
