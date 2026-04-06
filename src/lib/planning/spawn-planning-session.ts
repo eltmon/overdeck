@@ -410,8 +410,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
             startDocker,
             onProgress: (event) => {
               console.log(`[start-planning] Workspace progress: ${event.label} — ${event.detail} [${event.status}]`);
-              // Forward workspace sub-step progress as step 1 detail updates
-              progress(1, event.label, event.detail, event.status === 'complete' ? 'active' : event.status);
+              // Forward workspace sub-step progress as step 1 sub-step events
+              progress(1, event.label, event.detail, event.status);
             },
           });
           console.log(`[start-planning] Workspace result: success=${wsResult.success}, steps=${wsResult.steps.length}, errors=${wsResult.errors.length}`);
