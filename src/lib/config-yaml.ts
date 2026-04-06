@@ -90,6 +90,16 @@ export interface YamlConfig {
 
   /** Shadow mode configuration */
   shadow?: ShadowConfig;
+
+  /** Multi-tool sync configuration */
+  tools?: {
+    /**
+     * Additional AI tools to sync skills to.
+     * Supported: 'cursor' | 'codex' | 'windsurf' | 'cline' | 'copilot' | 'aider'
+     * Per-project .pan.yaml values merge additively with global config.
+     */
+    also_sync?: string[];
+  };
 }
 
 /**

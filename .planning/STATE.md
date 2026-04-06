@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-Working on bead panopticon-ihe (multi-tool sync for all 6 AI tool targets).
+Working on bead panopticon-4xd (update documentation).
 
 ## Completed Work
 - [x] panopticon-u6e: Copied docs/REPO-ARTIFACTS.md to workspace branch (commit: c6064e0)
@@ -12,16 +12,10 @@ Working on bead panopticon-ihe (multi-tool sync for all 6 AI tool targets).
 - [x] panopticon-bjd: Changed archive structure from flat to per-issue subdir in complete-planning route and movePrd in archive-planning.ts; added numericSuffix to findWorkspacePath; updated planning prompts (commit: 733b567)
 - [x] panopticon-b6g: Added ensurePanGitignore() to workspace-manager.ts, called during createWorkspace(); injects .pan/events/, .pan/convoy/, .pan/prompts/ into project .gitignore (commit: 2226565)
 - [x] panopticon-0dp: Added migratePanopticonToPan() to workspace-manager.ts; called during pan sync for all registered projects; handles events/triage/health/convoy/prompts → .pan/; warns on conflict (commit: ff0d4ef)
-- [x] panopticon-2nu: Added mergePanSkillsIntoWorkspace() in skills-merge.ts; called in createWorkspace() after global cache merge; .pan/skills/ → .claude/skills/ with skip-if-exists precedence (commit: pending)
+- [x] panopticon-2nu: Added mergePanSkillsIntoWorkspace() in skills-merge.ts; called in createWorkspace() after global cache merge; .pan/skills/ → .claude/skills/ with skip-if-exists precedence (commit: 4e564a7)
+- [x] panopticon-ihe: Created multi-tool-sync.ts with adapters for all 6 tools (cursor/codex/windsurf/cline/copilot/aider); integrated into pan sync; added tools.also_sync to YamlConfig; 18 tests pass (commit: pending)
 
 ## Remaining Work
-- [ ] panopticon-wju: Rename all project-level .panopticon/ path references to .pan/
-- [ ] panopticon-d31: Rename .panopticon.yaml to .pan.yaml with backwards compat
-- [ ] panopticon-bjd: Change archive structure from flat to per-issue subdirectory
-- [ ] panopticon-b6g: Add .pan/events/, .pan/convoy/, .pan/prompts/ to .gitignore
-- [ ] panopticon-0dp: Safe migration of existing .panopticon/ subdirs in workspaces
-- [ ] panopticon-2nu: Add .pan/skills/ as a sync source with correct precedence
-- [ ] panopticon-ihe: Implement multi-tool sync for all 6 AI tool targets
 - [ ] panopticon-4xd: Update documentation to match implemented behavior
 
 ## Key Decisions
