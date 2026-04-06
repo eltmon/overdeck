@@ -130,8 +130,8 @@ describe('syncSkillsToTools', () => {
   });
 
   it('syncs multiple skills to multiple tools', () => {
-    createSkill('skill-a');
-    createSkill('skill-b');
+    createSkill('skill-a', `---\nname: skill-a\n---\n# Skill A\nContent`);
+    createSkill('skill-b', `---\nname: skill-b\n---\n# Skill B\nContent`);
     const results = syncSkillsToTools(SKILLS_DIR, PROJECT_DIR, ['cursor', 'windsurf']);
     expect(results).toHaveLength(2);
     const cursor = results.find(r => r.tool === 'cursor')!;

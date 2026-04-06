@@ -217,7 +217,7 @@ export function syncSkillsToTools(
           continue;
         }
         const displayName = extractSkillName(rawContent, name);
-        writer(projectPath, displayName === name ? name : name, rawContent);
+        writer(projectPath, displayName, rawContent);
         result.written.push(name);
       } catch (err: any) {
         result.errors.push(`${name}: ${err.message}`);

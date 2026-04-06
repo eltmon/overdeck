@@ -4,7 +4,7 @@
  * Handles workspace creation and removal for both monorepo and polyrepo projects.
  */
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, statSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, chmodSync, realpathSync, rmSync, rmdirSync, statSync, renameSync } from 'fs';
 import { join, dirname, basename, extname, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -87,7 +87,7 @@ export function migratePanopticonToPan(projectPath: string): PanMigrationResult 
     try {
       const remaining = readdirSync(panopticonDir);
       if (remaining.length === 0) {
-        rmSync(panopticonDir);
+        rmdirSync(panopticonDir);
         result.migrated.push('.panopticon/ (empty dir removed)');
       }
     } catch {
