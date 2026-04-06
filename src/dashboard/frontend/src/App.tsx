@@ -175,9 +175,11 @@ export default function App() {
     }
   }, [agents]);
 
-  // Find agent for selected issue
+  // Find the work agent for selected issue (agent-<id>, not planning-<id>)
   const selectedIssueAgent = selectedIssue
-    ? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase())
+    ? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase() && a.id.startsWith('agent-'))
+      ?? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase())
+      ?? null
     : null;
 
   // Find issue URL for selected issue
