@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing panopticon-8bl: Cost tracking and usage display for OpenRouter models
+Running quality gates (panopticon-dz1)
 
 ## Completed Work
 - [x] panopticon-ugg: Add OpenRouter to provider system — model-fallback.ts, model-capabilities.ts, config-yaml.ts, env-loader.ts, settings-api.ts (commit: 1b7ee7d)
@@ -12,9 +12,9 @@ Implementing panopticon-8bl: Cost tracking and usage display for OpenRouter mode
 - [x] panopticon-565: Create dedicated OpenRouter settings page — OpenRouterPage.tsx + OpenRouterModelBrowser.tsx (commit: 018f62c)
 - [x] panopticon-shf: Unify ModelPicker with full provider system — fetches from /api/settings/available-models + /api/settings/openrouter/models, groups by provider, shows cost badges, passes effortLevels via onChange callback (commit: 19dfadc)
 - [x] panopticon-0ny: OpenRouter env overrides in conversation and agent launchers — added openrouter to ProviderName/PROVIDERS, getProviderForModel detects '/' in model ID, spawnConversationSession injects ANTHROPIC_BASE_URL+AUTH_TOKEN, agents.ts getProviderEnvForModel handles openrouter (commit: bbcb07b)
+- [x] panopticon-8bl: Cost tracking and usage display — ModelPicker shows FREE/$/1M for all models via costDisplay, OpenRouterModelBrowser shows emerald FREE badge and avg cost per 1M tokens (already complete as part of shf+565)
 
 ## Remaining Work
-- [ ] panopticon-8bl: Cost tracking and usage display for OpenRouter models
 - [ ] panopticon-dz1: Quality gates: typecheck, lint, and test pass
 
 ## Key Decisions
