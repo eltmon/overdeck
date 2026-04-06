@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle } from 'lucide-react';
+import { Circle, Loader2 } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../MissionControl/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
@@ -16,6 +16,7 @@ type ViewMode = 'conversation' | 'terminal';
 
 interface ConversationPanelProps {
   conversation: Conversation;
+  onArchived?: () => void;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -30,14 +31,23 @@ async function resumeConversation(name: string): Promise<Conversation> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationPanel({ conversation }: ConversationPanelProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const saved = localStorage.getItem('conv-panel-view-mode');
-    return saved === 'terminal' ? 'terminal' : 'conversation';
-  });
+export function ConversationPanel({ conversation, onArchived }: ConversationPanelProps) {
+  // Default to conversation view; persist per-conversation preference wouldn't make sense
+  // since new conversations should always start in conversation view
+  const [viewMode, setViewMode] = useState<ViewMode>('conversation');
+  // Track if terminal was ever opened — lazy mount to avoid xterm.js sizing issues
+  const [terminalEverOpened, setTerminalEverOpened] = useState(false);
 
   const [resumed, setResumed] = useState(false);
   const queryClient = useQueryClient();
+
+  // Query messages at this level so we can access streaming status in the header
+  const { data: messagesData } = useQuery({
+    queryKey: ['conversation-messages', conversation.name],
+    queryFn: () => fetchMessages(conversation.name),
+    refetchInterval: conversation.sessionAlive ? 2000 : false,
+  });
+  const isStreaming = messagesData?.streaming ?? false;
 
   const resumeMutation = useMutation({
     mutationFn: () => resumeConversation(conversation.name),
@@ -51,9 +61,19 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
     resumeMutation.mutate();
   }, [resumeMutation]);
 
+  const handleArchive = useCallback(async () => {
+    try {
+      await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/archive`, { method: 'POST' });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      onArchived?.();
+    } catch (err) {
+      console.error('[ConversationPanel] Archive failed:', err);
+    }
+  }, [conversation.name, queryClient, onArchived]);
+
   const handleViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem('conv-panel-view-mode', mode);
+    if (mode === 'terminal') setTerminalEverOpened(true);
   }, []);
 
   const showTerminal = conversation.sessionAlive || resumed;
@@ -69,6 +89,12 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
       {/* Header bar */}
       <div className={styles.conversationTerminalHeader}>
         <span className={styles.conversationTerminalTitle}>
+          {isStreaming && (
+            <Loader2
+              size={14}
+              className={styles.spinnerIcon}
+            />
+          )}
           {conversation.title ?? conversation.name}
         </span>
         <span className={styles.conversationTerminalStatus}>
@@ -100,29 +126,23 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
 
       {/* Body */}
       <div className={styles.conversationTerminalBody}>
-        {!showTerminal ? (
-          // Session ended — show resume overlay
-          <div className={styles.conversationResumeOverlay}>
-            <p>Session ended</p>
-            <button
-              className={styles.conversationResumeBtn}
-              onClick={handleResume}
-              disabled={resumeMutation.isPending}
-            >
-              {resumeMutation.isPending ? 'Resuming…' : 'Resume Session'}
-            </button>
-            {resumeMutation.isError && (
-              <p style={{ color: 'var(--mc-error)', fontSize: 12 }}>
-                {(resumeMutation.error as Error).message}
-              </p>
-            )}
+        {/* Terminal: lazy-mount on first switch, only when session is alive */}
+        {showTerminal && terminalEverOpened && (
+          <div style={viewMode === 'terminal'
+            ? { display: 'contents' }
+            : { position: 'absolute', visibility: 'hidden', width: '100%', height: '100%', overflow: 'hidden' }
+          }>
+            <XTerminal sessionName={conversation.tmuxSession} />
           </div>
-        ) : viewMode === 'terminal' ? (
-          // Terminal view — raw tmux output
-          <XTerminal sessionName={conversation.tmuxSession} />
-        ) : (
-          // Conversation view — structured message rendering
-          <ConversationView conversation={conversation} />
+        )}
+        {/* Conversation view — always shown (even for ended sessions to read history) */}
+        {(viewMode === 'conversation' || !showTerminal) && (
+          <ConversationView
+            conversation={conversation}
+            onResume={!showTerminal ? handleResume : undefined}
+            onArchive={handleArchive}
+            resumePending={resumeMutation.isPending}
+          />
         )}
       </div>
     </div>
@@ -136,6 +156,7 @@ interface MessagesResponse {
   workLog: WorkLogEntry[];
   streaming: boolean;
   discovering?: boolean;
+  totalCost?: number;
 }
 
 async function fetchMessages(name: string): Promise<MessagesResponse> {
@@ -146,30 +167,58 @@ async function fetchMessages(name: string): Promise<MessagesResponse> {
 
 interface ConversationViewProps {
   conversation: Conversation;
+  onResume?: () => void;
+  onArchive?: () => void;
+  resumePending?: boolean;
 }
 
-function ConversationView({ conversation }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending }: ConversationViewProps) {
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
     queryFn: () => fetchMessages(conversation.name),
-    // Re-poll when discovering (session_file not yet stored)
-    refetchInterval: (query) => {
-      if (query.state.data?.discovering) return 2000;
-      return false;
-    },
+    // Poll every 2s while session is active for live updates.
+    // Since we don't have WebSocket push (unlike T3Code), polling is our streaming mechanism.
+    refetchInterval: conversation.sessionAlive ? 2000 : false,
   });
 
   const messages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
   const streaming = data?.streaming ?? false;
-  const discovering = data?.discovering ?? false;
-  const isFirstMessage = !isLoading && !discovering && messages.length === 0;
+  const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
+  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive;
+
+  // "Working" = session is alive AND either:
+  // - server reports streaming (incomplete assistant message with recent file activity)
+  // - last message is from the user (waiting for assistant response)
+  // - last assistant message has no completedAt (still generating)
+  const lastMsg = messages[messages.length - 1];
+  const isWorking = conversation.sessionAlive && messages.length > 0 && (
+    streaming ||
+    lastMsg?.role === 'user' ||
+    (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
+  );
 
   return (
     <div className={styles.conversationView}>
-      {(isLoading || discovering) ? (
+      {isLoading ? (
         <div className={styles.conversationConnecting}>
-          <span>{isLoading ? 'Loading…' : 'Connecting to session…'}</span>
+          <span>Loading…</span>
+        </div>
+      ) : isOrphaned ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            This conversation has no saved history. The session may have ended before any messages were exchanged.
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            {onResume && (
+              <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
+                {resumePending ? 'Resuming…' : 'Resume Session'}
+              </button>
+            )}
+            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
+              Archive
+            </button>
+          </div>
         </div>
       ) : isFirstMessage ? (
         <div className={styles.conversationEmptyState}>
@@ -182,10 +231,22 @@ function ConversationView({ conversation }: ConversationViewProps) {
         <MessagesTimeline
           messages={messages}
           workLog={workLog}
-          streaming={streaming}
+          streaming={isWorking}
         />
       )}
-      <ComposerFooter conversation={conversation} isFirstMessage={isFirstMessage} />
+      {onResume ? (
+        <div className={styles.conversationResumeBar}>
+          <button
+            className={styles.conversationResumeBtn}
+            onClick={onResume}
+            disabled={resumePending}
+          >
+            {resumePending ? 'Resuming…' : 'Resume Session'}
+          </button>
+        </div>
+      ) : (
+        <ComposerFooter conversation={conversation} />
+      )}
     </div>
   );
 }

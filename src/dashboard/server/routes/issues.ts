@@ -34,6 +34,7 @@ import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
+import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
@@ -1878,8 +1879,7 @@ const getIssueBeadsRoute = HttpRouter.add(
 
         if (!isRemoteWorkspace) {
           try {
-            const { loadWorkspaceMetadata } = await import('../../../lib/remote/workspace-metadata.js');
-            const wsMetadata = loadWorkspaceMetadata(id);
+            const wsMetadata = loadWorkspaceMetadataStatic(id);
             if (wsMetadata?.vmName) {
               isRemoteWorkspace = true;
               remoteVmName = wsMetadata.vmName;

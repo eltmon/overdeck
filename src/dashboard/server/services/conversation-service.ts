@@ -11,6 +11,7 @@ import { readdir, stat, readFile, watch } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
+import { calculateCost, getPricing } from '../../../lib/cost.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,8 @@ export interface ParseResult {
   byteOffset: number;
   /** True when the last assistant message has no completedAt and file was modified recently. */
   streaming: boolean;
+  /** Total estimated cost in USD computed from assistant message usage data. */
+  totalCost: number;
 }
 
 // ─── CWD encoding ─────────────────────────────────────────────────────────────
@@ -70,9 +73,10 @@ export async function snapshotSessionFiles(cwd: string): Promise<Set<string>> {
 export async function discoverSessionFile(
   cwd: string,
   existingFiles: Set<string>,
+  timeoutMs = 60_000,
 ): Promise<string | null> {
   const projectDir = claudeProjectDir(cwd);
-  const deadline = Date.now() + 60_000;
+  const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     try {
@@ -95,15 +99,23 @@ export async function discoverSessionFile(
 
 // ─── JSONL parsing ────────────────────────────────────────────────────────────
 
+interface JsonlUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+}
+
 interface JsonlEntry {
   type?: string;
   role?: string;
   message?: {
     id?: string;
     role?: string;
-    content?: unknown[];
+    content?: unknown[] | string;
     model?: string;
     stop_reason?: string | null;
+    usage?: JsonlUsage;
   };
   timestamp?: string;
   sessionId?: string;
@@ -141,9 +153,12 @@ export async function parseConversationMessages(
 
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
+  let totalCost = 0;
 
   // Pending assistant message being assembled from content blocks
   let pendingAssistant: ChatMessage | null = null;
+  // Track last user message timestamp for duration calculation
+  let lastUserTimestamp: string | null = null;
   // Map tool_use id → WorkLogEntry (waiting for tool_result)
   const pendingToolUse = new Map<string, WorkLogEntry>();
 
@@ -157,7 +172,7 @@ export async function parseConversationMessages(
 
     if (entry.type === 'user' && entry.message) {
       const msg = entry.message;
-      const content = Array.isArray(msg.content) ? msg.content : [];
+      const rawContent = msg.content;
 
       // Flush any pending assistant message
       if (pendingAssistant) {
@@ -165,32 +180,62 @@ export async function parseConversationMessages(
         pendingAssistant = null;
       }
 
-      for (const block of content as ContentBlock[]) {
-        if (block.type === 'tool_result' && block.tool_use_id) {
-          // Complete a pending WorkLogEntry
-          const pending = pendingToolUse.get(block.tool_use_id);
-          if (pending) {
-            pendingToolUse.delete(block.tool_use_id);
-            workLog.push({
-              ...pending,
-              detail: block.is_error
-                ? `Error: ${JSON.stringify(block.content)}`
-                : pending.detail,
-              tone: block.is_error ? 'error' : pending.tone,
-            });
-          }
-        } else if (block.type === 'text' && block.text) {
+      // Content can be a string (plain text) or array of content blocks
+      if (typeof rawContent === 'string' && rawContent.trim()) {
+        // Skip command/system messages (XML tags from Claude Code internals)
+        if (!rawContent.startsWith('<')) {
+          const ts = entry.timestamp ?? new Date().toISOString();
+          lastUserTimestamp = ts;
           messages.push({
             id: entry.uuid ?? `user-${messages.length}`,
             role: 'user',
-            text: block.text,
-            createdAt: entry.timestamp ?? new Date().toISOString(),
+            text: rawContent,
+            createdAt: ts,
           });
+        }
+      } else if (Array.isArray(rawContent)) {
+        for (const block of rawContent as ContentBlock[]) {
+          if (block.type === 'tool_result' && block.tool_use_id) {
+            // Complete a pending WorkLogEntry
+            const pending = pendingToolUse.get(block.tool_use_id);
+            if (pending) {
+              pendingToolUse.delete(block.tool_use_id);
+              workLog.push({
+                ...pending,
+                detail: block.is_error
+                  ? `Error: ${JSON.stringify(block.content)}`
+                  : pending.detail,
+                tone: block.is_error ? 'error' : pending.tone,
+              });
+            }
+          } else if (block.type === 'text' && block.text) {
+            const ts = entry.timestamp ?? new Date().toISOString();
+            lastUserTimestamp = ts;
+            messages.push({
+              id: entry.uuid ?? `user-${messages.length}`,
+              role: 'user',
+              text: block.text,
+              createdAt: ts,
+            });
+          }
         }
       }
     } else if (entry.type === 'assistant' && entry.message) {
       const msg = entry.message;
       const content = Array.isArray(msg.content) ? msg.content : [];
+
+      // Accumulate cost from usage data
+      if (msg.usage && msg.model) {
+        const pricing = getPricing('anthropic', msg.model);
+        if (pricing) {
+          totalCost += calculateCost({
+            inputTokens: msg.usage.input_tokens ?? 0,
+            outputTokens: msg.usage.output_tokens ?? 0,
+            cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
+            cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+          }, pricing);
+        }
+      }
 
       let assistantText = '';
       for (const block of content as ContentBlock[]) {
@@ -219,8 +264,10 @@ export async function parseConversationMessages(
           id: msg.id ?? `asst-${messages.length}`,
           role: 'assistant',
           text: assistantText,
-          createdAt: entry.timestamp ?? new Date().toISOString(),
-          completedAt: msg.stop_reason ? entry.timestamp : undefined,
+          // createdAt = when the user sent the request (for duration calculation)
+          // completedAt = when this assistant response finished
+          createdAt: lastUserTimestamp ?? entry.timestamp ?? new Date().toISOString(),
+          completedAt: msg.stop_reason === 'end_turn' ? (entry.timestamp ?? undefined) : undefined,
           streaming: !msg.stop_reason,
         };
       }
@@ -245,7 +292,7 @@ export async function parseConversationMessages(
     streaming = Date.now() - fileStat.mtimeMs < 5000;
   }
 
-  return { messages, workLog, byteOffset: newByteOffset, streaming };
+  return { messages, workLog, byteOffset: newByteOffset, streaming, totalCost };
 }
 
 // ─── File watcher ─────────────────────────────────────────────────────────────

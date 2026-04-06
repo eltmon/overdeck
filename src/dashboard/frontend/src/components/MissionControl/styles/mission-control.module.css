@@ -1074,6 +1074,28 @@
   color: var(--mc-text-muted);
 }
 
+/* Loading skeletons */
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+.skeletonList {
+  padding: var(--mc-space-2) var(--mc-space-4) var(--mc-space-2) var(--mc-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeletonItem {
+  height: 14px;
+  width: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--mc-bg-hover) 25%, var(--mc-bg-selected) 50%, var(--mc-bg-hover) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
 .conversationItem {
   display: flex;
   align-items: center;
@@ -1093,7 +1115,7 @@
   background: var(--mc-bg-hover);
 }
 
-.conversationItem:hover .conversationDeleteBtn {
+.conversationItem:hover .conversationArchiveBtn {
   opacity: 1;
 }
 
@@ -1114,7 +1136,7 @@
   font-size: var(--mc-font-size-xs);
 }
 
-.conversationDeleteBtn {
+.conversationArchiveBtn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1133,9 +1155,26 @@
   padding: 0;
 }
 
-.conversationDeleteBtn:hover {
+.conversationArchiveBtn:hover {
   background: var(--mc-bg-hover);
-  color: var(--mc-error);
+  color: var(--mc-text-primary);
+}
+
+/* Archive button in orphaned conversation state */
+.conversationArchiveBtnLarge {
+  padding: var(--mc-space-2) var(--mc-space-4);
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-secondary);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  font-size: var(--mc-font-size-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.conversationArchiveBtnLarge:hover {
+  background: var(--mc-bg-selected);
+  color: var(--mc-text-primary);
 }
 
 /* Conversation Terminal Panel */
@@ -1165,6 +1204,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinnerIcon {
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+  color: var(--mc-accent);
 }
 
 .conversationTerminalStatus {
@@ -1190,6 +1243,13 @@
   justify-content: center;
   gap: var(--mc-space-4);
   color: var(--mc-text-secondary);
+}
+
+.conversationResumeBar {
+  padding: var(--mc-space-3);
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--mc-border);
 }
 
 .conversationResumeBtn {
@@ -1339,6 +1399,26 @@
   max-width: 100%;
 }
 
+/* Message timestamp (T3Code: text-[10px] text-muted-foreground/30) */
+.messageTimestamp {
+  font-size: 10px;
+  color: color-mix(in srgb, var(--mc-text-secondary) 30%, transparent);
+}
+
+/* Metadata line below assistant messages (timestamp + duration) */
+.messageMetadata {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--mc-space-1);
+  padding-left: 2px;
+}
+
+.messageSeparator {
+  font-size: 10px;
+  color: color-mix(in srgb, var(--mc-text-secondary) 30%, transparent);
+}
+
 /* Work log group */
 .workLogGroup {
   border: 1px solid var(--mc-border);
@@ -1357,6 +1437,15 @@
   font-size: var(--mc-font-size-sm);
   color: var(--mc-text-secondary);
   min-height: 20px;
+}
+
+.workLogTerminalIcon {
+  font-family: var(--mc-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 1px;
 }
 
 .workLogLabel {
@@ -1666,6 +1755,13 @@
 .pickerBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.pickerHint {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  padding: 4px var(--mc-space-2);
+  font-style: italic;
 }
 
 .pickerLabel {

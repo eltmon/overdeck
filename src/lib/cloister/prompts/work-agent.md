@@ -116,10 +116,11 @@ will be rejected.
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
-5. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
-6. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
-7. `INSPECTION PASSED` → proceed to step 1
-8. `INSPECTION BLOCKED` → fix, commit, `bd close` again
+5. **Update `.planning/STATE.md`** — update Current Phase, move bead to Completed Work, update Remaining Work
+6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
+7. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
+8. `INSPECTION PASSED` → proceed to step 1
+9. `INSPECTION BLOCKED` → fix, commit, `bd close` again
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
@@ -209,10 +210,11 @@ and your work will be rejected.
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
-5. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
-6. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
-7. `INSPECTION PASSED` → proceed to step 1
-8. `INSPECTION BLOCKED` → fix, commit, `bd close` again
+5. **Update `.planning/STATE.md`** — this is MANDATORY before closing the bead (see STATE.md format below)
+6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
+7. **WAIT** for the inspection result (delivered to your session via `pan work tell`)
+8. `INSPECTION PASSED` → proceed to step 1
+9. `INSPECTION BLOCKED` → fix, commit, `bd close` again
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
@@ -222,17 +224,46 @@ label filter you will see irrelevant beads from other workspaces.
 a separate commit with a separate `bd close`. The inspection fires automatically on
 `bd close` — you do not need to call `pan inspect` manually.
 
-## CRITICAL: Keep STATE.md Updated
+## CRITICAL: Keep STATE.md Updated — Crash Recovery Insurance
 
-**You may be interrupted, crash, or be stopped at any time.** To ensure the next agent can continue:
+**You may be interrupted, crash, or be stopped at any time.** If the system crashes with 50 agents
+running, STATE.md is the ONLY way to recover without burning expensive tokens re-discovering context.
 
-1. **Update `.planning/STATE.md` frequently** as you complete work
-2. After completing each task or significant milestone, update the "Current Status" section
-3. Document any decisions made or blockers encountered
-4. Keep the "Remaining Work" section accurate
+**STATE.md is updated as step 5 of every bead workflow — before `bd close`.** A hook enforces this:
+if STATE.md hasn't been updated since your last bead close, you'll receive a warning.
 
-The next agent will read STATE.md to know exactly where to pick up. Beads tasks track individual items,
-but STATE.md provides the narrative context and current state that beads alone cannot capture.
+### Required STATE.md Format
+
+Your `.planning/STATE.md` MUST contain these sections (update in-place, don't append):
+
+```markdown
+# {{ISSUE_ID}}: <title>
+
+## Status: <In Progress | Blocked | Implementation Complete | Ready for Merge>
+
+## Current Phase
+<What you are working on RIGHT NOW — specific enough that a new agent can pick up mid-task>
+
+## Completed Work
+- [x] <bead-id>: <what was done, 1 line> (commit: <short-sha>)
+- [x] <bead-id>: <what was done, 1 line> (commit: <short-sha>)
+
+## Remaining Work
+- [ ] <bead-id>: <what needs to be done>
+- [ ] <bead-id>: <what needs to be done>
+
+## Key Decisions
+- <D1>: <decision and why — only non-obvious ones that would surprise a new agent>
+
+## Specialist Feedback
+- [<timestamp>] <specialist> → <result> — <file path>
+```
+
+### What Makes a Good STATE.md Update
+- **Current Phase**: "Implementing bead panopticon-x8f (add retry logic to webhook handler)" — NOT "Working on implementation"
+- **Completed Work**: Include the commit SHA so a new agent can verify what's already done
+- **Remaining Work**: Sync with `bd list` output — if a bead is closed, move it to Completed
+- **Key Decisions**: Only decisions a new agent needs to know. "Used Effect.retry instead of manual loop because..." — NOT "decided to write code"
 
 ## CRITICAL: Complete ALL Work - No Excuses
 

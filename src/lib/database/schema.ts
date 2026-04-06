@@ -8,7 +8,7 @@
 import type Database from 'better-sqlite3';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 12;
 
 /**
  * Initialize the complete database schema.
@@ -174,7 +174,11 @@ export function initSchema(db: Database.Database): void {
       ended_at         TEXT,
       last_attached_at TEXT,
       session_file     TEXT,                               -- path to Claude Code JSONL session file (PAN-451)
-      title            TEXT                                -- human-readable title, auto-set from first message
+      title            TEXT,                               -- human-readable title, auto-set from first message
+      title_source     TEXT,                               -- 'auto', 'ai', or 'manual'
+      title_seed       TEXT,                               -- original auto-generated title for replacement check
+      total_cost       REAL DEFAULT 0,                     -- cached total cost in USD
+      archived_at      TEXT                                -- ISO timestamp when archived, null = active
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -314,6 +318,46 @@ export function runMigrations(db: Database.Database): void {
   if (currentVersion < 8) {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN title TEXT`);
+    } catch { /* already exists */ }
+  }
+
+  // v8 → v9: add title_source and title_seed columns to conversations
+  // title_source tracks how the title was set: 'auto' (truncated first message),
+  // 'ai' (Claude-generated), or 'manual' (user renamed). Used for T3Code-style
+  // canReplaceThreadTitle logic — only auto-generated titles get AI replacement.
+  // title_seed stores the original truncated message for replacement eligibility.
+  if (currentVersion < 9) {
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN title_source TEXT`);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN title_seed TEXT`);
+    } catch { /* already exists */ }
+  }
+
+  // v9 → v10: add total_cost column to conversations (cached cost in USD)
+  if (currentVersion < 10) {
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN total_cost REAL DEFAULT 0`);
+    } catch { /* already exists */ }
+  }
+
+  // v10 → v11: expression index for UPPER(issue_id) on cost_events
+  // The N+1 queries in getCostsByIssueFromDb use UPPER(issue_id) which defeats
+  // the existing idx_cost_issue_id index. This expression index fixes that.
+  if (currentVersion < 11) {
+    try {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_cost_issue_upper ON cost_events(UPPER(issue_id))`);
+    } catch { /* already exists */ }
+  }
+
+  // v11 → v12: archived_at column + index for conversations (T3Code pattern)
+  if (currentVersion < 12) {
+    try {
+      db.exec(`ALTER TABLE conversations ADD COLUMN archived_at TEXT`);
+    } catch { /* already exists */ }
+    try {
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(archived_at)`);
     } catch { /* already exists */ }
   }
 

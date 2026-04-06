@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { ActivityView } from './ActivityView';
@@ -8,6 +8,7 @@ import { DeaconStatus } from './DeaconStatus';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
+import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { Issue } from '../../types';
 import styles from './styles/mission-control.module.css';
 
@@ -53,6 +54,7 @@ interface MissionControlProps {
 export function MissionControl({ issues = [] }: MissionControlProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('mc-sidebar-width');
@@ -105,15 +107,31 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
-    setSelectedConversation(null); // clear conversation selection
+    setSelectedConversation(null);
+    setIsDraft(false);
   }, []);
 
   const handleSelectConversation = useCallback((name: string | null) => {
     setSelectedConversation(name);
+    setIsDraft(false);
     if (name !== null) {
-      setSelectedFeature(null); // clear feature selection
+      setSelectedFeature(null);
     }
   }, []);
+
+  const handleDraftCreated = useCallback(() => {
+    setIsDraft(true);
+    setSelectedConversation(null);
+    setSelectedFeature(null);
+  }, []);
+
+  const queryClient = useQueryClient();
+
+  const handleDraftPromoted = useCallback((conv: Conversation) => {
+    setIsDraft(false);
+    setSelectedConversation(conv.name);
+    queryClient.invalidateQueries({ queryKey: ['conversations'] });
+  }, [queryClient]);
 
   // Resizable sidebar drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -174,11 +192,17 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
           <ConversationList
             selectedConversation={selectedConversation}
             onSelectConversation={handleSelectConversation}
+            onDraftCreated={handleDraftCreated}
           />
 
           <div className={styles.projectTree}>
             {isLoading && projects.length === 0 ? (
-              <div className={styles.emptyProject}>Loading projects...</div>
+              <div className={styles.skeletonList}>
+                <div className={styles.skeletonItem} style={{ width: '60%' }} />
+                <div className={styles.skeletonItem} style={{ width: '80%' }} />
+                <div className={styles.skeletonItem} style={{ width: '45%' }} />
+                <div className={styles.skeletonItem} style={{ width: '70%' }} />
+              </div>
             ) : projects.length === 0 ? (
               <div className={styles.emptyProject}>No projects configured</div>
             ) : (
@@ -212,11 +236,15 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
 
         {/* Content Area */}
         <div className={styles.content}>
-          {selectedConversation ? (
+          {isDraft ? (
+            <DraftConversationPanel
+              onPromoted={handleDraftPromoted}
+            />
+          ) : selectedConversation ? (
             (() => {
               const conv = conversations.find(c => c.name === selectedConversation);
               return conv ? (
-                <ConversationPanel conversation={conv} />
+                <ConversationPanel key={conv.name} conversation={conv} onArchived={() => { setSelectedConversation(null); queryClient.invalidateQueries({ queryKey: ['conversations'] }); }} />
               ) : (
                 <div className={styles.contentEmpty}>
                   <div style={{ textAlign: 'center' }}>

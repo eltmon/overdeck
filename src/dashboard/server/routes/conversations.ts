@@ -10,13 +10,14 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import {
   listConversations,
@@ -27,16 +28,47 @@ import {
   updateLastAttached,
   updateSessionFile,
   updateConversationTitle,
+  updateConversationCost,
+  archiveConversation,
+  canReplaceTitle,
 } from '../../../lib/database/conversations-db.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
 import {
-  snapshotSessionFiles,
-  discoverSessionFile,
   parseConversationMessages,
 } from '../services/conversation-service.js';
-import { httpHandler } from './http-handler.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Wait for Claude Code to show its input prompt (❯) in the tmux pane.
+ * Polls every 500ms for up to 30 seconds. Claude Code takes a few seconds to start.
+ */
+async function waitForClaudeReady(tmuxSession: string): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      const { stdout } = await execAsync(
+        `tmux capture-pane -t ${tmuxSession} -p 2>/dev/null`,
+        { encoding: 'utf-8' },
+      );
+      // Claude Code shows ❯ when ready for input
+      if (stdout.includes('❯')) {
+        console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
+        return;
+      }
+    } catch {
+      // Session might not exist yet
+    }
+    await new Promise<void>((r) => setTimeout(r, 500));
+  }
+  console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
+}
+
+/** Compute the deterministic JSONL session file path from cwd + session UUID. */
+function sessionFilePath(cwd: string, sessionId: string): string {
+  const encodedCwd = cwd.replace(/\//g, '-');
+  return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,11 +106,16 @@ async function tmuxSessionExists(sessionName: string): Promise<boolean> {
 /**
  * Spawn a new tmux session running claude.
  * Uses a minimal launcher script for proper terminal env setup.
+ * Accepts a claudeSessionId to deterministically control the JSONL file path.
  */
 async function spawnConversationSession(
   tmuxSession: string,
   cwd: string,
+  claudeSessionId: string,
+  model?: string,
+  effort?: string,
   issueId?: string,
+  resume = false,
 ): Promise<void> {
   const stateDir = join(homedir(), '.panopticon', 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
@@ -92,11 +129,18 @@ async function spawnConversationSession(
     ...(issueId ? [`export PANOPTICON_ISSUE_ID="${issueId}"`] : []),
   ].join('\n');
 
+  const claudeArgs = [
+    '--dangerously-skip-permissions',
+    resume ? `--resume "${claudeSessionId}"` : `--session-id "${claudeSessionId}"`,
+    ...(model ? [`--model "${model}"`] : []),
+    ...(effort ? [`--effort "${effort}"`] : []),
+  ].join(' ');
+
   await writeFile(launcherScript, `#!/bin/bash
 ${envExports}
 cd "${cwd}"
 trap '' HUP
-claude --dangerously-skip-permissions
+claude ${claudeArgs}
 echo ""
 echo "Conversation session ended. Close this panel or click Resume to start a new session."
 while true; do sleep 60; done
@@ -117,23 +161,58 @@ while true; do sleep 60; done
 }
 
 /**
- * Discover the session file for a conversation, blocking until found.
- * Takes a snapshot of existing files (captured BEFORE spawn) and waits
- * for a NEW file to appear. Returns the path or null on timeout.
+ * Generate an AI title for a conversation using Claude CLI (T3Code pattern).
+ * Runs `claude -p --output-format json --json-schema ...` with the first message
+ * as input, then updates the conversation title if it hasn't been manually renamed.
  */
-async function awaitSessionFile(
-  name: string,
-  cwd: string,
-  existingFiles: Set<string>,
-): Promise<string | null> {
-  const path = await discoverSessionFile(cwd, existingFiles);
-  if (path) {
-    updateSessionFile(name, path);
-    console.log(`[conversations] Discovered session file for "${name}": ${path}`);
-  } else {
-    console.warn(`[conversations] Session file discovery timed out for "${name}"`);
-  }
-  return path;
+async function generateAiTitle(conversationName: string, firstMessage: string): Promise<void> {
+  const conv = getConversationByName(conversationName);
+  if (!conv || !canReplaceTitle(conv)) return;
+
+  const schema = JSON.stringify({
+    type: 'object',
+    properties: { title: { type: 'string' } },
+    required: ['title'],
+  });
+
+  const prompt = [
+    'You write concise thread titles for coding conversations.',
+    'Summarize the user\'s request in 3-8 words.',
+    'Avoid quotes, filler, prefixes, and trailing punctuation.',
+    '',
+    'User message:',
+    firstMessage,
+  ].join('\n');
+
+  const { stdout } = await execAsync(
+    `echo ${JSON.stringify(prompt)} | claude -p --output-format json --json-schema ${JSON.stringify(schema)} --model claude-haiku-4-5-20251001 --dangerously-skip-permissions`,
+    { encoding: 'utf-8', timeout: 30_000 },
+  );
+
+  // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
+  const parsed = JSON.parse(stdout.trim());
+  const aiTitle: string | undefined =
+    parsed?.structured_output?.title ?? parsed?.title;
+
+  if (!aiTitle || !aiTitle.trim()) return;
+
+  // Sanitize: strip quotes, normalize whitespace, take first line only
+  const sanitized = aiTitle
+    .trim()
+    .split(/\r?\n/)[0]
+    ?.trim()
+    .replace(/^['"`]+|['"`]+$/g, '')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  if (!sanitized) return;
+
+  // Re-check eligibility (may have been renamed while we waited)
+  const freshConv = getConversationByName(conversationName);
+  if (!freshConv || !canReplaceTitle(freshConv)) return;
+
+  updateConversationTitle(conversationName, sanitized, 'ai');
+  console.log(`[conversations] AI title for "${conversationName}": ${sanitized}`);
 }
 
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
@@ -141,69 +220,106 @@ async function awaitSessionFile(
 const getConversationsRoute = HttpRouter.add(
   'GET',
   '/api/conversations',
-  httpHandler(Effect.gen(function* () {
-    const conversations = listConversations();
+  Effect.gen(function* () {
+    return yield* Effect.promise(async () => {
+    try {
+        const conversations = listConversations();
 
-    // Enrich with live tmux status
-    // Grace period: treat recently-created active conversations as alive (tmux may not have
-    // started yet — spawn is async). After 30s we fall back to the actual tmux check.
-    const SPAWN_GRACE_MS = 30_000;
-    const enriched = yield* Effect.promise(() =>
-      Promise.all(
-        conversations.map(async (conv) => {
-          const withinGrace =
-            conv.status === 'active' &&
-            !conv.endedAt &&
-            Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
-          const sessionAlive = withinGrace || (await tmuxSessionExists(conv.tmuxSession));
-          return { ...conv, sessionAlive };
-        }),
-      )
-    );
+        // Enrich with live tmux status
+        // Grace period: treat recently-created active conversations as alive (tmux may not have
+        // started yet — spawn is async). After 30s we fall back to the actual tmux check.
+        const SPAWN_GRACE_MS = 30_000;
+        const enriched = await Promise.all(
+          conversations.map(async (conv) => {
+            const withinGrace =
+              conv.status === 'active' &&
+              !conv.endedAt &&
+              Date.now() - new Date(conv.createdAt).getTime() < SPAWN_GRACE_MS;
+            const sessionAlive = withinGrace || (await tmuxSessionExists(conv.tmuxSession));
+            return { ...conv, sessionAlive };
+          }),
+        );
 
-    return jsonResponse(enriched);
-  })),
+        return jsonResponse(enriched);
+      }    catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to list conversations: ' + msg }, { status: 500 });
+        }})
+  }),
 );
 
 // ─── Route: POST /api/conversations ──────────────────────────────────────────
+//
+// Unified spawn + create endpoint. Called on first message from draft mode.
+// Spawns Claude Code with selected model/effort, creates DB record, sends message.
+// Accepts: { message, model?, effort?, issueId? }
 
 const postConversationRoute = HttpRouter.add(
   'POST',
   '/api/conversations',
-  httpHandler(Effect.gen(function* () {
+  Effect.gen(function* () {
     const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
+        const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
+        const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
+        const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
+        const cwd = join(homedir(), 'Projects');
 
-    const rawName = typeof body['name'] === 'string' && body['name'].trim()
-      ? body['name'].trim()
-      : generateConversationName();
-    const name = sanitizeName(rawName);
-    const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
-    const cwd = join(homedir(), 'Projects');
-    const tmuxSession = `conv-${name}`;
+        if (!message) {
+          return jsonResponse({ error: 'message is required' }, { status: 400 });
+        }
 
-    // Prevent duplicate names
-    const existing = getConversationByName(name);
-    if (existing) {
-      return jsonResponse({ error: `Conversation "${name}" already exists` }, { status: 409 });
-    }
+        // Generate identifiers
+        const name = generateConversationName();
+        const tmuxSession = `conv-${name}`;
+        const claudeSessionId = randomUUID();
+        const sessionFile = sessionFilePath(cwd, claudeSessionId);
 
-    // Persist to DB
-    const conv = createConversation(name, tmuxSession, cwd, issueId);
+        console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'}`);
 
-    // Snapshot existing JSONL files BEFORE spawning so we can detect the new one
-    const existingFiles = yield* Effect.promise(() => snapshotSessionFiles(cwd));
+        // Spawn tmux session with model + effort + deterministic session ID
+        await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId);
+        console.log(`[conversations] tmux session ${tmuxSession} spawned, JSONL: ${sessionFile}`);
 
-    // Spawn tmux session (await so it's ready)
-    yield* Effect.tryPromise({
-      try: () => spawnConversationSession(tmuxSession, cwd, issueId),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+        // Title = truncated first message (T3Code pattern)
+        const MAX_TITLE_LEN = 60;
+        const title = message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '');
+
+        // Create DB record
+        const conv = createConversation({
+          name,
+          tmuxSession,
+          cwd,
+          issueId,
+          sessionFile,
+          title,
+          titleSource: 'auto',
+          titleSeed: title,
+        });
+
+        // Wait for Claude Code to be ready, send message, and generate title — all async.
+        // Don't block the HTTP response; the frontend will poll for messages.
+        void (async () => {
+          try {
+            await waitForClaudeReady(tmuxSession);
+            await sendKeysAsync(tmuxSession, message, 'conversation-message');
+            void generateAiTitle(name, message).catch((err: unknown) => {
+              console.error(`[conversations] AI title generation failed for "${name}":`, err);
+            });
+          } catch (err) {
+            console.error(`[conversations] Failed to send first message to ${tmuxSession}:`, err);
+          }
+        })();
+
+        return jsonResponse({ ...conv, sessionAlive: true }, { status: 201 });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to create conversation: ' + msg }, { status: 500 });
+      }
     });
-
-    // Block until we discover the new session file (up to 60s)
-    const sessionFile = yield* Effect.promise(() => awaitSessionFile(name, cwd, existingFiles));
-
-    return jsonResponse({ ...conv, sessionFile }, { status: 201 });
-  })),
+  }),
 );
 
 // ─── Route: DELETE /api/conversations/:name ───────────────────────────────────
@@ -211,25 +327,28 @@ const postConversationRoute = HttpRouter.add(
 const deleteConversationRoute = HttpRouter.add(
   'DELETE',
   '/api/conversations/:name',
-  httpHandler(Effect.gen(function* () {
+  Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+    try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
 
-    const conv = getConversationByName(name);
-    if (!conv) {
-      return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    }
+        // Kill tmux session
+        await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
 
-    // Kill tmux session
-    yield* Effect.promise(() =>
-      execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' })
-    );
+        // Mark ended in DB
+        markConversationEnded(name);
 
-    // Mark ended in DB
-    markConversationEnded(name);
-
-    return jsonResponse({ success: true });
-  })),
+        return jsonResponse({ success: true });
+      }    catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to delete conversation: ' + msg }, { status: 500 });
+        }})
+  }),
 );
 
 // ─── Route: POST /api/conversations/:name/resume ─────────────────────────────
@@ -237,34 +356,43 @@ const deleteConversationRoute = HttpRouter.add(
 const postConversationResumeRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/resume',
-  httpHandler(Effect.gen(function* () {
+  Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+    try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
 
-    const conv = getConversationByName(name);
-    if (!conv) {
-      return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    }
+        const sessionAlive = await tmuxSessionExists(conv.tmuxSession);
 
-    const sessionAlive = yield* Effect.promise(() => tmuxSessionExists(conv.tmuxSession));
+        if (sessionAlive) {
+          // Reattach: just update last_attached_at and mark active
+          updateLastAttached(name);
+          markConversationActive(name);
+          return jsonResponse({ ...conv, status: 'active', reattached: true });
+        }
 
-    if (sessionAlive) {
-      // Reattach: just update last_attached_at and mark active
-      updateLastAttached(name);
-      markConversationActive(name);
-      return jsonResponse({ ...conv, status: 'active', reattached: true });
-    }
+        // Respawn: resume the previous Claude Code session using --resume
+        // Extract the session UUID from the existing session file path
+        const oldSessionId = conv.sessionFile
+          ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
+          : undefined;
+        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), undefined, undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
+          (err: unknown) => {
+            console.error(`[conversations] Failed to respawn session ${conv.tmuxSession}:`, err);
+          },
+        );
 
-    // Respawn: create a new tmux session with the same name
-    spawnConversationSession(conv.tmuxSession, conv.cwd, conv.issueId ?? undefined).catch(
-      (err: unknown) => {
-        console.error(`[conversations] Failed to respawn session ${conv.tmuxSession}:`, err);
-      },
-    );
-
-    markConversationActive(name);
-    return jsonResponse({ ...conv, status: 'active', reattached: false });
-  })),
+        markConversationActive(name);
+        return jsonResponse({ ...conv, status: 'active', reattached: false });
+      }    catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to resume conversation: ' + msg }, { status: 500 });
+        }})
+  }),
 );
 
 // ─── Route: GET /api/conversations/:name/messages ────────────────────────────
@@ -272,31 +400,51 @@ const postConversationResumeRoute = HttpRouter.add(
 const getConversationMessagesRoute = HttpRouter.add(
   'GET',
   '/api/conversations/:name/messages',
-  httpHandler(Effect.gen(function* () {
+  Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
 
-    const conv = getConversationByName(name);
-    if (!conv) {
-      return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    }
+        if (!conv.sessionFile) {
+          // Session file should always be set (deterministic from --session-id).
+          // If missing, it's a legacy conversation — return empty.
+          return jsonResponse({ messages: [], workLog: [], streaming: false });
+        }
 
-    // session_file is null until discovery completes after Claude Code starts
-    if (!conv.sessionFile) {
-      return jsonResponse({ discovering: true, messages: [], workLog: [], streaming: false });
-    }
+        try {
+          const result = await parseConversationMessages(conv.sessionFile, 0);
 
-    const result = yield* Effect.tryPromise({
-      try: () => parseConversationMessages(conv.sessionFile!, 0),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+          // Cache cost in DB so the conversation list can show it without re-parsing
+          if (result.totalCost > 0) {
+            updateConversationCost(name, result.totalCost);
+          }
+
+          return jsonResponse({
+            messages: result.messages,
+            workLog: result.workLog,
+            streaming: result.streaming,
+            totalCost: result.totalCost,
+          });
+        } catch (parseErr: unknown) {
+          // File may not exist yet — Claude Code is still starting up.
+          // Return empty messages rather than 500.
+          const code = (parseErr as { code?: string })?.code;
+          if (code === 'ENOENT') {
+            return jsonResponse({ messages: [], workLog: [], streaming: false });
+          }
+          throw parseErr;
+        }
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to load messages: ' + msg }, { status: 500 });
+      }
     });
-
-    return jsonResponse({
-      messages: result.messages,
-      workLog: result.workLog,
-      streaming: result.streaming,
-    });
-  })),
+  }),
 );
 
 // ─── Route: POST /api/conversations/:name/message ────────────────────────────
@@ -304,29 +452,32 @@ const getConversationMessagesRoute = HttpRouter.add(
 const postConversationMessageRoute = HttpRouter.add(
   'POST',
   '/api/conversations/:name/message',
-  httpHandler(Effect.gen(function* () {
+  Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
 
-    const conv = getConversationByName(name);
-    if (!conv) {
-      return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    }
+        const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
+        if (!message) {
+          return jsonResponse({ error: 'Message is required' }, { status: 400 });
+        }
 
-    const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
-    if (!message) {
-      return jsonResponse({ error: 'Message is required' }, { status: 400 });
-    }
+        // Deliver via tmux load-buffer + paste-buffer (reliable delivery pattern)
+        await sendKeysAsync(conv.tmuxSession, message, 'conversation-message');
 
-    // Deliver via tmux load-buffer + paste-buffer (reliable delivery pattern)
-    yield* Effect.tryPromise({
-      try: () => sendKeysAsync(conv.tmuxSession, message, 'conversation-message'),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+        return jsonResponse({ ok: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to send message: ' + msg }, { status: 500 });
+      }
     });
-
-    return jsonResponse({ ok: true });
-  })),
+  }),
 );
 
 // ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
@@ -334,27 +485,59 @@ const postConversationMessageRoute = HttpRouter.add(
 const patchConversationRoute = HttpRouter.add(
   'PATCH',
   '/api/conversations/:name',
-  httpHandler(Effect.gen(function* () {
+  Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const req = yield* HttpServerRequest.HttpServerRequest;
-
-    const conv = getConversationByName(name);
-    if (!conv) {
-      return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
-    }
-
-    const body = yield* Effect.tryPromise({
-      try: () => req.json as Promise<{ title?: string }>,
-      catch: () => ({} as { title?: string }),
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        const body = await req.json as { title?: string };
+        if (typeof body.title === 'string' && body.title.trim()) {
+          // User explicitly renamed → mark as 'manual' so AI won't auto-replace
+          updateConversationTitle(name, body.title.trim(), 'manual');
+        }
+        return jsonResponse({ success: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to update conversation: ' + msg }, { status: 500 });
+      }
     });
+  }),
+);
 
-    if (typeof body.title === 'string' && body.title.trim()) {
-      updateConversationTitle(name, body.title.trim());
-    }
+// ─── Route: POST /api/conversations/:name/archive ───────────────────────────
 
-    return jsonResponse({ success: true });
-  })),
+const postConversationArchiveRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/archive',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        // Kill tmux session if still alive
+        await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+        // Mark as ended and archived
+        markConversationEnded(name);
+        archiveConversation(name);
+
+        return jsonResponse({ success: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to archive conversation: ' + msg }, { status: 500 });
+      }
+    });
+  }),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
@@ -365,6 +548,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   patchConversationRoute,
   deleteConversationRoute,
   postConversationResumeRoute,
+  postConversationArchiveRoute,
   getConversationMessagesRoute,
   postConversationMessageRoute,
 );

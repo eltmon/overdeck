@@ -65,7 +65,9 @@ async function resetDb() {
   resetDatabase();
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Close any stale DB connection from a previous test before changing PANOPTICON_HOME
+  await resetDb();
   TEST_HOME = join(tmpdir(), `pan-416-route-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
   process.env.PANOPTICON_HOME = TEST_HOME;
@@ -80,7 +82,7 @@ afterEach(async () => {
 describe('conversations route — DB integration', () => {
   it('creating and listing a conversation returns the right data', async () => {
     const { createConversation, listConversations } = await import('../../../../lib/database/conversations-db.js');
-    createConversation('integration-test', 'conv-integration-test', '/cwd');
+    createConversation({ name: 'integration-test', tmuxSession: 'conv-integration-test', cwd: '/cwd' });
     const list = listConversations();
     expect(list).toHaveLength(1);
     expect(list[0].name).toBe('integration-test');
@@ -90,7 +92,7 @@ describe('conversations route — DB integration', () => {
 
   it('deleting (marking ended) a conversation persists correctly', async () => {
     const { createConversation, markConversationEnded, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
-    createConversation('to-delete', 'conv-to-delete', '/cwd');
+    createConversation({ name: 'to-delete', tmuxSession: 'conv-to-delete', cwd: '/cwd' });
     markConversationEnded('to-delete');
     const conv = getConversationByName('to-delete');
     expect(conv!.status).toBe('ended');
@@ -98,7 +100,7 @@ describe('conversations route — DB integration', () => {
 
   it('resume on alive session updates last_attached_at', async () => {
     const { createConversation, updateLastAttached, markConversationActive, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
-    createConversation('resume-me', 'conv-resume-me', '/cwd');
+    createConversation({ name: 'resume-me', tmuxSession: 'conv-resume-me', cwd: '/cwd' });
     updateLastAttached('resume-me');
     markConversationActive('resume-me');
     const conv = getConversationByName('resume-me');

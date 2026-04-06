@@ -9,6 +9,8 @@ import { getDatabase } from './index.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export type TitleSource = 'auto' | 'ai' | 'manual';
+
 export interface Conversation {
   id: number;
   name: string;
@@ -23,6 +25,14 @@ export interface Conversation {
   sessionFile: string | null;
   /** Human-readable title, auto-set from first message content. Null until first message sent. */
   title: string | null;
+  /** How the title was set: 'auto' (truncated message), 'ai' (Claude-generated), 'manual' (user renamed). */
+  titleSource: TitleSource | null;
+  /** Original auto-generated title seed — used for canReplaceThreadTitle logic. */
+  titleSeed: string | null;
+  /** Cached total cost in USD, updated when messages are fetched. */
+  totalCost: number;
+  /** ISO timestamp when archived, null = not archived. */
+  archivedAt: string | null;
 }
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
@@ -40,6 +50,10 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     lastAttachedAt: (row['last_attached_at'] as string | null) ?? null,
     sessionFile: (row['session_file'] as string | null) ?? null,
     title: (row['title'] as string | null) ?? null,
+    titleSource: (row['title_source'] as TitleSource | null) ?? null,
+    titleSeed: (row['title_seed'] as string | null) ?? null,
+    totalCost: (row['total_cost'] as number) ?? 0,
+    archivedAt: (row['archived_at'] as string | null) ?? null,
   };
 }
 
@@ -50,8 +64,10 @@ export function listConversations(): Conversation[] {
   const rows = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title
+              created_at, ended_at, last_attached_at, session_file, title,
+              title_source, title_seed, total_cost, archived_at
        FROM conversations
+       WHERE archived_at IS NULL
        ORDER BY created_at DESC`,
     )
     .all() as Record<string, unknown>[];
@@ -63,7 +79,8 @@ export function getConversationByName(name: string): Conversation | null {
   const row = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title
+              created_at, ended_at, last_attached_at, session_file, title,
+              title_source, title_seed, total_cost, archived_at
        FROM conversations
        WHERE name = ?`,
     )
@@ -73,24 +90,39 @@ export function getConversationByName(name: string): Conversation | null {
 
 // ─── Write operations ─────────────────────────────────────────────────────────
 
-export function createConversation(
-  name: string,
-  tmuxSession: string,
-  cwd: string,
-  issueId?: string,
-): Conversation {
+export function createConversation(opts: {
+  name: string;
+  tmuxSession: string;
+  cwd: string;
+  issueId?: string;
+  sessionFile?: string;
+  title?: string;
+  titleSource?: TitleSource;
+  titleSeed?: string;
+}): Conversation {
   const db = getDatabase();
   const now = new Date().toISOString();
   const result = db
     .prepare(
-      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at)
-       VALUES (?, ?, 'active', ?, ?, ?)`,
+      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, session_file, title, title_source, title_seed)
+       VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(name, tmuxSession, cwd, issueId ?? null, now);
+    .run(
+      opts.name,
+      opts.tmuxSession,
+      opts.cwd,
+      opts.issueId ?? null,
+      now,
+      opts.sessionFile ?? null,
+      opts.title ?? null,
+      opts.titleSource ?? null,
+      opts.titleSeed ?? null,
+    );
   const conv = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title
+              created_at, ended_at, last_attached_at, session_file, title,
+              title_source, title_seed, total_cost, archived_at
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -134,10 +166,54 @@ export function updateSessionFile(name: string, sessionFilePath: string): void {
   ).run(sessionFilePath, name);
 }
 
-/** Set the human-readable title for a conversation (auto-set from first message). */
-export function updateConversationTitle(name: string, title: string): void {
+/** Set the human-readable title for a conversation. */
+export function updateConversationTitle(name: string, title: string, titleSource?: TitleSource): void {
+  const db = getDatabase();
+  if (titleSource) {
+    db.prepare(
+      `UPDATE conversations SET title = ?, title_source = ? WHERE name = ?`,
+    ).run(title, titleSource, name);
+  } else {
+    db.prepare(
+      `UPDATE conversations SET title = ? WHERE name = ?`,
+    ).run(title, name);
+  }
+}
+
+/** Archive a conversation — hides from list but preserves all data. */
+export function archiveConversation(name: string): void {
   const db = getDatabase();
   db.prepare(
-    `UPDATE conversations SET title = ? WHERE name = ?`,
-  ).run(title, name);
+    `UPDATE conversations SET archived_at = ? WHERE name = ?`,
+  ).run(new Date().toISOString(), name);
+}
+
+/** Unarchive a conversation — restores to the active list. */
+export function unarchiveConversation(name: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET archived_at = NULL WHERE name = ?`,
+  ).run(name);
+}
+
+/** Update the cached total cost for a conversation. */
+export function updateConversationCost(name: string, totalCost: number): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET total_cost = ? WHERE name = ?`,
+  ).run(totalCost, name);
+}
+
+/**
+ * T3Code-style title replacement eligibility check.
+ * A title can be replaced by AI if:
+ * - It matches the titleSeed (auto-generated from first message), OR
+ * - titleSource is 'auto' (never been manually renamed or AI-updated)
+ * Manual titles are never auto-replaced.
+ */
+export function canReplaceTitle(conv: Conversation): boolean {
+  if (conv.titleSource === 'manual') return false;
+  if (conv.titleSource === 'auto') return true;
+  // If AI already set it, don't replace again
+  return false;
 }

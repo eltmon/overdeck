@@ -265,47 +265,50 @@ describe('discoverSessionFile', () => {
   });
 
   it('returns the path of a newly created JSONL file on first poll', async () => {
-    // Pre-spawn snapshot is empty; 'session-abc123.jsonl' is new
+    // Snapshot has no files; new file appears on first poll
+    const existingFiles = new Set<string>();
     mockReaddir.mockResolvedValue(['session-abc123.jsonl']);
 
     const { discoverSessionFile } = await import('../conversation-service.js');
-    const result = await discoverSessionFile('/home/testuser/Projects/foo', new Set());
+    const result = await discoverSessionFile('/home/testuser/Projects/foo', existingFiles);
 
     expect(result).toContain('session-abc123.jsonl');
     expect(result).toContain('-home-testuser-Projects-foo');
   });
 
   it('ignores files that were in the pre-spawn snapshot', async () => {
-    // Both files exist before spawn — neither is "new"
-    // On second poll, only new-session.jsonl appears
+    // old-session.jsonl existed before spawn — should be ignored
+    const existingFiles = new Set(['old-session.jsonl']);
+    // First poll: only the old file. Second poll: new file appears.
     let callCount = 0;
     mockReaddir.mockImplementation(async () => {
       callCount++;
-      if (callCount === 1) return ['old-session.jsonl'];
+      if (callCount <= 1) return ['old-session.jsonl'];
       return ['old-session.jsonl', 'new-session.jsonl'];
     });
 
     const { discoverSessionFile } = await import('../conversation-service.js');
-    // existingFiles contains old-session.jsonl — it should be skipped
-    const result = await discoverSessionFile('/home/testuser/Projects/foo', new Set(['old-session.jsonl']));
+    const result = await discoverSessionFile('/home/testuser/Projects/foo', existingFiles);
     expect(result).toContain('new-session.jsonl');
   });
 
   it('ignores non-jsonl files and returns a jsonl file when present', async () => {
+    const existingFiles = new Set<string>();
     mockReaddir.mockResolvedValue(['README.md', 'notes.txt', 'session-xyz.jsonl']);
 
     const { discoverSessionFile } = await import('../conversation-service.js');
-    const result = await discoverSessionFile('/home/testuser/Projects/foo', new Set());
+    const result = await discoverSessionFile('/home/testuser/Projects/foo', existingFiles);
 
     expect(result).toContain('session-xyz.jsonl');
     expect(result).not.toContain('README.md');
   });
 
   it('uses the encoded cwd as the project directory name', async () => {
+    const existingFiles = new Set<string>();
     mockReaddir.mockResolvedValue(['session.jsonl']);
 
     const { discoverSessionFile } = await import('../conversation-service.js');
-    const result = await discoverSessionFile('/home/user/my/project', new Set());
+    const result = await discoverSessionFile('/home/user/my/project', existingFiles);
 
     // CWD /home/user/my/project → encoded as -home-user-my-project
     expect(result).toContain('-home-user-my-project');
