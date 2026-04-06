@@ -1433,69 +1433,19 @@ const postAgentsRoute = HttpRouter.add(
         const savedSessionId = getLatestSessionId(agentSessionName);
 
         if (existingAgentState && savedSessionId && (existingAgentState.status === 'stopped' || existingAgentState.status === 'completed')) {
-          // Kill any zombie tmux session before resuming
-          try {
-            await execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' });
-          } catch { /* No existing session — good */ }
-
-          // Remove completed marker so the agent can work again
-          const completedFile = join(homedir(), '.panopticon', 'agents', agentSessionName, 'completed');
-          try { await rm(completedFile, { force: true }); } catch { /* non-fatal */ }
-
-          // Build resume prompt with user message if provided
+          // Build resume prompt and save it for reference
           const agentDir = join(homedir(), '.panopticon', 'agents', agentSessionName);
-          const resumeLauncher = join(agentDir, 'resume-launcher.sh');
           const resumePromptFile = join(agentDir, 'resume-prompt.md');
           const userMessage = (body as any).message || undefined;
           const resumePrompt = buildResumePrompt(workspacePath, issueId, agentDir, userMessage);
           await writeFile(resumePromptFile, resumePrompt);
 
-          // Resume the existing Claude session — keeps full conversation history and session continuity.
-          // Start with --resume (interactive), then send the message via tmux after startup.
-          // Note: -p means "print mode" which exits after one response — NOT what we want for agents.
-          const resumeContent = `#!/bin/bash\nexec claude --resume "${savedSessionId}" --dangerously-skip-permissions\n`;
-          await writeFile(resumeLauncher, resumeContent, { mode: 0o755 });
-
-          // Spawn tmux session with resume command
-          const escapedCwd = workspacePath.replace(/"/g, '\\"');
-          await execAsync(
-            `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "bash ${resumeLauncher}"`,
-            { encoding: 'utf-8' }
-          );
-
-          console.log(`[start-agent] Resumed ${agentSessionName} session ${savedSessionId.slice(0, 8)}...`);
-
-          // Send the resume prompt via tmux after Claude starts up.
-          // Claude may show a "Resume from summary" interactive prompt first —
-          // send Enter to dismiss it (selects default: resume from summary),
-          // then wait for Claude to be ready, then send the actual message.
-          const { sendKeysAsync } = await import('../../../lib/tmux.js');
-          (async () => {
-            // Wait for Claude to start and potentially show the resume prompt
-            await new Promise(r => setTimeout(r, 4000));
-            try {
-              // Dismiss "Resume from summary" prompt if present (Enter selects default)
-              await execAsync(`tmux send-keys -t ${agentSessionName} Enter`, { encoding: 'utf-8' });
-              // Wait for Claude to fully initialize after dismissing
-              await new Promise(r => setTimeout(r, 3000));
-              // Now send the actual resume message
-              await sendKeysAsync(agentSessionName, resumePrompt);
-              console.log(`[start-agent] Sent resume prompt to ${agentSessionName}`);
-            } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : String(err);
-              console.error(`[start-agent] Failed to send resume prompt to ${agentSessionName}: ${msg}`);
-            }
-          })();
-
-          // Update agent state
-          existingAgentState.status = 'running';
-          existingAgentState.lastActivity = new Date().toISOString();
-          saveAgentState(existingAgentState);
-
-          saveAgentRuntimeState(agentSessionName, {
-            state: 'active',
-            resumedAt: new Date().toISOString(),
-          });
+          // Delegate to shared resumeAgent() — handles zombie cleanup, completed marker,
+          // provider auth, tmux session creation, and message delivery
+          const result = await resumeAgent(agentSessionName, resumePrompt);
+          if (!result.success) {
+            return jsonResponse({ error: result.error }, { status: 400 });
+          }
 
           // Transition issue to "In Progress"
           await Effect.runPromise(
@@ -1517,7 +1467,7 @@ const postAgentsRoute = HttpRouter.add(
                 model: existingAgentState.model,
                 status: 'running',
                 startedAt: existingAgentState.startedAt,
-                lastActivity: existingAgentState.lastActivity,
+                lastActivity: new Date().toISOString(),
                 phase: existingAgentState.phase,
               },
             },

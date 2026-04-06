@@ -874,17 +874,24 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
 export async function resumeAgent(agentId: string, message?: string): Promise<{ success: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
 
-  // Check runtime state
+  // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeState(normalizedId);
-  if (!runtimeState || runtimeState.state !== 'suspended') {
+  const agentState = getAgentState(normalizedId);
+  const allowedRuntimeStates = ['suspended', 'idle'];
+  const allowedAgentStatuses = ['stopped', 'completed'];
+
+  const canResume = (runtimeState && allowedRuntimeStates.includes(runtimeState.state))
+    || (agentState && allowedAgentStatuses.includes(agentState.status));
+
+  if (!canResume) {
     return {
       success: false,
-      error: `Cannot resume agent in state: ${runtimeState?.state || 'unknown'}`
+      error: `Cannot resume agent in state: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'}`
     };
   }
 
-  // Get saved session ID
-  const sessionId = getSessionId(normalizedId);
+  // Get saved session ID from any available source
+  const sessionId = getLatestSessionId(normalizedId);
   if (!sessionId) {
     return {
       success: false,
@@ -892,8 +899,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     };
   }
 
-  // Get agent state for workspace info
-  const agentState = getAgentState(normalizedId);
+  // Verify agent state exists (already fetched above for status check)
   if (!agentState) {
     return {
       success: false,
@@ -901,12 +907,17 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     };
   }
 
-  // Check if session already exists (shouldn't happen for suspended agents)
+  // Kill any zombie tmux session (crashed agent left behind)
   if (sessionExists(normalizedId)) {
-    return {
-      success: false,
-      error: 'Agent session already exists'
-    };
+    try {
+      killSession(normalizedId);
+    } catch { /* non-fatal */ }
+  }
+
+  // Remove completed marker so the agent can work again
+  const completedFile = join(getAgentDir(normalizedId), 'completed');
+  if (existsSync(completedFile)) {
+    try { unlinkSync(completedFile); } catch { /* non-fatal */ }
   }
 
   try {
