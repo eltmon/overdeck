@@ -108,10 +108,10 @@ export async function projectAddCommand(
     return;
   }
 
-  // Try to detect Linear team from .panopticon/project.toml or package.json
+  // Try to detect Linear team from .pan/project.toml or package.json
   let linearTeam = options.linearTeam;
   if (!linearTeam) {
-    const projectToml = join(fullPath, '.panopticon', 'project.toml');
+    const projectToml = join(fullPath, '.pan', 'project.toml');
     if (existsSync(projectToml)) {
       const content = readFileSync(projectToml, 'utf-8');
       const match = content.match(/team\s*=\s*"([^"]+)"/);

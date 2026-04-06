@@ -2,7 +2,7 @@
  * Per-project WAL Writer
  *
  * After each cost event is written, appends the event to a per-project
- * JSONL file at <events_repo>/.panopticon/events/ISSUE-ID.jsonl.
+ * JSONL file at <events_repo>/.pan/events/ISSUE-ID.jsonl.
  *
  * These git-tracked files allow multi-developer cost sync via `pan sync-costs`.
  */
@@ -12,7 +12,7 @@ import { join } from 'path';
 import { listProjects } from '../projects.js';
 import type { CostEvent } from './events.js';
 
-const DEFAULT_EVENTS_SUBDIR = '.panopticon/events';
+const DEFAULT_EVENTS_SUBDIR = '.pan/events';
 
 /**
  * Resolve the directory where WAL files for a given issue should be written.

@@ -109,7 +109,7 @@ export interface ProjectConfig {
   events_repo?: string;
   /**
    * Subdirectory within events_repo where cost JSONL files are stored.
-   * Defaults to ".panopticon/events".
+   * Defaults to ".pan/events".
    */
   events_path?: string;
 }
