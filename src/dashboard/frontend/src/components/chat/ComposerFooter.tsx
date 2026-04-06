@@ -15,7 +15,7 @@ import { SendHorizontal } from 'lucide-react';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, loadStoredModel, MODEL_EFFORT_SUPPORT, type ClaudeModelId } from './ModelPicker';
+import { ModelPicker, loadStoredModel, MODEL_EFFORT_SUPPORT } from './ModelPicker';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
@@ -46,7 +46,7 @@ interface ComposerFooterProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ComposerFooter({ conversation }: ComposerFooterProps) {
-  const [model, setModel] = useState<ClaudeModelId>(loadStoredModel);
+  const [model, setModel] = useState<string>(loadStoredModel);
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
@@ -56,7 +56,7 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
   const isEmpty = text.trim() === '';
 
   // Send /model command to tmux when model is changed on an active conversation
-  const handleModelChange = useCallback((newModel: ClaudeModelId) => {
+  const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
     if (conversation.sessionAlive) {
       void sendConversationMessage(conversation.name, `/model ${newModel}`).catch((err: unknown) => {
@@ -118,7 +118,7 @@ export function ComposerFooter({ conversation }: ComposerFooterProps) {
         {/* Toolbar inside the box */}
         <div className={styles.composerToolbar}>
           <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} />
-          <EffortPicker value={effort} onChange={setEffort} disabled={true} availableLevels={MODEL_EFFORT_SUPPORT[model]} />
+          <EffortPicker value={effort} onChange={setEffort} disabled={true} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           <div className={styles.composerToolbarSpacer} />
 
