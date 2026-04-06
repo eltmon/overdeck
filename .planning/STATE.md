@@ -22,3 +22,4 @@ Running quality gates (typecheck, lint, test) for bead pan-460-5gd
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-06T12:34Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
