@@ -189,11 +189,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
   });
 
   const startAgentMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (message?: string) => {
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId, projectId: issue?.project?.id }),
+        body: JSON.stringify({ issueId, projectId: issue?.project?.id, message: message || undefined }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -865,7 +865,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, onClose, onOpe
           onReopen={handleReopen}
           onResetReview={handleResetReview}
           onDismissPending={() => dismissPendingMutation.mutate()}
-          onStartAgent={() => startAgentMutation.mutate()}
+          onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
         />
 
