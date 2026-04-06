@@ -20,6 +20,7 @@ const PROVIDER_INFO: Record<
   google: { displayName: 'Google Vertex AI', icon: 'google', iconColor: '#4285F4', compatibility: 'router' },
   zai: { displayName: 'Z.AI (GLM)', icon: 'api', iconColor: '#94a3b8', compatibility: 'direct' },
   kimi: { displayName: 'Kimi (Moonshot)', icon: 'rocket_launch', iconColor: '#6366f1', compatibility: 'direct' },
+  openrouter: { displayName: 'OpenRouter', icon: 'hub', iconColor: '#6B7F8E', compatibility: 'direct' },
 };
 
 export function ProviderPanel({
@@ -31,7 +32,7 @@ export function ProviderPanel({
   onThinkingLevelChange,
   onTestConnection,
 }: ProviderPanelProps) {
-  const providerList: Provider[] = ['anthropic', 'openai', 'google', 'zai', 'kimi'];
+  const providerList: Provider[] = ['anthropic', 'openai', 'google', 'zai', 'kimi', 'openrouter'];
 
   const getApiKey = (provider: Provider): string | undefined => {
     if (provider === 'anthropic') {

@@ -13,7 +13,7 @@ import { SendHorizontal } from 'lucide-react';
 import { $getRoot } from 'lexical';
 import type { LexicalEditor } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, loadStoredModel, MODEL_EFFORT_SUPPORT, type ClaudeModelId } from './ModelPicker';
+import { ModelPicker, loadStoredModel, MODEL_EFFORT_SUPPORT } from './ModelPicker';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../MissionControl/ConversationList';
 import styles from '../MissionControl/styles/mission-control.module.css';
@@ -23,7 +23,7 @@ import styles from '../MissionControl/styles/mission-control.module.css';
 /** Single endpoint: spawn session + create conversation + send first message. */
 async function spawnAndCreate(
   message: string,
-  model: ClaudeModelId,
+  model: string,
   effort: EffortLevel,
 ): Promise<Conversation> {
   const res = await fetch('/api/conversations', {
@@ -47,7 +47,10 @@ interface DraftConversationPanelProps {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function DraftConversationPanel({ onPromoted }: DraftConversationPanelProps) {
-  const [model, setModel] = useState<ClaudeModelId>(loadStoredModel);
+  const [model, setModel] = useState<string>(loadStoredModel);
+  const [effortLevels, setEffortLevels] = useState<readonly string[]>(
+    () => MODEL_EFFORT_SUPPORT[loadStoredModel() as keyof typeof MODEL_EFFORT_SUPPORT] ?? ['low', 'medium', 'high'],
+  );
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
@@ -57,7 +60,11 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
   const draftKey = useMemo(() => `draft-${Date.now()}`, []);
 
   const isEmpty = text.trim() === '';
-  const availableEfforts = MODEL_EFFORT_SUPPORT[model] ?? [];
+
+  function handleModelChange(newModel: string, levels: readonly string[]) {
+    setModel(newModel);
+    setEffortLevels(levels);
+  }
 
   const handleSubmit = useCallback(async () => {
     const editor = editorRef.current;
@@ -114,8 +121,8 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
                 onChange={setText}
               />
               <div className={styles.composerToolbar}>
-                <ModelPicker value={model} onChange={setModel} disabled={sending} />
-                <EffortPicker value={effort} onChange={setEffort} disabled={sending} availableLevels={availableEfforts} />
+                <ModelPicker value={model} onChange={handleModelChange} disabled={sending} />
+                <EffortPicker value={effort} onChange={setEffort} disabled={sending} availableLevels={effortLevels} />
                 <div className={styles.composerToolbarSpacer} />
                 <button
                   className={styles.sendButton}
