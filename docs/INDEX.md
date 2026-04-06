@@ -68,6 +68,7 @@
 | Document | Description |
 |----------|-------------|
 | [CLAUDE.md](../CLAUDE.md) | Agent instructions (commit rules, messaging API, completion requirements) |
+| [.claude/rules/dashboard-node22-only.md](../.claude/rules/dashboard-node22-only.md) | Why dashboard must run under Node 22 (not Bun): node-pty PTY exits, circular ESM deps |
 
 ---
 
@@ -154,6 +155,7 @@
 - **"build"** / **"tsdown"** / **"rolldown"** / **"vite"** → BUILD.md
 - **"__dirname"** / **"bundled server"** / **"prompt template"** → BUILD.md
 - **"dist"** / **"production build"** → BUILD.md
+- **"node-pty"** / **"bun dashboard"** / **"pan up node"** / **"terminal PTY"** / **"circular ESM"** → `.claude/rules/dashboard-node22-only.md`, CLAUDE.md
 
 ### Testing
 - **"test"** / **"testing"** → TESTING.md, E2E_TEST_PLAN.md, TESTING-PROVIDERS.md
