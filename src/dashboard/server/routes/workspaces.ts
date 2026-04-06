@@ -1910,13 +1910,17 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     const { getTmuxSessionName, checkSpecialistQueue: cSQ, completeSpecialistTask } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
+    const resolvedProject = resolveProjectFromIssue(issueId);
+    const projectKey = resolvedProject?.projectKey;
+
     if (reviewStatus && ['passed', 'blocked', 'failed'].includes(reviewStatus)) {
-      const tmuxSession = getTmuxSessionName('review-agent');
+      const tmuxSession = getTmuxSessionName('review-agent', projectKey);
       saveAgentRuntimeState(tmuxSession, {
         state: 'idle',
+        currentIssue: undefined,
         lastActivity: new Date().toISOString(),
       });
-      console.log(`[review-status] Set review-agent to idle`);
+      console.log(`[review-status] Set review-agent (${tmuxSession}) to idle`);
 
       const queue = cSQ('review-agent');
       for (const item of queue.items) {
@@ -2000,12 +2004,13 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     }
 
     if (testStatus && ['passed', 'failed', 'skipped'].includes(testStatus)) {
-      const tmuxSession = getTmuxSessionName('test-agent');
+      const tmuxSession = getTmuxSessionName('test-agent', projectKey);
       saveAgentRuntimeState(tmuxSession, {
         state: 'idle',
+        currentIssue: undefined,
         lastActivity: new Date().toISOString(),
       });
-      console.log(`[review-status] Set test-agent to idle`);
+      console.log(`[review-status] Set test-agent (${tmuxSession}) to idle`);
 
       const queue = cSQ('test-agent');
       for (const item of queue.items) {
