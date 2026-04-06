@@ -141,11 +141,16 @@ The deployed server reads from `dist/` — changes in `src/` have no effect unti
 
 ### Branch naming
 
+Branches are created automatically by `pan work issue <PAN-XXX>` — you don't name them manually. The branch is always:
+
 ```
-feature/pan-<number>-short-description   # New features
-fix/pan-<number>-short-description       # Bug fixes
-chore/pan-<number>-short-description     # Maintenance, deps, tooling
-docs/pan-<number>-short-description      # Documentation only
+feature/pan-<number>
+```
+
+The prefix comes from `branch_prefix` in `projects.yaml` (defaults to `feature/`). For hotfixes or one-off changes done outside the agent pipeline, follow the same pattern manually:
+
+```bash
+git checkout -b feature/pan-<number>
 ```
 
 ### The flow
