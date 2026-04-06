@@ -18,8 +18,6 @@ const execAsync = promisify(exec);
 export interface CompactBeadsOptions {
   /** Number of days to keep closed beads. Default: 30 */
   days?: number;
-  /** Push commits to remote. Default: true */
-  pushToRemote?: boolean;
 }
 
 /**
@@ -30,7 +28,7 @@ export async function compactBeads(
   ctx: LifecycleContext,
   opts: CompactBeadsOptions = {},
 ): Promise<StepResult> {
-  const { days = 30, pushToRemote = true } = opts;
+  const { days = 30 } = opts;
   const step = 'compact-beads';
 
   // Check if bd CLI is available
@@ -64,25 +62,8 @@ export async function compactBeads(
       encoding: 'utf-8',
     });
 
-    // Stage changes
-    await execAsync('git add .beads/', { cwd: ctx.projectPath, encoding: 'utf-8' });
-
-    // Check if there are changes to commit
-    try {
-      await execAsync('git diff --cached --quiet', { cwd: ctx.projectPath, encoding: 'utf-8' });
-      // No changes after compaction
-      return stepOk(step, [`Compacted ${count} beads (no git changes)`]);
-    } catch {
-      // There are staged changes — commit them
-      await execAsync(
-        `git commit -m "chore: compact beads (remove closed issues > ${days} days)"`,
-        { cwd: ctx.projectPath, encoding: 'utf-8' },
-      );
-      if (pushToRemote) {
-        await execAsync('git push', { cwd: ctx.projectPath, encoding: 'utf-8' });
-      }
-      return stepOk(step, [`Compacted ${count} closed beads and committed`]);
-    }
+    // Beads are ephemeral (derived from vBRIEF) — no git commit needed
+    return stepOk(step, [`Compacted ${count} closed beads`]);
   } catch (err) {
     return stepFailed(step, `Beads compaction failed: ${(err as Error).message}`);
   }

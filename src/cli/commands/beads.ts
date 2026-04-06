@@ -125,23 +125,6 @@ async function compactCommand(options: CompactOptions): Promise<void> {
 
     spinner.succeed(`Compacted ${count} beads older than ${days} days`);
 
-    // Check for uncommitted changes
-    try {
-      await execAsync(`git diff --quiet .beads/`, { cwd, encoding: 'utf-8' });
-      // No changes
-      console.log(chalk.dim('No changes to commit (beads already up to date)'));
-    } catch {
-      // There are changes
-      console.log('');
-      console.log(chalk.bold('Changes detected in .beads/'));
-      console.log(chalk.dim('To commit the compacted beads:'));
-      console.log('');
-      console.log('  git add .beads/');
-      console.log('  git commit -m "chore: compact beads (remove closed issues > ' + days + ' days)"');
-      console.log('  git push');
-      console.log('');
-    }
-
     if (options.json) {
       console.log(JSON.stringify({ success: true, compacted: count, days }, null, 2));
     }
