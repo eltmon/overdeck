@@ -61,6 +61,7 @@ import { PANOPTICON_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
+import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
@@ -215,6 +216,22 @@ export class CloisterService {
       console.log('  ✓ Panopticon database initialized');
     } catch (error) {
       console.error('  ✗ Failed to initialize panopticon database:', error);
+    }
+
+    // PAN-493: Reset orphaned verificationStatus === 'running' states.
+    // If Cloister dies mid-verification, the status is left stuck at 'running' and the
+    // pipeline halts indefinitely. On startup, reset any such states to 'pending' so
+    // verification reruns automatically. Verification is idempotent — this is always safe.
+    try {
+      const statuses = loadReviewStatuses();
+      for (const [issueId, status] of Object.entries(statuses)) {
+        if (status.verificationStatus === 'running') {
+          setReviewStatus(issueId, { verificationStatus: 'pending' });
+          console.log(`  ✓ Reset orphaned verification 'running' → 'pending' for ${issueId}`);
+        }
+      }
+    } catch (error) {
+      console.error('  ✗ Failed to reset orphaned verification states:', error);
     }
 
     // PAN-378: Global specialists removed — per-project ephemeral specialists handle all work.
