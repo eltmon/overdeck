@@ -11,13 +11,23 @@
     "status": "approved",
     "uid": "56a68971-5d64-4078-89fd-ca16d0f21367",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-04-06T20:00:00Z",
-    "updated": "2026-04-06T20:00:00Z",
+    "updated": "2026-04-06T22:43:19.263Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/475", "label": "PAN-475", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/475",
+        "label": "PAN-475",
+        "type": "issue"
+      }
     ],
-    "tags": ["workflow", "merge", "pr", "ci", "review"],
+    "tags": [
+      "workflow",
+      "merge",
+      "pr",
+      "ci",
+      "review"
+    ],
     "narratives": {
       "Problem": "Local workspaces merge via git merge, bypassing PRs. No audit trail, no CI gate, incomplete work reaches main uncaught, and hotfixes get wiped by merge-agent's git restore.",
       "Proposal": "Replace local git merge with gh pr create + gh pr merge --squash for all workspaces. Review agent posts GitHub PR reviews. CI workflow enforces typecheck, lint, and tests on every PR."
@@ -26,7 +36,7 @@
       {
         "id": "ci-workflow",
         "title": "Fix CI workflow to enforce quality gates on PRs",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T20:00:00Z",
         "metadata": {
@@ -40,27 +50,37 @@
           {
             "id": "ci-workflow.ac1",
             "title": "Lint failures cause CI to fail (no || true)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "ci-workflow.ac2",
             "title": "CI runs npm test (Vitest suite), not just CLI smoke test",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "ci-workflow.ac3",
             "title": "CI runs on pull_request events targeting main",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           }
-        ]
+        ],
+        "completed": "2026-04-06T22:43:19.263Z"
       },
       {
         "id": "pr-creation",
         "title": "Create PR with rich description on work completion",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T20:00:00Z",
         "metadata": {
@@ -74,27 +94,37 @@
           {
             "id": "pr-creation.ac1",
             "title": "PR is created for local workspaces (not just remote)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "pr-creation.ac2",
             "title": "PR body includes issue link, beads summary, and AC checklist",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "pr-creation.ac3",
             "title": "PR URL is stored in review status for downstream use",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           }
-        ]
+        ],
+        "completed": "2026-04-06T22:43:19.263Z"
       },
       {
         "id": "review-github",
         "title": "Review agent posts GitHub PR reviews",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T20:00:00Z",
         "metadata": {
@@ -108,27 +138,37 @@
           {
             "id": "review-github.ac1",
             "title": "Review agent calls gh pr review --approve on pass",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "review-github.ac2",
             "title": "Review agent calls gh pr review --request-changes with synthesis body on fail",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "review-github.ac3",
             "title": "Feedback files still written to .planning/feedback/ for agent consumption",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           }
-        ]
+        ],
+        "completed": "2026-04-06T22:43:19.263Z"
       },
       {
         "id": "merge-pr-based",
         "title": "Replace local git merge with rebase + gh pr merge --squash",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T20:00:00Z",
         "metadata": {
@@ -142,39 +182,55 @@
           {
             "id": "merge-pr-based.ac1",
             "title": "triggerMerge() uses gh pr merge --squash for local workspaces",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "merge-pr-based.ac2",
             "title": "Merge agent rebases feature branch on main before merge",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "merge-pr-based.ac3",
             "title": "Merge conflicts are resolved by merge-agent during rebase",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "merge-pr-based.ac4",
             "title": "postMergeLifecycle() still runs after successful PR merge",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "merge-pr-based.ac5",
             "title": "Idempotency guards and mergeStatus state machine preserved",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           }
-        ]
+        ],
+        "completed": "2026-04-06T22:43:19.263Z"
       },
       {
         "id": "correctness-completeness",
         "title": "Extend correctness reviewer to flag incomplete work patterns",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-06T20:00:00Z",
         "metadata": {
@@ -188,21 +244,28 @@
           {
             "id": "correctness-completeness.ac1",
             "title": "Correctness reviewer checks for inconsistent pattern application across related files",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "correctness-completeness.ac2",
             "title": "Correctness reviewer verifies acceptance criteria from vBRIEF plan are addressed",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           }
-        ]
+        ],
+        "completed": "2026-04-06T22:43:19.263Z"
       },
       {
         "id": "docs-update",
         "title": "Update CONTRIBUTING.md and work-agent prompt for PR workflow",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-06T20:00:00Z",
         "metadata": {
@@ -216,30 +279,60 @@
           {
             "id": "docs-update.ac1",
             "title": "CONTRIBUTING.md merge workflow section reflects actual PR-based flow",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "docs-update.ac2",
             "title": "work-agent.md mentions PR creation on completion",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           },
           {
             "id": "docs-update.ac3",
             "title": "merge-agent.md describes rebase + gh pr merge flow",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-06T22:43:19.263Z"
           }
-        ]
+        ],
+        "completed": "2026-04-06T22:43:19.263Z"
       }
     ],
     "edges": [
-      { "from": "ci-workflow", "to": "merge-pr-based", "type": "blocks" },
-      { "from": "pr-creation", "to": "review-github", "type": "blocks" },
-      { "from": "pr-creation", "to": "merge-pr-based", "type": "blocks" },
-      { "from": "review-github", "to": "merge-pr-based", "type": "informs" },
-      { "from": "merge-pr-based", "to": "docs-update", "type": "informs" }
+      {
+        "from": "ci-workflow",
+        "to": "merge-pr-based",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-creation",
+        "to": "review-github",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-creation",
+        "to": "merge-pr-based",
+        "type": "blocks"
+      },
+      {
+        "from": "review-github",
+        "to": "merge-pr-based",
+        "type": "informs"
+      },
+      {
+        "from": "merge-pr-based",
+        "to": "docs-update",
+        "type": "informs"
+      }
     ]
   }
 }

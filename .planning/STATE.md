@@ -3,7 +3,7 @@
 ## Status: Implementation Complete
 
 ## Current Phase
-All beads complete. CI fix applied. Ready for review.
+All work complete. Ready for review.
 
 ## Completed Work
 - [x] feature-pan-489-52e: Replace local git merge with rebase + gh pr merge --squash in triggerMerge() + add spawnRebaseAgentForBranch() to merge-agent.ts (commit: 4746686)
@@ -12,7 +12,7 @@ All beads complete. CI fix applied. Ready for review.
 - [x] feature-pan-489-kn2: Expand ensurePRExists() with rich body, call from review endpoint, store prUrl in review status (commit: c9bed89)
 
 ## Remaining Work
-None
+None — all 6 vBRIEF items completed
 
 ## Key Decisions
 - D1: triggerMerge() for local monorepo now: ensurePRExists → spawnRebaseAgentForBranch → gh pr merge --squash → postMergeLifecycle. No more local git merge.
