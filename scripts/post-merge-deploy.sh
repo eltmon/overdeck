@@ -77,6 +77,8 @@ log "Waiting for server health check (${HEALTH_TIMEOUT}s timeout)..."
 for i in $(seq 1 "$HEALTH_TIMEOUT"); do
   if curl -s --max-time 2 "$HEALTH_URL" > /dev/null 2>&1; then
     log "Health check passed after ${i}s."
+    rm -f "$HOME/.panopticon/pending-post-merge.json" || true
+    log "Cleared pending post-merge marker."
     log "Post-merge deploy complete for issue=$ISSUE_ID."
     exit 0
   fi
