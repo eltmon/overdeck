@@ -140,9 +140,6 @@ function parseModel(raw: Record<string, unknown>): OpenRouterModel | null {
   const supportsThinking = detectThinkingSupport(raw);
   const category = classifyModel(id, name);
 
-  const topProviderRaw = raw['top_provider'] as Record<string, unknown> | undefined;
-  const topProvider = topProviderRaw ? (topProviderRaw['context_length'] as string | undefined) : undefined;
-
   // Extract provider display name from model ID (e.g., "qwen/..." -> "Qwen")
   const providerSlug = id.split('/')[0] ?? '';
   const providerDisplay = providerSlug.charAt(0).toUpperCase() + providerSlug.slice(1);
@@ -209,7 +206,7 @@ export const OpenRouterServiceLive = Layer.effect(
             return err; // This will be caught as error — we handle below
           },
         }).pipe(
-          Effect.catchAll((_err) =>
+          Effect.catch((_err) =>
             Effect.sync(() => cache?.models ?? [])
           )
         ),
@@ -237,7 +234,7 @@ export const OpenRouterServiceLive = Layer.effect(
           },
           catch: (err) => err,
         }).pipe(
-          Effect.catchAll((err) =>
+          Effect.catch((err) =>
             Effect.sync((): ApiKeyValidationResult => ({
               valid: false,
               error: err instanceof Error ? err.message : 'Network error',
@@ -258,7 +255,7 @@ export const OpenRouterServiceLive = Layer.effect(
           },
           catch: (err) => err,
         }).pipe(
-          Effect.catchAll((_err) =>
+          Effect.catch((_err) =>
             Effect.sync(() => cache?.models.find((m) => m.id === modelId) ?? null)
           )
         ),
