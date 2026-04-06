@@ -1162,14 +1162,6 @@ async function migrateCommand(issueId: string, options: MigrateOptions): Promise
     }
 
     // Sync beads before migrating
-    spinner.text = 'Syncing beads...';
-    try {
-      await execAsync('bd sync', { encoding: 'utf-8' });
-      await execAsync('git add .beads/ && git commit -m "Sync beads before migration" && git push', { encoding: 'utf-8' });
-    } catch {
-      // Non-fatal - beads sync might not be needed
-    }
-
     // Create remote workspace
     const branchName = `feature/${normalizedId}`;
     await createRemoteWorkspace(issueId, normalizedId, branchName, spinner, {});
