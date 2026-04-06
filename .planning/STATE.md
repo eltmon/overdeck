@@ -3,11 +3,12 @@
 ## Status: In Progress
 
 ## Current Phase
-Working on bead panopticon-d31 (.panopticon.yaml → .pan.yaml with backwards compat).
+Working on bead panopticon-bjd (archive structure: flat → per-issue subdirectory).
 
 ## Completed Work
 - [x] panopticon-u6e: Copied docs/REPO-ARTIFACTS.md to workspace branch (commit: c6064e0)
-- [x] panopticon-wju: Renamed project-level .panopticon/ paths to .pan/ in wal.ts, sync-wal.ts, convoy-templates.ts, convoy.ts, remote-agents.ts, projects.ts, project.ts (commit: pending)
+- [x] panopticon-wju: Renamed project-level .panopticon/ paths to .pan/ in wal.ts, sync-wal.ts, convoy-templates.ts, convoy.ts, remote-agents.ts, projects.ts, project.ts (commit: e5906a8)
+- [x] panopticon-d31: Updated config-yaml.ts to load .pan.yaml first, fall back to .panopticon.yaml with deprecation warning; updated hasProjectConfig, getProjectConfigPath; updated comments/strings in shadow-mode.ts, config.ts (commit: pending)
 
 ## Remaining Work
 - [ ] panopticon-wju: Rename all project-level .panopticon/ path references to .pan/

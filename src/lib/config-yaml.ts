@@ -3,7 +3,7 @@
  *
  * Loads and merges configuration from:
  * 1. Global config: ~/.panopticon/config.yaml
- * 2. Per-project config: .panopticon.yaml (project root)
+ * 2. Per-project config: .pan.yaml (project root, falls back to .panopticon.yaml with deprecation warning)
  *
  * Uses smart (capability-based) model selection - no legacy presets.
  */
@@ -273,7 +273,7 @@ function findProjectRoot(startDir: string = process.cwd()): string | null {
 }
 
 /**
- * Load per-project config (.panopticon.yaml in project root)
+ * Load per-project config (.pan.yaml in project root, with fallback to .panopticon.yaml)
  */
 function loadProjectConfig(): YamlConfig | null {
   const projectRoot = findProjectRoot();
@@ -281,8 +281,20 @@ function loadProjectConfig(): YamlConfig | null {
     return null;
   }
 
-  const projectConfigPath = join(projectRoot, '.panopticon.yaml');
-  return loadYamlFile(projectConfigPath);
+  const newConfigPath = join(projectRoot, '.pan.yaml');
+  if (existsSync(newConfigPath)) {
+    return loadYamlFile(newConfigPath);
+  }
+
+  const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
+  if (existsSync(legacyConfigPath)) {
+    process.stderr.write(
+      `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
+    );
+    return loadYamlFile(legacyConfigPath);
+  }
+
+  return null;
 }
 
 /**
@@ -619,12 +631,12 @@ export function loadConfig(): ConfigLoadResult {
 }
 
 /**
- * Check if a project-level config exists
+ * Check if a project-level config exists (.pan.yaml or .panopticon.yaml)
  */
 export function hasProjectConfig(): boolean {
   const projectRoot = findProjectRoot();
   if (!projectRoot) return false;
-  return existsSync(join(projectRoot, '.panopticon.yaml'));
+  return existsSync(join(projectRoot, '.pan.yaml')) || existsSync(join(projectRoot, '.panopticon.yaml'));
 }
 
 /**
@@ -642,10 +654,17 @@ export function getGlobalConfigPath(): string {
 }
 
 /**
- * Get path to project config file (null if not in a project)
+ * Get path to project config file (null if not in a project).
+ * Returns .pan.yaml if it exists, falls back to .panopticon.yaml, otherwise returns .pan.yaml as default.
  */
 export function getProjectConfigPath(): string | null {
   const projectRoot = findProjectRoot();
   if (!projectRoot) return null;
-  return join(projectRoot, '.panopticon.yaml');
+  if (existsSync(join(projectRoot, '.pan.yaml'))) {
+    return join(projectRoot, '.pan.yaml');
+  }
+  if (existsSync(join(projectRoot, '.panopticon.yaml'))) {
+    return join(projectRoot, '.panopticon.yaml');
+  }
+  return join(projectRoot, '.pan.yaml');
 }
