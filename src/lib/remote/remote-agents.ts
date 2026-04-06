@@ -116,13 +116,13 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
   if (prompt) {
     // Write prompt to file on VM using base64 to avoid escaping issues
-    const promptFile = `/workspace/.panopticon/prompts/${agentId}.md`;
-    await fly.ssh(vmName, `mkdir -p /workspace/.panopticon/prompts`);
+    const promptFile = `/workspace/.pan/prompts/${agentId}.md`;
+    await fly.ssh(vmName, `mkdir -p /workspace/.pan/prompts`);
     const promptBase64 = Buffer.from(prompt).toString('base64');
     await fly.ssh(vmName, `echo '${promptBase64}' | base64 -d > ${promptFile}`);
 
     // Create launcher script using base64 to avoid shell interpretation
-    const launcherScript = `/workspace/.panopticon/prompts/${agentId}-launcher.sh`;
+    const launcherScript = `/workspace/.pan/prompts/${agentId}-launcher.sh`;
     const launcherContent = `#!/bin/bash
 export PATH="/usr/local/bin:\$PATH"
 prompt=\$(cat "${promptFile}")
