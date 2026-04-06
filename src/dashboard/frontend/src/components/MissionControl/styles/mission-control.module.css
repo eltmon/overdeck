@@ -1115,7 +1115,7 @@
   background: var(--mc-bg-hover);
 }
 
-.conversationItem:hover .conversationDeleteBtn {
+.conversationItem:hover .conversationArchiveBtn {
   opacity: 1;
 }
 
@@ -1136,7 +1136,7 @@
   font-size: var(--mc-font-size-xs);
 }
 
-.conversationDeleteBtn {
+.conversationArchiveBtn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1155,9 +1155,26 @@
   padding: 0;
 }
 
-.conversationDeleteBtn:hover {
+.conversationArchiveBtn:hover {
   background: var(--mc-bg-hover);
-  color: var(--mc-error);
+  color: var(--mc-text-primary);
+}
+
+/* Archive button in orphaned conversation state */
+.conversationArchiveBtnLarge {
+  padding: var(--mc-space-2) var(--mc-space-4);
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-secondary);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  font-size: var(--mc-font-size-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.conversationArchiveBtnLarge:hover {
+  background: var(--mc-bg-selected);
+  color: var(--mc-text-primary);
 }
 
 /* Conversation Terminal Panel */
@@ -1226,6 +1243,13 @@
   justify-content: center;
   gap: var(--mc-space-4);
   color: var(--mc-text-secondary);
+}
+
+.conversationResumeBar {
+  padding: var(--mc-space-3);
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--mc-border);
 }
 
 .conversationResumeBtn {

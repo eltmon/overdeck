@@ -244,7 +244,7 @@ export function MissionControl({ issues = [] }: MissionControlProps) {
             (() => {
               const conv = conversations.find(c => c.name === selectedConversation);
               return conv ? (
-                <ConversationPanel key={conv.name} conversation={conv} />
+                <ConversationPanel key={conv.name} conversation={conv} onArchived={() => { setSelectedConversation(null); queryClient.invalidateQueries({ queryKey: ['conversations'] }); }} />
               ) : (
                 <div className={styles.contentEmpty}>
                   <div style={{ textAlign: 'center' }}>

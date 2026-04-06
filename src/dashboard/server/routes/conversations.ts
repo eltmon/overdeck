@@ -29,6 +29,7 @@ import {
   updateSessionFile,
   updateConversationTitle,
   updateConversationCost,
+  archiveConversation,
   canReplaceTitle,
 } from '../../../lib/database/conversations-db.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
@@ -114,6 +115,7 @@ async function spawnConversationSession(
   model?: string,
   effort?: string,
   issueId?: string,
+  resume = false,
 ): Promise<void> {
   const stateDir = join(homedir(), '.panopticon', 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
@@ -129,7 +131,7 @@ async function spawnConversationSession(
 
   const claudeArgs = [
     '--dangerously-skip-permissions',
-    `--session-id "${claudeSessionId}"`,
+    resume ? `--resume "${claudeSessionId}"` : `--session-id "${claudeSessionId}"`,
     ...(model ? [`--model "${model}"`] : []),
     ...(effort ? [`--effort "${effort}"`] : []),
   ].join(' ');
@@ -373,11 +375,12 @@ const postConversationResumeRoute = HttpRouter.add(
           return jsonResponse({ ...conv, status: 'active', reattached: true });
         }
 
-        // Respawn: create a new tmux session with the same name + new session ID
-        const newSessionId = randomUUID();
-        const newSessionFile = sessionFilePath(conv.cwd, newSessionId);
-        updateSessionFile(name, newSessionFile);
-        spawnConversationSession(conv.tmuxSession, conv.cwd, newSessionId, undefined, undefined, conv.issueId ?? undefined).catch(
+        // Respawn: resume the previous Claude Code session using --resume
+        // Extract the session UUID from the existing session file path
+        const oldSessionId = conv.sessionFile
+          ? conv.sessionFile.split('/').pop()?.replace('.jsonl', '') ?? undefined
+          : undefined;
+        spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), undefined, undefined, conv.issueId ?? undefined, !!oldSessionId).catch(
           (err: unknown) => {
             console.error(`[conversations] Failed to respawn session ${conv.tmuxSession}:`, err);
           },
@@ -506,6 +509,37 @@ const patchConversationRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/archive ───────────────────────────
+
+const postConversationArchiveRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/archive',
+  Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        // Kill tmux session if still alive
+        await execAsync(`tmux kill-session -t ${conv.tmuxSession} 2>/dev/null || true`, { encoding: 'utf-8' });
+
+        // Mark as ended and archived
+        markConversationEnded(name);
+        archiveConversation(name);
+
+        return jsonResponse({ success: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return jsonResponse({ error: 'Failed to archive conversation: ' + msg }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -514,6 +548,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   patchConversationRoute,
   deleteConversationRoute,
   postConversationResumeRoute,
+  postConversationArchiveRoute,
   getConversationMessagesRoute,
   postConversationMessageRoute,
 );

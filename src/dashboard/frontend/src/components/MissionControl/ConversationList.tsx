@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Plus, Circle } from 'lucide-react';
+import { ChevronRight, Plus, Circle, Archive } from 'lucide-react';
 import styles from './styles/mission-control.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,9 +41,9 @@ async function fetchConversations(): Promise<Conversation[]> {
 
 // No spawn API call — draft mode just shows the composer. Session is spawned on first message.
 
-async function deleteConversation(name: string): Promise<void> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error('Failed to delete conversation');
+async function archiveConversation(name: string): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/archive`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to archive conversation');
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -68,8 +68,8 @@ export function ConversationList({ selectedConversation, onSelectConversation, o
 
   // No mutation needed — draft mode is just local state
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteConversation,
+  const archiveMutation = useMutation({
+    mutationFn: archiveConversation,
     onSuccess: (_data, name) => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       if (selectedConversation === name) {
@@ -144,13 +144,13 @@ export function ConversationList({ selectedConversation, onSelectConversation, o
                 <span
                   role="button"
                   tabIndex={0}
-                  className={styles.conversationDeleteBtn}
-                  onClick={e => { e.stopPropagation(); deleteMutation.mutate(conv.name); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); deleteMutation.mutate(conv.name); } }}
-                  title="Stop session"
-                  aria-label={`Stop ${conv.name}`}
+                  className={styles.conversationArchiveBtn}
+                  onClick={e => { e.stopPropagation(); archiveMutation.mutate(conv.name); }}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); archiveMutation.mutate(conv.name); } }}
+                  title="Archive conversation"
+                  aria-label={`Archive ${conv.name}`}
                 >
-                  ×
+                  <Archive size={11} />
                 </span>
               </button>
             ))

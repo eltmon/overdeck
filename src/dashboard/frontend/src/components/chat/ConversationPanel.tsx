@@ -16,6 +16,7 @@ type ViewMode = 'conversation' | 'terminal';
 
 interface ConversationPanelProps {
   conversation: Conversation;
+  onArchived?: () => void;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -30,7 +31,7 @@ async function resumeConversation(name: string): Promise<Conversation> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationPanel({ conversation }: ConversationPanelProps) {
+export function ConversationPanel({ conversation, onArchived }: ConversationPanelProps) {
   // Default to conversation view; persist per-conversation preference wouldn't make sense
   // since new conversations should always start in conversation view
   const [viewMode, setViewMode] = useState<ViewMode>('conversation');
@@ -59,6 +60,16 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
   const handleResume = useCallback(() => {
     resumeMutation.mutate();
   }, [resumeMutation]);
+
+  const handleArchive = useCallback(async () => {
+    try {
+      await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/archive`, { method: 'POST' });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      onArchived?.();
+    } catch (err) {
+      console.error('[ConversationPanel] Archive failed:', err);
+    }
+  }, [conversation.name, queryClient, onArchived]);
 
   const handleViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode);
@@ -113,42 +124,25 @@ export function ConversationPanel({ conversation }: ConversationPanelProps) {
         )}
       </div>
 
-      {/* Body — both views stay mounted to avoid re-connect delay on toggle */}
+      {/* Body */}
       <div className={styles.conversationTerminalBody}>
-        {!showTerminal ? (
-          // Session ended — show resume overlay
-          <div className={styles.conversationResumeOverlay}>
-            <p>Session ended</p>
-            <button
-              className={styles.conversationResumeBtn}
-              onClick={handleResume}
-              disabled={resumeMutation.isPending}
-            >
-              {resumeMutation.isPending ? 'Resuming…' : 'Resume Session'}
-            </button>
-            {resumeMutation.isError && (
-              <p style={{ color: 'var(--mc-error)', fontSize: 12 }}>
-                {(resumeMutation.error as Error).message}
-              </p>
-            )}
+        {/* Terminal: lazy-mount on first switch, only when session is alive */}
+        {showTerminal && terminalEverOpened && (
+          <div style={viewMode === 'terminal'
+            ? { display: 'contents' }
+            : { position: 'absolute', visibility: 'hidden', width: '100%', height: '100%', overflow: 'hidden' }
+          }>
+            <XTerminal sessionName={conversation.tmuxSession} />
           </div>
-        ) : (
-          <>
-            {/* Terminal: lazy-mount on first switch, then keep alive but offscreen when hidden.
-                Uses visibility+position instead of display:none so xterm.js gets real dimensions. */}
-            {terminalEverOpened && (
-              <div style={viewMode === 'terminal'
-                ? { display: 'contents' }
-                : { position: 'absolute', visibility: 'hidden', width: '100%', height: '100%', overflow: 'hidden' }
-              }>
-                <XTerminal sessionName={conversation.tmuxSession} />
-              </div>
-            )}
-            {/* Conversation view */}
-            {viewMode === 'conversation' && (
-              <ConversationView conversation={conversation} />
-            )}
-          </>
+        )}
+        {/* Conversation view — always shown (even for ended sessions to read history) */}
+        {(viewMode === 'conversation' || !showTerminal) && (
+          <ConversationView
+            conversation={conversation}
+            onResume={!showTerminal ? handleResume : undefined}
+            onArchive={handleArchive}
+            resumePending={resumeMutation.isPending}
+          />
         )}
       </div>
     </div>
@@ -173,9 +167,12 @@ async function fetchMessages(name: string): Promise<MessagesResponse> {
 
 interface ConversationViewProps {
   conversation: Conversation;
+  onResume?: () => void;
+  onArchive?: () => void;
+  resumePending?: boolean;
 }
 
-function ConversationView({ conversation }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending }: ConversationViewProps) {
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
     queryFn: () => fetchMessages(conversation.name),
@@ -187,7 +184,8 @@ function ConversationView({ conversation }: ConversationViewProps) {
   const messages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
   const streaming = data?.streaming ?? false;
-  const isFirstMessage = !isLoading && messages.length === 0;
+  const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
+  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive;
 
   // "Working" = session is alive AND either:
   // - server reports streaming (incomplete assistant message with recent file activity)
@@ -206,6 +204,22 @@ function ConversationView({ conversation }: ConversationViewProps) {
         <div className={styles.conversationConnecting}>
           <span>Loading…</span>
         </div>
+      ) : isOrphaned ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            This conversation has no saved history. The session may have ended before any messages were exchanged.
+          </p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            {onResume && (
+              <button className={styles.conversationResumeBtn} onClick={onResume} disabled={resumePending}>
+                {resumePending ? 'Resuming…' : 'Resume Session'}
+              </button>
+            )}
+            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
+              Archive
+            </button>
+          </div>
+        </div>
       ) : isFirstMessage ? (
         <div className={styles.conversationEmptyState}>
           <p className={styles.conversationEmptyStateTitle}>How can I help you?</p>
@@ -220,7 +234,19 @@ function ConversationView({ conversation }: ConversationViewProps) {
           streaming={isWorking}
         />
       )}
-      <ComposerFooter conversation={conversation} />
+      {onResume ? (
+        <div className={styles.conversationResumeBar}>
+          <button
+            className={styles.conversationResumeBtn}
+            onClick={onResume}
+            disabled={resumePending}
+          >
+            {resumePending ? 'Resuming…' : 'Resume Session'}
+          </button>
+        </div>
+      ) : (
+        <ComposerFooter conversation={conversation} />
+      )}
     </div>
   );
 }
