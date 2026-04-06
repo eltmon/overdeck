@@ -6,7 +6,7 @@
 All work done. Awaiting inspection.
 
 ## Completed Work
-- [x] pan-460-vew: Implement shared PTY hub (PtyHub interface) with WebSocket multiplexing in ws-terminal.ts (commit: TBD)
+- [x] pan-460-vew: Implement shared PTY hub (PtyHub interface) with WebSocket multiplexing in ws-terminal.ts (commit: aa16cde)
 
 ## Remaining Work
 (none)
