@@ -8,12 +8,12 @@
   "plan": {
     "id": "pan-478",
     "title": "Complete httpHandler adoption for remaining 4 route files + ensureLabel fix",
-    "status": "approved",
+    "status": "completed",
     "uid": "d3a7e1f4-8b2c-4f9a-a6d1-3e5c7f2b9d84",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 7,
     "created": "2026-04-05T12:00:00Z",
-    "updated": "2026-04-05T12:00:00Z",
+    "updated": "2026-04-06T02:00:00Z",
     "references": [
       { "uri": "https://github.com/eltmon/panopticon-cli/issues/478", "label": "PAN-478", "type": "issue" }
     ],
@@ -26,9 +26,10 @@
       {
         "id": "agents-routes",
         "title": "Migrate agents.ts to httpHandler",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-05T12:00:00Z",
+        "completed": "2026-04-06T01:50:00Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-478"
@@ -38,19 +39,22 @@
           {
             "id": "agents-routes.ac1",
             "title": "All 20 routes wrapped with httpHandler",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:50:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "agents-routes.ac2",
             "title": "Zero try/catch blocks remain in agents.ts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:50:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "agents-routes.ac3",
             "title": "Generic catches converted to typed errors where intent is clear",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:50:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -58,9 +62,10 @@
       {
         "id": "issues-routes",
         "title": "Migrate issues.ts to httpHandler",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-05T12:00:00Z",
+        "completed": "2026-04-06T01:52:00Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-478"
@@ -70,13 +75,15 @@
           {
             "id": "issues-routes.ac1",
             "title": "All 17 routes wrapped with httpHandler",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:52:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "issues-routes.ac2",
             "title": "Zero try/catch blocks remain in issues.ts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:52:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -84,9 +91,10 @@
       {
         "id": "specialists-routes",
         "title": "Migrate specialists.ts to httpHandler",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-05T12:00:00Z",
+        "completed": "2026-04-06T01:56:00Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-478"
@@ -96,13 +104,15 @@
           {
             "id": "specialists-routes.ac1",
             "title": "All 33 routes wrapped with httpHandler",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:56:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "specialists-routes.ac2",
             "title": "Zero try/catch blocks remain in specialists.ts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:56:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -110,9 +120,10 @@
       {
         "id": "workspaces-routes",
         "title": "Migrate workspaces.ts to httpHandler",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-05T12:00:00Z",
+        "completed": "2026-04-06T01:58:00Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-478"
@@ -122,13 +133,15 @@
           {
             "id": "workspaces-routes.ac1",
             "title": "All 19 routes wrapped with httpHandler",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:58:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "workspaces-routes.ac2",
             "title": "Zero try/catch blocks remain in workspaces.ts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:58:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -136,9 +149,10 @@
       {
         "id": "ensure-label-fix",
         "title": "Fix ensureLabel to use ghFetch instead of raw fetch",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-05T12:00:00Z",
+        "completed": "2026-04-06T01:48:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-478"
@@ -148,13 +162,15 @@
           {
             "id": "ensure-label-fix.ac1",
             "title": "ensureLabel uses ghFetch() instead of raw fetch()",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:48:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "ensure-label-fix.ac2",
             "title": "Rate limiting and error handling preserved",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T01:48:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -162,9 +178,10 @@
       {
         "id": "quality-gates",
         "title": "Pass typecheck, lint, and tests",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-05T12:00:00Z",
+        "completed": "2026-04-06T02:00:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-478"
@@ -174,19 +191,22 @@
           {
             "id": "quality-gates.ac1",
             "title": "npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T02:00:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "quality-gates.ac2",
             "title": "npm run lint passes",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T02:00:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "quality-gates.ac3",
             "title": "npm test passes",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T02:00:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]

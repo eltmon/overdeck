@@ -62,3 +62,5 @@ Quality gates (typecheck, lint, tests)
 
 ## Specialist Feedback
 (none yet)
+- **[2026-04-06T01:46Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-06T01:54Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
