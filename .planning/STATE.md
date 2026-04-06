@@ -1,9 +1,9 @@
 # PAN-475: Enforce PR-based workflow — require reviews before merge
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Current Phase
-Implementing CI fix (remove || true from lint, add npm test step)
+All beads complete. CI fix applied. Ready for review.
 
 ## Completed Work
 - [x] feature-pan-489-52e: Replace local git merge with rebase + gh pr merge --squash in triggerMerge() + add spawnRebaseAgentForBranch() to merge-agent.ts (commit: 4746686)
@@ -12,7 +12,7 @@ Implementing CI fix (remove || true from lint, add npm test step)
 - [x] feature-pan-489-kn2: Expand ensurePRExists() with rich body, call from review endpoint, store prUrl in review status (commit: c9bed89)
 
 ## Remaining Work
-- [ ] CI: fix lint || true, add npm test step (bonus in-scope work from PRD)
+None
 
 ## Key Decisions
 - D1: triggerMerge() for local monorepo now: ensurePRExists → spawnRebaseAgentForBranch → gh pr merge --squash → postMergeLifecycle. No more local git merge.
