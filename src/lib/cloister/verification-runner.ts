@@ -22,7 +22,7 @@ import type { TemplatePlaceholders } from '../workspace-config.js';
 
 const execAsync = promisify(exec);
 
-export const VERIFICATION_MAX_CYCLES = 3;
+export const VERIFICATION_MAX_CYCLES = 10;
 
 export type VerificationRunnerOutcome =
   | { outcome: 'passed' }
