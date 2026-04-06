@@ -1,4 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
+import { httpHandler } from './http-handler.js';
 /**
  * Issues route module — Effect HttpRouter.Layer (PAN-428 B6)
  *
@@ -130,7 +131,7 @@ const readJsonBody = Effect.gen(function* () {
 const getIssuesRoute = HttpRouter.add(
   'GET',
   '/api/issues',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const urlOpt = HttpServerRequest.toURL(request);
     if (Option.isNone(urlOpt)) {
@@ -143,7 +144,7 @@ const getIssuesRoute = HttpRouter.add(
     const issueDataService = getIssueDataService();
     const issues = issueDataService.getIssues({ cycle, includeCompleted });
     return jsonResponse(issues);
-  }),
+  })),
 );
 
 // ─── Route: GET /api/issues/:id/analyze ──────────────────────────────────────
@@ -151,91 +152,83 @@ const getIssuesRoute = HttpRouter.add(
 const getIssueAnalyzeRoute = HttpRouter.add(
   'GET',
   '/api/issues/:id/analyze',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const linear = yield* LinearClient;
 
-    return yield* Effect.promise(async () => {
-        try {
-        const issue = await Effect.runPromise(
-          linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
-        );
+    const issue = yield* Effect.promise(() =>
+      Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))),
+    );
 
-        if (!issue) {
-          return jsonResponse({ error: 'Issue not found' }, { status: 404 });
-        }
+    if (!issue) {
+      return jsonResponse({ error: 'Issue not found' }, { status: 404 });
+    }
 
-        const desc = (issue.description || '').toLowerCase();
-        const title = issue.title.toLowerCase();
-        const combined = `${title} ${desc}`;
+    const desc = (issue.description || '').toLowerCase();
+    const title = issue.title.toLowerCase();
+    const combined = `${title} ${desc}`;
 
-        const reasons: string[] = [];
-        const subsystems: string[] = [];
-        let estimatedTasks = 1;
+    const reasons: string[] = [];
+    const subsystems: string[] = [];
+    let estimatedTasks = 1;
 
-        if (combined.includes('frontend') || combined.includes('ui') || combined.includes('component')) subsystems.push('frontend');
-        if (combined.includes('backend') || combined.includes('api') || combined.includes('endpoint')) subsystems.push('backend');
-        if (combined.includes('database') || combined.includes('migration') || combined.includes('schema')) subsystems.push('database');
-        if (combined.includes('test') || combined.includes('e2e') || combined.includes('playwright')) subsystems.push('tests');
+    if (combined.includes('frontend') || combined.includes('ui') || combined.includes('component')) subsystems.push('frontend');
+    if (combined.includes('backend') || combined.includes('api') || combined.includes('endpoint')) subsystems.push('backend');
+    if (combined.includes('database') || combined.includes('migration') || combined.includes('schema')) subsystems.push('database');
+    if (combined.includes('test') || combined.includes('e2e') || combined.includes('playwright')) subsystems.push('tests');
 
-        if (subsystems.length > 1) {
-          reasons.push(`Multiple subsystems involved: ${subsystems.join(', ')}`);
-          estimatedTasks += subsystems.length;
-        }
+    if (subsystems.length > 1) {
+      reasons.push(`Multiple subsystems involved: ${subsystems.join(', ')}`);
+      estimatedTasks += subsystems.length;
+    }
 
-        const ambiguousPatterns = ['should we', 'maybe', 'or', 'consider', 'option', 'approach', 'tbd', 'unclear'];
-        for (const pattern of ambiguousPatterns) {
-          if (combined.includes(pattern)) { reasons.push('Requirements may be ambiguous'); break; }
-        }
+    const ambiguousPatterns = ['should we', 'maybe', 'or', 'consider', 'option', 'approach', 'tbd', 'unclear'];
+    for (const pattern of ambiguousPatterns) {
+      if (combined.includes(pattern)) { reasons.push('Requirements may be ambiguous'); break; }
+    }
 
-        const architecturePatterns = ['refactor', 'architecture', 'redesign', 'migrate', 'integration', 'authentication'];
-        for (const pattern of architecturePatterns) {
-          if (combined.includes(pattern)) {
-            reasons.push(`Architecture decision needed: ${pattern}`);
-            estimatedTasks += 2;
-            break;
-          }
-        }
+    const architecturePatterns = ['refactor', 'architecture', 'redesign', 'migrate', 'integration', 'authentication'];
+    for (const pattern of architecturePatterns) {
+      if (combined.includes(pattern)) {
+        reasons.push(`Architecture decision needed: ${pattern}`);
+        estimatedTasks += 2;
+        break;
+      }
+    }
 
-        if (desc.length > 500) { reasons.push('Detailed description suggests complexity'); estimatedTasks += 1; }
+    if (desc.length > 500) { reasons.push('Detailed description suggests complexity'); estimatedTasks += 1; }
 
-        const labels = issue.labels.map((l) => l.name);
-        const complexLabels = ['complex', 'large', 'epic', 'multi-phase', 'architecture'];
-        for (const label of labels) {
-          if (complexLabels.some((cl: string) => label.toLowerCase().includes(cl))) {
-            reasons.push(`Label indicates complexity: ${label}`);
-            estimatedTasks += 2;
-          }
-        }
+    const labels = issue.labels.map((l) => l.name);
+    const complexLabels = ['complex', 'large', 'epic', 'multi-phase', 'architecture'];
+    for (const label of labels) {
+      if (complexLabels.some((cl: string) => label.toLowerCase().includes(cl))) {
+        reasons.push(`Label indicates complexity: ${label}`);
+        estimatedTasks += 2;
+      }
+    }
 
-        const isComplex = reasons.length >= 2 || subsystems.length > 1 || estimatedTasks >= 4;
+    const isComplex = reasons.length >= 2 || subsystems.length > 1 || estimatedTasks >= 4;
 
-        return jsonResponse({
-          issue: {
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            description: issue.description,
-            status: issue.state.name,
-            priority: issue.priority,
-            url: issue.url,
-            labels,
-          },
-          complexity: {
-            isComplex,
-            reasons,
-            subsystems,
-            estimatedTasks: Math.max(estimatedTasks, subsystems.length + 1),
-          },
-        });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error analyzing issue:', error);
-          return jsonResponse({ error: 'Failed to analyze issue: ' + msg }, { status: 500 });
-        }
-      })
-  }),
+    return jsonResponse({
+      issue: {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description,
+        status: issue.state.name,
+        priority: issue.priority,
+        url: issue.url,
+        labels,
+      },
+      complexity: {
+        isComplex,
+        reasons,
+        subsystems,
+        estimatedTasks: Math.max(estimatedTasks, subsystems.length + 1),
+      },
+    });
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/plan ────────────────────────────────────────
@@ -243,77 +236,70 @@ const getIssueAnalyzeRoute = HttpRouter.add(
 const postIssuePlanRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/plan',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
     const linear = yield* LinearClient;
 
-    return yield* Effect.promise(async () => {
-        try {
-        const { answers, tasks } = body as any;
+    const { answers, tasks } = body as any;
 
-        if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
-          return jsonResponse({ error: 'Tasks are required' }, { status: 400 });
-        }
+    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+      return jsonResponse({ error: 'Tasks are required' }, { status: 400 });
+    }
 
-        const issue = await Effect.runPromise(
-          linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null))),
-        );
+    const issue = yield* Effect.promise(() =>
+      Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))),
+    );
 
-        if (!issue) {
-          return jsonResponse({ error: 'Issue not found' }, { status: 404 });
-        }
+    if (!issue) {
+      return jsonResponse({ error: 'Issue not found' }, { status: 404 });
+    }
 
-        const issuePrefix = issue.identifier.split('-')[0];
-        const projectPath = getProjectPath(undefined, issuePrefix);
+    const issuePrefix = issue.identifier.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
 
-        const { findPRDFiles, analyzeComplexity, executePlan } = await import('../../../lib/planning/plan-utils.js');
+    const { findPRDFiles, analyzeComplexity, executePlan } = yield* Effect.promise(() =>
+      import('../../../lib/planning/plan-utils.js'),
+    );
 
-        const prdFiles = await findPRDFiles(issue.identifier, projectPath);
+    const prdFiles = yield* Effect.promise(() => findPRDFiles(issue.identifier, projectPath));
 
-        const planIssue = {
-          id: issue.id,
-          identifier: issue.identifier,
-          title: issue.title,
-          description: issue.description || undefined,
-          url: issue.url,
-        };
+    const planIssue = {
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      description: issue.description || undefined,
+      url: issue.url,
+    };
 
-        const complexity = analyzeComplexity(planIssue, prdFiles);
+    const complexity = analyzeComplexity(planIssue, prdFiles);
 
-        const decisions: Array<{ question: string; answer: string }> = [];
-        if (answers) {
-          if (answers.scope) decisions.push({ question: 'Scope', answer: answers.scope });
-          if (answers.approach) decisions.push({ question: 'Technical approach', answer: answers.approach });
-          if (answers.edgeCases) decisions.push({ question: 'Edge cases', answer: answers.edgeCases });
-          if (answers.testing?.length > 0) decisions.push({ question: 'Testing', answer: answers.testing.join(', ') });
-          if (answers.outOfScope) decisions.push({ question: 'Out of scope', answer: answers.outOfScope });
-        }
+    const decisions: Array<{ question: string; answer: string }> = [];
+    if (answers) {
+      if (answers.scope) decisions.push({ question: 'Scope', answer: answers.scope });
+      if (answers.approach) decisions.push({ question: 'Technical approach', answer: answers.approach });
+      if (answers.edgeCases) decisions.push({ question: 'Edge cases', answer: answers.edgeCases });
+      if (answers.testing?.length > 0) decisions.push({ question: 'Testing', answer: answers.testing.join(', ') });
+      if (answers.outOfScope) decisions.push({ question: 'Out of scope', answer: answers.outOfScope });
+    }
 
-        const result = await executePlan(planIssue, tasks, decisions, projectPath, {
-          commitAndPush: true,
-          prdFiles,
-        });
+    const result = yield* Effect.promise(() =>
+      executePlan(planIssue, tasks, decisions, projectPath, { commitAndPush: true, prdFiles }),
+    );
 
-        return jsonResponse({
-          success: true,
-          complexity,
-          existingPRDs: prdFiles.length > 0 ? prdFiles.map((f: string) => f.replace(projectPath, '.')) : undefined,
-          tasks,
-          files: {
-            state: result.files.state.replace(projectPath, '.'),
-            prd: result.files.prd ? result.files.prd.replace(projectPath, '.') : undefined,
-          },
-          prdCommitted: result.prdCommitted,
-        });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error creating plan:', error);
-          return jsonResponse({ error: 'Failed to create plan: ' + msg }, { status: 500 });
-        }
-      })
-  }),
+    return jsonResponse({
+      success: true,
+      complexity,
+      existingPRDs: prdFiles.length > 0 ? prdFiles.map((f: string) => f.replace(projectPath, '.')) : undefined,
+      tasks,
+      files: {
+        state: result.files.state.replace(projectPath, '.'),
+        prd: result.files.prd ? result.files.prd.replace(projectPath, '.') : undefined,
+      },
+      prdCommitted: result.prdCommitted,
+    });
+  })),
 );
 
 // ─── Route: GET /api/issues/:id/handoffs ─────────────────────────────────────
@@ -321,22 +307,12 @@ const postIssuePlanRoute = HttpRouter.add(
 const getIssueHandoffsRoute = HttpRouter.add(
   'GET',
   '/api/issues/:id/handoffs',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['id'] ?? '';
-
-    return yield* Effect.try({
-      try: () => {
-        const handoffs = readIssueHandoffEvents(issueId);
-        return jsonResponse({ handoffs });
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting issue handoffs:', error);
-        return jsonResponse({ error: 'Failed to get issue handoffs: ' + msg }, { status: 500 });
-      },
-    });
-  }),
+    const handoffs = readIssueHandoffEvents(issueId);
+    return jsonResponse({ handoffs });
+  })),
 );
 
 // ─── Route: POST /api/issues/:issueId/close ──────────────────────────────────
@@ -344,81 +320,73 @@ const getIssueHandoffsRoute = HttpRouter.add(
 const postIssueCloseRoute = HttpRouter.add(
   'POST',
   '/api/issues/:issueId/close',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.promise(async () => {
-        try {
-        const { reason } = body as any;
-        const issuePrefix = issueId.split('-')[0];
-        const projectPath = getProjectPath(undefined, issuePrefix);
+    const { reason } = body as any;
+    const issuePrefix = issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
 
-        const { close: closeWorkflow } = await import('../../../lib/lifecycle/index.js');
-        const githubCheck = isGitHubIssue(issueId);
+    const { close: closeWorkflow } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
+    const githubCheck = isGitHubIssue(issueId);
 
-        const issueDataService = getIssueDataService();
-        const issueSource = issueDataService.getIssueSource(issueId);
+    const issueDataService = getIssueDataService();
+    const issueSource = issueDataService.getIssueSource(issueId);
 
-        const ctx: any = {
-          issueId,
-          projectPath,
-          ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
-            ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
-            : {}),
+    const ctx: any = {
+      issueId,
+      projectPath,
+      ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+        ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+        : {}),
+    };
+
+    if (issueSource === 'rally') {
+      const rallyConfig = getRallyConfig();
+      if (rallyConfig) {
+        ctx.rally = {
+          apiKey: rallyConfig.apiKey,
+          server: rallyConfig.server,
+          workspace: rallyConfig.workspace,
+          project: rallyConfig.project,
         };
+      }
+    }
 
-        if (issueSource === 'rally') {
-          const rallyConfig = getRallyConfig();
-          if (rallyConfig) {
-            ctx.rally = {
-              apiKey: rallyConfig.apiKey,
-              server: rallyConfig.server,
-              workspace: rallyConfig.workspace,
-              project: rallyConfig.project,
-            };
-          }
-        }
+    const result = yield* Effect.promise(() => closeWorkflow(ctx, { reason }));
 
-        const result = await closeWorkflow(ctx, { reason });
+    if (githubCheck.isGitHub) {
+      execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 }).catch(() => {});
+    }
 
-        if (githubCheck.isGitHub) {
-          execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 }).catch(() => {});
-        }
+    // Invalidate tracker caches (fire and forget)
+    if (githubCheck.isGitHub) {
+      issueDataService.invalidateTracker('github').catch(() => {});
+    } else if (issueSource === 'rally') {
+      issueDataService.invalidateTracker('rally').catch(() => {});
+    } else {
+      issueDataService.invalidateTracker('linear').catch(() => {});
+    }
 
-        // Invalidate tracker caches (fire and forget)
-        if (githubCheck.isGitHub) {
-          issueDataService.invalidateTracker('github').catch(() => {});
-        } else if (issueSource === 'rally') {
-          issueDataService.invalidateTracker('rally').catch(() => {});
-        } else {
-          issueDataService.invalidateTracker('linear').catch(() => {});
-        }
+    if (result.success) {
+      yield* eventStore.append({
+        type: 'issues.updated',
+        timestamp: new Date().toISOString(),
+        payload: { issueId },
+      });
+    }
 
-        if (result.success) {
-          await Effect.runPromise(eventStore.append({
-            type: 'issues.updated',
-            timestamp: new Date().toISOString(),
-            payload: { issueId },
-          }));
-        }
-
-        return jsonResponse({
-          success: result.success,
-          message: result.success
-            ? `Closed ${issueId}${reason ? ': ' + reason : ''}`
-            : `Close failed for ${issueId}`,
-          steps: result.steps,
-        });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error closing issue:', error);
-          return jsonResponse({ error: 'Failed to close: ' + msg }, { status: 500 });
-        }
-      })
-  }),
+    return jsonResponse({
+      success: result.success,
+      message: result.success
+        ? `Closed ${issueId}${reason ? ': ' + reason : ''}`
+        : `Close failed for ${issueId}`,
+      steps: result.steps,
+    });
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/start-planning ──────────────────────────────
@@ -426,7 +394,7 @@ const postIssueCloseRoute = HttpRouter.add(
 const postIssueStartPlanningRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/start-planning',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
@@ -437,7 +405,6 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
 
     return yield* Effect.promise(async () => {
-        try {
         const {
           skipWorkspace = false,
           startDocker = false,
@@ -662,13 +629,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             Connection: 'keep-alive',
           },
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('[start-planning] Error:', error);
-          return jsonResponse({ error: 'Failed to start planning: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/abort-planning ──────────────────────────────
@@ -676,7 +638,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 const postIssueAbortPlanningRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/abort-planning',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
@@ -685,7 +647,6 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
-        try {
         const { deleteWorkspace } = body as any;
         const githubCheck = isGitHubIssue(id);
 
@@ -791,13 +752,8 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
           workspacePreserved: !deleteWorkspace && !workspaceDeleted,
           workspaceError,
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error aborting planning:', error);
-          return jsonResponse({ error: 'Failed to abort planning: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/complete-planning ───────────────────────────
@@ -805,7 +761,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
 const postIssueCompletePlanningRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/complete-planning',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
@@ -814,7 +770,6 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
 
     return yield* Effect.promise(async () => {
-        try {
         const skipKill = (body as any)?.skipKill === true;
         const sessionName = `planning-${id.toLowerCase()}`;
         const issueLower = id.toLowerCase();
@@ -1050,13 +1005,8 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
             ? 'Planning complete and pushed to git - ready for execution'
             : 'Planning complete - ready for execution',
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error completing planning:', error);
-          return jsonResponse({ error: 'Failed to complete planning: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/reset ───────────────────────────────────────
@@ -1064,7 +1014,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 const postIssueResetRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/reset',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const cleanupLog: string[] = [];
@@ -1072,7 +1022,6 @@ const postIssueResetRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
-        try {
         const issueLower = id.toLowerCase();
 
         // Kill local tmux sessions
@@ -1180,13 +1129,8 @@ const postIssueResetRoute = HttpRouter.add(
         try { issueDataService.patchIssue(id, { status: 'Todo', canonicalStatus: 'todo' }); } catch { /* non-fatal */ }
 
         return jsonResponse({ success: true, cleanupLog });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Reset failed:', error);
-          return jsonResponse({ success: false, error: msg, cleanupLog }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/cancel ──────────────────────────────────────
@@ -1194,7 +1138,7 @@ const postIssueResetRoute = HttpRouter.add(
 const postIssueCancelRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/cancel',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
@@ -1203,7 +1147,6 @@ const postIssueCancelRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
-        try {
         const { wipeWorkspace = false } = body as any;
         const issueLower = id.toLowerCase();
 
@@ -1302,13 +1245,8 @@ const postIssueCancelRoute = HttpRouter.add(
         try { issueDataService.patchIssue(id, { status: 'Canceled', canonicalStatus: 'done' }); } catch { /* non-fatal */ }
 
         return jsonResponse({ success: true, cleanupLog });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('[cancel] Failed:', error);
-          return jsonResponse({ success: false, error: msg, cleanupLog }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/reopen ──────────────────────────────────────
@@ -1316,7 +1254,7 @@ const postIssueCancelRoute = HttpRouter.add(
 const postIssueReopenRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/reopen',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
@@ -1325,7 +1263,6 @@ const postIssueReopenRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
-        try {
         const { reason: _reason } = body as any || {};
         const githubCheck = isGitHubIssue(id);
 
@@ -1444,13 +1381,8 @@ const postIssueReopenRoute = HttpRouter.add(
           agentRunning: false,
           nextStep: `Start an agent: pan work issue ${id}`,
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error reopening issue:', error);
-          return jsonResponse({ error: 'Failed to reopen issue: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/move-status ─────────────────────────────────
@@ -1458,7 +1390,7 @@ const postIssueReopenRoute = HttpRouter.add(
 const postIssueMoveStatusRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/move-status',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
@@ -1466,7 +1398,6 @@ const postIssueMoveStatusRoute = HttpRouter.add(
     const lifecycle = yield* IssueLifecycle;
 
     return yield* Effect.promise(async () => {
-        try {
         const { targetStatus, syncToTracker = false } = body as any || {};
 
         const validStatuses = ['backlog', 'todo', 'in_progress', 'in_review', 'done'];
@@ -1539,13 +1470,8 @@ const postIssueMoveStatusRoute = HttpRouter.add(
           syncToTracker,
           shadowState: shadowResult,
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error moving issue status:', error);
-          return jsonResponse({ error: 'Failed to move issue status: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/cleanup-workspace ───────────────────────────
@@ -1553,13 +1479,12 @@ const postIssueMoveStatusRoute = HttpRouter.add(
 const postIssueCleanupWorkspaceRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/cleanup-workspace',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const cleanupLog: string[] = [];
 
     return yield* Effect.promise(async () => {
-        try {
         const issueLower = id.toLowerCase();
         const githubCheck = isGitHubIssue(id);
 
@@ -1611,13 +1536,8 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
           message: `Workspace cleaned up for ${id}`,
           cleanupLog,
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error cleaning up workspace:', error);
-          return jsonResponse({ error: 'Failed to cleanup workspace: ' + msg, cleanupLog }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/deep-wipe ───────────────────────────────────
@@ -1625,14 +1545,13 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
 const postIssueDeepWipeRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/deep-wipe',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
-        try {
         const { deleteWorkspace = false } = body as any || {};
         const { deepWipe } = await import('../../../lib/lifecycle/index.js');
 
@@ -1728,13 +1647,8 @@ const postIssueDeepWipeRoute = HttpRouter.add(
             Connection: 'keep-alive',
           },
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error in deep wipe:', error);
-          return jsonResponse({ error: 'Deep wipe failed: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: POST /api/issues/:id/close-out ───────────────────────────────────
@@ -1742,13 +1656,12 @@ const postIssueDeepWipeRoute = HttpRouter.add(
 const postIssueCloseOutRoute = HttpRouter.add(
   'POST',
   '/api/issues/:id/close-out',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
     return yield* Effect.promise(async () => {
-        try {
         const { closeOut } = await import('../../../lib/lifecycle/index.js');
         const githubCheck = isGitHubIssue(id);
         let projectPath = '';
@@ -1811,13 +1724,8 @@ const postIssueCloseOutRoute = HttpRouter.add(
           })),
           error: result.success ? undefined : result.steps.find((s: any) => !s.success)?.error,
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error(`[close-out] Error for ${id}:`, error);
-          return jsonResponse({ error: msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/issues/:id/beads ────────────────────────────────────────
@@ -1825,12 +1733,11 @@ const postIssueCloseOutRoute = HttpRouter.add(
 const getIssueBeadsRoute = HttpRouter.add(
   'GET',
   '/api/issues/:id/beads',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
     return yield* Effect.promise(async () => {
-        try {
         const issueLower = id.toLowerCase();
         const githubCheck = isGitHubIssue(id);
         let projectPath = '';
@@ -1929,13 +1836,8 @@ const getIssueBeadsRoute = HttpRouter.add(
           source: querySource,
           isRemote: isRemoteWorkspace,
         });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error fetching beads:', error);
-          return jsonResponse({ error: 'Failed to fetch beads: ' + msg }, { status: 500 });
-        }
       })
-  }),
+  })),
 );
 
 // ─── Route: GET /api/issues/:id/costs ────────────────────────────────────────
@@ -1943,67 +1845,58 @@ const getIssueBeadsRoute = HttpRouter.add(
 const getIssueCostsRoute = HttpRouter.add(
   'GET',
   '/api/issues/:id/costs',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.try({
-      try: () => {
-        syncCache();
-        const issueData = getCostsForIssue(id);
+    syncCache();
+    const issueData = getCostsForIssue(id);
 
-        if (!issueData) {
-          return jsonResponse({
-            issueId: id.toUpperCase(),
-            totalCost: 0,
-            totalTokens: 0,
-            inputTokens: 0,
-            outputTokens: 0,
-            cacheReadTokens: 0,
-            cacheWriteTokens: 0,
-            models: {},
-            providers: {},
-            byModel: {},
-            byStage: {},
-            budget: undefined,
-            budgetWarning: false,
-          });
-        }
+    if (!issueData) {
+      return jsonResponse({
+        issueId: id.toUpperCase(),
+        totalCost: 0,
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        models: {},
+        providers: {},
+        byModel: {},
+        byStage: {},
+        budget: undefined,
+        budgetWarning: false,
+      });
+    }
 
-        return jsonResponse({
-          issueId: id.toUpperCase(),
-          totalCost: issueData.totalCost,
-          totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
-          inputTokens: issueData.inputTokens,
-          outputTokens: issueData.outputTokens,
-          cacheReadTokens: issueData.cacheReadTokens,
-          cacheWriteTokens: issueData.cacheWriteTokens,
-          models: issueData.models,
-          providers: issueData.providers,
-          byModel: Object.fromEntries(
-            Object.entries(issueData.models).map(([model, stats]: [string, any]) => [
-              model,
-              { cost: stats.cost, tokens: stats.tokens },
-            ])
-          ),
-          byStage: Object.fromEntries(
-            Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
-              stage,
-              { cost: stats.cost, tokens: stats.tokens },
-            ])
-          ),
-          budget: issueData.budget,
-          budgetWarning: issueData.budgetWarning,
-          lastUpdated: issueData.lastUpdated,
-        });
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting issue costs:', error);
-        return jsonResponse({ error: 'Failed to get issue costs: ' + msg }, { status: 500 });
-      },
+    return jsonResponse({
+      issueId: id.toUpperCase(),
+      totalCost: issueData.totalCost,
+      totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
+      inputTokens: issueData.inputTokens,
+      outputTokens: issueData.outputTokens,
+      cacheReadTokens: issueData.cacheReadTokens,
+      cacheWriteTokens: issueData.cacheWriteTokens,
+      models: issueData.models,
+      providers: issueData.providers,
+      byModel: Object.fromEntries(
+        Object.entries(issueData.models).map(([model, stats]: [string, any]) => [
+          model,
+          { cost: stats.cost, tokens: stats.tokens },
+        ])
+      ),
+      byStage: Object.fromEntries(
+        Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
+          stage,
+          { cost: stats.cost, tokens: stats.tokens },
+        ])
+      ),
+      budget: issueData.budget,
+      budgetWarning: issueData.budgetWarning,
+      lastUpdated: issueData.lastUpdated,
     });
-  }),
+  })),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
