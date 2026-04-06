@@ -35,9 +35,6 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
   // Default to conversation view; persist per-conversation preference wouldn't make sense
   // since new conversations should always start in conversation view
   const [viewMode, setViewMode] = useState<ViewMode>('conversation');
-  // Track if terminal was ever opened — lazy mount to avoid xterm.js sizing issues
-  const [terminalEverOpened, setTerminalEverOpened] = useState(false);
-
   const [resumed, setResumed] = useState(false);
   const queryClient = useQueryClient();
 
@@ -73,7 +70,6 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
 
   const handleViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode);
-    if (mode === 'terminal') setTerminalEverOpened(true);
   }, []);
 
   const showTerminal = conversation.sessionAlive || resumed;
@@ -126,16 +122,11 @@ export function ConversationPanel({ conversation, onArchived }: ConversationPane
 
       {/* Body */}
       <div className={styles.conversationTerminalBody}>
-        {/* Terminal: lazy-mount on first switch, only when session is alive */}
-        {showTerminal && terminalEverOpened && (
-          <div style={viewMode === 'terminal'
-            ? { display: 'contents' }
-            : { position: 'absolute', visibility: 'hidden', width: '100%', height: '100%', overflow: 'hidden' }
-          }>
-            <XTerminal sessionName={conversation.tmuxSession} />
-          </div>
+        {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
+        {showTerminal && viewMode === 'terminal' && (
+          <XTerminal sessionName={conversation.tmuxSession} />
         )}
-        {/* Conversation view — always shown (even for ended sessions to read history) */}
+        {/* Conversation view — shown when in conversation mode or session ended */}
         {(viewMode === 'conversation' || !showTerminal) && (
           <ConversationView
             conversation={conversation}

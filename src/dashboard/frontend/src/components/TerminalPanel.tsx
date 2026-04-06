@@ -21,7 +21,22 @@ export function TerminalPanel({ agent, onClose }: TerminalPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  const isStopped = agent.status === 'stopped';
+  // Check if agent's tmux session is alive via a lightweight probe.
+  // The store status can be stale after server restarts, so verify with the server.
+  // Default to showing XTerminal (optimistic) — switch to raw log only if probe confirms dead.
+  const { data: tmuxAlive } = useQuery({
+    queryKey: ['tmux-alive', agent.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${agent.id}/tmux-alive`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      return data.alive === true;
+    },
+    refetchInterval: 10000,
+  });
+
+  // Optimistic: show XTerminal until probe confirms dead (tmuxAlive === false, not undefined)
+  const isStopped = tmuxAlive === false;
 
   // Only poll output for stopped agents — running agents use XTerminal WebSocket
   const { data: output, refetch } = useQuery({

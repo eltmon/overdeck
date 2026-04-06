@@ -8,7 +8,7 @@
  * No terminal toggle in draft mode (nothing running yet).
  */
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { SendHorizontal } from 'lucide-react';
 import { $getRoot } from 'lexical';
 import type { LexicalEditor } from 'lexical';
@@ -53,6 +53,8 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<LexicalEditor | null>(null);
+  // Unique key per draft instance so Lexical doesn't reuse stale state
+  const draftKey = useMemo(() => `draft-${Date.now()}`, []);
 
   const isEmpty = text.trim() === '';
   const availableEfforts = MODEL_EFFORT_SUPPORT[model] ?? [];
@@ -105,7 +107,7 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
           <div className={styles.composerFooter}>
             <div className={styles.composerBox}>
               <ComposerPromptEditor
-                conversationName="draft"
+                conversationName={draftKey}
                 disabled={sending}
                 onCommandKeyDown={handleCommandKey}
                 editorRef={editorRef}
