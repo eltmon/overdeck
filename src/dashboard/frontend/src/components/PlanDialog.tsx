@@ -99,9 +99,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete }: PlanDialogPro
       });
 
       if (!res.ok) {
-        // Non-SSE error response (e.g. 409 conflict, 500 server error)
-        const data = await res.json();
-        setError(data.error || 'Failed to start planning');
+        // Non-SSE error response (e.g. 409 conflict, 500 server error, 502 Bad Gateway)
+        let errorMsg = 'Failed to start planning';
+        try {
+          const data = await res.json();
+          errorMsg = data.error || errorMsg;
+        } catch {
+          const text = await res.text().catch(() => '');
+          errorMsg = text || `Server error (${res.status})`;
+        }
+        setError(errorMsg);
         setStep('error');
         return;
       }
