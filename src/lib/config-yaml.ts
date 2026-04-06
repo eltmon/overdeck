@@ -56,6 +56,7 @@ export interface YamlConfig {
       google?: ProviderConfig | boolean;
       zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
+      openrouter?: ProviderConfig | boolean;
     };
 
     /** Per-work-type overrides (explicit model for specific tasks) */
@@ -63,6 +64,12 @@ export interface YamlConfig {
 
     /** Gemini thinking level (1-4) */
     gemini_thinking_level?: 1 | 2 | 3 | 4;
+  };
+
+  /** OpenRouter-specific configuration */
+  openrouter?: {
+    /** Favorite model IDs to show in ModelPicker */
+    favorites?: string[];
   };
 
   /** Legacy API keys (for backward compatibility) */
@@ -114,7 +121,11 @@ export interface NormalizedConfig {
     google?: string;
     zai?: string;
     kimi?: string;
+    openrouter?: string;
   };
+
+  /** OpenRouter favorite model IDs (shown in ModelPicker) */
+  openrouterFavorites: string[];
 
   /** Per-work-type overrides */
   overrides: Partial<Record<WorkTypeId, ModelId>>;
@@ -170,6 +181,7 @@ export interface ConfigLoadResult {
 const DEFAULT_CONFIG: NormalizedConfig = {
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   apiKeys: {},
+  openrouterFavorites: [],
   overrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
@@ -372,6 +384,20 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): NormalizedConfig {
           result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
         }
       }
+
+      // OpenRouter
+      const openrouter = normalizeProviderConfig(providers.openrouter);
+      if (openrouter.enabled) {
+        result.enabledProviders.add('openrouter');
+        if (openrouter.api_key) {
+          result.apiKeys.openrouter = resolveEnvVar(openrouter.api_key);
+        }
+      }
+    }
+
+    // Merge OpenRouter favorites
+    if (config.openrouter?.favorites) {
+      result.openrouterFavorites = config.openrouter.favorites;
     }
 
     // Merge legacy API keys (for backward compatibility)
@@ -562,6 +588,10 @@ export function loadConfig(): ConfigLoadResult {
   if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
     config.apiKeys.kimi = process.env.KIMI_API_KEY;
     config.enabledProviders.add('kimi');
+  }
+  if (process.env.OPENROUTER_API_KEY && !config.apiKeys.openrouter) {
+    config.apiKeys.openrouter = process.env.OPENROUTER_API_KEY;
+    config.enabledProviders.add('openrouter');
   }
 
   // Load tracker API keys from environment variables as fallback
