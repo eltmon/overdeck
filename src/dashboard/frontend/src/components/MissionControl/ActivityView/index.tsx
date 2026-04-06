@@ -15,6 +15,8 @@ interface ActivitySection {
   duration: number | null;
   status: string;
   transcript: string;
+  /** tmux session name to stream live — present when status is 'running' */
+  tmuxSession?: string;
 }
 
 interface CostByStage {

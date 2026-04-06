@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Loader2, ChevronRight, ChevronDown, GripHorizontal } from 'lucide-react';
 import styles from '../styles/mission-control.module.css';
+import { XTerminal } from '../../XTerminal';
 
 interface ActivitySection {
   type: string;
@@ -10,6 +11,8 @@ interface ActivitySection {
   duration: number | null;
   status: string;
   transcript: string;
+  /** tmux session name to stream live — present when status is 'running' */
+  tmuxSession?: string;
 }
 
 interface AgentSectionProps {
@@ -219,6 +222,11 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
       {/* Full content when expanded */}
       {expanded && (
         <>
+          {section.tmuxSession ? (
+            <div ref={contentRef} className={contentClass} style={{ ...contentStyle, padding: 0, overflow: 'hidden' }}>
+              <XTerminal sessionName={section.tmuxSession} />
+            </div>
+          ) : (
           <div
             ref={contentRef}
             className={contentClass}
@@ -226,6 +234,7 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
           >
             {section.transcript || '(no output yet)'}
           </div>
+          )}
 
           {/* Resize handle — drag to constrain, double-click to toggle */}
           <div
