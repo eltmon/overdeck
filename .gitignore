@@ -85,3 +85,8 @@ temp/
 .panopticon.env
 .playwright-mcp/
 .playwright-mcp/
+
+# Panopticon runtime artifacts (ephemeral, not tracked)
+.pan/events/
+.pan/convoy/
+.pan/prompts/

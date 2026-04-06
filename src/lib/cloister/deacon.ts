@@ -21,6 +21,7 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
+import { setReviewStatus } from '../review-status.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -1199,6 +1200,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       const reviewAgentActive = activeReviewSessions.has(issueId.toUpperCase());
       if (status.reviewStatus === 'reviewing' && !reviewAgentActive && !hasPassedReview) {
         console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but no review-agent is working on it`);
+        // Use setReviewStatus (not direct JSON write) so SQLite is updated too
+        setReviewStatus(issueId, { reviewStatus: 'pending' });
         status.reviewStatus = 'pending';
         modified = true;
         actions.push(`Reset orphaned review for ${issueId} (no review-agent active for this issue)`);

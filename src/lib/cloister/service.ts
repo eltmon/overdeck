@@ -25,7 +25,7 @@ import { getDatabase, closeDatabase } from '../database/index.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgents, getAgentState, getAgentRuntimeState } from '../agents.js';
+import { listRunningAgents, getAgentState, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
@@ -232,6 +232,30 @@ export class CloisterService {
       }
     } catch (error) {
       console.error('  ✗ Failed to reset orphaned verification states:', error);
+    }
+
+    // PAN-511: Clear stale currentIssue from idle project-specialist agents.
+    // If Cloister dies while a specialist is between tasks, the specialist's runtime.json
+    // may retain currentIssue pointing to a completed review. wakeSpecialistOrQueue checks
+    // currentIssue to decide whether to queue or dispatch — a stale value permanently blocks
+    // new dispatches until manually cleared. On startup, clear currentIssue from any
+    // specialist agent whose runtime state is 'idle' (safe: idle means no active task).
+    try {
+      if (existsSync(AGENTS_DIR)) {
+        const specialistPattern = /^specialist-.+-(review-agent|test-agent|merge-agent)$/;
+        const entries = readdirSync(AGENTS_DIR, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          if (!specialistPattern.test(entry.name)) continue;
+          const runtimeState = getAgentRuntimeState(entry.name);
+          if (runtimeState?.currentIssue && runtimeState.state === 'idle') {
+            saveAgentRuntimeState(entry.name, { currentIssue: undefined });
+            console.log(`  ✓ Cleared stale currentIssue '${runtimeState.currentIssue}' from idle ${entry.name}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('  ✗ Failed to clear stale specialist currentIssue states:', error);
     }
 
     // PAN-378: Global specialists removed — per-project ephemeral specialists handle all work.
