@@ -1551,7 +1551,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   }
 
   const tmuxSession = getTmuxSessionName(name);
-  const cwd = process.env.HOME || '/home/eltmon';
+  const cwd = getDevrootPath() || homedir();
 
   // Determine model for this specialist using work type router
   let model = 'claude-sonnet-4-6'; // default fallback
@@ -1601,6 +1601,12 @@ prompt=$(cat "${promptFile}")
 exec claude --dangerously-skip-permissions --session-id "${newSessionId}" --model ${model} "$prompt"
 `, { mode: 0o755 });
     setSessionId(name, newSessionId);
+
+    // Pre-trust cwd so specialists don't hit the trust prompt (same as spawnSpecialist)
+    try {
+      const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
+      preTrustDirectory(cwd);
+    } catch { /* non-fatal */ }
 
     // Spawn Claude Code via launcher script (with provider env vars)
     // -c sets tmux session working directory to project path (prevents trust prompt)
