@@ -31,6 +31,9 @@ push-state.json
 # Must not be committed as paths would be wrong in other clones
 redirect
 
+# Git hooks (installed by bd, machine-local, not for commit)
+hooks/
+
 # Sync state (local-only, per-machine)
 # These files are machine-specific and should not be shared across clones
 .sync.lock
