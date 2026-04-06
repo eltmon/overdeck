@@ -243,6 +243,11 @@ async function createWorktree(
       await execAsync(`git worktree add "${targetPath}" -b "${branchName}" "${defaultBranch}"`, { cwd: repoPath });
     }
 
+    // Clear unstaged deletions from the new worktree (e.g. .planning/ files that exist on the
+    // feature branch but not on main appear as deleted in a fresh worktree). Without this,
+    // `git rebase origin/main` fails immediately with "unstaged changes" (PAN-495).
+    await execAsync('git restore .', { cwd: targetPath }).catch(() => {});
+
     // Configure beads role so agents don't get "beads.role not configured" warnings
     await execAsync('git config beads.role agent', { cwd: targetPath }).catch(() => {});
 
