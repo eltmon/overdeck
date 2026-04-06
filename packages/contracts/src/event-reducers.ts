@@ -270,6 +270,62 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
     }
+    case 'workspace.created':
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
+    case 'workspace.wipe_started': {
+      const { issueId } = event.payload
+      const updatedIssues = (state.issuesRaw as Array<Record<string, unknown>>).map(issue => {
+        if (issue['identifier'] === issueId || issue['id'] === issueId) {
+          return { ...issue, canonicalStatus: 'wiping', state: 'wiping' }
+        }
+        return issue
+      })
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        issuesRaw: updatedIssues,
+      }
+    }
+
+    case 'workspace.destroyed':
+    case 'workspace.deleted': {
+      const { issueId } = event.payload
+      const updatedAgents = Object.fromEntries(
+        Object.entries(state.agentsById).filter(([, agent]) => agent.issueId !== issueId)
+      )
+      const updatedIssues = (state.issuesRaw as Array<Record<string, unknown>>).map(issue => {
+        if (issue['identifier'] === issueId || issue['id'] === issueId) {
+          return { ...issue, canonicalStatus: 'todo', state: 'todo' }
+        }
+        return issue
+      })
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentsById: updatedAgents,
+        issuesRaw: updatedIssues,
+      }
+    }
+
+    case 'workspace.aborted': {
+      const { issueId, sessionName } = event.payload
+      let updatedAgents: typeof state.agentsById
+      if (sessionName) {
+        const { [sessionName]: _removed, ...rest } = state.agentsById
+        updatedAgents = rest
+      } else {
+        updatedAgents = Object.fromEntries(
+          Object.entries(state.agentsById).filter(([, agent]) => agent.issueId !== issueId)
+        )
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentsById: updatedAgents,
+      }
+    }
+
     case 'planning.failed':
     case 'planning.sync':
     case 'plan.item_status_changed':
