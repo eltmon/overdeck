@@ -129,6 +129,15 @@ export const AgentSpawnerLive = Layer.effect(
         try: async () => {
           const { workspacePath } = opts;
 
+          // Guard: reject bare numeric IDs (e.g. "484") — they have no project prefix,
+          // so tracker routing, workspace naming, and beads all fail. Require "PAN-484".
+          if (/^\d+$/.test(issueId)) {
+            throw new AgentStartError({
+              id: issueId,
+              message: `Invalid issueId "${issueId}": bare numeric IDs are not allowed. Use a prefixed ID (e.g. PAN-${issueId}).`,
+            });
+          }
+
           // Guard: workspace must exist
           if (!existsSync(workspacePath)) {
             throw new WorkspaceNotFound({ id: issueId });
