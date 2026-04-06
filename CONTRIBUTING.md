@@ -158,11 +158,13 @@ git checkout -b feature/pan-<number>
 ```
 1. Create feature branch from latest main
 2. Make changes, commit using conventional commits (see below)
-3. Push branch: git push -u origin <branch>
-4. Open PR — title should match commit message style
-5. Review agent runs automated code review
-6. Test agent runs test suite
-7. When both pass → readyForMerge = true → human clicks MERGE in dashboard
+3. Push branch and signal completion: pan work done PAN-xxx
+   └─ Creates GitHub PR automatically (gh pr create)
+4. Review agent runs automated code review, posts GitHub PR review
+5. Test agent runs test suite
+6. When both pass → readyForMerge = true → human clicks MERGE in dashboard
+   └─ merge-agent rebases feature branch onto main (resolves conflicts if any)
+   └─ gh pr merge --squash (squash commit to main)
 ```
 
 ### PR checklist
@@ -447,6 +449,8 @@ pan work issue <PAN-XXX>
           │
           └─ All beads done → pan work done <PAN-XXX>
                │
+               ├─ Pushes feature branch
+               ├─ Creates GitHub PR (gh pr create)
                ▼
           Cloister detects completion
                │
@@ -454,6 +458,7 @@ pan work issue <PAN-XXX>
           Review Specialist wakes
                │
                ├─ reviewStatus: reviewing → passed / failed
+               ├─ Posts GitHub PR review (gh pr review --approve / --request-changes)
                ├─ If failed:
                │   feedback → agent mail/ → agent reads and fixes → re-submits
                └─ If passed:
@@ -467,6 +472,9 @@ pan work issue <PAN-XXX>
                          ▼
                     Human clicks MERGE in dashboard
                          │
+                         ├─ merge-agent rebases feature branch onto main
+                         │   (resolves conflicts if any, pushes rebased branch)
+                         ├─ gh pr merge --squash (squash commit to main)
                          ▼
                     scripts/post-merge-deploy.sh
                     (flock-guarded, runs npm run build, restarts server)
