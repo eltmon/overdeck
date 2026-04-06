@@ -23,6 +23,33 @@ import { mergeSkillsIntoWorkspace } from './skills-merge.js';
 
 const execAsync = promisify(exec);
 
+/**
+ * Ensure .pan/events/, .pan/convoy/, and .pan/prompts/ are excluded from git tracking
+ * in the given project root's .gitignore. .pan/skills/ is intentionally NOT excluded
+ * since project-specific skills should be committed.
+ */
+export function ensurePanGitignore(projectPath: string): void {
+  const gitignorePath = join(projectPath, '.gitignore');
+  const requiredEntries = ['.pan/events/', '.pan/convoy/', '.pan/prompts/'];
+
+  let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
+  const lines = content.split('\n');
+
+  const missing = requiredEntries.filter(entry => !lines.some(l => l.trim() === entry));
+  if (missing.length === 0) return;
+
+  // Append missing entries with a section header if we're adding for the first time
+  if (!content.endsWith('\n') && content.length > 0) {
+    content += '\n';
+  }
+  if (!lines.some(l => l.includes('.pan/'))) {
+    content += '\n# Panopticon runtime artifacts (ephemeral, not tracked)\n';
+  }
+  content += missing.join('\n') + '\n';
+
+  writeFileSync(gitignorePath, content, 'utf-8');
+}
+
 /** Progress event emitted during workspace creation. */
 export interface WorkspaceProgress {
   label: string;
@@ -469,6 +496,15 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
   ) {
     rmSync(resolvedPlanning, { recursive: true, force: true });
     result.steps.push('Removed stale .planning/ directory from previous issue');
+  }
+
+  // Ensure .pan/events/, .pan/convoy/, .pan/prompts/ are in the project's .gitignore
+  try {
+    ensurePanGitignore(projectConfig.path);
+    result.steps.push('Verified .pan/ runtime paths are in .gitignore');
+  } catch (gitignoreErr: any) {
+    // Non-fatal — log but don't block workspace creation
+    result.steps.push(`Warning: could not update .gitignore: ${gitignoreErr.message}`);
   }
 
   // Sanitize any docker-compose files in the workspace to use platform-agnostic paths
