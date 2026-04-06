@@ -3,14 +3,14 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead feature-pan-489-ly3: Fix tracker priority in transitionIssueState — github_repo before issue_prefix (Linear)
+Implementing bead feature-pan-489-z90: Validate issue ID format at agent spawn time
 
 ## Completed Work
-(none yet)
+- [x] feature-pan-489-ly3: Reordered tracker priority — github_repo before issue_prefix in transitionIssueState; 5 tests (commit: fb06757)
 
 ## Remaining Work
-- [ ] feature-pan-489-ly3: Fix tracker priority — check github_repo before issue_prefix in transitionIssueState
-- [ ] feature-pan-489-7pj: Guard bare numeric IDs — warn and skip in transitionIssueState
+- [x] feature-pan-489-ly3: Fix tracker priority — check github_repo before issue_prefix in transitionIssueState (commit: fb06757)
+- [x] feature-pan-489-7pj: Guard bare numeric IDs — warn and skip in transitionIssueState
 - [ ] feature-pan-489-z90: Validate issue ID format at agent spawn time
 - [ ] feature-pan-489-3u4: Migration scan — warn on bare numeric issueIds in state files at startup
 

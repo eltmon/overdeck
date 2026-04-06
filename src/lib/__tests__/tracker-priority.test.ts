@@ -43,6 +43,39 @@ const mockTracker = {
   getComment: vi.fn(),
 };
 
+describe('transitionIssueState bare numeric ID guard (PAN-489)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('skips transition and logs warning for bare numeric issueId', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await transitionIssueToInReview('484', '/some/workspace');
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('bare numeric ID'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"484"'));
+    expect(mockCreateTracker).not.toHaveBeenCalled();
+    expect(mockCreateTrackerFromConfig).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('does not skip transition for properly-prefixed issueId', async () => {
+    mockFindProjectByPath.mockReturnValue({
+      name: 'panopticon-cli',
+      path: '/projects/panopticon-cli',
+      github_repo: 'eltmon/panopticon-cli',
+    } as any);
+    mockGetIssuePrefix.mockReturnValue(undefined);
+    mockCreateTracker.mockReturnValue(mockTracker as any);
+
+    await transitionIssueToInReview('PAN-484', '/projects/panopticon-cli/workspaces/feature-pan-484');
+
+    expect(mockCreateTracker).toHaveBeenCalled();
+  });
+});
+
 describe('transitionIssueState tracker priority (PAN-489)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

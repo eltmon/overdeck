@@ -477,6 +477,18 @@ function determineModel(options: SpawnOptions): string {
  * github_repo must be checked first so GitHub projects don't misroute to Linear.
  */
 async function transitionIssueState(issueId: string, state: IssueState, workspacePath?: string): Promise<void> {
+  // Guard: bare numeric IDs (no alphabetic prefix, e.g. "484") must never reach
+  // any tracker API. Linear's searchIssues("484") would match MIN-484 in the wrong
+  // team. Log a warning and skip — the workspace's project must use prefixed IDs.
+  if (/^\d+$/.test(issueId)) {
+    console.warn(
+      `[agents] Skipping ${state} transition for bare numeric ID "${issueId}" — ` +
+      `issue IDs must include a project prefix (e.g. PAN-${issueId}). ` +
+      `This workspace was likely created before the pan- prefix convention.`
+    );
+    return;
+  }
+
   // Resolve the project from workspacePath — its configured tracker is authoritative.
   // Every issue MUST belong to a registered project with a tracker configured.
   const projectConfig = workspacePath ? findProjectByPath(workspacePath) : null;
