@@ -15,12 +15,20 @@ PROJECT_PATH="${3:?PROJECT_PATH required}"
 SOURCE_BRANCH="${4:-}"
 
 LOG_FILE="/tmp/panopticon-deploy.log"
+LOCK_FILE="/tmp/panopticon-deploy.lock"
 HEALTH_URL="http://localhost:3011/api/health"
 HEALTH_TIMEOUT=30
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [post-merge-deploy] $*" | tee -a "$LOG_FILE"
 }
+
+# --- Lock: only one deploy runs at a time ---
+exec 9>"$LOCK_FILE"
+if ! flock -x -n 9; then
+  log "Another deploy already in progress (lock held). Skipping deploy for $ISSUE_ID — the in-progress deploy will pick up the latest build."
+  exit 0
+fi
 
 log "Starting post-merge deploy for issue=$ISSUE_ID branch=$SOURCE_BRANCH"
 log "Repo root: $REPO_ROOT"
@@ -39,17 +47,7 @@ log "Build complete."
 log "Running npm link..."
 npm link >> "$LOG_FILE" 2>&1 || log "WARN: npm link failed (non-fatal)"
 
-# --- Step 3: Detect runtime mode before killing ---
-# Check if server is running under bun (dev) or node (prod)
-RUNTIME_MODE="prod"
-if pgrep -f "bun.*src/dashboard/server/main" > /dev/null 2>&1; then
-  RUNTIME_MODE="dev"
-elif pgrep -f "bun.*dashboard.*main" > /dev/null 2>&1; then
-  RUNTIME_MODE="dev"
-fi
-log "Detected runtime mode: $RUNTIME_MODE"
-
-# --- Step 4: Kill old server ---
+# --- Step 3: Kill old server ---
 log "Stopping old server processes..."
 for port in 3010 3011 3012; do
   fuser -k "${port}/tcp" >> "$LOG_FILE" 2>&1 || true
@@ -70,14 +68,9 @@ if lsof -i :3010,:3011,:3012 > /dev/null 2>&1; then
 fi
 
 # --- Step 5: Start new server ---
-log "Starting new server in $RUNTIME_MODE mode..."
-if [ "$RUNTIME_MODE" = "dev" ]; then
-  # Dev mode: bun runs main.ts directly via npm run dev equivalent
-  setsid npm run dev >> "$LOG_FILE" 2>&1 &
-else
-  # Prod mode: node runs compiled server
-  setsid node dist/dashboard/server.js >> "$LOG_FILE" 2>&1 &
-fi
+log "Starting new server..."
+NODE=/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node
+setsid "$NODE" dist/dashboard/server.js >> "$LOG_FILE" 2>&1 &
 
 # --- Step 6: Health check ---
 log "Waiting for server health check (${HEALTH_TIMEOUT}s timeout)..."
