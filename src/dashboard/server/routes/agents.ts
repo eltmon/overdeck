@@ -53,9 +53,11 @@ import {
   getAgentState,
   getAgentRuntimeState,
   saveAgentRuntimeState,
+  saveAgentState,
   getActivity,
   saveSessionId,
   getSessionId,
+  getLatestSessionId,
   resumeAgent,
   messageAgent,
   stopAgent,
@@ -68,6 +70,8 @@ import {
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../../../lib/paths.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
+import { buildResumePrompt } from '../../../lib/cloister/resume-prompt.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
@@ -1236,8 +1240,7 @@ const postAgentsRoute = HttpRouter.add(
 
         const issueLower = issueId.toLowerCase();
 
-        const { loadWorkspaceMetadata } = await import('../../../lib/remote/workspace-metadata.js');
-        const workspaceMetadata = loadWorkspaceMetadata(issueId);
+        const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
         const isRemote = workspaceMetadata?.location === 'remote';
 
         const issuePrefix = issueId.split('-')[0];
@@ -1338,7 +1341,7 @@ const postAgentsRoute = HttpRouter.add(
         let hasBeads = false;
         try {
           const { stdout: bdOutput } = await execAsync(
-            `bd list --json -l ${issueId.toLowerCase()} --limit 1`,
+            `bd list --json -l ${issueId.toLowerCase()} --status all --limit 1`,
             { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
           );
           const bdTasks = JSON.parse(bdOutput.trim() || '[]');
@@ -1437,8 +1440,94 @@ const postAgentsRoute = HttpRouter.add(
         const hasPlanning = existsSync(join(workspacePath, '.planning'));
         const phase = (body as any).phase || (hasPlanning ? 'implementation' : 'exploration');
 
-        // Kill any zombie tmux session from a previous crash
         const agentSessionName = `agent-${issueLower}`;
+
+        // Check if we can resume a stopped agent with a saved session
+        const existingAgentState = getAgentState(agentSessionName);
+        const savedSessionId = getLatestSessionId(agentSessionName);
+
+        if (existingAgentState && savedSessionId && (existingAgentState.status === 'stopped' || existingAgentState.status === 'completed')) {
+          // Kill any zombie tmux session before resuming
+          try {
+            await execAsync(`tmux kill-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' });
+          } catch { /* No existing session — good */ }
+
+          // Remove completed marker so the agent can work again
+          const completedFile = join(homedir(), '.panopticon', 'agents', agentSessionName, 'completed');
+          try { await rm(completedFile, { force: true }); } catch { /* non-fatal */ }
+
+          // Build context-rich resume prompt from STATE.md, beads, and feedback
+          const agentDir = join(homedir(), '.panopticon', 'agents', agentSessionName);
+          const resumeLauncher = join(agentDir, 'resume-launcher.sh');
+          const resumePromptFile = join(agentDir, 'resume-prompt.md');
+          const userMessage = (body as any).message || undefined;
+          const resumePrompt = buildResumePrompt(workspacePath, issueId, agentDir, userMessage);
+          writeFileSync(resumePromptFile, resumePrompt);
+          // Use launcher script to safely pass prompt via file (avoids shell escaping)
+          const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --resume "${savedSessionId}" --dangerously-skip-permissions -p "$prompt"\n`;
+          writeFileSync(resumeLauncher, resumeContent, { mode: 0o755 });
+
+          // Spawn tmux session with resume command
+          const escapedCwd = workspacePath.replace(/"/g, '\\"');
+          await execAsync(
+            `tmux new-session -d -s ${agentSessionName} -c "${escapedCwd}" -e PANOPTICON_AGENT_ID=${agentSessionName} -e PANOPTICON_ISSUE_ID=${issueId} -e PANOPTICON_SESSION_TYPE=${phase} -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false "bash ${resumeLauncher}"`,
+            { encoding: 'utf-8' }
+          );
+
+          console.log(`[start-agent] Resumed ${agentSessionName} with session ${savedSessionId}`);
+
+          // Update agent state
+          existingAgentState.status = 'running';
+          existingAgentState.lastActivity = new Date().toISOString();
+          saveAgentState(existingAgentState);
+
+          saveAgentRuntimeState(agentSessionName, {
+            state: 'active',
+            resumedAt: new Date().toISOString(),
+          });
+
+          // Transition issue to "In Progress"
+          await Effect.runPromise(
+            lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
+          );
+
+          Effect.runSync(eventStore.append({
+            type: 'agent.started',
+            timestamp: new Date().toISOString(),
+            payload: {
+              agentId: agentSessionName,
+              issueId,
+              resumed: true,
+              agent: {
+                id: agentSessionName,
+                issueId: existingAgentState.issueId,
+                workspace: existingAgentState.workspace,
+                runtime: existingAgentState.runtime,
+                model: existingAgentState.model,
+                status: 'running',
+                startedAt: existingAgentState.startedAt,
+                lastActivity: existingAgentState.lastActivity,
+                phase: existingAgentState.phase,
+              },
+            },
+          }));
+          Effect.runSync(eventStore.append({
+            type: 'issue.statusChanged',
+            timestamp: new Date().toISOString(),
+            payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
+          }));
+          try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+
+          return jsonResponse({
+            success: true,
+            message: `Resumed agent for ${issueId} (session ${savedSessionId.slice(0, 8)}...)`,
+            resumed: true,
+            agentId: agentSessionName,
+            projectPath,
+          });
+        }
+
+        // Kill any zombie tmux session from a previous crash
         try {
           await execAsync(`tmux has-session -t ${agentSessionName} 2>/dev/null`, { encoding: 'utf-8' });
           // Session exists — kill it so we can start fresh

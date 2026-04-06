@@ -337,6 +337,36 @@ export function getSessionId(agentId: string): string | null {
   }
 }
 
+/**
+ * Get the latest Claude session ID from any available source.
+ * Checks session.id first (written by suspend), then sessions.json (written by heartbeat hook),
+ * then runtime.json claudeSessionId field.
+ */
+export function getLatestSessionId(agentId: string): string | null {
+  // 1. session.id (written by auto-suspend)
+  const fromSessionFile = getSessionId(agentId);
+  if (fromSessionFile) return fromSessionFile;
+
+  // 2. sessions.json (written by heartbeat hook — last entry is most recent)
+  const sessionsFile = join(getAgentDir(agentId), 'sessions.json');
+  try {
+    if (existsSync(sessionsFile)) {
+      const sessions = JSON.parse(readFileSync(sessionsFile, 'utf8'));
+      if (Array.isArray(sessions) && sessions.length > 0) {
+        return sessions[sessions.length - 1];
+      }
+    }
+  } catch { /* non-fatal */ }
+
+  // 3. runtime.json claudeSessionId
+  const runtimeState = getAgentRuntimeState(agentId);
+  if (runtimeState?.claudeSessionId) {
+    return runtimeState.claudeSessionId;
+  }
+
+  return null;
+}
+
 export interface SpawnOptions {
   issueId: string;
   workspace: string;
