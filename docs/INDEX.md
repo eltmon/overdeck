@@ -20,6 +20,7 @@
 | [AGENTS.md](../AGENTS.md) | Agent system architecture and lifecycle |
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | How worker and specialist agents interact (includes inspect, review, test, merge specialists) |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
+| [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, VBRIEFs, STATE.md, multi-tool sync |
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |
 | [PRD-CLOISTER.md](./PRD-CLOISTER.md) | Cloister lifecycle manager requirements |
 | [PRD-REMOTE-WORKSPACES.md](./PRD-REMOTE-WORKSPACES.md) | Remote workspace requirements |
@@ -162,7 +163,10 @@
 - **"test-agent"** / **"test specialist"** → TESTING.md, SPECIALIST_WORKFLOW.md
 
 ### Development
-- **"skills"** → README.md, CLAUDE.md
+- **"skills"** → README.md, CLAUDE.md, REPO-ARTIFACTS.md
+- **".pan"** / **".pan.yaml"** / **"repo artifacts"** → REPO-ARTIFACTS.md
+- **"STATE.md archive"** / **"vBRIEF archive"** / **"planning artifacts"** → REPO-ARTIFACTS.md, VBRIEF.md
+- **"also_sync"** / **"multi-tool sync"** / **"cursor sync"** / **"codex sync"** → REPO-ARTIFACTS.md
 - **"commit"** / **"git commit"** → CLAUDE.md
 - **"messaging"** / **"messageAgent"** → CLAUDE.md
 - **"completion"** / **"work complete"** → CLAUDE.md
