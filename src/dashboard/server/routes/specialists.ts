@@ -1,4 +1,5 @@
-import { jsonResponse } from "../http-helpers.js";
+import { jsonResponse } from '../http-helpers.js';
+import { httpHandler } from './http-handler.js';
 /**
  * Specialists route module — Effect HttpRouter.Layer (PAN-428 B9)
  *
@@ -142,28 +143,20 @@ function getProjectPathForIssue(issuePrefix: string): string {
 const getSpecialistsRoute = HttpRouter.add(
   'GET',
   '/api/specialists',
-  Effect.promise(async () => {
-    try {
-      const {
-        getAllSpecialistStatus,
-        getAllProjectSpecialistStatuses,
-      } = await import('../../../lib/cloister/specialists.js');
+  httpHandler(Effect.gen(function* () {
+    const {
+      getAllSpecialistStatus,
+      getAllProjectSpecialistStatuses,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-      const legacySpecialists = await getAllSpecialistStatus();
-      const projectSpecialists = await getAllProjectSpecialistStatuses();
+    const legacySpecialists = yield* Effect.promise(() => getAllSpecialistStatus());
+    const projectSpecialists = yield* Effect.promise(() => getAllProjectSpecialistStatuses());
 
-      return jsonResponse({
-        specialists: legacySpecialists,
-        projects: projectSpecialists,
-      });
-    }    catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting specialists:', error);
-      return jsonResponse(
-        { error: 'Failed to get specialists: ' + msg },
-        { status: 500 },
-      );
-      }}),
+    return jsonResponse({
+      specialists: legacySpecialists,
+      projects: projectSpecialists,
+    });
+  })),
 );
 
 // ─── Route: POST /api/specialists/reset-all ───────────────────────────────────
@@ -172,70 +165,60 @@ const getSpecialistsRoute = HttpRouter.add(
 const postSpecialistsResetAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/reset-all',
-  Effect.promise(async () => {
+  httpHandler(Effect.gen(function* () {
+    const {
+      getAllSpecialists,
+      clearSessionId,
+      isRunning,
+      getTmuxSessionName,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const { clearHook } = yield* Effect.promise(() => import('../../../lib/hooks.js'));
+
+    const specialists = getAllSpecialists();
+    const results: { name: string; killed: boolean; sessionCleared: boolean; queueCleared: boolean }[] = [];
+
+    for (const specialist of specialists) {
+      const name = specialist.name;
+      let killed = false;
+
+      if (isRunning(name)) {
+        const tmuxSession = getTmuxSessionName(name);
+        const killResult = yield* Effect.promise(() =>
+          execAsync(`tmux kill-session -t "${tmuxSession}"`).then(() => true).catch(() => false),
+        );
+        killed = killResult;
+      }
+
+      const sessionCleared = clearSessionId(name);
+      clearHook(name);
+      results.push({ name, killed, sessionCleared, queueCleared: true });
+    }
+
+    // Reset any "reviewing" statuses to "pending"
+    let reviewStatusesReset = 0;
     try {
-      const {
-        getAllSpecialists,
-        clearSessionId,
-        isRunning,
-        getTmuxSessionName,
-      } = await import('../../../lib/cloister/specialists.js');
-      const { clearHook } = await import('../../../lib/hooks.js');
-
-      const specialists = getAllSpecialists();
-      const results: { name: string; killed: boolean; sessionCleared: boolean; queueCleared: boolean }[] = [];
-
-      for (const specialist of specialists) {
-        const name = specialist.name;
-        let killed = false;
-
-        if (isRunning(name)) {
-          const tmuxSession = getTmuxSessionName(name);
-          try {
-            await execAsync(`tmux kill-session -t "${tmuxSession}"`);
-            killed = true;
-          } catch {
-            // Session might not exist, continue
-          }
+      const statuses = loadReviewStatuses();
+      for (const key of Object.keys(statuses)) {
+        if (statuses[key].reviewStatus === 'reviewing') {
+          statuses[key].reviewStatus = 'pending';
+          statuses[key].updatedAt = new Date().toISOString();
+          reviewStatusesReset++;
         }
-
-        const sessionCleared = clearSessionId(name);
-        clearHook(name);
-        results.push({ name, killed, sessionCleared, queueCleared: true });
       }
-
-      // Reset any "reviewing" statuses to "pending"
-      let reviewStatusesReset = 0;
-      try {
-        const statuses = loadReviewStatuses();
-        for (const key of Object.keys(statuses)) {
-          if (statuses[key].reviewStatus === 'reviewing') {
-            statuses[key].reviewStatus = 'pending';
-            statuses[key].updatedAt = new Date().toISOString();
-            reviewStatusesReset++;
-          }
-        }
-        if (reviewStatusesReset > 0) {
-          saveReviewStatuses(statuses);
-        }
-      } catch (e) {
-        console.error('Failed to reset review statuses:', e);
+      if (reviewStatusesReset > 0) {
+        saveReviewStatuses(statuses);
       }
+    } catch (e) {
+      console.error('Failed to reset review statuses:', e);
+    }
 
-      return jsonResponse({
-        success: true,
-        message: `Reset ${results.length} specialists, cleared queues, reset ${reviewStatusesReset} review statuses`,
-        results,
-        reviewStatusesReset,
-      });
-    }    catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error resetting all specialists:', error);
-      return jsonResponse(
-        { error: 'Failed to reset specialists: ' + msg },
-        { status: 500 },
-      );
-      }}),
+    return jsonResponse({
+      success: true,
+      message: `Reset ${results.length} specialists, cleared queues, reset ${reviewStatusesReset} review statuses`,
+      results,
+      reviewStatusesReset,
+    });
+  })),
 );
 
 // ─── Route: POST /api/specialists/done ───────────────────────────────────────
@@ -245,7 +228,7 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
 const postSpecialistsDoneRoute = HttpRouter.add(
   'POST',
   '/api/specialists/done',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const { specialist, issueId, status, notes } = body as {
@@ -499,7 +482,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       notes,
       currentStatus: updatedStatus,
     });
-  }),
+  })),
 );
 
 // ─── Route: POST /api/specialists/logs/cleanup-all ────────────────────────────
@@ -508,25 +491,17 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/logs/cleanup-all',
-  Effect.promise(async () => {
-    try {
-      const { cleanupAllLogs } = await import('../../../lib/cloister/specialist-logs.js');
-      const results = cleanupAllLogs();
+  httpHandler(Effect.gen(function* () {
+    const { cleanupAllLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
+    const results = cleanupAllLogs();
 
-      return jsonResponse({
-        success: true,
-        totalDeleted: results.totalDeleted,
-        byProject: results.byProject,
-        message: `Cleaned up ${results.totalDeleted} old logs`,
-      });
-    }    catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error cleaning up all logs:', error);
-      return jsonResponse(
-        { error: 'Failed to clean up logs: ' + msg },
-        { status: 500 },
-      );
-      }}),
+    return jsonResponse({
+      success: true,
+      totalDeleted: results.totalDeleted,
+      byProject: results.byProject,
+      message: `Cleaned up ${results.totalDeleted} old logs`,
+    });
+  })),
 );
 
 // ─── Route: GET /api/specialists/queues ───────────────────────────────────────
@@ -535,34 +510,24 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
 const getSpecialistQueuesRoute = HttpRouter.add(
   'GET',
   '/api/specialists/queues',
-  Effect.promise(async () => {
-    try {
-      const { getAllSpecialists, checkSpecialistQueue } =
-        await import('../../../lib/cloister/specialists.js');
-      const specialists = getAllSpecialists();
+  httpHandler(Effect.gen(function* () {
+    const { getAllSpecialists, checkSpecialistQueue } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const specialists = getAllSpecialists();
 
-      const queues = await Promise.all(
-        specialists.map(async (specialist) => {
-          const queue = checkSpecialistQueue(specialist.name);
-          return {
-            specialistName: specialist.name,
-            hasWork: queue.hasWork,
-            urgentCount: queue.urgentCount,
-            totalCount: queue.items.length,
-            items: queue.items,
-          };
-        }),
-      );
+    const queues = specialists.map((specialist) => {
+      const queue = checkSpecialistQueue(specialist.name);
+      return {
+        specialistName: specialist.name,
+        hasWork: queue.hasWork,
+        urgentCount: queue.urgentCount,
+        totalCount: queue.items.length,
+        items: queue.items,
+      };
+    });
 
-      return jsonResponse({ queues });
-    }    catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting specialist queues:', error);
-      return jsonResponse(
-        { error: 'Failed to get specialist queues: ' + msg },
-        { status: 500 },
-      );
-      }}),
+    return jsonResponse({ queues });
+  })),
 );
 
 // ─── Route: GET /api/specialists/projects ────────────────────────────────────
@@ -571,20 +536,12 @@ const getSpecialistQueuesRoute = HttpRouter.add(
 const getSpecialistsProjectsRoute = HttpRouter.add(
   'GET',
   '/api/specialists/projects',
-  Effect.promise(async () => {
-    try {
-      const { getAllProjectSpecialistStatuses } =
-        await import('../../../lib/cloister/specialists.js');
-      const specialists = await getAllProjectSpecialistStatuses();
-      return jsonResponse(specialists);
-    }    catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting project specialists:', error);
-      return jsonResponse(
-        { error: 'Failed to get project specialists: ' + msg },
-        { status: 500 },
-      );
-      }}),
+  httpHandler(Effect.gen(function* () {
+    const { getAllProjectSpecialistStatuses } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const specialists = yield* Effect.promise(() => getAllProjectSpecialistStatuses());
+    return jsonResponse(specialists);
+  })),
 );
 
 // ─── Route: POST /api/specialists/:name/wake ─────────────────────────────────
@@ -592,89 +549,79 @@ const getSpecialistsProjectsRoute = HttpRouter.add(
 const postSpecialistWakeRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:name/wake',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const body = yield* readJsonBody;
     const { sessionId } = body as { sessionId?: string };
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const {
-          getTmuxSessionName,
-          getSessionId,
-          recordWake,
-          isRunning,
-        } = await import('../../../lib/cloister/specialists.js');
+    const {
+      getTmuxSessionName,
+      getSessionId,
+      recordWake,
+      isRunning,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-        if (await isRunning(name as SpecialistType)) {
-          return jsonResponse(
-            { error: `Specialist ${name} is already running` },
-            { status: 400 },
-          );
-        }
+    if (yield* Effect.promise(() => isRunning(name as SpecialistType))) {
+      return jsonResponse(
+        { error: `Specialist ${name} is already running` },
+        { status: 400 },
+      );
+    }
 
-        const existingSessionId = getSessionId(name as SpecialistType);
-        const tmuxSession = getTmuxSessionName(name as SpecialistType);
+    const existingSessionId = getSessionId(name as SpecialistType);
+    const tmuxSession = getTmuxSessionName(name as SpecialistType);
 
-        if (!existingSessionId && !sessionId) {
-          return jsonResponse(
-            {
-              error: 'No session ID found. Specialist must be initialized first or provide sessionId in request.',
-            },
-            { status: 400 },
-          );
-        }
+    if (!existingSessionId && !sessionId) {
+      return jsonResponse(
+        {
+          error: 'No session ID found. Specialist must be initialized first or provide sessionId in request.',
+        },
+        { status: 400 },
+      );
+    }
 
-        const useSessionId = sessionId || existingSessionId;
+    const useSessionId = sessionId || existingSessionId;
 
-        // Get specialist model from settings
-        const specSettings = loadSettings();
-        const specModelKey = `${name}_agent` as keyof typeof specSettings.models.specialists;
-        const specModel = specSettings.models.specialists[specModelKey] || 'claude-sonnet-4-6';
-        const specCmd = getAgentCommand(specModel);
-        const specCmdWithArgs =
-          specCmd.args.length > 0
-            ? `${specCmd.command} ${specCmd.args.join(' ')} --dangerously-skip-permissions`
-            : `${specCmd.command} --dangerously-skip-permissions`;
+    // Get specialist model from settings
+    const specSettings = loadSettings();
+    const specModelKey = `${name}_agent` as keyof typeof specSettings.models.specialists;
+    const specModel = specSettings.models.specialists[specModelKey] || 'claude-sonnet-4-6';
+    const specCmd = getAgentCommand(specModel);
+    const specCmdWithArgs =
+      specCmd.args.length > 0
+        ? `${specCmd.command} ${specCmd.args.join(' ')} --dangerously-skip-permissions`
+        : `${specCmd.command} --dangerously-skip-permissions`;
 
-        const cwd = homedir();
-        await execAsync(
-          `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${specCmdWithArgs} --resume ${useSessionId}"`,
-          { encoding: 'utf-8' },
-        );
+    const cwd = homedir();
+    yield* Effect.promise(() => execAsync(
+      `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${specCmdWithArgs} --resume ${useSessionId}"`,
+      { encoding: 'utf-8' },
+    ));
 
-        recordWake(name as SpecialistType, useSessionId!);
+    recordWake(name as SpecialistType, useSessionId!);
 
-        await Effect.runPromise(eventStore.append({
-          type: 'specialist.started',
-          timestamp: new Date().toISOString(),
-          payload: {
-            specialist: {
-              name: name as SpecialistType,
-              state: 'active',
-              isRunning: true,
-              lastWake: new Date().toISOString(),
-            },
-          },
-        }));
+    yield* eventStore.append({
+      type: 'specialist.started',
+      timestamp: new Date().toISOString(),
+      payload: {
+        specialist: {
+          name: name as SpecialistType,
+          state: 'active',
+          isRunning: true,
+          lastWake: new Date().toISOString(),
+        },
+      },
+    });
 
-        return jsonResponse({
-          success: true,
-          message: `Specialist ${name} woken up`,
-          tmuxSession,
-          sessionId: useSessionId,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error waking specialist:', error);
-        return jsonResponse(
-          { error: 'Failed to wake specialist: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({
+      success: true,
+      message: `Specialist ${name} woken up`,
+      tmuxSession,
+      sessionId: useSessionId,
+    });
+  })),
 );
 
 // ─── Route: POST /api/specialists/:name/reset ─────────────────────────────────
@@ -682,51 +629,41 @@ const postSpecialistWakeRoute = HttpRouter.add(
 const postSpecialistResetRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:name/reset',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const body = yield* readJsonBody;
     const { reinitialize = false } = body as { reinitialize?: boolean };
 
-    return yield* Effect.promise(async () => {
-    try {
-        const {
-          clearSessionId,
-          isRunning,
-          getTmuxSessionName,
-        } = await import('../../../lib/cloister/specialists.js');
+    const {
+      clearSessionId,
+      isRunning,
+      getTmuxSessionName,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-        if (await isRunning(name as SpecialistType)) {
-          const tmuxSession = getTmuxSessionName(name as SpecialistType);
-          return jsonResponse(
-            {
-              error: `Specialist ${name} is currently running. Stop it first (tmux kill-session -t ${tmuxSession})`,
-            },
-            { status: 400 },
-          );
-        }
+    if (yield* Effect.promise(() => isRunning(name as SpecialistType))) {
+      const tmuxSession = getTmuxSessionName(name as SpecialistType);
+      return jsonResponse(
+        {
+          error: `Specialist ${name} is currently running. Stop it first (tmux kill-session -t ${tmuxSession})`,
+        },
+        { status: 400 },
+      );
+    }
 
-        const wasDeleted = clearSessionId(name as SpecialistType);
+    const wasDeleted = clearSessionId(name as SpecialistType);
 
-        if (reinitialize) {
-          // TODO: Add initialization logic if needed
-          // For now, just clearing is sufficient
-        }
+    if (reinitialize) {
+      // TODO: Add initialization logic if needed
+      // For now, just clearing is sufficient
+    }
 
-        return jsonResponse({
-          success: true,
-          message: `Specialist ${name} reset`,
-          sessionCleared: wasDeleted,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error resetting specialist:', error);
-        return jsonResponse(
-          { error: 'Failed to reset specialist: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({
+      success: true,
+      message: `Specialist ${name} reset`,
+      sessionCleared: wasDeleted,
+    });
+  })),
 );
 
 // ─── Route: POST /api/specialists/:name/init ──────────────────────────────────
@@ -734,34 +671,24 @@ const postSpecialistResetRoute = HttpRouter.add(
 const postSpecialistInitRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:name/init',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { initializeSpecialist } = await import('../../../lib/cloister/specialists.js');
-        const result = await initializeSpecialist(name as SpecialistType);
+    const { initializeSpecialist } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const result = yield* Effect.promise(() => initializeSpecialist(name as SpecialistType));
 
-        if (!result.success) {
-          return jsonResponse({ error: result.message }, { status: 400 });
-        }
+    if (!result.success) {
+      return jsonResponse({ error: result.message }, { status: 400 });
+    }
 
-        return jsonResponse({
-          success: true,
-          message: result.message,
-          tmuxSession: result.tmuxSession,
-          note: 'Session ID will be available after Claude responds. Use "claude config get sessionId" in the tmux session to get it, then update via /reset with reinitialize.',
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error initializing specialist:', error);
-        return jsonResponse(
-          { error: 'Failed to initialize specialist: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({
+      success: true,
+      message: result.message,
+      tmuxSession: result.tmuxSession,
+      note: 'Session ID will be available after Claude responds. Use "claude config get sessionId" in the tmux session to get it, then update via /reset with reinitialize.',
+    });
+  })),
 );
 
 // ─── Route: POST /api/specialists/:name/report-status ────────────────────────
@@ -769,7 +696,7 @@ const postSpecialistInitRoute = HttpRouter.add(
 const postSpecialistReportStatusRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:name/report-status',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const body = yield* readJsonBody;
@@ -794,60 +721,50 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        // Write status to specialist's state directory
-        const specialistDir = join(homedir(), '.panopticon', 'specialists', name);
-        await mkdir(specialistDir, { recursive: true });
+    // Write status to specialist's state directory
+    const specialistDir = join(homedir(), '.panopticon', 'specialists', name);
+    yield* Effect.promise(() => mkdir(specialistDir, { recursive: true }));
 
-        const statusFile = join(specialistDir, `${issueId}-status.json`);
-        const statusData = {
-          issueId,
-          specialist: name,
-          status,
-          notes: notes || '',
-          timestamp: new Date().toISOString(),
-        };
+    const statusFile = join(specialistDir, `${issueId}-status.json`);
+    const statusData = {
+      issueId,
+      specialist: name,
+      status,
+      notes: notes || '',
+      timestamp: new Date().toISOString(),
+    };
 
-        await writeFile(statusFile, JSON.stringify(statusData, null, 2));
+    yield* Effect.promise(() => writeFile(statusFile, JSON.stringify(statusData, null, 2)));
 
-        console.log(`[specialists] ${name} reported status for ${issueId}: ${status}`);
+    console.log(`[specialists] ${name} reported status for ${issueId}: ${status}`);
 
-        // When specialist reports completion (passed/blocked/failed), set state to idle
-        if (['passed', 'blocked', 'failed'].includes(status)) {
-          const { getTmuxSessionName } = await import('../../../lib/cloister/specialists.js');
-          const tmuxSession = getTmuxSessionName(name as SpecialistType);
-          saveAgentRuntimeState(tmuxSession, {
-            state: 'idle',
-            lastActivity: new Date().toISOString(),
-          });
-        }
+    // When specialist reports completion (passed/blocked/failed), set state to idle
+    if (['passed', 'blocked', 'failed'].includes(status)) {
+      const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+      const tmuxSession = getTmuxSessionName(name as SpecialistType);
+      saveAgentRuntimeState(tmuxSession, {
+        state: 'idle',
+        lastActivity: new Date().toISOString(),
+      });
+    }
 
-        // Emit domain event based on status
-        if (status === 'passed') {
-          await Effect.runPromise(eventStore.append({
-            type: 'specialist.completed',
-            timestamp: new Date().toISOString(),
-            payload: { name: name as SpecialistType, issueId },
-          }));
-        } else if (status === 'failed' || status === 'blocked') {
-          await Effect.runPromise(eventStore.append({
-            type: 'specialist.failed',
-            timestamp: new Date().toISOString(),
-            payload: { name: name as SpecialistType, issueId, error: notes || `${name} reported ${status}` },
-          }));
-        }
+    // Emit domain event based on status
+    if (status === 'passed') {
+      yield* eventStore.append({
+        type: 'specialist.completed',
+        timestamp: new Date().toISOString(),
+        payload: { name: name as SpecialistType, issueId },
+      });
+    } else if (status === 'failed' || status === 'blocked') {
+      yield* eventStore.append({
+        type: 'specialist.failed',
+        timestamp: new Date().toISOString(),
+        payload: { name: name as SpecialistType, issueId, error: notes || `${name} reported ${status}` },
+      });
+    }
 
-        return jsonResponse({ success: true });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error saving specialist status:', error);
-        return jsonResponse(
-          { error: 'Failed to save status: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({ success: true });
+  })),
 );
 
 // ─── Route: GET /api/specialists/:name/cost ───────────────────────────────────
@@ -855,93 +772,87 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
 const getSpecialistCostRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:name/cost',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { getSessionId } = await import('../../../lib/cloister/specialists.js');
-        const sessionId = getSessionId(name as SpecialistType);
+    const { getSessionId } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const sessionId = getSessionId(name as SpecialistType);
 
-        if (!sessionId) {
-          return jsonResponse({ cost: 0, inputTokens: 0, outputTokens: 0 });
-        }
+    if (!sessionId) {
+      return jsonResponse({ cost: 0, inputTokens: 0, outputTokens: 0 });
+    }
 
-        // Find the JSONL session file
-        const homeDir = process.env.HOME || homedir();
-        const claudeProjectsDir = join(homeDir, '.claude', 'projects');
+    // Find the JSONL session file
+    const homeDir = process.env.HOME || homedir();
+    const claudeProjectsDir = join(homeDir, '.claude', 'projects');
 
-        const projectDirName = `-${homeDir.replace(/^\//, '').replace(/\//g, '-')}`;
-        const projectDir = join(claudeProjectsDir, projectDirName);
-        const sessionsIndexPath = join(projectDir, 'sessions-index.json');
+    const projectDirName = `-${homeDir.replace(/^\//, '').replace(/\//g, '-')}`;
+    const projectDir = join(claudeProjectsDir, projectDirName);
+    const sessionsIndexPath = join(projectDir, 'sessions-index.json');
 
-        let cost = 0;
-        let inputTokens = 0;
-        let outputTokens = 0;
-        let cacheReadTokens = 0;
-        let cacheWriteTokens = 0;
-        let detectedModel = '';
+    let cost = 0;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheReadTokens = 0;
+    let cacheWriteTokens = 0;
+    let detectedModel = '';
 
-        if (existsSync(sessionsIndexPath)) {
-          const indexContent = JSON.parse(await readFile(sessionsIndexPath, 'utf-8'));
-          const sessionEntry = indexContent.entries?.find(
-            (e: { sessionId: string }) => e.sessionId === sessionId,
-          );
+    if (existsSync(sessionsIndexPath)) {
+      const indexContent = JSON.parse(yield* Effect.promise(() => readFile(sessionsIndexPath, 'utf-8')));
+      const sessionEntry = indexContent.entries?.find(
+        (e: { sessionId: string }) => e.sessionId === sessionId,
+      );
 
-          if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
-            const jsonlContent = await readFile(sessionEntry.fullPath, 'utf-8');
-            const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
+      if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
+        const jsonlContent = yield* Effect.promise(() => readFile(sessionEntry.fullPath, 'utf-8'));
+        const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
 
-            for (const line of lines) {
-              try {
-                const entry = JSON.parse(line);
-                const usage = entry.message?.usage || entry.usage;
-                const model = entry.message?.model || entry.model;
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            const usage = entry.message?.usage || entry.usage;
+            const model = entry.message?.model || entry.model;
 
-                if (usage) {
-                  inputTokens += usage.input_tokens || 0;
-                  outputTokens += usage.output_tokens || 0;
-                  cacheReadTokens += usage.cache_read_input_tokens || 0;
-                  cacheWriteTokens += usage.cache_creation_input_tokens || 0;
-                }
-                if (model && !detectedModel) {
-                  detectedModel = model;
-                }
-              } catch {
-                // Skip malformed lines
-              }
+            if (usage) {
+              inputTokens += usage.input_tokens || 0;
+              outputTokens += usage.output_tokens || 0;
+              cacheReadTokens += usage.cache_read_input_tokens || 0;
+              cacheWriteTokens += usage.cache_creation_input_tokens || 0;
             }
+            if (model && !detectedModel) {
+              detectedModel = model;
+            }
+          } catch {
+            // Skip malformed lines
           }
         }
+      }
+    }
 
-        if (inputTokens > 0 || outputTokens > 0) {
-          const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
-          const pricing = getPricing(modelInfo.provider, modelInfo.model);
-          if (pricing) {
-            const usage: TokenUsage = {
-              inputTokens,
-              outputTokens,
-              cacheReadTokens,
-              cacheWriteTokens,
-            };
-            cost = calculateCost(usage, pricing);
-          }
-        }
-
-        return jsonResponse({
-          cost,
+    if (inputTokens > 0 || outputTokens > 0) {
+      const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
+      const pricing = getPricing(modelInfo.provider, modelInfo.model);
+      if (pricing) {
+        const usage: TokenUsage = {
           inputTokens,
           outputTokens,
           cacheReadTokens,
           cacheWriteTokens,
-          model: detectedModel,
-        });
-      }    catch (error: unknown) {
-        console.error('Error getting specialist cost:', error);
-        return jsonResponse({ cost: 0, inputTokens: 0, outputTokens: 0 });
-        }})
-  }),
+        };
+        cost = calculateCost(usage, pricing);
+      }
+    }
+
+    return jsonResponse({
+      cost,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
+      model: detectedModel,
+    });
+  })),
 );
 
 // ─── Route: GET /api/specialists/:name/queue ──────────────────────────────────
@@ -949,7 +860,7 @@ const getSpecialistCostRoute = HttpRouter.add(
 const getSpecialistQueueRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:name/queue',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
 
@@ -960,27 +871,17 @@ const getSpecialistQueueRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { checkSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
-        const queue = checkSpecialistQueue(name as SpecialistType);
+    const { checkSpecialistQueue } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const queue = checkSpecialistQueue(name as SpecialistType);
 
-        return jsonResponse({
-          specialistName: name,
-          hasWork: queue.hasWork,
-          urgentCount: queue.urgentCount,
-          totalCount: queue.items.length,
-          items: queue.items,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error getting queue for ${name}:`, error);
-        return jsonResponse(
-          { error: `Failed to get queue for ${name}: ${msg}` },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({
+      specialistName: name,
+      hasWork: queue.hasWork,
+      urgentCount: queue.urgentCount,
+      totalCount: queue.items.length,
+      items: queue.items,
+    });
+  })),
 );
 
 // ─── Route: POST /api/specialists/:name/queue ─────────────────────────────────
@@ -988,7 +889,7 @@ const getSpecialistQueueRoute = HttpRouter.add(
 const postSpecialistQueueRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:name/queue',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const body = yield* readJsonBody;
@@ -1017,55 +918,45 @@ const postSpecialistQueueRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId is required' }, { status: 400 });
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { spawnEphemeralSpecialist, submitToSpecialistQueue } =
-          await import('../../../lib/cloister/specialists.js');
+    const { spawnEphemeralSpecialist, submitToSpecialistQueue } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-        const resolved = resolveProjectFromIssue(issueId);
-        if (!resolved) {
-          return jsonResponse(
-            { error: `No project configured for ${issueId}. Add it to projects.yaml.` },
-            { status: 400 },
-          );
-        }
+    const resolved = resolveProjectFromIssue(issueId);
+    if (!resolved) {
+      return jsonResponse(
+        { error: `No project configured for ${issueId}. Add it to projects.yaml.` },
+        { status: 400 },
+      );
+    }
 
-        const result = await spawnEphemeralSpecialist(resolved.projectKey, name as SpecialistType, {
-          issueId,
-          workspace,
-          branch,
-          promptOverride: customPrompt,
-        });
+    const result = yield* Effect.promise(() => spawnEphemeralSpecialist(resolved.projectKey, name as SpecialistType, {
+      issueId,
+      workspace,
+      branch,
+      promptOverride: customPrompt,
+    }));
 
-        if (!result.success && result.error === 'specialist_busy') {
-          submitToSpecialistQueue(name as SpecialistType, {
-            priority: priority as 'urgent' | 'normal' | 'low',
-            source: 'api-queue',
-            issueId,
-            workspace,
-            branch,
-          });
-          return jsonResponse({
-            success: true,
-            queued: true,
-            message: `${name} busy, task queued for ${issueId}`,
-          });
-        }
+    if (!result.success && result.error === 'specialist_busy') {
+      submitToSpecialistQueue(name as SpecialistType, {
+        priority: priority as 'urgent' | 'normal' | 'low',
+        source: 'api-queue',
+        issueId,
+        workspace,
+        branch,
+      });
+      return jsonResponse({
+        success: true,
+        queued: true,
+        message: `${name} busy, task queued for ${issueId}`,
+      });
+    }
 
-        return jsonResponse({
-          success: result.success,
-          queued: false,
-          ...result,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error queuing work to ${name}:`, error);
-        return jsonResponse(
-          { error: `Failed to queue work to ${name}: ${msg}` },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({
+      success: result.success,
+      queued: false,
+      ...result,
+    });
+  })),
 );
 
 // ─── Route: DELETE /api/specialists/:name/queue/:itemId ───────────────────────
@@ -1073,7 +964,7 @@ const postSpecialistQueueRoute = HttpRouter.add(
 const deleteSpecialistQueueItemRoute = HttpRouter.add(
   'DELETE',
   '/api/specialists/:name/queue/:itemId',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const itemId = params['itemId'] as string;
@@ -1085,31 +976,21 @@ const deleteSpecialistQueueItemRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { completeSpecialistTask } = await import('../../../lib/cloister/specialists.js');
-        const success = completeSpecialistTask(name as SpecialistType, itemId);
+    const { completeSpecialistTask } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const success = completeSpecialistTask(name as SpecialistType, itemId);
 
-        if (!success) {
-          return jsonResponse(
-            { error: `Item ${itemId} not found in queue for ${name}` },
-            { status: 404 },
-          );
-        }
+    if (!success) {
+      return jsonResponse(
+        { error: `Item ${itemId} not found in queue for ${name}` },
+        { status: 404 },
+      );
+    }
 
-        return jsonResponse({
-          success: true,
-          message: `Removed item ${itemId} from ${name}'s queue`,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error removing item from ${name}'s queue:`, error);
-        return jsonResponse(
-          { error: `Failed to remove item: ${msg}` },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({
+      success: true,
+      message: `Removed item ${itemId} from ${name}'s queue`,
+    });
+  })),
 );
 
 // ─── Route: PUT /api/specialists/:name/queue/reorder ──────────────────────────
@@ -1117,7 +998,7 @@ const deleteSpecialistQueueItemRoute = HttpRouter.add(
 const putSpecialistQueueReorderRoute = HttpRouter.add(
   'PUT',
   '/api/specialists/:name/queue/reorder',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const body = yield* readJsonBody;
@@ -1137,31 +1018,21 @@ const putSpecialistQueueReorderRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { reorderHookItems } = await import('../../../lib/hooks.js');
-        const success = reorderHookItems(name, itemIds as string[]);
+    const { reorderHookItems } = yield* Effect.promise(() => import('../../../lib/hooks.js'));
+    const success = reorderHookItems(name, itemIds as string[]);
 
-        if (!success) {
-          return jsonResponse(
-            { error: 'Failed to reorder queue. Check that all item IDs are valid.' },
-            { status: 400 },
-          );
-        }
+    if (!success) {
+      return jsonResponse(
+        { error: 'Failed to reorder queue. Check that all item IDs are valid.' },
+        { status: 400 },
+      );
+    }
 
-        return jsonResponse({
-          success: true,
-          message: `Reordered queue for ${name}`,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error reordering queue for ${name}:`, error);
-        return jsonResponse(
-          { error: `Failed to reorder queue: ${msg}` },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({
+      success: true,
+      message: `Reordered queue for ${name}`,
+    });
+  })),
 );
 
 // ─── Route: POST /api/specialists/:name/auto-complete ────────────────────────
@@ -1169,7 +1040,7 @@ const putSpecialistQueueReorderRoute = HttpRouter.add(
 const postSpecialistAutoCompleteRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:name/auto-complete',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
     const body = yield* readJsonBody;
@@ -1192,15 +1063,13 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const {
-          getTmuxSessionName,
-          completeSpecialistTask,
-          wakeSpecialistWithTask,
-          checkSpecialistQueue,
-          submitToSpecialistQueue,
-        } = await import('../../../lib/cloister/specialists.js');
+    const {
+      getTmuxSessionName,
+      completeSpecialistTask,
+      wakeSpecialistWithTask,
+      checkSpecialistQueue,
+      submitToSpecialistQueue,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
         const tmuxSession = getTmuxSessionName(name as SpecialistType);
 
@@ -1250,7 +1119,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 
             if (existsSync(workStateFile)) {
               try {
-                const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
+                const workState = JSON.parse(yield* Effect.promise(() => readFile(workStateFile, 'utf-8')));
                 workspace = workState.workspace;
                 branch = workState.branch || `feature/${issueId.toLowerCase()}`;
               } catch {}
@@ -1329,32 +1198,27 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 
         if (nextValidTask) {
           console.log(`[specialists] Waking ${name} for next task: ${nextValidTask.payload.issueId}`);
-          await wakeSpecialistWithTask(name as SpecialistType, {
+          yield* Effect.promise(() => wakeSpecialistWithTask(name as SpecialistType, {
             issueId: nextValidTask.payload.issueId!,
             workspace: nextValidTask.payload.context?.workspace,
             branch: nextValidTask.payload.context?.branch,
-          });
+          }));
           completeSpecialistTask(name as SpecialistType, nextValidTask.id);
         }
 
-        await Effect.runPromise(eventStore.append({
-          type: 'specialist.completed',
-          timestamp: new Date().toISOString(),
-          payload: { name: name as SpecialistType, issueId },
-        }));
+    yield* eventStore.append({
+      type: 'specialist.completed',
+      timestamp: new Date().toISOString(),
+      payload: { name: name as SpecialistType, issueId },
+    });
 
-        return jsonResponse({
-          success: true,
-          status,
-          issueId,
-          nextTaskQueued: !!nextValidTask,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`Error processing auto-complete for ${name}:`, error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    return jsonResponse({
+      success: true,
+      status,
+      issueId,
+      nextTaskQueued: !!nextValidTask,
+    });
+  })),
 );
 
 // ─── Route: GET /api/specialists/:project/:type/status ────────────────────────
@@ -1362,7 +1226,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 const getProjectSpecialistStatusRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:type/status',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1374,20 +1238,10 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { getSpecialistStatus } = await import('../../../lib/cloister/specialists.js');
-        const status = await getSpecialistStatus(type, project);
-        return jsonResponse(status);
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting per-project specialist status:', error);
-        return jsonResponse(
-          { error: 'Failed to get specialist status: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    const { getSpecialistStatus } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const status = yield* Effect.promise(() => getSpecialistStatus(type, project));
+    return jsonResponse(status);
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/kill ────────────────────────
@@ -1395,7 +1249,7 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
 const postProjectSpecialistKillRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/kill',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1407,29 +1261,19 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { getTmuxSessionName } = await import('../../../lib/cloister/specialists.js');
-        const tmuxSession = getTmuxSessionName(type, project);
-        await execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {});
-        // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
-        saveAgentRuntimeState(tmuxSession, {
-          state: 'idle',
-          lastActivity: new Date().toISOString(),
-        });
-        return jsonResponse({
-          success: true,
-          message: `Killed ${type} (${project})`,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error killing per-project specialist:', error);
-        return jsonResponse(
-          { error: 'Failed to kill specialist: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const tmuxSession = getTmuxSessionName(type, project);
+    yield* Effect.promise(() => execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {}));
+    // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+    return jsonResponse({
+      success: true,
+      message: `Killed ${type} (${project})`,
+    });
+  })),
 );
 
 // ─── Route: GET /api/specialists/:project/:type/queue ────────────────────────
@@ -1437,7 +1281,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
 const getProjectSpecialistQueueRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:type/queue',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const type = params['type'] as string;
 
@@ -1448,20 +1292,10 @@ const getProjectSpecialistQueueRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { checkSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
-        const queue = checkSpecialistQueue(type);
-        return jsonResponse(queue);
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting per-project specialist queue:', error);
-        return jsonResponse(
-          { error: 'Failed to get queue: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    const { checkSpecialistQueue } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const queue = checkSpecialistQueue(type);
+    return jsonResponse(queue);
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/spawn ───────────────────────
@@ -1469,7 +1303,7 @@ const getProjectSpecialistQueueRoute = HttpRouter.add(
 const postProjectSpecialistSpawnRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/spawn',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1493,31 +1327,21 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { spawnEphemeralSpecialist } = await import('../../../lib/cloister/specialists.js');
-        const result = await spawnEphemeralSpecialist(project, type, {
-          issueId,
-          branch,
-          workspace,
-          prUrl,
-          context,
-        });
+    const { spawnEphemeralSpecialist } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const result = yield* Effect.promise(() => spawnEphemeralSpecialist(project, type, {
+      issueId,
+      branch,
+      workspace,
+      prUrl,
+      context,
+    }));
 
-        if (result.success) {
-          return jsonResponse(result);
-        } else {
-          return jsonResponse({ error: result.message }, { status: 500 });
-        }
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error spawning specialist:', error);
-        return jsonResponse(
-          { error: 'Failed to spawn specialist: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    if (result.success) {
+      return jsonResponse(result);
+    } else {
+      return jsonResponse({ error: result.message }, { status: 500 });
+    }
+  })),
 );
 
 // ─── Route: GET /api/specialists/:project/:type/runs ──────────────────────────
@@ -1525,7 +1349,7 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
 const getProjectSpecialistRunsRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:type/runs',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1543,20 +1367,10 @@ const getProjectSpecialistRunsRoute = HttpRouter.add(
       if (offsetParam) offset = parseInt(offsetParam, 10);
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { listRunLogs } = await import('../../../lib/cloister/specialist-logs.js');
-        const runs = listRunLogs(project, type, { limit, offset });
-        return jsonResponse(runs);
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error listing run logs:', error);
-        return jsonResponse(
-          { error: 'Failed to list run logs: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    const { listRunLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
+    const runs = listRunLogs(project, type, { limit, offset });
+    return jsonResponse(runs);
+  })),
 );
 
 // ─── Route: GET /api/specialists/:project/:type/runs/:runId/stream ────────────
@@ -1565,16 +1379,14 @@ const getProjectSpecialistRunsRoute = HttpRouter.add(
 const getProjectSpecialistRunStreamRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:type/runs/:runId/stream',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
     const runId = params['runId'] as string;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { getRunLogPath, isRunLogActive } =
-          await import('../../../lib/cloister/specialist-logs.js');
+    const { getRunLogPath, isRunLogActive } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
 
         const logPath = getRunLogPath(project, type, runId);
 
@@ -1652,15 +1464,7 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
             Connection: 'keep-alive',
           },
         });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error streaming run log:', error);
-        return jsonResponse(
-          { error: 'Failed to stream run log: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+  })),
 );
 
 // ─── Route: GET /api/specialists/:project/:type/runs/:runId ───────────────────
@@ -1668,33 +1472,23 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
 const getProjectSpecialistRunRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:type/runs/:runId',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
     const runId = params['runId'] as string;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { getRunLog, parseLogMetadata } =
-          await import('../../../lib/cloister/specialist-logs.js');
-        const content = getRunLog(project, type, runId);
+    const { getRunLog, parseLogMetadata } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
+    const content = getRunLog(project, type, runId);
 
-        if (!content) {
-          return jsonResponse({ error: 'Run log not found' }, { status: 404 });
-        }
+    if (!content) {
+      return jsonResponse({ error: 'Run log not found' }, { status: 404 });
+    }
 
-        const metadata = parseLogMetadata(content);
-        return jsonResponse({ runId, content, metadata });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting run log:', error);
-        return jsonResponse(
-          { error: 'Failed to get run log: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    const metadata = parseLogMetadata(content);
+    return jsonResponse({ runId, content, metadata });
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/runs/:runId/terminate ────────
@@ -1702,7 +1496,7 @@ const getProjectSpecialistRunRoute = HttpRouter.add(
 const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/runs/:runId/terminate',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1714,20 +1508,10 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { terminateSpecialist } = await import('../../../lib/cloister/specialists.js');
-        await terminateSpecialist(project, type);
-        return jsonResponse({ success: true, message: 'Specialist terminated' });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error terminating specialist:', error);
-        return jsonResponse(
-          { error: 'Failed to terminate specialist: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    const { terminateSpecialist } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    yield* Effect.promise(() => terminateSpecialist(project, type));
+    return jsonResponse({ success: true, message: 'Specialist terminated' });
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/grace/pause ──────────────────
@@ -1735,7 +1519,7 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
 const postProjectSpecialistGracePauseRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/grace/pause',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1747,28 +1531,18 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { pauseGracePeriod } = await import('../../../lib/cloister/specialists.js');
-        const success = pauseGracePeriod(project, type);
+    const { pauseGracePeriod } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const success = pauseGracePeriod(project, type);
 
-        if (success) {
-          return jsonResponse({ success: true, message: 'Grace period paused' });
-        } else {
-          return jsonResponse(
-            { error: 'No active grace period to pause' },
-            { status: 400 },
-          );
-        }
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error pausing grace period:', error);
-        return jsonResponse(
-          { error: 'Failed to pause grace period: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    if (success) {
+      return jsonResponse({ success: true, message: 'Grace period paused' });
+    } else {
+      return jsonResponse(
+        { error: 'No active grace period to pause' },
+        { status: 400 },
+      );
+    }
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/grace/resume ─────────────────
@@ -1776,7 +1550,7 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
 const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/grace/resume',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1788,28 +1562,18 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { resumeGracePeriod } = await import('../../../lib/cloister/specialists.js');
-        const success = resumeGracePeriod(project, type);
+    const { resumeGracePeriod } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const success = resumeGracePeriod(project, type);
 
-        if (success) {
-          return jsonResponse({ success: true, message: 'Grace period resumed' });
-        } else {
-          return jsonResponse(
-            { error: 'No paused grace period to resume' },
-            { status: 400 },
-          );
-        }
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error resuming grace period:', error);
-        return jsonResponse(
-          { error: 'Failed to resume grace period: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    if (success) {
+      return jsonResponse({ success: true, message: 'Grace period resumed' });
+    } else {
+      return jsonResponse(
+        { error: 'No paused grace period to resume' },
+        { status: 400 },
+      );
+    }
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/grace/exit ───────────────────
@@ -1817,7 +1581,7 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
 const postProjectSpecialistGraceExitRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/grace/exit',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1829,23 +1593,13 @@ const postProjectSpecialistGraceExitRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { exitGracePeriod } = await import('../../../lib/cloister/specialists.js');
-        exitGracePeriod(project, type);
-        return jsonResponse({
-          success: true,
-          message: 'Specialist terminated immediately',
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error exiting grace period:', error);
-        return jsonResponse(
-          { error: 'Failed to exit grace period: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    const { exitGracePeriod } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    exitGracePeriod(project, type);
+    return jsonResponse({
+      success: true,
+      message: 'Specialist terminated immediately',
+    });
+  })),
 );
 
 // ─── Route: GET /api/specialists/:project/:type/grace ────────────────────────
@@ -1853,7 +1607,7 @@ const postProjectSpecialistGraceExitRoute = HttpRouter.add(
 const getProjectSpecialistGraceRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:type/grace',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1865,25 +1619,15 @@ const getProjectSpecialistGraceRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { getGracePeriodState } = await import('../../../lib/cloister/specialists.js');
-        const state = getGracePeriodState(project, type);
+    const { getGracePeriodState } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const state = getGracePeriodState(project, type);
 
-        if (state) {
-          return jsonResponse(state);
-        } else {
-          return jsonResponse({ error: 'No active grace period' }, { status: 404 });
-        }
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting grace period state:', error);
-        return jsonResponse(
-          { error: 'Failed to get grace period state: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    if (state) {
+      return jsonResponse(state);
+    } else {
+      return jsonResponse({ error: 'No active grace period' }, { status: 404 });
+    }
+  })),
 );
 
 // ─── Route: GET /api/specialists/:project/:type/context ──────────────────────
@@ -1891,31 +1635,21 @@ const getProjectSpecialistGraceRoute = HttpRouter.add(
 const getProjectSpecialistContextRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:type/context',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { loadContextDigest } =
-          await import('../../../lib/cloister/specialist-context.js');
-        const digest = loadContextDigest(project, type);
+    const { loadContextDigest } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialist-context.js'));
+    const digest = loadContextDigest(project, type);
 
-        if (digest) {
-          return jsonResponse({ digest });
-        } else {
-          return jsonResponse({ error: 'No context digest found' }, { status: 404 });
-        }
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting context digest:', error);
-        return jsonResponse(
-          { error: 'Failed to get context digest: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    if (digest) {
+      return jsonResponse({ digest });
+    } else {
+      return jsonResponse({ error: 'No context digest found' }, { status: 404 });
+    }
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/context/regenerate ───────────
@@ -1923,34 +1657,24 @@ const getProjectSpecialistContextRoute = HttpRouter.add(
 const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/context/regenerate',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { regenerateContextDigest } =
-          await import('../../../lib/cloister/specialist-context.js');
-        const digest = await regenerateContextDigest(project, type);
+    const { regenerateContextDigest } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialist-context.js'));
+    const digest = yield* Effect.promise(() => regenerateContextDigest(project, type));
 
-        if (digest) {
-          return jsonResponse({ digest, message: 'Context digest regenerated' });
-        } else {
-          return jsonResponse(
-            { error: 'Failed to generate context digest' },
-            { status: 500 },
-          );
-        }
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error regenerating context digest:', error);
-        return jsonResponse(
-          { error: 'Failed to regenerate context digest: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    if (digest) {
+      return jsonResponse({ digest, message: 'Context digest regenerated' });
+    } else {
+      return jsonResponse(
+        { error: 'Failed to generate context digest' },
+        { status: 500 },
+      );
+    }
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/complete ─────────────────────
@@ -1958,7 +1682,7 @@ const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
 const postProjectSpecialistCompleteRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/complete',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
@@ -1979,24 +1703,14 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
       );
     }
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { signalSpecialistCompletion } =
-          await import('../../../lib/cloister/specialists.js');
-        signalSpecialistCompletion(project, type, { status, notes });
-        return jsonResponse({
-          success: true,
-          message: 'Specialist completion signaled, grace period started',
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error signaling completion:', error);
-        return jsonResponse(
-          { error: 'Failed to signal completion: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    const { signalSpecialistCompletion } =
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    signalSpecialistCompletion(project, type, { status, notes });
+    return jsonResponse({
+      success: true,
+      message: 'Specialist completion signaled, grace period started',
+    });
+  })),
 );
 
 // ─── Route: GET /api/specialists/:project/:type/latest-log ───────────────────
@@ -2004,40 +1718,32 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
 const getProjectSpecialistLatestLogRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:type/latest-log',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    return yield* Effect.tryPromise({
-      try: async () => {
-        const runsDir = join(homedir(), '.panopticon', 'specialists', project, type, 'runs');
-        if (!existsSync(runsDir)) {
-          return jsonResponse({ log: null, message: 'No runs found' });
-        }
+    const runsDir = join(homedir(), '.panopticon', 'specialists', project, type, 'runs');
+    if (!existsSync(runsDir)) {
+      return jsonResponse({ log: null, message: 'No runs found' });
+    }
 
-        const files = (await readdir(runsDir))
-          .filter((f) => f.endsWith('.log'))
-          .sort()
-          .reverse();
+    const files = (yield* Effect.promise(() => readdir(runsDir)))
+      .filter((f) => f.endsWith('.log'))
+      .sort()
+      .reverse();
 
-        if (files.length === 0) {
-          return jsonResponse({ log: null, message: 'No run logs found' });
-        }
+    if (files.length === 0) {
+      return jsonResponse({ log: null, message: 'No run logs found' });
+    }
 
-        const latestLog = await readFile(join(runsDir, files[0]), 'utf-8');
-        return jsonResponse({
-          log: latestLog,
-          file: files[0],
-          totalRuns: files.length,
-        });
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-      },
+    const latestLog = yield* Effect.promise(() => readFile(join(runsDir, files[0]), 'utf-8'));
+    return jsonResponse({
+      log: latestLog,
+      file: files[0],
+      totalRuns: files.length,
     });
-  }),
+  })),
 );
 
 // ─── Route: POST /api/specialists/:project/:type/logs/cleanup ────────────────
@@ -2045,33 +1751,23 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
 const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:type/logs/cleanup',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { cleanupOldLogs } = await import('../../../lib/cloister/specialist-logs.js');
-        const { getSpecialistRetention } = await import('../../../lib/projects.js');
+    const { cleanupOldLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
+    const { getSpecialistRetention } = yield* Effect.promise(() => import('../../../lib/projects.js'));
 
-        const retention = getSpecialistRetention(project);
-        const deleted = cleanupOldLogs(project, type, retention);
+    const retention = getSpecialistRetention(project);
+    const deleted = cleanupOldLogs(project, type, retention);
 
-        return jsonResponse({
-          success: true,
-          deleted,
-          message: `Cleaned up ${deleted} old logs`,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error cleaning up logs:', error);
-        return jsonResponse(
-          { error: 'Failed to clean up logs: ' + msg },
-          { status: 500 },
-        );
-        }})
-  }),
+    return jsonResponse({
+      success: true,
+      deleted,
+      message: `Cleaned up ${deleted} old logs`,
+    });
+  })),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
