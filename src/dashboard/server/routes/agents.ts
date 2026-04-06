@@ -1451,8 +1451,9 @@ const postAgentsRoute = HttpRouter.add(
           await writeFile(resumePromptFile, resumePrompt);
 
           // Resume the existing Claude session — keeps full conversation history and session continuity.
-          // Pass the resume prompt via -p so the agent gets context about why it was resumed.
-          const resumeContent = `#!/bin/bash\nprompt=$(cat "${resumePromptFile}")\nexec claude --resume "${savedSessionId}" --dangerously-skip-permissions -p "$prompt"\n`;
+          // Start with --resume (interactive), then send the message via tmux after startup.
+          // Note: -p means "print mode" which exits after one response — NOT what we want for agents.
+          const resumeContent = `#!/bin/bash\nexec claude --resume "${savedSessionId}" --dangerously-skip-permissions\n`;
           await writeFile(resumeLauncher, resumeContent, { mode: 0o755 });
 
           // Spawn tmux session with resume command
@@ -1463,6 +1464,21 @@ const postAgentsRoute = HttpRouter.add(
           );
 
           console.log(`[start-agent] Resumed ${agentSessionName} session ${savedSessionId.slice(0, 8)}...`);
+
+          // Send the resume prompt via tmux after Claude starts up
+          // Use sendKeysAsync (load-buffer + paste-buffer pattern) for reliable delivery
+          const { sendKeysAsync } = await import('../../../lib/tmux.js');
+          (async () => {
+            // Wait for Claude to initialize and show the prompt
+            await new Promise(r => setTimeout(r, 5000));
+            try {
+              await sendKeysAsync(agentSessionName, resumePrompt);
+              console.log(`[start-agent] Sent resume prompt to ${agentSessionName}`);
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.error(`[start-agent] Failed to send resume prompt to ${agentSessionName}: ${msg}`);
+            }
+          })();
 
           // Update agent state
           existingAgentState.status = 'running';
