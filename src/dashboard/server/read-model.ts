@@ -131,10 +131,37 @@ export const ReadModelServiceLive = Layer.effect(
             console.log(`[ReadModel] Pruned ${pruned} stale agents from projection cache`);
           }
 
+          // Also pick up agents created after the last cache save (new state files not in cache)
+          const cachedIds = new Set(validAgents.map((a: any) => a.id));
+          const { readdirSync: readdirSyncFs } = yield* Effect.promise(() => import('node:fs'));
+          const newAgentIds: string[] = [];
+          try {
+            const entries = readdirSyncFs(agentsDir);
+            for (const entry of entries) {
+              if (!cachedIds.has(entry) && existsSyncFs(joinPath(agentsDir, entry, 'state.json'))) {
+                newAgentIds.push(entry);
+              }
+            }
+          } catch { /* agentsDir may not exist on first boot */ }
+
+          // Load new agent state files and add them to the snapshot
+          const { readFileSync: readFileSyncFs } = yield* Effect.promise(() => import('node:fs'));
+          const newAgents: any[] = [];
+          for (const agentId of newAgentIds) {
+            try {
+              const raw = readFileSyncFs(joinPath(agentsDir, agentId, 'state.json'), 'utf-8');
+              newAgents.push(JSON.parse(raw));
+            } catch { /* skip unreadable state files */ }
+          }
+          if (newAgents.length > 0) {
+            console.log(`[ReadModel] Found ${newAgents.length} agent(s) created after last cache save: ${newAgents.map((a) => a.id).join(', ')}`);
+          }
+
+          const allAgents = [...validAgents, ...newAgents];
           state = {
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
-            agentsById: Object.fromEntries(validAgents.map((a: any) => [a.id, a])),
+            agentsById: Object.fromEntries(allAgents.map((a: any) => [a.id, a])),
             specialistsByName: Object.fromEntries((cached.specialists ?? []).map((s) => [s.name, s])),
             reviewStatusByIssueId: Object.fromEntries((cached.reviewStatuses ?? []).map((r) => [r.issueId, r])),
             issuesRaw: cached.issues ?? [],
@@ -143,7 +170,7 @@ export const ReadModelServiceLive = Layer.effect(
           usedProjectionCache = true;
           console.log(
             `[ReadModel] Fast bootstrap from projection cache: seq=${cached.sequence}, ` +
-            `agents=${(cached.agents ?? []).length}, issues=${(cached.issues ?? []).length}`,
+            `agents=${allAgents.length} (${validAgents.length} cached + ${newAgents.length} new), issues=${(cached.issues ?? []).length}`,
           );
         }
       } catch {

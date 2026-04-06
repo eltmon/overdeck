@@ -16,7 +16,8 @@ import { listRunningAgents } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
 import { getEventStore } from '../event-store.js'
-import type { AgentEnrichmentChangedEvent } from '@panopticon/contracts'
+import type { AgentEnrichmentChangedEvent, AgentCreatedEvent } from '@panopticon/contracts'
+import { toAgentStatus, toAgentPhase, toAgentResolution } from '../read-model.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,8 @@ interface EnrichmentServiceState {
   lastEnrichment: Map<string, AgentEnrichment>
   /** Last known JSONL file mtime per agent — skip re-scan if unchanged */
   lastMtime: Map<string, number | null>
+  /** Agent IDs for which we've already emitted agent.created this server lifetime */
+  seenAgentIds: Set<string>
 }
 
 // ─── Diff helpers ─────────────────────────────────────────────────────────────
@@ -55,6 +58,44 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   await Promise.all(
     runningAgents.map(async (agent) => {
       const { id: agentId, issueId, startedAt } = agent
+
+      // If this agent hasn't been seen since server start, emit agent.created so the
+      // read model adds it to agentsById (handles agents started after last cache save).
+      if (!state.seenAgentIds.has(agentId)) {
+        state.seenAgentIds.add(agentId)
+        try {
+          const createdEvent: Omit<AgentCreatedEvent, 'sequence'> = {
+            type: 'agent.created',
+            timestamp: new Date().toISOString(),
+            payload: {
+              agentId,
+              issueId: issueId ?? agentId,
+              agent: {
+                id: agentId,
+                issueId: issueId ?? agentId,
+                workspace: agent.workspace || undefined,
+                runtime: agent.runtime || undefined,
+                model: agent.model || undefined,
+                status: toAgentStatus(agent.status),
+                startedAt: agent.startedAt || undefined,
+                lastActivity: agent.lastActivity || undefined,
+                branch: agent.branch || undefined,
+                costSoFar: agent.costSoFar,
+                sessionId: agent.sessionId || undefined,
+                phase: toAgentPhase(agent.phase),
+                agentPhase: undefined,
+                hasPendingQuestion: undefined,
+                pendingQuestionCount: undefined,
+                resolution: toAgentResolution(agent.resolution),
+                resolutionCount: undefined,
+              },
+            },
+          }
+          eventStore.append(createdEvent as never)
+        } catch {
+          // Non-fatal — event store may not be ready at startup
+        }
+      }
 
       // Determine if the agent's issue has an active specialist
       let hasActiveSpecialist = false
@@ -127,6 +168,7 @@ const serviceState: EnrichmentServiceState = {
   timer: null,
   lastEnrichment: new Map(),
   lastMtime: new Map(),
+  seenAgentIds: new Set(),
 }
 
 export function startAgentEnrichmentService(): void {
