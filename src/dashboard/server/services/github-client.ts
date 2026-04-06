@@ -273,27 +273,25 @@ function makeGitHubClientImpl(token: string): GitHubClientShape {
     ensureLabel: (owner, repo, name, color = '0075ca', description = '') =>
       Effect.tryPromise({
         try: async () => {
-          // Try to create via ghFetch; intercept 422 (label already exists) before ghFetch
-          // throws, then fall back to fetching the existing label.
-          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/labels`, {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, color, description }),
-          });
-          if (res.status === 422) {
-            // Label already exists — fetch it via ghFetch
-            const getRes = await ghFetch(
-              `https://api.github.com/repos/${owner}/${repo}/labels/${encodeURIComponent(name)}`,
-            );
-            const data = (await getRes.json()) as any;
-            return { id: data.id, name: data.name, color: data.color } satisfies GitHubLabel;
+          // Try to create; if the label already exists (422), fall back to fetching it.
+          let createRes: Response;
+          try {
+            createRes = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/labels`, {
+              method: 'POST',
+              body: JSON.stringify({ name, color, description }),
+            });
+          } catch (err) {
+            // ghFetch throws on !res.ok including 422 (label already exists)
+            if (err instanceof Error && err.message.startsWith('GitHub API 422')) {
+              const getRes = await ghFetch(
+                `https://api.github.com/repos/${owner}/${repo}/labels/${encodeURIComponent(name)}`,
+              );
+              const data = (await getRes.json()) as any;
+              return { id: data.id, name: data.name, color: data.color } satisfies GitHubLabel;
+            }
+            throw err;
           }
-          if (res.status === 429) throw new RateLimited({ retryAfter: 60 });
-          if (!res.ok) {
-            const body = await res.text().catch(() => '');
-            throw new Error(`GitHub API ${res.status}: ${body}`);
-          }
-          const data = (await res.json()) as any;
+          const data = (await createRes.json()) as any;
           return { id: data.id, name: data.name, color: data.color } satisfies GitHubLabel;
         },
         catch: (err) => {

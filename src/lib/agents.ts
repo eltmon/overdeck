@@ -160,6 +160,7 @@ export interface AgentRuntimeState {
   lastActivity: string;
   currentTool?: string;
   sessionId?: string;
+  claudeSessionId?: string;
   suspendedAt?: string;
   resumedAt?: string;
   currentIssue?: string; // Issue ID the agent is currently working on
