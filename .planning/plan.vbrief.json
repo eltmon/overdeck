@@ -8,12 +8,12 @@
   "plan": {
     "id": "pan-488",
     "title": "Project repo artifact structure: .pan/ migration + multi-tool skill sync",
-    "status": "approved",
+    "status": "completed",
     "uid": "d7e3a1f4-8b2c-4d9e-a6f1-3c5e7b9d2a4f",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 10,
     "created": "2026-04-06T16:00:00Z",
-    "updated": "2026-04-06T16:00:00Z",
+    "updated": "2026-04-06T15:10:00Z",
     "references": [
       { "uri": "https://github.com/eltmon/panopticon-cli/issues/488", "label": "PAN-488", "type": "issue" }
     ],
@@ -26,9 +26,10 @@
       {
         "id": "add-design-doc",
         "title": "Add docs/REPO-ARTIFACTS.md to the workspace branch",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T14:10:00Z",
         "metadata": {
           "difficulty": "trivial",
           "issueLabel": "pan-488"
@@ -38,7 +39,8 @@
           {
             "id": "add-design-doc.ac1",
             "title": "docs/REPO-ARTIFACTS.md exists in the workspace and is committed to the feature branch",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:10:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -46,9 +48,10 @@
       {
         "id": "rename-panopticon-dirs",
         "title": "Rename all project-level .panopticon/ path references to .pan/",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T14:20:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-488"
@@ -58,19 +61,22 @@
           {
             "id": "rename-panopticon-dirs.ac1",
             "title": "All project-level .panopticon/ path references updated to .pan/ (grep confirms zero remaining project-level references)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:20:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "rename-panopticon-dirs.ac2",
             "title": "Convoy outputs unify under .pan/convoy (triage and health share one directory)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:20:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "rename-panopticon-dirs.ac3",
             "title": "Existing unit tests for cost WAL pass after path rename",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:20:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -78,9 +84,10 @@
       {
         "id": "rename-config-yaml",
         "title": "Rename .panopticon.yaml to .pan.yaml with backwards compat",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T14:30:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-488"
@@ -90,19 +97,22 @@
           {
             "id": "rename-config-yaml.ac1",
             "title": ".pan.yaml is loaded as the canonical config filename",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:30:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "rename-config-yaml.ac2",
             "title": ".panopticon.yaml falls back with stderr deprecation warning",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:30:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "rename-config-yaml.ac3",
             "title": "Existing workspaces with .panopticon.yaml continue to work (backwards compat verified in tests)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:30:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -110,9 +120,10 @@
       {
         "id": "archive-structure",
         "title": "Change archive structure from flat to per-issue subdirectory",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T14:40:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-488"
@@ -122,19 +133,22 @@
           {
             "id": "archive-structure.ac1",
             "title": "complete-planning archives to docs/prds/active/<issue-id>/ subdirectory",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:40:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "archive-structure.ac2",
             "title": "movePrd uses subdirectory format for completed PRDs",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:40:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "archive-structure.ac3",
             "title": "findWorkspacePath includes feature-${numericSuffix} candidate",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:40:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -142,9 +156,10 @@
       {
         "id": "pan-skills-source",
         "title": "Add .pan/skills/ as a sync source with correct precedence",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T14:55:00Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-488"
@@ -154,19 +169,22 @@
           {
             "id": "pan-skills-source.ac1",
             "title": ".pan/skills/ in project repo is discovered and synced to .claude/skills/",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:55:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "pan-skills-source.ac2",
             "title": "User-owned .claude/skills/<name>/ are never overwritten by .pan/skills/<name>/",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:55:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "pan-skills-source.ac3",
             "title": "pan sync --dry-run shows .pan/skills/ source files correctly",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T15:10:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -174,9 +192,10 @@
       {
         "id": "multi-tool-sync",
         "title": "Implement multi-tool sync for all 6 AI tool targets",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T15:00:00Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-488"
@@ -186,25 +205,29 @@
           {
             "id": "multi-tool-sync.ac1",
             "title": "pan sync writes to all tools listed in also_sync (global + per-project merged)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T15:00:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "multi-tool-sync.ac2",
             "title": "Each tool adapter produces correct format (mdc, AGENTS.md blocks, etc.)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T15:00:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "multi-tool-sync.ac3",
             "title": "pan sync --dry-run shows multi-tool output correctly",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T15:10:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "multi-tool-sync.ac4",
             "title": "Per-project also_sync merges with global (never replaces)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T15:00:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -212,9 +235,10 @@
       {
         "id": "workspace-migration",
         "title": "Safe migration of existing .panopticon/ subdirs in workspaces",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T14:50:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-488"
@@ -224,19 +248,22 @@
           {
             "id": "workspace-migration.ac1",
             "title": "pan sync migrates existing .panopticon/ subdirs to .pan/ in active workspaces (non-destructive)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:50:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "workspace-migration.ac2",
             "title": "Migration skips if .pan/ subdir already exists (handles partial previous runs safely)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:50:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "workspace-migration.ac3",
             "title": "Migration never touches ~/.panopticon/ (global tool dir)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:50:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -244,9 +271,10 @@
       {
         "id": "gitignore-injection",
         "title": "Add .pan/events/, .pan/convoy/, .pan/prompts/ to .gitignore",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T14:45:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-488"
@@ -256,13 +284,15 @@
           {
             "id": "gitignore-injection.ac1",
             "title": ".pan/events/, .pan/convoy/, .pan/prompts/ are gitignored in new workspaces",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:45:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "gitignore-injection.ac2",
             "title": ".pan/ itself and .planning/ are NOT gitignored",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T14:45:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
@@ -270,9 +300,10 @@
       {
         "id": "docs-update",
         "title": "Update documentation to match implemented behavior",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-06T16:00:00Z",
+        "completed": "2026-04-06T15:05:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-488"
@@ -282,13 +313,15 @@
           {
             "id": "docs-update.ac1",
             "title": "All documentation references to .panopticon.yaml updated to .pan.yaml",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T15:05:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "docs-update.ac2",
             "title": "docs/REPO-ARTIFACTS.md matches implemented behavior exactly",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-04-06T15:05:00Z",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
