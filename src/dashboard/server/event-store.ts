@@ -46,11 +46,17 @@ export interface EventStore {
 }
 
 // ─── Minimal DB interface (compatible with bun:sqlite and better-sqlite3) ────
+//
+// Uses positional parameters (?) in all SQL to avoid runtime differences in
+// named-parameter binding syntax:
+//   - bun:sqlite requires sigil in binding keys: { $name: value }
+//   - better-sqlite3 requires no sigil:          { name: value }
+// Positional parameters + arrays work identically in both runtimes.
 
 interface PreparedStatement<R = Record<string, unknown>> {
-  run(params?: Record<string, unknown>): { changes: number };
-  get(params?: Record<string, unknown>): R | undefined | null;
-  all(params?: Record<string, unknown>): R[];
+  run(params?: unknown[]): { changes: number };
+  get(params?: unknown[]): R | undefined | null;
+  all(params?: unknown[]): R[];
 }
 
 export interface DbAdapter {
@@ -135,19 +141,17 @@ export function createEventStore(db: DbAdapter): EventStore {
   // Allow many subscribers (one per WebSocket connection)
   emitter.setMaxListeners(0);
 
-  // Prepared statements for hot path performance
-  // Use $name syntax — both better-sqlite3 and bun:sqlite require the sigil prefix
-  // in the binding object when using named parameters. bun:sqlite does NOT accept
-  // { name: value } for :name params (unlike better-sqlite3). $name style is
-  // consistent across both runtimes.
+  // Prepared statements for hot path performance.
+  // All SQL uses positional parameters (?) — both bun:sqlite and better-sqlite3
+  // accept arrays for positional bindings with no runtime-specific differences.
   const insertStmt = db.prepare<void>(
-    `INSERT INTO events (type, timestamp, payload) VALUES ($type, $timestamp, $payload)`,
+    `INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)`,
   );
   const readFromStmt = db.prepare<EventRow>(
-    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > $fromSequence ORDER BY sequence ASC`,
+    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > ? ORDER BY sequence ASC`,
   );
   const compactStmt = db.prepare<void>(
-    `DELETE FROM events WHERE timestamp < $cutoff`,
+    `DELETE FROM events WHERE timestamp < ?`,
   );
   const latestSeqStmt = db.prepare<{ seq: number | null }>(
     `SELECT MAX(sequence) AS seq FROM events`,
@@ -161,7 +165,7 @@ export function createEventStore(db: DbAdapter): EventStore {
       (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
     const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
-    insertStmt.run({ $type: event.type, $timestamp: timestamp, $payload: payload });
+    insertStmt.run([event.type, timestamp, payload]);
 
     const row = lastRowIdStmt.get();
     const sequence = row?.sequence ?? 0;
@@ -178,7 +182,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function readFrom(fromSequence: number): StoredEvent[] {
-    const rows = readFromStmt.all({ $fromSequence: fromSequence });
+    const rows = readFromStmt.all([fromSequence]);
     return rows.map(rowToStored);
   }
 
@@ -189,7 +193,7 @@ export function createEventStore(db: DbAdapter): EventStore {
 
   function compact(): void {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const result = compactStmt.run({ $cutoff: sevenDaysAgo });
+    const result = compactStmt.run([sevenDaysAgo]);
     if (result.changes > 0) {
       console.log(`[event-store] Compacted ${result.changes} events older than 7 days`);
     }
