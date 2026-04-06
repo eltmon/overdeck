@@ -1,6 +1,6 @@
 # PAN-478: Complete httpHandler adoption for remaining 4 route files + ensureLabel fix
 
-## Status: Planning Complete
+## Status: Implementation Complete
 
 ## Problem
 
@@ -40,3 +40,25 @@ For ensureLabel: replace raw `fetch()` on line 278 with `ghFetch()`, matching th
 - `src/dashboard/server/routes/http-handler.ts` — the wrapper
 - `src/dashboard/server/services/typed-errors.ts` — typed error definitions
 - PR #474 — the PAN-470 migration (pattern reference)
+
+## Current Phase
+Quality gates (typecheck, lint, tests)
+
+## Completed Work
+- [x] panopticon-9y7: Fix ensureLabel to use ghFetch instead of raw fetch (commit: d01bc07)
+- [x] panopticon-aaj: Migrate agents.ts to httpHandler (commit: 5e6bac6)
+- [x] panopticon-v9w: Migrate issues.ts to httpHandler (commit: 56fabe0)
+- [x] panopticon-ayu: Migrate specialists.ts to httpHandler (commit: 37d3be2)
+- [x] panopticon-8j0: Migrate workspaces.ts to httpHandler (commit: c746ce4)
+
+## Remaining Work
+- [ ] panopticon-4k9: Pass typecheck, lint, and tests
+- [ ] panopticon-ayu: Migrate specialists.ts to httpHandler
+- [ ] panopticon-8j0: Migrate workspaces.ts to httpHandler
+- [ ] panopticon-4k9: Pass typecheck, lint, and tests
+
+## Key Decisions
+- ghFetch throws on !res.ok including 422; ensureLabel catches 422 error to fall back to label fetch
+
+## Specialist Feedback
+(none yet)
