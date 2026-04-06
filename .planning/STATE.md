@@ -10,7 +10,7 @@ Implementing panopticon-0ny: OpenRouter env overrides in conversation and agent 
 - [x] panopticon-q17: Create OpenRouter backend service — openrouter-service.ts with fetchModels() cache, validateApiKey(), getModelCapabilities() (commit: 4c69e2a)
 - [x] panopticon-r62: Add OpenRouter API endpoints — GET /openrouter/models, PUT /openrouter/favorites, POST /openrouter/test-key + register service in server.ts (commit: 2567689)
 - [x] panopticon-565: Create dedicated OpenRouter settings page — OpenRouterPage.tsx + OpenRouterModelBrowser.tsx (commit: 018f62c)
-- [x] panopticon-shf: Unify ModelPicker with full provider system — fetches from /api/settings/available-models + /api/settings/openrouter/models, groups by provider, shows cost badges, passes effortLevels via onChange callback (commit: TBD)
+- [x] panopticon-shf: Unify ModelPicker with full provider system — fetches from /api/settings/available-models + /api/settings/openrouter/models, groups by provider, shows cost badges, passes effortLevels via onChange callback (commit: 19dfadc)
 
 ## Remaining Work
 - [ ] panopticon-0ny: OpenRouter env overrides in conversation and agent launchers
