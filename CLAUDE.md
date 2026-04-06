@@ -51,7 +51,11 @@ These block the Node.js event loop, freezing all HTTP requests, WebSocket connec
 - **Stack**: TypeScript, Node.js 22+, React dashboard, SQLite, Effect.js
 - **Build**: `npm run build` (tsdown for CLI/server/contracts, Vite for frontend)
 - **Dev**: `npm run dev` (tsx watch)
-- **Dashboard**: Must use Node 22 — `node dist/dashboard/server.js` from repo root
+- **Dashboard**: Must use Node 22 (built dist) — `nohup /home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node dist/dashboard/server.js`
+  - **NEVER use `bun run src/dashboard/server/main.ts`** — two reasons:
+    1. **node-pty** (`@homebridge/node-pty-prebuilt-multiarch`) is a native Node addon. Under Bun's addon compat layer the PTY spawns but exits with code 0 immediately, breaking `/ws/terminal` for all workspaces.
+    2. **Circular ESM deps** — the dashboard source has circular imports that Bun tolerates but Node.js strict ESM rejects, so tsx/source-mode also fails under Node.
+  - `pan up` handles this automatically — it runs `dist/dashboard/server.js` under Node 22. Run `npm run build` first if the dist is stale.
 - **Issue tracking**: GitHub Issues (PAN-XXX prefix), NOT Linear
 - **Package manager**: Bun (bun.lock, `bun install`, `bun add`)
 - **Workspaces**: Bun workspaces — `packages/contracts`, `src/dashboard/server`, `src/dashboard/frontend`
