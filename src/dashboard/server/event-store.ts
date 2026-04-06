@@ -136,15 +136,18 @@ export function createEventStore(db: DbAdapter): EventStore {
   emitter.setMaxListeners(0);
 
   // Prepared statements for hot path performance
-  // Use :name syntax — both better-sqlite3 and bun:sqlite accept { name: value } params
+  // Use $name syntax — both better-sqlite3 and bun:sqlite require the sigil prefix
+  // in the binding object when using named parameters. bun:sqlite does NOT accept
+  // { name: value } for :name params (unlike better-sqlite3). $name style is
+  // consistent across both runtimes.
   const insertStmt = db.prepare<void>(
-    `INSERT INTO events (type, timestamp, payload) VALUES (:type, :timestamp, :payload)`,
+    `INSERT INTO events (type, timestamp, payload) VALUES ($type, $timestamp, $payload)`,
   );
   const readFromStmt = db.prepare<EventRow>(
-    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > :fromSequence ORDER BY sequence ASC`,
+    `SELECT sequence, type, timestamp, payload FROM events WHERE sequence > $fromSequence ORDER BY sequence ASC`,
   );
   const compactStmt = db.prepare<void>(
-    `DELETE FROM events WHERE timestamp < :cutoff`,
+    `DELETE FROM events WHERE timestamp < $cutoff`,
   );
   const latestSeqStmt = db.prepare<{ seq: number | null }>(
     `SELECT MAX(sequence) AS seq FROM events`,
@@ -158,7 +161,7 @@ export function createEventStore(db: DbAdapter): EventStore {
       (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
     const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
-    insertStmt.run({ type: event.type, timestamp, payload });
+    insertStmt.run({ $type: event.type, $timestamp: timestamp, $payload: payload });
 
     const row = lastRowIdStmt.get();
     const sequence = row?.sequence ?? 0;
@@ -175,7 +178,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function readFrom(fromSequence: number): StoredEvent[] {
-    const rows = readFromStmt.all({ fromSequence });
+    const rows = readFromStmt.all({ $fromSequence: fromSequence });
     return rows.map(rowToStored);
   }
 
@@ -186,7 +189,7 @@ export function createEventStore(db: DbAdapter): EventStore {
 
   function compact(): void {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const result = compactStmt.run({ cutoff: sevenDaysAgo });
+    const result = compactStmt.run({ $cutoff: sevenDaysAgo });
     if (result.changes > 0) {
       console.log(`[event-store] Compacted ${result.changes} events older than 7 days`);
     }

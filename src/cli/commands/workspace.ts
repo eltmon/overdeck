@@ -87,7 +87,23 @@ async function initializeWorkspaceBeads(workspacePath: string, issueId: string):
 
     if (beadsVersion >= 4701) {
       // v0.47.1+ - Use shared database with issue label for scoping
-      // The worktree inherits .beads/redirect from main repo, which points to shared database
+      // The worktree's .beads/ directory is created from git (only issues.jsonl is committed),
+      // so it lacks the redirect file needed to find the main repo's Dolt database.
+      // We must create .beads/redirect explicitly — it is gitignored so cannot be inherited.
+      const beadsDir = join(workspacePath, '.beads');
+      const redirectPath = join(beadsDir, 'redirect');
+      if (!existsSync(redirectPath)) {
+        // Walk up from workspacePath to find the main repo's .beads/ directory
+        // Worktrees live at <projectRoot>/workspaces/feature-<id>/ — two levels up
+        const projectRoot = resolve(workspacePath, '..', '..');
+        const mainBeadsDir = join(projectRoot, '.beads');
+        if (existsSync(mainBeadsDir)) {
+          mkdirSync(beadsDir, { recursive: true });
+          // Write relative path from workspace .beads/ to main .beads/
+          writeFileSync(redirectPath, '../../.beads', 'utf-8');
+        }
+      }
+
       // Use bare issueId label (e.g. "pan-419") matching createBeadsFromVBrief and all query sites
       const issueLabel = issueId.toLowerCase();
       const title = `${issueId.toUpperCase()}: Implementation`;
