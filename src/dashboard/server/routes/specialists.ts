@@ -143,14 +143,14 @@ function getProjectPathForIssue(issuePrefix: string): string {
 const getSpecialistsRoute = HttpRouter.add(
   'GET',
   '/api/specialists',
-  httpHandler(Effect.promise(async () => {
+  httpHandler(Effect.gen(function* () {
     const {
       getAllSpecialistStatus,
       getAllProjectSpecialistStatuses,
-    } = await import('../../../lib/cloister/specialists.js');
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-    const legacySpecialists = await getAllSpecialistStatus();
-    const projectSpecialists = await getAllProjectSpecialistStatuses();
+    const legacySpecialists = yield* Effect.promise(() => getAllSpecialistStatus());
+    const projectSpecialists = yield* Effect.promise(() => getAllProjectSpecialistStatuses());
 
     return jsonResponse({
       specialists: legacySpecialists,
@@ -165,14 +165,14 @@ const getSpecialistsRoute = HttpRouter.add(
 const postSpecialistsResetAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/reset-all',
-  httpHandler(Effect.promise(async () => {
+  httpHandler(Effect.gen(function* () {
     const {
       getAllSpecialists,
       clearSessionId,
       isRunning,
       getTmuxSessionName,
-    } = await import('../../../lib/cloister/specialists.js');
-    const { clearHook } = await import('../../../lib/hooks.js');
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const { clearHook } = yield* Effect.promise(() => import('../../../lib/hooks.js'));
 
     const specialists = getAllSpecialists();
     const results: { name: string; killed: boolean; sessionCleared: boolean; queueCleared: boolean }[] = [];
@@ -183,12 +183,10 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
 
       if (isRunning(name)) {
         const tmuxSession = getTmuxSessionName(name);
-        try {
-          await execAsync(`tmux kill-session -t "${tmuxSession}"`);
-          killed = true;
-        } catch {
-          // Session might not exist, continue
-        }
+        const killResult = yield* Effect.promise(() =>
+          execAsync(`tmux kill-session -t "${tmuxSession}"`).then(() => true).catch(() => false),
+        );
+        killed = killResult;
       }
 
       const sessionCleared = clearSessionId(name);
@@ -493,8 +491,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
   'POST',
   '/api/specialists/logs/cleanup-all',
-  httpHandler(Effect.promise(async () => {
-    const { cleanupAllLogs } = await import('../../../lib/cloister/specialist-logs.js');
+  httpHandler(Effect.gen(function* () {
+    const { cleanupAllLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
     const results = cleanupAllLogs();
 
     return jsonResponse({
@@ -512,23 +510,21 @@ const postSpecialistsLogsCleanupAllRoute = HttpRouter.add(
 const getSpecialistQueuesRoute = HttpRouter.add(
   'GET',
   '/api/specialists/queues',
-  httpHandler(Effect.promise(async () => {
+  httpHandler(Effect.gen(function* () {
     const { getAllSpecialists, checkSpecialistQueue } =
-      await import('../../../lib/cloister/specialists.js');
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const specialists = getAllSpecialists();
 
-    const queues = await Promise.all(
-      specialists.map(async (specialist) => {
-        const queue = checkSpecialistQueue(specialist.name);
-        return {
-          specialistName: specialist.name,
-          hasWork: queue.hasWork,
-          urgentCount: queue.urgentCount,
-          totalCount: queue.items.length,
-          items: queue.items,
-        };
-      }),
-    );
+    const queues = specialists.map((specialist) => {
+      const queue = checkSpecialistQueue(specialist.name);
+      return {
+        specialistName: specialist.name,
+        hasWork: queue.hasWork,
+        urgentCount: queue.urgentCount,
+        totalCount: queue.items.length,
+        items: queue.items,
+      };
+    });
 
     return jsonResponse({ queues });
   })),
@@ -540,10 +536,10 @@ const getSpecialistQueuesRoute = HttpRouter.add(
 const getSpecialistsProjectsRoute = HttpRouter.add(
   'GET',
   '/api/specialists/projects',
-  httpHandler(Effect.promise(async () => {
+  httpHandler(Effect.gen(function* () {
     const { getAllProjectSpecialistStatuses } =
-      await import('../../../lib/cloister/specialists.js');
-    const specialists = await getAllProjectSpecialistStatuses();
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const specialists = yield* Effect.promise(() => getAllProjectSpecialistStatuses());
     return jsonResponse(specialists);
   })),
 );
