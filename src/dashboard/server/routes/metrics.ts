@@ -18,15 +18,16 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/convoys/:id/output
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { readEvents } from '../../../lib/costs/index.js';
 import { startConvoy, stopConvoy, getConvoyStatus, listConvoys, type ConvoyContext } from '../../../lib/convoy.js';
+import { httpHandler } from './http-handler.js';
 
 // ─── Activity store ───────────────────────────────────────────────────────────
 // Mirror of the in-memory activity store from index.ts. The Effect HTTP server
@@ -48,7 +49,7 @@ const activities: ActivityEntry[] = [];
 const getMetricsSummaryRoute = HttpRouter.add(
   'GET',
   '/api/metrics/summary',
-  Effect.try({
+  httpHandler(Effect.try({
     try: () => {
       const service = getCloisterService();
       const status = service.getStatus();
@@ -87,15 +88,8 @@ const getMetricsSummaryRoute = HttpRouter.add(
         },
       });
     },
-    catch: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting metrics summary:', error);
-      return jsonResponse(
-        { error: 'Failed to get metrics summary: ' + msg },
-        { status: 500 },
-      );
-    },
-  }),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: GET /api/metrics/costs ───────────────────────────────────────────
@@ -103,26 +97,17 @@ const getMetricsSummaryRoute = HttpRouter.add(
 const getMetricsCostsRoute = HttpRouter.add(
   'GET',
   '/api/metrics/costs',
-  Effect.try({
+  httpHandler(Effect.try({
     try: () => {
-      const service = getCloisterService();
-      const costSummary = service.getCostSummary();
-
+      const costSummary = getCloisterService().getCostSummary();
       return jsonResponse({
         dailyTotal: costSummary.dailyTotal,
         topAgents: costSummary.topAgents,
         topIssues: costSummary.topIssues,
       });
     },
-    catch: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting cost metrics:', error);
-      return jsonResponse(
-        { error: 'Failed to get cost metrics: ' + msg },
-        { status: 500 },
-      );
-    },
-  }),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: GET /api/metrics/handoffs ────────────────────────────────────────
@@ -130,22 +115,7 @@ const getMetricsCostsRoute = HttpRouter.add(
 const getMetricsHandoffsRoute = HttpRouter.add(
   'GET',
   '/api/metrics/handoffs',
-  Effect.try({
-    try: () =>
-      jsonResponse({
-        totalHandoffs: 0,
-        successRate: 0,
-        byType: {},
-      }),
-    catch: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting handoff metrics:', error);
-      return jsonResponse(
-        { error: 'Failed to get handoff metrics: ' + msg },
-        { status: 500 },
-      );
-    },
-  }),
+  Effect.succeed(jsonResponse({ totalHandoffs: 0, successRate: 0, byType: {} })),
 );
 
 // ─── Route: GET /api/metrics/stuck ───────────────────────────────────────────
@@ -153,25 +123,13 @@ const getMetricsHandoffsRoute = HttpRouter.add(
 const getMetricsStuckRoute = HttpRouter.add(
   'GET',
   '/api/metrics/stuck',
-  Effect.try({
+  httpHandler(Effect.try({
     try: () => {
-      const service = getCloisterService();
-      const status = service.getStatus();
-
-      return jsonResponse({
-        current: status.summary.stuck,
-        incidents: [],
-      });
+      const status = getCloisterService().getStatus();
+      return jsonResponse({ current: status.summary.stuck, incidents: [] });
     },
-    catch: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error getting stuck agent metrics:', error);
-      return jsonResponse(
-        { error: 'Failed to get stuck agent metrics: ' + msg },
-        { status: 500 },
-      );
-    },
-  }),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: GET /api/activity ─────────────────────────────────────────────────
@@ -179,7 +137,7 @@ const getMetricsStuckRoute = HttpRouter.add(
 const getActivityRoute = HttpRouter.add(
   'GET',
   '/api/activity',
-  Effect.sync(() => jsonResponse(activities)),
+  Effect.succeed(jsonResponse(activities)),
 );
 
 // ─── Route: GET /api/activity/:id ────────────────────────────────────────────
@@ -190,7 +148,6 @@ const getActivityByIdRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-
     const activity = activities.find(a => a.id === id);
     if (!activity) {
       return jsonResponse({ error: 'Activity not found' }, { status: 404 });
@@ -204,20 +161,10 @@ const getActivityByIdRoute = HttpRouter.add(
 const getConvoysRoute = HttpRouter.add(
   'GET',
   '/api/convoys',
-  Effect.try({
-    try: () => {
-      const convoys = listConvoys();
-      return jsonResponse({ convoys });
-    },
-    catch: (error: unknown) => {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error listing convoys:', error);
-      return jsonResponse(
-        { error: 'Failed to list convoys: ' + msg },
-        { status: 500 },
-      );
-    },
-  }),
+  httpHandler(Effect.try({
+    try: () => jsonResponse({ convoys: listConvoys() }),
+    catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+  })),
 );
 
 // ─── Route: GET /api/convoys/:id ─────────────────────────────────────────────
@@ -225,28 +172,18 @@ const getConvoysRoute = HttpRouter.add(
 const getConvoyByIdRoute = HttpRouter.add(
   'GET',
   '/api/convoys/:id',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-
-    return yield* Effect.try({
-      try: () => {
-        const convoy = getConvoyStatus(id);
-        if (!convoy) {
-          return jsonResponse({ error: 'Convoy not found' }, { status: 404 });
-        }
-        return jsonResponse(convoy);
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting convoy status:', error);
-        return jsonResponse(
-          { error: 'Failed to get convoy status: ' + msg },
-          { status: 500 },
-        );
-      },
+    const convoy = yield* Effect.try({
+      try: () => getConvoyStatus(id),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-  }),
+    if (!convoy) {
+      return jsonResponse({ error: 'Convoy not found' }, { status: 404 });
+    }
+    return jsonResponse(convoy);
+  })),
 );
 
 // ─── Route: POST /api/convoys/start ──────────────────────────────────────────
@@ -254,15 +191,11 @@ const getConvoyByIdRoute = HttpRouter.add(
 const postConvoysStartRoute = HttpRouter.add(
   'POST',
   '/api/convoys/start',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const text = yield* request.text;
-    let body: any = {};
-    try {
-      body = text ? JSON.parse(text) : {};
-    } catch {
-      body = {};
-    }
+    let body: { template?: string; context?: ConvoyContext } = {};
+    try { body = text ? JSON.parse(text) : {}; } catch { /* use empty */ }
 
     const { template, context } = body;
     const eventStore = yield* EventStoreService;
@@ -270,31 +203,20 @@ const postConvoysStartRoute = HttpRouter.add(
     if (!template) {
       return jsonResponse({ error: 'Template name is required' }, { status: 400 });
     }
-
-    if (!context || !context.projectPath) {
-      return jsonResponse(
-        { error: 'Context with projectPath is required' },
-        { status: 400 },
-      );
+    if (!context?.projectPath) {
+      return jsonResponse({ error: 'Context with projectPath is required' }, { status: 400 });
     }
 
-    return yield* Effect.promise(async () => {
-        try {
-          const convoy = await startConvoy(template, context as ConvoyContext);
-          if ((context as ConvoyContext).issueId) {
-            Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId: (context as ConvoyContext).issueId } }));
-          }
-          return jsonResponse(convoy);
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error starting convoy:', error);
-          return jsonResponse(
-            { error: 'Failed to start convoy: ' + msg },
-            { status: 500 },
-          );
-        }
-      })
-  }),
+    const convoy = yield* Effect.tryPromise({
+      try: () => startConvoy(template, context),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+
+    if (context.issueId) {
+      yield* eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId: context.issueId } });
+    }
+    return jsonResponse(convoy);
+  })),
 );
 
 // ─── Route: POST /api/convoys/:id/stop ───────────────────────────────────────
@@ -302,24 +224,15 @@ const postConvoysStartRoute = HttpRouter.add(
 const postConvoyStopRoute = HttpRouter.add(
   'POST',
   '/api/convoys/:id/stop',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-
-    return yield* Effect.promise(async () => {
-        try {
-          await stopConvoy(id);
-          return jsonResponse({ success: true, message: 'Convoy stopped' });
-        } catch (error: unknown) {
-          const msg = error instanceof Error ? error.message : String(error);
-          console.error('Error stopping convoy:', error);
-          return jsonResponse(
-            { error: 'Failed to stop convoy: ' + msg },
-            { status: 500 },
-          );
-        }
-      })
-  }),
+    yield* Effect.tryPromise({
+      try: () => stopConvoy(id),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse({ success: true, message: 'Convoy stopped' });
+  })),
 );
 
 // ─── Route: GET /api/convoys/:id/output ──────────────────────────────────────
@@ -327,40 +240,33 @@ const postConvoyStopRoute = HttpRouter.add(
 const getConvoyOutputRoute = HttpRouter.add(
   'GET',
   '/api/convoys/:id/output',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    return yield* Effect.try({
-      try: () => {
-        const convoy = getConvoyStatus(id);
-        if (!convoy) {
-          return jsonResponse({ error: 'Convoy not found' }, { status: 404 });
-        }
-
-        const outputs: Record<string, string> = {};
-        for (const agent of convoy.agents) {
-          if (agent.outputFile && existsSync(agent.outputFile)) {
-            try {
-              outputs[agent.role] = readFileSync(agent.outputFile, 'utf-8');
-            } catch (err) {
-              outputs[agent.role] = `Error reading output: ${err}`;
-            }
-          }
-        }
-
-        return jsonResponse({ outputs });
-      },
-      catch: (error: unknown) => {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('Error getting convoy output:', error);
-        return jsonResponse(
-          { error: 'Failed to get convoy output: ' + msg },
-          { status: 500 },
-        );
-      },
+    const convoy = yield* Effect.try({
+      try: () => getConvoyStatus(id),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-  }),
+    if (!convoy) {
+      return jsonResponse({ error: 'Convoy not found' }, { status: 404 });
+    }
+
+    const outputs: Record<string, string> = {};
+    for (const agent of convoy.agents) {
+      if (agent.outputFile) {
+        // Non-fatal: skip unreadable output files rather than aborting the request
+        const content = yield* Effect.promise(() =>
+          readFile(agent.outputFile!, 'utf-8').catch(() => null as null | string)
+        );
+        if (content !== null) {
+          outputs[agent.role] = content;
+        }
+      }
+    }
+
+    return jsonResponse({ outputs });
+  })),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────

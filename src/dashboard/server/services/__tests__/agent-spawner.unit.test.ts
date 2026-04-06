@@ -1,5 +1,5 @@
 /**
- * Integration tests for agent-related service behaviour (PAN-449)
+ * Unit tests for AgentSpawner service (PAN-449)
  *
  * Tests AgentSpawner service with mocked underlying lib modules, verifying
  * that the service properly guards agent operations and handles errors.

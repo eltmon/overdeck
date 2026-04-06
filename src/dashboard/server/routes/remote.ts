@@ -14,13 +14,13 @@ import { jsonResponse } from "../http-helpers.js";
  *   POST /api/remote/workspaces/:issueId/agent/tell
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFile, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import * as yaml from 'yaml';
 import { Effect, Layer, Option } from 'effect';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
   createFlyProviderFromConfig,
@@ -33,52 +33,39 @@ import {
 } from '../../../lib/remote/index.js';
 import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { httpHandler } from './http-handler.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
-function loadRemoteWorkspaceMetadata(issueId: string): any | null {
+async function loadRemoteWorkspaceMetadata(issueId: string): Promise<unknown | null> {
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const metadataPath = join(homedir(), '.panopticon', 'workspaces', `${normalizedId}.yaml`);
-
-  if (!existsSync(metadataPath)) {
-    return null;
-  }
-
+  const content = await readFile(metadataPath, 'utf-8').catch(() => null);
+  if (!content) return null;
   try {
-    const content = readFileSync(metadataPath, 'utf-8');
     return yaml.parse(content);
   } catch {
     return null;
   }
 }
 
-function listRemoteWorkspaceMetadata(): unknown[] {
+async function listRemoteWorkspaceMetadata(): Promise<unknown[]> {
   const workspacesDir = join(homedir(), '.panopticon', 'workspaces');
+  const files = await readdir(workspacesDir).catch(() => [] as string[]);
+  const yamlFiles = files.filter(f => f.endsWith('.yaml'));
 
-  if (!existsSync(workspacesDir)) {
-    return [];
-  }
-
-  try {
-    const files = readdirSync(workspacesDir).filter(f => f.endsWith('.yaml'));
-    const workspaces: unknown[] = [];
-
-    for (const file of files) {
-      try {
-        const content = readFileSync(join(workspacesDir, file), 'utf-8');
-        const metadata = yaml.parse(content);
-        if (metadata.location === 'remote') {
-          workspaces.push(metadata);
-        }
-      } catch {
-        // Skip invalid files
-      }
+  const workspaces: unknown[] = [];
+  for (const file of yamlFiles) {
+    const content = await readFile(join(workspacesDir, file), 'utf-8').catch(() => null);
+    if (!content) continue;
+    try {
+      const metadata = yaml.parse(content) as { location?: string };
+      if (metadata.location === 'remote') workspaces.push(metadata);
+    } catch {
+      // Skip invalid files
     }
-
-    return workspaces;
-  } catch {
-    return [];
   }
+  return workspaces;
 }
 
 // Read the request body as unknown JSON
@@ -97,48 +84,41 @@ const readJsonBody = Effect.gen(function* () {
 const getRemoteStatusRoute = HttpRouter.add(
   'GET',
   '/api/remote/status',
-  Effect.gen(function* () {
-    return yield* Effect.promise(async () => {
-    try {
-        const config = loadPanConfig();
-        const remoteConfig = config.remote;
-        const enabled = remoteConfig?.enabled ?? false;
+  httpHandler(Effect.gen(function* () {
+    const config = loadPanConfig();
+    const remoteConfig = config.remote;
+    const enabled = remoteConfig?.enabled ?? false;
 
-        if (!enabled) {
-          return jsonResponse({
-            enabled: false,
-            available: false,
-            reason: 'Remote workspaces not enabled. Run: pan remote setup',
-          });
-        }
+    if (!enabled) {
+      return jsonResponse({
+        enabled: false,
+        available: false,
+        reason: 'Remote workspaces not enabled. Run: pan remote setup',
+      });
+    }
 
-        const availability = await isRemoteAvailable();
+    const availability = yield* Effect.tryPromise({
+      try: () => isRemoteAvailable(),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-        if (!availability.available) {
-          return jsonResponse({
-            enabled: true,
-            available: false,
-            reason: availability.reason,
-          });
-        }
+    if (!availability.available) {
+      return jsonResponse({ enabled: true, available: false, reason: availability.reason });
+    }
 
-        const fly = createFlyProviderFromConfig(remoteConfig);
-        const vms = await fly.listVms();
+    const fly = createFlyProviderFromConfig(remoteConfig);
+    const vms = yield* Effect.tryPromise({
+      try: () => fly.listVms(),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-        return jsonResponse({
-          enabled: true,
-          available: true,
-          provider: remoteConfig?.provider || 'fly',
-          vms: vms.map((vm: any) => ({
-            name: vm.name,
-            status: vm.status,
-          })),
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    return jsonResponse({
+      enabled: true,
+      available: true,
+      provider: remoteConfig?.provider || 'fly',
+      vms: (vms as Array<{ name: string; status: string }>).map(vm => ({ name: vm.name, status: vm.status })),
+    });
+  })),
 );
 
 // ─── Route: GET /api/remote/workspaces ───────────────────────────────────────
@@ -146,35 +126,22 @@ const getRemoteStatusRoute = HttpRouter.add(
 const listRemoteWorkspacesRoute = HttpRouter.add(
   'GET',
   '/api/remote/workspaces',
-  Effect.gen(function* () {
-    return yield* Effect.promise(async () => {
-    try {
-        const workspaces = listRemoteWorkspaceMetadata();
+  httpHandler(Effect.gen(function* () {
+    const workspaces = yield* Effect.promise(() => listRemoteWorkspaceMetadata());
 
-        const config = loadPanConfig();
-        const fly = createFlyProviderFromConfig(config.remote);
+    const config = loadPanConfig();
+    const fly = createFlyProviderFromConfig(config.remote);
 
-        let vms: any[] = [];
-        try {
-          vms = await fly.listVms();
-        } catch {
-          // Can't get VM status - return workspaces without status
-        }
+    // Best-effort: if listing VMs fails, return workspaces without status
+    const vms = yield* Effect.promise(() => fly.listVms().catch(() => [] as Array<{ name: string; status: string }>));
 
-        const enriched = (workspaces as any[]).map(ws => {
-          const vmInfo = vms.find((vm: any) => vm.name === ws.vmName);
-          return {
-            ...ws,
-            vmStatus: vmInfo?.status || 'unknown',
-          };
-        });
+    const enriched = (workspaces as Array<{ vmName?: string } & Record<string, unknown>>).map(ws => ({
+      ...ws,
+      vmStatus: (vms as Array<{ name: string; status: string }>).find(vm => vm.name === ws.vmName)?.status || 'unknown',
+    }));
 
-        return jsonResponse(enriched);
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    return jsonResponse(enriched);
+  })),
 );
 
 // ─── Route: GET /api/remote/workspaces/:issueId ───────────────────────────────
@@ -182,52 +149,36 @@ const listRemoteWorkspacesRoute = HttpRouter.add(
 const getRemoteWorkspaceRoute = HttpRouter.add(
   'GET',
   '/api/remote/workspaces/:issueId',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    return yield* Effect.promise(async () => {
-    try {
-        const metadata = loadRemoteWorkspaceMetadata(issueId);
+    const metadata = yield* Effect.promise(() => loadRemoteWorkspaceMetadata(issueId)) as Effect.Effect<{ vmName?: string } & Record<string, unknown> | null>;
 
-        if (!metadata) {
-          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
-        }
+    if (!metadata) {
+      return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
+    }
 
-        const config = loadPanConfig();
-        const fly = createFlyProviderFromConfig(config.remote);
+    const config = loadPanConfig();
+    const fly = createFlyProviderFromConfig(config.remote);
 
-        let vmStatus = 'unknown';
-        try {
-          vmStatus = await fly.getStatus(metadata.vmName);
-        } catch {
-          // Ignore - status unknown
-        }
+    // Best-effort: ignore errors when getting VM status
+    const vmStatus = yield* Effect.promise(() =>
+      fly.getStatus(metadata.vmName!).catch(() => 'unknown')
+    );
 
-        let agentStatus = null;
-        if (vmStatus === 'running') {
-          const agentId = `agent-${issueId.toLowerCase()}`;
-          const agentState = loadRemoteAgentState(agentId);
-          if (agentState) {
-            agentStatus = {
-              id: agentState.id,
-              status: agentState.status,
-              model: agentState.model,
-              startedAt: agentState.startedAt,
-            };
-          }
-        }
+    let agentStatus = null;
+    if (vmStatus === 'running') {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      const agentState = loadRemoteAgentState(agentId);
+      if (agentState) {
+        const s = agentState as { id: string; status: string; model: string; startedAt: string };
+        agentStatus = { id: s.id, status: s.status, model: s.model, startedAt: s.startedAt };
+      }
+    }
 
-        return jsonResponse({
-          ...metadata,
-          vmStatus,
-          agent: agentStatus,
-        });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    return jsonResponse({ ...metadata, vmStatus, agent: agentStatus });
+  })),
 );
 
 // ─── Route: POST /api/remote/workspaces/:issueId/start ───────────────────────
@@ -235,34 +186,30 @@ const getRemoteWorkspaceRoute = HttpRouter.add(
 const startRemoteWorkspaceRoute = HttpRouter.add(
   'POST',
   '/api/remote/workspaces/:issueId/start',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const metadata = loadRemoteWorkspaceMetadata(issueId);
+    const metadata = yield* Effect.promise(() => loadRemoteWorkspaceMetadata(issueId)) as Effect.Effect<{ vmName?: string } & Record<string, unknown> | null>;
+    if (!metadata) {
+      return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
+    }
 
-        if (!metadata) {
-          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
-        }
+    const config = loadPanConfig();
+    const fly = createFlyProviderFromConfig(config.remote);
 
-        const config = loadPanConfig();
-        const fly = createFlyProviderFromConfig(config.remote);
+    yield* Effect.tryPromise({
+      try: async () => {
+        await fly.startVm(metadata.vmName!);
+        await fly.ssh(metadata.vmName!, 'cd /workspace && docker compose up -d 2>/dev/null || true');
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-        await fly.startVm(metadata.vmName);
-
-        // Start containers
-        await fly.ssh(metadata.vmName, 'cd /workspace && docker compose up -d 2>/dev/null || true');
-
-        Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
-        return jsonResponse({ success: true, message: `Workspace ${issueId} started` });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    yield* eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } });
+    return jsonResponse({ success: true, message: `Workspace ${issueId} started` });
+  })),
 );
 
 // ─── Route: POST /api/remote/workspaces/:issueId/stop ────────────────────────
@@ -270,35 +217,30 @@ const startRemoteWorkspaceRoute = HttpRouter.add(
 const stopRemoteWorkspaceRoute = HttpRouter.add(
   'POST',
   '/api/remote/workspaces/:issueId/stop',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const metadata = loadRemoteWorkspaceMetadata(issueId);
+    const metadata = yield* Effect.promise(() => loadRemoteWorkspaceMetadata(issueId)) as Effect.Effect<{ vmName?: string } & Record<string, unknown> | null>;
+    if (!metadata) {
+      return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
+    }
 
-        if (!metadata) {
-          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
-        }
+    const config = loadPanConfig();
+    const fly = createFlyProviderFromConfig(config.remote);
 
-        const config = loadPanConfig();
-        const fly = createFlyProviderFromConfig(config.remote);
+    yield* Effect.tryPromise({
+      try: async () => {
+        await fly.ssh(metadata.vmName!, 'docker compose down 2>/dev/null || true');
+        await fly.stopVm(metadata.vmName!);
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-        // Stop containers first
-        await fly.ssh(metadata.vmName, 'docker compose down 2>/dev/null || true');
-
-        // Stop VM
-        await fly.stopVm(metadata.vmName);
-
-        Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
-        return jsonResponse({ success: true, message: `Workspace ${issueId} stopped` });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    yield* eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } });
+    return jsonResponse({ success: true, message: `Workspace ${issueId} stopped` });
+  })),
 );
 
 // ─── Route: POST /api/remote/workspaces/:issueId/agent/start ─────────────────
@@ -306,39 +248,32 @@ const stopRemoteWorkspaceRoute = HttpRouter.add(
 const startRemoteAgentRoute = HttpRouter.add(
   'POST',
   '/api/remote/workspaces/:issueId/agent/start',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { prompt, model } = body as { prompt?: string; model?: string };
+    const { prompt, model } = body as { prompt?: string; model?: string };
 
-        const metadata = loadRemoteWorkspaceMetadata(issueId);
-        if (!metadata) {
-          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
-        }
+    const metadata = yield* Effect.promise(() => loadRemoteWorkspaceMetadata(issueId)) as Effect.Effect<{ vmName?: string } & Record<string, unknown> | null>;
+    if (!metadata) {
+      return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
+    }
 
-        // Sync all credentials before spawning (tokens may have expired)
-        const fly = createFlyProviderFromConfig(loadPanConfig().remote);
-        await fly.syncAllCredentials(metadata.vmName);
+    const fly = createFlyProviderFromConfig(loadPanConfig().remote);
 
-        const state = await spawnRemoteAgent({
-          issueId,
-          workspace: metadata,
-          prompt,
-          model,
-        });
+    const state = yield* Effect.tryPromise({
+      try: async () => {
+        await fly.syncAllCredentials(metadata.vmName!);
+        return spawnRemoteAgent({ issueId, workspace: metadata, prompt, model });
+      },
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-        Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
-        return jsonResponse(state);
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    yield* eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } });
+    return jsonResponse(state);
+  })),
 );
 
 // ─── Route: POST /api/remote/workspaces/:issueId/agent/stop ──────────────────
@@ -346,29 +281,25 @@ const startRemoteAgentRoute = HttpRouter.add(
 const stopRemoteAgentRoute = HttpRouter.add(
   'POST',
   '/api/remote/workspaces/:issueId/agent/stop',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const metadata = loadRemoteWorkspaceMetadata(issueId);
+    const metadata = yield* Effect.promise(() => loadRemoteWorkspaceMetadata(issueId)) as Effect.Effect<{ vmName?: string } & Record<string, unknown> | null>;
+    if (!metadata) {
+      return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
+    }
 
-        if (!metadata) {
-          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
-        }
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    yield* Effect.tryPromise({
+      try: () => killRemoteAgent(agentId, metadata.vmName!),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-        const agentId = `agent-${issueId.toLowerCase()}`;
-        await killRemoteAgent(agentId, metadata.vmName);
-
-        Effect.runSync(eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } }));
-        return jsonResponse({ success: true, message: `Agent ${agentId} stopped` });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    yield* eventStore.append({ type: 'issues.updated', timestamp: new Date().toISOString(), payload: { issueId } });
+    return jsonResponse({ success: true, message: `Agent ${agentId} stopped` });
+  })),
 );
 
 // ─── Route: GET /api/remote/workspaces/:issueId/agent/output ─────────────────
@@ -376,32 +307,27 @@ const stopRemoteAgentRoute = HttpRouter.add(
 const getRemoteAgentOutputRoute = HttpRouter.add(
   'GET',
   '/api/remote/workspaces/:issueId/agent/output',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const request = yield* HttpServerRequest.HttpServerRequest;
     const urlOpt = HttpServerRequest.toURL(request);
-    const linesParam = Option.isSome(urlOpt)
-      ? urlOpt.value.searchParams.get('lines')
-      : null;
+    const linesParam = Option.isSome(urlOpt) ? urlOpt.value.searchParams.get('lines') : null;
     const lines = parseInt(linesParam ?? '') || 100;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const metadata = loadRemoteWorkspaceMetadata(issueId);
-        if (!metadata) {
-          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
-        }
+    const metadata = yield* Effect.promise(() => loadRemoteWorkspaceMetadata(issueId)) as Effect.Effect<{ vmName?: string } & Record<string, unknown> | null>;
+    if (!metadata) {
+      return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
+    }
 
-        const agentId = `agent-${issueId.toLowerCase()}`;
-        const output = await getRemoteAgentOutput(agentId, metadata.vmName, lines);
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    const output = yield* Effect.tryPromise({
+      try: () => getRemoteAgentOutput(agentId, metadata.vmName!, lines),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-        return jsonResponse({ output });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    return jsonResponse({ output });
+  })),
 );
 
 // ─── Route: POST /api/remote/workspaces/:issueId/agent/tell ──────────────────
@@ -409,33 +335,29 @@ const getRemoteAgentOutputRoute = HttpRouter.add(
 const tellRemoteAgentRoute = HttpRouter.add(
   'POST',
   '/api/remote/workspaces/:issueId/agent/tell',
-  Effect.gen(function* () {
+  httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const body = yield* readJsonBody;
 
-    return yield* Effect.promise(async () => {
-    try {
-        const { message } = body as { message?: string };
+    const { message } = body as { message?: string };
+    if (!message) {
+      return jsonResponse({ error: 'Message is required' }, { status: 400 });
+    }
 
-        if (!message) {
-          return jsonResponse({ error: 'Message is required' }, { status: 400 });
-        }
+    const metadata = yield* Effect.promise(() => loadRemoteWorkspaceMetadata(issueId)) as Effect.Effect<{ vmName?: string } & Record<string, unknown> | null>;
+    if (!metadata) {
+      return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
+    }
 
-        const metadata = loadRemoteWorkspaceMetadata(issueId);
-        if (!metadata) {
-          return jsonResponse({ error: 'Remote workspace not found' }, { status: 404 });
-        }
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    yield* Effect.tryPromise({
+      try: () => sendToRemoteAgent(agentId, metadata.vmName!, message),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
 
-        const agentId = `agent-${issueId.toLowerCase()}`;
-        await sendToRemoteAgent(agentId, metadata.vmName, message);
-
-        return jsonResponse({ success: true });
-      }    catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse({ error: msg }, { status: 500 });
-        }})
-  }),
+    return jsonResponse({ success: true });
+  })),
 );
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
