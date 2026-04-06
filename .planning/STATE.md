@@ -1,9 +1,9 @@
 # PAN-479: OpenRouter Integration
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Current Phase
-Running quality gates (panopticon-dz1)
+All beads complete. Quality gates pass.
 
 ## Completed Work
 - [x] panopticon-ugg: Add OpenRouter to provider system — model-fallback.ts, model-capabilities.ts, config-yaml.ts, env-loader.ts, settings-api.ts (commit: 1b7ee7d)
@@ -13,9 +13,10 @@ Running quality gates (panopticon-dz1)
 - [x] panopticon-shf: Unify ModelPicker with full provider system — fetches from /api/settings/available-models + /api/settings/openrouter/models, groups by provider, shows cost badges, passes effortLevels via onChange callback (commit: 19dfadc)
 - [x] panopticon-0ny: OpenRouter env overrides in conversation and agent launchers — added openrouter to ProviderName/PROVIDERS, getProviderForModel detects '/' in model ID, spawnConversationSession injects ANTHROPIC_BASE_URL+AUTH_TOKEN, agents.ts getProviderEnvForModel handles openrouter (commit: bbcb07b)
 - [x] panopticon-8bl: Cost tracking and usage display — ModelPicker shows FREE/$/1M for all models via costDisplay, OpenRouterModelBrowser shows emerald FREE badge and avg cost per 1M tokens (already complete as part of shf+565)
+- [x] panopticon-dz1: Quality gates pass — fixed pre-existing AgentRuntimeState.claudeSessionId missing field, ran bun install for workspace deps (commit: TBD)
 
 ## Remaining Work
-- [ ] panopticon-dz1: Quality gates: typecheck, lint, and test pass
+None
 
 ## Key Decisions
 - OpenRouter model IDs contain '/' (e.g., 'qwen/qwen3.6-plus:free') — used as heuristic in isOpenRouterModel()
