@@ -8,8 +8,8 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { join, resolve } from 'path';
 import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -43,14 +43,28 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     return { success: false, created: [], errors: ['bd (beads) CLI not found in PATH'], beadIds };
   }
 
-  // Ensure beads database is initialized — planning agents create the vBRIEF plan
-  // but don't run `bd init`, so the workspace may not have a .beads/ directory yet.
-  if (!existsSync(join(workspacePath, '.beads'))) {
-    try {
-      await execAsync('bd init', { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
-      console.log(`[beads] Initialized beads database in ${workspacePath}`);
-    } catch (initErr: any) {
-      return { success: false, created: [], errors: [`Failed to initialize beads: ${initErr.message}`], beadIds };
+  // Ensure beads is reachable from this workspace.
+  // Workspaces are git worktrees: only committed .beads files (issues.jsonl) are present.
+  // The .beads/redirect file — which points bd at the main repo's shared Dolt database —
+  // is gitignored and must be created explicitly if missing.
+  const beadsDir = join(workspacePath, '.beads');
+  const redirectPath = join(beadsDir, 'redirect');
+  if (!existsSync(redirectPath)) {
+    // Worktrees live at <projectRoot>/workspaces/feature-<id>/ — two levels up
+    const projectRoot = resolve(workspacePath, '..', '..');
+    const mainBeadsDir = join(projectRoot, '.beads');
+    if (existsSync(mainBeadsDir)) {
+      mkdirSync(beadsDir, { recursive: true });
+      writeFileSync(redirectPath, '../../.beads', 'utf-8');
+      console.log(`[beads] Created redirect to main repo .beads/ in ${workspacePath}`);
+    } else if (!existsSync(beadsDir)) {
+      // No main .beads/ and no local .beads/ — fall back to bd init
+      try {
+        await execAsync('bd init', { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
+        console.log(`[beads] Initialized beads database in ${workspacePath}`);
+      } catch (initErr: any) {
+        return { success: false, created: [], errors: [`Failed to initialize beads: ${initErr.message}`], beadIds };
+      }
     }
   }
 
