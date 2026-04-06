@@ -310,6 +310,53 @@ export const ShadowInferenceUpdateEvent = Schema.Struct({
 })
 export type ShadowInferenceUpdateEvent = typeof ShadowInferenceUpdateEvent.Type
 
+// ─── Workspace Lifecycle Events ───────────────────────────────────────────────
+
+/** New — workspace worktree created (before planning.started) */
+export const WorkspaceCreatedEvent = Schema.Struct({
+  type: Schema.Literal("workspace.created"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, workspacePath: Schema.String }),
+})
+export type WorkspaceCreatedEvent = typeof WorkspaceCreatedEvent.Type
+
+/** New — deep-wipe started (transitional state for UI spinner) */
+export const WorkspaceWipeStartedEvent = Schema.Struct({
+  type: Schema.Literal("workspace.wipe_started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type WorkspaceWipeStartedEvent = typeof WorkspaceWipeStartedEvent.Type
+
+/** New — deep-wipe completed, workspace fully destroyed */
+export const WorkspaceDestroyedEvent = Schema.Struct({
+  type: Schema.Literal("workspace.destroyed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type WorkspaceDestroyedEvent = typeof WorkspaceDestroyedEvent.Type
+
+/** New — cleanup-workspace completed, workspace directory removed */
+export const WorkspaceDeletedEvent = Schema.Struct({
+  type: Schema.Literal("workspace.deleted"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type WorkspaceDeletedEvent = typeof WorkspaceDeletedEvent.Type
+
+/** New — planning aborted, workspace returned to idle state */
+export const WorkspaceAbortedEvent = Schema.Struct({
+  type: Schema.Literal("workspace.aborted"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, sessionName: Schema.optional(Schema.String) }),
+})
+export type WorkspaceAbortedEvent = typeof WorkspaceAbortedEvent.Type
+
 // ─── Cost Events ──────────────────────────────────────────────────────────────
 
 /** New — cost event recorded in the store */
@@ -360,5 +407,10 @@ export const DomainEvent = Schema.Union([
   ActivityUpdatedEvent,
   ShadowInferenceUpdateEvent,
   CostEventRecordedEvent,
+  WorkspaceCreatedEvent,
+  WorkspaceWipeStartedEvent,
+  WorkspaceDestroyedEvent,
+  WorkspaceDeletedEvent,
+  WorkspaceAbortedEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type
