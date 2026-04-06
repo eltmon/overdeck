@@ -198,7 +198,8 @@ export function IssueAgentCard({
 
   const handleResume = (e: React.MouseEvent) => {
     e.stopPropagation();
-    resumeMutation.mutate(undefined);
+    // Open the workspace detail pane where the user can type a resume message
+    onSelect?.();
   };
 
   const toggleActivityExpanded = (e: React.MouseEvent) => {
