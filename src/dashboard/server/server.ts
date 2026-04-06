@@ -55,37 +55,29 @@ function isBunRuntime(): boolean {
 const HttpServerLive = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
-    if (isBunRuntime()) {
-      const BunHttpServer = yield* Effect.promise(
-        () => import('@effect/platform-bun/BunHttpServer'),
-      );
-      return BunHttpServer.layer({ port: config.port, hostname: config.host, idleTimeout: 120 });
-    } else {
-      const [NodeHttpServer, NodeHttp] = yield* Effect.all([
-        Effect.promise(() => import('@effect/platform-node/NodeHttpServer')),
-        Effect.promise(() => import('node:http')),
-      ]);
-      // Create the HTTP server externally so we can attach the raw WebSocket
-      // terminal handler BEFORE Effect takes over upgrade events.
-      const nodeServer = NodeHttp.createServer();
-      setupTerminalWebSocket(nodeServer);
-      return NodeHttpServer.layer(() => nodeServer, {
-        host: config.host,
-        port: config.port,
-      });
-    }
+    // Always use Node's http.createServer() so we can attach the raw WebSocket
+    // terminal handler via the 'upgrade' event BEFORE Effect registers its own
+    // upgrade listeners. Bun fully implements Node's http module, so this works
+    // in both runtimes. BunHttpServer.layer was used previously but it uses
+    // Bun.serve() which doesn't expose a raw upgrade event — that broke /ws/terminal.
+    const [NodeHttpServer, NodeHttp] = yield* Effect.all([
+      Effect.promise(() => import('@effect/platform-node/NodeHttpServer')),
+      Effect.promise(() => import('node:http')),
+    ]);
+    const nodeServer = NodeHttp.createServer();
+    setupTerminalWebSocket(nodeServer);
+    return NodeHttpServer.layer(() => nodeServer, {
+      host: config.host,
+      port: config.port,
+    });
   }),
 );
 
 const PlatformServicesLive = Layer.unwrap(
   Effect.gen(function* () {
-    if (isBunRuntime()) {
-      const { layer } = yield* Effect.promise(() => import('@effect/platform-bun/BunServices'));
-      return layer;
-    } else {
-      const { layer } = yield* Effect.promise(() => import('@effect/platform-node/NodeServices'));
-      return layer;
-    }
+    // Always use Node services — consistent with NodeHttpServer above.
+    const { layer } = yield* Effect.promise(() => import('@effect/platform-node/NodeServices'));
+    return layer;
   }),
 );
 
