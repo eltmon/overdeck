@@ -416,13 +416,13 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         const delay = getReconnectDelay(reconnectAttempts.current);
         reconnectAttempts.current += 1;
 
-        term!.writeln(`\r\n\x1b[33m● Connection lost. Reconnecting in ${delay / 1000}s (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...\x1b[0m`);
+        term!.writeln(`\r\n\x1b[33m● Connection lost — reconnecting to \x1b[1m${sessionName}\x1b[0m\x1b[33m in ${delay / 1000}s (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...\x1b[0m`);
 
         reconnectTimer.current = setTimeout(() => {
           connect();
         }, delay);
       } else {
-        term!.writeln('\r\n\x1b[31m● Connection lost after multiple attempts.\x1b[0m');
+        term!.writeln(`\r\n\x1b[31m● Could not reconnect to \x1b[1m${sessionName}\x1b[0m\x1b[31m after ${maxReconnectAttempts} attempts.\x1b[0m`);
         onDisconnectRef.current?.();
       }
     };
