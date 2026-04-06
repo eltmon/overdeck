@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send,
+  XCircle, RefreshCw, Square, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, AlertTriangle,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent } from '../../types';
@@ -66,6 +66,19 @@ export function ActionsSection({
   const [resumeMessage, setResumeMessage] = useState('');
   const isResume = !!agent && agent.status === 'stopped';
 
+  // Stuck merge detection: if mergeStatus has been 'merging' for > 2 min, enable retry (PAN-490)
+  const STUCK_MERGE_MS = 2 * 60 * 1000;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (reviewStatus?.mergeStatus !== 'merging') return;
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, [reviewStatus?.mergeStatus]);
+  const mergingElapsed = reviewStatus?.mergeStatus === 'merging' && reviewStatus.updatedAt
+    ? now - new Date(reviewStatus.updatedAt).getTime()
+    : 0;
+  const isMergeStuck = mergingElapsed > STUCK_MERGE_MS;
+
   if (reviewStatusLoading) {
     return (
       <div className="px-3 py-2 border-b border-pan-border" data-testid="workspace-actions">
@@ -112,11 +125,19 @@ export function ActionsSection({
           <button
             data-testid="merge-btn"
             onClick={onMerge}
-            disabled={mergeMutation.isPending || reviewStatus?.mergeStatus === 'merging'}
-            className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-500 disabled:opacity-50 font-medium"
+            disabled={mergeMutation.isPending || (reviewStatus?.mergeStatus === 'merging' && !isMergeStuck)}
+            className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-medium ${
+              isMergeStuck
+                ? 'bg-amber-600 text-white hover:bg-amber-500'
+                : 'bg-green-600 text-white hover:bg-green-500 disabled:opacity-50'
+            }`}
+            title={isMergeStuck ? 'Merge appears stuck — click to retry' : undefined}
           >
-            {(mergeMutation.isPending || reviewStatus?.mergeStatus === 'merging') ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
-            {reviewStatus?.mergeStatus === 'merging' ? 'MERGING...' : 'MERGE'}
+            {mergeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> :
+             isMergeStuck ? <AlertTriangle className="w-3 h-3" /> :
+             reviewStatus?.mergeStatus === 'merging' ? <Loader2 className="w-3 h-3 animate-spin" /> :
+             <CheckCircle className="w-3 h-3" />}
+            {isMergeStuck ? 'RETRY MERGE' : reviewStatus?.mergeStatus === 'merging' ? 'MERGING...' : 'MERGE'}
           </button>
         )}
         {reviewStatus?.mergeStatus === 'merged' && (
