@@ -565,9 +565,9 @@ const postSpecialistWakeRoute = HttpRouter.add(
       getSessionId,
       recordWake,
       isRunning,
-    } = await import('../../../lib/cloister/specialists.js');
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-    if (await isRunning(name as SpecialistType)) {
+    if (yield* Effect.promise(() => isRunning(name as SpecialistType))) {
       return jsonResponse(
         { error: `Specialist ${name} is already running` },
         { status: 400 },
@@ -599,10 +599,10 @@ const postSpecialistWakeRoute = HttpRouter.add(
         : `${specCmd.command} --dangerously-skip-permissions`;
 
     const cwd = homedir();
-    await execAsync(
+    yield* Effect.promise(() => execAsync(
       `tmux new-session -d -s "${tmuxSession}" -c "${cwd}" "${specCmdWithArgs} --resume ${useSessionId}"`,
       { encoding: 'utf-8' },
-    );
+    ));
 
     recordWake(name as SpecialistType, useSessionId!);
 
@@ -643,9 +643,9 @@ const postSpecialistResetRoute = HttpRouter.add(
       clearSessionId,
       isRunning,
       getTmuxSessionName,
-    } = await import('../../../lib/cloister/specialists.js');
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-    if (await isRunning(name as SpecialistType)) {
+    if (yield* Effect.promise(() => isRunning(name as SpecialistType))) {
       const tmuxSession = getTmuxSessionName(name as SpecialistType);
       return jsonResponse(
         {
@@ -679,8 +679,8 @@ const postSpecialistInitRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
 
-    const { initializeSpecialist } = await import('../../../lib/cloister/specialists.js');
-    const result = await initializeSpecialist(name as SpecialistType);
+    const { initializeSpecialist } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const result = yield* Effect.promise(() => initializeSpecialist(name as SpecialistType));
 
     if (!result.success) {
       return jsonResponse({ error: result.message }, { status: 400 });
@@ -727,7 +727,7 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
 
     // Write status to specialist's state directory
     const specialistDir = join(homedir(), '.panopticon', 'specialists', name);
-    await mkdir(specialistDir, { recursive: true });
+    yield* Effect.promise(() => mkdir(specialistDir, { recursive: true }));
 
     const statusFile = join(specialistDir, `${issueId}-status.json`);
     const statusData = {
@@ -738,13 +738,13 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
       timestamp: new Date().toISOString(),
     };
 
-    await writeFile(statusFile, JSON.stringify(statusData, null, 2));
+    yield* Effect.promise(() => writeFile(statusFile, JSON.stringify(statusData, null, 2)));
 
     console.log(`[specialists] ${name} reported status for ${issueId}: ${status}`);
 
     // When specialist reports completion (passed/blocked/failed), set state to idle
     if (['passed', 'blocked', 'failed'].includes(status)) {
-      const { getTmuxSessionName } = await import('../../../lib/cloister/specialists.js');
+      const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
       const tmuxSession = getTmuxSessionName(name as SpecialistType);
       saveAgentRuntimeState(tmuxSession, {
         state: 'idle',
@@ -780,7 +780,7 @@ const getSpecialistCostRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
 
-    const { getSessionId } = await import('../../../lib/cloister/specialists.js');
+    const { getSessionId } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const sessionId = getSessionId(name as SpecialistType);
 
     if (!sessionId) {
@@ -803,13 +803,13 @@ const getSpecialistCostRoute = HttpRouter.add(
     let detectedModel = '';
 
     if (existsSync(sessionsIndexPath)) {
-      const indexContent = JSON.parse(await readFile(sessionsIndexPath, 'utf-8'));
+      const indexContent = JSON.parse(yield* Effect.promise(() => readFile(sessionsIndexPath, 'utf-8')));
       const sessionEntry = indexContent.entries?.find(
         (e: { sessionId: string }) => e.sessionId === sessionId,
       );
 
       if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
-        const jsonlContent = await readFile(sessionEntry.fullPath, 'utf-8');
+        const jsonlContent = yield* Effect.promise(() => readFile(sessionEntry.fullPath, 'utf-8'));
         const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
 
         for (const line of lines) {
@@ -875,7 +875,7 @@ const getSpecialistQueueRoute = HttpRouter.add(
       );
     }
 
-    const { checkSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
+    const { checkSpecialistQueue } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const queue = checkSpecialistQueue(name as SpecialistType);
 
     return jsonResponse({
@@ -923,7 +923,7 @@ const postSpecialistQueueRoute = HttpRouter.add(
     }
 
     const { spawnEphemeralSpecialist, submitToSpecialistQueue } =
-      await import('../../../lib/cloister/specialists.js');
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
     const resolved = resolveProjectFromIssue(issueId);
     if (!resolved) {
@@ -933,12 +933,12 @@ const postSpecialistQueueRoute = HttpRouter.add(
       );
     }
 
-    const result = await spawnEphemeralSpecialist(resolved.projectKey, name as SpecialistType, {
+    const result = yield* Effect.promise(() => spawnEphemeralSpecialist(resolved.projectKey, name as SpecialistType, {
       issueId,
       workspace,
       branch,
       promptOverride: customPrompt,
-    });
+    }));
 
     if (!result.success && result.error === 'specialist_busy') {
       submitToSpecialistQueue(name as SpecialistType, {
@@ -980,7 +980,7 @@ const deleteSpecialistQueueItemRoute = HttpRouter.add(
       );
     }
 
-    const { completeSpecialistTask } = await import('../../../lib/cloister/specialists.js');
+    const { completeSpecialistTask } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const success = completeSpecialistTask(name as SpecialistType, itemId);
 
     if (!success) {
@@ -1022,7 +1022,7 @@ const putSpecialistQueueReorderRoute = HttpRouter.add(
       );
     }
 
-    const { reorderHookItems } = await import('../../../lib/hooks.js');
+    const { reorderHookItems } = yield* Effect.promise(() => import('../../../lib/hooks.js'));
     const success = reorderHookItems(name, itemIds as string[]);
 
     if (!success) {
@@ -1073,7 +1073,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
       wakeSpecialistWithTask,
       checkSpecialistQueue,
       submitToSpecialistQueue,
-    } = await import('../../../lib/cloister/specialists.js');
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
         const tmuxSession = getTmuxSessionName(name as SpecialistType);
 
@@ -1123,7 +1123,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 
             if (existsSync(workStateFile)) {
               try {
-                const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
+                const workState = JSON.parse(yield* Effect.promise(() => readFile(workStateFile, 'utf-8')));
                 workspace = workState.workspace;
                 branch = workState.branch || `feature/${issueId.toLowerCase()}`;
               } catch {}
@@ -1202,11 +1202,11 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 
         if (nextValidTask) {
           console.log(`[specialists] Waking ${name} for next task: ${nextValidTask.payload.issueId}`);
-          await wakeSpecialistWithTask(name as SpecialistType, {
+          yield* Effect.promise(() => wakeSpecialistWithTask(name as SpecialistType, {
             issueId: nextValidTask.payload.issueId!,
             workspace: nextValidTask.payload.context?.workspace,
             branch: nextValidTask.payload.context?.branch,
-          });
+          }));
           completeSpecialistTask(name as SpecialistType, nextValidTask.id);
         }
 
@@ -1242,8 +1242,8 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
       );
     }
 
-    const { getSpecialistStatus } = await import('../../../lib/cloister/specialists.js');
-    const status = await getSpecialistStatus(type, project);
+    const { getSpecialistStatus } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const status = yield* Effect.promise(() => getSpecialistStatus(type, project));
     return jsonResponse(status);
   })),
 );
@@ -1265,9 +1265,9 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       );
     }
 
-    const { getTmuxSessionName } = await import('../../../lib/cloister/specialists.js');
+    const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const tmuxSession = getTmuxSessionName(type, project);
-    await execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {});
+    yield* Effect.promise(() => execAsync(`tmux kill-session -t "${tmuxSession}"`).catch(() => {}));
     // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
@@ -1296,7 +1296,7 @@ const getProjectSpecialistQueueRoute = HttpRouter.add(
       );
     }
 
-    const { checkSpecialistQueue } = await import('../../../lib/cloister/specialists.js');
+    const { checkSpecialistQueue } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const queue = checkSpecialistQueue(type);
     return jsonResponse(queue);
   })),
@@ -1331,14 +1331,14 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
       );
     }
 
-    const { spawnEphemeralSpecialist } = await import('../../../lib/cloister/specialists.js');
-    const result = await spawnEphemeralSpecialist(project, type, {
+    const { spawnEphemeralSpecialist } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    const result = yield* Effect.promise(() => spawnEphemeralSpecialist(project, type, {
       issueId,
       branch,
       workspace,
       prUrl,
       context,
-    });
+    }));
 
     if (result.success) {
       return jsonResponse(result);
@@ -1371,7 +1371,7 @@ const getProjectSpecialistRunsRoute = HttpRouter.add(
       if (offsetParam) offset = parseInt(offsetParam, 10);
     }
 
-    const { listRunLogs } = await import('../../../lib/cloister/specialist-logs.js');
+    const { listRunLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
     const runs = listRunLogs(project, type, { limit, offset });
     return jsonResponse(runs);
   })),
@@ -1390,7 +1390,7 @@ const getProjectSpecialistRunStreamRoute = HttpRouter.add(
     const runId = params['runId'] as string;
 
     const { getRunLogPath, isRunLogActive } =
-      await import('../../../lib/cloister/specialist-logs.js');
+      yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
 
         const logPath = getRunLogPath(project, type, runId);
 
@@ -1483,7 +1483,7 @@ const getProjectSpecialistRunRoute = HttpRouter.add(
     const runId = params['runId'] as string;
 
     const { getRunLog, parseLogMetadata } =
-      await import('../../../lib/cloister/specialist-logs.js');
+      yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
     const content = getRunLog(project, type, runId);
 
     if (!content) {
@@ -1512,8 +1512,8 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
       );
     }
 
-    const { terminateSpecialist } = await import('../../../lib/cloister/specialists.js');
-    await terminateSpecialist(project, type);
+    const { terminateSpecialist } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+    yield* Effect.promise(() => terminateSpecialist(project, type));
     return jsonResponse({ success: true, message: 'Specialist terminated' });
   })),
 );
@@ -1535,7 +1535,7 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
       );
     }
 
-    const { pauseGracePeriod } = await import('../../../lib/cloister/specialists.js');
+    const { pauseGracePeriod } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const success = pauseGracePeriod(project, type);
 
     if (success) {
@@ -1566,7 +1566,7 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
       );
     }
 
-    const { resumeGracePeriod } = await import('../../../lib/cloister/specialists.js');
+    const { resumeGracePeriod } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const success = resumeGracePeriod(project, type);
 
     if (success) {
@@ -1597,7 +1597,7 @@ const postProjectSpecialistGraceExitRoute = HttpRouter.add(
       );
     }
 
-    const { exitGracePeriod } = await import('../../../lib/cloister/specialists.js');
+    const { exitGracePeriod } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     exitGracePeriod(project, type);
     return jsonResponse({
       success: true,
@@ -1623,7 +1623,7 @@ const getProjectSpecialistGraceRoute = HttpRouter.add(
       );
     }
 
-    const { getGracePeriodState } = await import('../../../lib/cloister/specialists.js');
+    const { getGracePeriodState } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     const state = getGracePeriodState(project, type);
 
     if (state) {
@@ -1645,7 +1645,7 @@ const getProjectSpecialistContextRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     const { loadContextDigest } =
-      await import('../../../lib/cloister/specialist-context.js');
+      yield* Effect.promise(() => import('../../../lib/cloister/specialist-context.js'));
     const digest = loadContextDigest(project, type);
 
     if (digest) {
@@ -1667,8 +1667,8 @@ const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
     const type = params['type'] as string;
 
     const { regenerateContextDigest } =
-      await import('../../../lib/cloister/specialist-context.js');
-    const digest = await regenerateContextDigest(project, type);
+      yield* Effect.promise(() => import('../../../lib/cloister/specialist-context.js'));
+    const digest = yield* Effect.promise(() => regenerateContextDigest(project, type));
 
     if (digest) {
       return jsonResponse({ digest, message: 'Context digest regenerated' });
@@ -1708,7 +1708,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
     }
 
     const { signalSpecialistCompletion } =
-      await import('../../../lib/cloister/specialists.js');
+      yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
     signalSpecialistCompletion(project, type, { status, notes });
     return jsonResponse({
       success: true,
@@ -1732,7 +1732,7 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
       return jsonResponse({ log: null, message: 'No runs found' });
     }
 
-    const files = (await readdir(runsDir))
+    const files = (yield* Effect.promise(() => readdir(runsDir)))
       .filter((f) => f.endsWith('.log'))
       .sort()
       .reverse();
@@ -1741,7 +1741,7 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
       return jsonResponse({ log: null, message: 'No run logs found' });
     }
 
-    const latestLog = await readFile(join(runsDir, files[0]), 'utf-8');
+    const latestLog = yield* Effect.promise(() => readFile(join(runsDir, files[0]), 'utf-8'));
     return jsonResponse({
       log: latestLog,
       file: files[0],
@@ -1760,8 +1760,8 @@ const postProjectSpecialistLogsCleanupRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    const { cleanupOldLogs } = await import('../../../lib/cloister/specialist-logs.js');
-    const { getSpecialistRetention } = await import('../../../lib/projects.js');
+    const { cleanupOldLogs } = yield* Effect.promise(() => import('../../../lib/cloister/specialist-logs.js'));
+    const { getSpecialistRetention } = yield* Effect.promise(() => import('../../../lib/projects.js'));
 
     const retention = getSpecialistRetention(project);
     const deleted = cleanupOldLogs(project, type, retention);
