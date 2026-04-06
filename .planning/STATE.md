@@ -1,6 +1,26 @@
 # PAN-475: Enforce PR-based workflow — require reviews before merge
 
-## Status: Planning Complete
+## Status: In Progress
+
+## Current Phase
+Implementing bead feature-pan-489-4fm (extend correctness reviewer to flag incomplete work patterns)
+
+## Completed Work
+- [x] feature-pan-489-52e: Replace local git merge with rebase + gh pr merge --squash in triggerMerge() + add spawnRebaseAgentForBranch() to merge-agent.ts (commit: 6e13d44)
+
+## Remaining Work
+- [ ] feature-pan-489-4fm: Extend correctness reviewer to flag incomplete work patterns
+- [ ] feature-pan-489-bcs: Update CONTRIBUTING.md and work-agent prompt for PR workflow
+- [ ] feature-pan-489-kn2: Create PR with rich description on work completion
+
+## Key Decisions
+- D1: triggerMerge() for local monorepo now: ensurePRExists → spawnRebaseAgentForBranch → gh pr merge --squash → postMergeLifecycle. No more local git merge.
+- D2: spawnRebaseAgentForBranch() added to merge-agent.ts — polls remote feature branch HEAD change to detect rebase completion
+- D3: Fixed broken onMergeComplete() calls (function didn't exist in merge-agent.ts) — replaced with postMergeLifecycle() calls in remote and polyrepo paths too
+- D4: ensurePRExists() updated to accept optional cwd and branchName params
+
+## Specialist Feedback
+(none yet)
 
 ## Problem
 
