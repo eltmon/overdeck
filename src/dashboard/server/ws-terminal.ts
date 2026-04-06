@@ -21,20 +21,9 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import { activePtyHubs, broadcastToHub, removeClientFromHub, type PtyHub } from './pty-hub.js';
 
 const execAsync = promisify(exec);
-
-/** A shared PTY hub: one PTY process serving multiple WebSocket clients. */
-interface PtyHub {
-  pty: pty.IPty;
-  clients: Set<WebSocket>;
-  /** Current PTY dimensions (set by first client, updated by any resize event). */
-  cols: number;
-  rows: number;
-}
-
-/** One hub per tmux session name. */
-const activePtyHubs = new Map<string, PtyHub>();
 
 /**
  * Install the raw WebSocket terminal handler on the given HTTP server.
@@ -178,21 +167,16 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
         ws.on('close', () => {
           console.log(`[ws-terminal] WebSocket closed for session: ${sessionName} (hub client removed)`);
-          existingHub.clients.delete(ws);
-          if (existingHub.clients.size === 0) {
+          const lastClient = removeClientFromHub(activePtyHubs, sessionName, ws);
+          if (lastClient) {
             console.log(`[ws-terminal] Last client disconnected for ${sessionName}, tearing down hub`);
-            activePtyHubs.delete(sessionName);
-            try { existingHub.pty.kill(); } catch { /* ignore */ }
+            // PTY (tmux attach) exits naturally when pipes close — no kill needed.
           }
         });
 
         ws.on('error', (err) => {
           console.error(`[ws-terminal] WebSocket error for ${sessionName}:`, err);
-          existingHub.clients.delete(ws);
-          if (existingHub.clients.size === 0) {
-            activePtyHubs.delete(sessionName);
-            try { existingHub.pty.kill(); } catch { /* ignore */ }
-          }
+          removeClientFromHub(activePtyHubs, sessionName, ws);
         });
 
         return; // Done — joined existing hub
@@ -251,11 +235,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         // Broadcast PTY data to ALL connected clients
         ptyProcess.onData((data) => {
           if (!forwarding) return;
-          for (const client of hub.clients) {
-            if (client.readyState === WebSocket.OPEN) {
-              client.send(data);
-            }
-          }
+          broadcastToHub(hub, data);
         });
 
         // After 200ms: start forwarding, then force full repaint via dimension toggle.
@@ -347,20 +327,16 @@ export function setupTerminalWebSocket(server: http.Server): void {
       // Clean up on WebSocket close
       ws.on('close', () => {
         console.log(`[ws-terminal] WebSocket closed for session: ${sessionName}`);
-        hub.clients.delete(ws);
-        if (hub.clients.size === 0) {
+        const lastClient = removeClientFromHub(activePtyHubs, sessionName, ws);
+        if (lastClient) {
           console.log(`[ws-terminal] Last client disconnected for ${sessionName}, tearing down hub`);
-          activePtyHubs.delete(sessionName);
-          // The PTY (tmux attach) will exit naturally when pipes close — don't kill it forcibly.
+          // PTY (tmux attach) exits naturally when pipes close — no kill needed.
         }
       });
 
       ws.on('error', (err) => {
         console.error(`[ws-terminal] WebSocket error for ${sessionName}:`, err);
-        hub.clients.delete(ws);
-        if (hub.clients.size === 0) {
-          activePtyHubs.delete(sessionName);
-        }
+        removeClientFromHub(activePtyHubs, sessionName, ws);
       });
     })();
   });
