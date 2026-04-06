@@ -50,7 +50,7 @@ describe('resolveWalDir', () => {
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     const dir = resolveWalDir('PAN-335');
-    expect(dir).toBe('/repos/panopticon/.panopticon/events');
+    expect(dir).toBe('/repos/panopticon/.pan/events');
   });
 
   it('uses events_repo when configured', async () => {
@@ -59,7 +59,7 @@ describe('resolveWalDir', () => {
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     const dir = resolveWalDir('PAN-335');
-    expect(dir).toBe('/shared/pan-events/.panopticon/events');
+    expect(dir).toBe('/shared/pan-events/.pan/events');
   });
 
   it('uses events_path when configured', async () => {
@@ -118,7 +118,7 @@ describe('appendToWal', () => {
     const result = appendToWal(event);
 
     expect(result).toBe(true);
-    const walFile = join(tmpDir, '.panopticon/events/PAN-335.jsonl');
+    const walFile = join(tmpDir, '.pan/events/PAN-335.jsonl');
     expect(existsSync(walFile)).toBe(true);
 
     const line = readFileSync(walFile, 'utf-8').trim();
@@ -142,7 +142,7 @@ describe('appendToWal', () => {
     appendToWal(makeCostEvent({ requestId: 'req-1' }));
     appendToWal(makeCostEvent({ requestId: 'req-2' }));
 
-    const walFile = join(tmpDir, '.panopticon/events/PAN-335.jsonl');
+    const walFile = join(tmpDir, '.pan/events/PAN-335.jsonl');
     const lines = readFileSync(walFile, 'utf-8').trim().split('\n').filter(Boolean);
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0]).requestId).toBe('req-1');
@@ -309,8 +309,8 @@ describe('syncWalFromAllProjects', () => {
     // Set up two project repos with events
     const repo1 = join(tmpDir, 'repo1');
     const repo2 = join(tmpDir, 'repo2');
-    const eventsDir1 = join(repo1, '.panopticon/events');
-    const eventsDir2 = join(repo2, '.panopticon/events');
+    const eventsDir1 = join(repo1, '.pan/events');
+    const eventsDir2 = join(repo2, '.pan/events');
     mkdirSync(eventsDir1, { recursive: true });
     mkdirSync(eventsDir2, { recursive: true });
 
@@ -334,7 +334,7 @@ describe('syncWalFromAllProjects', () => {
 
   it('collects non-fatal errors without throwing', async () => {
     const repo1 = join(tmpDir, 'repo1');
-    const eventsDir1 = join(repo1, '.panopticon/events');
+    const eventsDir1 = join(repo1, '.pan/events');
     mkdirSync(eventsDir1, { recursive: true });
     writeFileSync(join(eventsDir1, 'PAN-1.jsonl'), JSON.stringify(makeCostEvent()) + '\n');
 

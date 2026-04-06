@@ -13,6 +13,7 @@ import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/config-migration.js';
 import { migratePanopticonToPan } from '../../lib/workspace-manager.js';
+import { runMultiToolSync } from '../../lib/multi-tool-sync.js';
 
 // Get path to bundled git hooks
 const __filename = fileURLToPath(import.meta.url);
@@ -279,10 +280,12 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
 
-  // Migrate .panopticon/ → .pan/ in all registered projects
+  // Migrate .panopticon/ → .pan/ and run multi-tool sync in all registered projects
   const projects = listProjects();
   for (const { config } of projects) {
     if (!existsSync(config.path)) continue;
+
+    // Migrate .panopticon/ subdirs → .pan/
     const migResult = migratePanopticonToPan(config.path);
     if (migResult.migrated.length > 0) {
       console.log(chalk.cyan(`Migrated .panopticon/ → .pan/ in ${config.name}: ${migResult.migrated.join(', ')}`));
@@ -292,6 +295,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
     for (const err of migResult.errors) {
       console.log(chalk.red(`Migration error in ${config.name}: ${err}`));
+    }
+
+    // Multi-tool skill sync (cursor, codex, windsurf, cline, copilot, aider)
+    const toolSyncResults = runMultiToolSync(config.path);
+    for (const r of toolSyncResults) {
+      if (r.written.length > 0) {
+        console.log(chalk.cyan(`Synced ${r.written.length} skill(s) to ${r.tool} in ${config.name}`));
+      }
+      for (const err of r.errors) {
+        console.log(chalk.red(`Multi-tool sync error (${r.tool}) in ${config.name}: ${err}`));
+      }
     }
   }
 
