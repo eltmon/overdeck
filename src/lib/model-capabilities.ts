@@ -70,7 +70,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi';
+  provider: 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'openrouter';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */

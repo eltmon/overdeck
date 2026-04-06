@@ -84,6 +84,7 @@ export interface ApiSettingsConfig {
       google: boolean;
       zai: boolean;
       kimi: boolean;
+      openrouter: boolean;
     };
     overrides: Partial<Record<WorkTypeId, ModelId>>;
     gemini_thinking_level?: number;
@@ -93,6 +94,10 @@ export interface ApiSettingsConfig {
     google?: string;
     zai?: string;
     kimi?: string;
+    openrouter?: string;
+  };
+  openrouter?: {
+    favorites?: string[];
   };
   tracker_keys?: {
     linear?: string;
@@ -131,11 +136,15 @@ export function loadSettingsApi(): ApiSettingsConfig {
         google: config.enabledProviders.has('google'),
         zai: config.enabledProviders.has('zai'),
         kimi: config.enabledProviders.has('kimi'),
+        openrouter: config.enabledProviders.has('openrouter'),
       },
       overrides: config.overrides,
       gemini_thinking_level: config.geminiThinkingLevel,
     },
     api_keys: config.apiKeys,
+    openrouter: {
+      favorites: config.openrouterFavorites,
+    },
     tracker_keys: config.trackerKeys,
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
@@ -154,11 +163,13 @@ export function saveSettingsApi(settings: ApiSettingsConfig): void {
         google: settings.models.providers.google,
         zai: settings.models.providers.zai,
         kimi: settings.models.providers.kimi,
+        openrouter: settings.models.providers.openrouter,
       },
       overrides: settings.models.overrides,
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
     },
     api_keys: settings.api_keys,
+    openrouter: settings.openrouter,
     tracker_keys: settings.tracker_keys,
   };
 
@@ -195,6 +206,10 @@ export function updateSettingsApi(updates: Partial<ApiSettingsConfig>): ApiSetti
     api_keys: {
       ...current.api_keys,
       ...updates.api_keys,
+    },
+    openrouter: {
+      ...current.openrouter,
+      ...updates.openrouter,
     },
     tracker_keys: {
       ...current.tracker_keys,
@@ -278,6 +293,7 @@ export function getAvailableModelsApi(): {
   google: Array<{ id: ModelId; name: string }>;
   zai: Array<{ id: ModelId; name: string }>;
   kimi: Array<{ id: ModelId; name: string }>;
+  openrouter: Array<{ id: ModelId; name: string }>;
 } {
   const result: {
     anthropic: Array<{ id: ModelId; name: string }>;
@@ -285,12 +301,14 @@ export function getAvailableModelsApi(): {
     google: Array<{ id: ModelId; name: string }>;
     zai: Array<{ id: ModelId; name: string }>;
     kimi: Array<{ id: ModelId; name: string }>;
+    openrouter: Array<{ id: ModelId; name: string }>;
   } = {
     anthropic: [],
     openai: [],
     google: [],
     zai: [],
     kimi: [],
+    openrouter: [],
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
@@ -311,6 +329,9 @@ export function getAvailableModelsApi(): {
       case 'kimi':
         result.kimi.push(entry);
         break;
+      case 'openrouter':
+        result.openrouter.push(entry);
+        break;
     }
   }
 
@@ -329,6 +350,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         google: false,
         zai: false,
         kimi: true, // Kimi K2.5 used for implementation work agent
+        openrouter: false,
       },
       overrides: getOptimalModelDefaults(),
       gemini_thinking_level: 3,
